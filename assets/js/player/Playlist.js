@@ -37,6 +37,9 @@ export class Playlist {
         // Keyboard Shortcuts
         this._initKeyboardShortcuts();
 
+        // Setup player navigation
+        this._setupPlayerNavigation();
+
         // Load saved playlist
         this._loadSavedPlaylist();
     }
@@ -109,6 +112,46 @@ export class Playlist {
     }
 
     /**
+     * Setup player navigation callbacks
+     * @private
+     */
+    _setupPlayerNavigation() {
+        if (this.player && typeof this.player.setNavigationCallbacks === 'function') {
+            this.player.setNavigationCallbacks(
+                () => this.playPrevious(),
+                () => this.playNext()
+            );
+            this._updatePlayerNavigationState();
+        }
+    }
+
+    /**
+     * Check if can go to previous video
+     * @private
+     */
+    _canGoPrevious() {
+        return this.activeIndex > 0 && this.items.length > 0;
+    }
+
+    /**
+     * Check if can go to next video
+     * @private
+     */
+    _canGoNext() {
+        return this.activeIndex >= 0 && this.activeIndex < this.items.length - 1;
+    }
+
+    /**
+     * Update player navigation button states
+     * @private
+     */
+    _updatePlayerNavigationState() {
+        if (this.player && typeof this.player.updateNavigationButtons === 'function') {
+            this.player.updateNavigationButtons(this._canGoPrevious(), this._canGoNext());
+        }
+    }
+
+    /**
      * Play previous video
      */
     playPrevious() {
@@ -141,6 +184,7 @@ export class Playlist {
                         this.player.seek(state.time || 0);
                     }
                     this._updateUI();
+                    this._updatePlayerNavigationState();
                 }
             }
         }
@@ -225,6 +269,7 @@ export class Playlist {
         this.items.push(video);
         this._saveState();
         this.render();
+        this._updatePlayerNavigationState();
     }
 
     /**
@@ -235,6 +280,7 @@ export class Playlist {
         this.items = [...this.items, ...videos];
         this._saveState();
         this.render();
+        this._updatePlayerNavigationState();
     }
 
     /**
@@ -268,6 +314,7 @@ export class Playlist {
         this.items.splice(index, 1);
         this._saveState();
         this.render();
+        this._updatePlayerNavigationState();
     }
 
     /**
@@ -281,6 +328,7 @@ export class Playlist {
             // this.player.mediaElement.src = '';
             this.storage.clear();
             this.render();
+            this._updatePlayerNavigationState();
         }
     }
 
@@ -318,6 +366,7 @@ export class Playlist {
         // Update UI
         this._updateUI();
         this._saveState();
+        this._updatePlayerNavigationState();
 
         // Auto play if not the first load (optional logic)
         this.player.play();

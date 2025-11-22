@@ -60,6 +60,8 @@ export class CorePlayer {
         this.ui = {
             controls: null,
             playBtn: null,
+            prevBtn: null,
+            nextBtn: null,
             progressBar: null,
             progressContainer: null,
             timeDisplay: null,
@@ -72,6 +74,10 @@ export class CorePlayer {
             audioBtn: null,
             audioMenu: null
         };
+
+        // Navigation callbacks
+        this.onPrevious = null;
+        this.onNext = null;
 
         this._init();
     }
@@ -105,6 +111,16 @@ export class CorePlayer {
      * @private
      */
     _createHelpOverlay() {
+        const navigationSection = this.config.mode === 'player' ? `
+            <div class="mediabunny-help-section">
+                <h3>Navigation</h3>
+                <ul>
+                    <li><span class="key">Shift</span> + <span class="key">N</span> Next Video</li>
+                    <li><span class="key">Shift</span> + <span class="key">P</span> Previous Video</li>
+                </ul>
+            </div>
+        ` : '';
+
         const editorSection = this.config.mode === 'editor' ? `
             <div class="mediabunny-help-section">
                 <h3>Editor</h3>
@@ -140,6 +156,7 @@ export class CorePlayer {
                                 <li><span class="key">?</span> Toggle Help</li>
                             </ul>
                         </div>
+                        ${navigationSection}
                         ${editorSection}
                     </div>
                     <button class="mediabunny-close-help">Close</button>
@@ -268,6 +285,12 @@ export class CorePlayer {
                         <button class="mediabunny-btn" id="mb-play-btn" aria-label="Play" aria-pressed="false">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                         </button>
+                        <button class="mediabunny-btn" id="mb-prev-btn" aria-label="Previous Video" disabled>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                        </button>
+                        <button class="mediabunny-btn" id="mb-next-btn" aria-label="Next Video" disabled>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                        </button>
                         <div class="mediabunny-time" id="mb-time-display">0:00 / 0:00</div>
                     </div>
                     
@@ -317,6 +340,8 @@ export class CorePlayer {
         // Cache elements
         this.ui.controls = this.container.querySelector('.mediabunny-controls');
         this.ui.playBtn = this.container.querySelector('#mb-play-btn');
+        this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');
+        this.ui.nextBtn = this.container.querySelector('#mb-next-btn');
         this.ui.progressContainer = this.container.querySelector('.mediabunny-progress-container');
         this.ui.progressBar = this.container.querySelector('.mediabunny-progress-bar');
         this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
@@ -339,6 +364,18 @@ export class CorePlayer {
         // Play/Pause
         this.ui.playBtn.addEventListener('click', () => this.togglePlay());
         this.canvas.addEventListener('click', () => this.togglePlay());
+
+        // Navigation
+        this.ui.prevBtn.addEventListener('click', () => {
+            if (!this.ui.prevBtn.disabled && this.onPrevious) {
+                this.onPrevious();
+            }
+        });
+        this.ui.nextBtn.addEventListener('click', () => {
+            if (!this.ui.nextBtn.disabled && this.onNext) {
+                this.onNext();
+            }
+        });
 
         // Seek
         this.ui.progressContainer.addEventListener('click', (e) => this._seek(e));
@@ -597,6 +634,24 @@ export class CorePlayer {
                 e.preventDefault();
                 if (this.screenshotManager) {
                     this.screenshotManager.capture();
+                }
+                break;
+
+            // Navigation (Player Mode)
+            case 'n':
+                if (e.shiftKey && this.config.mode === 'player') {
+                    e.preventDefault();
+                    if (!this.ui.nextBtn.disabled && this.onNext) {
+                        this.onNext();
+                    }
+                }
+                break;
+            case 'p':
+                if (e.shiftKey && this.config.mode === 'player') {
+                    e.preventDefault();
+                    if (!this.ui.prevBtn.disabled && this.onPrevious) {
+                        this.onPrevious();
+                    }
                 }
                 break;
 
@@ -1117,6 +1172,34 @@ export class CorePlayer {
             this.ui.muteBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
         } else {
             this.ui.muteBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+        }
+    }
+
+    /**
+     * Set navigation callbacks for playlist integration
+     * @param {Function} onPrevious - Callback for previous video
+     * @param {Function} onNext - Callback for next video
+     */
+    setNavigationCallbacks(onPrevious, onNext) {
+        this.onPrevious = onPrevious;
+        this.onNext = onNext;
+    }
+
+    /**
+     * Update navigation button states
+     * @param {boolean} canGoPrev - Whether previous navigation is available
+     * @param {boolean} canGoNext - Whether next navigation is available
+     */
+    updateNavigationButtons(canGoPrev, canGoNext) {
+        if (this.ui.prevBtn) {
+            this.ui.prevBtn.disabled = !canGoPrev;
+            this.ui.prevBtn.style.opacity = canGoPrev ? '1' : '0.4';
+            this.ui.prevBtn.style.cursor = canGoPrev ? 'pointer' : 'not-allowed';
+        }
+        if (this.ui.nextBtn) {
+            this.ui.nextBtn.disabled = !canGoNext;
+            this.ui.nextBtn.style.opacity = canGoNext ? '1' : '0.4';
+            this.ui.nextBtn.style.cursor = canGoNext ? 'pointer' : 'not-allowed';
         }
     }
 
