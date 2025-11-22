@@ -250,7 +250,8 @@ export class Playlist {
             duration: 'Local File', // We'd need to load metadata to get real duration
             thumbnail: '', // No thumbnail for local files yet
             isLocal: true,
-            needsReload: false
+            needsReload: false,
+            file: file // Store reference to original file for downloads
         }));
 
         this.addItems(newItems);
@@ -396,12 +397,22 @@ export class Playlist {
         elements.forEach(el => {
             // Click to play
             el.addEventListener('click', (e) => {
-                // Ignore if clicking remove button
-                if (e.target.closest('.playlist-remove-btn')) return;
+                // Ignore if clicking action buttons
+                if (e.target.closest('.playlist-remove-btn') || e.target.closest('.playlist-download-btn')) return;
 
                 const index = parseInt(el.dataset.index);
                 this.selectItem(index);
             });
+
+            // Download button
+            const downloadBtn = el.querySelector('.playlist-download-btn');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(el.dataset.index);
+                    this._downloadItem(index);
+                });
+            }
 
             // Remove button
             const removeBtn = el.querySelector('.playlist-remove-btn');
@@ -434,6 +445,110 @@ export class Playlist {
     }
 
     /**
+     * Sanitize filename for download
+     * @param {string} filename - Original filename
+     * @returns {string} Sanitized filename
+     * @private
+     */
+    _sanitizeFilename(filename) {
+        // Remove invalid filename characters
+        let sanitized = filename.replace(/[<>:"/\\|?*]/g, '_');
+
+        // Ensure we have a file extension
+        if (!sanitized.match(/\.\w+$/)) {
+            // Try to get extension from URL or default to .mp4
+            sanitized += '.mp4';
+        }
+
+        return sanitized;
+    }
+
+    /**
+     * Download a video from the playlist
+     * @param {number} index - Index of video to download
+     * @private
+     */
+    async _downloadItem(index) {
+        if (index < 0 || index >= this.items.length) return;
+
+        const item = this.items[index];
+        const downloadBtn = this.container.querySelector(`[data-index="${index}"] .playlist-download-btn`);
+
+        try {
+            // Determine filename
+            let filename = item.title || 'video';
+
+            // If the item has a File object (local upload), try to get original filename
+            if (item.file && item.file.name) {
+                filename = item.file.name;
+            }
+
+            // Sanitize filename
+            filename = this._sanitizeFilename(filename);
+
+            let downloadUrl = item.url;
+            let blobUrl = null;
+
+            // Check if URL is a blob URL or a remote URL
+            const isBlobUrl = item.url.startsWith('blob:');
+
+            if (!isBlobUrl) {
+                // For remote URLs, fetch as blob to enable proper download
+                // Show loading state
+                if (downloadBtn) {
+                    downloadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity="0.3"/><path d="M12 2 A10 10 0 0 1 22 12" stroke="currentColor" stroke-width="2" fill="none"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></path></svg>';
+                    downloadBtn.style.opacity = '1';
+                }
+
+                console.log(`Fetching remote file: ${item.url}`);
+
+                const response = await fetch(item.url);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch file: ${response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                blobUrl = URL.createObjectURL(blob);
+                downloadUrl = blobUrl;
+                downloadBtn.style.opacity = "";
+            }
+
+            // Create temporary anchor element
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            a.style.display = 'none';
+
+            // Append to body, click, and remove
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            // Clean up blob URL if we created one
+            if (blobUrl) {
+                // Delay cleanup to ensure download starts
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+            }
+
+            console.log(`Downloading: ${filename}`);
+
+            // Restore download button icon
+            if (downloadBtn) {
+                downloadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/></svg>';
+            }
+
+        } catch (error) {
+            console.error('Download failed:', error);
+            alert(`Failed to download video: ${error.message}\n\nThis may be due to CORS restrictions on the remote server.`);
+
+            // Restore download button icon on error
+            if (downloadBtn) {
+                downloadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/></svg>';
+            }
+        }
+    }
+
+    /**
      * Create HTML for a playlist item
      * @private
      */
@@ -454,9 +569,14 @@ export class Playlist {
                     <div class="playlist-title" title="${item.title}">${item.title} <span style="color: var(--error-color); font-size: 0.7em;">${statusText}</span></div>
                     <div class="playlist-duration">${item.duration || '--:--'}</div>
                 </div>
-                <button class="playlist-remove-btn" title="Remove">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                </button>
+                <div class="playlist-actions">
+                    <button class="playlist-download-btn" title="Download video">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/></svg>
+                    </button>
+                    <button class="playlist-remove-btn" title="Remove">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                    </button>
+                </div>
             </div>
         `;
     }

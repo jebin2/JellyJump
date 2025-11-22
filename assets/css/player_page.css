@@ -226,3 +226,31 @@
 .playlist-remove-btn:hover {
     color: var(--error-color, #ff4444);
 }
+
+/* Action buttons container */
+.playlist-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.playlist-download-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease, color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playlist-item:hover .playlist-download-btn {
+    opacity: 1;
+}
+
+.playlist-download-btn:hover {
+    color: var(--accent-primary);
+}
