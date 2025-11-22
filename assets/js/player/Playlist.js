@@ -18,6 +18,11 @@ export class Playlist {
 
         // Drag and Drop Events
         this._attachDragEvents();
+
+        // Auto-play Next
+        this.player.mediaElement.addEventListener('ended', () => {
+            this.playNext();
+        });
     }
 
     /**
@@ -100,6 +105,63 @@ export class Playlist {
     }
 
     /**
+     * Remove a video from the playlist
+     * @param {number} index 
+     */
+    removeItem(index) {
+        if (index < 0 || index >= this.items.length) return;
+
+        // If removing the currently playing item
+        if (index === this.activeIndex) {
+            // Try to play next, or stop if it was the last one
+            if (this.items.length > 1) {
+                if (index < this.items.length - 1) {
+                    this.selectItem(index + 1);
+                    this.activeIndex--; // Adjust because we're about to splice
+                } else {
+                    this.selectItem(index - 1);
+                }
+            } else {
+                // List will be empty
+                this.player.pause();
+                this.player.mediaElement.src = '';
+                this.activeIndex = -1;
+            }
+        } else if (index < this.activeIndex) {
+            // If removing an item before current, adjust active index
+            this.activeIndex--;
+        }
+
+        this.items.splice(index, 1);
+        this.render();
+    }
+
+    /**
+     * Clear the playlist
+     */
+    clear() {
+        if (confirm('Are you sure you want to clear the playlist?')) {
+            this.items = [];
+            this.activeIndex = -1;
+            this.player.pause();
+            this.player.mediaElement.src = '';
+            this.render();
+        }
+    }
+
+    /**
+     * Play the next video in the playlist
+     */
+    playNext() {
+        if (this.activeIndex < this.items.length - 1) {
+            this.selectItem(this.activeIndex + 1);
+        } else {
+            // Loop to start? Or stop? Let's stop for now.
+            console.log('Playlist ended');
+        }
+    }
+
+    /**
      * Select and play a video by index
      * @param {number} index 
      */
@@ -141,10 +203,24 @@ export class Playlist {
         // Attach event listeners
         const elements = this.container.querySelectorAll('.playlist-item');
         elements.forEach(el => {
-            el.addEventListener('click', () => {
+            // Click to play
+            el.addEventListener('click', (e) => {
+                // Ignore if clicking remove button
+                if (e.target.closest('.playlist-remove-btn')) return;
+
                 const index = parseInt(el.dataset.index);
                 this.selectItem(index);
             });
+
+            // Remove button
+            const removeBtn = el.querySelector('.playlist-remove-btn');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(el.dataset.index);
+                    this.removeItem(index);
+                });
+            }
         });
 
         this._updateUI();
@@ -184,6 +260,9 @@ export class Playlist {
                     <div class="playlist-title" title="${item.title}">${item.title}</div>
                     <div class="playlist-duration">${item.duration || '--:--'}</div>
                 </div>
+                <button class="playlist-remove-btn" title="Remove">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
             </div>
         `;
     }

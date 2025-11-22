@@ -154,3 +154,24 @@
     color: var(--text-secondary);
     font-family: var(--font-mono);
 }
+
+.playlist-remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease, color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playlist-item:hover .playlist-remove-btn {
+    opacity: 1;
+}
+
+.playlist-remove-btn:hover {
+    color: var(--error-color, #ff4444);
+}

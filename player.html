@@ -25,7 +25,10 @@
             <header class="playlist-header">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2 class="text-xl font-bold">PLAYLIST</h2>
-                    <button class="btn btn-sm">Add +</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm btn-secondary" id="clear-btn">Clear</button>
+                        <button class="btn btn-sm" id="add-btn">Add +</button>
+                    </div>
                 </div>
             </header>
             <div class="playlist-content">
@@ -54,7 +57,8 @@
         const playlist = new Playlist(playlistContainer, player);
 
         // File Upload Handling
-        const addBtn = document.querySelector('.btn-sm'); // Assuming it's the only one for now, or add ID
+        const addBtn = document.getElementById('add-btn');
+        const clearBtn = document.getElementById('clear-btn');
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.multiple = true;
@@ -63,6 +67,7 @@
         document.body.appendChild(fileInput);
 
         addBtn.addEventListener('click', () => fileInput.click());
+        clearBtn.addEventListener('click', () => playlist.clear());
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
