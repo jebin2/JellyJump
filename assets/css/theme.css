@@ -322,7 +322,7 @@ body {
   gap: var(--space-lg);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 640px) {
 
   .grid-2,
   .grid-3 {
@@ -347,6 +347,7 @@ body {
   transition: all var(--transition-fast) var(--ease-standard);
   border-radius: var(--radius-none);
   text-decoration: none;
+  min-height: 44px;
 }
 
 /* Primary Button */

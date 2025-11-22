@@ -1,0 +1,261 @@
+/* =========================================
+   MediaBunny Player Styles
+   Phase: 10
+   ========================================= */
+
+.mediabunny-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.mediabunny-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* -----------------------------------------
+   Control Bar
+   ----------------------------------------- */
+.mediabunny-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(10, 10, 10, 0.9);
+    border-top: 2px solid var(--accent-primary);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+}
+
+.mediabunny-container:hover .mediabunny-controls,
+.mediabunny-controls.visible {
+    opacity: 1;
+}
+
+/* -----------------------------------------
+   Progress Bar
+   ----------------------------------------- */
+.mediabunny-progress-container {
+    width: 100%;
+    height: 8px;
+    background-color: var(--bg-tertiary);
+    cursor: pointer;
+    position: relative;
+}
+
+.mediabunny-progress-bar {
+    height: 100%;
+    background-color: var(--accent-primary);
+    width: 0%;
+    position: relative;
+}
+
+.mediabunny-progress-bar::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    background-color: #fff;
+    border: 2px solid var(--accent-primary);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.mediabunny-progress-container:hover .mediabunny-progress-bar::after {
+    opacity: 1;
+}
+
+/* -----------------------------------------
+   Buttons & Inputs
+   ----------------------------------------- */
+.mediabunny-controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.mediabunny-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 16px;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.mediabunny-btn:hover {
+    color: var(--accent-primary);
+}
+
+.mediabunny-time {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-left: 10px;
+}
+
+.mediabunny-volume-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mediabunny-volume-slider {
+    width: 80px;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-tertiary);
+    outline: none;
+    cursor: pointer;
+}
+
+.mediabunny-volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--accent-primary);
+    cursor: pointer;
+    border: 2px solid #fff;
+}
+
+/* -----------------------------------------
+   Menus & Popups
+   ----------------------------------------- */
+.mediabunny-menu-btn {
+    position: relative;
+}
+
+.mediabunny-menu {
+    position: absolute;
+    bottom: 50px;
+    right: 0;
+    background-color: rgba(10, 10, 10, 0.95);
+    border: 2px solid var(--accent-primary);
+    padding: 5px 0;
+    min-width: 150px;
+    display: none;
+    flex-direction: column;
+    z-index: 20;
+    box-shadow: var(--shadow-md) var(--accent-primary);
+}
+
+.mediabunny-menu.visible {
+    display: flex;
+}
+
+.mediabunny-menu-item {
+    padding: 8px 15px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mediabunny-menu-item:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-primary);
+}
+
+.mediabunny-menu-item.active {
+    color: var(--accent-primary);
+    font-weight: bold;
+}
+
+.mediabunny-btn.active {
+    color: var(--accent-primary);
+}
+
+/* -----------------------------------------
+   Accessibility & Focus
+   ----------------------------------------- */
+.mediabunny-btn:focus-visible,
+.mediabunny-volume-slider:focus-visible,
+.mediabunny-progress-container:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+/* -----------------------------------------
+   Loading State
+   ----------------------------------------- */
+.mediabunny-loader {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 48px;
+    height: 48px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--accent-primary);
+    animation: spin 1s ease-in-out infinite;
+    display: none;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.mediabunny-loader.visible {
+    display: block;
+}
+
+@keyframes spin {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+/* -----------------------------------------
+   Responsive Design
+   ----------------------------------------- */
+@media (max-width: 768px) {
+    .mediabunny-time {
+        font-size: 10px;
+    }
+
+    .mediabunny-volume-slider {
+        width: 60px;
+    }
+}
+
+@media (max-width: 640px) {
+    .mediabunny-volume-container {
+        gap: 5px;
+    }
+
+    .mediabunny-volume-slider {
+        display: none;
+        /* Hide volume slider on mobile, rely on device buttons */
+    }
+
+    .mediabunny-btn {
+        padding: 8px;
+        /* Larger touch targets */
+    }
+}

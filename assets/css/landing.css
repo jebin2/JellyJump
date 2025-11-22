@@ -139,6 +139,7 @@
 
 .feature-link {
     margin-top: auto;
+    padding: var(--space-sm) 0;
     font-family: var(--font-mono);
     font-weight: var(--font-bold);
     color: var(--accent-primary);

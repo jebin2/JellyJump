@@ -5,12 +5,108 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MediaBunny - Player</title>
+
+    <!-- CSS -->
     <link rel="stylesheet" href="assets/css/theme.css">
+    <link rel="stylesheet" href="assets/css/player.css">
+    <link rel="stylesheet" href="assets/css/player_page.css">
 </head>
 
 <body>
-    <h1>MediaBunny Player</h1>
-    <p>Video playback interface.</p>
+
+    <div class="player-layout">
+        <!-- Video Section -->
+        <main class="video-section" id="player-container">
+            <!-- Core Player will be injected here -->
+        </main>
+
+        <!-- Playlist Section -->
+        <aside class="playlist-section">
+            <header class="playlist-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="text-xl font-bold">PLAYLIST</h2>
+                    <button class="btn btn-sm">Add +</button>
+                </div>
+            </header>
+            <div class="playlist-content">
+                <div class="playlist-placeholder">
+                    <p>No videos in playlist.</p>
+                    <p class="text-sm mt-2">Drag & drop files here.</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import { CorePlayer } from './assets/js/core/Player.js';
+        import { Playlist } from './assets/js/player/Playlist.js';
+
+        // Initialize Player
+        const player = new CorePlayer('player-container', {
+            autoplay: false,
+            muted: false,
+            mode: 'player'
+        });
+
+        // Initialize Playlist
+        const playlistContainer = document.querySelector('.playlist-content');
+        const playlist = new Playlist(playlistContainer, player);
+
+        // File Upload Handling
+        const addBtn = document.querySelector('.btn-sm'); // Assuming it's the only one for now, or add ID
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.multiple = true;
+        fileInput.accept = 'video/*';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+
+        addBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                playlist.handleFiles(e.target.files);
+                // Reset input so same files can be selected again if needed
+                fileInput.value = '';
+            }
+        });
+
+        // Sample Data
+        const sampleVideos = [
+            {
+                title: "Big Buck Bunny",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                duration: "9:56",
+                thumbnail: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/320px-Big_buck_bunny_poster_big.jpg"
+            },
+            {
+                title: "Elephant Dream",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+                duration: "10:53",
+                thumbnail: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/ElephantsDreamPoster.jpg/320px-ElephantsDreamPoster.jpg"
+            },
+            {
+                title: "For Bigger Blazes",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                duration: "0:15",
+                thumbnail: "" // Test placeholder
+            },
+            {
+                title: "For Bigger Escapes",
+                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+                duration: "0:15",
+                thumbnail: ""
+            }
+        ];
+
+        // Load samples
+        playlist.addItems(sampleVideos);
+
+        // Select first item
+        playlist.selectItem(0);
+    </script>
+
 </body>
 
 </html>
