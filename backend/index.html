@@ -622,7 +622,7 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:7860/api';
+        const API_URL = '/api';
         let selectedFile = null;
 
         // Upload zone interactions
@@ -794,8 +794,8 @@
         // Refresh button
         document.getElementById('refreshBtn').addEventListener('click', loadFiles);
 
-        // Auto-refresh every 3 seconds
-        setInterval(loadFiles, 3000);
+        // Auto-refresh every 10 minutes
+        setInterval(loadFiles, 1000 * 60 * 10);
 
         // Show notification
         function showNotification(message, type = 'success') {
