@@ -3,8 +3,10 @@
 ## Global Phase Numbers: 26-32
 
 ### [Phase 26: Editor Layout](phase26-editor-layout.md)
-- Three-section layout with preview,timeline, library
-- **Done when**: Layout renders, core player in editor mode
+- Multi-tab project management with browser-style tabs
+- Three-panel layout: media library (20%), preview/canvas (50%), properties (30%)
+- Enhanced preview controls with time/duration display
+- **Done when**: Layout renders with multi-tab UI, core player integrated
 
 ### [Phase 27: Editor Timeline](phase27-editor-timeline.md)
 - Timeline UI with tracks and playhead
@@ -19,12 +21,15 @@
 - **Done when**: Can add transitions and effects
 
 ### [Phase 30: Editor Export](phase30-editor-export.md)
-- MediaBunny Conversion API for video export
-- **Done when**: Can export to MP4/WebM using MediaBunny
+- Multiple export options: video download, save to library, JSON export
+- MediaBunny Conversion API for video rendering
+- **Done when**: All three export options work, JSON includes project name
 
 ### [Phase 31: Editor Project](phase31-editor-project.md)
-- Save/load editing projects
-- **Done when**: Projects persist, auto-save works
+- JSON import/export for reusable templates
+- Multi-tab persistence with localStorage
+- Save/load editing projects with auto-save
+- **Done when**: Import/export works, multi-tab persistence functional
 
 ### [Phase 32: Editor Polish](phase32-editor-polish.md)
 - Performance optimization, keyboard shortcuts, UX
@@ -47,4 +52,4 @@ The editor page uses MediaBunny for ALL video processing (NO FFmpeg.wasm). **Con
 - **Quality control**: Video encoding config, bitrate, subjective qualities
 
 **Dependencies**: Phases 01-04 (Theme), 09-14 (Core)  
-**Global Phases**: 26-32 | **Time**: 6-8 hours
+**Global Phases**: 26-32 | **Time**: 6.5-8.5 hours
