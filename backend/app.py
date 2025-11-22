@@ -118,7 +118,7 @@ def worker_loop():
                     print(f"📄 Caption preview: {caption[:100]}...")
                     
                     # Update database with success
-                    update_status(file_id, 'completed', caption=caption)
+                    update_status(file_id, 'completed', caption=json.dumps(result))
                     
                     # Delete the audio file after successful processing
                     if os.path.exists(filepath):

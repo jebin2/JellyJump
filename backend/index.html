@@ -723,8 +723,7 @@
                         <td><span class="status status-${file.status}">${file.status.replace('_', ' ')}</span></td>
                         <td class="caption-cell">
                             ${file.caption ? 
-                                `<span>${captionPreview}</span>
-                                <button class="btn btn-small btn-secondary" onclick='showCaption(${JSON.stringify(file.caption)})' style="margin-left: 0.5rem;">Show</button>` 
+                                `<button class="btn btn-small btn-secondary" onclick='showCaption(${JSON.stringify(file.caption)})' style="margin-left: 0.5rem;">Show</button>` 
                                 : '—'}
                         </td>
                         <td>${new Date(file.created_at).toLocaleString()}</td>
