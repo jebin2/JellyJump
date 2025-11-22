@@ -28,6 +28,60 @@
 - **Player (15-20)**: Video player page
 - **Editor (21-27)**: Video editor page
 
+## Re-Implementing a Phase (Incremental Updates)
+
+**Scenario**: You're asked to implement a phase that may already be partially or fully implemented, OR phase requirements have been updated.
+
+**Smart Implementation Workflow**:
+
+### Step 1: Check Existing Implementation
+Before writing any code, **analyze what already exists**:
+
+1. **Scan the codebase** for files related to this phase
+2. **Review existing features** against the phase requirements
+3. **Identify the delta**: What's in the phase file but NOT in the code?
+
+### Step 2: Determine Action
+Based on your analysis:
+
+- **Scenario A: Nothing exists** → Implement the full phase from scratch
+- **Scenario B: Partially exists** → Implement ONLY the missing features
+- **Scenario C: Fully exists** → Verify it matches requirements, make minor fixes if needed
+- **Scenario D: Requirements updated** → Add new features, update existing ones minimally
+
+### Step 3: Incremental Implementation
+**Do NOT overwrite working code**. Instead:
+
+✅ **Preserve existing working features**  
+✅ **Add only new requirements**  
+✅ **Update existing code only if requirements changed**  
+✅ **Maintain compatibility with rest of codebase**
+
+### Step 4: Verify Against Testing Checklist
+After implementation:
+- ✅ **Old features still work** (regression check)
+- ✅ **New features implemented** (from updated requirements)
+- ✅ **All tests pass** (from phase Testing Checklist)
+
+### Example: Re-running Phase 10 (Core Structure)
+
+**Situation**: Phase 10 requirements were updated to add playback speed control.
+
+**Your Response**:
+1. "Checking existing Phase 10 implementation..."
+2. "Found: Play/pause, seek bar, volume control, time display ✅"
+3. "Missing: Playback speed control ❌"
+4. "Action: Adding playback speed control only, preserving existing code"
+5. Implement ONLY the playback speed feature
+6. Verify old features still work
+
+**Anti-Pattern** ❌:
+- Rewriting the entire player from scratch
+- Deleting working code and starting over
+- Ignoring what's already implemented
+
 ## Your First Task
 
 Please ask me: "Which phase should I implement first?" (The answer will usually be Phase 01).
+
+**OR** if re-implementing: "Checking existing implementation for Phase [XX]..."
