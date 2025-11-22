@@ -171,20 +171,36 @@
             transition: all 0.2s ease;
             box-shadow: 4px 4px 0 var(--bg);
             letter-spacing: 1px;
+            position: relative;
         }
 
-        .btn:hover {
+        .btn:hover:not(:disabled) {
             transform: translate(-2px, -2px);
             box-shadow: 6px 6px 0 var(--bg);
         }
 
-        .btn:active {
+        .btn:active:not(:disabled) {
             transform: translate(2px, 2px);
             box-shadow: 2px 2px 0 var(--bg);
         }
 
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .btn-secondary {
             background: var(--accent);
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            box-shadow: 3px 3px 0 var(--bg);
+        }
+
+        .btn-small:hover:not(:disabled) {
+            box-shadow: 4px 4px 0 var(--bg);
         }
 
         .table-section {
@@ -234,7 +250,6 @@
 
         tbody tr:hover {
             background: rgba(0, 255, 136, 0.1);
-            transform: translateX(5px);
         }
 
         td {
@@ -283,15 +298,10 @@
         }
 
         .caption-cell {
-            max-width: 400px;
+            max-width: 200px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-        }
-
-        .caption-cell:hover {
-            white-space: normal;
-            cursor: pointer;
         }
 
         .empty-state {
@@ -325,6 +335,170 @@
             box-shadow: 6px 6px 0 var(--bg);
         }
 
+        /* Loader styles */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 39, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 6px solid var(--surface);
+            border-top: 6px solid var(--primary);
+            border-right: 6px solid var(--accent);
+            border-bottom: 6px solid var(--secondary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            position: absolute;
+            margin-top: 120px;
+            font-size: 1.2rem;
+            font-weight: 900;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 39, 0.95);
+            z-index: 2000;
+            animation: fadeIn 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            border: var(--border) solid var(--primary);
+            box-shadow: 12px 12px 0 var(--primary);
+            padding: 2rem;
+            max-width: 800px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            animation: modalSlideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .modal-close {
+            background: var(--error);
+            color: var(--text);
+            border: 3px solid var(--bg);
+            width: 40px;
+            height: 40px;
+            border-radius: 0;
+            cursor: pointer;
+            font-size: 1.5rem;
+            font-weight: 900;
+            transition: all 0.2s ease;
+            box-shadow: 3px 3px 0 var(--bg);
+        }
+
+        .modal-close:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 var(--bg);
+        }
+
+        .code-block {
+            background: var(--bg);
+            border: 3px solid var(--accent);
+            padding: 1.5rem;
+            border-radius: 0;
+            overflow-x: auto;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .code-block code {
+            font-family: 'Courier New', monospace;
+            color: var(--primary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--accent);
+            color: var(--bg);
+            border: 3px solid var(--bg);
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 3px 3px 0 var(--bg);
+        }
+
+        .copy-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 var(--bg);
+        }
+
+        .copy-btn.copied {
+            background: var(--primary);
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
@@ -340,7 +514,11 @@
             }
 
             .caption-cell {
-                max-width: 200px;
+                max-width: 100px;
+            }
+
+            .modal-content {
+                padding: 1.5rem;
             }
         }
 
@@ -421,13 +599,37 @@
 
     <button class="refresh-btn" id="refreshBtn" title="Refresh">🔄</button>
 
+    <!-- Loader -->
+    <div class="loader-overlay" id="loader" style="display: none;">
+        <div>
+            <div class="loader"></div>
+            <div class="loader-text">Uploading...</div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="captionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">📄 Caption Details</div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCaption()">📋 Copy</button>
+                <code id="captionCode"></code>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const API_URL = '/api';
+        const API_URL = 'http://localhost:7860/api';
         let selectedFile = null;
 
         // Upload zone interactions
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('audioFile');
+        const loader = document.getElementById('loader');
+        const uploadBtn = document.getElementById('uploadBtn');
 
         uploadZone.addEventListener('click', () => fileInput.click());
 
@@ -459,7 +661,7 @@
         });
 
         // Upload button
-        document.getElementById('uploadBtn').addEventListener('click', async () => {
+        uploadBtn.addEventListener('click', async () => {
             if (!selectedFile) {
                 showNotification('Please select a file first!', 'error');
                 return;
@@ -467,6 +669,10 @@
 
             const formData = new FormData();
             formData.append('audio', selectedFile);
+
+            // Show loader
+            loader.style.display = 'flex';
+            uploadBtn.disabled = true;
 
             try {
                 const response = await fetch(`${API_URL}/upload`, {
@@ -486,6 +692,10 @@
                 }
             } catch (error) {
                 showNotification('Network error: ' + error.message, 'error');
+            } finally {
+                // Hide loader
+                loader.style.display = 'none';
+                uploadBtn.disabled = false;
             }
         });
 
@@ -502,25 +712,90 @@
                     return;
                 }
                 
-                tbody.innerHTML = files.map(file => `
+                tbody.innerHTML = files.map(file => {
+                    const captionPreview = file.caption ? 
+                        (file.caption.length > 50 ? file.caption.substring(0, 50) + '...' : file.caption) : 
+                        '—';
+                    
+                    return `
                     <tr>
                         <td><strong>${file.filename}</strong></td>
                         <td><span class="status status-${file.status}">${file.status.replace('_', ' ')}</span></td>
-                        <td class="caption-cell" title="${file.caption || 'N/A'}">${file.caption || '—'}</td>
+                        <td class="caption-cell">
+                            ${file.caption ? 
+                                `<span>${captionPreview}</span>
+                                <button class="btn btn-small btn-secondary" onclick='showCaption(${JSON.stringify(file.caption)})' style="margin-left: 0.5rem;">Show</button>` 
+                                : '—'}
+                        </td>
                         <td>${new Date(file.created_at).toLocaleString()}</td>
                         <td>${file.processed_at ? new Date(file.processed_at).toLocaleString() : '—'}</td>
                     </tr>
-                `).join('');
+                `;
+                }).join('');
             } catch (error) {
                 console.error('Error loading files:', error);
             }
         }
 
+        // Modal functions
+        function showCaption(caption) {
+            const modal = document.getElementById('captionModal');
+            const codeBlock = document.getElementById('captionCode');
+            
+            // Parse JSON if it's a string
+            let formattedCaption = caption;
+            try {
+                const parsed = JSON.parse(caption);
+                formattedCaption = JSON.stringify(parsed, null, 2);
+            } catch (e) {
+                // If not JSON, use as is
+                formattedCaption = caption;
+            }
+            
+            codeBlock.textContent = formattedCaption;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('captionModal');
+            modal.classList.remove('active');
+        }
+
+        function copyCaption() {
+            const codeBlock = document.getElementById('captionCode');
+            const copyBtn = event.target;
+            
+            navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✓ Copied!';
+                copyBtn.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        // Close modal on background click
+        document.getElementById('captionModal').addEventListener('click', (e) => {
+            if (e.target.id === 'captionModal') {
+                closeModal();
+            }
+        });
+
+        // Close modal on ESC key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
         // Refresh button
         document.getElementById('refreshBtn').addEventListener('click', loadFiles);
 
-        // Auto-refresh every 10 mins
-        setInterval(loadFiles, 1000 * 60 * 10);
+        // Auto-refresh every 3 seconds
+        setInterval(loadFiles, 3000);
 
         // Show notification
         function showNotification(message, type = 'success') {
