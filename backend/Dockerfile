@@ -25,10 +25,5 @@ RUN mkdir -p uploads temp_dir
 # Expose port
 EXPOSE 7860
 
-# Create a startup script
-RUN echo '#!/bin/bash\n\
-python worker.py &\n\
-python app.py' > /app/start.sh && chmod +x /app/start.sh
-
-# Run the application
-CMD ["/app/start.sh"]
+# Run only the Flask app (worker starts automatically on first upload)
+CMD ["python", "app.py"]

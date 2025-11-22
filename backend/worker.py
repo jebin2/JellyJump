@@ -9,12 +9,12 @@ from datetime import datetime
 CWD = "./"
 PYTHON_PATH = "stt-transcribe"
 STT_MODEL_NAME = "fasterwhispher"
-POLL_INTERVAL = 5  # seconds
+POLL_INTERVAL = 3  # seconds
 
 def process_audio(file_id, filepath):
     """Process audio file using STT and return the transcription"""
     try:
-        print(f"Processing file: {filepath}")
+        print(f"🔄 Running STT on: {os.path.abspath(filepath)}")
         
         # Run STT command
         command = f"""cd {CWD} && {PYTHON_PATH} --input {shlex.quote(os.path.abspath(filepath))} --model {STT_MODEL_NAME}"""
@@ -44,7 +44,7 @@ def process_audio(file_id, filepath):
         return caption, None
         
     except Exception as e:
-        print(f"Error processing file {file_id}: {str(e)}")
+        print(f"❌ Error processing file {file_id}: {str(e)}")
         return None, str(e)
 
 def update_status(file_id, status, caption=None, error=None):
@@ -70,7 +70,8 @@ def update_status(file_id, status, caption=None, error=None):
 
 def worker_loop():
     """Main worker loop that processes audio files"""
-    print("STT Worker started. Polling for new audio files...")
+    print("🤖 STT Worker started. Monitoring for new audio files...")
+    print("🗑️  Audio files will be deleted after successful processing\n")
     
     while True:
         try:
@@ -91,8 +92,8 @@ def worker_loop():
                 filename = row['filename']
                 
                 print(f"\n{'='*60}")
-                print(f"Processing: {filename}")
-                print(f"ID: {file_id}")
+                print(f"🎵 Processing: {filename}")
+                print(f"📝 ID: {file_id}")
                 print(f"{'='*60}")
                 
                 # Update status to processing
@@ -102,24 +103,36 @@ def worker_loop():
                 caption, error = process_audio(file_id, filepath)
                 
                 if caption:
-                    print(f"✓ Successfully processed: {filename}")
-                    print(f"Caption: {caption[:100]}...")
+                    print(f"✅ Successfully processed: {filename}")
+                    print(f"📄 Caption preview: {caption[:100]}...")
                     update_status(file_id, 'completed', caption=caption)
+                    
+                    # Delete the audio file after successful processing
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                        print(f"🗑️  Deleted audio file: {filepath}")
                 else:
-                    print(f"✗ Failed to process: {filename}")
+                    print(f"❌ Failed to process: {filename}")
                     print(f"Error: {error}")
                     update_status(file_id, 'failed', error=error)
+                    # Don't delete file on failure (for debugging)
             else:
                 # No files to process, sleep for a bit
                 time.sleep(POLL_INTERVAL)
                 
         except Exception as e:
-            print(f"Worker error: {str(e)}")
+            print(f"⚠️  Worker error: {str(e)}")
             time.sleep(POLL_INTERVAL)
 
 if __name__ == '__main__':
     # Initialize database if it doesn't exist
     if not os.path.exists('audio_captions.db'):
-        print("Database not found. Please run app.py first to initialize.")
+        print("❌ Database not found. Please run app.py first to initialize.")
     else:
+        print("\n" + "="*60)
+        print("🚀 Starting STT Worker (Standalone Mode)")
+        print("="*60)
+        print("⚠️  Note: Worker is now embedded in app.py")
+        print("⚠️  This standalone mode is for testing/debugging only")
+        print("="*60 + "\n")
         worker_loop()
