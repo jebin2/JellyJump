@@ -22,10 +22,9 @@ export class Playlist {
         // Drag and Drop Events
         this._attachDragEvents();
 
-        // Auto-play Next
-        this.player.mediaElement.addEventListener('ended', () => {
-            this.playNext();
-        });
+        // Note: Auto-play next would require CorePlayer to emit a custom event
+        // when video ends. For now, this is not implemented.
+        // TODO: Add player.on('ended', () => this.playNext()) if CorePlayer supports events
 
         // Save state on pause or unload
         window.addEventListener('beforeunload', () => {
@@ -150,7 +149,7 @@ export class Playlist {
      */
     _saveState() {
         this.storage.savePlaylist(this.items);
-        this.storage.savePlaybackState(this.activeIndex, this.player.mediaElement.currentTime);
+        this.storage.savePlaybackState(this.activeIndex, this.player.currentTime || 0);
     }
 
     /**

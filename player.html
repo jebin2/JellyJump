@@ -121,6 +121,34 @@
             playlist.addItems(sampleVideos);
             playlist.selectItem(0);
         }
+
+        // Mobile Playlist Toggle
+        const playlistToggle = document.getElementById('playlist-toggle');
+        const playlistSection = document.querySelector('.playlist-section');
+        const playlistOverlay = document.getElementById('playlist-overlay');
+
+        function updatePlaylistToggle() {
+            if (window.innerWidth <= 768) {
+                playlistToggle.style.display = 'block';
+            } else {
+                playlistToggle.style.display = 'none';
+                playlistSection.classList.remove('open');
+                playlistOverlay.classList.remove('visible');
+            }
+        }
+
+        updatePlaylistToggle();
+        window.addEventListener('resize', updatePlaylistToggle);
+
+        playlistToggle.addEventListener('click', () => {
+            playlistSection.classList.toggle('open');
+            playlistOverlay.classList.toggle('visible');
+        });
+
+        playlistOverlay.addEventListener('click', () => {
+            playlistSection.classList.remove('open');
+            playlistOverlay.classList.remove('visible');
+        });
     </script>
 
 </body>
