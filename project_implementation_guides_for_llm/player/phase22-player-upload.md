@@ -1,4 +1,4 @@
-# Phase 17: Player Upload
+# Phase 22: Player Upload
 
 ## Goal
 Implement file upload button and drag-and-drop zone for adding videos to playlist.
@@ -82,5 +82,5 @@ Implement file upload button and drag-and-drop zone for adding videos to playlis
 ✅ Ready for next phase
 
 ---
-**Phase**: 17 | **Component**: Player
+**Phase**: 22 | **Component**: Player
 **Estimated Time**: 40-60 minutes

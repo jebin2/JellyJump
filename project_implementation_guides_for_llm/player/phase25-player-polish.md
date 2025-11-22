@@ -1,4 +1,4 @@
-# Phase 20: Player Polish
+# Phase 25: Player Polish
 
 ## Goal
 Add responsive mobile drawer, keyboard shortcuts, and MediaBunny performance optimizations
@@ -87,5 +87,5 @@ Add responsive mobile drawer, keyboard shortcuts, and MediaBunny performance opt
 ✅ Player component complete
 
 ---
-**Phase**: 20 | **Component**: Player
+**Phase**: 25 | **Component**: Player
 **Estimated Time**: 40-60 minutes

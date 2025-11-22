@@ -1,4 +1,4 @@
-# Phase 23: Editor Editing
+# Phase 28: Editor Editing
 
 ## Goal
 Implement clip trimming, splitting, and rearranging using MediaBunny Conversion API
@@ -86,5 +86,5 @@ Implement clip trimming, splitting, and rearranging using MediaBunny Conversion 
 ✅ Ready for next phase
 
 ---
-**Phase**: 23 | **Component**: Editor
+**Phase**: 28 | **Component**: Editor
 **Estimated Time**: 50-70 minutes

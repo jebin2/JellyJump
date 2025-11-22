@@ -1,7 +1,9 @@
 # Phase 11: Core Media Features
 
 ## Goal
-Add subtitle support, audio track switching, and quality selection.
+Add subtitle support, audio track switching, and quality selection with controller UI integration.
+
+**Note**: This phase includes both backend media handling AND controller UI for subtitles and audio tracks.
 
 ## Features to Implement
 
@@ -40,17 +42,33 @@ Add subtitle support, audio track switching, and quality selection.
 - Switch tracks without interrupting playback
 - Close menu after selection
 
+### Feature 3b: SRT/VTT File Upload Button
+**Purpose**: Allow users to upload external subtitle files
+
+**Requirements**:
+- Upload button near subtitle toggle in controller
+- Icon: 📄 or "Add Captions"
+- Opens file picker for .srt or .vtt files
+- Loads selected file using Feature 1's loading system
+- Adds uploaded subtitle as new track
+- Auto-enable newly uploaded subtitle
+- Show feedback when subtitle loaded successfully
+- Apply theme button styling
+
 ### Feature 4: Audio Track Switching
-**Purpose**: Switch between audio tracks using MediaBunny
+**Purpose**: Switch between audio tracks using MediaBunny with controller UI
 
 **Requirements**:
 - **Consult**: mediabunny-llms-full.md for audio track detection and switching
+- **Audio track button/icon in controller** (🔊 or "Audio")
 - Detect available audio tracks using MediaBunny track API
-- Menu showing all audio track options
-- Label tracks by language or descriptive name
+- Dropdown menu showing all audio track options
+- Label tracks by language or descriptive name (e.g., "English", "Spanish")
 - Switch tracks seamlessly during playback using MediaBunny methods
-- Indicate currently active audio track
-- Only show if multiple audio tracks available
+- Highlight/check currently active audio track in menu
+- Only show button if multiple audio tracks available (hide for single track)
+- Close menu after selection
+- Apply theme styling to button and dropdown
 - **Reference**: Reading track metadata and input formats in mediabunny-llms-full.md
 
 ### Feature 5: Quality Selector

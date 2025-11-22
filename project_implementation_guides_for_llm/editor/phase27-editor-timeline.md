@@ -1,4 +1,4 @@
-# Phase 22: Editor Timeline
+# Phase 27: Editor Timeline
 
 ## Goal
 Build multi-track timeline with playhead, ruler, and track management using MediaBunny
@@ -85,5 +85,5 @@ Build multi-track timeline with playhead, ruler, and track management using Medi
 ✅ Ready for next phase
 
 ---
-**Phase**: 22 | **Component**: Editor
+**Phase**: 27 | **Component**: Editor
 **Estimated Time**: 40-60 minutes

@@ -4,6 +4,8 @@
 
 **Objective**: Verify and audit the MediaBunnyPlayer implementation to ensure all phases are correctly implemented, coding standards are followed, and quality is maintained.
 
+**Total Phases**: 32 (updated with new player features)
+
 ## Your Responsibilities
 
 1. **Phase Completion Verification** - Check which phases are implemented
@@ -19,7 +21,7 @@
 
 ### Step 1: Phase Completion Check
 
-**Action**: Verify implementation status for all 27 phases
+**Action**: Verify implementation status for all 32 phases
 
 For each phase group, check:
 
@@ -61,7 +63,7 @@ For each phase group, check:
 - All controls functional
 - Keyboard shortcuts work (Space, J/L, arrows, etc.)
 
-#### Player Page (Phases 15-20)
+#### Player Page (Phases 15-25)
 - [ ] **Phase 15**: 70/30 layout with core player embedded
 - [ ] **Phase 16**: Playlist UI with video items
 - [ ] **Phase 17**: File upload + drag-and-drop using MediaBunny Input/BlobSource
@@ -75,7 +77,7 @@ For each phase group, check:
 - Playlist displays metadata (duration, title)
 - Persistence works across page reloads
 
-#### Editor Page (Phases 21-27)
+#### Editor Page (Phases 26-32)
 - [ ] **Phase 21**: Three-section layout (preview + timeline + library)
 - [ ] **Phase 22**: Timeline with EncodedPacketSink/VideoSampleSink
 - [ ] **Phase 23**: Trimming using MediaBunny Conversion API
@@ -277,7 +279,7 @@ After your audit, provide a report in this format:
 
 ## Executive Summary
 - **Total Phases**: 27
-- **Implemented**: [X/27]
+- **Implemented**: [X/32]
 - **In Progress**: [List phases]
 - **Not Started**: [List phases]
 - **Overall Status**: [Ready for Production / Needs Work / Early Stage]

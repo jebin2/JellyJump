@@ -1,4 +1,4 @@
-# Phase 24: Editor Effects
+# Phase 29: Editor Effects
 
 ## Goal
 Apply transitions and filters using MediaBunny's video processing capabilities
@@ -84,5 +84,5 @@ Apply transitions and filters using MediaBunny's video processing capabilities
 ✅ Ready for next phase
 
 ---
-**Phase**: 24 | **Component**: Editor
+**Phase**: 29 | **Component**: Editor
 **Estimated Time**: 50-70 minutes
