@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Caption Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0a0e27;
+            --surface: #141b3d;
+            --primary: #00ff88;
+            --secondary: #ff00ff;
+            --accent: #00d4ff;
+            --error: #ff1744;
+            --text: #ffffff;
+            --border: 4px;
+        }
+
+        body {
+            font-family: 'Space Grotesk', 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(0, 255, 136, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(0, 212, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: slideDown 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 50%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: uppercase;
+            letter-spacing: -2px;
+            margin-bottom: 1rem;
+            position: relative;
+            display: inline-block;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 6px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--accent);
+            letter-spacing: 2px;
+        }
+
+        .upload-section {
+            background: var(--surface);
+            border: var(--border) solid var(--primary);
+            box-shadow: 8px 8px 0 var(--primary);
+            padding: 2rem;
+            margin-bottom: 3rem;
+            position: relative;
+            transition: all 0.3s ease;
+            animation: slideUp 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.2s both;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .upload-section:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 12px 12px 0 var(--primary);
+        }
+
+        .upload-zone {
+            border: 3px dashed var(--accent);
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .upload-zone:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: var(--primary);
+        }
+
+        .upload-zone.dragging {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: var(--primary);
+            transform: scale(1.02);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: var(--bg);
+            border: var(--border) solid var(--bg);
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 4px 4px 0 var(--bg);
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0 var(--bg);
+        }
+
+        .btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 var(--bg);
+        }
+
+        .btn-secondary {
+            background: var(--accent);
+        }
+
+        .table-section {
+            animation: slideUp 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.4s both;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            background: var(--surface);
+            border: var(--border) solid var(--secondary);
+            box-shadow: 8px 8px 0 var(--secondary);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+        }
+
+        th {
+            padding: 1.5rem 1rem;
+            text-align: left;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--bg);
+            border-right: 3px solid var(--bg);
+        }
+
+        th:last-child {
+            border-right: none;
+        }
+
+        tbody tr {
+            border-bottom: 2px solid rgba(0, 212, 255, 0.2);
+            transition: all 0.3s ease;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        tbody tr:hover {
+            background: rgba(0, 255, 136, 0.1);
+            transform: translateX(5px);
+        }
+
+        td {
+            padding: 1.5rem 1rem;
+            color: var(--text);
+        }
+
+        .status {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border: 3px solid;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        .status-not_started {
+            background: var(--bg);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .status-processing {
+            background: var(--bg);
+            border-color: var(--primary);
+            color: var(--primary);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .status-completed {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: var(--bg);
+        }
+
+        .status-failed {
+            background: var(--error);
+            border-color: var(--error);
+            color: var(--text);
+        }
+
+        .caption-cell {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .caption-cell:hover {
+            white-space: normal;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--accent);
+            font-size: 1.2rem;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--secondary);
+            border: var(--border) solid var(--bg);
+            box-shadow: 4px 4px 0 var(--bg);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            z-index: 1000;
+        }
+
+        .refresh-btn:hover {
+            transform: rotate(180deg) scale(1.1);
+            box-shadow: 6px 6px 0 var(--bg);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .upload-section, .table-wrapper {
+                box-shadow: 4px 4px 0 var(--primary);
+            }
+
+            th, td {
+                padding: 1rem 0.5rem;
+                font-size: 0.9rem;
+            }
+
+            .caption-cell {
+                max-width: 200px;
+            }
+        }
+
+        .notification {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            padding: 1.5rem 2rem;
+            background: var(--primary);
+            color: var(--bg);
+            border: var(--border) solid var(--bg);
+            box-shadow: 6px 6px 0 var(--bg);
+            font-weight: 900;
+            z-index: 2000;
+            animation: slideInRight 0.5s ease, slideOutRight 0.5s ease 3.5s;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Audio Caption Generator</h1>
+            <p class="subtitle">Transcribe • Process • Analyze</p>
+        </header>
+
+        <div class="upload-section">
+            <h2 style="margin-bottom: 1.5rem; color: var(--primary);">Upload Audio File</h2>
+            <div class="upload-zone" id="uploadZone">
+                <p style="font-size: 1.2rem; margin-bottom: 1rem;">📁 Drop audio file here or click to browse</p>
+                <p style="color: var(--accent); font-size: 0.9rem;">Supported: WAV, MP3, FLAC, OGG, M4A, AAC</p>
+                <input type="file" id="audioFile" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac">
+            </div>
+            <button class="btn" id="uploadBtn" style="margin-top: 1.5rem; width: 100%;">
+                🚀 Upload & Process
+            </button>
+        </div>
+
+        <div class="table-section">
+            <h2 style="margin-bottom: 1.5rem; color: var(--secondary);">Processing Queue</h2>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Filename</th>
+                            <th>Status</th>
+                            <th>Caption</th>
+                            <th>Created</th>
+                            <th>Processed</th>
+                        </tr>
+                    </thead>
+                    <tbody id="filesTable">
+                        <tr>
+                            <td colspan="5" class="empty-state">No files uploaded yet. Start by uploading an audio file!</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" id="refreshBtn" title="Refresh">🔄</button>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        let selectedFile = null;
+
+        // Upload zone interactions
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('audioFile');
+
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragging');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragging');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragging');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                fileInput.files = e.dataTransfer.files;
+                selectedFile = file;
+                showNotification(`Selected: ${file.name}`);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                showNotification(`Selected: ${selectedFile.name}`);
+            }
+        });
+
+        // Upload button
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
+            if (!selectedFile) {
+                showNotification('Please select a file first!', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('audio', selectedFile);
+
+            try {
+                const response = await fetch(`${API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showNotification('File uploaded successfully! 🎉');
+                    selectedFile = null;
+                    fileInput.value = '';
+                    loadFiles();
+                } else {
+                    showNotification(data.error || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                showNotification('Network error: ' + error.message, 'error');
+            }
+        });
+
+        // Load files
+        async function loadFiles() {
+            try {
+                const response = await fetch(`${API_URL}/files`);
+                const files = await response.json();
+                
+                const tbody = document.getElementById('filesTable');
+                
+                if (files.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No files uploaded yet. Start by uploading an audio file!</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = files.map(file => `
+                    <tr>
+                        <td><strong>${file.filename}</strong></td>
+                        <td><span class="status status-${file.status}">${file.status.replace('_', ' ')}</span></td>
+                        <td class="caption-cell" title="${file.caption || 'N/A'}">${file.caption || '—'}</td>
+                        <td>${new Date(file.created_at).toLocaleString()}</td>
+                        <td>${file.processed_at ? new Date(file.processed_at).toLocaleString() : '—'}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        // Refresh button
+        document.getElementById('refreshBtn').addEventListener('click', loadFiles);
+
+        // Auto-refresh every 3 seconds
+        setInterval(loadFiles, 3000);
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            
+            if (type === 'error') {
+                notification.style.background = 'var(--error)';
+            }
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+        }
+
+        // Initial load
+        loadFiles();
+    </script>
+</body>
+</html>
