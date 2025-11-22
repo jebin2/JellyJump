@@ -16,13 +16,15 @@ Create 70/30 split layout integrating core player on left and playlist panel on 
 - Apply theme background colors
 
 ### Feature 2: Video Section
-**Purpose**: Container for core player component
+**Purpose**: Container for core player component with MediaBunny
 
 **Requirements**:
 - Embed core player component from phases 09-14
+- **Note**: Core player already includes MediaBunny integration
 - Center video vertically in available space
 - Black background for letterboxing
 - Apply theme borders between sections
+- **Reference**: Core player MediaBunny setup from phase09-14
 
 ### Feature 3: Playlist Section
 **Purpose**: Scrollable panel for video list

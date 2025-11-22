@@ -1,7 +1,12 @@
 # Phase 19: Player Persistence
 
 ## Goal
-Save playlist to IndexedDB with auto-save, load on page load, resume playback position.
+Persist playlist and playback state using localStorage with MediaBunny considerations
+
+**MediaBunny Integration**: MediaBunny Input objects cannot be directly serialized. **Consult** mediabunny-llms-full.md to understand:
+- What can be persisted: file paths, blob URLs, format info, metadata
+- What cannot be persisted: Input objects, decoders, active streams
+- How to reconstruct Input objects from persisted data on page reload, load on page load, resume playback position.
 
 ## Features to Implement
 

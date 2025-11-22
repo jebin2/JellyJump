@@ -46,18 +46,21 @@ Implement the timeline-based video editing interface.
 - **HTML5** - Semantic markup
 - **CSS3** - Custom neobrutalism theme with Grid/Flexbox
 - **JavaScript (ES6+)** - Vanilla JS (No NPM/Bundlers)
-- **MediaBunny** - Core video library (via CDN)
+- **MediaBunny** - Core video library for ALL video operations (via CDN or npm)
+
+**Important**: **Consult `mediabunny-llms-full.md`** for all MediaBunny API usage.
 
 ### File Handling
 - **File System Access API** - Local file management
 - **IndexedDB** - Storing video metadata and playlists
-- **Web Workers** - Video processing tasks
+- **Web Workers** - Video processing tasks (optional optimization)
 
 ### Video Processing
-- **FFmpeg.wasm** - Client-side video editing
-- **Canvas API** - Video frame manipulation
-- **Web Audio API** - Audio editing
-- **MediaBunny** - Video playback, controls, metadata
+- **MediaBunny** - Video playback, reading, conversion, export, metadata extraction
+- **Canvas API** - Video frame manipulation for effects
+ **Web Audio API** - Audio editing (if needed)
+
+**No FFmpeg.wasm** - All video processing is handled by MediaBunny.
 
 ## Success Metrics
 - Page load time < 2 seconds

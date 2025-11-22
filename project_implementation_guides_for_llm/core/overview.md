@@ -96,7 +96,17 @@ Follow global phases 09-14 in order:
 
 ## Dependencies
 - **Phases 01-04** (Theme must be complete)
-- MediaBunny library
+- **MediaBunny library** - **Consult** `mediabunny-llms-full.md` for complete API documentation
+
+## MediaBunny APIs Used
+The core player component uses these MediaBunny features. **Refer to mediabunny-llms-full.md** for implementation details:
+
+- **Reading media files**: Input, BlobSource, format detection
+- **Playback control**: Play/pause, seek, volume, timestamps
+- **Track management**: Audio tracks, subtitle tracks, quality selection
+- **Media sinks**: VideoSampleSink (editor mode), CanvasSink (thumbnails)
+- **Metadata**: Duration, dimensions, codec, language
+- **Resource cleanup**: Closing inputs, sinks, decoders
 
 ## Used By
 - Player page (phases 15-20)

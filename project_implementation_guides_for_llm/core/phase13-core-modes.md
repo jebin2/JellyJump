@@ -1,7 +1,12 @@
 # Phase 13: Core Modes
 
 ## Goal
-Configure component for player mode vs editor mode with mode-specific features.
+Configure component for player vs editor modes with MediaBunny-specific features
+
+**MediaBunny Integration**: Different modes may use different MediaBunny capabilities. **Consult** mediabunny-llms-full.md for:
+- Editor mode: Frame-by-frame navigation using VideoSampleSink
+- Player mode: Standard playback controls
+- Timeline markers and region selection using EncodedPacketSink with mode-specific features.
 
 ## Features to Implement
 

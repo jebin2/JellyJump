@@ -79,15 +79,16 @@ Deliver professional output:
 ## Technology Stack
 
 ### Video Processing
-- **FFmpeg.wasm** - Client-side video processing
-- **Canvas API** - Frame manipulation
-- **Web Audio API** - Audio editing
-- **MediaBunny** - Preview playback
+- **MediaBunny** - ALL video operations (reading, processing, conversion, export)
+- **Canvas API** - Frame manipulation for effects
+- **Web Audio API** - Audio editing (if needed)
+
+**Important**: This project uses MediaBunny for video processing, NOT FFmpeg.wasm. **Consult mediabunny-llms-full.md** for all video operations.
 
 ### Performance
-- Web Workers for heavy processing
-- Efficient canvas rendering
-- Progress feedback during export
+- Web Workers for processing (optional optimization)
+- Efficient canvas rendering for effects
+- Progress feedback via MediaBunny conversion.onProgress
 - Memory management for large files
 
 ## Editor Mode Integration
@@ -133,13 +134,12 @@ Inherits all from core player (editor mode), plus:
 - Memory usage: < 2GB for 1080p video
 
 ## References
-- [FFmpeg.wasm Documentation](https://ffmpegwasm.netlify.app/)
+- **[MediaBunny Documentation](../mediabunny-llms-full.md)** - Core video library (primary reference)
 - [Canvas API](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
 - [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
 - [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)
 
 ---
 
-**Phase**: 2 (Editor Page)  
-**Dependencies**: theme, core player, FFmpeg.wasm  
+**Phase**: 2 (Editor Page)  \n**Dependencies**: theme, core player, **MediaBunny**  
 **Last Updated**: 2025-11-22

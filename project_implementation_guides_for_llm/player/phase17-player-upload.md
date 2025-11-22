@@ -6,15 +6,19 @@ Implement file upload button and drag-and-drop zone for adding videos to playlis
 ## Features to Implement
 
 ### Feature 1: File Upload Button
-**Purpose**: Browse and select video files to add
+**Purpose**: Browse and select video files using MediaBunny
 
 **Requirements**:
 - Button opens file picker dialog
 - Accept video formats: MP4, WebM, MOV, AVI
 - Allow multiple file selection
-- Use **MediaBunny** `Input` with `BlobSource` to ingest files
-- Extract metadata (title, duration) using MediaBunny
+- **Consult**: mediabunny-llms-full.md for:
+  - Creating `Input` objects from file blobs
+  - Using `BlobSource` for local files
+  - Format validation using `getFormat()`
+- Extract metadata (title, duration) from MediaBunny Input
 - Add selected videos to playlist
+- **Reference**: "Reading media files" and "BlobSource" sections in mediabunny-llms-full.md
 
 ### Feature 2: Folder Upload
 **Purpose**: Upload entire folder of videos at once
@@ -48,14 +52,19 @@ Implement file upload button and drag-and-drop zone for adding videos to playlis
 - Provide feedback on what was accepted/rejected
 
 ### Feature 5: Metadata Extraction
-**Purpose**: Get video information for playlist display
+**Purpose**: Get video information using MediaBunny for playlist display
 
 **Requirements**:
-- Use **MediaBunny** to read file metadata (duration, tracks)
+- **Consult**: mediabunny-llms-full.md for comprehensive metadata extraction:
+  - `input.getDuration()` for video duration
+  - `input.getTracks()` for track information
+  - `input.getFormat()` for format details
+  - Track metadata: dimensions, codec, language
 - Get filename as default title
-- Generate thumbnail if possible (optional)
-- Store file reference for playback
-- Handle videos that fail to load metadata
+- **Optional**: Generate thumbnail using CanvasSink (see "Media sinks" section)
+- Store MediaBunny Input reference for playback
+- Handle videos that fail to load metadata gracefully
+- **Reference**: "Reading track metadata" and "CanvasSink" in mediabunny-llms-full.md
 
 ## Testing Checklist
 - [ ] Upload button opens file picker

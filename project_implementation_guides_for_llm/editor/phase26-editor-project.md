@@ -1,7 +1,12 @@
 # Phase 26: Editor Project
 
 ## Goal
-Implement save/load project (.mbproj format), auto-save every 2 minutes, crash recovery.
+Save/load editor projects with timeline state and MediaBunny conversion configuration
+
+**MediaBunny Integration**: Project files should store conversion configurations and settings. **Consult** mediabunny-llms-full.md for:
+- Serializable conversion options (trim times, format, bitrate, etc.)
+- Input file references that can be restored
+- Non-serializable state to exclude (active Conversion, decoders)
 
 ## Features to Implement
 

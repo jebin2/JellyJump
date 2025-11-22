@@ -1,7 +1,13 @@
 # Phase 27: Editor Polish
 
 ## Goal
-Complete keyboard shortcuts, performance optimization (virtual timeline, web workers), final UX improvements.
+Responsive design, undo/redo, autosave, and MediaBunny conversion optimization
+
+**MediaBunny Integration**: Optimize MediaBunny conversion performance. **Consult** mediabunny-llms-full.md for:
+- Conversion performance optimization techniques
+- Proper cleanup of conversion resources
+- Efficient handling of multiple conversions
+- Memory management during intensive operations (virtual timeline, web workers), final UX improvements.
 
 ## Features to Implement
 

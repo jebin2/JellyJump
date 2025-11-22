@@ -16,13 +16,15 @@ Create three-section layout: preview/properties panel (top), timeline (middle), 
 - Full viewport height and width
 
 ### Feature 2: Preview & Properties Panel
-**Purpose**: Video preview and editing controls
+**Purpose**: Video preview using MediaBunny and editing controls
 
 **Requirements**:
-- Preview area (60% width): Core player in editor mode
+- Preview area (60% width): Core player in editor mode (from phases 09-14)
+- **Note**: Editor mode uses MediaBunny for frame-accurate preview
 - Properties panel (40% width): Tool controls and settings
 - Vertical split between preview and properties
 - Apply theme borders between panels
+- **Reference**: Core player editor mode configuration from phase13
 
 ### Feature 3: Timeline Section
 **Purpose**: Visual timeline for editing

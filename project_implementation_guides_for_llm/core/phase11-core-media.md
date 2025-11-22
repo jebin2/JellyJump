@@ -6,15 +6,17 @@ Add subtitle support, audio track switching, and quality selection.
 ## Features to Implement
 
 ### Feature 1: Subtitle Loading System
-**Purpose**: Load external subtitle files and add to video
+**Purpose**: Load external subtitle files using MediaBunny
 
 **Requirements**:
+- **Consult**: mediabunny-llms-full.md for subtitle track handling
 - Support VTT format (primary standard)
 - Support SRT format (convert to VTT if needed)
 - Accept subtitle file URL or file object
-- Parse subtitle content into cues
+- Parse subtitle content into cues using MediaBunny capabilities
 - Add as text track to video element
 - Handle loading errors gracefully
+- **Reference**: Track management and subtitle features in mediabunny-llms-full.md
 
 ### Feature 2: Subtitle Display Toggle
 **Purpose**: Control subtitle visibility on/off
@@ -39,26 +41,30 @@ Add subtitle support, audio track switching, and quality selection.
 - Close menu after selection
 
 ### Feature 4: Audio Track Switching
-**Purpose**: Switch between audio tracks if video has multiple
+**Purpose**: Switch between audio tracks using MediaBunny
 
 **Requirements**:
-- Detect available audio tracks using **MediaBunny**
+- **Consult**: mediabunny-llms-full.md for audio track detection and switching
+- Detect available audio tracks using MediaBunny track API
 - Menu showing all audio track options
 - Label tracks by language or descriptive name
-- Switch tracks seamlessly during playback
+- Switch tracks seamlessly during playback using MediaBunny methods
 - Indicate currently active audio track
 - Only show if multiple audio tracks available
+- **Reference**: Reading track metadata and input formats in mediabunny-llms-full.md
 
 ### Feature 5: Quality Selector
-**Purpose**: Choose video quality level if multiple streams available
+**Purpose**: Choose video quality level using MediaBunny
 
 **Requirements**:
+- **Consult**: mediabunny-llms-full.md for video track and quality management
 - 'Auto' quality option as default (adaptive)
 - List available quality levels (480p, 720p, 1080p, etc.)
-- Switch quality when user selects different level
+- Switch quality when user selects different level using MediaBunny
 - Show current quality in UI
 - Handle quality transitions smoothly (may cause brief buffering)
 - Only show if multiple quality streams exist
+- **Reference**: Video track handling in mediabunny-llms-full.md
 
 ## Testing Checklist
 - [ ] Subtitles load and display correctly

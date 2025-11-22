@@ -1,7 +1,13 @@
 # Phase 14: Core Polish
 
 ## Goal
-Apply theme styling, responsive design, accessibility, and optimizations.
+Apply theme, responsive design, accessibility, and MediaBunny resource management
+
+**MediaBunny Integration**: Proper cleanup and optimization of MediaBunny resources. **Consult** mediabunny-llms-full.md for:
+- Closing media sources and sinks
+- Proper decoder cleanup
+- Memory management best practices
+- Performance optimization techniques, and optimizations.
 
 ## Features to Implement
 

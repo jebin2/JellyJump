@@ -32,5 +32,14 @@ Phase 15 → 16 → 17 → 18 → 19 → 20
 (Layout) (Playlist) (Upload) (Manage) (Save) (Polish)
 ```
 
+## MediaBunny Integration
+The player page uses MediaBunny for file handling and metadata. **Consult mediabunny-llms-full.md** for:
+
+- **File upload**: Input with BlobSource for local files
+- **Metadata extraction**: Duration, format, tracks, dimensions
+- **Thumbnail generation**: CanvasSink for playlist thumbnails
+- **Format validation**: getFormat() for file type checking
+- **Resource management**: Proper cleanup when removing playlist items
+
 **Dependencies**: Phases 01-04 (Theme), 09-14 (Core)  
 **Global Phases**: 15-20 | **Time**: 3-4 hours

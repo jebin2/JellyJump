@@ -1,7 +1,13 @@
 # Phase 20: Player Polish
 
 ## Goal
-Responsive design (mobile drawer for playlist), virtual scrolling for 100+ videos, accessibility, performance optimization.
+Add responsive mobile drawer, keyboard shortcuts, and MediaBunny performance optimizations
+
+**MediaBunny Integration**: Optimize MediaBunny performance and handle errors. **Consult** mediabunny-llms-full.md for:
+- Decode error handling and recovery
+- Lazy loading and on-demand decoding
+- Memory management for large playlists
+- Performance optimization techniquesg for 100+ videos, accessibility, performance optimization.
 
 ## Features to Implement
 

@@ -1,7 +1,13 @@
 # Phase 23: Editor Editing
 
 ## Goal
-Implement trim (drag clip edges), cut/split at playhead, delete clips, drag to rearrange, undo/redo system.
+Implement clip trimming, splitting, and rearranging using MediaBunny Conversion API
+
+**MediaBunny Integration**: All editing operations use MediaBunny's conversion system. **Consult** mediabunny-llms-full.md for:
+- `Conversion` API for trimming clips using `trim: { start, end }` option
+- Creating new outputs from trimmed segments
+- Concatenating multiple clips (advanced)
+- Non-destructive editing patternste clips, drag to rearrange, undo/redo system.
 
 ## Features to Implement
 

@@ -19,8 +19,8 @@
 - **Done when**: Can add transitions and effects
 
 ### [Phase 25: Editor Export](phase25-editor-export.md)
-- FFmpeg.wasm integration for rendering
-- **Done when**: Can export to MP4/WebM
+- MediaBunny Conversion API for video export
+- **Done when**: Can export to MP4/WebM using MediaBunny
 
 ### [Phase 26: Editor Project](phase26-editor-project.md)
 - Save/load editing projects
@@ -35,6 +35,16 @@
 Phase 21 → 22 → 23 → 24 → 25 → 26 → 27
 (Layout) (Timeline) (Edit) (Effects) (Export) (Project) (Polish)
 ```
+
+## MediaBunny Integration
+The editor page uses MediaBunny for ALL video processing (NO FFmpeg.wasm). **Consult mediabunny-llms-full.md** for:
+
+- **Timeline generation**: EncodedPacketSink for packet markers, VideoSampleSink for thumbnails
+- **Trimming/Editing**: Conversion API with `trim: { start, end }` option
+- **Effects processing**: `video.process` callback for frame-by-frame manipulation
+- **Export/Rendering**: Output with Mp4OutputFormat, WebMOutputFormat
+- **Progress tracking**: conversion.onProgress for export feedback
+- **Quality control**: Video encoding config, bitrate, subjective qualities
 
 **Dependencies**: Phases 01-04 (Theme), 09-14 (Core)  
 **Global Phases**: 21-27 | **Time**: 6-8 hours

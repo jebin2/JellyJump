@@ -6,14 +6,15 @@ Build HTML structure and implement basic playback controls (play, pause, seek, v
 ## Features to Implement
 
 ### Feature 1: Video Element & Container
-**Purpose**: Core HTML structure for video display
+**Purpose**: Core HTML structure for video display with MediaBunny
 
 **Requirements**:
-- Video element as main display area
-- Container div wrapping video and controls
+- **Consult**: mediabunny-llms-full.md for video element setup and display
+- Create container div wrapping video and controls
 - Proper aspect ratio handling (16:9 typical)
 - Black background for video letterboxing
 - Apply theme container styling
+- **Reference**: MediaBunny player setup patterns in documentation
 
 ### Feature 2: Control Bar Layout
 **Purpose**: Bottom control bar containing all player controls
@@ -28,28 +29,32 @@ Build HTML structure and implement basic playback controls (play, pause, seek, v
 - Fixed height (48-60px typical)
 
 ### Feature 3: Play/Pause Control
-**Purpose**: Main playback toggle button
+**Purpose**: Main playback toggle button using MediaBunny API
 
 **Requirements**:
 - Single button that changes appearance based on playback state
 - Play icon (▶) displayed when video is paused
 - Pause icon (⏸) displayed when video is playing
-- Click toggles between play and pause states
+- **Consult**: mediabunny-llms-full.md for playback control methods
+- Implement play/pause toggle using MediaBunny API
 - Visual feedback on state change
 - Keyboard support: Space and K key also toggle
 - Apply theme button styling
+- **Reference**: Media playback controls in mediabunny-llms-full.md
 
 ### Feature 4: Progress/Seek Bar
-**Purpose**: Timeline scrubber for video navigation
+**Purpose**: Timeline scrubber for video navigation with MediaBunny
 
 **Requirements**:
 - Visual bar showing current playback position
 - Fill indicator that grows as video plays
-- Clickable to seek to specific time
+- **Consult**: mediabunny-llms-full.md for seeking and timestamp management
+- Implement clickable seek using MediaBunny API
 - Draggable for scrubbing through video
 - Show percentage of video completed
 - Update in real-time during playback (throttled to ~10fps)
 - Responsive to container width changes
+- **Reference**: Media sinks and seeking in mediabunny-llms-full.md
 
 ### Feature 5: Volume Control
 **Purpose**: Audio level adjustment
@@ -63,15 +68,17 @@ Build HTML structure and implement basic playback controls (play, pause, seek, v
 - Apply theme styling to slider
 
 ### Feature 6: Time Display
-**Purpose**: Show current and total duration
+**Purpose**: Show current and total duration from MediaBunny
 
 **Requirements**:
+- **Consult**: mediabunny-llms-full.md for duration and timestamp retrieval
 - Format times as MM:SS or H:MM:SS for longer videos
-- Current time updates during playback
-- Total duration displays after metadata loads
+- Current time updates during playback using MediaBunny events
+- Total duration displays after MediaBunny metadata loads
 - Use monospace font for consistent alignment
 - Apply theme secondary text color
 - Separator between current and total (e.g., "2:30 / 5:45")
+- **Reference**: Reading track metadata in mediabunny-llms-full.md
 
 ## Testing Checklist
 - [ ] Video loads and displays correctly

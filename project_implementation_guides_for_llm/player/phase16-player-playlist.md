@@ -1,7 +1,12 @@
 # Phase 16: Player Playlist
 
 ## Goal
-Build playlist UI with scrollable video items showing thumbnails, titles, and durations.
+Render playlist items with metadata extracted using MediaBunny
+
+**MediaBunny Integration**: Playlist items should display metadata from MediaBunny Input objects. **Consult** mediabunny-llms-full.md for:
+- Reading file metadata (duration, dimensions, format)
+- Track information extraction
+- Thumbnail generation using CanvasSinkhumbnails, titles, and durations.
 
 ## Features to Implement
 

@@ -1,7 +1,9 @@
 # Phase 12: Core Keyboard Shortcuts
 
 ## Goal
-Implement comprehensive keyboard control system.
+Implement comprehensive keyboard control system integrated with MediaBunny playback controls
+
+**MediaBunny Integration**: All keyboard shortcuts should use MediaBunny's playback API methods for play/pause, seek, volume control, etc. **Consult** mediabunny-llms-full.md for appropriate control methods..
 
 ## Features to Implement
 

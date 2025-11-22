@@ -1,18 +1,27 @@
 # Phase 25: Editor Export
 
 ## Goal
-Integrate FFmpeg.wasm for client-side rendering with format/quality options and progress indicator.
+Export edited video using MediaBunny Conversion API with format/quality options and progress tracking
+
+**MediaBunny Integration**: Use MediaBunny for ALL export operations (NO FFmpeg.wasm). **Consult** mediabunny-llms-full.md for:
+- `Conversion` API for converting/exporting edited videos
+- `Output` with `Mp4OutputFormat`, `WebMOutputFormat`, etc.
+- `BufferTarget` or `FileSystemWritableFileStreamTarget` for saving
+- Video/audio encoding configuration (bitrate, quality, codec)
+- Progress tracking with `conversion.onProgress`
+- Format-specific options and codec support
 
 ## Features to Implement
 
-### Feature 1: FFmpeg.wasm Integration
-**Purpose**: Client-side video rendering
+### Feature 1: MediaBunny Conversion Setup
+**Purpose**: Initialize MediaBunny for video export operations
 
 **Requirements**:
-- Load FFmpeg.wasm library
-- Initialize FFmpeg in web worker
-- Handle loading progress
-- Error handling for unsupported browsers
+- **Consult**: mediabunny-llms-full.md "Converting media files" section
+- Set up Conversion with Input from editing timeline
+- Configure Output with target format
+- Apply editing operations (trim, effects) during conversion
+- **Reference**: Complete conversion examples in mediabunny-llms-full.md
 
 ### Feature 2: Export Modal/Dialog
 **Purpose**: Configure export settings
@@ -25,55 +34,65 @@ Integrate FFmpeg.wasm for client-side rendering with format/quality options and 
 - Export button
 
 ### Feature 3: Format Options
-**Purpose**: Choose output video format
+**Purpose**: Choose output video format using MediaBunny
 
 **Requirements**:
-- MP4 (H.264 codec) - most compatible
-- WebM (VP9 codec) - modern browsers
-- Other formats as needed
+- **Consult**: mediabunny-llms-full.md for output formats and codecs
+- MP4 with H.264 codec (most compatible) - Use `Mp4OutputFormat`
+- WebM with VP9 codec (modern browsers) - Use `WebMOutputFormat`
+- Other formats as supported by MediaBunny
 - Default to MP4
+- **Reference**: "Output formats" and "Supported formats and codecs" in mediabunny-llms-full.md
 
 ### Feature 4: Quality Settings
-**Purpose**: Control output quality and size
+**Purpose**: Control output quality using MediaBunny encoding options
 
 **Requirements**:
-- Low (720p, smaller file)
-- Medium (1080p, balanced)
-- High (1080p, high quality)
-- Custom resolution option
-- Estimated file size display
+- **Consult**: mediabunny-llms-full.md for video encoding configuration
+- Low (720p) - Use lower bitrate or `QUALITY_LOW`
+- Medium (1080p) - Use `QUALITY_MEDIUM` or balanced bitrate
+- High (1080p, high quality) - Use `QUALITY_HIGH` or custom high bitrate
+- Custom resolution option using `width` and `height` in conversion video options
+- Estimated file size display (calculate from bitrate × duration)
+- **Reference**: "Video options" and "subjective qualities" in converting media files section
 
 ### Feature 5: Progress Indicator
-**Purpose**: Show rendering progress
+**Purpose**: Show rendering progress using MediaBunny conversion tracking
 
 **Requirements**:
-- Progress bar (0-100%)
+- **Consult**: mediabunny-llms-full.md for conversion progress monitoring
+- Use `conversion.onProgress` callback to track conversion progress
+- Progress bar (0-100%) from progress value
 - Percentage complete text
-- Estimated time remaining
-- Cancel button
-- Progress updates in real-time
+- Estimated time remaining (calculate from progress rate)
+- Cancel button using `conversion.cancel()`
+- Progress updates propagate from MediaBunny conversion
+- **Reference**: "Monitoring progress" in converting media files section
 
 ### Feature 6: Download Rendered File
-**Purpose**: Save exported video
+**Purpose**: Save exported video using MediaBunny targets
 
 **Requirements**:
-- Automatically trigger download when complete
-- Use specified filename
-- Handle download in browser
-- Success message
-- Option to export another
+- **Consult**: mediabunny-llms-full.md for output targets
+- Use `BufferTarget` to get ArrayBuffer then download via blob URL
+- OR use `FileSystemWritableFileStreamTarget` to save directly
+- After `conversion.execute()` completes, access `output.target.buffer`
+- Create blob URL and trigger download with specified filename
+- Success message when download completes
+- Option to export another video
+- **Reference**: "Writing media files" targets section in mediabunny-llms-full.md
 
 ## Testing Checklist
-- [ ] FFmpeg loads correctly
-- [ ] Export dialog works
-- [ ] Can select format/quality
-- [ ] Progress bar updates
-- [ ] File downloads successfully
-- [ ] Video plays correctly
+- [ ] MediaBunny Conversion initializes correctly
+- [ ] Export dialog works with format/quality options
+- [ ] Can select different output formats (MP4, WebM)
+- [ ] Progress bar updates during conversion
+- [ ] File downloads successfully after conversion
+- [ ] Exported video plays correctly with applied edits
 
 ## Done When
-✅ Export functionality works  
-✅ FFmpeg integration complete  
+✅ Export functionality works using MediaBunny  
+✅ MediaBunny Conversion integration complete  
 ✅ Progress feedback works  
 ✅ All tests pass  
 ✅ Ready for next phase

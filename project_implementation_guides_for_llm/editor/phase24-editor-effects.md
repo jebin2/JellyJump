@@ -1,7 +1,13 @@
 # Phase 24: Editor Effects
 
 ## Goal
-Add transitions (fade, wipe, etc.), filters (brightness, contrast), text overlay system.
+Apply transitions and filters using MediaBunny's video processing capabilities
+
+**MediaBunny Integration**: Effects are applied through MediaBunny's conversion process callback. **Consult** mediabunny-llms-full.md for:
+- `video.process` callback in Conversion API for frame-by-frame processing
+- Canvas API integration for applying filters (grayscale, brightness, etc.)
+- VideoSample manipulation and drawing
+- Processing video samples with custom transformationsers (brightness, contrast), text overlay system.
 
 ## Features to Implement
 

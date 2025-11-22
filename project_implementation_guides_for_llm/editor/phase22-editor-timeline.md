@@ -1,7 +1,13 @@
 # Phase 22: Editor Timeline
 
 ## Goal
-Build timeline UI with video/audio tracks, playhead scrubber, timecode ruler, zoom controls.
+Build multi-track timeline with playhead, ruler, and track management using MediaBunny
+
+**MediaBunny Integration**: Timeline requires precise frame and timestamp data. **Consult** mediabunny-llms-full.md for:
+- `EncodedPacketSink` for packet-level timeline markers
+- `VideoSampleSink` for thumbnail generation at specific timestamps
+- `samplesAtTimestamps` for efficient thumbnail extraction
+- Precise timestamp and duration retrieval from tracksad scrubber, timecode ruler, zoom controls.
 
 ## Features to Implement
 

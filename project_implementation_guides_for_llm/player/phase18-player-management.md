@@ -1,7 +1,12 @@
 # Phase 18: Player Management
 
 ## Goal
-Add playlist operations: play video on click, reorder via drag, remove videos, next/previous navigation, auto-play next.
+Implement remove, clear, and auto-play features with proper MediaBunny resource management
+
+**MediaBunny Integration**: When removing playlist items or clearing the playlist, properly cleanup MediaBunny resources. **Consult** mediabunny-llms-full.md for:
+- Closing Input objects when no longer needed
+- Proper decoder/sink cleanup
+- Switching between MediaBunny inputs for playlist navigationo on click, reorder via drag, remove videos, next/previous navigation, auto-play next.
 
 ## Features to Implement
 
