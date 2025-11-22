@@ -1,3 +1,5 @@
+import { StorageService } from './StorageService.js';
+
 /**
  * Playlist Manager
  * Handles rendering and interaction for the video playlist.
@@ -12,6 +14,7 @@ export class Playlist {
         this.player = player;
         this.items = [];
         this.activeIndex = -1;
+        this.storage = new StorageService();
 
         // Clear placeholder
         this.container.innerHTML = '';
@@ -23,6 +26,49 @@ export class Playlist {
         this.player.mediaElement.addEventListener('ended', () => {
             this.playNext();
         });
+
+        // Save state on pause or unload
+        window.addEventListener('beforeunload', () => {
+            this._saveState();
+        });
+
+        // Load saved playlist
+        this._loadSavedPlaylist();
+    }
+
+    /**
+     * Load saved playlist from storage
+     * @private
+     */
+    _loadSavedPlaylist() {
+        const savedItems = this.storage.loadPlaylist();
+        if (savedItems.length > 0) {
+            this.items = savedItems;
+            this.render();
+
+            // Restore playback state
+            const state = this.storage.loadPlaybackState();
+            if (state && state.index >= 0 && state.index < this.items.length) {
+                // Don't auto-play on restore, just load
+                this.activeIndex = state.index;
+                const video = this.items[this.activeIndex];
+
+                if (!video.needsReload) {
+                    this.player.load(video.url);
+                    this.player.mediaElement.currentTime = state.time || 0;
+                    this._updateUI();
+                }
+            }
+        }
+    }
+
+    /**
+     * Save current state
+     * @private
+     */
+    _saveState() {
+        this.storage.savePlaylist(this.items);
+        this.storage.savePlaybackState(this.activeIndex, this.player.mediaElement.currentTime);
     }
 
     /**
@@ -75,7 +121,8 @@ export class Playlist {
             url: URL.createObjectURL(file),
             duration: 'Local File', // We'd need to load metadata to get real duration
             thumbnail: '', // No thumbnail for local files yet
-            isLocal: true
+            isLocal: true,
+            needsReload: false
         }));
 
         this.addItems(newItems);
@@ -92,6 +139,7 @@ export class Playlist {
      */
     addItem(video) {
         this.items.push(video);
+        this._saveState();
         this.render();
     }
 
@@ -101,6 +149,7 @@ export class Playlist {
      */
     addItems(videos) {
         this.items = [...this.items, ...videos];
+        this._saveState();
         this.render();
     }
 
@@ -133,6 +182,7 @@ export class Playlist {
         }
 
         this.items.splice(index, 1);
+        this._saveState();
         this.render();
     }
 
@@ -145,6 +195,7 @@ export class Playlist {
             this.activeIndex = -1;
             this.player.pause();
             this.player.mediaElement.src = '';
+            this.storage.clear();
             this.render();
         }
     }
@@ -168,14 +219,21 @@ export class Playlist {
     selectItem(index) {
         if (index < 0 || index >= this.items.length) return;
 
-        this.activeIndex = index;
         const video = this.items[index];
+
+        if (video.needsReload) {
+            alert('This local file needs to be re-uploaded.');
+            return;
+        }
+
+        this.activeIndex = index;
 
         // Load video into player
         this.player.load(video.url);
 
         // Update UI
         this._updateUI();
+        this._saveState();
 
         // Auto play if not the first load (optional logic)
         this.player.play();
@@ -251,13 +309,16 @@ export class Playlist {
             ? `<img src="${item.thumbnail}" alt="${item.title}">`
             : `<svg width="24" height="24" viewBox="0 0 24 24" fill="#666"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zm-10-6l-4 4h8l-4-4z"/></svg>`;
 
+        const statusClass = item.needsReload ? 'needs-reload' : '';
+        const statusText = item.needsReload ? '(Missing File)' : '';
+
         return `
-            <div class="playlist-item" data-index="${index}">
+            <div class="playlist-item ${statusClass}" data-index="${index}">
                 <div class="playlist-thumbnail">
                     ${thumbnail}
                 </div>
                 <div class="playlist-info">
-                    <div class="playlist-title" title="${item.title}">${item.title}</div>
+                    <div class="playlist-title" title="${item.title}">${item.title} <span style="color: var(--error-color); font-size: 0.7em;">${statusText}</span></div>
                     <div class="playlist-duration">${item.duration || '--:--'}</div>
                 </div>
                 <button class="playlist-remove-btn" title="Remove">

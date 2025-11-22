@@ -105,11 +105,11 @@
             }
         ];
 
-        // Load samples
-        playlist.addItems(sampleVideos);
-
-        // Select first item
-        playlist.selectItem(0);
+        // Load samples only if playlist is empty (first run)
+        if (playlist.items.length === 0) {
+            playlist.addItems(sampleVideos);
+            playlist.selectItem(0);
+        }
     </script>
 
 </body>
