@@ -13,6 +13,7 @@ UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'flac', 'ogg', 'm4a', 'aac'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs('temp_dir', exist_ok=True)
 
 def init_db():
     conn = sqlite3.connect('audio_captions.db')
@@ -112,6 +113,12 @@ def get_file(file_id):
         'processed_at': row['processed_at']
     })
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'healthy', 'service': 'audio-caption-generator'})
+
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Use PORT environment variable for Hugging Face compatibility
+    port = int(os.environ.get('PORT', 7860))
+    app.run(debug=False, host='0.0.0.0', port=port)
