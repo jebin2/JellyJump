@@ -4,7 +4,7 @@
 
 **Objective**: Verify and audit the MediaBunnyPlayer implementation to ensure all phases are correctly implemented, coding standards are followed, and quality is maintained.
 
-**Total Phases**: 32 (updated with new player features)
+**Total Phases**: 44 (Theme: 01-04, Dashboard: 05-08, Core: 09-14, Player: 15-25, Editor: 26-44)
 
 ## Your Responsibilities
 
@@ -21,7 +21,7 @@
 
 ### Step 1: Phase Completion Check
 
-**Action**: Verify implementation status for all 32 phases
+**Action**: Verify implementation status for all 44 phases
 
 For each phase group, check:
 
@@ -66,31 +66,51 @@ For each phase group, check:
 #### Player Page (Phases 15-25)
 - [ ] **Phase 15**: 70/30 layout with core player embedded
 - [ ] **Phase 16**: Playlist UI with video items
-- [ ] **Phase 17**: File upload + drag-and-drop using MediaBunny Input/BlobSource
-- [ ] **Phase 18**: Playlist management (play, remove, navigate, auto-play)
-- [ ] **Phase 19**: Playlist persistence (IndexedDB or localStorage)
-- [ ] **Phase 20**: Mobile responsive drawer, performance optimized
+- [ ] **Phase 17**: Video capture from webcam/screen
+- [ ] **Phase 18**: Playlist navigation (next, previous, jump)
+- [ ] **Phase 19**: Download video feature
+- [ ] **Phase 20**: Playback speed controls
+- [ ] **Phase 21**: Loop mode (single, playlist)
+- [ ] **Phase 22**: File upload + drag-and-drop
+- [ ] **Phase 23**: Playlist management (reorder, remove, clear)
+- [ ] **Phase 24**: Playlist persistence (localStorage)
+- [ ] **Phase 25**: Mobile responsive drawer, accessibility polish
 
 **Verification**:
 - `player.html` file exists
 - MediaBunny Input/BlobSource used for file handling
+- All 11 player features functional
 - Playlist displays metadata (duration, title)
 - Persistence works across page reloads
 
-#### Editor Page (Phases 26-32)
-- [ ] **Phase 21**: Three-section layout (preview + timeline + library)
-- [ ] **Phase 22**: Timeline with EncodedPacketSink/VideoSampleSink
-- [ ] **Phase 23**: Trimming using MediaBunny Conversion API
-- [ ] **Phase 24**: Effects using `video.process` callback
-- [ ] **Phase 25**: Export using MediaBunny (NOT FFmpeg.wasm)
-- [ ] **Phase 26**: Project save/load
-- [ ] **Phase 27**: Final polish, undo/redo, performance
+#### Editor Page (Phases 26-44)
+- [ ] **Phase 26**: Navigation tabs (Import, Edit, Export)
+- [ ] **Phase 27**: Media library with file management
+- [ ] **Phase 28**: Preview canvas with playback controls
+- [ ] **Phase 29**: Properties panel for selected clips
+- [ ] **Phase 30**: Timeline structure and ruler
+- [ ] **Phase 31**: Timeline tracks (video, audio, text)
+- [ ] **Phase 32**: Timeline playhead and scrubbing
+- [ ] **Phase 33**: Timeline zoom and pan controls
+- [ ] **Phase 34**: Clip trimming (in/out points)
+- [ ] **Phase 35**: Clip cutting/splitting
+- [ ] **Phase 36**: Clip dragging and reordering
+- [ ] **Phase 37**: Undo/redo system
+- [ ] **Phase 38**: Transitions between clips
+- [ ] **Phase 39**: Video filters and effects
+- [ ] **Phase 40**: Text overlays and titles
+- [ ] **Phase 41**: Transform controls (position, scale, rotation)
+- [ ] **Phase 42**: Export video with MediaBunny
+- [ ] **Phase 43**: Project save/load functionality
+- [ ] **Phase 44**: Final polish and performance optimization
 
 **Verification**:
 - `editor.html` file exists
 - **CRITICAL**: No FFmpeg.wasm - only MediaBunny Conversion API
-- Timeline shows thumbnails
+- Timeline shows thumbnails and multiple tracks
+- All 19 editor features functional
 - Export works with Mp4OutputFormat/WebMOutputFormat
+- Undo/redo system works correctly
 
 ---
 
@@ -278,8 +298,8 @@ After your audit, provide a report in this format:
 # MediaBunnyPlayer Verification Report
 
 ## Executive Summary
-- **Total Phases**: 27
-- **Implemented**: [X/32]
+- **Total Phases**: 44
+- **Implemented**: [X/44]
 - **In Progress**: [List phases]
 - **Not Started**: [List phases]
 - **Overall Status**: [Ready for Production / Needs Work / Early Stage]

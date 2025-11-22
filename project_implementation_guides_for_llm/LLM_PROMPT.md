@@ -4,11 +4,11 @@
 
 **Objective**: Implement the MediaBunnyPlayer project phase-by-phase using the provided guide files.
 
-**Note**: This project now has **32 phases** total, including advanced player features.
+**Note**: This project now has **44 phases** total, including advanced player and editor features.
 
 ## Core Rules
 
-1.  **Follow the Phases**: Implement strictly in order from Phase 01 to Phase 32. Do not skip phases.
+1.  **Follow the Phases**: Implement strictly in order from Phase 01 to Phase 44. Do not skip phases.
 2.  **Read Before Coding**: Before writing any code for a phase, read the corresponding `phaseNN-[name].md` file completely.
 3.  **Requirements over Code**: The phase files contain *requirements*, not code. You must interpret these requirements and generate the best possible HTML/CSS/JS implementation.
 4.  **No Placeholders**: Do not use placeholder comments like `<!-- Add controls here -->`. Write the actual working code.
@@ -24,11 +24,11 @@
 
 ## Project Structure
 
-- **Theme (01-04)**: Design system foundation
-- **Dashboard (05-08)**: Landing page
-- **Core (09-14)**: Reusable video player component
-- **Player (15-25)**: Video player page with advanced features
-- **Editor (26-32)**: Video editor page
+- **Theme (01-04)**: Design system foundation (4 phases)
+- **Dashboard (05-08)**: Landing page (4 phases)
+- **Core (09-14)**: Reusable video player component (6 phases)
+- **Player (15-25)**: Video player page with advanced features (11 phases)
+- **Editor (26-44)**: Video editor page with timeline, effects, and export (19 phases)
 
 ## Re-Implementing a Phase (Incremental Updates)
 

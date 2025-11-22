@@ -109,8 +109,8 @@ The core player component uses these MediaBunny features. **Refer to mediabunny-
 - **Resource cleanup**: Closing inputs, sinks, decoders
 
 ## Used By
-- Player page (phases 15-20)
-- Editor page (phases 21-27)
+- Player page (phases 15-25)
+- Editor page (phases 26-44)
 
 ---
 

@@ -13,7 +13,7 @@ All powered by the **MediaBunny** library and unified by a bold **Dark Neobrutal
 
 ## Phase-Based Implementation Strategy
 
-This project is organized into **27 sequential phases**, grouped by component. Each component has its own folder containing:
+This project is organized into **44 sequential phases**, grouped by component. Each component has its own folder containing:
 - `goal.md` - Component objectives and requirements
 - `overview.md` - Phase roadmap for that component
 - `phaseNN-[name].md` - Detailed implementation guide for each step
@@ -32,13 +32,13 @@ Create the landing page and entry point.
 Build the reusable video player component.
 - **Components**: [`core/`](core/) - MediaBunny integration, controls, keyboard support
 
-#### **Phases 15-20: Player Page** ▶️
-Build the dedicated video viewing interface.
-- **Components**: [`player/`](player/) - Playlist management, upload, persistence
+#### **Phases 15-25: Player Page** ▶️
+Build the dedicated video viewing interface with advanced features.
+- **Components**: [`player/`](player/) - Playlist UI, capture, navigation, download, speed controls, loop modes, upload, management, persistence, responsive polish
 
-#### **Phases 21-27: Editor Page** ✂️
-Implement the timeline-based video editing interface.
-- **Components**: [`editor/`](editor/) - Timeline, trimming, effects, export
+#### **Phases 26-44: Editor Page** ✂️
+Implement the comprehensive timeline-based video editing interface.
+- **Components**: [`editor/`](editor/) - Navigation tabs, media library, preview canvas, properties panel, timeline (structure/tracks/playhead/zoom), clip operations (trim/cut/drag), undo/redo, transitions, filters, text overlays, transforms, export, project management, polish
 
 ## Technology Stack
 
@@ -73,11 +73,11 @@ Implement the timeline-based video editing interface.
 
 To implement this project, follow the phases in order:
 
-1. **Theme**: Phases 01-04
-2. **Dashboard**: Phases 05-08
-3. **Core**: Phases 09-14
-4. **Player**: Phases 15-20
-5. **Editor**: Phases 21-27
+1. **Theme**: Phases 01-04 (4 phases)
+2. **Dashboard**: Phases 05-08 (4 phases)
+3. **Core**: Phases 09-14 (6 phases)
+4. **Player**: Phases 15-25 (11 phases)
+5. **Editor**: Phases 26-44 (19 phases)
 
 See [README.md](README.md) for the complete sequential list.
 
