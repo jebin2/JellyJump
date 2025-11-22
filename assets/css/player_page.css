@@ -62,6 +62,19 @@
 }
 
 /* -----------------------------------------
+   Mobile Elements (Hidden by default)
+   ----------------------------------------- */
+.playlist-overlay {
+    display: none;
+}
+
+#playlist-toggle {
+    display: none;
+    /* Overrides inline style if moved to CSS, but inline takes precedence. 
+                      However, we should ensure it's hidden in CSS too. */
+}
+
+/* -----------------------------------------
    Responsive Design
    ----------------------------------------- */
 @media (max-width: 1024px) {
@@ -77,6 +90,7 @@
         height: auto;
         min-height: 100vh;
         overflow-y: auto;
+        position: relative;
     }
 
     .video-section {
@@ -87,11 +101,48 @@
         position: sticky;
         top: 0;
         z-index: 100;
+        background: #000;
     }
 
     .playlist-section {
-        height: auto;
-        min-height: 50vh;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 60vh;
+        background-color: var(--bg-secondary);
+        z-index: 200;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-top: 2px solid var(--accent-primary);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .playlist-section.open {
+        transform: translateY(0);
+    }
+
+    /* Overlay when playlist is open */
+    .playlist-overlay {
+        display: block;
+        /* Override default none */
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 150;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .playlist-overlay.visible {
+        opacity: 1;
+        pointer-events: auto;
     }
 }
 

@@ -32,8 +32,90 @@ export class Playlist {
             this._saveState();
         });
 
+        // Mobile Drawer Logic
+        this._initMobileDrawer();
+
+        // Keyboard Shortcuts
+        this._initKeyboardShortcuts();
+
         // Load saved playlist
         this._loadSavedPlaylist();
+    }
+
+    /**
+     * Initialize mobile drawer toggle
+     * @private
+     */
+    _initMobileDrawer() {
+        const toggleBtn = document.getElementById('playlist-toggle');
+        const overlay = document.getElementById('playlist-overlay');
+        const section = this.container.closest('.playlist-section');
+
+        if (toggleBtn && overlay && section) {
+            // Show button only on mobile (handled via CSS usually, but let's force check)
+            const checkMobile = () => {
+                if (window.innerWidth <= 768) {
+                    toggleBtn.style.display = 'flex';
+                } else {
+                    toggleBtn.style.display = 'none';
+                    section.classList.remove('open');
+                    overlay.classList.remove('visible');
+                }
+            };
+
+            window.addEventListener('resize', checkMobile);
+            checkMobile();
+
+            const toggleDrawer = () => {
+                const isOpen = section.classList.contains('open');
+                if (isOpen) {
+                    section.classList.remove('open');
+                    overlay.classList.remove('visible');
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                } else {
+                    section.classList.add('open');
+                    overlay.classList.add('visible');
+                    toggleBtn.setAttribute('aria-expanded', 'true');
+                }
+            };
+
+            toggleBtn.addEventListener('click', toggleDrawer);
+            overlay.addEventListener('click', toggleDrawer);
+        }
+    }
+
+    /**
+     * Initialize keyboard shortcuts
+     * @private
+     */
+    _initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Ignore if typing in input
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+            if (e.shiftKey && e.key.toLowerCase() === 'n') {
+                e.preventDefault();
+                this.playNext();
+            } else if (e.shiftKey && e.key.toLowerCase() === 'p') {
+                e.preventDefault();
+                this.playPrevious();
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                // Remove active item if focused or just active? 
+                // Let's say if we have a selection concept separate from playing, 
+                // but for now let's just remove the currently playing one for simplicity 
+                // OR maybe better: remove the one hovered? No, keyboard.
+                // Let's skip delete for now to avoid accidental deletion of playing video.
+            }
+        });
+    }
+
+    /**
+     * Play previous video
+     */
+    playPrevious() {
+        if (this.activeIndex > 0) {
+            this.selectItem(this.activeIndex - 1);
+        }
     }
 
     /**
@@ -306,7 +388,7 @@ export class Playlist {
      */
     _createItemHTML(item, index) {
         const thumbnail = item.thumbnail
-            ? `<img src="${item.thumbnail}" alt="${item.title}">`
+            ? `<img src="${item.thumbnail}" alt="${item.title}" loading="lazy">`
             : `<svg width="24" height="24" viewBox="0 0 24 24" fill="#666"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zm-10-6l-4 4h8l-4-4z"/></svg>`;
 
         const statusClass = item.needsReload ? 'needs-reload' : '';

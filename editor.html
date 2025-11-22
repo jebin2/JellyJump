@@ -5,12 +5,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MediaBunny - Editor</title>
+
+    <!-- CSS -->
     <link rel="stylesheet" href="assets/css/theme.css">
+    <link rel="stylesheet" href="assets/css/player.css">
+    <link rel="stylesheet" href="assets/css/editor_page.css">
 </head>
 
 <body>
-    <h1>MediaBunny Editor</h1>
-    <p>Video editing interface.</p>
+
+    <div class="editor-layout">
+        <!-- Top Section: Preview & Properties -->
+        <section class="top-section">
+            <div class="preview-panel" id="editor-player-container">
+                <!-- Core Player (Editor Mode) injected here -->
+            </div>
+            <aside class="properties-panel">
+                <h3 class="text-lg font-bold mb-4">PROPERTIES</h3>
+                <div class="form-group">
+                    <label class="text-sm text-secondary">Clip Name</label>
+                    <input type="text" class="input" value="Sequence 01">
+                </div>
+                <div class="form-group mt-4">
+                    <label class="text-sm text-secondary">Duration</label>
+                    <div class="text-mono">00:00:00:00</div>
+                </div>
+            </aside>
+        </section>
+
+        <!-- Middle Section: Timeline -->
+        <section class="timeline-section">
+            <div class="timeline-header">
+                <span>00:00</span>
+                <span style="margin-left: auto;">Timeline</span>
+            </div>
+            <div class="timeline-tracks">
+                <!-- Tracks will go here -->
+                <div style="color: #666; padding: 20px; text-align: center;">Timeline Area</div>
+            </div>
+        </section>
+
+        <!-- Bottom Section: Media Library -->
+        <section class="library-section">
+            <div class="library-item">Media 1</div>
+            <div class="library-item">Media 2</div>
+            <div class="library-item">Effect 1</div>
+            <div class="library-item">Trans 1</div>
+        </section>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import { CorePlayer } from './assets/js/core/Player.js';
+
+        // Initialize Player in Editor Mode
+        const player = new CorePlayer('editor-player-container', {
+            autoplay: false,
+            muted: false,
+            mode: 'editor' // Enables frame stepping, etc.
+        });
+
+        // Load a sample video for demonstration
+        player.load('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4');
+    </script>
+
 </body>
 
 </html>
