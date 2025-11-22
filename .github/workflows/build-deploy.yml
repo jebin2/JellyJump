@@ -1,0 +1,89 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main  # Change to your default branch if different
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper git operations
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          npm install --save-dev terser
+          npm install --save-dev clean-css-cli
+          npm install --save-dev html-minifier-terser
+      
+      - name: Create build directory
+        run: mkdir -p build
+      
+      - name: Minify JavaScript files
+        run: |
+          find . -name "*.js" -not -path "./node_modules/*" -not -path "./build/*" -not -path "./.git/*" | while read file; do
+            output_file="build/${file#./}"
+            mkdir -p "$(dirname "$output_file")"
+            npx terser "$file" --compress --mangle --output "$output_file"
+          done
+      
+      - name: Minify CSS files
+        run: |
+          find . -name "*.css" -not -path "./node_modules/*" -not -path "./build/*" -not -path "./.git/*" | while read file; do
+            output_file="build/${file#./}"
+            mkdir -p "$(dirname "$output_file")"
+            npx cleancss -o "$output_file" "$file"
+          done
+      
+      - name: Minify HTML files
+        run: |
+          find . -name "*.html" -not -path "./node_modules/*" -not -path "./build/*" -not -path "./.git/*" | while read file; do
+            output_file="build/${file#./}"
+            mkdir -p "$(dirname "$output_file")"
+            npx html-minifier-terser \
+              --collapse-whitespace \
+              --remove-comments \
+              --minify-css true \
+              --minify-js true \
+              --output "$output_file" \
+              "$file"
+          done
+      
+      - name: Copy other assets
+        run: |
+          # Copy images, fonts, and other assets
+          find . \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" -o -name "*.ico" -o -name "*.woff" -o -name "*.woff2" -o -name "*.ttf" -o -name "*.eot" \) \
+            -not -path "./node_modules/*" \
+            -not -path "./build/*" \
+            -not -path "./.git/*" | while read file; do
+            output_file="build/${file#./}"
+            mkdir -p "$(dirname "$output_file")"
+            cp "$file" "$output_file"
+          done
+      
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+      
+      - name: Commit and push to build folder
+        run: |
+          git add build/
+          git diff --staged --quiet || git commit -m "Build: Update minified assets [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
