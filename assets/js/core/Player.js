@@ -104,11 +104,12 @@ export class CorePlayer {
     _init() {
         this.container.classList.add('mediabunny-container');
 
-        // Create canvas element
-        this.canvas = document.createElement('canvas');
-        this.canvas.className = 'mediabunny-video';
+        // Create canvas element using template
+        const canvasTemplate = document.getElementById('player-canvas-template');
+        const canvasClone = canvasTemplate.content.cloneNode(true);
+        this.canvas = canvasClone.querySelector('canvas');
         this.ctx = this.canvas.getContext('2d');
-        this.container.appendChild(this.canvas);
+        this.container.appendChild(canvasClone);
 
         // Initialize Screenshot Manager (before creating controls)
         this.screenshotManager = new ScreenshotManager(this);
@@ -126,144 +127,28 @@ export class CorePlayer {
      * @private
      */
     _createHelpOverlay() {
-        const navigationSection = this.config.mode === 'player' ? `
-            <div class="mediabunny-help-section">
-                <h3>Navigation</h3>
-                <ul>
-                    <li><span class="key">Shift</span> + <span class="key">N</span> Next Video</li>
-                    <li><span class="key">Shift</span> + <span class="key">P</span> Previous Video</li>
-                </ul>
-            </div>
-        ` : '';
+        const template = document.getElementById('player-help-overlay-template');
+        const clone = template.content.cloneNode(true);
 
-        const editorSection = this.config.mode === 'editor' ? `
-            <div class="mediabunny-help-section">
-                <h3>Editor</h3>
-                <ul>
-                    <li><span class="key">,</span> / <span class="key">.</span> Prev/Next Frame</li>
-                    <li><span class="key">I</span> / <span class="key">O</span> In/Out Point</li>
-                </ul>
-            </div>
-        ` : '';
+        // Configure sections based on mode
+        const navSection = clone.getElementById('help-navigation-section');
+        const editorSection = clone.getElementById('help-editor-section');
 
-        const loopSection = `
-            <div class="mediabunny-help-section">
-                <h3>Looping</h3>
-                <ul>
-                    <li><span class="key">I</span> Set Loop Start (A)</li>
-                    <li><span class="key">O</span> Set Loop End (B)</li>
-                    <li><span class="key">R</span> Reset Loop</li>
-                </ul>
-            </div>
-        `;
+        if (this.config.mode === 'player') {
+            if (navSection) navSection.style.display = 'block';
+            if (editorSection) editorSection.style.display = 'none';
+        } else if (this.config.mode === 'editor') {
+            if (navSection) navSection.style.display = 'none';
+            if (editorSection) editorSection.style.display = 'block';
+        }
 
-        const helpHTML = `
-            <div class="mediabunny-help-overlay" style="display: none;">
-                <div class="mediabunny-help-content">
-                    <h2 class="mediabunny-help-title">Keyboard Shortcuts ${this.config.mode === 'editor' ? '(Editor Mode)' : '(Player Mode)'}</h2>
-                    <div class="mediabunny-help-grid">
-                        <div class="mediabunny-help-section">
-                            <h3>Playback</h3>
-                            <ul>
-                                <li><span class="key">Space</span> / <span class="key">K</span> Play/Pause</li>
-                                <li><span class="key">J</span> / <span class="key">L</span> -/+ 10s</li>
-                                <li><span class="key">←</span> / <span class="key">→</span> -/+ 5s</li>
-                                <li><span class="key">0</span>-<span class="key">9</span> Seek 0-90%</li>
-                                <li><span class="key">Home</span> / <span class="key">End</span> Start/End</li>
-                            </ul>
-                        </div>
-                        <div class="mediabunny-help-section">
-                            <h3>Audio & Display</h3>
-                            <ul>
-                                <li><span class="key">↑</span> / <span class="key">↓</span> Volume +/-</li>
-                                <li><span class="key">M</span> Mute Toggle</li>
-                                <li><span class="key">F</span> Fullscreen</li>
-                                <li><span class="key">C</span> Captions Toggle</li>
-                                <li><span class="key">?</span> Toggle Help</li>
-                            </ul>
-                        </div>
-                        ${navigationSection}
-                        ${editorSection}
-                        ${loopSection}
-                    </div>
-                    <button class="mediabunny-close-help">Close</button>
-                </div>
-            </div>
-            <style>
-                .mediabunny-help-overlay {
-                    position: absolute;
-                    top: 0; left: 0; width: 100%; height: 100%;
-                    background: rgba(0, 0, 0, 0.85);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 100;
-                    backdrop-filter: blur(5px);
-                }
-                .mediabunny-help-content {
-                    background: var(--bg-secondary, #1a1a1a);
-                    border: 2px solid var(--accent-primary, #00ff88);
-                    padding: 30px;
-                    max-width: 600px;
-                    width: 90%;
-                    box-shadow: 8px 8px 0 0 var(--accent-primary, #00ff88);
-                    color: var(--text-primary, #fff);
-                    font-family: var(--font-primary, sans-serif);
-                }
-                .mediabunny-help-title {
-                    margin-top: 0;
-                    border-bottom: 1px solid var(--border-dark, #333);
-                    padding-bottom: 15px;
-                    margin-bottom: 20px;
-                    text-transform: uppercase;
-                }
-                .mediabunny-help-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                    gap: 20px;
-                    margin-bottom: 20px;
-                }
-                .mediabunny-help-section h3 {
-                    color: var(--accent-primary, #00ff88);
-                    font-size: 0.9rem;
-                    text-transform: uppercase;
-                    margin-bottom: 10px;
-                }
-                .mediabunny-help-section ul {
-                    list-style: none;
-                    padding: 0;
-                }
-                .mediabunny-help-section li {
-                    margin-bottom: 8px;
-                    font-size: 0.9rem;
-                    display: flex;
-                    align-items: center;
-                }
-                .key {
-                    background: var(--bg-tertiary, #333);
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-family: monospace;
-                    margin-right: 5px;
-                    border: 1px solid var(--border-dark, #555);
-                }
-                .mediabunny-close-help {
-                    background: transparent;
-                    border: 2px solid var(--accent-primary, #00ff88);
-                    color: var(--accent-primary, #00ff88);
-                    padding: 8px 20px;
-                    text-transform: uppercase;
-                    font-weight: bold;
-                    cursor: pointer;
-                    width: 100%;
-                }
-                .mediabunny-close-help:hover {
-                    background: var(--accent-primary, #00ff88);
-                    color: black;
-                }
-            </style>
-        `;
-        this.container.insertAdjacentHTML('beforeend', helpHTML);
+        // Update title
+        const title = clone.querySelector('.mediabunny-help-title');
+        if (title) {
+            title.textContent = `Keyboard Shortcuts ${this.config.mode === 'editor' ? '(Editor Mode)' : '(Player Mode)'}`;
+        }
+
+        this.container.appendChild(clone);
 
         this.ui.helpOverlay = this.container.querySelector('.mediabunny-help-overlay');
         this.ui.closeHelpBtn = this.container.querySelector('.mediabunny-close-help');
@@ -297,123 +182,18 @@ export class CorePlayer {
      * @private
      */
     _createControls() {
-        // Loading Spinner
-        const loaderHTML = `<div class="mediabunny-loader"></div>`;
-        this.container.insertAdjacentHTML('beforeend', loaderHTML);
+        // Loader
+        const loaderTemplate = document.getElementById('player-loader-template');
+        this.container.appendChild(loaderTemplate.content.cloneNode(true));
         this.ui.loader = this.container.querySelector('.mediabunny-loader');
 
-        const controlsHTML = `
-            <div class="mediabunny-controls">
-                <div class="mediabunny-progress-container" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
-                    <div class="mediabunny-progress-bar"></div>
-                    <div class="mediabunny-loop-region" style="display: none;"></div>
-                    <div class="mediabunny-marker marker-a" style="display: none;"></div>
-                    <div class="mediabunny-marker marker-b" style="display: none;"></div>
-                </div>
-                <div class="mediabunny-controls-row">
-                    <div style="display: flex; align-items: center;">
-                        <button class="mediabunny-btn" id="mb-play-btn" aria-label="Play" aria-pressed="false">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                        </button>
-                        <button class="mediabunny-btn" id="mb-prev-btn" aria-label="Previous Video" disabled>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-                        </button>
-                        <button class="mediabunny-btn" id="mb-next-btn" aria-label="Next Video" disabled>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-                        </button>
-                        <div class="mediabunny-time" id="mb-time-display">0:00 / 0:00</div>
-                    </div>
-                    
-                    <div class="mediabunny-volume-container">
-                        <button class="mediabunny-btn" id="mb-mute-btn" aria-label="Mute" aria-pressed="false">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                        </button>
-                        <input type="range" class="mediabunny-volume-slider" id="mb-volume-slider" min="0" max="1" step="0.05" value="${this.config.volume}" aria-label="Volume">
-                        
-                        <!-- Audio Track Menu -->
-                        <div class="mediabunny-menu-btn" id="mb-audio-container" style="display: none;">
-                            <button class="mediabunny-btn" id="mb-audio-btn" aria-label="Audio Tracks" aria-haspopup="true" aria-expanded="false">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
-                            </button>
-                            <div class="mediabunny-menu" id="mb-audio-menu" role="menu"></div>
-                        </div>
+        // Controls
+        const controlsTemplate = document.getElementById('player-controls-template');
+        this.container.appendChild(controlsTemplate.content.cloneNode(true));
 
-                        <!-- Subtitle Menu -->
-                        <div class="mediabunny-menu-btn">
-                            <button class="mediabunny-btn" id="mb-cc-btn" aria-label="Subtitles" aria-haspopup="true" aria-expanded="false">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg>
-                            </button>
-                            <div class="mediabunny-menu" id="mb-cc-menu" role="menu">
-                                <div class="mediabunny-menu-item active" data-value="off" role="menuitem" tabindex="0">Off</div>
-                                <div class="mediabunny-menu-item" id="mb-upload-cc" role="menuitem" tabindex="0">
-                                    <span>Upload Subtitle</span>
-                                    <input type="file" id="mb-cc-input" accept=".vtt,.srt" style="display: none;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Speed Menu -->
-                        <div class="mediabunny-menu-btn" id="mb-speed-container">
-                            <button class="mediabunny-btn" id="mb-speed-btn" aria-label="Playback Speed" aria-haspopup="true" aria-expanded="false" style="font-size: 0.8rem; font-weight: bold; width: auto; padding: 0 8px;">
-                                1x
-                            </button>
-                            <div class="mediabunny-menu" id="mb-speed-menu" role="menu">
-                                <div class="mediabunny-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x</div>
-                                <div class="mediabunny-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x</div>
-                                <div class="mediabunny-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
-                                <div class="mediabunny-menu-item" data-value="1" role="menuitem" tabindex="0">Normal</div>
-                                <div class="mediabunny-menu-item" data-value="1.25" role="menuitem" tabindex="0">1.25x</div>
-                                <div class="mediabunny-menu-item" data-value="1.5" role="menuitem" tabindex="0">1.5x</div>
-                                <div class="mediabunny-menu-item" data-value="1.75" role="menuitem" tabindex="0">1.75x</div>
-                                <div class="mediabunny-menu-item" data-value="2" role="menuitem" tabindex="0">2x</div>
-                            </div>
-                        </div>
-
-                        <button class="mediabunny-btn" id="mb-loop-btn" aria-label="Loop Mode: Off">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-                        </button>
-
-                        <button class="mediabunny-btn" id="mb-fullscreen-btn" aria-label="Fullscreen">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const loopPanelHTML = `
-            <div class="mediabunny-loop-panel" style="display: none;">
-                <div class="loop-panel-header">
-                    <span>Loop Controls</span>
-                    <button class="mediabunny-close-btn" aria-label="Close Loop Panel">×</button>
-                </div>
-                <div class="loop-panel-content">
-                    <div class="loop-status">Mode: <span id="mb-loop-status">Off</span></div>
-                    <div class="loop-inputs">
-                        <div class="input-group">
-                            <label for="mb-loop-start">Start (A)</label>
-                            <div class="input-row">
-                                <input type="text" id="mb-loop-start" placeholder="MM:SS" class="mediabunny-input">
-                                <button class="mediabunny-btn-small" id="mb-set-a-btn">Set</button>
-                            </div>
-                        </div>
-                        <div class="input-group">
-                            <label for="mb-loop-end">End (B)</label>
-                            <div class="input-row">
-                                <input type="text" id="mb-loop-end" placeholder="MM:SS" class="mediabunny-input">
-                                <button class="mediabunny-btn-small" id="mb-set-b-btn">Set</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="loop-actions">
-                        <button class="mediabunny-btn-text" id="mb-clear-loop-btn">Clear Markers</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        this.container.insertAdjacentHTML('beforeend', controlsHTML);
-        this.container.insertAdjacentHTML('beforeend', loopPanelHTML);
+        // Loop Panel
+        const loopPanelTemplate = document.getElementById('player-loop-panel-template');
+        this.container.appendChild(loopPanelTemplate.content.cloneNode(true));
 
         // Initialize Screenshot Manager UI (must be after controls, before caching)
         if (this.screenshotManager) {
@@ -710,27 +490,28 @@ export class CorePlayer {
     _updateLoopUI() {
         // Update Button
         const btn = this.ui.loopBtn;
+        const use = btn.querySelector('use');
         let statusText = 'Off';
 
         if (this.loopMode === 'off') {
             btn.style.color = '';
             btn.setAttribute('aria-label', 'Loop Mode: Off');
-            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>';
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop');
             statusText = 'Off';
         } else if (this.loopMode === 'playlist') {
             btn.style.color = 'var(--accent-primary)';
             btn.setAttribute('aria-label', 'Loop Mode: Playlist');
-            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">LIST</text></svg>';
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-playlist');
             statusText = 'Playlist';
         } else if (this.loopMode === 'one') {
             btn.style.color = 'var(--accent-primary)';
             btn.setAttribute('aria-label', 'Loop Mode: One');
-            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">1</text></svg>';
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-one');
             statusText = 'Current Video';
         } else if (this.loopMode === 'ab') {
             btn.style.color = 'var(--accent-primary)';
             btn.setAttribute('aria-label', 'Loop Mode: A-B');
-            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">A-B</text></svg>';
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-ab');
             statusText = 'A-B Loop';
         }
 
@@ -821,34 +602,33 @@ export class CorePlayer {
             this.audioSink = new MediaBunny.AudioBufferSink(this.audioTrack);
 
             // Update UI
-            this._updateAudioTrackMenu();
+            this._updateAudioTracks();
             console.log(`Switched to audio track: ${track.id}`);
         }
     }
 
-    async _updateAudioTrackMenu() {
-        if (!this.input) return;
+    async _updateAudioTracks() {
+        if (!this.ui.audioMenu) return;
 
-        const audioTracks = await this.input.getAudioTracks();
+        this.ui.audioMenu.textContent = '';
+        const tracks = this.input ? await this.input.getAudioTracks() : [];
 
-        if (audioTracks.length <= 1) {
+        if (tracks.length <= 1) {
             this.ui.audioContainer.style.display = 'none';
             return;
         }
 
         this.ui.audioContainer.style.display = 'block';
-        this.ui.audioMenu.innerHTML = '';
+        const template = document.getElementById('player-menu-item-template');
 
-        audioTracks.forEach((track, index) => {
-            const isActive = this.audioTrack && this.audioTrack.id === track.id;
-            const label = track.languageCode || `Track ${index + 1}`;
-
-            const item = document.createElement('div');
-            item.className = `mediabunny-menu-item ${isActive ? 'active' : ''}`;
+        tracks.forEach((track, index) => {
+            const item = template.content.cloneNode(true).querySelector('.mediabunny-menu-item');
+            item.textContent = track.languageCode || `Track ${index + 1}`;
             item.dataset.value = track.id;
-            item.textContent = label;
-            item.setAttribute('role', 'menuitem');
-            item.setAttribute('tabindex', '0');
+
+            if (this.audioTrack && this.audioTrack.id === track.id) {
+                item.classList.add('active');
+            }
 
             this.ui.audioMenu.appendChild(item);
         });
@@ -1173,7 +953,7 @@ export class CorePlayer {
                 this.audioSink = new MediaBunny.AudioBufferSink(this.audioTrack);
             }
 
-            this._updateAudioTrackMenu();
+            this._updateAudioTracks();
             this._updateSubtitleMenu();
 
             this.ui.loader.classList.remove('visible');
@@ -1315,7 +1095,7 @@ export class CorePlayer {
 
         this.audioContextStartTime = this.audioContext.currentTime;
         this.isPlaying = true;
-        this._updatePlayIcon();
+        this._updatePlayPauseUI();
 
         if (this.audioSink) {
             // Start the audio iterator
@@ -1331,7 +1111,7 @@ export class CorePlayer {
         console.log("Player.pause() called");
         this.playbackTimeAtStart = this._getPlaybackTime();
         this.isPlaying = false;
-        this._updatePlayIcon();
+        this._updatePlayPauseUI();
 
         if (this.audioBufferIterator) {
             this.audioBufferIterator.return(); // This stops any for-loops that are iterating the iterator
@@ -1548,15 +1328,16 @@ export class CorePlayer {
         }
     }
 
-    _updatePlayIcon() {
-        if (!this.isPlaying) {
-            this.ui.playBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
-            this.ui.playBtn.setAttribute('aria-label', 'Play');
-            this.ui.playBtn.setAttribute('aria-pressed', 'false');
-        } else {
-            this.ui.playBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+    _updatePlayPauseUI() {
+        const use = this.ui.playBtn.querySelector('use');
+        if (this.isPlaying) {
             this.ui.playBtn.setAttribute('aria-label', 'Pause');
             this.ui.playBtn.setAttribute('aria-pressed', 'true');
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-pause');
+        } else {
+            this.ui.playBtn.setAttribute('aria-label', 'Play');
+            this.ui.playBtn.setAttribute('aria-pressed', 'false');
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-play');
         }
     }
 
@@ -1581,10 +1362,11 @@ export class CorePlayer {
 
     _updateVolumeIcon() {
         // Visual update only for now
+        const use = this.ui.muteBtn.querySelector('use');
         if (this.config.muted || this.config.volume === 0) {
-            this.ui.muteBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
         } else {
-            this.ui.muteBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
         }
     }
 

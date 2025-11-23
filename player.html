@@ -63,9 +63,13 @@
             const screenshotResponse = await fetch('assets/templates/screenshot-templates.html');
             const screenshotHtml = await screenshotResponse.text();
 
+            // Load player templates
+            const playerResponse = await fetch('assets/templates/player-templates.html');
+            const playerHtml = await playerResponse.text();
+
             const tempDiv = document.createElement('div');
             tempDiv.style.display = 'none'; // Hide template container
-            tempDiv.innerHTML = playlistHtml + screenshotHtml;
+            tempDiv.innerHTML = playlistHtml + screenshotHtml + playerHtml;
             document.body.appendChild(tempDiv);
 
             // Now that templates are loaded, import and initialize
