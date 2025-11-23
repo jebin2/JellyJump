@@ -464,17 +464,22 @@ export class Playlist {
 
     /**
      * Get video duration using MediaBunny
-     * @param {File} file
+     * @param {File|string} resource - File object or URL string
      * @returns {Promise<number>}
      * @private
      */
-    async _getVideoDuration(file) {
+    async _getVideoDuration(resource) {
         try {
-            const source = new MediaBunny.BlobSource(file);
+            // Create appropriate source based on resource type
+            const source = resource instanceof File
+                ? new MediaBunny.BlobSource(resource)
+                : new MediaBunny.UrlSource(resource);
+            
             const input = new MediaBunny.Input({
                 source,
                 formats: MediaBunny.ALL_FORMATS
             });
+            
             const duration = await input.computeDuration();
             return duration;
         } catch (error) {
