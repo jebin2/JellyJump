@@ -805,8 +805,11 @@ export class CorePlayer {
         }
 
         // Stop all active sources
-        this.activeSources.forEach(source => {
-            try { source.stop(); } catch (e) { }
+        [...this.activeSources].forEach(source => {
+            try {
+                source.onended = null;
+                source.stop();
+            } catch (e) { }
         });
         this.activeSources = [];
     }
@@ -896,8 +899,11 @@ export class CorePlayer {
         this.currentTime = Math.max(0, Math.min(this.duration, time));
 
         // Stop current audio
-        this.activeSources.forEach(source => {
-            try { source.stop(); } catch (e) { }
+        [...this.activeSources].forEach(source => {
+            try {
+                source.onended = null;
+                source.stop();
+            } catch (e) { }
         });
         this.activeSources = [];
         const myPlaybackId = ++this.playbackId; // Cancel any running iterator and capture ID
