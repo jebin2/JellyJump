@@ -861,3 +861,74 @@
         font-size: 10px;
     }
 }
+
+/* -----------------------------------------
+   12. Notification System
+   ----------------------------------------- */
+.notification-container {
+    position: fixed;
+    top: 80px;
+    right: var(--space-lg);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    pointer-events: none;
+}
+
+.notification {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: var(--border-medium) solid var(--border-primary);
+    box-shadow: var(--shadow-lg) #000000;
+    padding: var(--space-md) var(--space-lg);
+    min-width: 280px;
+    max-width: 400px;
+    pointer-events: all;
+    animation: slideInRight 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.notification--success {
+    border-color: var(--accent-primary);
+}
+
+.notification--error {
+    border-color: var(--accent-danger);
+}
+
+.notification__icon {
+    font-size: var(--text-xl);
+}
+
+.notification__message {
+    flex: 1;
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}

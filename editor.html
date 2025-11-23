@@ -343,8 +343,19 @@
         </div>
     </section>
 
+    <!-- Hidden file input for media import -->
+    <input type="file" id="media-import-input" data-file-input="media-import"
+        accept="video/*,audio/*,image/*,.mp4,.webm,.mov,.mp3,.wav,.ogg,.m4a,.jpg,.jpeg,.png,.gif,.webp" multiple hidden
+        aria-label="Import media files">
+
+    <!-- Notification container -->
+    <div id="notification-container" class="notification-container"></div>
+
     <!-- Scripts -->
     <script type="module" src="assets/js/dropdown-menu.js"></script>
+    <script type="module" src="assets/js/indexeddb-helper.js"></script>
+    <script type="module" src="assets/js/import-handler.js"></script>
+    <script type="module" src="assets/js/media-library.js"></script>
 
 </body>
 
