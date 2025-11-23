@@ -94,6 +94,108 @@
 }
 
 /* -----------------------------------------
+   1.5 Dropdown Menu
+   ----------------------------------------- */
+.dropdown-menu {
+    position: fixed;
+    top: 60px;
+    left: 16px;
+    min-width: 280px;
+    background-color: var(--bg-secondary);
+    border: var(--border-medium) solid var(--border-primary);
+    box-shadow: var(--shadow-lg) var(--accent-primary);
+    z-index: 900;
+    padding: var(--space-sm) 0;
+}
+
+.dropdown-menu[hidden] {
+    display: none;
+}
+
+/* Slide-in animation */
+.dropdown-menu:not([hidden]) {
+    animation: dropdownSlideIn 0.2s ease-out;
+}
+
+@keyframes dropdownSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dropdown-menu__item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background-color: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-standard);
+    text-align: left;
+}
+
+.dropdown-menu__item:hover {
+    background-color: var(--bg-tertiary);
+    border-left-color: var(--accent-primary);
+}
+
+.item-icon {
+    font-size: var(--text-lg);
+}
+
+.item-label {
+    flex: 1;
+    font-weight: var(--font-medium);
+}
+
+.item-shortcut {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+
+.dropdown-menu__divider {
+    height: 1px;
+    background-color: var(--border-dark);
+    margin: var(--space-sm) var(--space-md);
+}
+
+/* File button active state when menu open */
+.nav-menu-btn[aria-expanded="true"] {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+/* Disabled menu item state */
+.dropdown-menu__item--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    color: var(--text-muted);
+}
+
+.dropdown-menu__item--disabled:hover {
+    background-color: transparent;
+    border-left-color: transparent;
+}
+
+/* Edit menu positioning (offset for Edit button position) */
+.dropdown-menu[data-dropdown="edit"] {
+    left: 105px;
+}
+
+/* -----------------------------------------
    2. Multi-Tab Bar
    ----------------------------------------- */
 .tab-bar {

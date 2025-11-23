@@ -19,8 +19,8 @@
             <h1 class="nav-title">MediaBunny Editor</h1>
         </div>
         <div class="nav-center">
-            <button class="nav-menu-btn" data-menu="file">File</button>
-            <button class="nav-menu-btn" data-menu="edit">Edit</button>
+            <button class="nav-menu-btn" data-menu="file" aria-expanded="false" aria-haspopup="true">File</button>
+            <button class="nav-menu-btn" data-menu="edit" aria-expanded="false" aria-haspopup="true">Edit</button>
             <button class="nav-menu-btn" data-menu="view">View</button>
             <button class="nav-menu-btn" data-menu="effects">Effects</button>
         </div>
@@ -29,6 +29,63 @@
             <button class="nav-action-btn" data-action="export">📤 Export ▾</button>
         </div>
     </nav>
+
+    <!-- File Menu Dropdown -->
+    <div class="dropdown-menu" data-dropdown="file" role="menu" hidden>
+        <button class="dropdown-menu__item" data-action="new-project" role="menuitem">
+            <span class="item-icon">📄</span>
+            <span class="item-label">New Project</span>
+            <span class="item-shortcut">Ctrl+N</span>
+        </button>
+        <button class="dropdown-menu__item" data-action="open-project" role="menuitem">
+            <span class="item-icon">📂</span>
+            <span class="item-label">Open Project</span>
+            <span class="item-shortcut">Ctrl+O</span>
+        </button>
+        <div class="dropdown-menu__divider"></div>
+        <button class="dropdown-menu__item" data-action="save" role="menuitem">
+            <span class="item-icon">💾</span>
+            <span class="item-label">Save</span>
+            <span class="item-shortcut">Ctrl+S</span>
+        </button>
+        <button class="dropdown-menu__item" data-action="save-as" role="menuitem">
+            <span class="item-icon">💾</span>
+            <span class="item-label">Save As...</span>
+            <span class="item-shortcut">Ctrl+Shift+S</span>
+        </button>
+    </div>
+
+    <!-- Edit Menu Dropdown -->
+    <div class="dropdown-menu" data-dropdown="edit" role="menu" hidden>
+        <button class="dropdown-menu__item dropdown-menu__item--disabled" data-action="undo" data-disabled="true"
+            role="menuitem" aria-disabled="true">
+            <span class="item-icon">↩️</span>
+            <span class="item-label">Undo</span>
+            <span class="item-shortcut">Ctrl+Z</span>
+        </button>
+        <button class="dropdown-menu__item dropdown-menu__item--disabled" data-action="redo" data-disabled="true"
+            role="menuitem" aria-disabled="true">
+            <span class="item-icon">↪️</span>
+            <span class="item-label">Redo</span>
+            <span class="item-shortcut">Ctrl+Y</span>
+        </button>
+        <div class="dropdown-menu__divider"></div>
+        <button class="dropdown-menu__item" data-action="cut" role="menuitem">
+            <span class="item-icon">✂️</span>
+            <span class="item-label">Cut</span>
+            <span class="item-shortcut">Ctrl+X</span>
+        </button>
+        <button class="dropdown-menu__item" data-action="copy" role="menuitem">
+            <span class="item-icon">📋</span>
+            <span class="item-label">Copy</span>
+            <span class="item-shortcut">Ctrl+C</span>
+        </button>
+        <button class="dropdown-menu__item" data-action="paste" role="menuitem">
+            <span class="item-icon">📄</span>
+            <span class="item-label">Paste</span>
+            <span class="item-shortcut">Ctrl+V</span>
+        </button>
+    </div>
 
     <!-- Multi-Tab Bar -->
     <div class="tab-bar">
@@ -294,6 +351,9 @@
             <button class="toolbar-btn" aria-label="Redo">↩️ Redo</button>
         </div>
     </section>
+
+    <!-- Scripts -->
+    <script type="module" src="assets/js/dropdown-menu.js"></script>
 
 </body>
 
