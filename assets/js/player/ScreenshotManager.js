@@ -1,6 +1,6 @@
 /**
  * Screenshot Manager
- * Handles video frame capture, preview, and download functionality
+ * Handles video frame capture, preview, and download functionality  
  * Phase 17: Player Frame Capture
  */
 
@@ -18,7 +18,9 @@ export class ScreenshotManager {
             timestamp: null,
             downloadBtn: null,
             cancelBtn: null,
-            closeBtn: null
+            closeBtn: null,
+            prevBtn: null,
+            nextBtn: null
         };
     }
 
@@ -78,7 +80,17 @@ export class ScreenshotManager {
                         <button class="mediabunny-screenshot-close" id="mb-screenshot-close" aria-label="Close">&times;</button>
                     </div>
                     <div class="mediabunny-screenshot-preview-container">
+                        <button class="mediabunny-screenshot-nav mediabunny-screenshot-prev" id="mb-screenshot-prev" aria-label="Previous Frame" title="Previous Frame">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                            </svg>
+                        </button>
                         <img class="mediabunny-screenshot-preview" id="mb-screenshot-preview" alt="Screenshot preview" />
+                        <button class="mediabunny-screenshot-nav mediabunny-screenshot-next" id="mb-screenshot-next" aria-label="Next Frame" title="Next Frame">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                            </svg>
+                        </button>
                     </div>
                     <div class="mediabunny-screenshot-actions">
                         <button class="mediabunny-btn mediabunny-btn-primary" id="mb-screenshot-download">Download PNG</button>
@@ -102,6 +114,8 @@ export class ScreenshotManager {
         this.ui.downloadBtn = container.querySelector('#mb-screenshot-download');
         this.ui.cancelBtn = container.querySelector('#mb-screenshot-cancel');
         this.ui.closeBtn = container.querySelector('#mb-screenshot-close');
+        this.ui.prevBtn = container.querySelector('#mb-screenshot-prev');
+        this.ui.nextBtn = container.querySelector('#mb-screenshot-next');
     }
 
     /**
@@ -123,6 +137,14 @@ export class ScreenshotManager {
 
         if (this.ui.closeBtn) {
             this.ui.closeBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        if (this.ui.prevBtn) {
+            this.ui.prevBtn.addEventListener('click', () => this.captureAdjacentFrame(-1));
+        }
+
+        if (this.ui.nextBtn) {
+            this.ui.nextBtn.addEventListener('click', () => this.captureAdjacentFrame(1));
         }
 
         if (this.ui.modal) {
@@ -171,6 +193,51 @@ export class ScreenshotManager {
     }
 
     /**
+     * Capture adjacent frame (previous or next)
+     * @param {number} direction - -1 for previous, 1 for next
+     */
+    async captureAdjacentFrame(direction) {
+        if (!this.player.videoSink || !this.player.videoTrack) {
+            return;
+        }
+
+        try {
+            // Calculate frame duration based on frame rate
+            const fps = this.player.frameRate || 30;
+            const frameDuration = 1 / fps;
+
+            // Calculate new timestamp
+            const currentTimestamp = this.screenshotTimestamp || this.player.currentTime;
+            let newTimestamp = currentTimestamp + (direction * frameDuration);
+
+            // Clamp to video duration
+            newTimestamp = Math.max(0, Math.min(this.player.duration, newTimestamp));
+
+            // Get frame at new timestamp
+            const frame = await this.player.videoSink.getCanvas(newTimestamp);
+
+            if (!frame || !frame.canvas) {
+                console.error('Failed to capture adjacent frame');
+                return;
+            }
+
+            // Convert canvas to data URL
+            const dataUrl = frame.canvas.toDataURL('image/png');
+
+            // Update modal with new frame (don't close/reopen)
+            this.ui.preview.src = dataUrl;
+            this.screenshotDataUrl = dataUrl;
+            this.screenshotTimestamp = frame.timestamp;
+
+            // Update timestamp display
+            const timeStr = this._formatTime(frame.timestamp);
+            this.ui.timestamp.textContent = `at ${timeStr}`;
+        } catch (error) {
+            console.error('Error capturing adjacent frame:', error);
+        }
+    }
+
+    /**
      * Show screenshot modal with preview
      * @param {string} imageData - Data URL of the screenshot
      * @param {number} timestamp - Frame timestamp
@@ -187,6 +254,9 @@ export class ScreenshotManager {
         const timeStr = this._formatTime(timestamp);
         this.ui.timestamp.textContent = `at ${timeStr}`;
 
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+
         // Show modal
         this.ui.modal.style.display = 'flex';
     }
@@ -199,6 +269,9 @@ export class ScreenshotManager {
 
         // Hide modal
         this.ui.modal.style.display = 'none';
+
+        // Restore body scroll
+        document.body.style.overflow = '';
 
         // Clean up
         this.ui.preview.src = '';

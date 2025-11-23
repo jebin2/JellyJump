@@ -76,7 +76,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: auto;
+    overflow: hidden;
+    position: relative;
 }
 
 .mediabunny-screenshot-preview {
@@ -84,6 +85,38 @@
     max-height: 100%;
     object-fit: contain;
     border: 1px solid var(--border-dark, #333);
+    position: relative;
+    z-index: 1;
+}
+
+.mediabunny-screenshot-nav {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid var(--accent-primary, #00ff88);
+    color: var(--accent-primary, #00ff88);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 100;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.mediabunny-screenshot-nav:hover {
+    background: var(--accent-primary, #00ff88);
+    color: #000;
+}
+
+.mediabunny-screenshot-prev {
+    left: 10px;
+}
+
+.mediabunny-screenshot-next {
+    right: 10px;
 }
 
 .mediabunny-screenshot-actions {

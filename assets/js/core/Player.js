@@ -89,12 +89,12 @@ export class CorePlayer {
         this.ctx = this.canvas.getContext('2d');
         this.container.appendChild(this.canvas);
 
+        // Initialize Screenshot Manager (before creating controls)
+        this.screenshotManager = new ScreenshotManager(this);
+
         // Create UI
         this._createControls();
         this._createHelpOverlay();
-
-        // Initialize Screenshot Manager
-        this.screenshotManager = new ScreenshotManager(this);
 
         // Attach Events
         this._attachEvents();
@@ -309,6 +309,11 @@ export class CorePlayer {
 
         this.container.insertAdjacentHTML('beforeend', controlsHTML);
 
+        // Initialize Screenshot Manager UI (must be after controls, before caching)
+        if (this.screenshotManager) {
+            this.screenshotManager.init();
+        }
+
         // Cache elements
         this.ui.controls = this.container.querySelector('.mediabunny-controls');
         this.ui.playBtn = this.container.querySelector('#mb-play-btn');
@@ -324,11 +329,6 @@ export class CorePlayer {
         this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
         this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
         this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
-
-        // Initialize Screenshot Manager (after UI elements are cached)
-        if (this.screenshotManager) {
-            this.screenshotManager.init();
-        }
     }
 
     /**
