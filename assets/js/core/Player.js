@@ -19,7 +19,6 @@ export class CorePlayer {
         this.canvas = null;
         this.ctx = null;
         this.isPlaying = false;
-        this.isSeeking = false;
         this.currentTime = 0;
         this.duration = 0;
         this.animationFrameId = null;
@@ -838,12 +837,6 @@ export class CorePlayer {
         const loop = async () => {
             if (!this.isPlaying) return;
 
-            // Skip update if seeking to prevent fighting with seek operation
-            if (this.isSeeking) {
-                this.animationFrameId = requestAnimationFrame(loop);
-                return;
-            }
-
             const now = performance.now();
             const dt = (now - lastTime) / 1000;
             lastTime = now;
@@ -917,46 +910,6 @@ export class CorePlayer {
         const rect = this.ui.progressContainer.getBoundingClientRect();
         const pos = (e.clientX - rect.left) / rect.width;
         this._seekTo(pos * this.duration);
-    }
-
-    async _seekTo(time) {
-        this.isSeeking = true;
-        try {
-            this.currentTime = Math.max(0, Math.min(this.duration, time));
-
-            // Stop current audio
-            [...this.activeSources].forEach(source => {
-                try {
-                    source.onended = null;
-                    source.stop();
-                } catch (e) { }
-            });
-            this.activeSources = [];
-            const myPlaybackId = ++this.playbackId; // Cancel any running iterator and capture ID
-
-            // Pass false to prevent overwriting this.currentTime with stale frame time
-            // Poll until we get a frame close to the target time
-            const startTime = performance.now();
-            while (performance.now() - startTime < 1000) { // 1s timeout
-                const renderedTime = await this._renderFrame(this.currentTime, false);
-
-                // Check if we got a frame and it's close enough (within 100ms)
-                // Note: renderedTime might be undefined/null if seek failed or no frame returned
-                if (renderedTime !== null && renderedTime !== undefined && Math.abs(renderedTime - this.currentTime) < 0.1) {
-                    break;
-                }
-
-                // Wait a bit before retrying
-                await new Promise(r => setTimeout(r, 20));
-            }
-
-            // Restart audio if playing AND we are still the latest operation
-            if (this.playbackId === myPlaybackId && this.isPlaying && this.audioSink) {
-                this._playAudio(this.currentTime);
-            }
-        } finally {
-            this.isSeeking = false;
-        }
     }
 
     /**
