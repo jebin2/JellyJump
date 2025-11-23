@@ -1,9 +1,10 @@
 import { modalDialog } from './modal-dialog.js';
+import { StorageHelper } from './storage-helper.js';
 
 /**
  * MediaBunny Editor - Tab Manager
  * Handles creation, state management, and rendering of project tabs.
- * Phase: 36
+ * Phase: 37
  */
 
 export class TabManager {
@@ -13,6 +14,7 @@ export class TabManager {
         this.tabContainer = document.querySelector('.tab-bar__tabs');
         this.createBtn = document.querySelector('[data-action="create-tab"]');
         this.notificationContainer = document.getElementById('notification-container');
+        this.saveTimeout = null;
 
         this.init();
     }
@@ -28,10 +30,56 @@ export class TabManager {
             this.tabContainer.addEventListener('keydown', (e) => this.handleKeyDown(e));
         }
 
-        // Create initial tab if none exist
-        if (this.tabs.length === 0) {
+        // Load saved tabs
+        this.loadTabs();
+    }
+
+    /**
+     * Loads tabs from localStorage
+     */
+    loadTabs() {
+        const savedTabs = StorageHelper.load('tabs');
+        const activeTabId = StorageHelper.load('active_tab');
+
+        if (savedTabs && Array.isArray(savedTabs) && savedTabs.length > 0) {
+            this.tabs = savedTabs;
+            this.renderTabs();
+
+            // Restore active tab
+            if (activeTabId) {
+                const tabToActivate = this.tabs.find(t => t.id === activeTabId);
+                if (tabToActivate) {
+                    this.switchTab(activeTabId, false); // false = don't save again immediately
+                } else {
+                    this.switchTab(this.tabs[0].id, false);
+                }
+            } else {
+                this.switchTab(this.tabs[0].id, false);
+            }
+            console.log(`Restored ${this.tabs.length} tabs`);
+        } else {
+            // First time load
             this.createTab();
         }
+    }
+
+    /**
+     * Saves tabs to localStorage (debounced)
+     */
+    saveTabs() {
+        if (this.saveTimeout) clearTimeout(this.saveTimeout);
+
+        this.saveTimeout = setTimeout(() => {
+            StorageHelper.save('tabs', this.tabs);
+
+            const activeTab = this.tabs.find(t => t.isActive);
+            if (activeTab) {
+                StorageHelper.save('active_tab', activeTab.id);
+            }
+
+            StorageHelper.save('last_save', Date.now());
+            // console.log('Tabs saved to storage');
+        }, 500);
     }
 
     /**
@@ -95,7 +143,9 @@ export class TabManager {
                     type: 'primary',
                     callback: () => {
                         console.log(`Saving project: ${tab.id}`);
-                        // Simulate save
+                        // Simulate save (update flag and persist)
+                        tab.hasUnsavedChanges = false;
+                        this.saveTabs();
                         this.performCloseTab(tab.id);
                     }
                 },
@@ -143,6 +193,7 @@ export class TabManager {
 
         // Render updates
         this.renderTabs();
+        this.saveTabs(); // Save after closing
 
         console.log(`Closed tab: ${tabId}`);
     }
@@ -156,6 +207,7 @@ export class TabManager {
         if (tab && !tab.hasUnsavedChanges) {
             tab.hasUnsavedChanges = true;
             this.renderTabs();
+            this.saveTabs();
         }
     }
 
@@ -168,6 +220,7 @@ export class TabManager {
         if (tab && tab.hasUnsavedChanges) {
             tab.hasUnsavedChanges = false;
             this.renderTabs();
+            this.saveTabs();
         }
     }
 
@@ -208,32 +261,31 @@ export class TabManager {
     /**
      * Switches to the specified tab
      * @param {string} tabId 
+     * @param {boolean} save Whether to trigger a save
      */
-    switchTab(tabId) {
+    switchTab(tabId, save = true) {
         const tab = this.tabs.find(t => t.id === tabId);
+        if (!tab || tab.isActive) return;
 
-        if (!tab) return;
-        if (tab.isActive) return; // Already active
+        this.tabs.forEach(t => t.isActive = false);
+        tab.isActive = true;
 
-        // Update state
-        this.tabs.forEach(t => t.isActive = (t.id === tabId));
-
-        // Update UI
         this.renderTabs();
+        this.updateUIState();
 
-        console.log(`Switched to tab: ${tabId}`);
-        console.log(`Loading project data for tab: ${tabId}`);
+        // Load project data (placeholder)
+        console.log(`Switched to tab: ${tab.name} (${tabId})`);
+        console.log('Loading project data...');
 
-        // Placeholder for loading data
-        // this.loadProjectData(tab);
+        if (save) this.saveTabs();
     }
 
     /**
-     * Creates a new tab if limit is not reached
+     * Creates a new project tab
      */
     createTab() {
         if (this.tabs.length >= this.maxTabs) {
-            this.showNotification('⚠️ Maximum 10 tabs allowed', 'error');
+            this.showNotification(`Maximum limit of ${this.maxTabs} tabs reached`, 'warning');
             return;
         }
 
@@ -241,19 +293,24 @@ export class TabManager {
             id: crypto.randomUUID(),
             name: 'Untitled Project',
             isActive: true,
+            hasUnsavedChanges: false,
+            projectData: {
+                timeline: [],
+                clips: [],
+                settings: {}
+            },
             createdAt: Date.now()
         };
 
-        // Deactivate current active tab
+        // Deactivate other tabs
         this.tabs.forEach(tab => tab.isActive = false);
 
-        // Add new tab
         this.tabs.push(newTab);
-
-        // Render all tabs (simplest way to ensure UI sync)
         this.renderTabs();
+        this.updateUIState();
 
-        console.log(`Created tab: ${newTab.id}`);
+        // Save immediately on creation
+        this.saveTabs();
     }
 
     /**
@@ -313,6 +370,13 @@ export class TabManager {
                 notification.remove();
             });
         }, 3000);
+    }
+
+    /**
+     * Updates UI state based on active tab
+     */
+    updateUIState() {
+        // Placeholder for future UI updates (e.g. enable/disable controls)
     }
 }
 
