@@ -141,5 +141,9 @@ Inherits all from core player (editor mode), plus:
 
 ---
 
-**Phase**: 2 (Editor Page)  \n**Dependencies**: theme, core player, **MediaBunny**  
-**Last Updated**: 2025-11-22
+**Phase**: 2 (Editor Page)  
+**Dependencies**: theme, core player, **MediaBunny**  
+**Phases**: 26-103 (78 granular phases, one feature each)  
+**Estimated Time**: 30-35 hours  
+**Implementation**: See [overview.md](overview.md)  
+**Last Updated**: 2025-11-23
