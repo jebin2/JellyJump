@@ -1,6 +1,7 @@
 /**
  * Screenshot Manager
  * Handles video frame capture, preview, and download functionality
+ * Phase 17: Player Frame Capture
  */
 
 export class ScreenshotManager {
@@ -25,8 +26,67 @@ export class ScreenshotManager {
      * Initialize screenshot UI and attach event listeners
      */
     init() {
+        this._createUI();
         this._cacheElements();
         this._attachEvents();
+    }
+
+    /**
+     * Create screenshot UI elements
+     * @private
+     */
+    _createUI() {
+        // Insert button before fullscreen button
+        const fullscreenBtn = this.player.container.querySelector('#mb-fullscreen-btn');
+        if (fullscreenBtn) {
+            fullscreenBtn.insertAdjacentHTML('beforebegin', ScreenshotManager.getButtonHTML());
+        }
+
+        // Insert modal at end of container
+        this.player.container.insertAdjacentHTML('beforeend', ScreenshotManager.getModalHTML());
+    }
+
+    /**
+     * Get screenshot button HTML
+     * @returns {string}
+     * @static
+     */
+    static getButtonHTML() {
+        return `
+            <!-- Screenshot Button -->
+            <button class="mediabunny-btn" id="mb-screenshot-btn" aria-label="Take Screenshot" title="Screenshot (S)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 15.5c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/>
+                    <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+                </svg>
+            </button>
+        `;
+    }
+
+    /**
+     * Get screenshot modal HTML
+     * @returns {string}
+     * @static
+     */
+    static getModalHTML() {
+        return `
+            <div class="mediabunny-screenshot-modal" style="display: none;">
+                <div class="mediabunny-screenshot-modal-content">
+                    <div class="mediabunny-screenshot-header">
+                        <h3>Screenshot Preview</h3>
+                        <span class="mediabunny-screenshot-timestamp" id="mb-screenshot-timestamp"></span>
+                        <button class="mediabunny-screenshot-close" id="mb-screenshot-close" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="mediabunny-screenshot-preview-container">
+                        <img class="mediabunny-screenshot-preview" id="mb-screenshot-preview" alt="Screenshot preview" />
+                    </div>
+                    <div class="mediabunny-screenshot-actions">
+                        <button class="mediabunny-btn mediabunny-btn-primary" id="mb-screenshot-download">Download PNG</button>
+                        <button class="mediabunny-btn mediabunny-btn-secondary" id="mb-screenshot-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     /**

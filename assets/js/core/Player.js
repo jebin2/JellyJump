@@ -6,6 +6,7 @@
 import { MediaBunny } from './MediaBunny.js';
 import { PLAYER_CONFIG } from './config.js';
 import { SubtitleManager } from './SubtitleManager.js';
+import { ScreenshotManager } from '../player/ScreenshotManager.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -33,6 +34,9 @@ export class CorePlayer {
         // Subtitles
         this.subtitleManager = new SubtitleManager();
         this.isSubtitlesEnabled = false;
+
+        // Screenshot Manager
+        this.screenshotManager = null;
 
         // Web Audio API
         this.audioContext = null;
@@ -88,6 +92,9 @@ export class CorePlayer {
         // Create UI
         this._createControls();
         this._createHelpOverlay();
+
+        // Initialize Screenshot Manager
+        this.screenshotManager = new ScreenshotManager(this);
 
         // Attach Events
         this._attachEvents();
@@ -317,6 +324,11 @@ export class CorePlayer {
         this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
         this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
         this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
+
+        // Initialize Screenshot Manager (after UI elements are cached)
+        if (this.screenshotManager) {
+            this.screenshotManager.init();
+        }
     }
 
     /**
@@ -567,6 +579,8 @@ export class CorePlayer {
             case 'escape':
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
+                } else if (this.screenshotManager && this.screenshotManager.isModalOpen()) {
+                    this.screenshotManager.closeModal();
                 } else if (this.ui.helpOverlay.style.display !== 'none') {
                     this._toggleHelp();
                 }
@@ -576,6 +590,14 @@ export class CorePlayer {
             case '?':
                 e.preventDefault();
                 this._toggleHelp();
+                break;
+
+            // Screenshot
+            case 's':
+                e.preventDefault();
+                if (this.screenshotManager) {
+                    this.screenshotManager.capture();
+                }
                 break;
 
             // Editor Mode Controls
