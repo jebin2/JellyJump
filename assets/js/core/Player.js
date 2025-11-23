@@ -66,8 +66,17 @@ export class CorePlayer {
             ccBtn: null,
             ccMenu: null,
             audioBtn: null,
-            audioMenu: null
+            audioMenu: null,
+            screenshotBtn: null,
+            screenshotModal: null,
+            screenshotPreview: null,
+            screenshotDownloadBtn: null,
+            screenshotCancelBtn: null,
+            screenshotCloseBtn: null
         };
+
+        // Screenshot state
+        this.wasPlayingBeforeCapture = false;
 
         this._init();
     }
@@ -292,6 +301,11 @@ export class CorePlayer {
                             </div>
                         </div>
 
+                        <!-- Screenshot Button -->
+                        <button class="mediabunny-btn" id="mb-screenshot-btn" aria-label="Take Screenshot" title="Screenshot (S)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                        </button>
+
                         <button class="mediabunny-btn" id="mb-fullscreen-btn" aria-label="Fullscreen">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
                         </button>
@@ -300,7 +314,28 @@ export class CorePlayer {
             </div>
         `;
 
+        // Screenshot Modal HTML
+        const screenshotModalHTML = `
+            <div class="mediabunny-screenshot-modal" style="display: none;">
+                <div class="mediabunny-screenshot-modal-content">
+                    <div class="mediabunny-screenshot-header">
+                        <h3>Screenshot Preview</h3>
+                        <span class="mediabunny-screenshot-timestamp" id="mb-screenshot-timestamp"></span>
+                        <button class="mediabunny-screenshot-close" id="mb-screenshot-close" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="mediabunny-screenshot-preview-container">
+                        <img class="mediabunny-screenshot-preview" id="mb-screenshot-preview" alt="Screenshot preview" />
+                    </div>
+                    <div class="mediabunny-screenshot-actions">
+                        <button class="mediabunny-btn mediabunny-btn-primary" id="mb-screenshot-download">Download PNG</button>
+                        <button class="mediabunny-btn mediabunny-btn-secondary" id="mb-screenshot-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
         this.container.insertAdjacentHTML('beforeend', controlsHTML);
+        this.container.insertAdjacentHTML('beforeend', screenshotModalHTML);
 
         // Cache elements
         this.ui.controls = this.container.querySelector('.mediabunny-controls');
@@ -317,6 +352,13 @@ export class CorePlayer {
         this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
         this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
         this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
+        this.ui.screenshotBtn = this.container.querySelector('#mb-screenshot-btn');
+        this.ui.screenshotModal = this.container.querySelector('.mediabunny-screenshot-modal');
+        this.ui.screenshotPreview = this.container.querySelector('#mb-screenshot-preview');
+        this.ui.screenshotDownloadBtn = this.container.querySelector('#mb-screenshot-download');
+        this.ui.screenshotCancelBtn = this.container.querySelector('#mb-screenshot-cancel');
+        this.ui.screenshotCloseBtn = this.container.querySelector('#mb-screenshot-close');
+        this.ui.screenshotTimestamp = this.container.querySelector('#mb-screenshot-timestamp');
     }
 
     /**
@@ -409,6 +451,18 @@ export class CorePlayer {
             }
             if (!this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
                 this.ui.audioMenu.classList.remove('visible');
+            }
+        });
+
+        // Screenshot
+        this.ui.screenshotBtn.addEventListener('click', () => this.captureFrame());
+        this.ui.screenshotDownloadBtn.addEventListener('click', () => this._downloadScreenshot());
+        this.ui.screenshotCancelBtn.addEventListener('click', () => this._closeScreenshotModal());
+        this.ui.screenshotCloseBtn.addEventListener('click', () => this._closeScreenshotModal());
+        this.ui.screenshotModal.addEventListener('click', (e) => {
+            // Close modal if clicking on backdrop
+            if (e.target === this.ui.screenshotModal) {
+                this._closeScreenshotModal();
             }
         });
 
@@ -567,6 +621,8 @@ export class CorePlayer {
             case 'escape':
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
+                } else if (this.ui.screenshotModal.style.display !== 'none') {
+                    this._closeScreenshotModal();
                 } else if (this.ui.helpOverlay.style.display !== 'none') {
                     this._toggleHelp();
                 }
@@ -576,6 +632,12 @@ export class CorePlayer {
             case '?':
                 e.preventDefault();
                 this._toggleHelp();
+                break;
+
+            // Screenshot
+            case 's':
+                e.preventDefault();
+                this.captureFrame();
                 break;
 
             // Editor Mode Controls
@@ -628,6 +690,111 @@ export class CorePlayer {
         const frameDuration = 1 / fps;
         const newTime = this.currentTime + (direction * frameDuration);
         this._seekTo(Math.max(0, Math.min(this.duration, newTime)));
+    }
+
+    /**
+     * Capture current video frame as screenshot
+     */
+    async captureFrame() {
+        if (!this.videoSink || !this.videoTrack) {
+            console.warn('No video loaded');
+            return;
+        }
+
+        try {
+            // Track if we were playing
+            this.wasPlayingBeforeCapture = this.isPlaying;
+
+            // Pause video if playing
+            if (this.isPlaying) {
+                this.pause();
+            }
+
+            // Get current frame from MediaBunny
+            const frame = await this.videoSink.getCanvas(this.currentTime);
+
+            if (!frame || !frame.canvas) {
+                console.error('Failed to capture frame');
+                return;
+            }
+
+            // Convert canvas to data URL
+            const dataUrl = frame.canvas.toDataURL('image/png');
+
+            // Show modal with preview
+            this._showScreenshotModal(dataUrl, frame.timestamp);
+        } catch (error) {
+            console.error('Error capturing frame:', error);
+        }
+    }
+
+    /**
+     * Show screenshot modal with preview
+     * @param {string} imageData - Data URL of the screenshot
+     * @param {number} timestamp - Frame timestamp
+     * @private
+     */
+    _showScreenshotModal(imageData, timestamp) {
+        // Set preview image
+        this.ui.screenshotPreview.src = imageData;
+        this.screenshotDataUrl = imageData; // Store for download
+        this.screenshotTimestamp = timestamp;
+
+        // Update timestamp display
+        const timeStr = this._formatTime(timestamp);
+        this.ui.screenshotTimestamp.textContent = `at ${timeStr}`;
+
+        // Show modal
+        this.ui.screenshotModal.style.display = 'flex';
+    }
+
+    /**
+     * Close screenshot modal
+     * @private
+     */
+    _closeScreenshotModal() {
+        // Hide modal
+        this.ui.screenshotModal.style.display = 'none';
+
+        // Clean up
+        this.ui.screenshotPreview.src = '';
+        this.screenshotDataUrl = null;
+        this.screenshotTimestamp = null;
+
+        // Resume playback if it was playing before
+        if (this.wasPlayingBeforeCapture) {
+            this.play();
+            this.wasPlayingBeforeCapture = false;
+        }
+    }
+
+    /**
+     * Download screenshot as PNG file
+     * @private
+     */
+    _downloadScreenshot() {
+        if (!this.screenshotDataUrl) return;
+
+        try {
+            // Generate filename with timestamp
+            const timestamp = Math.floor(this.screenshotTimestamp || this.currentTime);
+            const filename = `screenshot-${timestamp}s.png`;
+
+            // Create temporary download link
+            const link = document.createElement('a');
+            link.href = this.screenshotDataUrl;
+            link.download = filename;
+
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Close modal
+            this._closeScreenshotModal();
+        } catch (error) {
+            console.error('Error downloading screenshot:', error);
+        }
     }
 
     /**
