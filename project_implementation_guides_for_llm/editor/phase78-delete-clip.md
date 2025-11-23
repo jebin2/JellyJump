@@ -1,41 +1,53 @@
 # Phase 78: Delete Selected Clip
 
 ## Goal
-Delete key or button, remove from timeline, gap handling
+Remove selected clips from the timeline
 
 ## Group
-**Clip Editing**
+**Clip Selection & Editing**
 
 ## Feature to Implement
 
-### ONE Feature: Delete Selected Clip
-**Purpose**: Delete key or button, remove from timeline, gap handling
+### ONE Feature: Delete Clip
+**Purpose**: Remove unwanted clips
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Trigger**: `Delete` or `Backspace` key, or Trash icon in toolbar
+- **Target**: All clips in `selectedClipIds`
+- **Logic**:
+    - Remove clip objects from the Track/Timeline model
+    - Clear selection state
+    - Re-render timeline
+
+#### 2. Interaction Behavior
+- User selects one or more clips.
+- User presses Delete.
+- Clips disappear.
+- **Gap**: A gap remains (Lift delete).
+- **Ripple Delete**: (Shift+Delete) - Optional for v1. **Stick to Lift (Gap) Delete**.
+
+#### 3. Files to Create/Modify
+- `assets/js/timeline-actions.js`
+- `assets/js/timeline.js`
+
+#### 4. MediaBunny Integration
+- `track.removeClip(clipId)`
+- Ensure resources are cleaned up if necessary (though usually just a reference removal).
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement Ripple Delete (closing the gap) yet.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Delete key removes selected clip(s)
+- [ ] Toolbar trash button removes selected clip(s)
+- [ ] Multi-selection delete works
+- [ ] Undo restores the deleted clips
+- [ ] No errors if nothing selected
 
 ## Done When
-✅ Delete Selected Clip fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 78 | **Component**: Editor | **Group**: Clip Editing  
-**Estimated Time**: 20 min
+✅ Selected clips can be deleted  
+✅ Timeline updates correctly  
+✅ Undo/Redo works  
+✅ Ready for Phase 79

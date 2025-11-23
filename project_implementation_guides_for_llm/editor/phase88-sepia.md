@@ -1,41 +1,37 @@
 # Phase 88: Sepia Filter
 
 ## Goal
-Toggle sepia tone filter on/off
+Apply a preset Sepia look
 
 ## Group
 **Video Filters**
 
 ## Feature to Implement
 
-### ONE Feature: Sepia Filter
-**Purpose**: Toggle sepia tone filter on/off
+### ONE Feature: Sepia Toggle
+**Purpose**: Old-timey film look
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI**: Checkbox "Sepia" OR Preset Button.
+- **Rendering**:
+    - `filter: sepia(1)` (or adjustable 0-1).
+    - **Decision**: Slider 0-1 for intensity.
+
+#### 2. Interaction
+- Adjust Sepia intensity.
+
+#### 3. Files to Create/Modify
+- `assets/js/properties/filter-presets.js`
+
+#### 4. What NOT to Do
+- ❌ Do NOT implement Film Grain yet.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Sepia slider works
+- [ ] Visuals look correct
 
 ## Done When
-✅ Sepia Filter fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 88 | **Component**: Editor | **Group**: Video Filters  
-**Estimated Time**: 15 min
+✅ Sepia filter works  
+✅ Ready for Phase 89 (Text Overlay)

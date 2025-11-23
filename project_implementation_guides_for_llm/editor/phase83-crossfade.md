@@ -1,41 +1,53 @@
 # Phase 83: Crossfade Transition
 
 ## Goal
-Crossfade between clips, overlap duration control
+Create a smooth transition between two overlapping clips
 
 ## Group
 **Transitions**
 
 ## Feature to Implement
 
-### ONE Feature: Crossfade Transition
-**Purpose**: Crossfade between clips, overlap duration control
+### ONE Feature: Crossfade (Dissolve)
+**Purpose**: Blend one clip into another
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Concept**: A "Transition" object that links two clips.
+- **Simplification for v1**: Just overlapping clips on different tracks with Fades?
+    - **Standard NLE**: Transitions sit *between* clips on the same track.
+    - **MediaBunny**: Might be easier to just use overlapping tracks + Opacity automation.
+    - **Decision**: Implement **Track Overlap Crossfade**.
+        - Clip A on Track 1. Clip B on Track 2.
+        - Overlap them.
+        - Apply Fade Out to A, Fade In to B.
+- **Automated Tool**: "Add Crossfade" button.
+    - Requires selecting two adjacent clips.
+    - Moves them to overlap (if on same track, maybe move one to new track?).
+    - **Alternative**: **Single Track Transition**.
+        - MediaBunny supports `CrossfadeNode`?
+        - If yes, use that.
+        - If no, stick to **Overlap + Opacity**.
+    - **Decision**: **Overlap + Opacity** is the most robust "manual" way for v1.
+
+#### 2. Interaction
+- Select Clip A and Clip B.
+- Click "Crossfade".
+- System adjusts `fadeIn`/`fadeOut` to match overlap duration.
+
+#### 3. Files to Create/Modify
+- `assets/js/timeline-actions.js`
+
+#### 4. What NOT to Do
+- ❌ Do NOT build a complex "Transition Track" or specific Transition Object yet if the engine doesn't support it natively.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Overlapping clips blend correctly
+- [ ] "Crossfade" helper sets fade durations correctly
+- [ ] Playback is smooth
 
 ## Done When
-✅ Crossfade Transition fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 83 | **Component**: Editor | **Group**: Transitions  
-**Estimated Time**: 30 min
+✅ Can create a crossfade effect  
+✅ Helper action works (optional)  
+✅ Ready for Phase 84

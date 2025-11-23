@@ -1,41 +1,56 @@
 # Phase 97: Export Video Download
 
 ## Goal
-MediaBunny Conversion API, format/quality options, progress bar, download
+Render the timeline to a video file and download it
 
 ## Group
 **Export**
 
 ## Feature to Implement
 
-### ONE Feature: Export Video Download
-**Purpose**: MediaBunny Conversion API, format/quality options, progress bar, download
+### ONE Feature: Video Export
+**Purpose**: The final output of the editor
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Trigger**: "Export Video" button in Export Menu (Phase 31).
+- **UI**:
+    - Modal or Panel overlay.
+    - **Settings**:
+        - Format: MP4 (default), WebM.
+        - Quality: High, Medium, Low.
+        - Resolution: 1080p, 720p.
+    - **Action**: "Start Export" button.
+    - **Progress**: Progress bar (0-100%) and "Rendering..." text.
+- **Logic**:
+    - Initialize `MediaBunny.Conversion`.
+    - Configure `Mp4OutputFormat` / `WebMOutputFormat`.
+    - Start conversion.
+    - On complete: Trigger browser download.
+
+#### 2. MediaBunny Integration
+- **CRITICAL**: This is the core engine function.
+- `conversion = new Conversion(timeline, outputFormat)`
+- `conversion.start()`
+- `conversion.onProgress((p) => updateProgressBar(p))`
+- `conversion.onComplete((blob) => download(blob))`
+
+#### 3. Files to Create/Modify
+- `assets/js/export/video-export.js`
+- `assets/js/export/export-modal.js`
+
+#### 4. What NOT to Do
+- ❌ Do NOT implement server-side rendering. Client-side only (WASM).
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Export modal opens
+- [ ] Start button triggers conversion
+- [ ] Progress bar updates
+- [ ] File downloads upon completion
+- [ ] Video plays correctly in external player
 
 ## Done When
-✅ Export Video Download fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 97 | **Component**: Editor | **Group**: Export  
-**Estimated Time**: 45 min
+✅ Can export a playable video file  
+✅ Progress feedback works  
+✅ Ready for Phase 98

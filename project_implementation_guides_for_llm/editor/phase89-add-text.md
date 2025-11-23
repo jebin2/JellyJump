@@ -1,7 +1,7 @@
 # Phase 89: Add Text Clip
 
 ## Goal
-Create text clip, add to Text track, set start/end time
+Create a new text element on the timeline
 
 ## Group
 **Text Overlays**
@@ -9,33 +9,45 @@ Create text clip, add to Text track, set start/end time
 ## Feature to Implement
 
 ### ONE Feature: Add Text Clip
-**Purpose**: Create text clip, add to Text track, set start/end time
+**Purpose**: Allow users to insert titles and captions
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Trigger**: "Add Text" button in Media Panel (Text tab) or Toolbar.
+- **Action**:
+    - Creates a new `Clip` object with `type: 'text'`.
+    - Default duration: 5 seconds.
+    - Default content: "Your Text Here".
+    - Adds to the dedicated **Text Track** (Track 4).
+- **Visuals**:
+    - Render text clip on timeline (distinct color, e.g., Purple).
+    - Show "T" icon or text content on the clip bar.
+
+#### 2. Data Model
+- `Clip` object extension:
+    - `type`: 'video' | 'image' | 'audio' | 'text'
+    - `content`: string
+    - `style`: object (font, color, size - defaults)
+
+#### 3. Files to Create/Modify
+- `assets/js/timeline-actions.js`
+- `assets/js/models/Clip.js` (if exists, or update structure)
+
+#### 4. MediaBunny Integration
+- Use `TextNode` (if available) or `CanvasNode` to render text.
+- **Strategy**: Create a `CanvasSource` that draws text, then treat it like a video frame.
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement rich text editor (bold/italic per character). Global style only.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] "Add Text" button creates a clip
+- [ ] Clip appears on Text track
+- [ ] Default text is visible in preview
+- [ ] Clip has correct default duration
 
 ## Done When
-✅ Add Text Clip fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 89 | **Component**: Editor | **Group**: Text Overlays  
-**Estimated Time**: 25 min
+✅ Text clip appears on timeline  
+✅ Text renders in preview player  
+✅ Ready for Phase 90

@@ -1,41 +1,58 @@
-# Phase 80: Undo/Redo Stack
+# Phase 80: Undo/Redo Stack (Command Pattern)
 
 ## Goal
-Command pattern for all operations, history stack (max 50)
+Implement a robust Undo/Redo system using the Command Pattern
 
 ## Group
 **Undo/Redo**
 
 ## Feature to Implement
 
-### ONE Feature: Undo/Redo Stack
-**Purpose**: Command pattern for all operations, history stack (max 50)
+### ONE Feature: Command History
+**Purpose**: Track user actions to allow reverting changes
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Command Class**: Base class for all undoable actions.
+    - `execute()`
+    - `undo()`
+- **History Manager**:
+    - `undoStack`: Array of executed commands
+    - `redoStack`: Array of undone commands
+    - `push(command)`: Executes and adds to stack, clears redo
+    - `undo()`: Pops from undo, calls `undo()`, pushes to redo
+    - `redo()`: Pops from redo, calls `execute()`, pushes to undo
+
+#### 2. Commands to Implement (Examples)
+- `MoveClipCommand(clipId, oldTime, newTime, oldTrack, newTrack)`
+- `TrimClipCommand(clipId, oldStart, oldDuration, newStart, newDuration)`
+- `AddClipCommand(clip)`
+- `DeleteClipCommand(clip)`
+- `SplitClipCommand(originalClip, newClip)`
+
+#### 3. Files to Create/Modify
+- `assets/js/history/Command.js`
+- `assets/js/history/HistoryManager.js`
+- `assets/js/commands/MoveClipCommand.js`
+- `assets/js/commands/TrimClipCommand.js`
+- ...etc
+
+#### 4. Integration
+- Refactor existing actions (Move, Trim, Delete) to use `HistoryManager.push(new Command(...))` instead of direct modification.
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement state snapshotting (saving entire JSON every time). It's too heavy. Use Command Pattern.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Performing an action adds to undo stack
+- [ ] Undo reverts the action correctly
+- [ ] Redo re-applies the action correctly
+- [ ] Performing a new action clears the redo stack
+- [ ] Stack limit (e.g., 50 items) works (optional)
 
 ## Done When
-✅ Undo/Redo Stack fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 80 | **Component**: Editor | **Group**: Undo/Redo  
-**Estimated Time**: 35 min
+✅ HistoryManager is implemented  
+✅ At least one action (e.g., Move) is refactored to use Commands  
+✅ Undo/Redo logic is solid  
+✅ Ready for Phase 81

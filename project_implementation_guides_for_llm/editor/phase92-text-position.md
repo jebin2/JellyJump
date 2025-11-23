@@ -1,41 +1,48 @@
 # Phase 92: Text Position
 
 ## Goal
-X/Y position sliders, alignment options
+Position text elements on the video canvas
 
 ## Group
 **Text Overlays**
 
 ## Feature to Implement
 
-### ONE Feature: Text Position
-**Purpose**: X/Y position sliders, alignment options
+### ONE Feature: Text Positioning
+**Purpose**: Place titles where needed (lower third, center, top)
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI Controls**:
+    - **Position X**: Slider/Input (0% to 100% or pixels).
+    - **Position Y**: Slider/Input (0% to 100% or pixels).
+    - **Alignment**: Buttons (Left, Center, Right).
+- **Data Model**:
+    - `clip.position.x`
+    - `clip.position.y`
+    - `clip.style.align`
+
+#### 2. Interaction
+- Adjust sliders to move text.
+- **Advanced (Optional)**: Drag text in Preview panel.
+    - **Decision**: Stick to **Sliders** for v1 simplicity.
+
+#### 3. Rendering
+- Update Canvas drawing coordinates.
+- Handle alignment (measure text width).
+
+#### 4. Files to Create/Modify
+- `assets/js/properties/text-properties.js`
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement complex constraints or snapping in the preview window.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] X/Y sliders move text
+- [ ] Alignment buttons work (center text around point)
+- [ ] Text stays within bounds (or not, up to user)
 
 ## Done When
-✅ Text Position fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 92 | **Component**: Editor | **Group**: Text Overlays  
-**Estimated Time**: 25 min
+✅ Text can be positioned  
+✅ Ready for Phase 93 (Transform Controls)

@@ -1,41 +1,53 @@
 # Phase 81: Undo/Redo UI
 
 ## Goal
-Ctrl+Z, Ctrl+Y shortcuts, button states
+Add Undo/Redo buttons and keyboard shortcuts
 
 ## Group
 **Undo/Redo**
 
 ## Feature to Implement
 
-### ONE Feature: Undo/Redo UI
-**Purpose**: Ctrl+Z, Ctrl+Y shortcuts, button states
+### ONE Feature: Undo/Redo Controls
+**Purpose**: User interface for the history system
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Toolbar Buttons**:
+    - Undo Icon (Arrow Left/Back)
+    - Redo Icon (Arrow Right/Forward)
+- **State**:
+    - Disable Undo button if stack empty
+    - Disable Redo button if stack empty
+- **Shortcuts**:
+    - `Ctrl+Z` / `Cmd+Z` -> Undo
+    - `Ctrl+Y` / `Cmd+Shift+Z` -> Redo
+
+#### 2. Interaction Behavior
+- Click Undo -> Call `HistoryManager.undo()` -> Update UI
+- Click Redo -> Call `HistoryManager.redo()` -> Update UI
+- Update button states after every history change event.
+
+#### 3. Files to Create/Modify
+- `assets/js/history-ui.js` (or inside `edit-toolbar.js`)
+- `editor.html`
+
+#### 4. Styling
+- Use standard toolbar button styles (Phase 65)
+- Disabled state: Opacity 0.5, `pointer-events: none`
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement a visual history list (Photoshop style) yet.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Buttons appear in toolbar
+- [ ] Buttons enable/disable correctly based on stack
+- [ ] Keyboard shortcuts work
+- [ ] Tooltips show "Undo (Ctrl+Z)"
 
 ## Done When
-✅ Undo/Redo UI fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 81 | **Component**: Editor | **Group**: Undo/Redo  
-**Estimated Time**: 15 min
+✅ Undo/Redo buttons visible  
+✅ Shortcuts functional  
+✅ Visual feedback (disabled states) correct  
+✅ Ready for Phase 82 (Transitions)

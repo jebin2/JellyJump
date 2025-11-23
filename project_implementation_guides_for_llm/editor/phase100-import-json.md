@@ -1,41 +1,46 @@
 # Phase 100: Import JSON Project
 
 ## Goal
-Load .json file, parse and restore timeline state
+Load a saved project from a JSON file
 
 ## Group
 **Project Management**
 
 ## Feature to Implement
 
-### ONE Feature: Import JSON Project
-**Purpose**: Load .json file, parse and restore timeline state
+### ONE Feature: Project Deserialization
+**Purpose**: Restore a previous session
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Trigger**: File > Open Project.
+- **UI**: File Picker (`.json`, `.mbp`).
+- **Logic**:
+    - Read file -> Parse JSON.
+    - Clear current timeline.
+    - Reconstruct Tracks and Clips.
+    - **Link Media**:
+        - Check if `mediaId` exists in IndexedDB.
+        - If yes, link it.
+        - If no, show "Missing Media" placeholder (Red clip?).
+
+#### 2. Interaction
+- Open file -> Timeline populates.
+
+#### 3. Files to Create/Modify
+- `assets/js/project/project-loader.js`
+- `assets/js/models/Project.js` (`fromJSON()` method)
+
+#### 4. What NOT to Do
+- ❌ Do NOT try to auto-find moved media files.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Loading JSON restores clips
+- [ ] Correctly links existing media
+- [ ] Handles missing media gracefully (no crash)
+- [ ] Timeline renders correctly after load
 
 ## Done When
-✅ Import JSON Project fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 100 | **Component**: Editor | **Group**: Project Management  
-**Estimated Time**: 35 min
+✅ Can load project from JSON  
+✅ Ready for Phase 101

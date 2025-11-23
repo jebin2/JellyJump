@@ -1,7 +1,7 @@
 # Phase 84: Wipe Transition
 
 ## Goal
-Wipe effect with direction options (left, right, up, down)
+Implement a linear wipe transition between clips
 
 ## Group
 **Transitions**
@@ -9,33 +9,41 @@ Wipe effect with direction options (left, right, up, down)
 ## Feature to Implement
 
 ### ONE Feature: Wipe Transition
-**Purpose**: Wipe effect with direction options (left, right, up, down)
+**Purpose**: A specific transition style (Left to Right wipe)
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Effect**: A mask that animates position over time.
+- **MediaBunny Integration**:
+    - `WipeEffect` or `MaskNode`.
+    - If not available, use `WebGL` shader node (advanced).
+    - **Fallback**: If too hard, skip or implement "Slide" (animate position).
+    - **Assumption**: MediaBunny has basic effects. Use `Wipe`.
+
+#### 2. UI Controls
+- **Transition Panel**: Select "Wipe Left", "Wipe Right".
+- **Duration**: Slider.
+
+#### 3. Implementation Details
+- Similar to Fade, but animates a `mask` property or `clip` rect.
+- `clip-path: inset(0 0 0 ${progress}%)` (CSS) -> **But this is for Video Canvas**.
+- Need to update the **WebGL/Canvas renderer**.
+
+#### 4. Files to Create/Modify
+- `assets/js/effects/WipeEffect.js`
+- `assets/js/properties/transition-properties.js`
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement 50 different wipe shapes. Just Linear (Left/Right).
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Wipe effect renders correctly
+- [ ] Direction can be changed
+- [ ] Duration works
+- [ ] Performance is acceptable
 
 ## Done When
-✅ Wipe Transition fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 84 | **Component**: Editor | **Group**: Transitions  
-**Estimated Time**: 30 min
+✅ Wipe transition works  
+✅ Configurable direction/duration  
+✅ Ready for Phase 85 (Filters)

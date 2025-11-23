@@ -1,41 +1,37 @@
 # Phase 87: Grayscale Filter
 
 ## Goal
-Toggle grayscale filter on/off
+Apply a preset Grayscale look
 
 ## Group
 **Video Filters**
 
 ## Feature to Implement
 
-### ONE Feature: Grayscale Filter
-**Purpose**: Toggle grayscale filter on/off
+### ONE Feature: Grayscale Toggle
+**Purpose**: Quick B&W effect
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI**: Checkbox "Grayscale" OR Preset Button.
+- **Logic**:
+    - Sets `saturation` to 0.0 OR applies specific `grayscale(1)` filter.
+    - **Decision**: Use `grayscale(1)` filter for semantic clarity.
+
+#### 2. Interaction
+- Toggle on/off.
+
+#### 3. Files to Create/Modify
+- `assets/js/properties/filter-presets.js`
+
+#### 4. What NOT to Do
+- ❌ Do NOT mix with Saturation slider (if they conflict). Usually Grayscale overrides saturation.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Grayscale toggle works
+- [ ] Can be disabled
 
 ## Done When
-✅ Grayscale Filter fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 87 | **Component**: Editor | **Group**: Video Filters  
-**Estimated Time**: 15 min
+✅ Grayscale filter works  
+✅ Ready for Phase 88

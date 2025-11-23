@@ -1,41 +1,41 @@
 # Phase 98: Export to Library
 
 ## Goal
-Render and save to media library, add to Videos category
+Save the rendered video back to the Media Library
 
 ## Group
 **Export**
 
 ## Feature to Implement
 
-### ONE Feature: Export to Library
-**Purpose**: Render and save to media library, add to Videos category
+### ONE Feature: Save to Library
+**Purpose**: Use the output of one project as input for another (nested comps)
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI**: Checkbox in Export Modal: "Add to Media Library".
+- **Logic**:
+    - After conversion completes (Phase 97):
+    - Take the resulting `Blob`.
+    - Create a new `MediaItem` (Video).
+    - Store in IndexedDB (Phase 41).
+    - Refresh Media Panel.
+
+#### 2. Interaction
+- User checks box -> Exports -> New video appears in "Videos" tab.
+
+#### 3. Files to Create/Modify
+- `assets/js/export/video-export.js`
+
+#### 4. What NOT to Do
+- ❌ Do NOT implement automatic re-import without user consent.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Checkbox works
+- [ ] Exported video appears in library
+- [ ] Can be dragged to timeline immediately
 
 ## Done When
-✅ Export to Library fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 98 | **Component**: Editor | **Group**: Export  
-**Estimated Time**: 30 min
+✅ Can export directly to library  
+✅ Ready for Phase 99

@@ -1,41 +1,41 @@
 # Phase 95: Rotation Control
 
 ## Goal
-Rotation slider (0-360°), preview update
+Rotate video clips
 
 ## Group
-**Transform**
+**Transform Controls**
 
 ## Feature to Implement
 
-### ONE Feature: Rotation Control
-**Purpose**: Rotation slider (0-360°), preview update
+### ONE Feature: Rotation
+**Purpose**: Fix orientation or artistic effect
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI**:
+    - **Rotation**: Slider (0 to 360 degrees) or Knob.
+- **Data Model**:
+    - `clip.transform.rotation` (degrees or radians).
+
+#### 2. MediaBunny Integration
+- `TransformEffect` rotation parameter.
+
+#### 3. Interaction
+- Adjust slider -> Video spins.
+
+#### 4. Files to Create/Modify
+- `assets/js/properties/transform-properties.js`
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement 3D rotation. 2D only.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Rotation slider works
+- [ ] 90, 180, 270 degrees look correct
+- [ ] Center anchor point
 
 ## Done When
-✅ Rotation Control fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 95 | **Component**: Editor | **Group**: Transform  
-**Estimated Time**: 20 min
+✅ Rotation works  
+✅ Ready for Phase 96

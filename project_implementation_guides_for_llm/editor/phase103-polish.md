@@ -1,41 +1,53 @@
 # Phase 103: Keyboard Shortcuts & Polish
 
 ## Goal
-All keyboard shortcuts, performance optimization, cross-browser testing
+Finalize the editor with shortcuts and UX improvements
 
 ## Group
 **Polish**
 
 ## Feature to Implement
 
-### ONE Feature: Keyboard Shortcuts & Polish
-**Purpose**: All keyboard shortcuts, performance optimization, cross-browser testing
+### ONE Feature: Keyboard Shortcuts Manager
+**Purpose**: Power user efficiency
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Shortcut Manager**:
+    - Central registry of commands (from Phase 80).
+    - Map keys to commands.
+- **Key Map**:
+    - `Space`: Play/Pause
+    - `Delete`/`Backspace`: Delete Clip
+    - `Ctrl+Z`: Undo
+    - `Ctrl+Y` / `Ctrl+Shift+Z`: Redo
+    - `Ctrl+S`: Save Project
+    - `Ctrl+C` / `Ctrl+V`: Copy/Paste (optional)
+    - `Home`: Go to Start
+    - `End`: Go to End
+    - `Left`/`Right`: Nudge Playhead (1 frame)
+    - `Shift+Left`/`Right`: Nudge Playhead (10 frames)
+
+#### 2. Polish Items
+- **Tooltips**: Add title attributes to all icon buttons.
+- **Cursor Styles**: Ensure correct cursors (grab, grabbing, text, pointer).
+- **Focus Management**: Ensure keyboard focus doesn't get stuck.
+
+#### 3. Files to Create/Modify
+- `assets/js/input/keyboard-manager.js`
+- `assets/js/main.js` (Init)
+
+#### 4. What NOT to Do
+- ❌ Do NOT start new features. Fix only.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] All shortcuts work
+- [ ] No conflicts with browser shortcuts (prevent default where needed)
+- [ ] Tooltips appear on hover
+- [ ] UI feels responsive
 
 ## Done When
-✅ Keyboard Shortcuts & Polish fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 103 | **Component**: Editor | **Group**: Polish  
-**Estimated Time**: 45 min
+✅ Editor feels complete  
+✅ All phases 26-103 are integrated  
+✅ Ready for Launch! 🚀

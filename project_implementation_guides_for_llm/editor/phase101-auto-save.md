@@ -1,41 +1,40 @@
 # Phase 101: Auto-Save Project
 
 ## Goal
-Save to localStorage every 30s, show 'Saving..' indicator
+Automatically save project state to LocalStorage
 
 ## Group
 **Project Management**
 
 ## Feature to Implement
 
-### ONE Feature: Auto-Save Project
-**Purpose**: Save to localStorage every 30s, show 'Saving..' indicator
+### ONE Feature: Auto-Save
+**Purpose**: Prevent data loss on crash/refresh
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Trigger**: Timer (every 30s) OR on every action (debounced 1s).
+- **Logic**:
+    - Serialize Project to JSON.
+    - Save to `localStorage.getItem('currentProject')`.
+    - Update "Last saved: 10:42 AM" in status bar.
+
+#### 2. Restoration
+- On page load (Phase 26/37), check for auto-save.
+- If found, load it.
+
+#### 3. Files to Create/Modify
+- `assets/js/project/auto-save.js`
+
+#### 4. What NOT to Do
+- ❌ Do NOT save to server yet.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Changes persist after page refresh
+- [ ] "Saved" indicator updates
+- [ ] Performance is not impacted (don't save on every mousemove)
 
 ## Done When
-✅ Auto-Save Project fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 101 | **Component**: Editor | **Group**: Project Management  
-**Estimated Time**: 20 min
+✅ Auto-save functional  
+✅ Ready for Phase 102

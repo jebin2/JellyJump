@@ -1,41 +1,52 @@
 # Phase 85: Brightness/Contrast Filter
 
 ## Goal
-Sliders for brightness/contrast, real-time preview
+Adjust brightness and contrast of video clips
 
 ## Group
 **Video Filters**
 
 ## Feature to Implement
 
-### ONE Feature: Brightness/Contrast Filter
-**Purpose**: Sliders for brightness/contrast, real-time preview
+### ONE Feature: Color Correction (Basic)
+**Purpose**: Fix lighting issues or create artistic looks
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Data Model**: `brightness` (default 1.0), `contrast` (default 1.0).
+- **UI**:
+    - **Properties Panel**: "Color" section.
+    - Sliders:
+        - Brightness: 0.0 to 2.0
+        - Contrast: 0.0 to 2.0
+- **Rendering**:
+    - Apply filter to video frame.
+    - CSS Filter: `filter: brightness(X) contrast(Y)` (If using Video Element).
+    - WebGL: Shader uniform update (If using Canvas).
+    - **Decision**: Use **CSS Filters** for v1 if possible (fastest), or **Canvas Filter** if drawing to canvas.
+
+#### 2. Interaction
+- Real-time preview as slider moves.
+
+#### 3. Files to Create/Modify
+- `assets/js/properties/color-properties.js`
+- `assets/js/timeline-renderer.js`
+
+#### 4. MediaBunny Integration
+- `clip.setFilter('brightness', value)`
+- `clip.setFilter('contrast', value)`
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement Curves or Levels yet.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Brightness slider affects video
+- [ ] Contrast slider affects video
+- [ ] Values persist in project data
+- [ ] Reset button works (optional)
 
 ## Done When
-✅ Brightness/Contrast Filter fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 85 | **Component**: Editor | **Group**: Video Filters  
-**Estimated Time**: 25 min
+✅ Brightness/Contrast adjustable  
+✅ Visuals update in real-time  
+✅ Ready for Phase 86

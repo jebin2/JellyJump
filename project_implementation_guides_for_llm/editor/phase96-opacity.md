@@ -1,41 +1,42 @@
 # Phase 96: Opacity Control
 
 ## Goal
-Opacity slider (0-100%), preview update
+Adjust transparency of video clips
 
 ## Group
-**Transform**
+**Transform Controls**
 
 ## Feature to Implement
 
-### ONE Feature: Opacity Control
-**Purpose**: Opacity slider (0-100%), preview update
+### ONE Feature: Global Opacity
+**Purpose**: Semi-transparent overlays or ghosting
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI**:
+    - **Opacity**: Slider (0% to 100%).
+- **Data Model**:
+    - `clip.opacity` (0.0 to 1.0).
+
+#### 2. MediaBunny Integration
+- Same as Phase 82 (Fade), but this is a static global value.
+- If Fade is also active, multiply them: `finalOpacity = globalOpacity * fadeOpacity`.
+
+#### 3. Interaction
+- Adjust slider -> Video becomes transparent.
+
+#### 4. Files to Create/Modify
+- `assets/js/properties/transform-properties.js`
+
+#### 5. What NOT to Do
+- ❌ Do NOT confuse with Fade In/Out. This is the base opacity.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Opacity slider works
+- [ ] 0% is invisible
+- [ ] 50% shows background (if any)
 
 ## Done When
-✅ Opacity Control fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 96 | **Component**: Editor | **Group**: Transform  
-**Estimated Time**: 15 min
+✅ Opacity control works  
+✅ Ready for Phase 97 (Export)

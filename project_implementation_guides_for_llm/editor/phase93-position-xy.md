@@ -1,41 +1,47 @@
-# Phase 93: Position Controls
+# Phase 93: Position Controls (X/Y)
 
 ## Goal
-X/Y position sliders, apply to selected clip
+Move video clips on the canvas (Picture-in-Picture)
 
 ## Group
-**Transform**
+**Transform Controls**
 
 ## Feature to Implement
 
-### ONE Feature: Position Controls
-**Purpose**: X/Y position sliders, apply to selected clip
+### ONE Feature: Video Positioning
+**Purpose**: Create PiP effects or adjust framing
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI**:
+    - "Transform" section in Properties Panel.
+    - **Position X**: Slider (-50% to 150%).
+    - **Position Y**: Slider (-50% to 150%).
+- **Data Model**:
+    - `clip.transform.x` (default 0 or 0.5 depending on origin).
+    - `clip.transform.y`.
+
+#### 2. MediaBunny Integration
+- Use `TransformEffect` or `VideoNode` positioning.
+- Coordinate system: Usually 0,0 is center or top-left. Check MediaBunny docs.
+- **Assumption**: Normalized coordinates (0.0-1.0).
+
+#### 3. Interaction
+- Select video clip -> Adjust sliders -> Video moves.
+
+#### 4. Files to Create/Modify
+- `assets/js/properties/transform-properties.js`
+
+#### 5. What NOT to Do
+- ❌ Do NOT implement on-canvas drag handles for video yet.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] X slider moves video horizontally
+- [ ] Y slider moves video vertically
+- [ ] Values persist
+- [ ] Reset button works
 
 ## Done When
-✅ Position Controls fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 93 | **Component**: Editor | **Group**: Transform  
-**Estimated Time**: 20 min
+✅ Video positioning works  
+✅ Ready for Phase 94

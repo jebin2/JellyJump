@@ -1,41 +1,61 @@
 # Phase 75: Clip Trim Handles
 
 ## Goal
-Resize handles on clip edges, cursor change on hover
+Render interactive handles on the edges of selected clips for trimming
 
 ## Group
-**Clip Editing**
+**Clip Selection & Editing**
 
 ## Feature to Implement
 
-### ONE Feature: Clip Trim Handles
-**Purpose**: Resize handles on clip edges, cursor change on hover
+### ONE Feature: Trim Handles Visuals
+**Purpose**: Visual affordance to indicate that clips can be resized/trimmed
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **Handles**: Visual elements on Left and Right edges of a **selected** clip
+- **Appearance**:
+    - Width: ~5-10px
+    - Color: Accent color or white
+    - Cursor: `col-resize` or `ew-resize`
+- **Visibility**: Only visible when clip is selected
+
+#### 2. DOM Structure
+- Inside `.timeline-clip`:
+    - `<div class="clip-handle handle-left"></div>`
+    - `<div class="clip-handle handle-right"></div>`
+- OR render them as separate overlays (easier to keep inside clip for positioning)
+
+#### 3. Styling (CSS)
+- Absolute positioning within the clip
+- `z-index`: Higher than clip content
+- Hover state: Highlight handle
+
+#### 4. Files to Create/Modify
+- `assets/css/timeline.css`
+- `assets/js/timeline-renderer.js` (Update clip rendering)
+
+#### 5. Interaction Preparation
+- Add `data-action="trim-left"` and `data-action="trim-right"` to handles
+- This phase is **Visuals ONLY**. Interaction is Phase 76.
+
+#### 6. What NOT to Do
+- ❌ Do NOT implement the actual dragging logic yet
+- ❌ Do NOT show handles on unselected clips
+
+**MediaBunny Integration**: Not applicable
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Selecting a clip shows handles
+- [ ] Deselecting hides handles
+- [ ] Handles are positioned correctly (left/right edges)
+- [ ] Cursor changes to resize arrow on hover
+- [ ] Handles do not obscure clip content too much
+- [ ] Multi-selection: Show handles on ALL selected clips? (Yes, usually)
 
 ## Done When
-✅ Clip Trim Handles fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 75 | **Component**: Editor | **Group**: Clip Editing  
-**Estimated Time**: 15 min
+✅ Handles appear on selected clips  
+✅ CSS styling is correct  
+✅ Cursor feedback is correct  
+✅ Ready for Phase 76 (Drag to Trim)

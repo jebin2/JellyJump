@@ -1,41 +1,39 @@
 # Phase 102: Project Templates
 
 ## Goal
-Save current project as template, load from template list
+Start new projects from predefined templates
 
 ## Group
 **Project Management**
 
 ## Feature to Implement
 
-### ONE Feature: Project Templates
-**Purpose**: Save current project as template, load from template list
+### ONE Feature: Template System
+**Purpose**: Quick start for common formats (Social Media, YouTube)
 
 **Requirements**:
-- [LLM: Implement this ONE atomic feature]
-- Follow Dark Neobrutalism theme
-- Add proper error handling
-- Include basic validation
-- Test thoroughly
 
-**MediaBunny Integration** (if applicable):
-- Consult mediabunny-llms-full.md for video operations
-- Use appropriate MediaBunny APIs
+#### 1. What to Build
+- **UI**: "New Project" modal (Phase 33 update).
+- **Options**:
+    - "Blank Project"
+    - "Instagram Story (9:16)"
+    - "YouTube (16:9)"
+- **Logic**:
+    - Load a hardcoded JSON structure for the selected template.
+    - Sets resolution, frame rate, maybe intro text clip.
+
+#### 2. Files to Create/Modify
+- `assets/js/project/templates.js`
+- `assets/js/ui/new-project-modal.js`
+
+#### 3. What NOT to Do
+- ❌ Do NOT build a template editor. Just hardcode 2-3 JSONs.
 
 ## Testing Checklist
-- [ ] Feature implemented and functional
-- [ ] Styling matches Dark Neobrutalism theme
-- [ ] No console errors
-- [ ] Works in Chrome, Firefox, Edge
-- [ ] Responsive behavior (if applicable)
-- [ ] Keyboard shortcuts work (if applicable)
+- [ ] Selecting template sets correct resolution
+- [ ] Selecting template adds default clips (if any)
 
 ## Done When
-✅ Project Templates fully functional  
-✅ Passes all manual tests  
-✅ Integrated with existing code  
-✅ Ready for next phase
-
----
-**Phase**: 102 | **Component**: Editor | **Group**: Project Management  
-**Estimated Time**: 25 min
+✅ Templates work  
+✅ Ready for Phase 103 (Polish)
