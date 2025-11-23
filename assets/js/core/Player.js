@@ -615,8 +615,9 @@ export class CorePlayer {
      * @private
      */
     _stepFrame(direction) {
-        // Assume 30fps for frame duration
-        const frameDuration = 1 / 30;
+        // Use actual frame rate if available, otherwise default to 30fps
+        const fps = this.frameRate || 30;
+        const frameDuration = 1 / fps;
         const newTime = this.currentTime + (direction * frameDuration);
         this._seekTo(Math.max(0, Math.min(this.duration, newTime)));
     }
@@ -656,6 +657,16 @@ export class CorePlayer {
             // Get Video Track
             this.videoTrack = await this.input.getPrimaryVideoTrack();
             if (this.videoTrack) {
+                // Compute frame rate from metadata
+                try {
+                    const stats = await this.videoTrack.computePacketStats();
+                    this.frameRate = stats.averagePacketRate || 30;
+                    console.log(`Detected frame rate: ${this.frameRate} fps`);
+                } catch (e) {
+                    console.warn("Could not compute frame rate, defaulting to 30fps", e);
+                    this.frameRate = 30;
+                }
+
                 // Setup Canvas Sink
                 this.videoSink = new MediaBunny.CanvasSink(this.videoTrack);
 
