@@ -47,7 +47,7 @@
     <!-- Hidden File Inputs -->
     <input type="file" id="mb-file-input" multiple accept="video/*" style="display: none;">
     <input type="file" id="mb-folder-input" webkitdirectory directory style="display: none;">
-    
+
     <!-- Hidden Download Anchor (reusable) -->
     <a id="mb-download-link" style="display: none;"></a>
 
@@ -56,11 +56,16 @@
         // Load templates first, then initialize player
         async function initializeApp() {
             // Load playlist templates
-            const response = await fetch('assets/templates/playlist-templates.html');
-            const html = await response.text();
+            const playlistResponse = await fetch('assets/templates/playlist-templates.html');
+            const playlistHtml = await playlistResponse.text();
+
+            // Load screenshot templates
+            const screenshotResponse = await fetch('assets/templates/screenshot-templates.html');
+            const screenshotHtml = await screenshotResponse.text();
+
             const tempDiv = document.createElement('div');
             tempDiv.style.display = 'none'; // Hide template container
-            tempDiv.innerHTML = html;
+            tempDiv.innerHTML = playlistHtml + screenshotHtml;
             document.body.appendChild(tempDiv);
 
             // Now that templates are loaded, import and initialize
@@ -94,13 +99,6 @@
                         title: 'Elephant Dream',
                         url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
                         duration: '10:53',
-                        thumbnail: '',
-                        isLocal: false
-                    },
-                    {
-                        title: 'For Bigger Blazes',
-                        url: 'https://commondatastorage.googleapis.com/gtv-vi',
-                        duration: '0:15',
                         thumbnail: '',
                         isLocal: false
                     },

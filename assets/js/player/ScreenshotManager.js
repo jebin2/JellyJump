@@ -37,69 +37,26 @@ export class ScreenshotManager {
      * Create screenshot UI elements
      * @private
      */
+    /**
+     * Create screenshot UI elements
+     * @private
+     */
     _createUI() {
         // Insert button before fullscreen button
         const fullscreenBtn = this.player.container.querySelector('#mb-fullscreen-btn');
         if (fullscreenBtn) {
-            fullscreenBtn.insertAdjacentHTML('beforebegin', ScreenshotManager.getButtonHTML());
+            const btnTemplate = document.getElementById('screenshot-button-template');
+            const btnClone = btnTemplate.content.cloneNode(true);
+            fullscreenBtn.parentNode.insertBefore(btnClone, fullscreenBtn);
         }
 
         // Insert modal at end of container
-        this.player.container.insertAdjacentHTML('beforeend', ScreenshotManager.getModalHTML());
+        const modalTemplate = document.getElementById('screenshot-modal-template');
+        const modalClone = modalTemplate.content.cloneNode(true);
+        this.player.container.appendChild(modalClone);
     }
 
-    /**
-     * Get screenshot button HTML
-     * @returns {string}
-     * @static
-     */
-    static getButtonHTML() {
-        return `
-            <!-- Screenshot Button -->
-            <button class="mediabunny-btn" id="mb-screenshot-btn" aria-label="Take Screenshot" title="Screenshot (S)">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 15.5c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/>
-                    <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-                </svg>
-            </button>
-        `;
-    }
 
-    /**
-     * Get screenshot modal HTML
-     * @returns {string}
-     * @static
-     */
-    static getModalHTML() {
-        return `
-            <div class="mediabunny-screenshot-modal" style="display: none;">
-                <div class="mediabunny-screenshot-modal-content">
-                    <div class="mediabunny-screenshot-header">
-                        <h3>Screenshot Preview</h3>
-                        <span class="mediabunny-screenshot-timestamp" id="mb-screenshot-timestamp"></span>
-                        <button class="mediabunny-screenshot-close" id="mb-screenshot-close" aria-label="Close">&times;</button>
-                    </div>
-                    <div class="mediabunny-screenshot-preview-container">
-                        <button class="mediabunny-screenshot-nav mediabunny-screenshot-prev" id="mb-screenshot-prev" aria-label="Previous Frame" title="Previous Frame">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-                            </svg>
-                        </button>
-                        <img class="mediabunny-screenshot-preview" id="mb-screenshot-preview" alt="Screenshot preview" />
-                        <button class="mediabunny-screenshot-nav mediabunny-screenshot-next" id="mb-screenshot-next" aria-label="Next Frame" title="Next Frame">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="mediabunny-screenshot-actions">
-                        <button class="mediabunny-btn mediabunny-btn-primary" id="mb-screenshot-download">Download PNG</button>
-                        <button class="mediabunny-btn mediabunny-btn-secondary" id="mb-screenshot-cancel">Cancel</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
 
     /**
      * Cache DOM elements
@@ -296,15 +253,11 @@ export class ScreenshotManager {
             const timestamp = Math.floor(this.screenshotTimestamp || this.player.currentTime);
             const filename = `screenshot-${timestamp}s.png`;
 
-            // Create temporary download link
-            const link = document.createElement('a');
+            // Use reusable download anchor from HTML
+            const link = document.getElementById('mb-download-link');
             link.href = this.screenshotDataUrl;
             link.download = filename;
-
-            // Trigger download
-            document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
 
             // Close modal
             this.closeModal();
