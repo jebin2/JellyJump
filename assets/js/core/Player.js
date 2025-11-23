@@ -695,7 +695,7 @@ export class CorePlayer {
                 this.canvas.height = this.videoTrack.displayHeight;
 
                 // Render first frame
-                await this._renderFrame(0);
+                await this._startVideoIterator();
             }
 
             // Setup Audio Track
