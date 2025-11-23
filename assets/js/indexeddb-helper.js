@@ -113,6 +113,42 @@ class IndexedDBHelper {
             request.onerror = () => reject(request.error);
         });
     }
+
+    /**
+     * Update media item with thumbnail
+     * @param {string} id - Media ID
+     * @param {Blob} thumbnailBlob - Thumbnail image blob
+     * @returns {Promise<void>}
+     */
+    async updateMediaThumbnail(id, thumbnailBlob) {
+        if (!this.db) await this.init();
+
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+
+            // Get existing media item
+            const getRequest = store.get(id);
+
+            getRequest.onsuccess = () => {
+                const mediaItem = getRequest.result;
+                if (mediaItem) {
+                    // Update thumbnail fields
+                    mediaItem.thumbnail = thumbnailBlob;
+                    mediaItem.thumbnailGenerated = true;
+
+                    // Save updated item
+                    const putRequest = store.put(mediaItem);
+                    putRequest.onsuccess = () => resolve();
+                    putRequest.onerror = () => reject(putRequest.error);
+                } else {
+                    reject(new Error('Media item not found'));
+                }
+            };
+
+            getRequest.onerror = () => reject(getRequest.error);
+        });
+    }
 }
 
 // Export singleton instance

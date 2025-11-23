@@ -9,6 +9,8 @@
     <!-- CSS -->
     <link rel="stylesheet" href="assets/css/theme.css">
     <link rel="stylesheet" href="assets/css/editor.css">
+    <link rel="stylesheet" href="assets/css/player.css">
+    <link rel="stylesheet" href="assets/css/screenshot.css">
 </head>
 
 <body>
@@ -128,81 +130,108 @@
     <!-- Main Editor Layout -->
     <div class="editor-container">
         <!-- Left Panel: Media Library (20%) -->
-        <aside class="media-library-panel">
-            <!-- Vertical Tabs -->
-            <div class="vertical-tabs">
-                <button class="vertical-tab active" data-tab="videos">
-                    <span class="tab-icon">📹</span>
-                    <span class="tab-label">Videos</span>
-                    <span class="tab-count">12</span>
+        <aside class="media-library-panel media-panel">
+            <!-- Vertical Tabs (Phase 39) -->
+            <div class="media-panel__tabs">
+                <button class="media-tab active" data-media-tab="videos" role="tab" aria-selected="true">
+                    <span class="media-tab__icon">🎬</span>
+                    <span class="media-tab__label">Videos</span>
+                    <span class="media-tab__count">(0)</span>
                 </button>
-                <button class="vertical-tab" data-tab="audio">
-                    <span class="tab-icon">🎵</span>
-                    <span class="tab-label">Audio</span>
-                    <span class="tab-count">5</span>
+                <button class="media-tab" data-media-tab="audio" role="tab" aria-selected="false">
+                    <span class="media-tab__icon">🎵</span>
+                    <span class="media-tab__label">Audio</span>
+                    <span class="media-tab__count">(0)</span>
                 </button>
-                <button class="vertical-tab" data-tab="images">
-                    <span class="tab-icon">🖼️</span>
-                    <span class="tab-label">Images</span>
-                    <span class="tab-count">8</span>
+                <button class="media-tab" data-media-tab="images" role="tab" aria-selected="false">
+                    <span class="media-tab__icon">🖼️</span>
+                    <span class="media-tab__label">Images</span>
+                    <span class="media-tab__count">(0)</span>
                 </button>
-                <button class="vertical-tab" data-tab="text">
-                    <span class="tab-icon">📝</span>
-                    <span class="tab-label">Text</span>
-                    <span class="tab-count">0</span>
+                <button class="media-tab" data-media-tab="text" role="tab" aria-selected="false">
+                    <span class="media-tab__icon">📝</span>
+                    <span class="media-tab__label">Text</span>
+                    <span class="media-tab__count">(0)</span>
                 </button>
-                <button class="vertical-tab" data-tab="effects">
-                    <span class="tab-icon">🎨</span>
-                    <span class="tab-label">Effects</span>
-                    <span class="tab-count">15</span>
+                <button class="media-tab" data-media-tab="effects" role="tab" aria-selected="false">
+                    <span class="media-tab__icon">✨</span>
+                    <span class="media-tab__label">Effects</span>
+                    <span class="media-tab__count">(0)</span>
                 </button>
-                <button class="vertical-tab" data-tab="projects">
-                    <span class="tab-icon">📁</span>
-                    <span class="tab-label">Projects</span>
-                    <span class="tab-count">3</span>
+                <button class="media-tab" data-media-tab="projects" role="tab" aria-selected="false">
+                    <span class="media-tab__icon">📁</span>
+                    <span class="media-tab__label">Projects</span>
+                    <span class="media-tab__count">(0)</span>
                 </button>
-                <button class="vertical-tab-upload">Upload</button>
             </div>
 
             <!-- Content Area -->
-            <div class="library-content">
-                <div class="library-search">
-                    <input type="text" class="input" placeholder="Search videos...">
+            <div class="media-panel__content">
+                <!-- Search Bar -->
+                <div class="media-search" role="search">
+                    <span class="media-search__icon">🔍</span>
+                    <input type="text" class="media-search__input" placeholder="Search media..."
+                        aria-label="Search media library" data-search="media">
+                    <button class="media-search__clear" aria-label="Clear search" data-action="clear-search"
+                        hidden>✕</button>
                 </div>
-                <div class="library-grid">
-                    <div class="library-tile">
-                        <div class="tile-thumbnail"></div>
-                        <div class="tile-name">Video 1.mp4</div>
-                    </div>
-                    <div class="library-tile">
-                        <div class="tile-thumbnail"></div>
-                        <div class="tile-name">Video 2.mp4</div>
-                    </div>
-                    <div class="library-tile">
-                        <div class="tile-thumbnail"></div>
-                        <div class="tile-name">Video 3.mov</div>
-                    </div>
-                    <div class="library-tile">
-                        <div class="tile-thumbnail"></div>
-                        <div class="tile-name">Video 4.mp4</div>
-                    </div>
-                    <div class="library-tile">
-                        <div class="tile-thumbnail"></div>
-                        <div class="tile-name">Video 5.avi</div>
-                    </div>
-                    <div class="library-tile">
-                        <div class="tile-thumbnail"></div>
-                        <div class="tile-name">Video 6.mp4</div>
-                    </div>
+
+                <!-- Videos Content (Default Active) -->
+                <div class="media-content" data-category="videos" role="tabpanel" id="videos-panel">
+                    <button class="media-upload-btn" data-upload="videos" aria-label="Import videos">
+                        📥 Import Videos
+                    </button>
+                    <p class="media-content__empty">No videos yet. Click Import Videos to get started.</p>
+                </div>
+
+                <!-- Audio Content -->
+                <div class="media-content" data-category="audio" role="tabpanel" id="audio-panel" hidden>
+                    <button class="media-upload-btn" data-upload="audio" aria-label="Import audio">
+                        📥 Import Audio
+                    </button>
+                    <p class="media-content__empty">🎵 No audio files yet. Click Import Audio to add music or sounds.
+                    </p>
+                </div>
+
+                <!-- Images Content -->
+                <div class="media-content" data-category="images" role="tabpanel" id="images-panel" hidden>
+                    <button class="media-upload-btn" data-upload="images" aria-label="Import images">
+                        📥 Import Images
+                    </button>
+                    <p class="media-content__empty">🖼️ No images yet. Click Import Images to add photos or graphics.
+                    </p>
+                </div>
+
+                <!-- Text Content -->
+                <div class="media-content" data-category="text" role="tabpanel" id="text-panel" hidden>
+                    <p class="media-content__empty">📝 No text overlays yet. Create text in timeline.</p>
+                </div>
+
+                <!-- Effects Content -->
+                <div class="media-content" data-category="effects" role="tabpanel" id="effects-panel" hidden>
+                    <p class="media-content__empty">✨ No effects yet. Coming soon.</p>
+                </div>
+
+                <!-- Projects Content -->
+                <div class="media-content" data-category="projects" role="tabpanel" id="projects-panel" hidden>
+                    <p class="media-content__empty">📁 No saved projects yet.</p>
                 </div>
             </div>
         </aside>
 
         <!-- Center Panel: Preview Canvas (50%) -->
-        <section class="preview-panel">
-            <!-- Empty container for MediaBunny Player (Phase 49) -->
-            <!-- Player will provide its own controls, time display, and metadata -->
-            <div id="preview-player-container" class="preview-canvas"></div>
+        <section class="preview-panel" aria-label="Video preview panel">
+            <!-- Video Display Area (16:9) -->
+            <div class="preview-panel__video">
+                <!-- MediaBunny Player will be added here in Phase 49 -->
+                <div class="preview-canvas" id="preview-player-container"></div>
+            </div>
+
+            <!-- Player Controls Area -->
+            <div class="preview-panel__controls">
+                <!-- Controls will be added in Phases 50-53 -->
+                <!-- Play/Pause, Timeline, Time, Volume, Fullscreen -->
+            </div>
         </section>
 
         <!-- Right Panel: Properties (30%) -->
@@ -338,6 +367,18 @@
         accept="video/*,audio/*,image/*,.mp4,.webm,.mov,.mp3,.wav,.ogg,.m4a,.jpg,.jpeg,.png,.gif,.webp" multiple hidden
         aria-label="Import media files">
 
+    <!-- Hidden file input for video upload -->
+    <input type="file" id="video-upload-input" data-file-input="video-upload" accept="video/*,.mp4,.webm,.mov,.avi,.mkv"
+        multiple hidden aria-label="Select video files">
+
+    <!-- Hidden file input for audio upload -->
+    <input type="file" id="audio-upload-input" data-file-input="audio-upload"
+        accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac" multiple hidden aria-label="Select audio files">
+
+    <!-- Hidden file input for image upload -->
+    <input type="file" id="image-upload-input" data-file-input="image-upload"
+        accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp" multiple hidden aria-label="Select image files">
+
     <!-- Notification container -->
     <div id="notification-container" class="notification-container"></div>
 
@@ -345,10 +386,13 @@
     <script type="module" src="assets/js/dropdown-menu.js"></script>
     <script type="module" src="assets/js/indexeddb-helper.js"></script>
     <script type="module" src="assets/js/import-handler.js"></script>
+    <script type="module" src="assets/js/thumbnail-generator.js"></script>
+    <script type="module" src="assets/js/preview-player.js"></script>
     <script type="module" src="assets/js/media-library.js"></script>
     <script type="module" src="assets/js/storage-helper.js"></script>
     <script type="module" src="assets/js/modal-dialog.js"></script>
     <script type="module" src="assets/js/tab-manager.js"></script>
+    <script type="module" src="assets/js/media-tab-manager.js"></script>
 
 </body>
 
