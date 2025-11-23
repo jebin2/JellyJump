@@ -808,6 +808,7 @@ export class CorePlayer {
     }
 
     pause() {
+        console.log("Player.pause() called");
         this.isPlaying = false;
         this._updatePlayIcon();
         this.playbackId++; // Cancel current playback loop
@@ -861,11 +862,13 @@ export class CorePlayer {
     }
 
     async _playAudio(startTime) {
+        console.log(`_playAudio called with startTime: ${startTime}`);
         if (!this.audioSink || !this.audioContext) return;
 
         const currentPlaybackId = ++this.playbackId;
         const baseTime = this.audioContext.currentTime;
         const timeOffset = baseTime - startTime;
+        console.log(`_playAudio: baseTime=${baseTime}, timeOffset=${timeOffset}`);
 
         try {
             // Use the iterator pattern from the guide
@@ -878,12 +881,7 @@ export class CorePlayer {
 
                 // Calculate absolute start time
                 const absoluteStartTime = timestamp + timeOffset;
-
-                // If we are late, we can't play in the past.
-                // However, since we are iterating, we should just play at the calculated time.
-                // The AudioContext handles "past" start times by playing immediately, 
-                // but we might want to be careful about drift.
-                // For now, trust the guide's pattern.
+                console.log(`Scheduling buffer: timestamp=${timestamp}, absoluteStartTime=${absoluteStartTime}`);
 
                 source.start(absoluteStartTime);
                 this.activeSources.push(source);
@@ -907,6 +905,7 @@ export class CorePlayer {
     }
 
     async _seekTo(time) {
+        console.log(`_seekTo called with time: ${time}`);
         const wasPlaying = this.isPlaying;
         if (wasPlaying) {
             this.pause();
@@ -915,9 +914,7 @@ export class CorePlayer {
         this.currentTime = Math.max(0, Math.min(this.duration, time));
         this._updateProgress(); // Update UI immediately
 
-        // Render frame at new time, but DO NOT update this.currentTime from the frame
-        // to avoid reverting to a stale timestamp if the decoder is slow.
-        await this._renderFrame(this.currentTime, false);
+        await this._renderFrame(this.currentTime);
 
         if (wasPlaying) {
             await this.play();
