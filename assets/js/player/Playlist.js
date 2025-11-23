@@ -462,19 +462,25 @@ export class Playlist {
         }
     }
 
-    _getVideoDuration(file) {
-        return new Promise((resolve, reject) => {
-            const video = document.createElement('video');
-            video.preload = 'metadata';
-            video.onloadedmetadata = () => {
-                window.URL.revokeObjectURL(video.src);
-                resolve(video.duration);
-            };
-            video.onerror = () => {
-                reject("Invalid video");
-            };
-            video.src = URL.createObjectURL(file);
-        });
+    /**
+     * Get video duration using MediaBunny
+     * @param {File} file
+     * @returns {Promise<number>}
+     * @private
+     */
+    async _getVideoDuration(file) {
+        try {
+            const source = new MediaBunny.BlobSource(file);
+            const input = new MediaBunny.Input({
+                source,
+                formats: MediaBunny.ALL_FORMATS
+            });
+            const duration = await input.computeDuration();
+            return duration;
+        } catch (error) {
+            console.error('Error getting video duration:', error);
+            return 0;
+        }
     }
 
     _formatDuration(seconds) {
@@ -968,20 +974,14 @@ export class Playlist {
                 downloadBtn.style.opacity = "";
             }
 
-            // Create temporary anchor element
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = filename;
-            a.style.display = 'none';
-
-            // Append to body, click, and remove
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // Use reusable download anchor from HTML
+            const downloadLink = document.getElementById('mb-download-link');
+            downloadLink.href = downloadUrl;
+            downloadLink.download = filename;
+            downloadLink.click();
 
             // Clean up blob URL if we created one
             if (blobUrl) {
-                // Delay cleanup to ensure download starts
                 setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
             }
 
@@ -1050,10 +1050,8 @@ export class Playlist {
 
         // Status text
         if (item.needsReload) {
-            const statusSpan = document.createElement('span');
-            statusSpan.style.color = 'var(--error-color)';
-            statusSpan.style.fontSize = '0.7em';
-            statusSpan.textContent = ' (Missing File)';
+            const statusTemplate = document.getElementById('missing-file-status-template');
+            const statusSpan = statusTemplate.content.cloneNode(true);
             title.appendChild(statusSpan);
         }
 
