@@ -1,5 +1,4 @@
 import { IndexedDBService } from './IndexedDBService.js';
-
 import { MediaBunny } from '../core/MediaBunny.js';
 
 /**
@@ -96,26 +95,14 @@ export class Playlist {
     }
 
     _createHeader() {
+        const template = document.getElementById('playlist-header-controls-template');
+        const clone = template.content.cloneNode(true);
+
         const header = document.createElement('div');
         header.className = 'playlist-header';
-        header.innerHTML = `
-            <div class="playlist-title-text">Playlist</div>
-            <div class="playlist-controls">
-                <button class="mediabunny-btn-small" id="mb-add-files">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Files
-                </button>
-                <button class="mediabunny-btn-small" id="mb-add-folder">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg> Folder
-                </button>
-                <button class="mediabunny-btn-small" id="mb-clear-playlist" title="Clear Playlist">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                </button>
-            </div>
-            <input type="file" id="mb-file-input" multiple accept="video/*" style="display: none;">
-            <input type="file" id="mb-folder-input" webkitdirectory directory style="display: none;">
-        `;
+        header.appendChild(clone);
 
-        // Insert before container (which is the list)
+        // Insert before container
         this.container.parentNode.insertBefore(header, this.container);
 
         // Attach events
@@ -633,10 +620,9 @@ export class Playlist {
         this.container.innerHTML = '';
 
         if (this.items.length === 0) {
-            this.container.innerHTML = `
-                <div class="playlist-placeholder">
-                    <p>No videos in playlist.</p>
-                </div>`;
+            const template = document.getElementById('playlist-empty-template');
+            const clone = template.content.cloneNode(true);
+            this.container.appendChild(clone);
             return;
         }
 
@@ -748,19 +734,21 @@ export class Playlist {
      * @private
      */
     _createFolderHeader(folder, isExpanded) {
-        const header = document.createElement('div');
-        header.className = 'playlist-folder-header';
-        header.innerHTML = `
-            <div class="playlist-folder-info">
-                <span class="playlist-toggle ${isExpanded ? 'expanded' : ''}">▶</span>
-                <span class="folder-icon">📁</span>
-                <span class="folder-name">${folder.name}</span>
-            </div>
-            <button class="playlist-remove-btn folder-remove-btn" title="Remove Folder" aria-label="Remove folder ${folder.name}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            </button>
-        `;
-        return header;
+        const template = document.getElementById('playlist-folder-header-template');
+        const clone = template.content.cloneNode(true);
+
+        const header = clone.querySelector('.playlist-folder-header');
+        const toggle = header.querySelector('.playlist-toggle');
+        const folderName = header.querySelector('.folder-name');
+        const removeBtn = header.querySelector('.folder-remove-btn');
+
+        if (isExpanded) {
+            toggle.classList.add('expanded');
+        }
+        folderName.textContent = folder.name;
+        removeBtn.setAttribute('aria-label', `Remove folder ${folder.name}`);
+
+        return clone.firstElementChild;
     }
 
     /**
@@ -803,9 +791,8 @@ export class Playlist {
      * @private
      */
     _createPlaylistItemElement(item) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = this._createItemHTML(item, item.originalIndex);
-        const itemEl = tempDiv.firstElementChild;
+        const fragment = this._createItemHTML(item, item.originalIndex);
+        const itemEl = fragment.querySelector('.playlist-item');
 
         this._attachItemEvents(itemEl);
         return itemEl;
@@ -961,7 +948,10 @@ export class Playlist {
                 // For remote URLs, fetch as blob to enable proper download
                 // Show loading state
                 if (downloadBtn) {
-                    downloadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity="0.3"/><path d="M12 2 A10 10 0 0 1 22 12" stroke="currentColor" stroke-width="2" fill="none"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></path></svg>';
+                    const loadingTemplate = document.getElementById('loading-spinner-template');
+                    const loadingIcon = loadingTemplate.content.cloneNode(true);
+                    downloadBtn.innerHTML = '';
+                    downloadBtn.appendChild(loadingIcon);
                     downloadBtn.style.opacity = '1';
                 }
 
@@ -999,7 +989,12 @@ export class Playlist {
 
             // Restore download button icon
             if (downloadBtn) {
-                downloadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/></svg>';
+                // Clone from template in playlist-templates.html
+                const template = document.getElementById('playlist-item-template');
+                const tempItem = template.content.cloneNode(true);
+                const downloadIcon = tempItem.querySelector('.playlist-download-btn svg').cloneNode(true);
+                downloadBtn.innerHTML = '';
+                downloadBtn.appendChild(downloadIcon);
             }
 
         } catch (error) {
@@ -1008,7 +1003,12 @@ export class Playlist {
 
             // Restore download button icon on error
             if (downloadBtn) {
-                downloadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/></svg>';
+                // Clone from template in playlist-templates.html
+                const template = document.getElementById('playlist-item-template');
+                const tempItem = template.content.cloneNode(true);
+                const downloadIcon = tempItem.querySelector('.playlist-download-btn svg').cloneNode(true);
+                downloadBtn.innerHTML = '';
+                downloadBtn.appendChild(downloadIcon);
             }
         }
     }
@@ -1018,34 +1018,49 @@ export class Playlist {
      * @private
      */
     _createItemHTML(item, index) {
-        const thumbnail = item.thumbnail
-            ? `<img src="${item.thumbnail}" alt="${item.title}" loading="lazy">`
-            : `<svg width="24" height="24" viewBox="0 0 24 24" fill="#666"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zm-10-6l-4 4h8l-4-4z"/></svg>`;
+        const template = document.getElementById('playlist-item-template');
+        const clone = template.content.cloneNode(true);
 
-        const statusClass = item.needsReload ? 'needs-reload' : '';
-        const statusText = item.needsReload ? '(Missing File)' : '';
-        const errorClass = item.error ? 'error' : '';
-        const title = item.title || 'Unknown Video';
+        const itemEl = clone.querySelector('.playlist-item');
+        const thumbnail = itemEl.querySelector('.playlist-thumbnail');
+        const title = itemEl.querySelector('.playlist-title');
+        const duration = itemEl.querySelector('.playlist-duration');
 
-        return `
-            <div class="playlist-item ${statusClass} ${errorClass}" data-index="${index}" tabindex="0" role="button" aria-label="Play ${title}">
-                <div class="playlist-thumbnail">
-                    ${thumbnail}
-                </div>
-                <div class="playlist-info">
-                    <div class="playlist-title" title="${title}">${title} <span style="color: var(--error-color); font-size: 0.7em;">${statusText}</span></div>
-                    <div class="playlist-duration">${item.duration || '--:--'}</div>
-                </div>
-                <div class="playlist-actions">
-                    <button class="playlist-download-btn" title="Download video" aria-label="Download">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/></svg>
-                    </button>
-                    <button class="playlist-remove-btn" title="Remove" aria-label="Remove">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                    </button>
-                </div>
-            </div>
-        `;
+        // Set attributes
+        itemEl.dataset.index = index;
+        itemEl.setAttribute('aria-label', `Play ${item.title || 'Unknown Video'}`);
+
+        // Status classes
+        if (item.needsReload) itemEl.classList.add('needs-reload');
+        if (item.error) itemEl.classList.add('error');
+
+        // Thumbnail
+        if (item.thumbnail) {
+            thumbnail.innerHTML = `<img src="${item.thumbnail}" alt="${item.title}" loading="lazy">`;
+        } else {
+            const placeholderTemplate = document.getElementById('video-placeholder-template');
+            const placeholderClone = placeholderTemplate.content.cloneNode(true);
+            thumbnail.appendChild(placeholderClone);
+        }
+
+        // Title
+        const titleText = item.title || 'Unknown Video';
+        title.textContent = titleText;
+        title.setAttribute('title', titleText);
+
+        // Status text
+        if (item.needsReload) {
+            const statusSpan = document.createElement('span');
+            statusSpan.style.color = 'var(--error-color)';
+            statusSpan.style.fontSize = '0.7em';
+            statusSpan.textContent = ' (Missing File)';
+            title.appendChild(statusSpan);
+        }
+
+        // Duration
+        duration.textContent = item.duration || '--:--';
+
+        return clone;
     }
 
     /**

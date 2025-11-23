@@ -420,10 +420,19 @@ button:focus-visible {
 }
 
 @keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
     to {
-        transform: translate(-50%, -50%) rotate(360deg);
+        transform: rotate(360deg);
     }
 }
+
+/* Spinner rotation animation */
+.spinner-rotate {
+    animation: spin 1s linear infinite;
+}
+
 
 /* -----------------------------------------
    Responsive Design

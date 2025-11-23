@@ -15,6 +15,15 @@
 
 <body>
 
+    <!-- SVG Icon Sprite (loaded first for immediate use) -->
+    <div style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- Icons are defined in sprite.svg and loaded via <use> tags -->
+            </defs>
+        </svg>
+    </div>
+
     <div class="player-layout">
         <!-- Video Section -->
         <main class="video-section" id="player-container">
@@ -35,56 +44,79 @@
         </aside>
     </div>
 
+    <!-- Hidden File Inputs -->
+    <input type="file" id="mb-file-input" multiple accept="video/*" style="display: none;">
+    <input type="file" id="mb-folder-input" webkitdirectory directory style="display: none;">
+
     <!-- Scripts -->
     <script type="module">
-        import { CorePlayer } from './assets/js/core/Player.js';
-        import { Playlist } from './assets/js/player/Playlist.js';
+        // Load templates first, then initialize player
+        async function initializeApp() {
+            // Load playlist templates
+            const response = await fetch('assets/templates/playlist-templates.html');
+            const html = await response.text();
+            const tempDiv = document.createElement('div');
+            tempDiv.style.display = 'none'; // Hide template container
+            tempDiv.innerHTML = html;
+            document.body.appendChild(tempDiv);
 
-        // Initialize Player
-        const player = new CorePlayer('player-container', {
-            autoplay: false,
-            muted: false,
-            mode: 'player'
-        });
+            // Now that templates are loaded, import and initialize
+            const { CorePlayer } = await import('./assets/js/core/Player.js');
+            const { Playlist } = await import('./assets/js/player/Playlist.js');
 
-        // Initialize Playlist
-        const playlistContainer = document.querySelector('.playlist-content');
-        const playlist = new Playlist(playlistContainer, player);
+            // Initialize Player
+            const player = new CorePlayer('player-container', {
+                autoplay: false,
+                muted: false,
+                mode: 'player'
+            });
 
-        // File Upload Handling is now managed by Playlist.js internally
+            // Initialize Playlist
+            const playlist = new Playlist(
+                document.querySelector('.playlist-content'),
+                player
+            );
 
-        // Sample Data
-        const sampleVideos = [
-            {
-                title: "Big Buck Bunny",
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-                duration: "9:56",
-                thumbnail: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/320px-Big_buck_bunny_poster_big.jpg"
-            },
-            {
-                title: "Elephant Dream",
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-                duration: "10:53",
-                thumbnail: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/ElephantsDreamPoster.jpg/320px-ElephantsDreamPoster.jpg"
-            },
-            {
-                title: "For Bigger Blazes",
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-                duration: "0:15",
-                thumbnail: "" // Test placeholder
-            },
-            {
-                title: "For Bigger Escapes",
-                url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-                duration: "0:15",
-                thumbnail: ""
+            // Demo Videos (optional)
+            if (!localStorage.getItem('MediaBunnyDB-playlist')) {
+                playlist.addItems([
+                    {
+                        title: 'Big Buck Bunny',
+                        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                        duration: '09:54',
+                        thumbnail: '',
+                        isLocal: false
+                    },
+                    {
+                        title: 'Elephant Dream',
+                        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+                        duration: '10:53',
+                        thumbnail: '',
+                        isLocal: false
+                    },
+                    {
+                        title: 'For Bigger Blazes',
+                        url: 'https://commondatastorage.googleapis.com/gtv-vi',
+                        duration: '0:15',
+                        thumbnail: '',
+                        isLocal: false
+                    },
+                    {
+                        title: 'For Bigger Escapes',
+                        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+                        duration: '0:15',
+                        thumbnail: '',
+                        isLocal: false
+                    }
+                ]);
             }
-        ];
+        }
 
-        // Load samples only if playlist is empty (first run)
-        if (playlist.items.length === 0) {
-            playlist.addItems(sampleVideos);
-            playlist.selectItem(0);
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
         }
     </script>
 

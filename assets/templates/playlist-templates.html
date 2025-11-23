@@ -1,0 +1,85 @@
+<!-- Playlist Templates -->
+<!-- All HTML templates for the playlist component -->
+<!-- These are cloned and populated with data in Playlist.js -->
+
+<!-- Playlist Item Template -->
+<template id="playlist-item-template">
+    <div class="playlist-item" data-index="" tabindex="0" role="button">
+        <div class="playlist-thumbnail"></div>
+        <div class="playlist-info">
+            <div class="playlist-title"></div>
+            <div class="playlist-duration"></div>
+        </div>
+        <div class="playlist-actions">
+            <button class="playlist-download-btn" title="Download video" aria-label="Download">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </button>
+            <button class="playlist-remove-btn" title="Remove" aria-label="Remove">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-trash"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Folder Header Template -->
+<template id="playlist-folder-header-template">
+    <div class="playlist-folder-header">
+        <div class="playlist-folder-info">
+            <span class="playlist-toggle">▶</span>
+            <span class="folder-icon">📁</span>
+            <span class="folder-name"></span>
+        </div>
+        <button class="playlist-remove-btn folder-remove-btn" title="Remove Folder" aria-label="Remove folder">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-trash"></use>
+            </svg>
+        </button>
+    </div>
+</template>
+
+<!-- Empty Playlist Template -->
+<template id="playlist-empty-template">
+    <div class="playlist-placeholder">
+        <p>No videos in playlist.</p>
+    </div>
+</template>
+
+<!-- Playlist Header Controls Template -->
+<template id="playlist-header-controls-template">
+    <div class="playlist-title-text">Playlist</div>
+    <div class="playlist-controls">
+        <button class="mediabunny-btn-small" id="mb-add-files">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-plus"></use>
+            </svg> Files
+        </button>
+        <button class="mediabunny-btn-small" id="mb-add-folder">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-folder"></use>
+            </svg> Folder
+        </button>
+        <button class="mediabunny-btn-small" id="mb-clear-playlist" title="Clear Playlist">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-trash"></use>
+            </svg>
+        </button>
+    </div>
+</template>
+
+<!-- Video Placeholder SVG Template -->
+<template id="video-placeholder-template">
+    <svg width="24" height="24" fill="#666">
+        <use href="assets/icons/sprite.svg#icon-video-placeholder"></use>
+    </svg>
+</template>
+
+<!-- Loading Spinner Template -->
+<template id="loading-spinner-template">
+    <svg width="16" height="16" fill="currentColor" class="spinner-rotate">
+        <use href="assets/icons/sprite.svg#icon-loading"></use>
+    </svg>
+</template>

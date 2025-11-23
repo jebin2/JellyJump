@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+    
+    <!-- Download Icon -->
+    <symbol id="icon-download" viewBox="0 0 24 24">
+        <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/>
+    </symbol>
+
+    <!-- Trash/Delete Icon -->
+    <symbol id="icon-trash" viewBox="0 0 24 24">
+        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+    </symbol>
+
+    <!-- Plus/Add Icon -->
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+    </symbol>
+
+    <!-- Folder Icon -->
+    <symbol id="icon-folder" viewBox="0 0 24 24">
+        <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+    </symbol>
+
+    <!-- Video Placeholder Icon -->
+    <symbol id="icon-video-placeholder" viewBox="0 0 24 24">
+        <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zm-10-6l-4 4h8l-4-4z"/>
+    </symbol>
+
+    <!-- Loading Spinner Icon (rotates via CSS) -->
+    <symbol id="icon-loading" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" opacity="0.3"/>
+        <path d="M12 2 A10 10 0 0 1 22 12" stroke="currentColor" stroke-width="2" fill="none"/>
+    </symbol>
+
+    <!-- Play Icon -->
+    <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="M8 5v14l11-7z"/>
+    </symbol>
+
+</svg>
