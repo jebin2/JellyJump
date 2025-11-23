@@ -19,6 +19,7 @@ export class CorePlayer {
         this.canvas = null;
         this.ctx = null;
         this.isPlaying = false;
+        this.isSeeking = false;
         this.currentTime = 0;
         this.duration = 0;
         this.animationFrameId = null;
@@ -712,15 +713,19 @@ export class CorePlayer {
     /**
      * Render a specific frame
      * @param {number} timestamp 
+     * @param {boolean} updateTime - Whether to update the player's current time from the frame
      */
-    async _renderFrame(timestamp) {
+    async _renderFrame(timestamp, updateTime = true) {
         if (!this.videoSink) return;
 
         const frame = await this.videoSink.getCanvas(timestamp);
         if (frame && frame.canvas) {
             this.ctx.drawImage(frame.canvas, 0, 0, this.canvas.width, this.canvas.height);
-            this.currentTime = timestamp;
-            this._updateProgress();
+
+            if (updateTime) {
+                this.currentTime = timestamp;
+                this._updateProgress();
+            }
 
             if (this.isSubtitlesEnabled) {
                 this._renderSubtitles(timestamp);
@@ -820,6 +825,12 @@ export class CorePlayer {
         const loop = async () => {
             if (!this.isPlaying) return;
 
+            // Skip update if seeking to prevent fighting with seek operation
+            if (this.isSeeking) {
+                this.animationFrameId = requestAnimationFrame(loop);
+                return;
+            }
+
             const now = performance.now();
             const dt = (now - lastTime) / 1000;
             lastTime = now;
@@ -896,23 +907,29 @@ export class CorePlayer {
     }
 
     async _seekTo(time) {
-        this.currentTime = Math.max(0, Math.min(this.duration, time));
+        this.isSeeking = true;
+        try {
+            this.currentTime = Math.max(0, Math.min(this.duration, time));
 
-        // Stop current audio
-        [...this.activeSources].forEach(source => {
-            try {
-                source.onended = null;
-                source.stop();
-            } catch (e) { }
-        });
-        this.activeSources = [];
-        const myPlaybackId = ++this.playbackId; // Cancel any running iterator and capture ID
+            // Stop current audio
+            [...this.activeSources].forEach(source => {
+                try {
+                    source.onended = null;
+                    source.stop();
+                } catch (e) { }
+            });
+            this.activeSources = [];
+            const myPlaybackId = ++this.playbackId; // Cancel any running iterator and capture ID
 
-        await this._renderFrame(this.currentTime);
+            // Pass false to prevent overwriting this.currentTime with stale frame time
+            await this._renderFrame(this.currentTime, false);
 
-        // Restart audio if playing AND we are still the latest operation
-        if (this.playbackId === myPlaybackId && this.isPlaying && this.audioSink) {
-            this._playAudio(this.currentTime);
+            // Restart audio if playing AND we are still the latest operation
+            if (this.playbackId === myPlaybackId && this.isPlaying && this.audioSink) {
+                this._playAudio(this.currentTime);
+            }
+        } finally {
+            this.isSeeking = false;
         }
     }
 
