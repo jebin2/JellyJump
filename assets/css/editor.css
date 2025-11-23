@@ -421,6 +421,7 @@
     border-right: var(--border-medium) solid var(--border-dark);
 }
 
+/* Empty container for MediaBunny Player (Phase 49) */
 .preview-canvas {
     width: 100%;
     max-width: 800px;
@@ -431,40 +432,6 @@
     align-items: center;
     justify-content: center;
     position: relative;
-}
-
-.preview-placeholder {
-    font-size: var(--text-2xl);
-    font-weight: var(--font-bold);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-}
-
-.preview-info {
-    margin-top: var(--space-md);
-    display: flex;
-    gap: var(--space-xl);
-    align-items: center;
-}
-
-.preview-metadata {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-}
-
-.preview-time {
-    font-family: var(--font-mono);
-    font-size: var(--text-lg);
-    color: var(--accent-primary);
-    font-weight: var(--font-bold);
-}
-
-.preview-controls {
-    margin-top: var(--space-md);
-    display: flex;
-    gap: var(--space-sm);
 }
 
 /* -----------------------------------------
