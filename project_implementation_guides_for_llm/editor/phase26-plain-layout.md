@@ -94,10 +94,12 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
 - Apply Dark Neobrutalism theme styling
 
 **Structure**:
-- **Video area** (placeholder):
-  - Gray rectangle with aspect ratio 16:9
+- **Player Container**:
+  - Empty `div` with ID `preview-player-container`
+  - This will host the **existing MediaBunny Player** component (Phase 49)
+  - Aspect ratio 16:9 (use CSS aspect-ratio or padding hack)
   - Centered in available space
-  - Text: "Preview Canvas" (placeholder)
+  - Background: Black
 - **Metadata display** (below video):
   - "1920x1080 @ 30fps" (placeholder text)
 - **Time display**:
@@ -106,7 +108,7 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
   - [▶] Play button
   - [⏸] Pause button
   - [⛶] Fullscreen button
-- **No functionality** - just styled buttons
+- **No functionality** - just styled buttons and empty container
 
 ### Feature 5: Properties Panel (Right Sidebar)
 **Purpose**: Right sidebar for editing controls (30% width)
@@ -161,7 +163,7 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
 - **Video 2 Track**:
   - Show 1 placeholder clip
 - **Audio Track**:
-  - Show waveform placeholder (▁▃▅▇ pattern)
+  - Show waveform placeholder ( ▃▅▇ pattern)
 - **Text Track**:
   - Show text clip placeholder ("Hello World")
 - **Playhead**: Vertical line at ~5 second mark (visual only)
@@ -209,7 +211,7 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
 - [ ] Tab bar shows placeholder tabs
 - [ ] Media Library shows vertical tabs (6 categories)
 - [ ] Media Library content area shows tile grid placeholders
-- [ ] Preview canvas shows video placeholder and controls
+- [ ] Preview canvas shows empty player container (black box)
 - [ ] Properties panel shows section headers and placeholders
 - [ ] Timeline shows header, ruler, 4 tracks, and toolbar
 - [ ] Timeline tracks show placeholder clips
@@ -223,7 +225,8 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
 ✅ All panels visible and properly sized  
 ✅ Dark Neobrutalism styling applied throughout  
 ✅ Media Library vertical tabs structure in place  
-✅ Preview, Properties, Timeline all have placeholder content  
+✅ Preview panel has correct container for Player  
+✅ Properties, Timeline all have placeholder content  
 ✅ Responsive layout works  
 ✅ **NO JavaScript** - pure CSS and HTML  
 ✅ Ready for Phase 27 (add tab switching logic)
