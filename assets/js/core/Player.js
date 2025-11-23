@@ -913,6 +913,7 @@ export class CorePlayer {
         }
 
         this.currentTime = Math.max(0, Math.min(this.duration, time));
+        this._updateProgress(); // Update UI immediately
 
         // Render frame at new time, but DO NOT update this.currentTime from the frame
         // to avoid reverting to a stale timestamp if the decoder is slow.
