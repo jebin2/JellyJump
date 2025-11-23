@@ -207,21 +207,25 @@
 
         <!-- Right Panel: Properties (30%) -->
         <aside class="properties-panel">
-            <!-- Selected Clip Section (Expanded) -->
-            <div class="property-section expanded">
-                <div class="property-header">
-                    <span class="property-icon">📋</span>
-                    <h3 class="property-title">Selected Clip</h3>
-                    <span class="property-toggle">▼</span>
-                </div>
-                <div class="property-content">
+            <!-- Properties Tabs -->
+            <div class="properties-tabs">
+                <button class="prop-tab active">
+                    <span class="prop-tab-icon">ℹ️</span>
+                    <span class="prop-tab-label">Info</span>
+                </button>
+                <button class="prop-tab">
+                    <span class="prop-tab-icon">⚙️</span>
+                    <span class="prop-tab-label">Settings</span>
+                </button>
+            </div>
+
+            <!-- Info Tab Content (Visible) -->
+            <div class="prop-content active" id="prop-content-info">
+                <div class="property-group">
+                    <div class="group-header">File Metadata</div>
                     <div class="property-item">
                         <label class="label">Name</label>
                         <div class="property-value">clip1.mp4</div>
-                    </div>
-                    <div class="property-item">
-                        <label class="label">Start</label>
-                        <div class="property-value font-mono">00:00:00</div>
                     </div>
                     <div class="property-item">
                         <label class="label">Duration</label>
@@ -234,57 +238,13 @@
                 </div>
             </div>
 
-            <!-- Effects Section (Collapsed) -->
-            <div class="property-section">
-                <div class="property-header">
-                    <span class="property-icon">⚡</span>
-                    <h3 class="property-title">Effects</h3>
-                    <span class="property-toggle">▶</span>
-                </div>
-            </div>
-
-            <!-- Filters Section (Collapsed) -->
-            <div class="property-section">
-                <div class="property-header">
-                    <span class="property-icon">🎨</span>
-                    <h3 class="property-title">Filters</h3>
-                    <span class="property-toggle">▶</span>
-                </div>
-            </div>
-
-            <!-- Text Overlay Section (Collapsed) -->
-            <div class="property-section">
-                <div class="property-header">
-                    <span class="property-icon">📝</span>
-                    <h3 class="property-title">Text Overlay</h3>
-                    <span class="property-toggle">▶</span>
-                </div>
-            </div>
-
-            <!-- Transform Section (Collapsed) -->
-            <div class="property-section">
-                <div class="property-header">
-                    <span class="property-icon">🔧</span>
-                    <h3 class="property-title">Transform</h3>
-                    <span class="property-toggle">▶</span>
-                </div>
-            </div>
-
-            <!-- Audio Mix Section (Expanded) -->
-            <div class="property-section expanded">
-                <div class="property-header">
-                    <span class="property-icon">🔊</span>
-                    <h3 class="property-title">Audio Mix</h3>
-                    <span class="property-toggle">▼</span>
-                </div>
-                <div class="property-content">
+            <!-- Settings Tab Content (Hidden) -->
+            <div class="prop-content" id="prop-content-settings" hidden>
+                <div class="property-group">
+                    <div class="group-header">Clip Settings</div>
                     <div class="property-item">
-                        <label class="label">Volume</label>
-                        <input type="range" class="volume-slider" min="0" max="100" value="75">
-                        <div class="volume-value">75%</div>
-                    </div>
-                    <div class="property-item">
-                        <button class="btn-secondary">🔇 Mute</button>
+                        <label class="label">Opacity</label>
+                        <input type="range" class="volume-slider" min="0" max="100" value="100">
                     </div>
                 </div>
             </div>
@@ -346,7 +306,7 @@
                 <div class="track-label">Audio</div>
                 <div class="track-content">
                     <div class="clip audio-clip" style="left: 0%; width: 60%;" data-clip="a1">
-                        <div class="waveform">▁▃▅▇▅▃▁▃▅▇▅▃▁▃▅▇▅▃▁▃▅▇▅▃▁▃▅▇▅▃▁</div>
+                        <div class="waveform"> ▃▅▇▅▃ ▃▅▇▅▃ ▃▅▇▅▃ ▃▅▇▅▃ ▃▅▇▅▃ </div>
                     </div>
                 </div>
             </div>

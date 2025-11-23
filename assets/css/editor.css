@@ -484,60 +484,91 @@
     min-width: 300px;
     max-width: 500px;
     background-color: var(--bg-secondary);
-    padding: var(--space-md);
-    overflow-y: auto;
+    border-left: var(--border-medium) solid var(--border-dark);
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
+    overflow: hidden;
 }
 
-.property-section {
+/* Properties Tabs */
+.properties-tabs {
+    display: flex;
     background-color: var(--bg-primary);
-    border: var(--border-thin) solid var(--border-dark);
+    border-bottom: var(--border-thin) solid var(--border-dark);
+    flex-shrink: 0;
 }
 
-.property-header {
+.prop-tab {
+    flex: 1;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-sm);
     padding: var(--space-md);
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
     cursor: pointer;
     transition: all var(--transition-fast) var(--ease-standard);
-    border-left: 3px solid transparent;
+    color: var(--text-secondary);
 }
 
-.property-section.expanded .property-header {
-    border-left-color: var(--accent-primary);
+.prop-tab:hover {
     background-color: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
-.property-header:hover {
+.prop-tab.active {
     background-color: var(--bg-tertiary);
+    border-bottom-color: var(--accent-primary);
+    color: var(--text-primary);
 }
 
-.property-icon {
+.prop-tab-icon {
     font-size: var(--text-lg);
 }
 
-.property-title {
+.prop-tab-label {
     font-size: var(--text-sm);
     font-weight: var(--font-bold);
     text-transform: uppercase;
-    color: var(--text-primary);
+}
+
+/* Tab Content */
+.prop-content {
     flex: 1;
-}
-
-.property-toggle {
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-}
-
-.property-content {
+    overflow-y: auto;
     padding: var(--space-md);
-    border-top: var(--border-thin) solid var(--border-dark);
+    display: none;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.prop-content.active {
+    display: flex;
+}
+
+.prop-content[hidden] {
+    display: none;
+}
+
+/* Property Groups */
+.property-group {
+    background-color: var(--bg-primary);
+    border: var(--border-thin) solid var(--border-dark);
+    padding: var(--space-md);
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
+}
+
+.group-header {
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-xs);
 }
 
 .property-item {
@@ -546,9 +577,16 @@
     gap: var(--space-xs);
 }
 
+.label {
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    font-weight: var(--font-medium);
+}
+
 .property-value {
     color: var(--text-primary);
     font-size: var(--text-sm);
+    font-family: var(--font-mono);
 }
 
 .volume-slider {
@@ -798,119 +836,41 @@
     font-weight: var(--font-bold);
 }
 
-.text-clip {
-    background-color: var(--accent-warning);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #000000;
-    font-weight: var(--font-bold);
-    font-size: var(--text-xs);
-}
-
-/* -----------------------------------------
-   10. Timeline Toolbar
-   ----------------------------------------- */
+/* Edit Toolbar */
 .timeline-toolbar {
-    height: 50px;
+    height: 40px;
     background-color: var(--bg-primary);
     border-top: var(--border-thin) solid var(--border-dark);
     display: flex;
     align-items: center;
     padding: 0 var(--space-md);
-    gap: var(--space-sm);
+    gap: var(--space-xs);
 }
 
 .toolbar-btn {
-    padding: var(--space-xs) var(--space-md);
-    background-color: var(--bg-tertiary);
-    border: var(--border-thin) solid var(--border-dark);
+    padding: var(--space-xs) var(--space-sm);
+    background-color: transparent;
+    border: 1px solid transparent;
     color: var(--text-secondary);
     font-size: var(--text-xs);
-    font-weight: var(--font-medium);
     cursor: pointer;
     transition: all var(--transition-fast) var(--ease-standard);
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .toolbar-btn:hover {
-    background-color: var(--accent-primary);
-    color: #000000;
-    border-color: #000000;
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-dark);
+    color: var(--text-primary);
 }
 
-/* -----------------------------------------
-   11. Responsive Design
-   ----------------------------------------- */
-@media (max-width: 1024px) {
-    .editor-container {
-        flex-direction: column;
-        bottom: 40vh;
-    }
-
-    .media-library-panel,
-    .preview-panel,
-    .properties-panel {
-        width: 100%;
-        max-width: none;
-        border-right: none;
-        border-bottom: var(--border-thin) solid var(--border-dark);
-    }
-
-    .media-library-panel {
-        height: 200px;
-    }
-
-    .preview-panel {
-        height: 400px;
-    }
-
-    .properties-panel {
-        height: 300px;
-    }
-
-    .timeline-section {
-        height: 40vh;
-    }
-
-    .library-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (max-width: 640px) {
-    .nav-center {
-        display: none;
-    }
-
-    .nav-title {
-        font-size: var(--text-sm);
-    }
-
-    .nav-action-btn {
-        padding: var(--space-xs) var(--space-sm);
-        font-size: var(--text-xs);
-    }
-
-    .library-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .vertical-tabs {
-        width: 60px;
-    }
-
-    .vertical-tab .tab-label {
-        font-size: 10px;
-    }
-}
-
-/* -----------------------------------------
-   12. Notification System
-   ----------------------------------------- */
+/* Notification */
 .notification-container {
     position: fixed;
-    top: 80px;
-    right: var(--space-lg);
+    bottom: 20px;
+    right: 20px;
     z-index: 2000;
     display: flex;
     flex-direction: column;
