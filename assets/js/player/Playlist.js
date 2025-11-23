@@ -42,9 +42,6 @@ export class Playlist {
             this._saveState();
         });
 
-        // Mobile Drawer Logic
-        this._initMobileDrawer();
-
         // Keyboard Shortcuts
         this._initKeyboardShortcuts();
 
@@ -53,6 +50,49 @@ export class Playlist {
 
         // Load saved playlist
         this._loadSavedPlaylist();
+    }
+
+
+    /**
+     * Initialize Keyboard Shortcuts
+     * @private
+     */
+    _initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Ignore if typing in input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            // Shift + N: Next Video
+            if (e.shiftKey && (e.key === 'N' || e.key === 'n')) {
+                e.preventDefault();
+                this.playNext();
+            }
+
+            // Shift + P: Previous Video
+            if (e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+                e.preventDefault();
+                this.playPrevious();
+            }
+
+            // Delete: Remove selected/active video
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                // Only if not editing text
+                if (this.activeIndex >= 0) {
+                    // Optional: Confirm before delete via shortcut?
+                    // For now, let's just delete to be snappy, or maybe prompt
+                    if (confirm('Remove current video from playlist?')) {
+                        this.removeItem(this.activeIndex);
+                    }
+                }
+            }
+
+            // Ctrl + U: Upload Files
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
+                e.preventDefault();
+                const fileInput = document.getElementById('mb-file-input');
+                if (fileInput) fileInput.click();
+            }
+        });
     }
 
     _createHeader() {
@@ -389,8 +429,11 @@ export class Playlist {
                 isLocal: true,
                 needsReload: false,
                 file: file,
+                isLocal: true,
+                needsReload: false,
+                file: file,
                 path: path,
-                id: crypto.randomUUID() // Add unique ID for persistence
+                id: this._generateId() // Add unique ID for persistence
             };
         });
 
@@ -474,7 +517,7 @@ export class Playlist {
      * @param {Object} video - Video object { title, url, duration, thumbnail }
      */
     addItem(video) {
-        if (!video.id) video.id = crypto.randomUUID();
+        if (!video.id) video.id = this._generateId();
         this.items.push(video);
         this._saveState();
         this.render();
@@ -486,7 +529,7 @@ export class Playlist {
      * @param {Array} videos 
      */
     addItems(videos) {
-        videos.forEach(v => { if (!v.id) v.id = crypto.randomUUID(); });
+        videos.forEach(v => { if (!v.id) v.id = this._generateId(); });
         this.items = [...this.items, ...videos];
         this._saveState();
         this.render();
@@ -933,25 +976,39 @@ export class Playlist {
 
         const statusClass = item.needsReload ? 'needs-reload' : '';
         const statusText = item.needsReload ? '(Missing File)' : '';
+        const errorClass = item.error ? 'error' : '';
+        const title = item.title || 'Unknown Video';
 
         return `
-            <div class="playlist-item ${statusClass}" data-index="${index}">
+            <div class="playlist-item ${statusClass} ${errorClass}" data-index="${index}" tabindex="0" role="button" aria-label="Play ${title}">
                 <div class="playlist-thumbnail">
                     ${thumbnail}
                 </div>
                 <div class="playlist-info">
-                    <div class="playlist-title" title="${item.title}">${item.title} <span style="color: var(--error-color); font-size: 0.7em;">${statusText}</span></div>
+                    <div class="playlist-title" title="${title}">${title} <span style="color: var(--error-color); font-size: 0.7em;">${statusText}</span></div>
                     <div class="playlist-duration">${item.duration || '--:--'}</div>
                 </div>
                 <div class="playlist-actions">
-                    <button class="playlist-download-btn" title="Download video">
+                    <button class="playlist-download-btn" title="Download video" aria-label="Download">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/></svg>
                     </button>
-                    <button class="playlist-remove-btn" title="Remove">
+                    <button class="playlist-remove-btn" title="Remove" aria-label="Remove">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                     </button>
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * Generate a unique ID
+     * @private
+     * @returns {string}
+     */
+    _generateId() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     }
 }

@@ -21,17 +21,6 @@
             <!-- Core Player will be injected here -->
         </main>
 
-        <!-- Mobile Playlist Toggle -->
-        <button id="playlist-toggle" class="btn btn-icon" aria-label="Toggle Playlist"
-            style="position: fixed; bottom: 20px; right: 20px; z-index: 110; display: none;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-            </svg>
-        </button>
-
-        <!-- Overlay for mobile drawer -->
-        <div class="playlist-overlay" id="playlist-overlay"></div>
-
         <!-- Playlist Section -->
         <aside class="playlist-section">
             <header class="playlist-header" style="display: none;">
@@ -97,34 +86,6 @@
             playlist.addItems(sampleVideos);
             playlist.selectItem(0);
         }
-
-        // Mobile Playlist Toggle
-        const playlistToggle = document.getElementById('playlist-toggle');
-        const playlistSection = document.querySelector('.playlist-section');
-        const playlistOverlay = document.getElementById('playlist-overlay');
-
-        function updatePlaylistToggle() {
-            if (window.innerWidth <= 768) {
-                playlistToggle.style.display = 'block';
-            } else {
-                playlistToggle.style.display = 'none';
-                playlistSection.classList.remove('open');
-                playlistOverlay.classList.remove('visible');
-            }
-        }
-
-        updatePlaylistToggle();
-        window.addEventListener('resize', updatePlaylistToggle);
-
-        playlistToggle.addEventListener('click', () => {
-            playlistSection.classList.toggle('open');
-            playlistOverlay.classList.toggle('visible');
-        });
-
-        playlistOverlay.addEventListener('click', () => {
-            playlistSection.classList.remove('open');
-            playlistOverlay.classList.remove('visible');
-        });
     </script>
 
 </body>

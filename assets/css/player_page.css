@@ -87,9 +87,9 @@
     .player-layout {
         grid-template-columns: 1fr;
         grid-template-rows: auto 1fr;
-        height: auto;
-        min-height: 100vh;
-        overflow-y: auto;
+        /* Video auto-sized, playlist fills remaining */
+        height: 100vh;
+        overflow: hidden;
         position: relative;
     }
 
@@ -98,30 +98,19 @@
         /* 16:9 Aspect Ratio */
         border-right: none;
         border-bottom: 2px solid var(--accent-primary);
-        position: sticky;
-        top: 0;
-        z-index: 100;
         background: #000;
     }
 
     .playlist-section {
-        position: fixed;
-        bottom: 0;
-        left: 0;
+        position: relative;
         width: 100%;
-        height: 60vh;
+        height: 100%;
+        /* Fill remaining grid space */
         background-color: var(--bg-secondary);
-        z-index: 200;
-        transform: translateY(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         border-top: 2px solid var(--accent-primary);
-        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
         display: flex;
         flex-direction: column;
-    }
-
-    .playlist-section.open {
-        transform: translateY(0);
+        overflow-y: auto;
     }
 
     /* Overlay when playlist is open */
