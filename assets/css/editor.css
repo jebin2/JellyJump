@@ -230,7 +230,7 @@
 }
 
 /* -----------------------------------------
-   2. Multi-Tab Bar
+   2. Multi-Tab Bar (45px height)
    ----------------------------------------- */
 .tab-bar {
     position: fixed;
@@ -238,59 +238,67 @@
     left: 0;
     right: 0;
     height: 45px;
-    background-color: var(--bg-primary);
+    background-color: var(--bg-secondary);
     border-bottom: var(--border-medium) solid var(--border-dark);
+    box-shadow: var(--shadow-sm) rgba(0, 0, 0, 0.3);
+    z-index: 900;
     display: flex;
     align-items: center;
     padding: 0 var(--space-sm);
     gap: var(--space-sm);
-    z-index: 99;
 }
 
-.tab-new-btn {
-    width: 40px;
-    height: 32px;
-    background-color: var(--bg-tertiary);
-    border: var(--border-thin) solid var(--border-primary);
-    color: var(--accent-primary);
+/* Tab container for scrollable tabs */
+.tab-bar__tabs {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    /* Hide scrollbar */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+}
+
+.tab-bar__tabs::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
+}
+
+/* Create new tab button */
+.tab-bar__create-btn {
+    width: 45px;
+    height: 45px;
+    background-color: var(--bg-primary);
+    border: var(--border-medium) solid var(--border-primary);
+    color: var(--text-primary);
     font-size: var(--text-xl);
-    font-weight: var(--font-bold);
     cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-standard);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--transition-fast) var(--ease-standard);
+    flex-shrink: 0;
 }
 
-.tab-new-btn:hover {
-    background-color: var(--accent-primary);
-    color: #000000;
-}
-
-.tab {
-    height: 32px;
-    padding: 0 var(--space-md);
+.tab-bar__create-btn:hover {
     background-color: var(--bg-tertiary);
-    border: var(--border-thin) solid var(--border-dark);
-    color: var(--text-secondary);
-    font-size: var(--text-sm);
-    font-weight: var(--font-medium);
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: all var(--transition-fast) var(--ease-standard);
+    box-shadow: 4px 4px 0 0 var(--accent-primary);
+    transform: translate(-2px, -2px);
 }
 
-.tab.active {
-    background-color: var(--bg-secondary);
-    border-color: var(--border-primary);
-    color: var(--text-primary);
-    box-shadow: 0 2px 0 0 var(--accent-primary);
+.tab-bar__create-btn:active {
+    transform: translate(0, 0);
+    box-shadow: none;
 }
 
-.tab:hover:not(.active) {
-    border-color: var(--border-primary);
-    color: var(--text-primary);
+.tab-bar__create-btn:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
 }
 
 /* -----------------------------------------

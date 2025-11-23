@@ -117,10 +117,12 @@
 
     <!-- Multi-Tab Bar -->
     <div class="tab-bar">
-        <button class="tab-new-btn" aria-label="New Tab">+</button>
-        <div class="tab active" data-tab="untitled">Untitled Project *</div>
-        <div class="tab" data-tab="project2">Project 2</div>
-        <div class="tab" data-tab="videoedit">Video Edit</div>
+        <div class="tab-bar__tabs">
+            <!-- Empty initially - tabs will be created dynamically in Phase 33 -->
+        </div>
+        <button class="tab-bar__create-btn" data-action="create-tab" aria-label="Create new tab">
+            ➕
+        </button>
     </div>
 
     <!-- Main Editor Layout -->
