@@ -41,7 +41,6 @@ export class CorePlayer {
         this.isAudioInitialized = false;
         this.currentAudioSource = null;
         this.activeSources = [];
-        this.activeSources = [];
         this.playbackId = 0;
 
         // New state variables for MediaBunny example pattern
@@ -925,6 +924,11 @@ export class CorePlayer {
     }
 
     _startRenderLoop() {
+        // Prevent starting multiple render loops
+        if (this.animationFrameId) {
+            return;
+        }
+
         const loop = () => {
             if (this.isPlaying) {
                 const playbackTime = this._getPlaybackTime();
