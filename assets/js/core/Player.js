@@ -727,7 +727,7 @@ export class CorePlayer {
      * @param {boolean} updateTime - Whether to update the player's current time from the frame
      */
     async _renderFrame(timestamp, updateTime = true) {
-        if (!this.videoSink) return;
+        if (!this.videoSink) return null;
 
         const frame = await this.videoSink.getCanvas(timestamp);
         if (frame && frame.canvas) {
@@ -741,7 +741,9 @@ export class CorePlayer {
             if (this.isSubtitlesEnabled) {
                 this._renderSubtitles(timestamp);
             }
+            return frame.timestamp;
         }
+        return null;
     }
 
     /**
@@ -933,7 +935,20 @@ export class CorePlayer {
             const myPlaybackId = ++this.playbackId; // Cancel any running iterator and capture ID
 
             // Pass false to prevent overwriting this.currentTime with stale frame time
-            await this._renderFrame(this.currentTime, false);
+            // Poll until we get a frame close to the target time
+            const startTime = performance.now();
+            while (performance.now() - startTime < 1000) { // 1s timeout
+                const renderedTime = await this._renderFrame(this.currentTime, false);
+
+                // Check if we got a frame and it's close enough (within 100ms)
+                // Note: renderedTime might be undefined/null if seek failed or no frame returned
+                if (renderedTime !== null && renderedTime !== undefined && Math.abs(renderedTime - this.currentTime) < 0.1) {
+                    break;
+                }
+
+                // Wait a bit before retrying
+                await new Promise(r => setTimeout(r, 20));
+            }
 
             // Restart audio if playing AND we are still the latest operation
             if (this.playbackId === myPlaybackId && this.isPlaying && this.audioSink) {
