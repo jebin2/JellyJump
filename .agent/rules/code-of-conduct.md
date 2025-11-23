@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Code of Conduct (COC) & Coding Standards
 
 This document serves as the "Constitution" for code quality in the **MediaBunny Player** project. All code, whether written by humans or LLMs, must strictly adhere to these rules.

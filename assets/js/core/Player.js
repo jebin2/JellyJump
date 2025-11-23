@@ -22,6 +22,7 @@ export class CorePlayer {
         this.isPlaying = false;
         this.currentTime = 0;
         this.duration = 0;
+        this.playbackRate = parseFloat(localStorage.getItem('mediabunny-speed')) || 1.0;
         this.animationFrameId = null;
 
         // MediaBunny objects
@@ -71,8 +72,11 @@ export class CorePlayer {
             loader: null,
             ccBtn: null,
             ccMenu: null,
+            ccMenu: null,
             audioBtn: null,
-            audioMenu: null
+            audioMenu: null,
+            speedBtn: null,
+            speedMenu: null
         };
 
         // Navigation callbacks
@@ -322,6 +326,23 @@ export class CorePlayer {
                             </div>
                         </div>
 
+                        <!-- Speed Menu -->
+                        <div class="mediabunny-menu-btn" id="mb-speed-container">
+                            <button class="mediabunny-btn" id="mb-speed-btn" aria-label="Playback Speed" aria-haspopup="true" aria-expanded="false" style="font-size: 0.8rem; font-weight: bold; width: auto; padding: 0 8px;">
+                                1x
+                            </button>
+                            <div class="mediabunny-menu" id="mb-speed-menu" role="menu">
+                                <div class="mediabunny-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x</div>
+                                <div class="mediabunny-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x</div>
+                                <div class="mediabunny-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
+                                <div class="mediabunny-menu-item" data-value="1" role="menuitem" tabindex="0">Normal</div>
+                                <div class="mediabunny-menu-item" data-value="1.25" role="menuitem" tabindex="0">1.25x</div>
+                                <div class="mediabunny-menu-item" data-value="1.5" role="menuitem" tabindex="0">1.5x</div>
+                                <div class="mediabunny-menu-item" data-value="1.75" role="menuitem" tabindex="0">1.75x</div>
+                                <div class="mediabunny-menu-item" data-value="2" role="menuitem" tabindex="0">2x</div>
+                            </div>
+                        </div>
+
                         <button class="mediabunny-btn" id="mb-fullscreen-btn" aria-label="Fullscreen">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
                         </button>
@@ -354,6 +375,10 @@ export class CorePlayer {
         this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
         this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
         this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
+        this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
+        this.ui.speedMenu = this.container.querySelector('#mb-speed-menu');
+
+        this._updateSpeedMenu();
     }
 
     /**
@@ -451,6 +476,21 @@ export class CorePlayer {
             this.ui.audioMenu.classList.remove('visible');
         });
 
+        // Speed Control
+        this.ui.speedBtn.addEventListener('click', () => {
+            this.ui.speedMenu.classList.toggle('visible');
+            this.ui.speedBtn.setAttribute('aria-expanded', this.ui.speedMenu.classList.contains('visible'));
+        });
+
+        this.ui.speedMenu.addEventListener('click', (e) => {
+            const item = e.target.closest('.mediabunny-menu-item');
+            if (!item) return;
+
+            const speed = parseFloat(item.dataset.value);
+            this.setPlaybackRate(speed);
+            this.ui.speedMenu.classList.remove('visible');
+        });
+
         // Close menus when clicking outside
         document.addEventListener('click', (e) => {
             if (!this.ui.ccBtn.contains(e.target) && !this.ui.ccMenu.contains(e.target)) {
@@ -459,10 +499,53 @@ export class CorePlayer {
             if (!this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
                 this.ui.audioMenu.classList.remove('visible');
             }
+            if (!this.ui.speedBtn.contains(e.target) && !this.ui.speedMenu.contains(e.target)) {
+                this.ui.speedMenu.classList.remove('visible');
+            }
         });
 
         // Keyboard Shortcuts
         document.addEventListener('keydown', (e) => this._handleKeyboard(e));
+    }
+
+    _updateSpeedMenu() {
+        const items = this.ui.speedMenu.querySelectorAll('.mediabunny-menu-item');
+        items.forEach(item => {
+            const speed = parseFloat(item.dataset.value);
+            if (speed === this.playbackRate) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+        this.ui.speedBtn.textContent = this.playbackRate === 1 ? '1x' : `${this.playbackRate}x`;
+        if (this.playbackRate !== 1) {
+            this.ui.speedBtn.style.color = 'var(--accent-primary)';
+        } else {
+            this.ui.speedBtn.style.color = '';
+        }
+    }
+
+    /**
+     * Set playback rate
+     * @param {number} rate 
+     */
+    async setPlaybackRate(rate) {
+        if (rate < 0.25 || rate > 2) return;
+
+        const wasPlaying = this.isPlaying;
+        if (wasPlaying) {
+            this.pause();
+        }
+
+        this.playbackRate = rate;
+        localStorage.setItem('mediabunny-speed', rate);
+        this._updateSpeedMenu();
+
+        if (wasPlaying) {
+            await this.play();
+        }
     }
 
     _updateSubtitleMenu() {
@@ -654,6 +737,18 @@ export class CorePlayer {
                     }
                 }
                 break;
+            case '<':
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    this._cycleSpeed(-1);
+                }
+                break;
+            case '>':
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    this._cycleSpeed(1);
+                }
+                break;
 
             // Editor Mode Controls
             case ',':
@@ -692,6 +787,17 @@ export class CorePlayer {
     _toggleHelp() {
         const isVisible = this.ui.helpOverlay.style.display !== 'none';
         this.ui.helpOverlay.style.display = isVisible ? 'none' : 'flex';
+    }
+
+    _cycleSpeed(direction) {
+        const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+        let index = speeds.indexOf(this.playbackRate);
+        if (index === -1) index = 3; // Default to 1x if weird value
+
+        index += direction;
+        if (index >= 0 && index < speeds.length) {
+            this.setPlaybackRate(speeds[index]);
+        }
     }
 
     /**
@@ -894,7 +1000,7 @@ export class CorePlayer {
      */
     _getPlaybackTime() {
         if (this.isPlaying && this.audioContext) {
-            return this.audioContext.currentTime - this.audioContextStartTime + this.playbackTimeAtStart;
+            return (this.audioContext.currentTime - this.audioContextStartTime) * this.playbackRate + this.playbackTimeAtStart;
         } else {
             return this.playbackTimeAtStart;
         }
@@ -1055,9 +1161,12 @@ export class CorePlayer {
 
                 const node = this.audioContext.createBufferSource();
                 node.buffer = buffer;
+                node.playbackRate.value = this.playbackRate;
                 node.connect(this.gainNode);
 
-                const startTimestamp = this.audioContextStartTime + timestamp - this.playbackTimeAtStart;
+                // Calculate when this chunk should play in AudioContext time
+                // Formula: startTimestamp = audioContextStartTime + (mediaTimestamp - playbackTimeAtStart) / playbackRate
+                const startTimestamp = this.audioContextStartTime + (timestamp - this.playbackTimeAtStart) / this.playbackRate;
 
                 // Two cases: Either, the audio starts in the future or in the past
                 if (startTimestamp >= this.audioContext.currentTime) {
@@ -1065,7 +1174,13 @@ export class CorePlayer {
                     node.start(startTimestamp);
                 } else {
                     // If it starts in the past, then let's only play the audible section that remains from here on out
-                    node.start(this.audioContext.currentTime, this.audioContext.currentTime - startTimestamp);
+                    // We need to offset into the buffer by how much time has passed * playbackRate
+                    const timePassed = this.audioContext.currentTime - startTimestamp;
+                    const offset = timePassed * this.playbackRate;
+
+                    if (offset < buffer.duration) {
+                        node.start(this.audioContext.currentTime, offset);
+                    }
                 }
 
                 this.queuedAudioNodes.add(node);
