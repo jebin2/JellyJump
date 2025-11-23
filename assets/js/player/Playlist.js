@@ -1,4 +1,4 @@
-import { StorageService } from './StorageService.js';
+import { IndexedDBService } from './IndexedDBService.js';
 
 import { MediaBunny } from '../core/MediaBunny.js';
 
@@ -16,8 +16,12 @@ export class Playlist {
         this.player = player;
         this.items = [];
         this.activeIndex = -1;
-        this.storage = new StorageService();
-        this.expandedFolders = new Set(); // Track expanded folder paths
+        this.storage = new IndexedDBService();
+        this.expandedFolders = new Set(); // Track expanded folders
+
+        // Storage
+        this.storage = new IndexedDBService();
+        this.saveTimeout = null; // For debouncing saves
 
         // Clear placeholder
         this.container.innerHTML = '';
@@ -227,29 +231,36 @@ export class Playlist {
      * Load saved playlist from storage
      * @private
      */
-    _loadSavedPlaylist() {
-        const savedItems = this.storage.loadPlaylist();
-        if (savedItems.length > 0) {
-            this.items = savedItems;
-            this.render();
+    async _loadSavedPlaylist() {
+        try {
+            const savedItems = await this.storage.loadPlaylist();
+            if (savedItems.length > 0) {
+                this.items = savedItems;
+                this.render();
 
-            // Restore playback state
-            const state = this.storage.loadPlaybackState();
-            if (state && state.index >= 0 && state.index < this.items.length) {
-                // Don't auto-play on restore, just load
-                this.activeIndex = state.index;
-                const video = this.items[this.activeIndex];
+                // Restore playback state
+                const state = await this.storage.loadPlaybackState();
+                if (state && state.index >= 0 && state.index < this.items.length) {
+                    // Don't auto-play on restore, just load
+                    this.activeIndex = state.index;
+                    const video = this.items[this.activeIndex];
 
-                if (!video.needsReload) {
-                    this.player.load(video.url);
-                    // Use the new seek method
-                    if (typeof this.player.seek === 'function') {
-                        this.player.seek(state.time || 0);
+                    if (!video.needsReload) {
+                        this.player.load(video.url);
+                        // Use the new seek method
+                        if (typeof this.player.seek === 'function') {
+                            this.player.seek(state.time || 0);
+                        }
+                        this._updateUI();
+                        this._updatePlayerNavigationState();
                     }
-                    this._updateUI();
-                    this._updatePlayerNavigationState();
                 }
+            } else {
+                this.render(); // Render empty state
             }
+        } catch (e) {
+            console.error('Error loading playlist:', e);
+            this.render();
         }
     }
 
@@ -378,7 +389,8 @@ export class Playlist {
                 isLocal: true,
                 needsReload: false,
                 file: file,
-                path: path
+                path: path,
+                id: crypto.randomUUID() // Add unique ID for persistence
             };
         });
 
@@ -462,6 +474,7 @@ export class Playlist {
      * @param {Object} video - Video object { title, url, duration, thumbnail }
      */
     addItem(video) {
+        if (!video.id) video.id = crypto.randomUUID();
         this.items.push(video);
         this._saveState();
         this.render();
@@ -473,6 +486,7 @@ export class Playlist {
      * @param {Array} videos 
      */
     addItems(videos) {
+        videos.forEach(v => { if (!v.id) v.id = crypto.randomUUID(); });
         this.items = [...this.items, ...videos];
         this._saveState();
         this.render();
