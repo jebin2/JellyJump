@@ -22,6 +22,133 @@
 }
 
 /* -----------------------------------------
+   Playlist
+   ----------------------------------------- */
+.playlist-section {
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-dark);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.playlist-header {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-tertiary);
+}
+
+.playlist-title-text {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.playlist-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.playlist-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.playlist-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-left: 0;
+    /* Reset margin */
+}
+
+/* Tree View Styles */
+.playlist-tree-level {
+    display: flex;
+    flex-direction: column;
+}
+
+.playlist-folder {
+    display: flex;
+    flex-direction: column;
+}
+
+.playlist-folder-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* Space between info and delete btn */
+    padding: 8px 10px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-weight: bold;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.playlist-folder-info {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.playlist-folder-header:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.folder-remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    /* Hidden by default */
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.playlist-folder-header:hover .folder-remove-btn {
+    opacity: 1;
+    /* Show on hover */
+}
+
+.folder-remove-btn:hover {
+    color: var(--error-color);
+    background: rgba(255, 0, 0, 0.1);
+}
+
+.playlist-toggle {
+    margin-right: 8px;
+    font-size: 10px;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+.playlist-toggle.expanded {
+    transform: rotate(90deg);
+}
+
+.folder-icon {
+    margin-right: 8px;
+}
+
+.playlist-children {
+    padding-left: 20px;
+    /* Indentation */
+    border-left: 1px solid var(--border-light);
+}
+
+/* -----------------------------------------
    Control Bar
    ----------------------------------------- */
 .mediabunny-controls {

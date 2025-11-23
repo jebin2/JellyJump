@@ -1,5 +1,7 @@
 import { StorageService } from './StorageService.js';
 
+import { MediaBunny } from '../core/MediaBunny.js';
+
 /**
  * Playlist Manager
  * Handles rendering and interaction for the video playlist.
@@ -15,9 +17,14 @@ export class Playlist {
         this.items = [];
         this.activeIndex = -1;
         this.storage = new StorageService();
+        this.expandedFolders = new Set(); // Track expanded folder paths
 
         // Clear placeholder
         this.container.innerHTML = '';
+
+        // Initialize UI
+        this._createHeader();
+        this._createListContainer();
 
         // Drag and Drop Events
         this._attachDragEvents();
@@ -42,6 +49,58 @@ export class Playlist {
 
         // Load saved playlist
         this._loadSavedPlaylist();
+    }
+
+    _createHeader() {
+        const header = document.createElement('div');
+        header.className = 'playlist-header';
+        header.innerHTML = `
+            <div class="playlist-title-text">Playlist</div>
+            <div class="playlist-controls">
+                <button class="mediabunny-btn-small" id="mb-add-files">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Files
+                </button>
+                <button class="mediabunny-btn-small" id="mb-add-folder">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg> Folder
+                </button>
+                <button class="mediabunny-btn-small" id="mb-clear-playlist" title="Clear Playlist">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+            </div>
+            <input type="file" id="mb-file-input" multiple accept="video/*" style="display: none;">
+            <input type="file" id="mb-folder-input" webkitdirectory directory style="display: none;">
+        `;
+
+        // Insert before container (which is the list)
+        this.container.parentNode.insertBefore(header, this.container);
+
+        // Attach events
+        header.querySelector('#mb-add-files').addEventListener('click', () => {
+            document.getElementById('mb-file-input').click();
+        });
+
+        header.querySelector('#mb-add-folder').addEventListener('click', () => {
+            document.getElementById('mb-folder-input').click();
+        });
+
+        header.querySelector('#mb-clear-playlist').addEventListener('click', () => {
+            this.clear();
+        });
+
+        document.getElementById('mb-file-input').addEventListener('change', (e) => {
+            this.handleFiles(e.target.files);
+            e.target.value = ''; // Reset
+        });
+
+        document.getElementById('mb-folder-input').addEventListener('change', (e) => {
+            this.handleFiles(e.target.files);
+            e.target.value = ''; // Reset
+        });
+    }
+
+    _createListContainer() {
+        // The passed container is the list container
+        this.container.classList.add('playlist-items');
     }
 
     /**
@@ -229,11 +288,66 @@ export class Playlist {
             }, false);
         });
 
-        section.addEventListener('drop', (e) => {
+        section.addEventListener('drop', async (e) => {
             const dt = e.dataTransfer;
-            const files = dt.files;
-            this.handleFiles(files);
+            const items = dt.items;
+
+            if (items) {
+                // Use DataTransferItemList interface to access the file(s)
+                const files = [];
+                const queue = [];
+
+                for (let i = 0; i < items.length; i++) {
+                    const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                    if (entry) {
+                        queue.push(this._scanEntry(entry));
+                    } else if (items[i].kind === 'file') {
+                        files.push(items[i].getAsFile());
+                    }
+                }
+
+                const scannedFiles = await Promise.all(queue);
+                const flatScanned = scannedFiles.flat();
+
+                // Combine simple files and scanned entries
+                const allFiles = [...files, ...flatScanned];
+                this.handleFiles(allFiles);
+            } else {
+                // Use DataTransfer interface to access the file(s)
+                this.handleFiles(dt.files);
+            }
         }, false);
+    }
+
+    /**
+     * Recursively scan a FileSystemEntry
+     * @param {FileSystemEntry} entry 
+     * @returns {Promise<Array<File>>}
+     */
+    _scanEntry(entry) {
+        return new Promise((resolve) => {
+            if (entry.isFile) {
+                entry.file(file => {
+                    // Patch webkitRelativePath if missing (it usually is for dropped files)
+                    if (!file.webkitRelativePath && entry.fullPath) {
+                        // entry.fullPath usually starts with /
+                        Object.defineProperty(file, 'webkitRelativePath', {
+                            value: entry.fullPath.substring(1)
+                        });
+                    }
+                    resolve([file]);
+                });
+            } else if (entry.isDirectory) {
+                const dirReader = entry.createReader();
+                dirReader.readEntries(async (entries) => {
+                    const promises = entries.map(e => this._scanEntry(e));
+                    const results = await Promise.all(promises);
+                    resolve(results.flat());
+                });
+            } else {
+                resolve([]);
+            }
+        });
     }
 
     /**
@@ -248,21 +362,98 @@ export class Playlist {
             return;
         }
 
-        const newItems = videoFiles.map(file => ({
-            title: file.name,
-            url: URL.createObjectURL(file),
-            duration: 'Local File', // We'd need to load metadata to get real duration
-            thumbnail: '', // No thumbnail for local files yet
-            isLocal: true,
-            needsReload: false,
-            file: file // Store reference to original file for downloads
-        }));
+        const newItems = videoFiles.map(file => {
+            // Determine path
+            let path = file.webkitRelativePath || file.name;
+            // If path doesn't contain separators, it's at root
+            if (!path.includes('/')) {
+                path = file.name;
+            }
+
+            return {
+                title: file.name,
+                url: URL.createObjectURL(file),
+                duration: 'Loading...',
+                thumbnail: '',
+                isLocal: true,
+                needsReload: false,
+                file: file,
+                path: path
+            };
+        });
 
         this.addItems(newItems);
+
+        // Process metadata for new items
+        this._processMetadata(newItems);
 
         // If playlist was empty, play the first new file
         if (this.items.length === newItems.length) {
             this.selectItem(0);
+        }
+    }
+
+    /**
+     * Process metadata for local files
+     * @param {Array} items 
+     */
+    async _processMetadata(items) {
+        for (const item of items) {
+            if (item.isLocal && item.file) {
+                try {
+                    // Use MediaBunny to get duration
+                    // We need to create a temporary input
+                    // Note: MediaBunny might not be fully exposed here, 
+                    // but we can try to use a hidden video element as a fallback if MediaBunny is complex to instantiate just for metadata
+                    // Or use the player's method if available.
+
+                    // Simple fallback: use a temporary video element
+                    const duration = await this._getVideoDuration(item.file);
+                    item.duration = this._formatDuration(duration);
+
+                    // Update UI if this item is rendered
+                    this._updateItemUI(item);
+                    this._saveState();
+                } catch (e) {
+                    console.warn('Failed to load metadata for', item.title, e);
+                    item.duration = '--:--';
+                    this._updateItemUI(item);
+                }
+            }
+        }
+    }
+
+    _getVideoDuration(file) {
+        return new Promise((resolve, reject) => {
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.onloadedmetadata = () => {
+                window.URL.revokeObjectURL(video.src);
+                resolve(video.duration);
+            };
+            video.onerror = () => {
+                reject("Invalid video");
+            };
+            video.src = URL.createObjectURL(file);
+        });
+    }
+
+    _formatDuration(seconds) {
+        if (!seconds || isNaN(seconds)) return '--:--';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    _updateItemUI(item) {
+        // Find the element
+        const index = this.items.indexOf(item);
+        if (index === -1) return;
+
+        const el = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
+        if (el) {
+            const durationEl = el.querySelector('.playlist-duration');
+            if (durationEl) durationEl.textContent = item.duration;
         }
     }
 
@@ -395,45 +586,158 @@ export class Playlist {
             return;
         }
 
-        this.items.forEach((item, index) => {
-            const itemHTML = this._createItemHTML(item, index);
-            this.container.insertAdjacentHTML('beforeend', itemHTML);
+        // Build Tree
+        const tree = this._buildTree(this.items);
+
+        // Render Tree
+        this.container.appendChild(this._renderTreeLevel(tree));
+
+        // Update Active State
+        this._updateUI();
+    }
+
+    /**
+     * Build hierarchical tree from items
+     * @param {Array} items 
+     */
+    _buildTree(items) {
+        const root = { name: 'root', children: {}, items: [] };
+
+        items.forEach((item, index) => {
+            const path = item.path || item.title || 'Unknown';
+            const parts = path.split('/');
+            // If path is just filename, it goes to root items
+            if (parts.length === 1) {
+                root.items.push({ ...item, originalIndex: index });
+                return;
+            }
+
+            // Navigate/Create folders
+            let current = root;
+            for (let i = 0; i < parts.length - 1; i++) {
+                const folderName = parts[i];
+                if (!current.children[folderName]) {
+                    current.children[folderName] = {
+                        name: folderName,
+                        path: parts.slice(0, i + 1).join('/'),
+                        children: {},
+                        items: []
+                    };
+                }
+                current = current.children[folderName];
+            }
+
+            // Add item to last folder
+            current.items.push({ ...item, originalIndex: index });
         });
 
-        // Attach event listeners
-        const elements = this.container.querySelectorAll('.playlist-item');
-        elements.forEach(el => {
-            // Click to play
-            el.addEventListener('click', (e) => {
+        return root;
+    }
+
+    /**
+     * Render a level of the tree
+     * @param {Object} node 
+     * @returns {HTMLElement}
+     */
+    _renderTreeLevel(node) {
+        const container = document.createElement('div');
+        container.className = 'playlist-tree-level';
+
+        // Render Folders
+        Object.values(node.children).forEach(folder => {
+            const folderEl = document.createElement('div');
+            folderEl.className = 'playlist-folder';
+
+            const isExpanded = this.expandedFolders.has(folder.path);
+
+            const header = document.createElement('div');
+            header.className = 'playlist-folder-header';
+            header.innerHTML = `
+                <div class="playlist-folder-info">
+                    <span class="playlist-toggle ${isExpanded ? 'expanded' : ''}">▶</span>
+                    <span class="folder-icon">📁</span>
+                    <span class="folder-name">${folder.name}</span>
+                </div>
+                <button class="playlist-remove-btn folder-remove-btn" title="Remove Folder">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+            `;
+
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'playlist-children';
+            childrenContainer.style.display = isExpanded ? 'block' : 'none';
+
+            // Recursively render children
+            childrenContainer.appendChild(this._renderTreeLevel(folder));
+
+            // Toggle Event (only on info part)
+            header.querySelector('.playlist-folder-info').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const expanded = childrenContainer.style.display !== 'none';
+                if (expanded) {
+                    childrenContainer.style.display = 'none';
+                    header.querySelector('.playlist-toggle').classList.remove('expanded');
+                    this.expandedFolders.delete(folder.path);
+                } else {
+                    childrenContainer.style.display = 'block';
+                    header.querySelector('.playlist-toggle').classList.add('expanded');
+                    this.expandedFolders.add(folder.path);
+                }
+            });
+
+            // Remove Folder Event
+            header.querySelector('.folder-remove-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm(`Delete folder "${folder.name}" and all its contents?`)) {
+                    this.removeFolder(folder.path);
+                }
+            });
+
+            folderEl.appendChild(header);
+            folderEl.appendChild(childrenContainer);
+            container.appendChild(folderEl);
+        });
+
+        // Render Items
+        node.items.forEach(item => {
+            // Create item element from HTML string
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = this._createItemHTML(item, item.originalIndex);
+            const itemEl = tempDiv.firstElementChild;
+
+            // Attach events directly to this element
+            itemEl.addEventListener('click', (e) => {
                 // Ignore if clicking action buttons
                 if (e.target.closest('.playlist-remove-btn') || e.target.closest('.playlist-download-btn')) return;
 
-                const index = parseInt(el.dataset.index);
+                const index = parseInt(itemEl.dataset.index);
                 this.selectItem(index);
             });
 
             // Download button
-            const downloadBtn = el.querySelector('.playlist-download-btn');
+            const downloadBtn = itemEl.querySelector('.playlist-download-btn');
             if (downloadBtn) {
                 downloadBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const index = parseInt(el.dataset.index);
+                    const index = parseInt(itemEl.dataset.index);
                     this._downloadItem(index);
                 });
             }
 
             // Remove button
-            const removeBtn = el.querySelector('.playlist-remove-btn');
+            const removeBtn = itemEl.querySelector('.playlist-remove-btn');
             if (removeBtn) {
                 removeBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const index = parseInt(el.dataset.index);
+                    const index = parseInt(itemEl.dataset.index);
                     this.removeItem(index);
                 });
             }
+
+            container.appendChild(itemEl);
         });
 
-        this._updateUI();
+        return container;
     }
 
     /**
@@ -441,15 +745,63 @@ export class Playlist {
      * @private
      */
     _updateUI() {
-        const elements = this.container.querySelectorAll('.playlist-item');
-        elements.forEach((el, index) => {
-            if (index === this.activeIndex) {
-                el.classList.add('active');
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } else {
-                el.classList.remove('active');
+        // Remove active class from all
+        const allItems = this.container.querySelectorAll('.playlist-item');
+        allItems.forEach(el => el.classList.remove('active'));
+
+        // Add active class to current index
+        if (this.activeIndex >= 0) {
+            const activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+            if (activeEl) {
+                activeEl.classList.add('active');
+                activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
+        }
+    }
+
+    /**
+     * Remove a folder and its contents
+     * @param {string} folderPath 
+     */
+    removeFolder(folderPath) {
+        // Capture the currently active item before modification
+        const activeItem = (this.activeIndex >= 0 && this.activeIndex < this.items.length)
+            ? this.items[this.activeIndex]
+            : null;
+
+        const originalLength = this.items.length;
+
+        // Filter items
+        this.items = this.items.filter(item => {
+            const itemPath = item.path || '';
+            if (itemPath === folderPath || itemPath.startsWith(folderPath + '/')) {
+                return false; // Remove
+            }
+            return true; // Keep
         });
+
+        if (this.items.length !== originalLength) {
+            // Check if active item still exists
+            if (activeItem) {
+                const newIndex = this.items.indexOf(activeItem);
+                if (newIndex === -1) {
+                    // Active item was removed
+                    this.activeIndex = -1;
+                    // Stop playback and reset player
+                    if (this.player) {
+                        this.player.reset();
+                    }
+                } else {
+                    // Active item still exists, update index
+                    this.activeIndex = newIndex;
+                }
+            } else {
+                this.activeIndex = -1;
+            }
+
+            this._saveState();
+            this.render();
+        }
     }
 
     /**

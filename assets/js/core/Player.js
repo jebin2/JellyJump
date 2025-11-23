@@ -1059,6 +1059,41 @@ export class CorePlayer {
     }
 
     /**
+     * Reset the player state and unload media
+     */
+    reset() {
+        this.pause();
+
+        // Clear canvas
+        if (this.ctx && this.canvas) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        // Reset state
+        this.currentTime = 0;
+        this.duration = 0;
+        this.input = null;
+        this.videoTrack = null;
+        this.audioTrack = null;
+        this.videoFrameIterator = null;
+        this.audioBufferIterator = null;
+        this.nextFrame = null;
+
+        // Update UI
+        this._updateTimeDisplay();
+        this._updateProgress();
+        this.ui.loader.style.display = 'none';
+
+        // Reset Audio Context if needed
+        if (this.audioContext) {
+            this.activeSources.forEach(source => {
+                try { source.stop(); } catch (e) { }
+            });
+            this.activeSources = [];
+        }
+    }
+
+    /**
      * Load a media source
      * @param {string} url - URL of the media file
      */
