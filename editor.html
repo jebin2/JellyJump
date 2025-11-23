@@ -26,7 +26,8 @@
         </div>
         <div class="nav-right">
             <button class="nav-action-btn" data-action="import">📥 Import</button>
-            <button class="nav-action-btn" data-action="export">📤 Export ▾</button>
+            <button class="nav-action-btn" data-menu="export" data-action="export" aria-expanded="false"
+                aria-haspopup="true">📤 Export <span class="dropdown-arrow" data-dropdown-arrow>▾</span></button>
         </div>
     </nav>
 
@@ -84,6 +85,33 @@
             <span class="item-icon">📄</span>
             <span class="item-label">Paste</span>
             <span class="item-shortcut">Ctrl+V</span>
+        </button>
+    </div>
+
+    <!-- Export Menu Dropdown -->
+    <div class="dropdown-menu dropdown-menu--export" data-dropdown="export" role="menu" hidden>
+        <button class="dropdown-menu__item" data-action="export-video" role="menuitem">
+            <span class="item-icon">🎬</span>
+            <div class="item-content">
+                <span class="item-label">Export Video</span>
+                <span class="item-description">Download as MP4/WebM</span>
+            </div>
+        </button>
+        <div class="dropdown-menu__divider"></div>
+        <button class="dropdown-menu__item" data-action="export-library" role="menuitem">
+            <span class="item-icon">📚</span>
+            <div class="item-content">
+                <span class="item-label">Export to Library</span>
+                <span class="item-description">Save to media library</span>
+            </div>
+        </button>
+        <div class="dropdown-menu__divider"></div>
+        <button class="dropdown-menu__item" data-action="export-json" role="menuitem">
+            <span class="item-icon">📄</span>
+            <div class="item-content">
+                <span class="item-label">Export as JSON</span>
+                <span class="item-description">Save project file</span>
+            </div>
         </button>
     </div>
 
