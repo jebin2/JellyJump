@@ -6,7 +6,7 @@ Implement remove, clear, and auto-play features with proper MediaBunny resource 
 **MediaBunny Integration**: When removing playlist items or clearing the playlist, properly cleanup MediaBunny resources. **Consult** mediabunny-llms-full.md for:
 - Closing Input objects when no longer needed
 - Proper decoder/sink cleanup
-- Switching between MediaBunny inputs for playlist navigationo on click, reorder via drag, remove videos, next/previous navigation, auto-play next.
+- Switching between MediaBunny inputs for playlist navigationo on click, remove videos, next/previous navigation, auto-play next.
 
 ## Features to Implement
 
@@ -30,17 +30,7 @@ Implement remove, clear, and auto-play features with proper MediaBunny resource 
 - Update visual list
 - Handle removing currently playing video
 
-### Feature 3: Reorder Videos
-**Purpose**: Change video order via drag and drop
-
-**Requirements**:
-- Drag any item up or down in list
-- Visual feedback during drag (highlight drop position)
-- Update playlist order array
-- Maintain currently playing video
-- Touch support for mobile reordering
-
-### Feature 4: Next/Previous Navigation
+### Feature 3: Next/Previous Navigation
 **Purpose**: Navigate through playlist sequentially
 
 **Requirements**:
@@ -50,7 +40,7 @@ Implement remove, clear, and auto-play features with proper MediaBunny resource 
 - Disable buttons at playlist boundaries
 - Update active indicator
 
-### Feature 5: Auto-Play Next
+### Feature 4: Auto-Play Next
 **Purpose**: Automatically play next video when current ends
 
 **Requirements**:
@@ -60,7 +50,7 @@ Implement remove, clear, and auto-play features with proper MediaBunny resource 
 - Handle last video (stop or loop to first)
 - Allow user to disable auto-play (optional)
 
-### Feature 6: Playlist Controls
+### Feature 5: Playlist Controls
 **Purpose**: Bulk playlist operations
 
 **Requirements**:
@@ -72,7 +62,6 @@ Implement remove, clear, and auto-play features with proper MediaBunny resource 
 ## Testing Checklist
 - [ ] Clicking item plays video
 - [ ] Can remove videos
-- [ ] Can reorder videos
 - [ ] Next/Prev buttons work
 - [ ] Auto-play next works
 - [ ] Clear all works
