@@ -39,6 +39,7 @@ export class CorePlayer {
         this.gainNode = null;
         this.nextAudioTime = 0;
         this.isAudioInitialized = false;
+        this.currentAudioSource = null;
 
         // UI Elements
         this.ui = {
@@ -774,7 +775,7 @@ export class CorePlayer {
         this._startRenderLoop();
 
         if (this.audioSink) {
-            this._scheduleAudio();
+            this._scheduleAudio(this.currentTime);
         }
     }
 
@@ -788,6 +789,15 @@ export class CorePlayer {
 
         if (this.audioContext) {
             this.audioContext.suspend();
+        }
+
+        if (this.currentAudioSource) {
+            try {
+                this.currentAudioSource.stop();
+            } catch (e) {
+                // Ignore errors if already stopped
+            }
+            this.currentAudioSource = null;
         }
     }
 
@@ -820,23 +830,40 @@ export class CorePlayer {
         this.animationFrameId = requestAnimationFrame(loop);
     }
 
-    async _scheduleAudio() {
-        if (!this.audioSink || !this.audioContext) return;
+    async _scheduleAudio(startTime) {
+        if (!this.audioSink || !this.audioContext || !this.isPlaying) return;
 
-        // Simple audio scheduling: Fetch buffer for current time and play
-        // In a robust implementation, we'd schedule chunks ahead of time
+        try {
+            // Fetch buffer for the requested time
+            const bufferWrapper = await this.audioSink.getBuffer(startTime);
 
-        const bufferWrapper = await this.audioSink.getBuffer(this.currentTime);
-        if (bufferWrapper && bufferWrapper.buffer) {
-            const source = this.audioContext.createBufferSource();
-            source.buffer = bufferWrapper.buffer;
-            source.connect(this.gainNode);
+            if (bufferWrapper && bufferWrapper.buffer) {
+                const source = this.audioContext.createBufferSource();
+                source.buffer = bufferWrapper.buffer;
+                source.connect(this.gainNode);
 
-            // Play immediately (syncing is complex, this is a basic approximation)
-            source.start(0, 0); // Start from beginning of chunk
+                // Calculate when to play this chunk
+                // For simplicity in this fix, we play immediately if it's the first chunk after seek/play
+                // In a perfect system, we'd use audioContext.currentTime for precise scheduling
 
-            // Note: This simple implementation doesn't handle continuous audio perfectly
-            // It's a placeholder for the complex logic needed for seamless audio streaming
+                source.start(0);
+                this.currentAudioSource = source;
+
+                // Schedule next chunk when this one ends
+                source.onended = () => {
+                    if (this.isPlaying) {
+                        const duration = source.buffer.duration;
+                        const nextTime = startTime + duration;
+
+                        // Only schedule if we haven't reached the end
+                        if (nextTime < this.duration) {
+                            this._scheduleAudio(nextTime);
+                        }
+                    }
+                };
+            }
+        } catch (error) {
+            console.error("Error scheduling audio:", error);
         }
     }
 
@@ -848,8 +875,21 @@ export class CorePlayer {
 
     async _seekTo(time) {
         this.currentTime = Math.max(0, Math.min(this.duration, time));
+
+        // Stop current audio
+        if (this.currentAudioSource) {
+            try {
+                this.currentAudioSource.stop();
+            } catch (e) { }
+            this.currentAudioSource = null;
+        }
+
         await this._renderFrame(this.currentTime);
-        // TODO: Seek audio context
+
+        // Restart audio if playing
+        if (this.isPlaying && this.audioSink) {
+            this._scheduleAudio(this.currentTime);
+        }
     }
 
     toggleFullscreen() {
