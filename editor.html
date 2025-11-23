@@ -4,70 +4,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaBunny - Editor</title>
+    <title>MediaBunny Editor</title>
 
     <!-- CSS -->
     <link rel="stylesheet" href="assets/css/theme.css">
-    <link rel="stylesheet" href="assets/css/player.css">
-    <link rel="stylesheet" href="assets/css/editor_page.css">
+    <link rel="stylesheet" href="assets/css/editor.css">
 </head>
 
 <body>
+    <!-- Top Navigation Bar -->
+    <nav class="editor-nav">
+        <div class="nav-left">
+            <span class="nav-brand">🎬</span>
+            <h1 class="nav-title">MediaBunny Editor</h1>
+        </div>
+        <div class="nav-center">
+            <button class="nav-menu-btn" data-menu="file">File</button>
+            <button class="nav-menu-btn" data-menu="edit">Edit</button>
+            <button class="nav-menu-btn" data-menu="view">View</button>
+            <button class="nav-menu-btn" data-menu="effects">Effects</button>
+        </div>
+        <div class="nav-right">
+            <button class="nav-action-btn" data-action="import">📥 Import</button>
+            <button class="nav-action-btn" data-action="export">📤 Export ▾</button>
+        </div>
+    </nav>
 
-    <div class="editor-layout">
-        <!-- Top Section: Preview & Properties -->
-        <section class="top-section">
-            <div class="preview-panel" id="editor-player-container">
-                <!-- Core Player (Editor Mode) injected here -->
-            </div>
-            <aside class="properties-panel">
-                <h3 class="text-lg font-bold mb-4">PROPERTIES</h3>
-                <div class="form-group">
-                    <label class="text-sm text-secondary">Clip Name</label>
-                    <input type="text" class="input" value="Sequence 01">
-                </div>
-                <div class="form-group mt-4">
-                    <label class="text-sm text-secondary">Duration</label>
-                    <div class="text-mono">00:00:00:00</div>
-                </div>
-            </aside>
-        </section>
-
-        <!-- Middle Section: Timeline -->
-        <section class="timeline-section">
-            <div class="timeline-header">
-                <span>00:00</span>
-                <span style="margin-left: auto;">Timeline</span>
-            </div>
-            <div class="timeline-tracks">
-                <!-- Tracks will go here -->
-                <div style="color: #666; padding: 20px; text-align: center;">Timeline Area</div>
-            </div>
-        </section>
-
-        <!-- Bottom Section: Media Library -->
-        <section class="library-section">
-            <div class="library-item">Media 1</div>
-            <div class="library-item">Media 2</div>
-            <div class="library-item">Effect 1</div>
-            <div class="library-item">Trans 1</div>
-        </section>
+    <!-- Multi-Tab Bar -->
+    <div class="tab-bar">
+        <button class="tab-new-btn" aria-label="New Tab">+</button>
+        <div class="tab active" data-tab="untitled">Untitled Project *</div>
+        <div class="tab" data-tab="project2">Project 2</div>
+        <div class="tab" data-tab="videoedit">Video Edit</div>
     </div>
 
-    <!-- Scripts -->
-    <script type="module">
-        import { CorePlayer } from './assets/js/core/Player.js';
+    <!-- Main Editor Layout -->
+    <div class="editor-container">
+        <!-- Left Panel: Media Library (20%) -->
+        <aside class="media-library-panel">
+            <!-- Vertical Tabs -->
+            <div class="vertical-tabs">
+                <button class="vertical-tab active" data-tab="videos">
+                    <span class="tab-icon">📹</span>
+                    <span class="tab-label">Videos</span>
+                    <span class="tab-count">12</span>
+                </button>
+                <button class="vertical-tab" data-tab="audio">
+                    <span class="tab-icon">🎵</span>
+                    <span class="tab-label">Audio</span>
+                    <span class="tab-count">5</span>
+                </button>
+                <button class="vertical-tab" data-tab="images">
+                    <span class="tab-icon">🖼️</span>
+                    <span class="tab-label">Images</span>
+                    <span class="tab-count">8</span>
+                </button>
+                <button class="vertical-tab" data-tab="text">
+                    <span class="tab-icon">📝</span>
+                    <span class="tab-label">Text</span>
+                    <span class="tab-count">0</span>
+                </button>
+                <button class="vertical-tab" data-tab="effects">
+                    <span class="tab-icon">🎨</span>
+                    <span class="tab-label">Effects</span>
+                    <span class="tab-count">15</span>
+                </button>
+                <button class="vertical-tab" data-tab="projects">
+                    <span class="tab-icon">📁</span>
+                    <span class="tab-label">Projects</span>
+                    <span class="tab-count">3</span>
+                </button>
+                <button class="vertical-tab-upload">Upload</button>
+            </div>
 
-        // Initialize Player in Editor Mode
-        const player = new CorePlayer('editor-player-container', {
-            autoplay: false,
-            muted: false,
-            mode: 'editor' // Enables frame stepping, etc.
-        });
+            <!-- Content Area -->
+            <div class="library-content">
+                <div class="library-search">
+                    <input type="text" class="input" placeholder="Search videos...">
+                </div>
+                <div class="library-grid">
+                    <div class="library-tile">
+                        <div class="tile-thumbnail"></div>
+                        <div class="tile-name">Video 1.mp4</div>
+                    </div>
+                    <div class="library-tile">
+                        <div class="tile-thumbnail"></div>
+                        <div class="tile-name">Video 2.mp4</div>
+                    </div>
+                    <div class="library-tile">
+                        <div class="tile-thumbnail"></div>
+                        <div class="tile-name">Video 3.mov</div>
+                    </div>
+                    <div class="library-tile">
+                        <div class="tile-thumbnail"></div>
+                        <div class="tile-name">Video 4.mp4</div>
+                    </div>
+                    <div class="library-tile">
+                        <div class="tile-thumbnail"></div>
+                        <div class="tile-name">Video 5.avi</div>
+                    </div>
+                    <div class="library-tile">
+                        <div class="tile-thumbnail"></div>
+                        <div class="tile-name">Video 6.mp4</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
 
-        // Load a sample video for demonstration
-        player.load('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4');
-    </script>
+        <!-- Center Panel: Preview Canvas (50%) -->
+        <section class="preview-panel">
+            <div class="preview-canvas">
+                <div class="preview-placeholder">Preview Canvas</div>
+            </div>
+            <div class="preview-info">
+                <div class="preview-metadata">1920x1080 @ 30fps</div>
+                <div class="preview-time">00:00:05 / 00:00:30</div>
+            </div>
+            <div class="preview-controls">
+                <button class="btn-control" aria-label="Play">▶</button>
+                <button class="btn-control" aria-label="Pause">⏸</button>
+                <button class="btn-control" aria-label="Fullscreen">⛶</button>
+            </div>
+        </section>
+
+        <!-- Right Panel: Properties (30%) -->
+        <aside class="properties-panel">
+            <!-- Selected Clip Section (Expanded) -->
+            <div class="property-section expanded">
+                <div class="property-header">
+                    <span class="property-icon">📋</span>
+                    <h3 class="property-title">Selected Clip</h3>
+                    <span class="property-toggle">▼</span>
+                </div>
+                <div class="property-content">
+                    <div class="property-item">
+                        <label class="label">Name</label>
+                        <div class="property-value">clip1.mp4</div>
+                    </div>
+                    <div class="property-item">
+                        <label class="label">Start</label>
+                        <div class="property-value font-mono">00:00:00</div>
+                    </div>
+                    <div class="property-item">
+                        <label class="label">Duration</label>
+                        <div class="property-value font-mono">00:45</div>
+                    </div>
+                    <div class="property-item">
+                        <label class="label">Resolution</label>
+                        <div class="property-value">1920x1080</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Effects Section (Collapsed) -->
+            <div class="property-section">
+                <div class="property-header">
+                    <span class="property-icon">⚡</span>
+                    <h3 class="property-title">Effects</h3>
+                    <span class="property-toggle">▶</span>
+                </div>
+            </div>
+
+            <!-- Filters Section (Collapsed) -->
+            <div class="property-section">
+                <div class="property-header">
+                    <span class="property-icon">🎨</span>
+                    <h3 class="property-title">Filters</h3>
+                    <span class="property-toggle">▶</span>
+                </div>
+            </div>
+
+            <!-- Text Overlay Section (Collapsed) -->
+            <div class="property-section">
+                <div class="property-header">
+                    <span class="property-icon">📝</span>
+                    <h3 class="property-title">Text Overlay</h3>
+                    <span class="property-toggle">▶</span>
+                </div>
+            </div>
+
+            <!-- Transform Section (Collapsed) -->
+            <div class="property-section">
+                <div class="property-header">
+                    <span class="property-icon">🔧</span>
+                    <h3 class="property-title">Transform</h3>
+                    <span class="property-toggle">▶</span>
+                </div>
+            </div>
+
+            <!-- Audio Mix Section (Expanded) -->
+            <div class="property-section expanded">
+                <div class="property-header">
+                    <span class="property-icon">🔊</span>
+                    <h3 class="property-title">Audio Mix</h3>
+                    <span class="property-toggle">▼</span>
+                </div>
+                <div class="property-content">
+                    <div class="property-item">
+                        <label class="label">Volume</label>
+                        <input type="range" class="volume-slider" min="0" max="100" value="75">
+                        <div class="volume-value">75%</div>
+                    </div>
+                    <div class="property-item">
+                        <button class="btn-secondary">🔇 Mute</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Bottom Panel: Timeline Section -->
+    <section class="timeline-section">
+        <!-- Timeline Header -->
+        <div class="timeline-header">
+            <div class="timeline-label">🕐 Timeline</div>
+            <div class="timeline-zoom">
+                <button class="zoom-btn">25%</button>
+                <button class="zoom-btn active">100%</button>
+                <button class="zoom-btn">200%</button>
+            </div>
+            <div class="timeline-duration">
+                <span class="font-mono">00:00:30</span>
+                <button class="timeline-settings" aria-label="Settings">⚙</button>
+            </div>
+        </div>
+
+        <!-- Time Ruler -->
+        <div class="time-ruler">
+            <div class="time-marker" style="left: 0%;">0:00</div>
+            <div class="time-marker" style="left: 16.67%;">0:05</div>
+            <div class="time-marker" style="left: 33.33%;">0:10</div>
+            <div class="time-marker" style="left: 50%;">0:15</div>
+            <div class="time-marker" style="left: 66.67%;">0:20</div>
+            <div class="time-marker" style="left: 83.33%;">0:25</div>
+            <div class="time-marker" style="left: 100%;">0:30</div>
+        </div>
+
+        <!-- Timeline Tracks -->
+        <div class="timeline-tracks">
+            <!-- Playhead -->
+            <div class="playhead" style="left: 16.67%;"></div>
+
+            <!-- Video Track 1 -->
+            <div class="track">
+                <div class="track-label">Video 1</div>
+                <div class="track-content">
+                    <div class="clip" style="left: 0%; width: 20%;" data-clip="v1"></div>
+                    <div class="clip" style="left: 25%; width: 15%;" data-clip="v2"></div>
+                    <div class="clip" style="left: 45%; width: 25%;" data-clip="v3"></div>
+                </div>
+            </div>
+
+            <!-- Video Track 2 -->
+            <div class="track">
+                <div class="track-label">Video 2</div>
+                <div class="track-content">
+                    <div class="clip" style="left: 10%; width: 30%;" data-clip="v4"></div>
+                </div>
+            </div>
+
+            <!-- Audio Track -->
+            <div class="track">
+                <div class="track-label">Audio</div>
+                <div class="track-content">
+                    <div class="clip audio-clip" style="left: 0%; width: 60%;" data-clip="a1">
+                        <div class="waveform">▁▃▅▇▅▃▁▃▅▇▅▃▁▃▅▇▅▃▁▃▅▇▅▃▁▃▅▇▅▃▁</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text Track -->
+            <div class="track">
+                <div class="track-label">Text</div>
+                <div class="track-content">
+                    <div class="clip text-clip" style="left: 20%; width: 15%;" data-clip="t1">Hello World</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Toolbar -->
+        <div class="timeline-toolbar">
+            <button class="toolbar-btn" aria-label="Cut">✂️ Cut</button>
+            <button class="toolbar-btn" aria-label="Trim">📏 Trim</button>
+            <button class="toolbar-btn" aria-label="Split">➕ Split</button>
+            <button class="toolbar-btn" aria-label="Copy">📋 Copy</button>
+            <button class="toolbar-btn" aria-label="Paste">📄 Paste</button>
+            <button class="toolbar-btn" aria-label="Delete">🗑️ Delete</button>
+            <button class="toolbar-btn" aria-label="Undo">🔄 Undo</button>
+            <button class="toolbar-btn" aria-label="Redo">↩️ Redo</button>
+        </div>
+    </section>
 
 </body>
 
