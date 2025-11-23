@@ -118,23 +118,19 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
 - Apply Dark Neobrutalism theme borders
 - Vertical scroll if content overflows
 
-**Section Structure** (collapsible headers, visual only):
-- 📋 **Selected Clip** (expanded)
-  - Show placeholder clip info:
+**Tabbed Structure** (visual only):
+- **Tab Bar**:
+  - [ ℹ️ Info ] (Active)
+  - [ ⚙️ Settings ] (Inactive)
+- **Info Tab Content** (Visible):
+  - Placeholder metadata:
     - Name: clip1.mp4
-    - Start: 00:00:00
     - Duration: 00:45
     - Resolution: 1920x1080
-- ⚡ **Effects** (collapsed)
-- 🎨 **Filters** (collapsed)
-- 📝 **Text Overlay** (collapsed)
-- 🔧 **Transform** (collapsed)
-  - Placeholder sliders/inputs
-- 🔊 **Audio Mix** (expanded)
-  - Volume slider placeholder (visual only)
-  - Mute button (visual only)
+- **Settings Tab Content** (Hidden):
+  - Placeholder for controls
 
-**No functionality** - just visual headers and placeholders
+**No functionality** - just visual structure and placeholders
 
 ### Feature 6: Timeline Section (Bottom)
 **Purpose**: Bottom panel for timeline editor (30% viewport height)

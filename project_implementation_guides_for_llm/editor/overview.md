@@ -188,33 +188,34 @@ Each phase implements ONE atomic, testable feature for maximum LLM clarity and e
 
 ### [Phase 54: Properties Panel Structure](phase54-properties-panel.md)
 - 30% width right panel
-- Container styling
+- Container styling (Dark Neobrutalism)
 - **Est**: 10 min
 
 ### [Phase 55: Empty State Display](phase55-empty-state.md)
-- "Select a clip to edit" message
-- Show when nothing selected
+- "Select an item to view properties" message
+- Centered icon and text
 - **Est**: 10 min
 
-### [Phase 56: Collapsible Section Headers](phase56-collapsible-sections.md)
-- 6 section headers with expand/collapse
-- Smooth animation, persist state
+### [Phase 56: Tabbed Interface UI](phase56-tabbed-interface.md)
+- Tab Bar: [ Info ] [ Settings ]
+- Tab switching logic and styling
 - **Est**: 25 min
 
-### [Phase 57: Selected Clip Info](phase57-clip-info.md)
-- Show clip metadata
-- Update when clip selected
+### [Phase 57: Info Tab Content](phase57-info-tab.md)
+- Read-only metadata display
+- Name, Duration, Resolution, Path
 - **Est**: 20 min
 
-### [Phase 58: Volume Slider Control](phase58-volume-slider.md)
-- Volume slider (0-100%)
-- Apply to selected clip
-- **Est**: 20 min
-
-### [Phase 59: Mute Toggle Button](phase59-mute-toggle.md)
-- Mute/unmute button
-- Visual feedback
+### [Phase 58: Settings Tab Foundation](phase58-settings-tab.md)
+- Container for configurable options
+- Placeholder content for now
 - **Est**: 15 min
+
+### [Phase 59: Context Switching Logic](phase59-context-switching.md)
+- Switch content based on selection
+- Media Library -> Info only
+- Timeline -> Info + Settings
+- **Est**: 25 min
 
 ---
 
