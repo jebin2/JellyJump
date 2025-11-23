@@ -906,6 +906,23 @@ export class CorePlayer {
         }
     }
 
+    async _seekTo(time) {
+        const wasPlaying = this.isPlaying;
+        if (wasPlaying) {
+            this.pause();
+        }
+
+        this.currentTime = Math.max(0, Math.min(this.duration, time));
+
+        // Render frame at new time, but DO NOT update this.currentTime from the frame
+        // to avoid reverting to a stale timestamp if the decoder is slow.
+        await this._renderFrame(this.currentTime, false);
+
+        if (wasPlaying) {
+            await this.play();
+        }
+    }
+
     _seek(e) {
         const rect = this.ui.progressContainer.getBoundingClientRect();
         const pos = (e.clientX - rect.left) / rect.width;
