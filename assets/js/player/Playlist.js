@@ -136,7 +136,10 @@ export class Playlist {
 
                 if (!video.needsReload) {
                     this.player.load(video.url);
-                    this.player.mediaElement.currentTime = state.time || 0;
+                    // Use the new seek method
+                    if (typeof this.player.seek === 'function') {
+                        this.player.seek(state.time || 0);
+                    }
                     this._updateUI();
                 }
             }
@@ -254,7 +257,7 @@ export class Playlist {
             } else {
                 // List will be empty
                 this.player.pause();
-                this.player.mediaElement.src = '';
+                // this.player.mediaElement.src = ''; // CorePlayer doesn't support this directly, pause is enough
                 this.activeIndex = -1;
             }
         } else if (index < this.activeIndex) {
@@ -275,7 +278,7 @@ export class Playlist {
             this.items = [];
             this.activeIndex = -1;
             this.player.pause();
-            this.player.mediaElement.src = '';
+            // this.player.mediaElement.src = '';
             this.storage.clear();
             this.render();
         }
@@ -297,7 +300,7 @@ export class Playlist {
      * Select and play a video by index
      * @param {number} index 
      */
-    selectItem(index) {
+    async selectItem(index) {
         if (index < 0 || index >= this.items.length) return;
 
         const video = this.items[index];
@@ -310,7 +313,7 @@ export class Playlist {
         this.activeIndex = index;
 
         // Load video into player
-        this.player.load(video.url);
+        await this.player.load(video.url);
 
         // Update UI
         this._updateUI();

@@ -40,6 +40,8 @@ export class CorePlayer {
         this.nextAudioTime = 0;
         this.isAudioInitialized = false;
         this.currentAudioSource = null;
+        this.activeSources = [];
+        this.playbackId = 0;
 
         // UI Elements
         this.ui = {
@@ -624,16 +626,18 @@ export class CorePlayer {
      */
     async load(url) {
         try {
+            // Stop any current playback
+            this.pause();
+            this.currentTime = 0;
+            this.videoSink = null;
+            this.audioSink = null;
+
             this.ui.loader.classList.add('visible');
             console.log(`Loading media: ${url}`);
 
-            // Fetch the file as a Blob
-            const response = await fetch(url);
-            const blob = await response.blob();
-
-            // Initialize MediaBunny Input
+            // Initialize MediaBunny Input with UrlSource
             this.input = new MediaBunny.Input({
-                source: new MediaBunny.BlobSource(blob),
+                source: new MediaBunny.UrlSource(url),
                 formats: MediaBunny.ALL_FORMATS
             });
 
@@ -775,13 +779,15 @@ export class CorePlayer {
         this._startRenderLoop();
 
         if (this.audioSink) {
-            this._scheduleAudio(this.currentTime);
+            this._playAudio(this.currentTime);
         }
     }
 
     pause() {
         this.isPlaying = false;
         this._updatePlayIcon();
+        this.playbackId++; // Cancel current playback loop
+
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
@@ -791,14 +797,11 @@ export class CorePlayer {
             this.audioContext.suspend();
         }
 
-        if (this.currentAudioSource) {
-            try {
-                this.currentAudioSource.stop();
-            } catch (e) {
-                // Ignore errors if already stopped
-            }
-            this.currentAudioSource = null;
-        }
+        // Stop all active sources
+        this.activeSources.forEach(source => {
+            try { source.stop(); } catch (e) { }
+        });
+        this.activeSources = [];
     }
 
     _startRenderLoop() {
@@ -830,40 +833,41 @@ export class CorePlayer {
         this.animationFrameId = requestAnimationFrame(loop);
     }
 
-    async _scheduleAudio(startTime) {
-        if (!this.audioSink || !this.audioContext || !this.isPlaying) return;
+    async _playAudio(startTime) {
+        if (!this.audioSink || !this.audioContext) return;
+
+        const currentPlaybackId = ++this.playbackId;
+        const baseTime = this.audioContext.currentTime;
+        const timeOffset = baseTime - startTime;
 
         try {
-            // Fetch buffer for the requested time
-            const bufferWrapper = await this.audioSink.getBuffer(startTime);
+            // Use the iterator pattern from the guide
+            for await (const { buffer, timestamp } of this.audioSink.buffers(startTime)) {
+                if (this.playbackId !== currentPlaybackId || !this.isPlaying) break;
 
-            if (bufferWrapper && bufferWrapper.buffer) {
                 const source = this.audioContext.createBufferSource();
-                source.buffer = bufferWrapper.buffer;
+                source.buffer = buffer;
                 source.connect(this.gainNode);
 
-                // Calculate when to play this chunk
-                // For simplicity in this fix, we play immediately if it's the first chunk after seek/play
-                // In a perfect system, we'd use audioContext.currentTime for precise scheduling
+                // Calculate absolute start time
+                const absoluteStartTime = timestamp + timeOffset;
 
-                source.start(0);
-                this.currentAudioSource = source;
+                // If we are late, we can't play in the past.
+                // However, since we are iterating, we should just play at the calculated time.
+                // The AudioContext handles "past" start times by playing immediately, 
+                // but we might want to be careful about drift.
+                // For now, trust the guide's pattern.
 
-                // Schedule next chunk when this one ends
+                source.start(absoluteStartTime);
+                this.activeSources.push(source);
+
                 source.onended = () => {
-                    if (this.isPlaying) {
-                        const duration = source.buffer.duration;
-                        const nextTime = startTime + duration;
-
-                        // Only schedule if we haven't reached the end
-                        if (nextTime < this.duration) {
-                            this._scheduleAudio(nextTime);
-                        }
-                    }
+                    const index = this.activeSources.indexOf(source);
+                    if (index > -1) this.activeSources.splice(index, 1);
                 };
             }
         } catch (error) {
-            console.error("Error scheduling audio:", error);
+            console.error("Error playing audio:", error);
         }
     }
 
@@ -877,19 +881,26 @@ export class CorePlayer {
         this.currentTime = Math.max(0, Math.min(this.duration, time));
 
         // Stop current audio
-        if (this.currentAudioSource) {
-            try {
-                this.currentAudioSource.stop();
-            } catch (e) { }
-            this.currentAudioSource = null;
-        }
+        this.activeSources.forEach(source => {
+            try { source.stop(); } catch (e) { }
+        });
+        this.activeSources = [];
+        this.playbackId++; // Cancel any running iterator
 
         await this._renderFrame(this.currentTime);
 
         // Restart audio if playing
         if (this.isPlaying && this.audioSink) {
-            this._scheduleAudio(this.currentTime);
+            this._playAudio(this.currentTime);
         }
+    }
+
+    /**
+     * Seek to a specific time
+     * @param {number} time - Time in seconds
+     */
+    seek(time) {
+        this._seekTo(time);
     }
 
     toggleFullscreen() {
