@@ -629,6 +629,13 @@ export class CorePlayer {
             // Stop any current playback
             this.pause();
             this.currentTime = 0;
+
+            // Clear canvas and reset UI immediately
+            if (this.ctx && this.canvas) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+            this._updateTimeDisplay();
+
             this.videoSink = null;
             this.audioSink = null;
 
