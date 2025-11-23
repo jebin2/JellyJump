@@ -121,6 +121,10 @@ export class Playlist {
                 () => this.playPrevious(),
                 () => this.playNext()
             );
+
+            // Hook up onEnded for auto-advance
+            this.player.onEnded = () => this.playNext();
+
             this._updatePlayerNavigationState();
         }
     }
@@ -340,8 +344,12 @@ export class Playlist {
         if (this.activeIndex < this.items.length - 1) {
             this.selectItem(this.activeIndex + 1);
         } else {
-            // Loop to start? Or stop? Let's stop for now.
-            console.log('Playlist ended');
+            // Check if playlist loop is enabled
+            if (this.player.loopMode === 'playlist') {
+                this.selectItem(0);
+            } else {
+                console.log('Playlist ended');
+            }
         }
     }
 

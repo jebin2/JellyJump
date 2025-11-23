@@ -74,19 +74,145 @@ This document serves as the "Constitution" for code quality in the **MediaBunny 
 
 ## 9. Modularity & Reusability
 *   **DRY (Don't Repeat Yourself)**: If you copy-paste code more than once, extract it into a reusable function or module.
-*   **Shared Utilities**: Place common helper functions (e.g., DOM helpers, formatters, validators) in a dedicated `utils/` folder.
+*   **Shared Utilities**: Place common helper functions in a dedicated folder (e.g., `utils/`, `helpers/`).
 *   **Component Isolation**: Each module/class should be self-contained with minimal coupling. Avoid tight dependencies between unrelated modules.
 *   **Configuration Over Code**: Extract magic numbers, URLs, and repeated values into a config file or constants.
     *   ✅ `const API_ENDPOINT = '/api/media';`
     *   ❌ Using `'/api/media'` scattered across 10 files
 *   **Composition Over Inheritance**: Prefer small, composable functions/modules over deep class hierarchies.
-*   **Interface Contracts**: When modules interact, define clear interfaces (method names, expected parameters, return values). Document these contracts.
 
 ## 10. Testability
 *   **Write Testable Code**: Pure functions, dependency injection, and small modules are easier to test.
 *   **Avoid Global State**: Use parameters or class properties instead of globals. Global state makes testing and debugging difficult.
 *   **Side Effects Isolation**: Isolate side effects (DOM manipulation, API calls, localStorage) to make core logic testable.
-*   **Predictable Behavior**: Functions should behave the same way given the same inputs, regardless of when they're called.
+
+## 11. CSS Standards
+
+### 11.1 Separation of Concerns
+*   **No Inline Styles in HTML**: Never use `style=""` attributes. Exception: Dynamic values (e.g., progress bars, drag positions).
+*   **No CSS-in-JS**: Do NOT embed CSS strings in JavaScript files. All styles belong in `.css` files.
+    *   ❌ `element.style.cssText = 'color: red; font-size: 14px;'`
+    *   ❌ Creating `<style>` tags dynamically in JS
+    *   ✅ Toggle classes: `element.classList.add('error-state')`
+*   **External Stylesheets Only**: Organize CSS in a logical folder structure (e.g., `styles/`, `css/`).
+
+### 11.2 CSS Architecture
+*   **BEM Naming Convention**: Use Block-Element-Modifier pattern.
+    ```css
+    .video-player { }              /* Block */
+    .video-player__controls { }    /* Element */
+    .video-player--fullscreen { }  /* Modifier */
+    ```
+*   **No ID Selectors**: Never use `#id` for styling. IDs are for JS only.
+*   **Shallow Specificity**: Keep selectors flat (1-2 levels max).
+
+### 11.3 CSS Custom Properties (Variables)
+*   **Centralized Theming**: Define all colors, spacing, and magic numbers as CSS variables.
+    ```css
+    :root {
+        --color-primary: #007bff;
+        --space-md: 16px;
+    }
+    ```
+*   **Use Variables Everywhere**: Reference variables instead of hardcoding.
+    ```css
+    /* ❌ Bad */
+    .button { background: #007bff; padding: 8px 16px; }
+    
+    /* ✅ Good */
+    .button { background: var(--color-primary); padding: var(--space-sm) var(--space-md); }
+    ```
+
+### 11.4 Responsive & Performance
+*   **Mobile-First**: Base styles for mobile, then `min-width` media queries.
+*   **Avoid `@import`**: Use `<link>` tags in HTML.
+*   **Minimize Repaints**: Animate `transform` and `opacity`, not `width`/`height`/`top`/`left`.
+
+### 11.5 Accessibility
+*   **Focus States**: Always style `:focus-visible` for keyboard navigation.
+*   **Contrast Ratios**: Meet WCAG AA standards (4.5:1 for text).
+
+## 12. HTML Standards
+
+### 12.1 Semantic Markup
+*   **Use Semantic Tags**: `<nav>`, `<main>`, `<article>`, `<section>` over `<div>`.
+*   **Buttons vs Links**: `<button>` for actions, `<a>` for navigation.
+*   **Heading Hierarchy**: Use `<h1>` to `<h6>` in order. One `<h1>` per page.
+
+### 12.2 Accessibility
+*   **Alt Text**: Every `<img>` needs `alt` (or `alt=""` for decorative).
+*   **ARIA Labels**: Use for icon-only controls.
+    ```html
+    <button aria-label="Play video"><svg>...</svg></button>
+    ```
+*   **Keyboard Navigation**: All interactive elements must be keyboard accessible.
+
+### 12.3 Data Attributes for JS
+*   **Use `data-*` for JS Hooks**: Never select by styling class names.
+    ```html
+    <!-- ✅ Good -->
+    <button class="btn" data-action="play">Play</button>
+    ```
+    ```javascript
+    document.querySelector('[data-action="play"]');
+    ```
+
+### 12.4 Templates
+*   **Use `<template>` Tags**: For repeating elements, clone in JS.
+    ```html
+    <template id="card-template">
+        <div class="card">...</div>
+    </template>
+    ```
+
+## 13. Theme Management
+*   **Use `data-theme` Attribute**: Apply themes via root attribute.
+    ```html
+    <html data-theme="dark">
+    ```
+    ```javascript
+    document.documentElement.dataset.theme = 'dark';
+    ```
+*   **Persist Theme**: Save in `localStorage`.
+*   **CSS Variable Overrides**: Define theme variants.
+    ```css
+    :root { --color-bg: #fff; }
+    [data-theme="dark"] { --color-bg: #1a1a1a; }
+    ```
+
+## 14. JavaScript & CSS Interaction
+
+### 14.1 Class Toggling (The Right Way)
+```javascript
+// ✅ Toggle classes for state
+element.classList.add('is-active');
+element.classList.toggle('is-expanded');
+
+// ❌ Direct style manipulation
+element.style.display = 'block';
+```
+
+### 14.2 When Inline Styles Are Allowed
+*   Only for dynamic/computed values:
+    ```javascript
+    // ✅ Dynamic positioning
+    dragElement.style.transform = `translate(${x}px, ${y}px)`;
+    
+    // ✅ Progress bars
+    progressBar.style.width = `${percentage}%`;
+    
+    // ❌ Static styles
+    button.style.backgroundColor = 'blue'; // Use classes!
+    ```
+
+## 15. Review Checklist
+- [ ] No CSS in JS files
+- [ ] No inline HTML styles (except dynamic values)
+- [ ] CSS variables used (no hardcoded colors/spacing)
+- [ ] BEM naming followed
+- [ ] Semantic HTML + ARIA labels
+- [ ] Data attributes for JS hooks
+- [ ] Theme uses `data-theme`
 
 ---
 **Enforcement**: Code that violates these rules will be rejected during review.

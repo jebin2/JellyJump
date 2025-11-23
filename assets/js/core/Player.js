@@ -23,6 +23,9 @@ export class CorePlayer {
         this.currentTime = 0;
         this.duration = 0;
         this.playbackRate = parseFloat(localStorage.getItem('mediabunny-speed')) || 1.0;
+        this.loopMode = 'off'; // 'off', 'all', 'ab'
+        this.loopStart = null;
+        this.loopEnd = null;
         this.animationFrameId = null;
 
         // MediaBunny objects
@@ -76,12 +79,20 @@ export class CorePlayer {
             audioBtn: null,
             audioMenu: null,
             speedBtn: null,
-            speedMenu: null
+            speedMenu: null,
+            loopBtn: null,
+            loopMarkerA: null,
+            loopMarkerB: null,
+            loopRegion: null,
+            loopPanel: null,
+            loopStartInput: null,
+            loopEndInput: null
         };
 
         // Navigation callbacks
-        this.onPrevious = null;
         this.onNext = null;
+        this.onPrevious = null;
+        this.onEnded = null;
 
         this._init();
     }
@@ -135,6 +146,17 @@ export class CorePlayer {
             </div>
         ` : '';
 
+        const loopSection = `
+            <div class="mediabunny-help-section">
+                <h3>Looping</h3>
+                <ul>
+                    <li><span class="key">I</span> Set Loop Start (A)</li>
+                    <li><span class="key">O</span> Set Loop End (B)</li>
+                    <li><span class="key">R</span> Reset Loop</li>
+                </ul>
+            </div>
+        `;
+
         const helpHTML = `
             <div class="mediabunny-help-overlay" style="display: none;">
                 <div class="mediabunny-help-content">
@@ -162,6 +184,7 @@ export class CorePlayer {
                         </div>
                         ${navigationSection}
                         ${editorSection}
+                        ${loopSection}
                     </div>
                     <button class="mediabunny-close-help">Close</button>
                 </div>
@@ -283,6 +306,9 @@ export class CorePlayer {
             <div class="mediabunny-controls">
                 <div class="mediabunny-progress-container" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
                     <div class="mediabunny-progress-bar"></div>
+                    <div class="mediabunny-loop-region" style="display: none;"></div>
+                    <div class="mediabunny-marker marker-a" style="display: none;"></div>
+                    <div class="mediabunny-marker marker-b" style="display: none;"></div>
                 </div>
                 <div class="mediabunny-controls-row">
                     <div style="display: flex; align-items: center;">
@@ -343,6 +369,10 @@ export class CorePlayer {
                             </div>
                         </div>
 
+                        <button class="mediabunny-btn" id="mb-loop-btn" aria-label="Loop Mode: Off">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+                        </button>
+
                         <button class="mediabunny-btn" id="mb-fullscreen-btn" aria-label="Fullscreen">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
                         </button>
@@ -351,7 +381,39 @@ export class CorePlayer {
             </div>
         `;
 
+        const loopPanelHTML = `
+            <div class="mediabunny-loop-panel" style="display: none;">
+                <div class="loop-panel-header">
+                    <span>Loop Controls</span>
+                    <button class="mediabunny-close-btn" aria-label="Close Loop Panel">×</button>
+                </div>
+                <div class="loop-panel-content">
+                    <div class="loop-status">Mode: <span id="mb-loop-status">Off</span></div>
+                    <div class="loop-inputs">
+                        <div class="input-group">
+                            <label for="mb-loop-start">Start (A)</label>
+                            <div class="input-row">
+                                <input type="text" id="mb-loop-start" placeholder="MM:SS" class="mediabunny-input">
+                                <button class="mediabunny-btn-small" id="mb-set-a-btn">Set</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="mb-loop-end">End (B)</label>
+                            <div class="input-row">
+                                <input type="text" id="mb-loop-end" placeholder="MM:SS" class="mediabunny-input">
+                                <button class="mediabunny-btn-small" id="mb-set-b-btn">Set</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="loop-actions">
+                        <button class="mediabunny-btn-text" id="mb-clear-loop-btn">Clear Markers</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
         this.container.insertAdjacentHTML('beforeend', controlsHTML);
+        this.container.insertAdjacentHTML('beforeend', loopPanelHTML);
 
         // Initialize Screenshot Manager UI (must be after controls, before caching)
         if (this.screenshotManager) {
@@ -377,6 +439,19 @@ export class CorePlayer {
         this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
         this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
         this.ui.speedMenu = this.container.querySelector('#mb-speed-menu');
+        this.ui.loopBtn = this.container.querySelector('#mb-loop-btn');
+        this.ui.loopMarkerA = this.container.querySelector('.mediabunny-marker.marker-a');
+        this.ui.loopMarkerB = this.container.querySelector('.mediabunny-marker.marker-b');
+        this.ui.loopRegion = this.container.querySelector('.mediabunny-loop-region');
+
+        this.ui.loopPanel = this.container.querySelector('.mediabunny-loop-panel');
+        this.ui.loopStartInput = this.container.querySelector('#mb-loop-start');
+        this.ui.loopEndInput = this.container.querySelector('#mb-loop-end');
+        this.ui.loopStatus = this.container.querySelector('#mb-loop-status');
+        this.ui.setABtn = this.container.querySelector('#mb-set-a-btn');
+        this.ui.setBBtn = this.container.querySelector('#mb-set-b-btn');
+        this.ui.clearLoopBtn = this.container.querySelector('#mb-clear-loop-btn');
+        this.ui.closeLoopPanelBtn = this.container.querySelector('.mediabunny-loop-panel .mediabunny-close-btn');
 
         this._updateSpeedMenu();
     }
@@ -491,6 +566,40 @@ export class CorePlayer {
             this.ui.speedMenu.classList.remove('visible');
         });
 
+        // Loop Control
+        this.ui.loopBtn.addEventListener('click', () => this.toggleLoopMode());
+        // Long press or right click to open panel? Or just a separate button?
+        // Let's make right click open panel for now, or maybe just double click?
+        // Actually, let's add a context menu listener to the loop button
+        this.ui.loopBtn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.toggleLoopPanel();
+        });
+
+        // Loop Panel Events
+        this.ui.closeLoopPanelBtn.addEventListener('click', () => this.toggleLoopPanel());
+        this.ui.setABtn.addEventListener('click', () => this.setLoopStart());
+        this.ui.setBBtn.addEventListener('click', () => this.setLoopEnd());
+        this.ui.clearLoopBtn.addEventListener('click', () => this.clearLoopMarkers());
+
+        this.ui.loopStartInput.addEventListener('change', (e) => {
+            const time = this._parseTime(e.target.value);
+            if (time !== null) {
+                this.loopStart = time;
+                this.loopMode = 'ab';
+                this._updateLoopUI();
+            }
+        });
+
+        this.ui.loopEndInput.addEventListener('change', (e) => {
+            const time = this._parseTime(e.target.value);
+            if (time !== null) {
+                this.loopEnd = time;
+                this.loopMode = 'ab';
+                this._updateLoopUI();
+            }
+        });
+
         // Close menus when clicking outside
         document.addEventListener('click', (e) => {
             if (!this.ui.ccBtn.contains(e.target) && !this.ui.ccMenu.contains(e.target)) {
@@ -524,6 +633,139 @@ export class CorePlayer {
             this.ui.speedBtn.style.color = 'var(--accent-primary)';
         } else {
             this.ui.speedBtn.style.color = '';
+        }
+    }
+
+    /**
+     * Toggle Loop Mode: Off -> Playlist -> One -> Off
+     */
+    toggleLoopMode() {
+        if (this.loopMode === 'off') {
+            this.loopMode = 'playlist';
+        } else if (this.loopMode === 'playlist') {
+            this.loopMode = 'one';
+        } else {
+            this.loopMode = 'off';
+        }
+        // If we were in A-B, this cycle exits it.
+        // If we want to clear A-B markers when leaving A-B mode via button:
+        if (this.loopStart !== null || this.loopEnd !== null) {
+            // Optional: Keep markers but disable A-B? Or clear?
+            // Let's clear for simplicity if user cycles modes.
+            this.loopStart = null;
+            this.loopEnd = null;
+        }
+        this._updateLoopUI();
+    }
+
+    toggleLoopPanel() {
+        const isVisible = this.ui.loopPanel.style.display !== 'none';
+        this.ui.loopPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            this._updateLoopUI(); // Ensure inputs are synced
+        }
+    }
+
+    setLoopStart() {
+        this.loopStart = this.currentTime;
+        if (this.loopEnd !== null && this.loopStart >= this.loopEnd) {
+            this.loopEnd = null; // Reset end if start is after it
+        }
+        this.loopMode = 'ab'; // Auto-enable A-B mode
+        this._updateLoopUI();
+        console.log('Loop Start set:', this.loopStart);
+    }
+
+    setLoopEnd() {
+        if (this.loopStart === null) {
+            this.setLoopStart(); // If no start, set start instead
+            return;
+        }
+        if (this.currentTime <= this.loopStart) {
+            console.warn('Loop End must be after Loop Start');
+            return;
+        }
+        this.loopEnd = this.currentTime;
+        this.loopMode = 'ab'; // Auto-enable A-B mode
+        this._updateLoopUI();
+        console.log('Loop End set:', this.loopEnd);
+    }
+
+    clearLoopMarkers() {
+        this.loopStart = null;
+        this.loopEnd = null;
+        // Keep mode as is, or switch to off? 
+        // Requirement says "Keeps A-B loop mode active but prompts for new markers"
+        // But if markers are null, A-B loop effectively does nothing.
+        this._updateLoopUI();
+    }
+
+    resetLoop() {
+        this.loopStart = null;
+        this.loopEnd = null;
+        this.loopMode = 'off';
+        this._updateLoopUI();
+    }
+
+    _updateLoopUI() {
+        // Update Button
+        const btn = this.ui.loopBtn;
+        let statusText = 'Off';
+
+        if (this.loopMode === 'off') {
+            btn.style.color = '';
+            btn.setAttribute('aria-label', 'Loop Mode: Off');
+            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>';
+            statusText = 'Off';
+        } else if (this.loopMode === 'playlist') {
+            btn.style.color = 'var(--accent-primary)';
+            btn.setAttribute('aria-label', 'Loop Mode: Playlist');
+            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">LIST</text></svg>';
+            statusText = 'Playlist';
+        } else if (this.loopMode === 'one') {
+            btn.style.color = 'var(--accent-primary)';
+            btn.setAttribute('aria-label', 'Loop Mode: One');
+            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">1</text></svg>';
+            statusText = 'Current Video';
+        } else if (this.loopMode === 'ab') {
+            btn.style.color = 'var(--accent-primary)';
+            btn.setAttribute('aria-label', 'Loop Mode: A-B');
+            btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">A-B</text></svg>';
+            statusText = 'A-B Loop';
+        }
+
+        // Update Panel
+        if (this.ui.loopStatus) {
+            this.ui.loopStatus.textContent = statusText;
+            this.ui.loopStartInput.value = this.loopStart !== null ? this._formatTime(this.loopStart) : '';
+            this.ui.loopEndInput.value = this.loopEnd !== null ? this._formatTime(this.loopEnd) : '';
+        }
+
+        // Update Markers
+        if (this.duration > 0) {
+            if (this.loopStart !== null) {
+                this.ui.loopMarkerA.style.display = 'block';
+                this.ui.loopMarkerA.style.left = `${(this.loopStart / this.duration) * 100}%`;
+            } else {
+                this.ui.loopMarkerA.style.display = 'none';
+            }
+
+            if (this.loopEnd !== null) {
+                this.ui.loopMarkerB.style.display = 'block';
+                this.ui.loopMarkerB.style.left = `${(this.loopEnd / this.duration) * 100}%`;
+            } else {
+                this.ui.loopMarkerB.style.display = 'none';
+            }
+
+            if (this.loopStart !== null && this.loopEnd !== null) {
+                this.ui.loopRegion.style.display = 'block';
+                const startPct = (this.loopStart / this.duration) * 100;
+                const endPct = (this.loopEnd / this.duration) * 100;
+                this.ui.loopRegion.style.left = `${startPct}%`;
+                this.ui.loopRegion.style.width = `${endPct - startPct}%`;
+            } else {
+                this.ui.loopRegion.style.display = 'none';
+            }
         }
     }
 
@@ -635,8 +877,13 @@ export class CorePlayer {
                 this._seekTo(Math.max(0, this.currentTime - 10));
                 break;
             case 'l':
-                e.preventDefault();
-                this._seekTo(Math.min(this.duration, this.currentTime + 10));
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    this.clearLoopMarkers();
+                } else {
+                    e.preventDefault();
+                    this._seekTo(Math.min(this.duration, this.currentTime + 10));
+                }
                 break;
             case 'arrowleft':
                 e.preventDefault();
@@ -764,18 +1011,16 @@ export class CorePlayer {
                 }
                 break;
             case 'i':
-                if (this.config.mode === 'editor') {
-                    e.preventDefault();
-                    console.log('Set In-point at:', this.currentTime);
-                    // TODO: Implement marker logic when editor is built
-                }
+                e.preventDefault();
+                this.setLoopStart();
                 break;
             case 'o':
-                if (this.config.mode === 'editor') {
-                    e.preventDefault();
-                    console.log('Set Out-point at:', this.currentTime);
-                    // TODO: Implement marker logic when editor is built
-                }
+                e.preventDefault();
+                this.setLoopEnd();
+                break;
+            case 'r':
+                e.preventDefault();
+                this.resetLoop();
                 break;
         }
     }
@@ -1118,9 +1363,27 @@ export class CorePlayer {
                 this.currentTime = playbackTime; // Update internal time for UI
 
                 if (playbackTime >= this.duration) {
-                    // Pause playback once the end is reached
-                    this.pause();
-                    this.playbackTimeAtStart = this.duration;
+                    if (this.loopMode === 'one') {
+                        this._seekTo(0);
+                        return; // Restart loop
+                    } else {
+                        // Pause playback once the end is reached
+                        this.pause();
+                        this.playbackTimeAtStart = this.duration;
+
+                        // Notify ended
+                        if (this.onEnded) {
+                            this.onEnded();
+                        }
+                    }
+                }
+
+                // Check Loop A-B
+                if (this.loopMode === 'ab' && this.loopStart !== null && this.loopEnd !== null) {
+                    if (playbackTime >= this.loopEnd) {
+                        this._seekTo(this.loopStart);
+                        return;
+                    }
                 }
 
                 // Check if the current playback time has caught up to the next frame

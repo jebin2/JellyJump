@@ -81,6 +81,35 @@
     opacity: 1;
 }
 
+.mediabunny-marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.mediabunny-marker.marker-a {
+    background-color: #00ff00;
+    /* Green for Start */
+}
+
+.mediabunny-marker.marker-b {
+    background-color: #ff0000;
+    /* Red for End */
+}
+
+.mediabunny-loop-region {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background-color: rgba(0, 255, 136, 0.3);
+    /* Semi-transparent accent */
+    z-index: 1;
+    pointer-events: none;
+}
+
 /* -----------------------------------------
    Buttons & Inputs
    ----------------------------------------- */
@@ -258,4 +287,118 @@
         padding: 8px;
         /* Larger touch targets */
     }
+}
+
+/* -----------------------------------------
+   Loop Panel
+   ----------------------------------------- */
+.mediabunny-loop-panel {
+    position: absolute;
+    bottom: 70px;
+    right: 10px;
+    width: 250px;
+    background-color: rgba(10, 10, 10, 0.95);
+    border: 2px solid var(--accent-primary);
+    padding: 15px;
+    z-index: 20;
+    box-shadow: var(--shadow-md) var(--accent-primary);
+    font-family: var(--font-mono);
+}
+
+.loop-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 5px;
+    color: var(--accent-primary);
+    font-weight: bold;
+}
+
+.mediabunny-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.mediabunny-close-btn:hover {
+    color: var(--text-primary);
+}
+
+.loop-status {
+    margin-bottom: 15px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.loop-status span {
+    color: var(--text-primary);
+    font-weight: bold;
+}
+
+.input-group {
+    margin-bottom: 10px;
+}
+
+.input-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.input-row {
+    display: flex;
+    gap: 5px;
+}
+
+.mediabunny-input {
+    flex: 1;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-dark);
+    color: var(--text-primary);
+    padding: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.mediabunny-input:focus {
+    border-color: var(--accent-primary);
+    outline: none;
+}
+
+.mediabunny-btn-small {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+    padding: 2px 8px;
+    font-size: 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.mediabunny-btn-small:hover {
+    background: var(--accent-primary);
+    color: #000;
+}
+
+.loop-actions {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.mediabunny-btn-text {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.mediabunny-btn-text:hover {
+    color: var(--error-color, #ff4444);
 }
