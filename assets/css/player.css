@@ -112,6 +112,11 @@ button:focus-visible {
     flex-direction: column;
 }
 
+/* Utility class to hide elements - replaces inline style manipulation */
+.hidden {
+    display: none !important;
+}
+
 .playlist-folder-header {
     display: flex;
     align-items: center;

@@ -429,9 +429,6 @@ export class Playlist {
                 isLocal: true,
                 needsReload: false,
                 file: file,
-                isLocal: true,
-                needsReload: false,
-                file: file,
                 path: path,
                 id: this._generateId() // Add unique ID for persistence
             };
@@ -702,99 +699,150 @@ export class Playlist {
 
         // Render Folders
         Object.values(node.children).forEach(folder => {
-            const folderEl = document.createElement('div');
-            folderEl.className = 'playlist-folder';
-
-            const isExpanded = this.expandedFolders.has(folder.path);
-
-            const header = document.createElement('div');
-            header.className = 'playlist-folder-header';
-            header.innerHTML = `
-                <div class="playlist-folder-info">
-                    <span class="playlist-toggle ${isExpanded ? 'expanded' : ''}">▶</span>
-                    <span class="folder-icon">📁</span>
-                    <span class="folder-name">${folder.name}</span>
-                </div>
-                <button class="playlist-remove-btn folder-remove-btn" title="Remove Folder">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                </button>
-            `;
-
-            const childrenContainer = document.createElement('div');
-            childrenContainer.className = 'playlist-children';
-            childrenContainer.style.display = isExpanded ? 'block' : 'none';
-
-            // Recursively render children
-            childrenContainer.appendChild(this._renderTreeLevel(folder));
-
-            // Toggle Event (only on info part)
-            header.querySelector('.playlist-folder-info').addEventListener('click', (e) => {
-                e.stopPropagation();
-                const expanded = childrenContainer.style.display !== 'none';
-                if (expanded) {
-                    childrenContainer.style.display = 'none';
-                    header.querySelector('.playlist-toggle').classList.remove('expanded');
-                    this.expandedFolders.delete(folder.path);
-                } else {
-                    childrenContainer.style.display = 'block';
-                    header.querySelector('.playlist-toggle').classList.add('expanded');
-                    this.expandedFolders.add(folder.path);
-                }
-            });
-
-            // Remove Folder Event
-            header.querySelector('.folder-remove-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (confirm(`Delete folder "${folder.name}" and all its contents?`)) {
-                    this.removeFolder(folder.path);
-                }
-            });
-
-            folderEl.appendChild(header);
-            folderEl.appendChild(childrenContainer);
-            container.appendChild(folderEl);
+            container.appendChild(this._createFolderElement(folder));
         });
 
         // Render Items
         node.items.forEach(item => {
-            // Create item element from HTML string
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = this._createItemHTML(item, item.originalIndex);
-            const itemEl = tempDiv.firstElementChild;
-
-            // Attach events directly to this element
-            itemEl.addEventListener('click', (e) => {
-                // Ignore if clicking action buttons
-                if (e.target.closest('.playlist-remove-btn') || e.target.closest('.playlist-download-btn')) return;
-
-                const index = parseInt(itemEl.dataset.index);
-                this.selectItem(index);
-            });
-
-            // Download button
-            const downloadBtn = itemEl.querySelector('.playlist-download-btn');
-            if (downloadBtn) {
-                downloadBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const index = parseInt(itemEl.dataset.index);
-                    this._downloadItem(index);
-                });
-            }
-
-            // Remove button
-            const removeBtn = itemEl.querySelector('.playlist-remove-btn');
-            if (removeBtn) {
-                removeBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const index = parseInt(itemEl.dataset.index);
-                    this.removeItem(index);
-                });
-            }
-
-            container.appendChild(itemEl);
+            container.appendChild(this._createPlaylistItemElement(item));
         });
 
         return container;
+    }
+
+    /**
+     * Create folder element with header and children
+     * @param {Object} folder
+     * @returns {HTMLElement}
+     * @private
+     */
+    _createFolderElement(folder) {
+        const folderEl = document.createElement('div');
+        folderEl.className = 'playlist-folder';
+
+        const isExpanded = this.expandedFolders.has(folder.path);
+
+        // Create header
+        const header = this._createFolderHeader(folder, isExpanded);
+
+        // Create children container
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = `playlist-children ${isExpanded ? '' : 'hidden'}`;
+
+        // Recursively render children
+        childrenContainer.appendChild(this._renderTreeLevel(folder));
+
+        // Attach events
+        this._attachFolderEvents(header, childrenContainer, folder);
+
+        folderEl.appendChild(header);
+        folderEl.appendChild(childrenContainer);
+        return folderEl;
+    }
+
+    /**
+     * Create folder header HTML
+     * @param {Object} folder
+     * @param {boolean} isExpanded
+     * @returns {HTMLElement}
+     * @private
+     */
+    _createFolderHeader(folder, isExpanded) {
+        const header = document.createElement('div');
+        header.className = 'playlist-folder-header';
+        header.innerHTML = `
+            <div class="playlist-folder-info">
+                <span class="playlist-toggle ${isExpanded ? 'expanded' : ''}">▶</span>
+                <span class="folder-icon">📁</span>
+                <span class="folder-name">${folder.name}</span>
+            </div>
+            <button class="playlist-remove-btn folder-remove-btn" title="Remove Folder" aria-label="Remove folder ${folder.name}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </button>
+        `;
+        return header;
+    }
+
+    /**
+     * Attach event listeners to folder elements
+     * @param {HTMLElement} header
+     * @param {HTMLElement} childrenContainer
+     * @param {Object} folder
+     * @private
+     */
+    _attachFolderEvents(header, childrenContainer, folder) {
+        // Toggle Event
+        header.querySelector('.playlist-folder-info').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = childrenContainer.classList.contains('hidden');
+
+            if (isHidden) {
+                childrenContainer.classList.remove('hidden');
+                header.querySelector('.playlist-toggle').classList.add('expanded');
+                this.expandedFolders.add(folder.path);
+            } else {
+                childrenContainer.classList.add('hidden');
+                header.querySelector('.playlist-toggle').classList.remove('expanded');
+                this.expandedFolders.delete(folder.path);
+            }
+        });
+
+        // Remove Folder Event
+        header.querySelector('.folder-remove-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete folder "${folder.name}" and all its contents?`)) {
+                this.removeFolder(folder.path);
+            }
+        });
+    }
+
+    /**
+     * Create playlist item element with events
+     * @param {Object} item
+     * @returns {HTMLElement}
+     * @private
+     */
+    _createPlaylistItemElement(item) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = this._createItemHTML(item, item.originalIndex);
+        const itemEl = tempDiv.firstElementChild;
+
+        this._attachItemEvents(itemEl);
+        return itemEl;
+    }
+
+    /**
+     * Attach event listeners to playlist item
+     * @param {HTMLElement} itemEl
+     * @private
+     */
+    _attachItemEvents(itemEl) {
+        // Click to play
+        itemEl.addEventListener('click', (e) => {
+            if (e.target.closest('.playlist-remove-btn') || e.target.closest('.playlist-download-btn')) return;
+            const index = parseInt(itemEl.dataset.index);
+            this.selectItem(index);
+        });
+
+        // Download button
+        const downloadBtn = itemEl.querySelector('.playlist-download-btn');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt(itemEl.dataset.index);
+                this._downloadItem(index);
+            });
+        }
+
+        // Remove button
+        const removeBtn = itemEl.querySelector('.playlist-remove-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt(itemEl.dataset.index);
+                this.removeItem(index);
+            });
+        }
     }
 
     /**
