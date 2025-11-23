@@ -900,12 +900,12 @@ export class CorePlayer {
             try { source.stop(); } catch (e) { }
         });
         this.activeSources = [];
-        this.playbackId++; // Cancel any running iterator
+        const myPlaybackId = ++this.playbackId; // Cancel any running iterator and capture ID
 
         await this._renderFrame(this.currentTime);
 
-        // Restart audio if playing
-        if (this.isPlaying && this.audioSink) {
+        // Restart audio if playing AND we are still the latest operation
+        if (this.playbackId === myPlaybackId && this.isPlaying && this.audioSink) {
             this._playAudio(this.currentTime);
         }
     }
