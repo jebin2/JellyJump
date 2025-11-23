@@ -104,7 +104,8 @@
     background-color: var(--bg-secondary);
     border: var(--border-medium) solid var(--border-primary);
     box-shadow: var(--shadow-lg) var(--accent-primary);
-    z-index: 900;
+    z-index: 1001;
+    /* Higher than tab-bar (900) and nav (1000) */
     padding: var(--space-sm) 0;
 }
 
@@ -191,8 +192,10 @@
 }
 
 /* Edit menu positioning (offset for Edit button position) */
+/* Note: Ideally this should be calculated via JS, but for now we hardcode based on button width */
 .dropdown-menu[data-dropdown="edit"] {
-    left: 105px;
+    left: 85px;
+    /* Adjusted to align with Edit button */
 }
 
 /* Export menu right-aligned positioning */
@@ -299,6 +302,89 @@
 .tab-bar__create-btn:focus-visible {
     outline: 2px solid var(--accent-primary);
     outline-offset: 2px;
+}
+
+/* Editor Tab Styles */
+.editor-tab {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 0 var(--space-md);
+    height: 100%;
+    background-color: var(--bg-primary);
+    border-right: var(--border-thin) solid var(--border-dark);
+    border-bottom: 2px solid transparent;
+    min-width: 150px;
+    max-width: 200px;
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-standard);
+    position: relative;
+    user-select: none;
+}
+
+.editor-tab:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+    background-color: var(--bg-tertiary);
+}
+
+.editor-tab:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.editor-tab.active {
+    background-color: var(--bg-tertiary);
+    border-bottom: 4px solid var(--accent-primary);
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+    box-shadow: 0 -2px 0 0 var(--accent-primary) inset;
+}
+
+@import 'modal.css';
+
+.editor-tab__name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: var(--text-sm);
+}
+
+.editor-tab.unsaved .editor-tab__name::after {
+    content: ' *';
+    color: var(--accent-primary);
+    font-weight: bold;
+}
+
+.editor-tab__close {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    opacity: 0;
+    transition: all var(--transition-fast) var(--ease-standard);
+}
+
+.editor-tab:hover .editor-tab__close,
+.editor-tab.active .editor-tab__close {
+    opacity: 1;
+}
+
+.editor-tab__close:hover {
+    background-color: var(--accent-danger);
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.editor-tab__close:active {
+    transform: scale(0.95);
 }
 
 /* -----------------------------------------

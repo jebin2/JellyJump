@@ -100,14 +100,6 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
   - Aspect ratio 16:9 (use CSS aspect-ratio or padding hack)
   - Centered in available space
   - Background: Black
-- **Metadata display** (below video):
-  - "1920x1080 @ 30fps" (placeholder text)
-- **Time display**:
-  - "00:00:05 / 00:00:30" (placeholder)
-- **Playback controls** (visual only):
-  - [▶] Play button
-  - [⏸] Pause button
-  - [⛶] Fullscreen button
 - **No functionality** - just styled buttons and empty container
 
 ### Feature 5: Properties Panel (Right Sidebar)
