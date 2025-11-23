@@ -865,6 +865,14 @@ export class CorePlayer {
                     const index = this.activeSources.indexOf(source);
                     if (index > -1) this.activeSources.splice(index, 1);
                 };
+
+                // Throttling: Don't schedule too far ahead to prevent resource exhaustion
+                // If we are more than 2 seconds ahead, wait until we are closer
+                if (absoluteStartTime - this.audioContext.currentTime > 2.0) {
+                    while (this.isPlaying && this.playbackId === currentPlaybackId && (absoluteStartTime - this.audioContext.currentTime > 0.5)) {
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+                }
             }
         } catch (error) {
             console.error("Error playing audio:", error);
