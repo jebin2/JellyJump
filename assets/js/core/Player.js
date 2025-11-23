@@ -41,7 +41,17 @@ export class CorePlayer {
         this.isAudioInitialized = false;
         this.currentAudioSource = null;
         this.activeSources = [];
+        this.activeSources = [];
         this.playbackId = 0;
+
+        // New state variables for MediaBunny example pattern
+        this.videoFrameIterator = null;
+        this.audioBufferIterator = null;
+        this.nextFrame = null;
+        this.queuedAudioNodes = new Set();
+        this.asyncId = 0;
+        this.playbackTimeAtStart = 0;
+        this.audioContextStartTime = null;
 
         // UI Elements
         this.ui = {
@@ -631,6 +641,17 @@ export class CorePlayer {
             this.pause();
             this.currentTime = 0;
 
+            // Reset new state
+            if (this.videoFrameIterator) await this.videoFrameIterator.return();
+            if (this.audioBufferIterator) await this.audioBufferIterator.return();
+            this.videoFrameIterator = null;
+            this.audioBufferIterator = null;
+            this.nextFrame = null;
+            this.asyncId++;
+            this.playbackTimeAtStart = 0;
+            this.audioContextStartTime = null;
+            this.queuedAudioNodes.clear();
+
             // Clear canvas and reset UI immediately
             if (this.ctx && this.canvas) {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -725,24 +746,37 @@ export class CorePlayer {
      * @param {number} timestamp 
      * @param {boolean} updateTime - Whether to update the player's current time from the frame
      */
-    async _renderFrame(timestamp, updateTime = true) {
-        if (!this.videoSink) return null;
+    /**
+     * Iterates over the video frame iterator until it finds a video frame in the future.
+     */
+    async _updateNextFrame() {
+        const currentAsyncId = this.asyncId;
 
-        const frame = await this.videoSink.getCanvas(timestamp);
-        if (frame && frame.canvas) {
-            this.ctx.drawImage(frame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+        // We have a loop here because we may need to iterate over multiple frames until we reach a frame in the future
+        while (true) {
+            if (!this.videoFrameIterator) break;
+            const result = await this.videoFrameIterator.next();
+            const newNextFrame = result.value ?? null;
 
-            if (updateTime) {
-                this.currentTime = timestamp;
-                this._updateProgress();
+            if (!newNextFrame) {
+                break;
             }
 
-            if (this.isSubtitlesEnabled) {
-                this._renderSubtitles(timestamp);
+            if (currentAsyncId !== this.asyncId) {
+                break;
             }
-            return frame.timestamp;
+
+            const playbackTime = this._getPlaybackTime();
+            if (newNextFrame.timestamp <= playbackTime) {
+                // Draw it immediately
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.drawImage(newNextFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+            } else {
+                // Save it for later
+                this.nextFrame = newNextFrame;
+                break;
+            }
         }
-        return null;
     }
 
     /**
@@ -778,6 +812,19 @@ export class CorePlayer {
     }
 
     /**
+     * Returns the current playback time in the media file.
+     * To ensure perfect audio-video sync, we always use the audio context's clock to determine playback time, even
+     * when there is no audio track.
+     */
+    _getPlaybackTime() {
+        if (this.isPlaying && this.audioContext) {
+            return this.audioContext.currentTime - this.audioContextStartTime + this.playbackTimeAtStart;
+        } else {
+            return this.playbackTimeAtStart;
+        }
+    }
+
+    /**
      * Toggle playback state
      */
     togglePlay() {
@@ -789,7 +836,7 @@ export class CorePlayer {
     }
 
     async play() {
-        if (!this.videoTrack) return;
+        if (!this.videoTrack && !this.audioTrack) return;
 
         // Initialize Audio Context on first user interaction
         this._initAudio();
@@ -798,20 +845,36 @@ export class CorePlayer {
             await this.audioContext.resume();
         }
 
+        if (this._getPlaybackTime() >= this.duration) {
+            // If we're at the end, let's snap back to the start
+            this.playbackTimeAtStart = 0;
+            await this._startVideoIterator();
+        }
+
+        this.audioContextStartTime = this.audioContext.currentTime;
         this.isPlaying = true;
         this._updatePlayIcon();
-        this._startRenderLoop();
 
         if (this.audioSink) {
-            this._playAudio(this.currentTime);
+            // Start the audio iterator
+            if (this.audioBufferIterator) await this.audioBufferIterator.return();
+            this.audioBufferIterator = this.audioSink.buffers(this._getPlaybackTime());
+            this._runAudioIterator();
         }
+
+        this._startRenderLoop();
     }
 
     pause() {
         console.log("Player.pause() called");
+        this.playbackTimeAtStart = this._getPlaybackTime();
         this.isPlaying = false;
         this._updatePlayIcon();
-        this.playbackId++; // Cancel current playback loop
+
+        if (this.audioBufferIterator) {
+            this.audioBufferIterator.return(); // This stops any for-loops that are iterating the iterator
+            this.audioBufferIterator = null;
+        }
 
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
@@ -822,38 +885,74 @@ export class CorePlayer {
             this.audioContext.suspend();
         }
 
-        // Stop all active sources
-        [...this.activeSources].forEach(source => {
+        // Stop all audio nodes that were already queued to play
+        for (const node of this.queuedAudioNodes) {
             try {
-                source.onended = null;
-                source.stop();
+                node.stop();
             } catch (e) { }
-        });
-        this.activeSources = [];
+        }
+        this.queuedAudioNodes.clear();
+    }
+
+    /**
+     * Creates a new video frame iterator and renders the first video frame.
+     */
+    async _startVideoIterator() {
+        if (!this.videoSink) return;
+
+        this.asyncId++;
+        const currentAsyncId = this.asyncId;
+
+        if (this.videoFrameIterator) await this.videoFrameIterator.return(); // Dispose of the current iterator
+
+        // Create a new iterator
+        this.videoFrameIterator = this.videoSink.canvases(this._getPlaybackTime());
+
+        // Get the first two frames
+        const firstFrame = (await this.videoFrameIterator.next()).value ?? null;
+        const secondFrame = (await this.videoFrameIterator.next()).value ?? null;
+
+        // Prevent race conditions if asyncId changed while awaiting
+        if (currentAsyncId !== this.asyncId) return;
+
+        this.nextFrame = secondFrame;
+
+        if (firstFrame) {
+            // Draw the first frame
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.drawImage(firstFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+        }
     }
 
     _startRenderLoop() {
-        let lastTime = performance.now();
+        const loop = () => {
+            if (this.isPlaying) {
+                const playbackTime = this._getPlaybackTime();
+                this.currentTime = playbackTime; // Update internal time for UI
 
-        const loop = async () => {
-            if (!this.isPlaying) return;
-
-            const now = performance.now();
-            const dt = (now - lastTime) / 1000;
-            lastTime = now;
-
-            this.currentTime += dt;
-            if (this.currentTime >= this.duration) {
-                this.currentTime = 0; // Loop or stop
-                if (!this.config.loop) {
+                if (playbackTime >= this.duration) {
+                    // Pause playback once the end is reached
                     this.pause();
-                    return;
+                    this.playbackTimeAtStart = this.duration;
+                }
+
+                // Check if the current playback time has caught up to the next frame
+                if (this.nextFrame && this.nextFrame.timestamp <= playbackTime) {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.drawImage(this.nextFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+                    this.nextFrame = null;
+
+                    // Request the next frame
+                    this._updateNextFrame();
+                }
+
+                // Update UI
+                this._updateProgress();
+
+                if (this.isSubtitlesEnabled) {
+                    this._renderSubtitles(playbackTime);
                 }
             }
-
-            // In a real implementation, we'd use the iterator or a more efficient seeking method
-            // For this basic implementation, we'll just request the frame at current time
-            await this._renderFrame(this.currentTime);
 
             this.animationFrameId = requestAnimationFrame(loop);
         };
@@ -861,62 +960,72 @@ export class CorePlayer {
         this.animationFrameId = requestAnimationFrame(loop);
     }
 
-    async _playAudio(startTime) {
-        console.log(`_playAudio called with startTime: ${startTime}`);
-        if (!this.audioSink || !this.audioContext) return;
-
-        const currentPlaybackId = ++this.playbackId;
-        const baseTime = this.audioContext.currentTime;
-        const timeOffset = baseTime - startTime;
-        console.log(`_playAudio: baseTime=${baseTime}, timeOffset=${timeOffset}`);
+    /**
+     * Loops over the audio buffer iterator, scheduling the audio to be played in the audio context.
+     */
+    async _runAudioIterator() {
+        if (!this.audioSink) return;
 
         try {
-            // Use the iterator pattern from the guide
-            for await (const { buffer, timestamp } of this.audioSink.buffers(startTime)) {
-                if (this.playbackId !== currentPlaybackId || !this.isPlaying) break;
+            // To play back audio, we loop over all audio chunks (typically very short) of the file and play them at the correct
+            // timestamp. The result is a continuous, uninterrupted audio signal.
+            for await (const { buffer, timestamp } of this.audioBufferIterator) {
+                if (!this.isPlaying) break;
 
-                const source = this.audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(this.gainNode);
+                const node = this.audioContext.createBufferSource();
+                node.buffer = buffer;
+                node.connect(this.gainNode);
 
-                // Calculate absolute start time
-                const absoluteStartTime = timestamp + timeOffset;
-                console.log(`Scheduling buffer: timestamp=${timestamp}, absoluteStartTime=${absoluteStartTime}`);
+                const startTimestamp = this.audioContextStartTime + timestamp - this.playbackTimeAtStart;
 
-                source.start(absoluteStartTime);
-                this.activeSources.push(source);
+                // Two cases: Either, the audio starts in the future or in the past
+                if (startTimestamp >= this.audioContext.currentTime) {
+                    // If the audio starts in the future, easy, we just schedule it
+                    node.start(startTimestamp);
+                } else {
+                    // If it starts in the past, then let's only play the audible section that remains from here on out
+                    node.start(this.audioContext.currentTime, this.audioContext.currentTime - startTimestamp);
+                }
 
-                source.onended = () => {
-                    const index = this.activeSources.indexOf(source);
-                    if (index > -1) this.activeSources.splice(index, 1);
+                this.queuedAudioNodes.add(node);
+                node.onended = () => {
+                    this.queuedAudioNodes.delete(node);
                 };
 
-                // Throttling: Don't schedule too far ahead to prevent resource exhaustion
-                // If we are more than 2 seconds ahead, wait until we are closer
-                if (absoluteStartTime - this.audioContext.currentTime > 2.0) {
-                    while (this.isPlaying && this.playbackId === currentPlaybackId && (absoluteStartTime - this.audioContext.currentTime > 0.5)) {
-                        await new Promise(r => setTimeout(r, 100));
-                    }
+                // If we're more than a second ahead of the current playback time, let's slow down the loop until time has
+                // passed.
+                if (timestamp - this._getPlaybackTime() >= 1) {
+                    await new Promise((resolve) => {
+                        const id = setInterval(() => {
+                            if (!this.isPlaying || timestamp - this._getPlaybackTime() < 1) {
+                                clearInterval(id);
+                                resolve();
+                            }
+                        }, 100);
+                    });
                 }
             }
         } catch (error) {
-            console.error("Error playing audio:", error);
+            console.error("Error in audio iterator:", error);
         }
     }
 
     async _seekTo(time) {
         console.log(`_seekTo called with time: ${time}`);
+
         const wasPlaying = this.isPlaying;
+
         if (wasPlaying) {
             this.pause();
         }
 
-        this.currentTime = Math.max(0, Math.min(this.duration, time));
+        this.playbackTimeAtStart = Math.max(0, Math.min(this.duration, time));
+        this.currentTime = this.playbackTimeAtStart; // Sync internal currentTime for UI
         this._updateProgress(); // Update UI immediately
 
-        await this._renderFrame(this.currentTime);
+        await this._startVideoIterator();
 
-        if (wasPlaying) {
+        if (wasPlaying && this.playbackTimeAtStart < this.duration) {
             await this.play();
         }
     }
