@@ -227,53 +227,93 @@
                 <div class="preview-canvas" id="preview-player-container"></div>
             </div>
 
-            <!-- Player Controls Area -->
-            <div class="preview-panel__controls">
-                <!-- Controls will be added in Phases 50-53 -->
-                <!-- Play/Pause, Timeline, Time, Volume, Fullscreen -->
-            </div>
         </section>
 
         <!-- Right Panel: Properties (30%) -->
-        <aside class="properties-panel">
-            <!-- Properties Tabs -->
-            <div class="properties-tabs">
-                <button class="prop-tab active">
-                    <span class="prop-tab-icon">ℹ️</span>
-                    <span class="prop-tab-label">Info</span>
-                </button>
-                <button class="prop-tab">
-                    <span class="prop-tab-icon">⚙️</span>
-                    <span class="prop-tab-label">Settings</span>
-                </button>
+        <aside id="properties-panel" class="properties-panel">
+            <div class="panel-header"
+                style="padding: var(--space-md); border-bottom: 3px solid var(--border-color); font-weight: bold;">
+                Properties</div>
+
+            <!-- Empty State (Phase 55) -->
+            <div id="properties-empty-state" class="properties-empty-state">
+                <div class="empty-state-icon">🖱️</div>
+                <div class="empty-state-title">No Selection</div>
+                <div class="empty-state-message">Select a clip in the timeline or an item in the library to view
+                    details.</div>
             </div>
 
-            <!-- Info Tab Content (Visible) -->
-            <div class="prop-content active" id="prop-content-info">
-                <div class="property-group">
-                    <div class="group-header">File Metadata</div>
-                    <div class="property-item">
-                        <label class="label">Name</label>
-                        <div class="property-value">clip1.mp4</div>
-                    </div>
-                    <div class="property-item">
-                        <label class="label">Duration</label>
-                        <div class="property-value font-mono">00:45</div>
-                    </div>
-                    <div class="property-item">
-                        <label class="label">Resolution</label>
-                        <div class="property-value">1920x1080</div>
+            <!-- Properties Content (Phase 56) -->
+            <div id="properties-content" class="properties-content" style="display: none;">
+                <!-- Tab Bar -->
+                <div id="properties-tab-bar" class="properties-tab-bar">
+                    <button id="tab-btn-info" class="prop-tab active">
+                        <span class="prop-tab-icon">ℹ️</span>
+                        <span class="prop-tab-label">Info</span>
+                    </button>
+                    <button id="tab-btn-settings" class="prop-tab">
+                        <span class="prop-tab-icon">⚙️</span>
+                        <span class="prop-tab-label">Settings</span>
+                    </button>
+                </div>
+
+                <!-- Tab Content Areas -->
+                <div id="tab-content-info" class="prop-tab-content active">
+                    <div class="property-group">
+                        <div class="group-header">File Metadata</div>
+
+                        <div class="property-item">
+                            <label class="label">Name</label>
+                            <div id="info-name" class="property-value">video_01.mp4</div>
+                        </div>
+
+                        <div class="property-item">
+                            <label class="label">Type</label>
+                            <div id="info-type" class="property-value">Video</div>
+                        </div>
+
+                        <div class="property-item">
+                            <label class="label">Duration</label>
+                            <div id="info-duration" class="property-value">00:00:45</div>
+                        </div>
+
+                        <div class="property-item">
+                            <label class="label">Resolution</label>
+                            <div id="info-resolution" class="property-value">1920x1080</div>
+                        </div>
+
+                        <div class="property-item">
+                            <label class="label">File Path</label>
+                            <div id="info-path" class="property-value text-truncate" title="/imported/video_01.mp4">
+                                /imported/video_01.mp4</div>
+                        </div>
                     </div>
                 </div>
-            </div>
+                <div id="tab-content-settings" class="prop-tab-content">
+                    <!-- Transform Section -->
+                    <div class="property-group">
+                        <div class="group-header">Transform</div>
+                        <div class="property-item">
+                            <label class="label">Position X</label>
+                            <input type="number" class="prop-input" value="0" disabled>
+                        </div>
+                        <div class="property-item">
+                            <label class="label">Position Y</label>
+                            <input type="number" class="prop-input" value="0" disabled>
+                        </div>
+                        <div class="property-item">
+                            <label class="label">Scale</label>
+                            <input type="range" class="prop-slider" min="0" max="200" value="100" disabled>
+                        </div>
+                    </div>
 
-            <!-- Settings Tab Content (Hidden) -->
-            <div class="prop-content" id="prop-content-settings" hidden>
-                <div class="property-group">
-                    <div class="group-header">Clip Settings</div>
-                    <div class="property-item">
-                        <label class="label">Opacity</label>
-                        <input type="range" class="volume-slider" min="0" max="100" value="100">
+                    <!-- Audio Section -->
+                    <div class="property-group">
+                        <div class="group-header">Audio</div>
+                        <div class="property-item">
+                            <label class="label">Volume</label>
+                            <input type="range" class="prop-slider" min="0" max="100" value="100" disabled>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -281,72 +321,42 @@
     </div>
 
     <!-- Bottom Panel: Timeline Section -->
-    <section class="timeline-section">
-        <!-- Timeline Header -->
-        <div class="timeline-header">
-            <div class="timeline-label">🕐 Timeline</div>
-            <div class="timeline-zoom">
-                <button class="zoom-btn">25%</button>
-                <button class="zoom-btn active">100%</button>
-                <button class="zoom-btn">200%</button>
+    <section class="timeline-panel">
+        <!-- Timeline Header (Phase 61) -->
+        <div class="timeline__header">
+            <!-- Left: Spacer (since Play/Time removed) -->
+            <div class="timeline__controls-left">
+                <!-- Play/Time controls removed as they are in the player -->
             </div>
-            <div class="timeline-duration">
-                <span class="font-mono">00:00:30</span>
-                <button class="timeline-settings" aria-label="Settings">⚙</button>
+
+            <!-- Center: Zoom -->
+            <div class="timeline__controls-center">
+                <button id="timeline-zoom-out" class="timeline-btn" aria-label="Zoom Out"
+                    data-timeline-control="zoom-out">
+                    <span class="icon">🔍-</span>
+                </button>
+                <span id="timeline-zoom-level" class="font-mono">100%</span>
+                <button id="timeline-zoom-in" class="timeline-btn" aria-label="Zoom In" data-timeline-control="zoom-in">
+                    <span class="icon">🔍+</span>
+                </button>
+            </div>
+
+            <!-- Right: Settings -->
+            <div class="timeline__controls-right">
+                <button id="timeline-settings-btn" class="timeline-btn" aria-label="Timeline Settings">
+                    <span class="icon">⚙️</span>
+                </button>
             </div>
         </div>
 
-        <!-- Time Ruler -->
-        <div class="time-ruler">
-            <div class="time-marker" style="left: 0%;">0:00</div>
-            <div class="time-marker" style="left: 16.67%;">0:05</div>
-            <div class="time-marker" style="left: 33.33%;">0:10</div>
-            <div class="time-marker" style="left: 50%;">0:15</div>
-            <div class="time-marker" style="left: 66.67%;">0:20</div>
-            <div class="time-marker" style="left: 83.33%;">0:25</div>
-            <div class="time-marker" style="left: 100%;">0:30</div>
+        <!-- Time Ruler (Phase 62-63) -->
+        <div class="timeline__ruler">
+            <!-- Ruler markers will be added in Phase 62 -->
         </div>
 
-        <!-- Timeline Tracks -->
-        <div class="timeline-tracks">
-            <!-- Playhead -->
-            <div class="playhead" style="left: 16.67%;"></div>
-
-            <!-- Video Track 1 -->
-            <div class="track">
-                <div class="track-label">Video 1</div>
-                <div class="track-content">
-                    <div class="clip" style="left: 0%; width: 20%;" data-clip="v1"></div>
-                    <div class="clip" style="left: 25%; width: 15%;" data-clip="v2"></div>
-                    <div class="clip" style="left: 45%; width: 25%;" data-clip="v3"></div>
-                </div>
-            </div>
-
-            <!-- Video Track 2 -->
-            <div class="track">
-                <div class="track-label">Video 2</div>
-                <div class="track-content">
-                    <div class="clip" style="left: 10%; width: 30%;" data-clip="v4"></div>
-                </div>
-            </div>
-
-            <!-- Audio Track -->
-            <div class="track">
-                <div class="track-label">Audio</div>
-                <div class="track-content">
-                    <div class="clip audio-clip" style="left: 0%; width: 60%;" data-clip="a1">
-                        <div class="waveform"> ▃▅▇▅▃ ▃▅▇▅▃ ▃▅▇▅▃ ▃▅▇▅▃ ▃▅▇▅▃ </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Text Track -->
-            <div class="track">
-                <div class="track-label">Text</div>
-                <div class="track-content">
-                    <div class="clip text-clip" style="left: 20%; width: 15%;" data-clip="t1">Hello World</div>
-                </div>
-            </div>
+        <!-- Track Container (Phase 64) -->
+        <div class="timeline__tracks">
+            <!-- Tracks will be added in Phase 64 -->
         </div>
 
         <!-- Edit Toolbar -->
@@ -388,6 +398,9 @@
     <script type="module" src="assets/js/import-handler.js"></script>
     <script type="module" src="assets/js/thumbnail-generator.js"></script>
     <script type="module" src="assets/js/preview-player.js"></script>
+    <script type="module" src="assets/js/properties-panel.js"></script>
+    <script type="module" src="assets/js/timeline.js"></script>
+    <script type="module" src="assets/js/editor-init.js"></script>
     <script type="module" src="assets/js/media-library.js"></script>
     <script type="module" src="assets/js/storage-helper.js"></script>
     <script type="module" src="assets/js/modal-dialog.js"></script>
