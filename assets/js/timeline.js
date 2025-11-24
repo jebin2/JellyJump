@@ -43,7 +43,74 @@ class TimelineManager {
                 this.ruler.appendChild(content);
             }
             content.style.width = `${width}px`;
+
+            this.generateTimeMarkers(content);
         }
+    }
+
+    generateTimeMarkers(container) {
+        // Clear existing markers
+        container.innerHTML = '';
+
+        const zoomRatio = this.zoomLevel / 100;
+        const pxPerSec = this.pixelsPerSecond * zoomRatio;
+
+        // Determine interval based on zoom (Phase 63 requirement)
+        let majorInterval = 5; // seconds
+        let minorInterval = 1; // seconds
+
+        // Adjust intervals for zoom levels (basic logic for now)
+        if (pxPerSec < 20) {
+            majorInterval = 10;
+            minorInterval = 5;
+        } else if (pxPerSec < 10) {
+            majorInterval = 30;
+            minorInterval = 10;
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        for (let t = 0; t <= this.duration; t += minorInterval) {
+            const position = t * pxPerSec;
+            const isMajor = t % majorInterval === 0;
+
+            if (isMajor) {
+                // Major Tick & Label
+                const marker = document.createElement('div');
+                marker.className = 'timeline__marker';
+                marker.style.left = `${position}px`;
+
+                const label = document.createElement('span');
+                label.className = 'timeline__label';
+                label.textContent = this.formatTimeLabel(t);
+                marker.appendChild(label);
+
+                const tick = document.createElement('div');
+                tick.className = 'timeline__tick timeline__tick--major';
+                marker.appendChild(tick);
+
+                fragment.appendChild(marker);
+            } else {
+                // Minor Tick
+                const marker = document.createElement('div');
+                marker.className = 'timeline__marker';
+                marker.style.left = `${position}px`;
+
+                const tick = document.createElement('div');
+                tick.className = 'timeline__tick timeline__tick--minor';
+                marker.appendChild(tick);
+
+                fragment.appendChild(marker);
+            }
+        }
+
+        container.appendChild(fragment);
+    }
+
+    formatTimeLabel(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
     attachEventListeners() {

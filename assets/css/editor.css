@@ -990,6 +990,55 @@ mark {
             transparent 250px);
 }
 
+.timeline__ruler-content {
+    position: relative;
+    height: 100%;
+}
+
+.timeline__marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.timeline__tick {
+    width: 1px;
+    background-color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.timeline__tick--major {
+    width: 2px;
+    height: 100%;
+    background-color: var(--border-color);
+    opacity: 1;
+}
+
+.timeline__tick--minor {
+    height: 50%;
+    margin-top: 0;
+    /* Align to top */
+}
+
+.timeline__label {
+    position: absolute;
+    top: 2px;
+    font-size: 10px;
+    font-family: monospace;
+    color: var(--text-secondary);
+    transform: translateX(-50%);
+    /* Center label */
+    white-space: nowrap;
+    background-color: var(--bg-tertiary);
+    /* Background to cover grid lines behind text */
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
 .timeline__tracks {
     flex: 1;
     background-color: #1a1a1a;
