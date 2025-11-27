@@ -291,6 +291,18 @@ class TimelineManager {
         // If dragging, ignore click
         if (this.isDragging) return;
 
+        // Check for trim handles first (Phase 76)
+        const handle = e.target.closest('.clip-handle');
+        if (handle) {
+            const clipEl = handle.closest('.timeline-clip');
+            if (clipEl) {
+                const clipId = clipEl.dataset.clipId;
+                const action = handle.dataset.action; // 'trim-left' or 'trim-right'
+                this.handleTrimStart(e, action, clipId);
+                return;
+            }
+        }
+
         const clipEl = e.target.closest('.timeline-clip');
 
         if (clipEl) {
@@ -302,6 +314,132 @@ class TimelineManager {
             // Clicked on empty space
             this.deselectAll();
         }
+    }
+
+    handleTrimStart(e, action, clipId) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!window.clipManager) return;
+        const clip = window.clipManager.getClip(clipId);
+        if (!clip) return;
+
+        this.isTrimming = true;
+        this.trimAction = action;
+        this.trimClipId = clipId;
+        this.trimStartX = e.clientX;
+        this.trimOriginalStartTime = clip.startTime;
+        this.trimOriginalDuration = clip.duration;
+        this.trimClipElement = document.querySelector(`.timeline-clip[data-clip-id="${clipId}"]`);
+
+        // Add global listeners
+        this.trimMoveHandler = (e) => this.handleTrimMove(e);
+        this.trimEndHandler = (e) => this.handleTrimEnd(e);
+
+        document.addEventListener('mousemove', this.trimMoveHandler);
+        document.addEventListener('mouseup', this.trimEndHandler);
+
+        console.log(`Started trimming ${action} on clip ${clipId}`);
+    }
+
+    handleTrimMove(e) {
+        if (!this.isTrimming || !this.trimClipElement) return;
+
+        const deltaX = e.clientX - this.trimStartX;
+        const zoomRatio = this.zoomLevel / 100;
+        const pxPerSec = this.pixelsPerSecond * zoomRatio;
+        const deltaTime = deltaX / pxPerSec;
+
+        let newStartTime = this.trimOriginalStartTime;
+        let newDuration = this.trimOriginalDuration;
+
+        const minDuration = 0.5; // Minimum 0.5s
+
+        if (this.trimAction === 'trim-left') {
+            newStartTime += deltaTime;
+            newDuration -= deltaTime;
+
+            // Constraints
+            if (newDuration < minDuration) {
+                newStartTime = this.trimOriginalStartTime + (this.trimOriginalDuration - minDuration);
+                newDuration = minDuration;
+            }
+            if (newStartTime < 0) {
+                newStartTime = 0;
+                newDuration = this.trimOriginalStartTime + this.trimOriginalDuration;
+            }
+
+            // Collision check (previous clip)
+            // For v1, we just block. 
+            // Ideally we check against all clips on the same track.
+            // Simplified: Clamp to 0 is done. Overlap check is complex without spatial index.
+            // We'll rely on visual feedback for now or implement basic overlap check later.
+
+        } else if (this.trimAction === 'trim-right') {
+            newDuration += deltaTime;
+
+            // Constraints
+            if (newDuration < minDuration) {
+                newDuration = minDuration;
+            }
+
+            // Collision check (next clip)
+            // Simplified: No overlap check yet.
+        }
+
+        // Update Visuals (Ghosting or direct update)
+        // We'll update the element directly for responsiveness
+        if (window.clipRenderer) {
+            // Create a temp clip object to update position
+            const tempClip = {
+                startTime: newStartTime,
+                duration: newDuration,
+                trackId: this.trimClipElement.dataset.trackId // Needed for rendering?
+            };
+
+            // We can't use renderClip because it recreates elements.
+            // We need a method to update just style.
+            // Or we manually update style here.
+
+            const left = newStartTime * pxPerSec;
+            const width = newDuration * pxPerSec;
+
+            this.trimClipElement.style.left = `${left}px`;
+            this.trimClipElement.style.width = `${width}px`;
+
+            // Update label or tooltip?
+        }
+
+        this.currentTrimValues = { startTime: newStartTime, duration: newDuration };
+    }
+
+    handleTrimEnd(e) {
+        if (!this.isTrimming) return;
+
+        this.isTrimming = false;
+        document.removeEventListener('mousemove', this.trimMoveHandler);
+        document.removeEventListener('mouseup', this.trimEndHandler);
+
+        if (this.currentTrimValues && window.clipManager) {
+            window.clipManager.updateClip(this.trimClipId, {
+                startTime: this.currentTrimValues.startTime,
+                duration: this.currentTrimValues.duration
+            });
+
+            // Re-render to ensure clean state and correct data attributes
+            const clip = window.clipManager.getClip(this.trimClipId);
+            if (window.clipRenderer && clip) {
+                window.clipRenderer.renderClip(clip);
+                // Re-select to show handles again (renderClip might remove selection class if not handled)
+                // Actually renderClip recreates element, so selection class is lost.
+                // We need to re-apply selection.
+                this.selectClip(this.trimClipId, false); // Single select to be safe
+            }
+        }
+
+        this.trimClipElement = null;
+        this.currentTrimValues = null;
+        console.log('Trim ended');
     }
 
     selectClip(clipId, isMultiSelect = false) {

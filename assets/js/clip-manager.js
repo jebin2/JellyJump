@@ -73,6 +73,37 @@ class ClipManager {
     }
 
     /**
+     * Get a specific clip by ID
+     * @param {string} clipId 
+     */
+    getClip(clipId) {
+        return this.clips.find(clip => clip.id === clipId);
+    }
+
+    /**
+     * Update clip properties
+     * @param {string} clipId 
+     * @param {Object} updates 
+     */
+    updateClip(clipId, updates) {
+        const clip = this.getClip(clipId);
+        if (!clip) return;
+
+        Object.assign(clip, updates);
+
+        // If timing changed, update project duration
+        if (updates.startTime !== undefined || updates.duration !== undefined) {
+            this.updateProjectDuration();
+        }
+
+        // Dispatch update event
+        const event = new CustomEvent('clip-updated', {
+            detail: { clipId, updates, clip }
+        });
+        window.dispatchEvent(event);
+    }
+
+    /**
      * Update project duration based on clips
      */
     updateProjectDuration() {
