@@ -1549,6 +1549,8 @@ export class CorePlayer {
 
         // Handle auto-hide
         if (this.controlBarMode === 'overlay') {
+            // Show controls initially
+            this.ui.controls.classList.add('visible');
             this._startAutoHideTimer();
         } else {
             this._clearAutoHideTimer();

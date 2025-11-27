@@ -232,20 +232,40 @@ button:focus-visible {
 .mediabunny-container.mode-fixed {
     display: flex;
     flex-direction: column;
+    height: 100%;
+    /* Ensure container fills height */
 }
 
+/* Ensure video wrapper takes available space */
 .mediabunny-container.mode-fixed .mediabunny-video-wrapper {
     flex: 1;
+    position: relative;
     min-height: 0;
+    /* Important for flexbox scrolling */
 }
 
-/* Fixed mode - controls always visible at bottom */
+/* Ensure controls don't shrink and stay at bottom */
 .mediabunny-container.mode-fixed .mediabunny-controls {
     position: relative;
     bottom: auto;
     opacity: 1 !important;
     background: var(--bg-secondary);
     flex-shrink: 0;
+    z-index: 20;
+    /* Ensure above other elements */
+}
+
+@media (max-width: 768px) {
+    .mediabunny-container.mode-fixed {
+        height: 100%;
+        min-height: 250px;
+        /* Minimum height for mobile */
+    }
+
+    /* Adjust controls padding for mobile */
+    .mediabunny-container.mode-fixed .mediabunny-controls {
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
 }
 
 /* Mode toggle button */
