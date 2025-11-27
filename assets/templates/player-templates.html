@@ -14,7 +14,7 @@
 <template id="player-controls-template">
     <div class="mediabunny-controls">
         <div class="mediabunny-progress-container" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100"
-            aria-valuenow="0" tabindex="0">
+            aria-valuenow="0" tabindex="0" data-control="progress">
             <div class="mediabunny-progress-bar"></div>
             <div class="mediabunny-loop-region" style="display: none;"></div>
             <div class="mediabunny-marker marker-a" style="display: none;"></div>
@@ -22,7 +22,8 @@
         </div>
         <div class="mediabunny-controls-row">
             <div style="display: flex; align-items: center;">
-                <button class="mediabunny-btn" id="mb-play-btn" aria-label="Play" aria-pressed="false">
+                <button class="mediabunny-btn" id="mb-play-btn" aria-label="Play" aria-pressed="false"
+                    data-control="playPause">
                     <svg width="24" height="24" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-play"></use>
                     </svg>
@@ -37,10 +38,10 @@
                         <use href="assets/icons/sprite.svg#icon-chevron-right"></use>
                     </svg>
                 </button>
-                <div class="mediabunny-time" id="mb-time-display">0:00 / 0:00</div>
+                <div class="mediabunny-time" id="mb-time-display" data-control="time">0:00 / 0:00</div>
             </div>
 
-            <div class="mediabunny-volume-container">
+            <div class="mediabunny-volume-container" data-control="volume">
                 <button class="mediabunny-btn" id="mb-mute-btn" aria-label="Mute" aria-pressed="false">
                     <svg width="24" height="24" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-volume-high"></use>
@@ -61,7 +62,7 @@
                 </div>
 
                 <!-- Subtitle Menu -->
-                <div class="mediabunny-menu-btn">
+                <div class="mediabunny-menu-btn" data-control="captions">
                     <button class="mediabunny-btn" id="mb-cc-btn" aria-label="Subtitles" aria-haspopup="true"
                         aria-expanded="false">
                         <svg width="24" height="24" fill="currentColor">
@@ -78,7 +79,7 @@
                 </div>
 
                 <!-- Speed Menu -->
-                <div class="mediabunny-menu-btn" id="mb-speed-container">
+                <div class="mediabunny-menu-btn" id="mb-speed-container" data-control="speed">
                     <button class="mediabunny-btn" id="mb-speed-btn" aria-label="Playback Speed" aria-haspopup="true"
                         aria-expanded="false"
                         style="font-size: 0.8rem; font-weight: bold; width: auto; padding: 0 8px;">
@@ -96,20 +97,20 @@
                     </div>
                 </div>
 
-                <button class="mediabunny-btn" id="mb-loop-btn" aria-label="Loop Mode: Off">
+                <button class="mediabunny-btn" id="mb-loop-btn" aria-label="Loop Mode: Off" data-control="loop">
                     <svg width="24" height="24" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-loop"></use>
                     </svg>
                 </button>
 
-                <button class="mediabunny-btn" id="mb-fullscreen-btn" aria-label="Fullscreen">
+                <button class="mediabunny-btn" id="mb-fullscreen-btn" aria-label="Fullscreen" data-control="fullscreen">
                     <svg width="24" height="24" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-fullscreen"></use>
                     </svg>
                 </button>
 
                 <button class="mediabunny-btn mode-toggle-btn" id="mb-mode-toggle-btn" aria-label="Pin controls"
-                    aria-pressed="false" title="Pin controls">
+                    aria-pressed="false" title="Pin controls" data-control="modeToggle">
                     <span class="icon-unpinned">▼</span>
                     <span class="icon-pinned">▲</span>
                 </button>

@@ -32,6 +32,61 @@ export class CorePlayer {
         this.controlBarMode = 'overlay'; // 'overlay' or 'fixed'
         this.autoHideTimer = null;
 
+        // Controls Configuration
+        this.config.controls = {
+            playPause: true,
+            volume: true,
+            time: true,
+            progress: true,
+            captions: true,
+            settings: true,
+            fullscreen: true,
+            loop: true,
+            speed: true,
+            modeToggle: true,
+            ...this.config.controls
+        };
+
+        // Controls Presets
+        this.PRESETS = {
+            player: {
+                playPause: true,
+                volume: true,
+                time: true,
+                progress: true,
+                captions: true,
+                settings: true,
+                fullscreen: true,
+                loop: true,
+                speed: true,
+                modeToggle: true
+            },
+            editor: {
+                playPause: true,
+                volume: true,
+                time: true,
+                progress: true,
+                captions: true,
+                settings: false,
+                fullscreen: true,
+                loop: false,
+                speed: true,
+                modeToggle: false
+            },
+            minimal: {
+                playPause: true,
+                volume: false,
+                time: true,
+                progress: true,
+                captions: false,
+                settings: false,
+                fullscreen: false,
+                loop: false,
+                speed: false,
+                modeToggle: false
+            }
+        };
+
         // MediaBunny objects
         this.input = null;
         this.videoTrack = null;
@@ -1614,5 +1669,66 @@ export class CorePlayer {
         }
         // Show cursor when timer is cleared
         this.container.classList.remove('hide-cursor');
+    }
+    /**
+     * Set controls configuration
+     * @param {Object} config - Configuration object with boolean flags for each control
+     */
+    setControlsConfig(config) {
+        this.config.controls = { ...this.config.controls, ...config };
+        this._applyControlVisibility();
+    }
+
+    /**
+     * Toggle a specific control
+     * @param {string} name - Name of the control (e.g., 'volume', 'fullscreen')
+     * @param {boolean} visible - Whether the control should be visible
+     */
+    toggleControl(name, visible) {
+        if (this.config.controls.hasOwnProperty(name)) {
+            this.config.controls[name] = visible;
+            this._applyControlVisibility();
+        } else {
+            console.warn(`Control '${name}' not found in configuration.`);
+        }
+    }
+
+    /**
+     * Get current controls configuration
+     * @returns {Object}
+     */
+    getControlsConfig() {
+        return { ...this.config.controls };
+    }
+
+    /**
+     * Set controls preset
+     * @param {string} presetName - Name of the preset ('player', 'editor', 'minimal')
+     */
+    setControlsPreset(presetName) {
+        if (this.PRESETS[presetName]) {
+            this.setControlsConfig(this.PRESETS[presetName]);
+        } else {
+            console.warn(`Preset '${presetName}' not found.`);
+        }
+    }
+
+    /**
+     * Apply control visibility based on configuration
+     * @private
+     */
+    _applyControlVisibility() {
+        if (!this.ui.controls) return;
+
+        Object.entries(this.config.controls).forEach(([name, visible]) => {
+            const element = this.ui.controls.querySelector(`[data-control="${name}"]`);
+            if (element) {
+                if (visible) {
+                    element.classList.remove('control--hidden');
+                } else {
+                    element.classList.add('control--hidden');
+                }
+            }
+        });
     }
 }

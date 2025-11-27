@@ -298,6 +298,13 @@ button:focus-visible {
     display: inline;
 }
 
+/* -----------------------------------------
+   Utility Classes
+   ----------------------------------------- */
+.control--hidden {
+    display: none !important;
+}
+
 
 /* -----------------------------------------
    Progress Bar
