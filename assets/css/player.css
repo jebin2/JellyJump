@@ -187,8 +187,17 @@ button:focus-visible {
 }
 
 /* -----------------------------------------
-   Control Bar
+   Control Bar - Mode Aware
    ----------------------------------------- */
+
+/* Video wrapper for fixed mode */
+.mediabunny-video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* Default overlay mode */
 .mediabunny-controls {
     position: absolute;
     bottom: 0;
@@ -205,10 +214,70 @@ button:focus-visible {
     z-index: 10;
 }
 
-.mediabunny-container:hover .mediabunny-controls,
-.mediabunny-controls.visible {
+/* Overlay mode - show only when marked visible */
+.mediabunny-container.mode-overlay .mediabunny-controls.visible {
     opacity: 1;
 }
+
+/* Hide cursor when hide-cursor class is added */
+.mediabunny-container.hide-cursor {
+    cursor: none !important;
+}
+
+.mediabunny-container.hide-cursor * {
+    cursor: none !important;
+}
+
+/* Fixed mode - container uses flexbox */
+.mediabunny-container.mode-fixed {
+    display: flex;
+    flex-direction: column;
+}
+
+.mediabunny-container.mode-fixed .mediabunny-video-wrapper {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Fixed mode - controls always visible at bottom */
+.mediabunny-container.mode-fixed .mediabunny-controls {
+    position: relative;
+    bottom: auto;
+    opacity: 1 !important;
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+}
+
+/* Mode toggle button */
+.mode-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 5px;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mode-toggle-btn:hover {
+    color: var(--accent-primary);
+}
+
+/* Icon visibility based on mode */
+.mode-toggle-btn .icon-pinned {
+    display: none;
+}
+
+.mediabunny-container.mode-fixed .mode-toggle-btn .icon-unpinned {
+    display: none;
+}
+
+.mediabunny-container.mode-fixed .mode-toggle-btn .icon-pinned {
+    display: inline;
+}
+
 
 /* -----------------------------------------
    Progress Bar
@@ -423,6 +492,7 @@ button:focus-visible {
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }
@@ -576,6 +646,7 @@ button:focus-visible {
 .mediabunny-btn-text:hover {
     color: var(--error-color, #ff4444);
 }
+
 /* -----------------------------------------
    Help Overlay
    ----------------------------------------- */

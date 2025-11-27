@@ -28,6 +28,10 @@ export class CorePlayer {
         this.loopEnd = null;
         this.animationFrameId = null;
 
+        // Control bar mode
+        this.controlBarMode = 'overlay'; // 'overlay' or 'fixed'
+        this.autoHideTimer = null;
+
         // MediaBunny objects
         this.input = null;
         this.videoTrack = null;
@@ -120,6 +124,9 @@ export class CorePlayer {
 
         // Attach Events
         this._attachEvents();
+
+        // Load control bar mode preference
+        this._loadControlBarMode();
     }
 
     /**
@@ -211,6 +218,7 @@ export class CorePlayer {
         this.ui.muteBtn = this.container.querySelector('#mb-mute-btn');
         this.ui.volumeSlider = this.container.querySelector('#mb-volume-slider');
         this.ui.fullscreenBtn = this.container.querySelector('#mb-fullscreen-btn');
+        this.ui.modeToggleBtn = this.container.querySelector('#mb-mode-toggle-btn');
         this.ui.ccBtn = this.container.querySelector('#mb-cc-btn');
         this.ui.ccMenu = this.container.querySelector('#mb-cc-menu');
         this.ui.ccInput = this.container.querySelector('#mb-cc-input');
@@ -282,6 +290,38 @@ export class CorePlayer {
 
         // Fullscreen
         this.ui.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+
+        // Control Bar Mode Toggle
+        this.ui.modeToggleBtn.addEventListener('click', () => this.toggleControlBarMode());
+
+        // Auto-hide for overlay mode
+        this.container.addEventListener('mousemove', (e) => this._handleMouseMove(e));
+
+        // Rule 2: On cursor enter canvas/video the control bar should appear immediately
+        this.container.addEventListener('mouseenter', () => {
+            if (this.controlBarMode === 'overlay') {
+                this.ui.controls.classList.add('visible');
+                this._clearAutoHideTimer();
+                if (this.isPlaying) this._startAutoHideTimer();
+            }
+        });
+
+        // Rule 4: When the cursor move out of the canvas /video the control bar should hide immediately
+        this.container.addEventListener('mouseleave', () => {
+            if (this.controlBarMode === 'overlay' && this.isPlaying) {
+                this._clearAutoHideTimer();
+                this.ui.controls.classList.remove('visible');
+                this.container.classList.add('hide-cursor');
+            }
+        });
+
+        // Keep controls visible when hovering over them (Rule 3)
+        this.ui.controls.addEventListener('mouseenter', () => this._clearAutoHideTimer());
+        this.ui.controls.addEventListener('mouseleave', () => {
+            if (this.isPlaying && this.controlBarMode === 'overlay') {
+                this._startAutoHideTimer();
+            }
+        });
 
         // Subtitles
         this.ui.ccBtn.addEventListener('click', () => {
@@ -1105,12 +1145,23 @@ export class CorePlayer {
         }
 
         this._startRenderLoop();
+
+        // Start auto-hide timer for overlay mode (even if mouse is stationary)
+        if (this.controlBarMode === 'overlay') {
+            // Small delay to allow user to see controls when they click play
+            setTimeout(() => {
+                if (this.isPlaying && this.controlBarMode === 'overlay') {
+                    this._startAutoHideTimer();
+                }
+            }, 500);
+        }
     }
 
     pause() {
         console.log("Player.pause() called");
         this.playbackTimeAtStart = this._getPlaybackTime();
         this.isPlaying = false;
+        this._clearAutoHideTimer();
         this._updatePlayPauseUI();
 
         if (this.audioBufferIterator) {
@@ -1436,5 +1487,130 @@ export class CorePlayer {
 
         this.container.classList.remove('mediabunny-container');
         this.container = null;
+    }
+
+    // ========================================
+    // Control Bar Mode Methods
+    // ========================================
+
+    /**
+     * Load control bar mode from localStorage
+     * @private
+     */
+    _loadControlBarMode() {
+        try {
+            const savedMode = localStorage.getItem('controlBarMode');
+            if (savedMode === 'fixed' || savedMode === 'overlay') {
+                this.controlBarMode = savedMode;
+            }
+        } catch (e) {
+            console.warn('Failed to load control bar mode:', e);
+        }
+        this._applyControlBarMode();
+    }
+
+    /**
+     * Save control bar mode to localStorage
+     * @private
+     */
+    _saveControlBarMode() {
+        try {
+            localStorage.setItem('controlBarMode', this.controlBarMode);
+        } catch (e) {
+            console.warn('Failed to save control bar mode:', e);
+        }
+    }
+
+    /**
+     * Toggle between overlay and fixed control bar modes
+     */
+    toggleControlBarMode() {
+        this.controlBarMode = this.controlBarMode === 'overlay' ? 'fixed' : 'overlay';
+        this._applyControlBarMode();
+        this._saveControlBarMode();
+    }
+
+    /**
+     * Apply the current control bar mode
+     * @private
+     */
+    _applyControlBarMode() {
+        // Remove both classes
+        this.container.classList.remove('mode-overlay', 'mode-fixed');
+
+        // Add current mode class
+        this.container.classList.add(`mode-${this.controlBarMode}`);
+
+        // Update button aria-label and aria-pressed
+        const isFixed = this.controlBarMode === 'fixed';
+        this.ui.modeToggleBtn.setAttribute('aria-label', isFixed ? 'Unpin controls' : 'Pin controls');
+        this.ui.modeToggleBtn.setAttribute('aria-pressed', isFixed.toString());
+        this.ui.modeToggleBtn.setAttribute('title', isFixed ? 'Unpin controls' : 'Pin controls');
+
+        // Handle auto-hide
+        if (this.controlBarMode === 'overlay') {
+            this._startAutoHideTimer();
+        } else {
+            this._clearAutoHideTimer();
+            this.ui.controls.classList.add('visible');
+        }
+    }
+
+    /**
+     * Handle mouse movement for auto-hide
+     * @private
+     */
+    _handleMouseMove(e) {
+        if (this.controlBarMode !== 'overlay') return;
+
+        // Show controls (Rule 2 & 3)
+        this.ui.controls.classList.add('visible');
+
+        // Reset timer
+        this._clearAutoHideTimer();
+
+        // Don't auto-hide if paused
+        if (!this.isPlaying) return;
+
+        // Check if mouse is over controls (using coordinates for reliability)
+        const controlsRect = this.ui.controls.getBoundingClientRect();
+        const isOverControls = e.clientY >= controlsRect.top &&
+            e.clientY <= controlsRect.bottom &&
+            e.clientX >= controlsRect.left &&
+            e.clientX <= controlsRect.right;
+
+        // Only start auto-hide timer if NOT over controls (Rule 1 & 3)
+        if (!isOverControls) {
+            this._startAutoHideTimer();
+        }
+    }
+
+    /**
+     * Start auto-hide timer (3 seconds)
+     * @private
+     */
+    _startAutoHideTimer() {
+        if (this.controlBarMode !== 'overlay') return;
+        if (!this.isPlaying) return; // Don't hide when paused
+
+        this._clearAutoHideTimer();
+        this.autoHideTimer = setTimeout(() => {
+            this.ui.controls.classList.remove('visible');
+            // Also hide cursor
+            this.container.classList.add('hide-cursor');
+        }, 3000);
+    }
+
+    /**
+     * Clear auto-hide timer
+     * @private
+     */
+    _clearAutoHideTimer() {
+        if (this.autoHideTimer) {
+            clearTimeout(this.autoHideTimer);
+            this.autoHideTimer = null;
+        }
+        // Show cursor when timer is cleared
+        this.container.classList.remove('hide-cursor');
     }
 }
