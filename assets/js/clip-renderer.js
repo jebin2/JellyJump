@@ -55,6 +55,17 @@ class ClipRenderer {
         // Position and Size
         this.updateElementPosition(el, clip);
 
+        // Handles (Phase 75)
+        const handleLeft = document.createElement('div');
+        handleLeft.className = 'clip-handle handle-left';
+        handleLeft.dataset.action = 'trim-left';
+        el.appendChild(handleLeft);
+
+        const handleRight = document.createElement('div');
+        handleRight.className = 'clip-handle handle-right';
+        handleRight.dataset.action = 'trim-right';
+        el.appendChild(handleRight);
+
         // Apply thumbnail if available
         if (clip.type === 'video' && window.thumbnailExtractor) {
             const thumbnail = window.thumbnailExtractor.getThumbnail(clip.mediaId);

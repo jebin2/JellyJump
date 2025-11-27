@@ -1977,3 +1977,40 @@ mark {
     /* Ensure it doesn't block clicks on clips */
     box-shadow: 1px 0 2px rgba(0, 0, 0, 0.3);
 }
+
+/* -----------------------------------------
+   14. Clip Trim Handles (Phase 75)
+   ----------------------------------------- */
+.clip-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    background-color: transparent;
+    z-index: 20;
+    cursor: ew-resize;
+    display: none;
+    /* Hidden by default */
+}
+
+.handle-left {
+    left: 0;
+    border-left: 4px solid var(--text-primary);
+}
+
+.handle-right {
+    right: 0;
+    border-right: 4px solid var(--text-primary);
+}
+
+/* Specificity boost to ensure display: block overrides display: none */
+.timeline-clip.selected .clip-handle {
+    display: block !important;
+}
+
+.clip-handle:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--accent-secondary);
+}
+
+```
