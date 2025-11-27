@@ -359,16 +359,38 @@
             <!-- Tracks will be added dynamically by JS -->
         </div>
 
-        <!-- Edit Toolbar -->
-        <div class="timeline-toolbar">
-            <button class="toolbar-btn" aria-label="Cut">✂️ Cut</button>
-            <button class="toolbar-btn" aria-label="Trim">📏 Trim</button>
-            <button class="toolbar-btn" aria-label="Split">➕ Split</button>
-            <button class="toolbar-btn" aria-label="Copy">📋 Copy</button>
-            <button class="toolbar-btn" aria-label="Paste">📄 Paste</button>
-            <button class="toolbar-btn" aria-label="Delete">🗑️ Delete</button>
-            <button class="toolbar-btn" aria-label="Undo">🔄 Undo</button>
-            <button class="toolbar-btn" aria-label="Redo">↩️ Redo</button>
+        <!-- Edit Toolbar (Phase 65) -->
+        <div class="timeline-toolbar" role="toolbar" aria-label="Timeline editing tools">
+            <button class="toolbar-btn" data-action="cut" aria-label="Cut selected clip (Ctrl+X)" disabled>
+                <span class="toolbar-btn__icon">✂️</span>
+                <span class="toolbar-btn__label">Cut</span>
+                <span class="toolbar-btn__shortcut">Ctrl+X</span>
+            </button>
+            <button class="toolbar-btn" data-action="copy" aria-label="Copy selected clip (Ctrl+C)" disabled>
+                <span class="toolbar-btn__icon">📋</span>
+                <span class="toolbar-btn__label">Copy</span>
+                <span class="toolbar-btn__shortcut">Ctrl+C</span>
+            </button>
+            <button class="toolbar-btn" data-action="paste" aria-label="Paste clip (Ctrl+V)" disabled>
+                <span class="toolbar-btn__icon">📄</span>
+                <span class="toolbar-btn__label">Paste</span>
+                <span class="toolbar-btn__shortcut">Ctrl+V</span>
+            </button>
+            <button class="toolbar-btn" data-action="delete" aria-label="Delete selected clip (Del)" disabled>
+                <span class="toolbar-btn__icon">🗑️</span>
+                <span class="toolbar-btn__label">Delete</span>
+                <span class="toolbar-btn__shortcut">Del</span>
+            </button>
+            <button class="toolbar-btn" data-action="undo" aria-label="Undo last action (Ctrl+Z)" disabled>
+                <span class="toolbar-btn__icon">↩️</span>
+                <span class="toolbar-btn__label">Undo</span>
+                <span class="toolbar-btn__shortcut">Ctrl+Z</span>
+            </button>
+            <button class="toolbar-btn" data-action="redo" aria-label="Redo last action (Ctrl+Y)" disabled>
+                <span class="toolbar-btn__icon">↪️</span>
+                <span class="toolbar-btn__label">Redo</span>
+                <span class="toolbar-btn__shortcut">Ctrl+Y</span>
+            </button>
         </div>
     </section>
 
@@ -406,6 +428,7 @@
     <script type="module" src="assets/js/modal-dialog.js"></script>
     <script type="module" src="assets/js/tab-manager.js"></script>
     <script type="module" src="assets/js/media-tab-manager.js"></script>
+    <script type="module" src="assets/js/timeline-toolbar.js"></script>
 
 </body>
 

@@ -1714,3 +1714,78 @@ mark {
     white-space: nowrap;
     opacity: 0.5;
 }
+
+/* -----------------------------------------
+   9. Timeline Toolbar (Phase 65)
+   ----------------------------------------- */
+.timeline-toolbar {
+    height: 50px;
+    background-color: var(--bg-secondary);
+    border-top: 2px solid var(--border-dark);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-md);
+    gap: var(--space-sm);
+    z-index: 20;
+    /* Above tracks */
+    flex-shrink: 0;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background-color: transparent;
+    border: 2px solid transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-standard);
+    border-radius: 4px;
+    position: relative;
+}
+
+.toolbar-btn:hover:not([disabled]) {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-dark);
+    transform: translateY(-1px);
+}
+
+.toolbar-btn:active:not([disabled]) {
+    transform: translateY(1px);
+    background-color: var(--bg-hover);
+}
+
+.toolbar-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toolbar-btn__icon {
+    font-size: 1.1rem;
+}
+
+.toolbar-btn__label {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+}
+
+.toolbar-btn__shortcut {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-left: var(--space-xs);
+    font-family: var(--font-mono);
+}
+
+/* Responsive: Hide labels on small screens */
+@media (max-width: 768px) {
+
+    .toolbar-btn__label,
+    .toolbar-btn__shortcut {
+        display: none;
+    }
+
+    .toolbar-btn {
+        padding: var(--space-xs);
+    }
+}
