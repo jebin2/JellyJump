@@ -272,6 +272,14 @@ class TimelineManager {
         });
 
         this.attachDropHandlers();
+
+        // Wheel Zoom
+        if (this.trackContainer) {
+            this.trackContainer.addEventListener('wheel', (e) => this.handleWheelZoom(e), { passive: false });
+        }
+        if (this.ruler) {
+            this.ruler.addEventListener('wheel', (e) => this.handleWheelZoom(e), { passive: false });
+        }
     }
 
     attachDropHandlers() {
@@ -481,30 +489,45 @@ class TimelineManager {
 
     handleZoom(change) {
         let newZoom = this.zoomLevel + change;
-        // Clamp between 25% and 400%
-        newZoom = Math.max(25, Math.min(400, newZoom));
+        // Clamp between 10% and 400%
+        newZoom = Math.max(10, Math.min(400, newZoom));
 
         if (newZoom !== this.zoomLevel) {
-            this.zoomLevel = newZoom;
-            if (this.zoomLevelDisplay) {
-                this.zoomLevelDisplay.textContent = `${this.zoomLevel}%`;
-            }
-            console.log(`Zoom level: ${this.zoomLevel}%`);
-
-            this.updateRuler();
-            this.updatePlayheadPosition(this.currentTime || 0);
-
-            // Refresh clips
-            if (window.clipRenderer) {
-                window.clipRenderer.refresh();
-            }
-
-            // Dispatch zoom event for future use
-            const event = new CustomEvent('timeline-zoom-change', {
-                detail: { zoomLevel: this.zoomLevel }
-            });
-            window.dispatchEvent(event);
+            this.setZoom(newZoom);
         }
+    }
+
+    handleWheelZoom(e) {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+
+        const delta = -Math.sign(e.deltaY) * 10; // 10% steps
+        this.handleZoom(delta);
+    }
+
+    setZoom(level) {
+        this.zoomLevel = level;
+        if (this.zoomLevelDisplay) {
+            this.zoomLevelDisplay.textContent = `${this.zoomLevel}%`;
+        }
+        console.log(`Zoom level: ${this.zoomLevel}%`);
+
+        // Store previous scroll center time to restore focus?
+        // For now, simple re-render.
+
+        this.updateRuler();
+        this.updatePlayheadPosition(this.currentTime || 0);
+
+        // Refresh clips
+        if (window.clipRenderer) {
+            window.clipRenderer.refresh();
+        }
+
+        // Dispatch zoom event
+        const event = new CustomEvent('timeline-zoom-change', {
+            detail: { zoomLevel: this.zoomLevel }
+        });
+        window.dispatchEvent(event);
     }
 
     createPlayhead() {
