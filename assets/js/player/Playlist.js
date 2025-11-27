@@ -96,6 +96,11 @@ export class Playlist {
 
     _createHeader() {
         const template = document.getElementById('playlist-header-controls-template');
+        if (!template) {
+            console.error('Playlist header template not found!');
+            return;
+        }
+
         const clone = template.content.cloneNode(true);
 
         const header = document.createElement('div');
@@ -105,28 +110,60 @@ export class Playlist {
         // Insert before container
         this.container.parentNode.insertBefore(header, this.container);
 
+        // Initialize Sidebar Toggle RIGHT AFTER header is in DOM
+        const sidebarElement = document.querySelector('.playlist-section');
+        const toggleButton = document.getElementById('sidebar-toggle-btn');
+
+        if (sidebarElement && toggleButton) {
+            import('./SidebarToggle.js').then(({ SidebarToggle }) => {
+                new SidebarToggle(sidebarElement, toggleButton);
+            }).catch(err => {
+                console.error('Failed to load SidebarToggle:', err);
+            });
+        } else {
+            console.warn('Sidebar toggle elements not found', { sidebarElement, toggleButton });
+        }
+
         // Attach events
-        header.querySelector('#mb-add-files').addEventListener('click', () => {
-            document.getElementById('mb-file-input').click();
-        });
+        const addFilesBtn = header.querySelector('#mb-add-files');
+        const addFolderBtn = header.querySelector('#mb-add-folder');
+        const clearBtn = header.querySelector('#mb-clear-playlist');
 
-        header.querySelector('#mb-add-folder').addEventListener('click', () => {
-            document.getElementById('mb-folder-input').click();
-        });
+        if (addFilesBtn) {
+            addFilesBtn.addEventListener('click', () => {
+                document.getElementById('mb-file-input').click();
+            });
+        }
 
-        header.querySelector('#mb-clear-playlist').addEventListener('click', () => {
-            this.clear();
-        });
+        if (addFolderBtn) {
+            addFolderBtn.addEventListener('click', () => {
+                document.getElementById('mb-folder-input').click();
+            });
+        }
 
-        document.getElementById('mb-file-input').addEventListener('change', (e) => {
-            this.handleFiles(e.target.files);
-            e.target.value = ''; // Reset
-        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this.clear();
+            });
+        }
 
-        document.getElementById('mb-folder-input').addEventListener('change', (e) => {
-            this.handleFiles(e.target.files);
-            e.target.value = ''; // Reset
-        });
+        // File input events
+        const fileInput = document.getElementById('mb-file-input');
+        const folderInput = document.getElementById('mb-folder-input');
+
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                this.handleFiles(e.target.files);
+                e.target.value = ''; // Reset
+            });
+        }
+
+        if (folderInput) {
+            folderInput.addEventListener('change', (e) => {
+                this.handleFiles(e.target.files);
+                e.target.value = ''; // Reset
+            });
+        }
     }
 
     _createListContainer() {
@@ -474,12 +511,12 @@ export class Playlist {
             const source = resource instanceof File
                 ? new MediaBunny.BlobSource(resource)
                 : new MediaBunny.UrlSource(resource);
-            
+
             const input = new MediaBunny.Input({
                 source,
                 formats: MediaBunny.ALL_FORMATS
             });
-            
+
             const duration = await input.computeDuration();
             return duration;
         } catch (error) {

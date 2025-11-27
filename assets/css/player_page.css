@@ -1,11 +1,11 @@
 /* =========================================
    Player Page Styles
-   Phase: 15
+   Phase: 15-16
    ========================================= */
 
 .player-layout {
     display: grid;
-    grid-template-columns: 70% 30%;
+    grid-template-columns: 1fr auto;
     height: 100vh;
     width: 100vw;
     overflow: hidden;
@@ -31,13 +31,109 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow: hidden;
+    overflow: visible;
+    /* Changed from hidden to allow button to show */
+    position: relative;
+    transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1),
+        min-width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Collapsed State - Hide sidebar completely, show only overlay button */
+.playlist-section.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: visible !important;
+    /* CRITICAL: Allow button to show outside collapsed area */
+}
+
+.playlist-section.collapsed .playlist-header {
+    display: block !important;
+    /* Keep header visible to show button */
+    overflow: visible;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.playlist-section.collapsed .playlist-header-top {
+    width: auto;
+}
+
+.playlist-section.collapsed .playlist-title-text,
+.playlist-section.collapsed .playlist-controls {
+    display: none;
+}
+
+.playlist-section.collapsed .playlist-content {
+    display: none;
+}
+
+/* Overlay expand button when collapsed */
+.playlist-section.collapsed .sidebar-collapse-btn {
+    display: block !important;
+    position: fixed;
+    top: var(--space-md);
+    /* Align with header position */
+    right: 20px;
+    transform: none;
+    /* Remove centering */
+    z-index: 100;
+    background-color: var(--bg-primary);
+    border: 2px solid var(--accent-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    padding: var(--space-sm) var(--space-sm);
+    margin: 0;
 }
 
 .playlist-header {
     padding: var(--space-md);
     border-bottom: 2px solid var(--border-color);
     background-color: var(--bg-primary);
+}
+
+.playlist-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.playlist-title-text {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+/* Sidebar Collapse Button - Default (expanded) state */
+.sidebar-collapse-btn {
+    background: none;
+    border: 2px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 1.2rem;
+    line-height: 1;
+    transition: all 0.2s ease;
+    border-radius: 2px;
+    position: relative;
+    /* Default positioning in header */
+}
+
+.sidebar-collapse-btn:hover {
+    background-color: rgba(var(--accent-primary-rgb), 0.1);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.sidebar-collapse-btn:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+.playlist-controls {
+    display: flex;
+    gap: var(--space-xs);
 }
 
 .playlist-content {
@@ -77,11 +173,6 @@
 /* -----------------------------------------
    Responsive Design
    ----------------------------------------- */
-@media (max-width: 1024px) {
-    .player-layout {
-        grid-template-columns: 65% 35%;
-    }
-}
 
 @media (max-width: 768px) {
     .player-layout {
@@ -103,7 +194,9 @@
 
     .playlist-section {
         position: relative;
-        width: 100%;
+        width: 100% !important;
+        /* Override desktop collapse width */
+        min-width: 100% !important;
         height: 100%;
         /* Fill remaining grid space */
         background-color: var(--bg-secondary);
@@ -111,6 +204,62 @@
         display: flex;
         flex-direction: column;
         overflow-y: auto;
+        transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    /* Mobile vertical collapse - slide completely off-screen */
+    .playlist-section.collapsed {
+        width: 100% !important;
+        height: 100% !important;
+        transform: translateY(100%) !important;
+        /* Slide completely down */
+        overflow: hidden !important;
+        transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    /* Hide the regular sidebar button when collapsed in mobile */
+    .playlist-section.collapsed .sidebar-collapse-btn {
+        display: none !important;
+    }
+
+    /* Mobile expand button (separate element, always visible when playlist collapsed) */
+    .mobile-expand-button {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+        background-color: var(--bg-primary);
+        border: 3px solid var(--accent-primary);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        padding: 12px 16px;
+        font-size: 1.5rem;
+        cursor: pointer;
+        border-radius: 4px;
+        color: var(--text-primary);
+        line-height: 1;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-expand-button:hover {
+        background-color: rgba(var(--accent-primary-rgb), 0.1);
+        transform: scale(1.1);
+    }
+
+    .mobile-expand-button:focus {
+        outline: 2px solid var(--accent-primary);
+        outline-offset: 2px;
+    }
+
+    /* Hide header content when collapsed, but keep button visible */
+    .playlist-section.collapsed .playlist-header {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    .playlist-section.collapsed .playlist-title-text,
+    .playlist-section.collapsed .playlist-controls {
+        display: none !important;
     }
 
     /* Overlay when playlist is open */
@@ -242,4 +391,17 @@
 
 .playlist-download-btn:hover {
     color: var(--accent-primary);
+}
+
+/* -----------------------------------------
+   Accessibility: Reduced Motion
+   ----------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .playlist-section {
+        transition: none;
+    }
+
+    .sidebar-collapse-btn {
+        transition: none;
+    }
 }

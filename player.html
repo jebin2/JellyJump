@@ -42,6 +42,12 @@
                 </div>
             </div>
         </aside>
+
+        <!-- Mobile Expand Button (separate from playlist) -->
+        <button id="mobile-expand-btn" class="mobile-expand-button" aria-label="Expand playlist" title="Expand playlist"
+            style="display: none;">
+            ▲
+        </button>
     </div>
 
     <!-- Hidden File Inputs -->
@@ -83,7 +89,7 @@
                 mode: 'player'
             });
 
-            // Initialize Playlist
+            // Initialize Playlist (which will initialize SidebarToggle internally)
             const playlist = new Playlist(
                 document.querySelector('.playlist-content'),
                 player
