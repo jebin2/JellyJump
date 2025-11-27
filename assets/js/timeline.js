@@ -262,6 +262,190 @@ class TimelineManager {
         window.addEventListener('preview-player-time-update', (e) => {
             this.updateTime(e.detail.currentTime);
         });
+
+        // Project duration change
+        window.addEventListener('project-duration-change', (e) => {
+            this.duration = e.detail.duration;
+            this.updateRuler();
+        });
+
+        this.attachDropHandlers();
+    }
+
+    attachDropHandlers() {
+        if (!this.trackContainer) return;
+
+        // Delegate drag events to tracks
+        this.trackContainer.addEventListener('dragover', (e) => this.handleDragOver(e));
+        this.trackContainer.addEventListener('drop', (e) => this.handleDrop(e));
+        this.trackContainer.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+    }
+
+    handleDragOver(e) {
+        e.preventDefault(); // Allow drop
+
+        const trackContent = e.target.closest('.timeline-track__content');
+        if (!trackContent) return;
+
+        const track = trackContent.closest('.timeline-track');
+        if (!track) return;
+
+        // Validate media type (assuming we can get type from drag data or state)
+        // Note: DataTransfer data is not available in dragover for security, 
+        // so we might need a global state or just allow visual feedback for now.
+
+        track.classList.add('drag-over');
+
+        // Calculate and show drop indicator
+        const dropTime = this.calculateDropTime(e, trackContent);
+        this.showDropIndicator(trackContent, dropTime);
+    }
+
+    handleDragLeave(e) {
+        const trackContent = e.target.closest('.timeline-track__content');
+        if (!trackContent) return;
+
+        const track = trackContent.closest('.timeline-track');
+        if (track) {
+            track.classList.remove('drag-over');
+            track.classList.remove('drag-error');
+        }
+        this.hideDropIndicator(trackContent);
+    }
+
+    async handleDrop(e) {
+        e.preventDefault();
+
+        const trackContent = e.target.closest('.timeline-track__content');
+        if (!trackContent) return;
+
+        const track = trackContent.closest('.timeline-track');
+        if (!track) return;
+
+        // Cleanup visual feedback
+        track.classList.remove('drag-over');
+        this.hideDropIndicator(trackContent);
+
+        // Get drag data
+        const mediaId = e.dataTransfer.getData('text/plain');
+        if (!mediaId) return;
+
+        // Retrieve media details (mocking retrieval or using a helper if available)
+        // In a real app, we'd fetch from IndexedDB. For now, we'll assume success 
+        // or use a global helper if one exists. 
+        // Since we don't have direct DB access here synchronously, we'll simulate or use what we have.
+        // Ideally, we should have a `MediaService.getMediaById(mediaId)`.
+
+        // For this phase, we'll assume we can get basic info or just create the clip
+        // with the ID and some defaults, relying on the ClipManager to handle details later
+        // or fetching it here if possible.
+
+        // Let's try to find the media element in the library to get duration/type if possible,
+        // or fetch from DB.
+
+        try {
+            // We'll use the ID to create the clip. 
+            // We need duration and type. 
+            // For now, we'll fetch from DB using the helper if available globally
+            // or just use placeholder values if we can't access DB easily here.
+
+            // Note: In Phase 42 we created IndexedDBHelper. 
+            // Let's assume window.indexedDBHelper is available or we import it.
+            // It is imported in editor.html.
+
+            let media = null;
+            if (window.indexedDBHelper) {
+                media = await window.indexedDBHelper.getMedia(mediaId);
+            }
+
+            if (!media) {
+                console.error('Media not found for ID:', mediaId);
+                return;
+            }
+
+            // Validate type
+            const trackType = track.dataset.trackType;
+            let isValid = false;
+            if (trackType === 'video' && (media.type.startsWith('video') || media.type.startsWith('image'))) {
+                isValid = true;
+            } else if (trackType === 'audio' && media.type.startsWith('audio')) {
+                isValid = true;
+            }
+
+            if (!isValid) {
+                console.warn(`Invalid media type ${media.type} for track ${trackType}`);
+                // Show error feedback (flash red maybe)
+                return;
+            }
+
+            const dropTime = this.calculateDropTime(e, trackContent);
+            const trackId = track.dataset.trackId;
+
+            // Create clip
+            if (window.clipManager) {
+                const clip = window.clipManager.createClip(
+                    mediaId,
+                    trackId,
+                    dropTime,
+                    media.duration || 5, // Default 5s for images
+                    media.type.startsWith('video') ? 'video' : (media.type.startsWith('audio') ? 'audio' : 'image'),
+                    media.name
+                );
+                window.clipManager.addClip(clip);
+
+                // Remove empty state if present
+                if (track.dataset.empty === 'true') {
+                    track.dataset.empty = 'false';
+                    // We don't remove the text via CSS, but we could update the attribute
+                    // The CSS handles hiding it if we change the structure or attribute
+                }
+            }
+
+        } catch (err) {
+            console.error('Error handling drop:', err);
+        }
+    }
+
+    calculateDropTime(e, trackContent) {
+        const rect = trackContent.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left + this.trackContainer.scrollLeft;
+
+        // Convert pixels to seconds
+        const zoomRatio = this.zoomLevel / 100;
+        const pxPerSec = this.pixelsPerSecond * zoomRatio;
+
+        let time = offsetX / pxPerSec;
+
+        // Clamp to 0
+        time = Math.max(0, time);
+
+        // Snap to grid (optional, simple rounding for now)
+        // Round to nearest 0.1s
+        time = Math.round(time * 10) / 10;
+
+        return time;
+    }
+
+    showDropIndicator(trackContent, time) {
+        let indicator = trackContent.querySelector('.drop-indicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'drop-indicator';
+            trackContent.appendChild(indicator);
+        }
+
+        const zoomRatio = this.zoomLevel / 100;
+        const pxPerSec = this.pixelsPerSecond * zoomRatio;
+        const position = time * pxPerSec;
+
+        indicator.style.left = `${position}px`;
+    }
+
+    hideDropIndicator(trackContent) {
+        const indicator = trackContent.querySelector('.drop-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
     }
 
     togglePlay() {

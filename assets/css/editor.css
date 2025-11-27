@@ -1789,3 +1789,39 @@ mark {
         padding: var(--space-xs);
     }
 }
+
+/* -----------------------------------------
+   10. Drop Indicators (Phase 66)
+   ----------------------------------------- */
+.timeline-track.drag-over {
+    background-color: rgba(var(--accent-primary-rgb), 0.1);
+    border-color: var(--accent-primary);
+}
+
+.timeline-track.drag-error {
+    background-color: rgba(var(--accent-danger-rgb), 0.1);
+    border-color: var(--accent-danger);
+    cursor: not-allowed;
+}
+
+.drop-indicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: var(--accent-primary);
+    z-index: 10;
+    pointer-events: none;
+    box-shadow: 0 0 4px var(--accent-primary);
+}
+
+.drop-indicator::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 10px;
+    height: 10px;
+    background-color: var(--accent-primary);
+    border-radius: 50%;
+}
