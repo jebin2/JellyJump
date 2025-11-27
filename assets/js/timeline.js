@@ -1,6 +1,6 @@
 /**
  * TimelineManager
- * Handles timeline header controls and synchronization with the PreviewPlayer.
+ * Handles timeline header controls, ruler, tracks, and synchronization.
  */
 class TimelineManager {
     constructor() {
@@ -15,25 +15,111 @@ class TimelineManager {
 
         this.settingsBtn = document.getElementById('timeline-settings-btn');
         this.ruler = document.querySelector('.timeline__ruler');
+        this.trackContainer = document.getElementById('timeline-tracks');
 
         // State
         this.zoomLevel = 100;
         this.isPlaying = false;
-        this.duration = 60; // Increased to 60 seconds to force scroll
+        this.duration = 60; // Default duration
         this.pixelsPerSecond = 50; // Default at 100% zoom
+        this.tracks = []; // Store track data
 
         this.init();
     }
 
     init() {
         this.attachEventListeners();
+        this.createTrackContainer();
         this.updateRuler();
+        this.syncHorizontalScroll();
         console.log('TimelineManager initialized');
+    }
+
+    createTrackContainer() {
+        if (!this.trackContainer) return;
+
+        // Clear existing
+        this.trackContainer.innerHTML = '';
+        this.tracks = [];
+
+        // Add default tracks
+        this.addTrack('video', 'Video Track 1');
+        this.addTrack('video', 'Video Track 2');
+        this.addTrack('audio', 'Audio Track 1');
+    }
+
+    addTrack(type, name) {
+        const trackId = `track-${this.tracks.length + 1}`;
+        const trackEl = document.createElement('div');
+        trackEl.className = `timeline-track timeline-track--${type}`;
+        trackEl.dataset.trackId = trackId;
+        trackEl.dataset.trackType = type;
+        trackEl.dataset.empty = 'true';
+        trackEl.dataset.emptyText = 'Drag media here';
+
+        // Track Header
+        const header = document.createElement('div');
+        header.className = 'timeline-track__header';
+
+        const info = document.createElement('div');
+        info.className = 'timeline-track__info';
+
+        const icon = document.createElement('span');
+        icon.className = 'timeline-track__icon';
+        icon.textContent = type === 'video' ? '🎬' : '🎵';
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'timeline-track__name';
+        nameEl.textContent = name;
+        nameEl.title = name;
+
+        info.appendChild(icon);
+        info.appendChild(nameEl);
+
+        const controls = document.createElement('div');
+        controls.className = 'timeline-track__controls';
+
+        // Placeholder controls
+        const muteBtn = document.createElement('button');
+        muteBtn.className = 'track-btn';
+        muteBtn.innerHTML = '🔇';
+        muteBtn.title = 'Mute';
+
+        const soloBtn = document.createElement('button');
+        soloBtn.className = 'track-btn';
+        soloBtn.innerHTML = 'S';
+        soloBtn.title = 'Solo';
+
+        const lockBtn = document.createElement('button');
+        lockBtn.className = 'track-btn';
+        lockBtn.innerHTML = '🔒';
+        lockBtn.title = 'Lock';
+
+        controls.appendChild(muteBtn);
+        controls.appendChild(soloBtn);
+        controls.appendChild(lockBtn);
+
+        header.appendChild(info);
+        header.appendChild(controls);
+
+        // Track Content
+        const content = document.createElement('div');
+        content.className = 'timeline-track__content';
+
+        trackEl.appendChild(header);
+        trackEl.appendChild(content);
+
+        this.trackContainer.appendChild(trackEl);
+        this.tracks.push({ id: trackId, type, name, element: trackEl });
+
+        // Update width of new track content
+        this.updateTrackWidth();
     }
 
     updateRuler() {
         if (this.ruler) {
-            const width = this.duration * this.pixelsPerSecond * (this.zoomLevel / 100);
+            const width = this.calculateWidth();
+
             // Create a content div if it doesn't exist to force scroll width
             let content = this.ruler.querySelector('.timeline__ruler-content');
             if (!content) {
@@ -45,7 +131,20 @@ class TimelineManager {
             content.style.width = `${width}px`;
 
             this.generateTimeMarkers(content);
+            this.updateTrackWidth();
         }
+    }
+
+    calculateWidth() {
+        return this.duration * this.pixelsPerSecond * (this.zoomLevel / 100);
+    }
+
+    updateTrackWidth() {
+        const width = this.calculateWidth();
+        const trackContents = document.querySelectorAll('.timeline-track__content');
+        trackContents.forEach(content => {
+            content.style.width = `${width}px`;
+        });
     }
 
     generateTimeMarkers(container) {
@@ -59,7 +158,7 @@ class TimelineManager {
         let majorInterval = 5; // seconds
         let minorInterval = 1; // seconds
 
-        // Adjust intervals for zoom levels (basic logic for now)
+        // Adjust intervals for zoom levels
         if (pxPerSec < 20) {
             majorInterval = 10;
             minorInterval = 5;
@@ -105,6 +204,31 @@ class TimelineManager {
         }
 
         container.appendChild(fragment);
+    }
+
+    syncHorizontalScroll() {
+        if (!this.ruler || !this.trackContainer) return;
+
+        let isSyncingRuler = false;
+        let isSyncingTracks = false;
+
+        // Ruler scroll -> Track scroll
+        this.ruler.addEventListener('scroll', () => {
+            if (!isSyncingRuler) {
+                isSyncingTracks = true;
+                this.trackContainer.scrollLeft = this.ruler.scrollLeft;
+            }
+            isSyncingRuler = false;
+        });
+
+        // Track scroll -> Ruler scroll
+        this.trackContainer.addEventListener('scroll', () => {
+            if (!isSyncingTracks) {
+                isSyncingRuler = true;
+                this.ruler.scrollLeft = this.trackContainer.scrollLeft;
+            }
+            isSyncingTracks = false;
+        });
     }
 
     formatTimeLabel(seconds) {
@@ -179,6 +303,8 @@ class TimelineManager {
                 this.zoomLevelDisplay.textContent = `${this.zoomLevel}%`;
             }
             console.log(`Zoom level: ${this.zoomLevel}%`);
+
+            this.updateRuler();
 
             // Dispatch zoom event for future use
             const event = new CustomEvent('timeline-zoom-change', {

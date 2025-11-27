@@ -1571,3 +1571,146 @@ mark {
         opacity: 0;
     }
 }
+
+/* -----------------------------------------
+   8. Timeline Tracks (Phase 64)
+   ----------------------------------------- */
+.timeline-tracks {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    /* Syncs with ruler */
+    background-color: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* Custom scrollbar for vertical scroll */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-dark) var(--bg-secondary);
+}
+
+.timeline-tracks::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.timeline-tracks::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.timeline-tracks::-webkit-scrollbar-thumb {
+    background-color: var(--border-dark);
+    border-radius: 4px;
+}
+
+.timeline-track {
+    display: flex;
+    border-bottom: 2px solid var(--border-dark);
+    position: relative;
+    flex-shrink: 0;
+    background-color: var(--bg-secondary);
+    transition: background-color 0.2s ease;
+}
+
+.timeline-track:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* Fixed Track Header */
+.timeline-track__header {
+    width: 150px;
+    flex-shrink: 0;
+    background-color: var(--bg-secondary);
+    border-right: 3px solid var(--border-dark);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--space-xs) var(--space-sm);
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    /* Keep above content when scrolling horizontally */
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.timeline-track__info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+
+.timeline-track__icon {
+    font-size: 1.2rem;
+}
+
+.timeline-track__name {
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.timeline-track__controls {
+    display: flex;
+    gap: 4px;
+}
+
+.track-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-dark);
+    color: var(--text-secondary);
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.track-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+}
+
+/* Track Content Area */
+.timeline-track__content {
+    flex: 1;
+    position: relative;
+    /* Background grid pattern */
+    background-image: linear-gradient(to right, var(--border-dark) 1px, transparent 1px);
+    background-size: 100px 100%;
+    /* Matches major tick interval roughly, will be dynamic later */
+    background-color: var(--bg-primary);
+    min-width: 100%;
+    /* Ensure it fills at least the viewport width */
+}
+
+/* Track Types */
+.timeline-track--video {
+    height: 80px;
+}
+
+.timeline-track--audio {
+    height: 60px;
+}
+
+/* Empty State in Track */
+.timeline-track[data-empty="true"] .timeline-track__content::after {
+    content: attr(data-empty-text);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    pointer-events: none;
+    white-space: nowrap;
+    opacity: 0.5;
+}
