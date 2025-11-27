@@ -1,55 +1,77 @@
-# Player Page - Implementation Overview
-
-## Global Phase Numbers: 15-25
+## Global Phase Numbers: 15-31
 
 ### [Phase 15: Player Layout](phase15-player-layout.md)
-- 70/30 split layout, core player integration
+- 80/20 split layout, core player integration
 - **Done when**: Layout works, core player embedded
 
-### [Phase 16: Player Playlist](phase16-player-playlist.md)
+### [Phase 16: Collapsible Sidebar](phase16-collapsible-sidebar.md)
+- Collapse/expand playlist sidebar with smooth transitions
+- **Done when**: Sidebar can be collapsed and expanded, state persists
+
+### [Phase 17: Control Bar Mode Toggle](phase17-control-bar-mode.md)
+- Toggle between overlay and fixed control bar modes
+- **Done when**: Both modes work, mode persists across sessions
+
+### [Phase 18: Optional Control Components](phase18-optional-controls.md)
+- Configurable control bar with optional components
+- **Done when**: Controls can be shown/hidden via configuration
+
+### [Phase 19: Default Frame Display](phase19-default-frame.md)
+- Display 50th percentile frame or last paused frame on load
+- **Done when**: Frame displays before playback, state persists
+
+### [Phase 20: URL Upload Feature](phase20-url-upload.md)
+- Upload videos from remote URLs
+- **Done when**: URL upload works with modal, errors handled
+
+### [Phase 21: Single File Auto-Load](phase21-single-file-autoload.md)
+- Auto-load single uploaded files/URLs into player
+- **Done when**: Single files auto-load, multiple files don't
+
+### [Phase 22: Player Playlist](phase22-player-playlist.md)
 - Playlist UI with video items
 - **Done when**: Playlist displays videos, click plays
 
-### [Phase 17: Player Frame Capture](phase17-player-capture.md)
+### [Phase 23: Player Frame Capture](phase23-player-capture.md)
 - Screenshot feature with preview and download
 - **Done when**: Can capture and download frames
 
-### [Phase 18: Player Navigation](phase18-player-navigation.md)
+### [Phase 24: Player Navigation](phase24-player-navigation.md)
 - Next/Previous video controls in controller
 - **Done when**: Navigation buttons work with playlist
 
-### [Phase 19: Player Download](phase19-player-download.md)
+### [Phase 25: Player Download](phase25-player-download.md)
 - Download videos from playlist
 - **Done when**: Download button works in playlist
 
-### [Phase 20: Player Speed](phase20-player-speed.md)
+### [Phase 26: Player Speed](phase26-player-speed.md)
 - Playback speed control (0.25x-2x)
 - **Done when**: Speed selector works
 
-### [Phase 21: Player A-B Loop](phase21-player-loop.md)
+### [Phase 27: Player A-B Loop](phase27-player-loop.md)
 - Loop section with A-B markers
 - **Done when**: A-B loop and full loop work
 
-### [Phase 22: Player Upload](phase22-player-upload.md)
+### [Phase 28: Player Upload](phase28-player-upload.md)
 - File upload and drag-and-drop
 - **Done when**: Can upload files via both methods
 
-### [Phase 23: Player Management](phase23-player-management.md)
+### [Phase 29: Player Management](phase29-player-management.md)
 - Playlist operations (play, reorder, remove, navigate)
 - **Done when**: Full playlist management works
 
-### [Phase 24: Player Persistence](phase24-player-persistence.md)
+### [Phase 30: Player Persistence](phase30-player-persistence.md)
 - localStorage/IndexedDB save/load
 - **Done when**: Playlist persists across sessions
 
-### [Phase 25: Player Polish](phase25-player-polish.md)
+### [Phase 31: Player Polish](phase31-player-polish.md)
 - Responsive, accessible, performant
 - **Done when**: Works on all devices, handles 100+ videos
 
 ## Implementation Order
 ```
-Phase 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25
-(Layout) (Playlist) (Capture) (Nav) (Download) (Speed) (Loop) (Upload) (Manage) (Save) (Polish)
+Phase 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31
+(Layout) (Collapse) (ControlMode) (OptionalControls) (DefaultFrame) (URLUpload) (AutoLoad) (Playlist) (Capture) (Nav) (Download) (Speed) (Loop) (Upload) (Manage) (Save) (Polish)
 ```
 
 ## MediaBunny Integration
@@ -64,4 +86,4 @@ The player page uses MediaBunny for file handling and metadata. **Consult mediab
 - **Playback speed**: MediaBunny playback rate control
 
 **Dependencies**: Phases 01-04 (Theme), 09-14 (Core)  
-**Global Phases**: 15-25 | **Time**: ~6 hours
+**Global Phases**: 15-31 | **Time**: ~8-9 hours

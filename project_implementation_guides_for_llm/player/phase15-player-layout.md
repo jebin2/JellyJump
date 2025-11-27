@@ -1,7 +1,7 @@
 # Phase 15: Player Layout
 
 ## Goal
-Create 70/30 split layout integrating core player on left and playlist panel on right.
+Create 80/20 split layout integrating core player on left and playlist panel on right.
 
 ## Features to Implement
 
@@ -9,8 +9,8 @@ Create 70/30 split layout integrating core player on left and playlist panel on 
 **Purpose**: Create two-column layout for video and playlist
 
 **Requirements**:
-- 70% width for video section (left)
-- 30% width for playlist section (right)
+- 80% width for video section (left)
+- 20% width for playlist section (right)
 - Use CSS Grid or Flexbox for layout
 - Full viewport height
 - Apply theme background colors
@@ -30,7 +30,7 @@ Create 70/30 split layout integrating core player on left and playlist panel on 
 **Purpose**: Scrollable panel for video list
 
 **Requirements**:
-- Fixed 30% width on desktop
+- Fixed 20% width on desktop
 - Header showing "PLAYLIST" or similar
 - Scrollable content area for video items
 - Apply theme styling (background, borders)
@@ -47,7 +47,7 @@ Create 70/30 split layout integrating core player on left and playlist panel on 
 - Maintain usability on all screen sizes
 
 ## Testing Checklist
-- [ ] Layout splits correctly (70/30)
+- [ ] Layout splits correctly (80/20)
 - [ ] Core player embedded and visible
 - [ ] Playlist section visible and scrollable
 - [ ] Responsive layout works on mobile

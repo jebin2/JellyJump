@@ -39,9 +39,9 @@ Focus on viewing experience:
 - IndexedDB persistence
 
 ### Layout Structure
-**70/30 Split Design:**
-- **Left (70%)**: Video player + controls (core player component)
-- **Right (30%)**: Scrollable playlist with management tools
+**80/20 Split Design:**
+- **Left (80%)**: Video player + controls (core player component)
+- **Right (20%)**: Scrollable playlist with management tools (collapsible)
 
 ## Core Features
 
@@ -81,8 +81,8 @@ Focus on viewing experience:
 - MediaBunny for metadata extraction
 
 ## Responsive Behavior
-- **Desktop (1024px+)**: 70/30 split, both visible
-- **Tablet (768-1023px)**: 65/35 split or collapsible playlist
+- **Desktop (1024px+)**: 80/20 split, both visible, sidebar collapsible
+- **Tablet (768-1023px)**: 80/20 split, sidebar can collapse to 40px
 - **Mobile (<768px)**: Full video, playlist as drawer/modal
 
 ## Success Criteria
