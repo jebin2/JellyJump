@@ -280,6 +280,78 @@ class TimelineManager {
         if (this.ruler) {
             this.ruler.addEventListener('wheel', (e) => this.handleWheelZoom(e), { passive: false });
         }
+
+        // Clip Selection (Delegation)
+        if (this.trackContainer) {
+            this.trackContainer.addEventListener('click', (e) => this.handleClipSelection(e));
+        }
+    }
+
+    handleClipSelection(e) {
+        // If dragging, ignore click
+        if (this.isDragging) return;
+
+        const clipEl = e.target.closest('.timeline-clip');
+
+        if (clipEl) {
+            // Clicked on a clip
+            const clipId = clipEl.dataset.clipId;
+            const isMultiSelect = e.ctrlKey || e.metaKey;
+            this.selectClip(clipId, isMultiSelect);
+        } else {
+            // Clicked on empty space
+            this.deselectAll();
+        }
+    }
+
+    selectClip(clipId, isMultiSelect = false) {
+        // Initialize Set if needed (or ensure it's a Set)
+        if (!this.selectedClipIds) {
+            this.selectedClipIds = new Set();
+        }
+
+        if (isMultiSelect) {
+            // Toggle
+            if (this.selectedClipIds.has(clipId)) {
+                this.selectedClipIds.delete(clipId);
+                const clipEl = document.querySelector(`.timeline-clip[data-clip-id="${clipId}"]`);
+                if (clipEl) clipEl.classList.remove('selected');
+            } else {
+                this.selectedClipIds.add(clipId);
+                const clipEl = document.querySelector(`.timeline-clip[data-clip-id="${clipId}"]`);
+                if (clipEl) clipEl.classList.add('selected');
+            }
+        } else {
+            // Single select
+            this.deselectAll();
+            this.selectedClipIds.add(clipId);
+            const clipEl = document.querySelector(`.timeline-clip[data-clip-id="${clipId}"]`);
+            if (clipEl) clipEl.classList.add('selected');
+        }
+
+        // Dispatch event
+        const selectedIds = Array.from(this.selectedClipIds);
+        const event = new CustomEvent('timeline-selection-changed', {
+            detail: { selectedClipIds: selectedIds }
+        });
+        window.dispatchEvent(event);
+    }
+
+    deselectAll() {
+        if (this.selectedClipIds) {
+            this.selectedClipIds.forEach(id => {
+                const el = document.querySelector(`.timeline-clip[data-clip-id="${id}"]`);
+                if (el) el.classList.remove('selected');
+            });
+            this.selectedClipIds.clear();
+        } else {
+            this.selectedClipIds = new Set();
+        }
+
+        const event = new CustomEvent('timeline-selection-changed', {
+            detail: { selectedClipIds: [] }
+        });
+        window.dispatchEvent(event);
     }
 
     attachDropHandlers() {

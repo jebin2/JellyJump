@@ -64,7 +64,15 @@ class ClipRenderer {
             }
         }
 
-        trackContent.appendChild(el);
+        // Re-query track content safely to avoid any stale references or nesting issues
+        const targetTrackContent = document.querySelector(`.timeline-track[data-track-id="${clip.trackId}"] .timeline-track__content`);
+
+        if (targetTrackContent) {
+            targetTrackContent.appendChild(el);
+            console.log(`Rendered clip ${clip.id} to track ${clip.trackId}`);
+        } else {
+            console.error(`Track content not found for track ${clip.trackId} when rendering clip ${clip.id}`);
+        }
     }
 
     /**

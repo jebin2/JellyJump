@@ -1,291 +1,102 @@
 /**
- * Properties Panel Manager
- * Handles the right sidebar properties panel interactions.
- * Phase 56: Tabbed Interface
+ * PropertiesPanel
+ * Manages the properties panel on the right side of the editor.
+ * Updates content based on selected timeline clip.
  */
-
-export class PropertiesPanel {
+class PropertiesPanel {
     constructor() {
-        this.container = document.getElementById('properties-panel');
-        this.emptyState = document.getElementById('properties-empty-state');
-        this.contentContainer = document.getElementById('properties-content');
+        this.panel = document.getElementById('properties-panel');
+        this.content = document.querySelector('.properties-panel__content');
+        this.emptyState = document.querySelector('.properties-panel__empty-state');
 
-        // Tabs
-        this.tabBar = document.getElementById('properties-tab-bar');
-        this.btnInfo = document.getElementById('tab-btn-info');
-        this.btnSettings = document.getElementById('tab-btn-settings');
+        // Sections
+        this.clipInfoSection = document.getElementById('prop-clip-info');
 
-        // Content Areas
-        this.contentInfo = document.getElementById('tab-content-info');
-        this.contentSettings = document.getElementById('tab-content-settings');
+        // Fields
+        this.nameField = document.getElementById('prop-clip-name');
+        this.startTimeField = document.getElementById('prop-clip-start');
+        this.durationField = document.getElementById('prop-clip-duration');
+        this.typeField = document.getElementById('prop-clip-type');
 
         this.init();
     }
 
-    /**
-     * Initialize event listeners
-     */
     init() {
-        if (this.btnInfo) {
-            this.btnInfo.addEventListener('click', () => this.switchTab('info'));
-        }
+        // Listen for selection events
+        window.addEventListener('timeline-selection-changed', (e) => this.onSelectionChanged(e.detail));
 
-        if (this.btnSettings) {
-            this.btnSettings.addEventListener('click', () => this.switchTab('settings'));
-        }
-
-        // For testing/dev: Show content if needed (normally hidden by default until selection)
-        // this.showContent(); 
+        console.log('PropertiesPanel initialized');
     }
 
-    /**
-     * Switch between Info and Settings tabs
-     * @param {string} tabId - 'info' or 'settings'
-     */
-    switchTab(tabId) {
-        if (tabId === 'info') {
-            // Activate Info Tab
-            this.btnInfo.classList.add('active');
-            this.btnSettings.classList.remove('active');
-
-            // Show Info Content
-            this.contentInfo.classList.add('active');
-            this.contentSettings.classList.remove('active');
-        } else if (tabId === 'settings') {
-            // Activate Settings Tab
-            this.btnSettings.classList.add('active');
-            this.btnInfo.classList.remove('active');
-
-            // Show Settings Content
-            this.contentSettings.classList.add('active');
-            this.contentInfo.classList.remove('active');
-        }
-    }
-
-    /**
-     * Update the properties panel based on selection
-     * @param {string} selectionType - 'none', 'library', 'timeline'
-     * @param {object} data - Data object for the selected item
-     */
-    update(selectionType, data = {}) {
-        console.log(`PropertiesPanel update: ${selectionType}`, data);
-
-        if (selectionType === 'none') {
+    onSelectionChanged({ selectedClipIds }) {
+        if (!selectedClipIds || selectedClipIds.length === 0) {
             this.showEmptyState();
-            return;
-        }
-
-        // Show content for 'library' or 'timeline'
-        this.showContent();
-
-        // Update Metadata
-        this._updateMetadata(data);
-
-        // Handle Tabs based on type
-        if (selectionType === 'library') {
-            // Library items only show Info
-            this.switchTab('info');
-            this._toggleSettings(false);
-        } else if (selectionType === 'timeline') {
-            // Timeline clips show Info and Settings
-            // We keep the current tab if it's valid, or default to Info
-            if (!this.btnSettings.classList.contains('active') && !this.btnInfo.classList.contains('active')) {
-                this.switchTab('info');
+        } else if (selectedClipIds.length === 1) {
+            // Single clip
+            const clipId = selectedClipIds[0];
+            let clipData = null;
+            if (window.clipManager) {
+                clipData = window.clipManager.getClip(clipId);
             }
-            this._toggleSettings(true);
-        }
-    }
-
-    /**
-     * Update metadata fields in Info tab
-     * @param {object} data 
-     */
-    _updateMetadata(data) {
-        const setField = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.textContent = value || '-';
-                if (id === 'info-path') el.title = value || '';
-            }
-        };
-
-        setField('info-name', data.name);
-        setField('info-type', data.type);
-        setField('info-duration', data.duration);
-        setField('info-resolution', data.resolution);
-        setField('info-path', data.path);
-    }
-
-    /**
-     * Enable or disable the Settings tab
-     * @param {boolean} enabled 
-     */
-    _toggleSettings(enabled) {
-        if (enabled) {
-            this.btnSettings.style.display = 'flex';
+            this.showClipDetails(clipData);
         } else {
-            this.btnSettings.style.display = 'none';
-            // If settings was active but now disabled, switch to info
-            if (this.btnSettings.classList.contains('active')) {
-                this.switchTab('info');
-            }
+            // Multiple clips
+            this.showMultiSelectState(selectedClipIds.length);
         }
     }
 
-    /**
-     * Update the properties panel based on selection
-     * @param {string} selectionType - 'none', 'library', 'timeline'
-     * @param {object} data - Data object for the selected item
-     */
-    update(selectionType, data = {}) {
-        console.log(`PropertiesPanel update: ${selectionType}`, data);
+    showClipDetails(clipData) {
+        if (!clipData) return;
 
-        if (selectionType === 'none') {
-            this.showEmptyState();
-            return;
-        }
-
-        // Show content for 'library' or 'timeline'
-        this.showContent();
-
-        // Update Metadata
-        this._updateMetadata(data);
-
-        // Handle Tabs based on type
-        if (selectionType === 'library') {
-            // Library items only show Info
-            this.switchTab('info');
-            this._toggleSettings(false);
-        } else if (selectionType === 'timeline') {
-            // Timeline clips show Info and Settings
-            // We keep the current tab if it's valid, or default to Info
-            if (!this.btnSettings.classList.contains('active') && !this.btnInfo.classList.contains('active')) {
-                this.switchTab('info');
-            }
-            this._toggleSettings(true);
-        }
-    }
-
-    /**
-     * Update metadata fields in Info tab
-     * @param {object} data 
-     */
-    _updateMetadata(data) {
-        const setField = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.textContent = value || '-';
-                if (id === 'info-path') el.title = value || '';
-            }
-        };
-
-        setField('info-name', data.name);
-        setField('info-type', data.type);
-        setField('info-duration', data.duration);
-        setField('info-resolution', data.resolution);
-        setField('info-path', data.path);
-    }
-
-    /**
-     * Enable or disable the Settings tab
-     * @param {boolean} enabled 
-     */
-    _toggleSettings(enabled) {
-        if (enabled) {
-            this.btnSettings.style.display = 'flex';
-        } else {
-            this.btnSettings.style.display = 'none';
-            // If settings was active but now disabled, switch to info
-            if (this.btnSettings.classList.contains('active')) {
-                this.switchTab('info');
-            }
-        }
-    }
-
-    /**
-     * Update the properties panel based on selection
-     * @param {string} selectionType - 'none', 'library', 'timeline'
-     * @param {object} data - Data object for the selected item
-     */
-    update(selectionType, data = {}) {
-        console.log(`PropertiesPanel update: ${selectionType}`, data);
-
-        if (selectionType === 'none') {
-            this.showEmptyState();
-            return;
-        }
-
-        // Show content for 'library' or 'timeline'
-        this.showContent();
-
-        // Update Metadata
-        this._updateMetadata(data);
-
-        // Handle Tabs based on type
-        if (selectionType === 'library') {
-            // Library items only show Info
-            this.switchTab('info');
-            this._toggleSettings(false);
-        } else if (selectionType === 'timeline') {
-            // Timeline clips show Info and Settings
-            // We keep the current tab if it's valid, or default to Info
-            if (!this.btnSettings.classList.contains('active') && !this.btnInfo.classList.contains('active')) {
-                this.switchTab('info');
-            }
-            this._toggleSettings(true);
-        }
-    }
-
-    /**
-     * Update metadata fields in Info tab
-     * @param {object} data 
-     */
-    _updateMetadata(data) {
-        const setField = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.textContent = value || '-';
-                if (id === 'info-path') el.title = value || '';
-            }
-        };
-
-        setField('info-name', data.name);
-        setField('info-type', data.type);
-        setField('info-duration', data.duration);
-        setField('info-resolution', data.resolution);
-        setField('info-path', data.path);
-    }
-
-    /**
-     * Enable or disable the Settings tab
-     * @param {boolean} enabled 
-     */
-    _toggleSettings(enabled) {
-        if (enabled) {
-            this.btnSettings.style.display = 'flex';
-        } else {
-            this.btnSettings.style.display = 'none';
-            // If settings was active but now disabled, switch to info
-            if (this.btnSettings.classList.contains('active')) {
-                this.switchTab('info');
-            }
-        }
-    }
-
-    /**
-     * Show the properties content (hides empty state)
-     */
-    showContent() {
+        // Show content, hide empty state
+        if (this.content) this.content.style.display = 'block';
         if (this.emptyState) this.emptyState.style.display = 'none';
-        if (this.contentContainer) this.contentContainer.style.display = 'flex';
+
+        // Update fields
+        if (this.nameField) {
+            this.nameField.value = clipData.name || 'Untitled';
+            this.nameField.disabled = false;
+        }
+        if (this.startTimeField) {
+            this.startTimeField.value = this.formatTime(clipData.startTime);
+            this.startTimeField.disabled = false;
+        }
+        if (this.durationField) {
+            this.durationField.value = this.formatTime(clipData.duration);
+            this.durationField.disabled = false;
+        }
+        if (this.typeField) this.typeField.textContent = clipData.type.toUpperCase();
     }
 
-    /**
-     * Show the empty state (hides properties content)
-     */
+    showMultiSelectState(count) {
+        // Show content, hide empty state
+        if (this.content) this.content.style.display = 'block';
+        if (this.emptyState) this.emptyState.style.display = 'none';
+
+        // Update fields to show mixed state
+        if (this.nameField) {
+            this.nameField.value = `${count} items selected`;
+            this.nameField.disabled = true;
+        }
+        if (this.startTimeField) {
+            this.startTimeField.value = '-';
+            this.startTimeField.disabled = true;
+        }
+        if (this.durationField) {
+            this.durationField.value = '-';
+            this.durationField.disabled = true;
+        }
+        if (this.typeField) this.typeField.textContent = 'MIXED';
+    }
+
     showEmptyState() {
+        // Hide content, show empty state
+        if (this.content) this.content.style.display = 'none';
         if (this.emptyState) this.emptyState.style.display = 'flex';
-        if (this.contentContainer) this.contentContainer.style.display = 'none';
+    }
+
+    formatTime(seconds) {
+        return seconds.toFixed(2) + 's';
     }
 }
 
@@ -293,3 +104,4 @@ export class PropertiesPanel {
 document.addEventListener('DOMContentLoaded', () => {
     window.propertiesPanel = new PropertiesPanel();
 });
+export default window.propertiesPanel;

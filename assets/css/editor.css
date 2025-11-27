@@ -1914,9 +1914,16 @@ mark {
 }
 
 .timeline-clip--has-thumbnail .timeline-clip__label {
-    background-color: rgba(0, 0, 0, 0.5);
-    border-bottom-right-radius: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 2px 4px;
+    border-radius: 2px;
     display: inline-block;
+}
+
+.timeline-clip.selected {
+    border: 2px solid var(--color-accent);
+    z-index: 10;
+    box-shadow: 0 0 8px rgba(var(--color-accent-rgb), 0.5);
 }
 
 /* -----------------------------------------
