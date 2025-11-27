@@ -182,10 +182,35 @@ class PreviewPlayerManager {
     getCurrentVideoId() {
         return this.currentVideoId;
     }
+
+    // --- Playback Control Wrappers ---
+
+    play() {
+        if (this.player) return this.player.play();
+    }
+
+    pause() {
+        if (this.player) return this.player.pause();
+    }
+
+    seek(time) {
+        if (this.player) {
+            this.player.videoElement.currentTime = time;
+        }
+    }
+
+    getCurrentTime() {
+        return this.player ? this.player.videoElement.currentTime : 0;
+    }
+
+    getDuration() {
+        return this.player ? this.player.videoElement.duration : 0;
+    }
 }
 
 // Create singleton instance
 export const previewPlayerManager = new PreviewPlayerManager();
+window.previewPlayer = previewPlayerManager;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {

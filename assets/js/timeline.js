@@ -31,6 +31,8 @@ class TimelineManager {
         this.attachEventListeners();
         this.createTrackContainer();
         this.updateRuler();
+        this.createPlayhead();
+        this.attachScrubHandlers();
         this.syncHorizontalScroll();
         console.log('TimelineManager initialized');
     }
@@ -231,7 +233,7 @@ class TimelineManager {
         });
     }
 
-    formatTimeLabel(seconds) {
+    formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -468,6 +470,7 @@ class TimelineManager {
         if (this.currentTimeDisplay) {
             this.currentTimeDisplay.textContent = this.formatTime(time);
         }
+        this.updatePlayheadPosition(time);
     }
 
     updateDuration(duration) {
@@ -489,6 +492,12 @@ class TimelineManager {
             console.log(`Zoom level: ${this.zoomLevel}%`);
 
             this.updateRuler();
+            this.updatePlayheadPosition(this.currentTime || 0);
+
+            // Refresh clips
+            if (window.clipRenderer) {
+                window.clipRenderer.refresh();
+            }
 
             // Dispatch zoom event for future use
             const event = new CustomEvent('timeline-zoom-change', {
@@ -498,6 +507,196 @@ class TimelineManager {
         }
     }
 
+    createPlayhead() {
+        // Create Head in Ruler
+        if (this.ruler) {
+            let rulerContent = this.ruler.querySelector('.timeline__ruler-content');
+            if (rulerContent) {
+                this.playheadHead = document.createElement('div');
+                this.playheadHead.className = 'timeline-playhead__head';
+                rulerContent.appendChild(this.playheadHead);
+            }
+        }
+
+        // Create Line in Track Container
+        if (this.trackContainer) {
+            this.playheadLine = document.createElement('div');
+            this.playheadLine.className = 'timeline-playhead__line';
+            this.trackContainer.appendChild(this.playheadLine);
+        }
+    }
+
+    updatePlayheadPosition(time) {
+        this.currentTime = time;
+        const zoomRatio = this.zoomLevel / 100;
+        const pxPerSec = this.pixelsPerSecond * zoomRatio;
+        const position = time * pxPerSec;
+
+        if (this.playheadHead) {
+            this.playheadHead.style.transform = `translateX(${position}px) translateX(-50%)`;
+        }
+
+        if (this.playheadLine) {
+            this.playheadLine.style.transform = `translateX(${position}px)`;
+            // Ensure line height covers all tracks
+            this.playheadLine.style.height = `${this.trackContainer.scrollHeight}px`;
+        }
+    }
+
+    attachScrubHandlers() {
+        // Click to Seek (Ruler)
+        if (this.ruler) {
+            this.ruler.addEventListener('mousedown', (e) => this.onRulerClick(e));
+        }
+
+        // Drag to Scrub (Playhead)
+        if (this.playheadHead) {
+            this.playheadHead.addEventListener('mousedown', (e) => this.onPlayheadDragStart(e));
+        }
+
+        // Keyboard Navigation
+        document.addEventListener('keydown', (e) => this.handleKeyboardNav(e));
+    }
+
+    onRulerClick(e) {
+        // Ignore if clicking the playhead handle (let drag handler handle it)
+        if (e.target.closest('.timeline-playhead__head')) return;
+
+        const rulerContent = this.ruler.querySelector('.timeline__ruler-content');
+        if (!rulerContent) return;
+
+        const rect = rulerContent.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left; // Scroll is handled by rect if content is scrolled? 
+        // Actually, rulerContent is the scrollable inner part. 
+        // If we click on ruler container, we need to account for scroll.
+        // If we click on rulerContent, offsetX is relative to it? No, clientX is viewport.
+        // Let's use the event target or container logic.
+
+        // Better: Calculate time from click position relative to the content start
+        // The ruler container scrolls. The content is inside.
+        // If we click on the ruler container (visible area):
+        // time = (clientX - rulerRect.left + scrollLeft) / pxPerSec
+
+        const rulerRect = this.ruler.getBoundingClientRect();
+        const clickX = e.clientX - rulerRect.left + this.ruler.scrollLeft;
+
+        const zoomRatio = this.zoomLevel / 100;
+        const pxPerSec = this.pixelsPerSecond * zoomRatio;
+
+        let time = clickX / pxPerSec;
+        time = Math.max(0, Math.min(time, this.duration));
+
+        if (window.playbackManager) {
+            window.playbackManager.seek(time);
+        }
+    }
+
+    onPlayheadDragStart(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        this.isDragging = true;
+
+        // Pause if playing
+        if (window.playbackManager && window.playbackManager.isPlaying) {
+            this.wasPlaying = true;
+            window.playbackManager.pause();
+        } else {
+            this.wasPlaying = false;
+        }
+
+        // Add global listeners
+        this.dragMoveHandler = (e) => this.onPlayheadDragMove(e);
+        this.dragEndHandler = (e) => this.onPlayheadDragEnd(e);
+
+        document.addEventListener('mousemove', this.dragMoveHandler);
+        document.addEventListener('mouseup', this.dragEndHandler);
+
+        // Add active class
+        this.playheadHead.classList.add('active');
+    }
+
+    onPlayheadDragMove(e) {
+        if (!this.isDragging) return;
+
+        const rulerRect = this.ruler.getBoundingClientRect();
+        const clickX = e.clientX - rulerRect.left + this.ruler.scrollLeft;
+
+        const zoomRatio = this.zoomLevel / 100;
+        const pxPerSec = this.pixelsPerSecond * zoomRatio;
+
+        let time = clickX / pxPerSec;
+        time = Math.max(0, Math.min(time, this.duration));
+
+        // Update visually immediately
+        this.updatePlayheadPosition(time);
+
+        // Seek player (could be throttled, but for now direct)
+        if (window.playbackManager) {
+            window.playbackManager.seek(time);
+        }
+
+        // Auto-scroll if near edges
+        // (Optional enhancement for later)
+    }
+
+    onPlayheadDragEnd(e) {
+        if (!this.isDragging) return;
+
+        this.isDragging = false;
+        this.playheadHead.classList.remove('active');
+
+        document.removeEventListener('mousemove', this.dragMoveHandler);
+        document.removeEventListener('mouseup', this.dragEndHandler);
+
+        // Resume if was playing? Usually scrubbing leaves it paused, 
+        // but user preference might vary. Let's leave it paused for precision.
+        // if (this.wasPlaying && window.playbackManager) {
+        //     window.playbackManager.play();
+        // }
+    }
+
+    handleKeyboardNav(e) {
+        // Only if not editing text
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        if (!window.playbackManager) return;
+
+        const FRAME_TIME = 1 / 30; // Approx 30fps
+        const JUMP_TIME = 1; // 1 second
+
+        let newTime = this.currentTime || 0;
+
+        switch (e.key) {
+            case 'ArrowLeft':
+                if (e.shiftKey) newTime -= JUMP_TIME;
+                else newTime -= FRAME_TIME;
+                e.preventDefault();
+                break;
+            case 'ArrowRight':
+                if (e.shiftKey) newTime += JUMP_TIME;
+                else newTime += FRAME_TIME;
+                e.preventDefault();
+                break;
+            case 'Home':
+                newTime = 0;
+                e.preventDefault();
+                break;
+            case 'End':
+                newTime = this.duration;
+                e.preventDefault();
+                break;
+            case ' ': // Spacebar to toggle play
+                e.preventDefault();
+                window.playbackManager.togglePlay();
+                return; // togglePlay handles its own seek/sync
+            default:
+                return;
+        }
+
+        newTime = Math.max(0, Math.min(newTime, this.duration));
+        window.playbackManager.seek(newTime);
+    }
     formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);

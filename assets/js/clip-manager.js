@@ -46,6 +46,11 @@ class ClipManager {
         this.updateProjectDuration();
         console.log('Clip added:', clip);
 
+        // Render visual clip
+        if (window.clipRenderer) {
+            window.clipRenderer.renderClip(clip);
+        }
+
         // Dispatch event for UI updates
         const event = new CustomEvent('clip-added', { detail: { clip } });
         window.dispatchEvent(event);

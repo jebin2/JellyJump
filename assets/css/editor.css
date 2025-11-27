@@ -1825,3 +1825,148 @@ mark {
     background-color: var(--accent-primary);
     border-radius: 50%;
 }
+
+/* -----------------------------------------
+   11. Timeline Clips (Phase 67)
+   ----------------------------------------- */
+.timeline-clip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    background-color: var(--bg-tertiary);
+    border: 3px solid var(--border-primary);
+    border-radius: 4px;
+    box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    overflow: hidden;
+    z-index: 5;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    /* Prevent text selection */
+    user-select: none;
+}
+
+.timeline-clip:hover {
+    border-color: var(--text-secondary);
+    z-index: 6;
+}
+
+.timeline-clip--video {
+    background: linear-gradient(135deg, #4a148c 0%, #7b1fa2 100%);
+    border-color: #9c27b0;
+}
+
+.timeline-clip--video:hover {
+    border-color: #e1bee7;
+}
+
+.timeline-clip--audio {
+    background: linear-gradient(135deg, #004d40 0%, #00796b 100%);
+    border-color: #009688;
+}
+
+.timeline-clip--audio:hover {
+    border-color: #b2dfdb;
+}
+
+.timeline-clip--image {
+    background: linear-gradient(135deg, #e65100 0%, #f57c00 100%);
+    border-color: #ff9800;
+}
+
+.timeline-clip--image:hover {
+    border-color: #ffe0b2;
+}
+
+.timeline-clip__label {
+    display: block;
+    padding: 4px 8px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+}
+
+/* Hide label on very short clips */
+.timeline-clip--short .timeline-clip__label {
+    display: none;
+}
+
+.timeline-clip[data-selected="true"] {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent-primary);
+    z-index: 10;
+}
+
+/* -----------------------------------------
+   12. Clip Thumbnails (Phase 68)
+   ----------------------------------------- */
+.timeline-clip--has-thumbnail {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* Blend mode to tint the thumbnail with the clip color */
+    background-blend-mode: multiply;
+}
+
+.timeline-clip--has-thumbnail .timeline-clip__label {
+    background-color: rgba(0, 0, 0, 0.5);
+    border-bottom-right-radius: 4px;
+    display: inline-block;
+}
+
+/* -----------------------------------------
+   13. Timeline Playhead (Phase 69)
+   ----------------------------------------- */
+.timeline-playhead__head {
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 12px solid var(--accent-danger);
+    z-index: 100;
+    cursor: ew-resize;
+    transform: translateX(-50%);
+    pointer-events: auto;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+    transition: transform 0.05s linear;
+    /* Smooth movement */
+}
+
+.timeline-playhead__head.active {
+    filter: drop-shadow(0 0 4px var(--accent-danger));
+    transform: translateX(-50%) scale(1.2);
+}
+
+.timeline__ruler {
+    /* ... existing styles ... */
+    cursor: pointer;
+}
+
+.timeline-playhead__head::after {
+    content: '';
+    position: absolute;
+    top: -12px;
+    left: -8px;
+    width: 16px;
+    height: 4px;
+    background-color: var(--accent-danger);
+}
+
+.timeline-playhead__line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: var(--accent-danger);
+    z-index: 50;
+    pointer-events: none;
+    /* Ensure it doesn't block clicks on clips */
+    box-shadow: 1px 0 2px rgba(0, 0, 0, 0.3);
+}
