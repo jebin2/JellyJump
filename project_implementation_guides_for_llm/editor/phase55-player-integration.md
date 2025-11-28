@@ -3,8 +3,19 @@
 ## Goal
 Initialize the **existing MediaBunny Player component**, load video from selected clip, and configure it for the editor context.
 
-## Group
-**Preview Player**
+---
+
+## What to Build
+
+Integrate CorePlayer:
+- Import core player component
+- Initialize in preview area
+- Configure for editor mode
+- Connect to timeline
+- Sync playback with timeline
+- Resource management
+
+---
 
 ## Feature to Implement
 
@@ -67,13 +78,17 @@ Load video from two sources:
 - ❌ Do NOT create a `<video>` tag manually. Let the Player class handle it.
 - ❌ Do NOT duplicate player logic (buffering, error handling) if the Player class already does it.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Player class imported successfully
 - [ ] Player instance created in preview container
 - [ ] Video loads from Media Library
 - [ ] Player fits container (16:9)
 - [ ] No double controls (built-in vs custom)
 - [ ] Console errors handled
+
+---
 
 ## Done When
 ✅ Existing Player component is mounted  

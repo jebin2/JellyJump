@@ -3,8 +3,19 @@
 ## Goal
 Display current time and duration from the existing MediaBunny Player.
 
-## Group
-**Preview Player**
+---
+
+## What to Build
+
+Time display:
+- Current time indicator
+- Total duration display
+- Format: MM:SS or HH:MM:SS
+- Real-time updates
+- Monospace font
+- Timecode accuracy
+
+---
 
 ## Feature to Implement
 
@@ -36,11 +47,15 @@ Display current time and duration from the existing MediaBunny Player.
 #### 5. What NOT to Do
 - ❌ Do NOT use `setInterval` to poll time. Use the player's event.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Time updates during playback
 - [ ] Duration appears after video loads
 - [ ] Formatting is correct (00:00)
 - [ ] Handles NaN duration gracefully
+
+---
 
 ## Done When
 ✅ Time display updates in real-time  

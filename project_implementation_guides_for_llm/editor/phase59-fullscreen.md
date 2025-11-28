@@ -3,8 +3,19 @@
 ## Goal
 Toggle fullscreen mode for the Preview Panel.
 
-## Group
-**Preview Player**
+---
+
+## What to Build
+
+Fullscreen toggle:
+- Fullscreen button
+- Enter/exit fullscreen mode
+- Keyboard shortcut (F)
+- Maintain aspect ratio
+- Show/hide UI elements
+- Browser fullscreen API
+
+---
 
 ## Feature to Implement
 
@@ -32,11 +43,15 @@ Toggle fullscreen mode for the Preview Panel.
 #### 4. What NOT to Do
 - ❌ Do NOT rely on the Player's built-in fullscreen button (we disabled controls in Phase 49).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Button toggles fullscreen
 - [ ] Esc key exits fullscreen
 - [ ] Controls remain visible in fullscreen
 - [ ] Button icon updates
+
+---
 
 ## Done When
 ✅ Fullscreen toggle works  

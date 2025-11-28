@@ -40,11 +40,15 @@ Properties Panel Group (Phases 54-59)
 - Do not implement tabs yet (Phase 56).
 - Do not add content yet (Phase 55, 57).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Right panel is visible and positioned correctly.
 - [ ] Width is approximately 30% of the editor area.
 - [ ] Panel has a left border separating it from the preview.
 - [ ] Panel resizes when the window is resized.
+
+---
 
 ## Done When
 - [ ] `properties-panel` container exists in DOM.

@@ -40,10 +40,14 @@ Properties Panel Group (Phases 54-59)
 ## What NOT to Do
 - Do not implement the logic to hide it yet (Phase 59).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] "No Selection" message is visible in the right panel.
 - [ ] Content is centered vertically and horizontally.
 - [ ] Text is readable but visually distinct as a "placeholder" state.
+
+---
 
 ## Done When
 - [ ] Empty state HTML structure is added.

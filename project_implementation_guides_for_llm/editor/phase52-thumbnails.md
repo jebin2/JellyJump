@@ -3,8 +3,19 @@
 ## Goal
 Use MediaBunny VideoSampleSink for first frame, cache in IndexedDB, lazy loading
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Media thumbnails:
+- Generate video thumbnails
+- Extract frame at mid-point
+- Audio waveform previews
+- Image thumbnail scaling
+- Cache generated thumbnails
+- Placeholder for loading
+
+---
 
 ## Feature to Implement
 
@@ -201,7 +212,9 @@ Consult `mediabunny-llms-full.md` for detailed VideoSampleSink usage.
 - **MediaBunny Docs**: See mediabunny-llms-full.md for VideoSampleSink
 - **IndexedDB**: Use existing database from Phase 30
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Video tiles show placeholder initially
 - [ ] Thumbnails generate when video tiles first visible
 - [ ] Thumbnail displays in tile after generation
@@ -218,6 +231,8 @@ Consult `mediabunny-llms-full.md` for detailed VideoSampleSink usage.
 - [ ] No memory leaks (MediaBunny resources disposed)
 - [ ] Console logs errors for failed generations
 - [ ] No console errors for successful generations
+
+---
 
 ## Done When
 ✅ Video thumbnails generate using MediaBunny or HTML5  

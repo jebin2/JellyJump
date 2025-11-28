@@ -3,8 +3,19 @@
 ## Goal
 Display video metadata from the existing MediaBunny Player.
 
-## Group
-**Preview Player**
+---
+
+## What to Build
+
+Resolution and FPS display:
+- Show video resolution (e.g., 1920x1080)
+- Display frame rate (e.g., 30fps)
+- Auto-detect from video
+- Update on clip change
+- Compact visual display
+- Clickable for details
+
+---
 
 ## Feature to Implement
 
@@ -31,11 +42,15 @@ Display video metadata from the existing MediaBunny Player.
 #### 4. What NOT to Do
 - ❌ Do NOT try to calculate FPS manually by counting frames. Use stored metadata.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Resolution shows correctly
 - [ ] FPS shows correctly (if available)
 - [ ] Updates when new video loads
 - [ ] Clears when video unloads
+
+---
 
 ## Done When
 ✅ Metadata display works  

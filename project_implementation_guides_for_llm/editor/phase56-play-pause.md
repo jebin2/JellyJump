@@ -3,8 +3,19 @@
 ## Goal
 Connect custom Play and Pause buttons to the existing MediaBunny Player instance.
 
-## Group
-**Preview Player**
+---
+
+## What to Build
+
+Play/pause controls:
+- Play/pause button
+- Toggle playback state
+- Keyboard shortcut (Space)
+- Visual state feedback
+- Sync with timeline playhead
+- Handle loading states
+
+---
 
 ## Feature to Implement
 
@@ -37,12 +48,16 @@ Connect custom Play and Pause buttons to the existing MediaBunny Player instance
 #### 5. What NOT to Do
 - ❌ Do NOT implement a new playback engine. Just call the existing player methods.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Play button starts video
 - [ ] Pause button stops video
 - [ ] Button icon updates when video ends
 - [ ] Spacebar works
 - [ ] State stays in sync if video pauses itself (e.g., end of file)
+
+---
 
 ## Done When
 ✅ Play/Pause works via custom button  

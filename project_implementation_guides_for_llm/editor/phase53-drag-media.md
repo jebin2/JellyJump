@@ -3,8 +3,19 @@
 ## Goal
 Make tiles draggable, drag cursor, visual feedback, drag data (drop in Phase 66)
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Drag media to timeline:
+- Drag from media panel
+- Visual drag feedback
+- Drop zones in timeline
+- Snap to playhead/clips
+- Add to timeline track
+- Position calculation
+
+---
 
 ## Feature to Implement
 
@@ -175,7 +186,9 @@ Extend MediaLibrary class:
 - **Phase 66**: Drop onto timeline functionality
 - **HTML5 Drag-and-Drop API**: Use built-in browser API
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Tiles show `draggable="true"` attribute
 - [ ] Cursor changes to "grab" on tile hover
 - [ ] Can initiate drag by clicking and holding tile
@@ -191,6 +204,8 @@ Extend MediaLibrary class:
 - [ ] Drag works across all media categories
 - [ ] No console errors
 - [ ] Smooth visual transitions
+
+---
 
 ## Done When
 ✅ Tiles are draggable  

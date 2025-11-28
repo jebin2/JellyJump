@@ -3,8 +3,19 @@
 ## Goal
 Create 50% width center panel with video container placeholder
 
-## Group
-**Preview Player**
+---
+
+## What to Build
+
+Preview panel structure:
+- Center panel container
+- Video preview area
+- Control bar at bottom
+- Aspect ratio preservation
+- Responsive sizing
+- Black letterboxing
+
+---
 
 ## Feature to Implement
 
@@ -143,7 +154,9 @@ Phase 26 already created basic panel structure. This phase refines:
 - **Code of Conduct**: Follow BEM naming, no inline styles, use CSS variables
 - **Dark Neobrutalism**: Thick borders, black video area
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Preview panel appears in center of editor
 - [ ] Panel is 50% width (or remaining space)
 - [ ] Panel height fills from below tab bar to above timeline
@@ -158,6 +171,8 @@ Phase 26 already created basic panel structure. This phase refines:
 - [ ] No overflow or scrollbars in panel
 - [ ] Responsive on tablet (maintains layout)
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Preview panel structured with video area + controls area  
