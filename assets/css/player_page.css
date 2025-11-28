@@ -190,6 +190,13 @@
         border-right: none;
         border-bottom: 2px solid var(--accent-primary);
         background: #000;
+        transition: height 0.3s ease;
+    }
+
+    /* Fixed Mode on Mobile: Expand to full height */
+    .video-section.mode-fixed {
+        height: 100vh;
+        border-bottom: none;
     }
 
     .playlist-section {
