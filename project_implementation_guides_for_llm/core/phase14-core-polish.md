@@ -9,6 +9,14 @@ Apply theme, responsive design, accessibility, and MediaBunny resource managemen
 - Memory management best practices
 - Performance optimization techniques, and optimizations.
 
+---
+
+## What to Build
+
+Polish and optimization:\n- Dark Neobrutalism theme integration\n- Responsive design for all screen sizes\n- WCAG AA accessibility compliance\n- Performance optimizations\n- MediaBunny resource management\n- Cross-browser compatibility
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Theme Integration
@@ -68,6 +76,8 @@ Apply theme, responsive design, accessibility, and MediaBunny resource managemen
 - Add polyfills if needed for older browser support
 - Verify MediaBunny compatibility in all target browsers
 
+---
+
 ## Testing Checklist
 - [ ] Theme styling matches design system
 - [ ] Responsive layout works on mobile/tablet
@@ -75,6 +85,8 @@ Apply theme, responsive design, accessibility, and MediaBunny resource managemen
 - [ ] Keyboard navigation is smooth and visible
 - [ ] Performance is smooth (no jank)
 - [ ] Works in major browsers
+
+---
 
 ## Done When
 ✅ Polished, accessible, responsive player  

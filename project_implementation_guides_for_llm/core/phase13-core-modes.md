@@ -8,6 +8,14 @@ Configure component for player vs editor modes with MediaBunny-specific features
 - Player mode: Standard playback controls
 - Timeline markers and region selection using EncodedPacketSink with mode-specific features.
 
+---
+
+## What to Build
+
+Mode configuration system:\n- Player mode configuration\n- Editor mode configuration\n- Mode detection and application\n- Feature toggling based on mode\n- UI adaptation per mode
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Mode Configuration System
@@ -61,12 +69,16 @@ Configure component for player vs editor modes with MediaBunny-specific features
 - Update help overlay to show mode-appropriate shortcuts
 - Apply different styles if needed per mode
 
+---
+
 ## Testing Checklist
 - [ ] Player mode loads correctly by default
 - [ ] Editor mode loads when configured
 - [ ] Editor-specific controls visible only in editor mode
 - [ ] Player-specific controls visible only in player mode
 - [ ] Keyboard shortcuts adapt to mode
+
+---
 
 ## Done When
 ✅ Both modes function correctly  

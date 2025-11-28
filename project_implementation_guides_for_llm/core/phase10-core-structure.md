@@ -3,6 +3,22 @@
 ## Goal
 Build HTML structure and implement basic playback controls (play, pause, seek, volume).
 
+**MediaBunny Note**: Use MediaBunny APIs for playback control, seeking, and time management. Consult `mediabunny-llms-full.md` for implementation details.
+
+---
+
+## What to Build
+
+Core player controls:
+- Video container and control bar layout
+- Play/pause toggle with MediaBunny
+- Progress/seek bar with scrubbing
+- Volume control with mute
+- Time display (current/total)
+- Fullscreen button
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Video Element & Container
@@ -80,6 +96,8 @@ Build HTML structure and implement basic playback controls (play, pause, seek, v
 - Separator between current and total (e.g., "2:30 / 5:45")
 - **Reference**: Reading track metadata in mediabunny-llms-full.md
 
+---
+
 ## Testing Checklist
 - [ ] Video loads and displays correctly
 - [ ] Play/Pause button toggles video and icon
@@ -87,6 +105,8 @@ Build HTML structure and implement basic playback controls (play, pause, seek, v
 - [ ] Volume control adjusts audio and mutes
 - [ ] Time display shows correct duration and updates
 - [ ] Controls layout is responsive
+
+---
 
 ## Done When
 ✅ Basic playback controls work  

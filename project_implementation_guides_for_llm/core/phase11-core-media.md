@@ -3,7 +3,21 @@
 ## Goal
 Add subtitle support, audio track switching, and quality selection with controller UI integration.
 
-**Note**: This phase includes both backend media handling AND controller UI for subtitles and audio tracks.
+**MediaBunny Note**: Use MediaBunny track management APIs for subtitles, audio tracks, and quality selection. Consult `mediabunny-llms-full.md` for track handling details.
+
+---
+
+## What to Build
+
+Media track features:
+- Subtitle loading system (VTT/SRT)
+- Subtitle display toggle button
+- Subtitle track selector dropdown
+- SRT/VTT file upload button
+- Audio track switching with UI
+- Quality selector (if multiple streams available)
+
+---
 
 ## Features to Implement
 
@@ -42,7 +56,7 @@ Add subtitle support, audio track switching, and quality selection with controll
 - Switch tracks without interrupting playback
 - Close menu after selection
 
-### Feature 3b: SRT/VTT File Upload Button
+### Feature 4: SRT/VTT File Upload Button
 **Purpose**: Allow users to upload external subtitle files
 
 **Requirements**:
@@ -55,12 +69,12 @@ Add subtitle support, audio track switching, and quality selection with controll
 - Show feedback when subtitle loaded successfully
 - Apply theme button styling
 
-### Feature 4: Audio Track Switching
+### Feature 5: Audio Track Switching
 **Purpose**: Switch between audio tracks using MediaBunny with controller UI
 
 **Requirements**:
 - **Consult**: mediabunny-llms-full.md for audio track detection and switching
-- **Audio track button/icon in controller** (🔊 or "Audio")
+- Audio track button/icon in controller (🔊 or "Audio")
 - Detect available audio tracks using MediaBunny track API
 - Dropdown menu showing all audio track options
 - Label tracks by language or descriptive name (e.g., "English", "Spanish")
@@ -71,7 +85,7 @@ Add subtitle support, audio track switching, and quality selection with controll
 - Apply theme styling to button and dropdown
 - **Reference**: Reading track metadata and input formats in mediabunny-llms-full.md
 
-### Feature 5: Quality Selector
+### Feature 6: Quality Selector
 **Purpose**: Choose video quality level using MediaBunny
 
 **Requirements**:
@@ -84,20 +98,32 @@ Add subtitle support, audio track switching, and quality selection with controll
 - Only show if multiple quality streams exist
 - **Reference**: Video track handling in mediabunny-llms-full.md
 
+---
+
 ## Testing Checklist
+
 - [ ] Subtitles load and display correctly
 - [ ] CC toggle turns subtitles on/off
-- [ ] Track selector changes subtitle language
+- [ ] Subtitle track selector changes language
+- [ ] SRT/VTT upload works
 - [ ] Audio tracks switch correctly (if available)
 - [ ] Quality selector changes stream quality
 - [ ] UI elements hidden if feature unavailable
+- [ ] No playback interruption during switches
+
+---
 
 ## Done When
-✅ Subtitles work  
-✅ Audio/Quality switching works  
+
+✅ Subtitles work (load, toggle, select)  
+✅ Audio track switching works  
+✅ Quality selection works  
+✅ All UI controls integrated  
 ✅ All tests pass  
 ✅ Ready for next phase
 
 ---
-**Phase**: 11 | **Component**: Core
-**Estimated Time**: 30-50 minutes
+
+**Phase**: 11 | **Component**: Core  
+**Estimated Time**: 40-60 minutes  
+**Complexity**: Medium

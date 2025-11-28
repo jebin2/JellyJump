@@ -5,6 +5,14 @@ Implement comprehensive keyboard control system integrated with MediaBunny playb
 
 **MediaBunny Integration**: All keyboard shortcuts should use MediaBunny's playback API methods for play/pause, seek, volume control, etc. **Consult** mediabunny-llms-full.md for appropriate control methods..
 
+---
+
+## What to Build
+
+Keyboard shortcut system:\n- Universal playback shortcuts (Space, J/K/L, arrows)\n- Audio control shortcuts (Up/Down, M)\n- Display control shortcuts (F, C, Esc)\n- Editor mode shortcuts (comma/period, I/O)\n- Keyboard event handler with context awareness\n- Help overlay (optional)
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Universal Playback Shortcuts
@@ -67,6 +75,8 @@ Implement comprehensive keyboard control system integrated with MediaBunny playb
 - Dismiss with Escape key or click outside
 - Apply theme styling (card/modal style)
 
+---
+
 ## Testing Checklist
 - [ ] Playback shortcuts work (Space, K, J, L, Arrows)
 - [ ] Volume shortcuts work (Up, Down, M)
@@ -74,6 +84,8 @@ Implement comprehensive keyboard control system integrated with MediaBunny playb
 - [ ] Editor shortcuts work only in editor mode
 - [ ] Inputs are not blocked by shortcuts
 - [ ] Help overlay displays correct keys
+
+---
 
 ## Done When
 ✅ All keyboard shortcuts functional  
