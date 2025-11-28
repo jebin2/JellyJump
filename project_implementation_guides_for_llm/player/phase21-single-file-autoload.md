@@ -15,22 +15,6 @@ Automatically load and play single uploaded files or URLs in the player for imme
 - Auto-load only for single item additions
 - Don't auto-load for batch uploads (multiple files, folders)
 
-**Detection Logic**:
-```javascript
-function shouldAutoLoad(uploadedItems) {
-  return uploadedItems.length === 1;
-}
-
-// In upload handler
-if (shouldAutoLoad(files)) {
-  await addToPlaylist(files[0]);
-  await loadInPlayer(files[0]);
-} else {
-  await addToPlaylist(files);
-  // Don't auto-load multiple files
-}
-```
-
 ### Feature 2: Auto-Load Single File Upload
 **Purpose**: Load immediately when user uploads one file
 
@@ -42,28 +26,6 @@ if (shouldAutoLoad(files)) {
 - Don't autoplay (browser restriction), just load
 - Show poster frame (Phase 19)
 
-**Implementation**:
-```javascript
-async function handleFileUpload(files) {
-  if (files.length === 1) {
-    const file = files[0];
-    
-    // Add to playlist
-    const playlistItem = await addToPlaylist(file);
-    
-    // Load in player
-    await loadVideoInPlayer(playlistItem);
-    
-    // Extract and show poster frame (Phase 19)
-    await showPosterFrame(playlistItem);
-    
-  } else {
-    // Just add all to playlist
-    await addToPlaylist(files);
-  }
-}
-```
-
 ### Feature 3: Auto-Load Single URL
 **Purpose**: Load immediately when user adds one URL (Phase 20)
 
@@ -73,31 +35,6 @@ async function handleFileUpload(files) {
 - Then load into player
 - Same behavior as single file upload
 - Integrate with Phase 20 (URL Upload)
-
-**Implementation**:
-```javascript
-async function addVideoFromUrl(url) {
-  try {
-    // Fetch video (Phase 20 logic)
-    const blob = await fetchVideoFromUrl(url);
-    
-    // Add to playlist
-    const playlistItem = await addToPlaylist({
-      source: 'url',
-      url: url,
-      blob: blob,
-      ...
-    });
-    
-    // Auto-load since it's a single URL
-    await loadVideoInPlayer(playlistItem);
-    await showPosterFrame(playlistItem);
-    
-  } catch (error) {
-    // Handle error
-  }
-}
-```
 
 ### Feature 4: Skip Auto-Load for Multiple Files
 **Purpose**: Avoid unexpected behavior when uploading batches
@@ -125,29 +62,6 @@ async function addVideoFromUrl(url) {
 - Reset playback controls (time to 0:00)
 - Extract poster frame and display
 - Don't start playback (wait for user click)
-
-**MediaBunny Integration**:
-```javascript
-async function loadVideoInPlayer(playlistItem) {
-  // Create MediaBunny Input
-  const input = new Input(new BlobSource(playlistItem.blob));
-  
-  // Switch player to new video
-  await player.switchVideo(input);
-  
-  // Update UI
-  updateVideoInfo({
-    title: playlistItem.name,
-    duration: playlistItem.duration
-  });
-  
-  // Extract poster frame (Phase 19)
-  const posterFrame = await extractFrameAt(player.duration * 0.5);
-  displayPoster(posterFrame);
-  
-  // Player is ready, waiting for user to click play
-}
-```
 
 ### Feature 6: Visual Feedback
 **Purpose**: Confirm auto-load to user

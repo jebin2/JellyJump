@@ -29,26 +29,6 @@ Display a video frame on page load to overcome browser autoplay restrictions and
 - Display as video poster or canvas overlay
 - Fallback to 25% or 75% if 50% fails
 
-**MediaBunny Integration**:
-```javascript
-// Option 1: Using Player.getCurrentFrame()
-await player.seekTo(duration * 0.5);
-const frameDataUrl = await player.getCurrentFrame();
-
-// Option 2: Using VideoSampleSink
-const sink = new VideoSampleSink({
-  onSample: (sample) => {
-    // Convert sample to canvas
-    const canvas = document.createElement('canvas');
-    canvas.width = sample.codedWidth;
-    canvas.height = sample.codedHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(sample, 0, 0);
-    const dataUrl = canvas.toDataURL('image/png');
-  }
-});
-```
-
 **Reference**: Consult `mediabunny-llms-full.md` for:
 - Frame extraction APIs
 - VideoSampleSink usage
@@ -64,19 +44,6 @@ const sink = new VideoSampleSink({
 - On page load: Check for last paused data
 - If found: Display that frame and pre-seek to that timestamp
 - If not found: Fall back to 50th percentile of first video
-
-**LocalStorage Structure**:
-```javascript
-{
-  lastPlayback: {
-    videoUrl: 'blob:http://...',      // or file name
-    videoName: 'example.mp4',
-    timestamp: 25.5,                  // seconds
-    frameDataUrl: 'data:image/png;base64,...',
-    savedAt: '2024-11-27T10:30:00Z'   // ISO timestamp
-  }
-}
-```
 
 **Storage Triggers**:
 - On pause: Extract current frame, save to localStorage
@@ -94,44 +61,6 @@ const sink = new VideoSampleSink({
 - Maintain aspect ratio
 - Show play button overlay on top of frame
 
-**Implementation Options**:
-
-**Option A: Video Poster**
-```javascript
-video.poster = frameDataUrl;
-// Removed automatically when video plays
-```
-
-**Option B: Canvas Overlay**
-```javascript
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
-const img = new Image();
-img.src = frameDataUrl;
-img.onload = () => {
-  canvas.width = img.width;
-  canvas.height = img.height;
-  ctx.drawImage(img, 0, 0);
-  overlay.appendChild(canvas);
-};
-
-// Remove on play
-video.addEventListener('play', () => {
-  overlay.remove();
-}, { once: true });
-```
-
-**Option C: Background Image**
-```javascript
-videoContainer.style.backgroundImage = `url(${frameDataUrl})`;
-videoContainer.style.backgroundSize = 'contain';
-
-// Remove on play
-video.addEventListener('play', () => {
-  videoContainer.style.backgroundImage = '';
-}, { once: true });
-```
-
 ### Feature 5: Update on Pause/Close
 **Purpose**: Keep localStorage in sync with user's viewing state
 
@@ -141,29 +70,6 @@ video.addEventListener('play', () => {
 - Update localStorage with new timestamp and frame
 - Debounce updates (max once per second)
 - Handle page unload/close
-
-**Implementation**:
-```javascript
-let updateTimeout;
-
-video.addEventListener('pause', async () => {
-  clearTimeout(updateTimeout);
-  updateTimeout = setTimeout(async () => {
-    const timestamp = video.currentTime;
-    const frameDataUrl = await extractCurrentFrame();
-    saveLastPlayback({
-      videoName: currentVideo.name,
-      timestamp,
-      frameDataUrl
-    });
-  }, 500); // Debounce 500ms
-});
-
-window.addEventListener('beforeunload', () => {
-  // Save current state
-  saveLastPlayback({...});
-});
-```
 
 ## Testing Checklist
 - [ ] On first load with no localStorage: Shows 50th percentile frame of first video

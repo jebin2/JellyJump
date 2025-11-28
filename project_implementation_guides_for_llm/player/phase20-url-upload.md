@@ -16,22 +16,6 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 - Keyboard accessible
 - Tooltip: "Add video from URL"
 
-**Button Placement**:
-```
-[📁 Files] [📂 Folder] [🔗 URL] [🗑️ Clear]
-```
-
-**HTML Structure**:
-```html
-<button 
-  class="btn btn--primary" 
-  data-action="upload-url"
-  aria-label="Upload video from URL"
-  title="Add video from URL">
-  🔗 URL
-</button>
-```
-
 ### Feature 2: URL Input Modal
 **Purpose**: Capture URL input from user
 
@@ -46,20 +30,6 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 - Input validation: Check URL format before submission
 - Loading indicator during fetch
 - Error message display area
-
-**Modal Structure**:
-```
-┌─────────────────────────────┐
-│ Add Video from URL       ✕  │
-├─────────────────────────────┤
-│ Enter video URL:            │
-│ ┌─────────────────────────┐ │
-│ │ https://...             │ │
-│ └─────────────────────────┘ │
-│                             │
-│  [Cancel]  [Add Video]      │
-└─────────────────────────────┘
-```
 
 **Modal Behavior**:
 - Opens on button click
@@ -79,24 +49,6 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 - Show error for invalid URLs
 - Disable "Add" button until valid URL entered
 
-**Validation Logic**:
-```javascript
-function isValidUrl(string) {
-  try {
-    const url = new URL(string);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch (_) {
-    return false;
-  }
-}
-
-// Optional: Check file extension
-function isLikelyVideoUrl(url) {
-  const videoExtensions = /\.(mp4|webm|mov|avi|mkv|m4v|ogv)(\?.*)?$/i;
-  return videoExtensions.test(url);
-}
-```
-
 **Error Messages**:
 - "Please enter a valid URL"
 - "URL must start with http:// or https://"
@@ -115,54 +67,6 @@ function isLikelyVideoUrl(url) {
 - Handle loading state (show spinner/progress)
 - Handle errors gracefully
 
-**Implementation**:
-```javascript
-async function addVideoFromUrl(url) {
-  try {
-    // Show loading indicator
-    showLoading('Fetching video...');
-    
-    // Fetch video
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    // Convert to Blob
-    const blob = await response.blob();
-    
-    // Create MediaBunny Input
-    const input = new Input(new BlobSource(blob));
-    
-    // Get metadata
-    const format = await input.getFormat();
-    const duration = format.duration;
-    
-    // Extract filename from URL
-    const filename = url.split('/').pop().split('?')[0] || 'Remote Video';
-    
-    // Add to playlist
-    addToPlaylist({
-      name: filename,
-      url: url,
-      blob: blob,
-      input: input,
-      duration: duration,
-      source: 'url'
-    });
-    
-    // Close modal
-    closeModal();
-    
-  } catch (error) {
-    // Show error
-    showError(`Failed to load video: ${error.message}`);
-  } finally {
-    hideLoading();
-  }
-}
-```
-
 ### Feature 5: CORS Error Handling
 **Purpose**: Handle cross-origin restrictions gracefully
 
@@ -171,19 +75,6 @@ async function addVideoFromUrl(url) {
 - Show user-friendly error message
 - Suggest alternatives (e.g., "Try downloading the file first")
 - Don't crash or show cryptic errors
-
-**CORS Error Detection**:
-```javascript
-try {
-  const response = await fetch(url);
-} catch (error) {
-  if (error.name === 'TypeError' && error.message.includes('CORS')) {
-    showError('Cannot access this URL due to CORS restrictions. Try downloading the file and uploading it locally.');
-  } else {
-    showError(`Network error: ${error.message}`);
-  }
-}
-```
 
 **User Guidance**:
 - "CORS Error: This server doesn't allow direct video access. Download the file and use 'Upload Files' instead."
@@ -200,28 +91,6 @@ try {
 - Allow cancellation (abort fetch)
 
 **Advanced: Progress Tracking**
-```javascript
-const response = await fetch(url);
-const reader = response.body.getReader();
-const contentLength = +response.headers.get('Content-Length');
-
-let receivedLength = 0;
-let chunks = [];
-
-while(true) {
-  const {done, value} = await reader.read();
-  if (done) break;
-  
-  chunks.push(value);
-  receivedLength += value.length;
-  
-  // Update progress
-  const progress = (receivedLength / contentLength) * 100;
-  updateProgress(progress);
-}
-
-const blob = new Blob(chunks);
-```
 
 ## Testing Checklist
 - [ ] "Upload URL" button visible and clickable

@@ -31,57 +31,32 @@ Implement collapsible/expandable playlist sidebar with smooth transitions and pe
 - Fade in sidebar content when expanding
 - No layout jumps or flickers
 - Transition duration: 300ms
-- Use `cubic-bezier` for smooth easing
-
-**CSS Approach**:
-```css
-.playlist-sidebar {
-  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.playlist-sidebar.collapsed {
-  width: 40px;
-}
-
-.playlist-sidebar.expanded {
-  width: 20%;
-}
-```
+- Use cubic-bezier for smooth easing
+- Apply transitions to width and opacity properties
 
 ### Feature 3: Content Visibility Management
 **Purpose**: Hide playlist content gracefully when collapsed
 
 **Requirements**:
 - When collapsed: Hide all content except toggle button
-- Use `overflow: hidden` to prevent content overflow
+- Use overflow: hidden to prevent content overflow
 - Fade out content before width animation completes
 - Show only vertical expand button when collapsed
 - Optional: Show video count badge on collapsed button
-
-**Implementation**:
-- Add `.collapsed` class to sidebar container
-- Use CSS to hide content: `.playlist-sidebar.collapsed .playlist-content { display: none; }`
+- Add collapsed class to sidebar container
+- Use CSS to hide content when sidebar has collapsed class
 - Keep toggle button visible with positioning
 
 ### Feature 4: State Persistence
 **Purpose**: Remember user's sidebar preference across sessions
 
 **Requirements**:
-- Store state in localStorage: `sidebarCollapsed: true/false`
+- Store state in localStorage with key: sidebarCollapsed
+- Value: true (collapsed) or false (expanded)
 - Load state on page load
 - Apply correct class immediately (before transition)
 - Update localStorage on every toggle
-
-**LocalStorage Structure**:
-```javascript
-{
-  sidebarCollapsed: false  // default: expanded
-}
-```
-
-**Implementation**:
-- On load: Check `localStorage.getItem('sidebarCollapsed')`
-- On toggle: `localStorage.setItem('sidebarCollapsed', state)`
+- Default: expanded (false) if no stored value
 
 ### Feature 5: Responsive Behavior
 **Purpose**: Ensure collapse feature works on all screen sizes

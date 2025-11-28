@@ -23,26 +23,6 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 - Video playing + no mouse → Hide controls
 - Touch on mobile → Toggle controls visibility
 
-**CSS Approach**:
-```css
-.video-container {
-  position: relative;
-}
-
-.controls.overlay {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  opacity: 1;
-  transition: opacity 300ms;
-}
-
-.controls.overlay.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-```
-
 ### Feature 2: Fixed Mode (For Editor)
 **Purpose**: Always-visible controls for editing workflows
 
@@ -53,36 +33,6 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 - Solid background (no transparency)
 - Controls positioned in normal document flow
 - Suitable for scrubbing, precise editing
-
-**Layout**:
-```
-┌────────────────────┐
-│                    │
-│   Video Content    │ ← Height: calc(100% - controls height)
-│                    │
-├────────────────────┤
-│    Controls        │ ← Fixed, always visible
-└────────────────────┘
-```
-
-**CSS Approach**:
-```css
-.video-container.fixed-mode {
-  display: flex;
-  flex-direction: column;
-}
-
-.video-wrapper {
-  flex: 1;
-  min-height: 0;
-}
-
-.controls.fixed {
-  position: relative;
-  background: var(--color-bg-secondary);
-  opacity: 1;
-}
-```
 
 ### Feature 3: Mode Toggle Button
 **Purpose**: Allow users to switch between modes
@@ -108,13 +58,6 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 - Default: `'overlay'` for player page
 - Apply correct mode on page load
 - Update localStorage on mode change
-
-**LocalStorage Structure**:
-```javascript
-{
-  controlBarMode: 'overlay'  // or 'fixed'
-}
-```
 
 ### Feature 5: Smooth Transitions
 **Purpose**: Professional transition between modes

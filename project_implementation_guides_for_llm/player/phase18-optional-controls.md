@@ -14,23 +14,6 @@ Make control bar components optional and configurable for different use cases (p
 - Default: All controls visible (backward compatibility)
 - Support runtime configuration updates
 
-**Configuration Structure**:
-```javascript
-const controlsConfig = {
-  showPlayPause: true,      // Play/Pause button
-  showProgress: true,       // Progress bar
-  showTime: true,           // Current time / Duration
-  showVolume: true,         // Volume slider
-  showFullscreen: true,     // Fullscreen button
-  showSpeed: true,          // Playback speed selector (Phase 26)
-  showScreenshot: true,     // Screenshot button (Phase 23)
-  showLoop: true,           // Loop button (Phase 27)
-  showDownload: true,       // Download button (Phase 25)
-  showNavigation: true,     // Next/Previous buttons (Phase 24)
-  showSettings: true        // Settings menu
-};
-```
-
 ### Feature 2: Conditional Rendering
 **Purpose**: Show/hide controls based on configuration
 
@@ -40,25 +23,6 @@ const controlsConfig = {
 - Alternatively, don't render DOM elements if `show*: false`
 - Apply configuration on initialization
 - Update DOM when configuration changes
-
-**Implementation Approach**:
-
-**Option A: CSS Classes**
-```javascript
-// In control rendering
-if (!config.showSpeed) {
-  speedButton.classList.add('control--hidden');
-}
-```
-
-**Option B: Conditional DOM**
-```javascript
-// Only create element if enabled
-if (config.showSpeed) {
-  const speedButton = createSpeedButton();
-  controlsContainer.appendChild(speedButton);
-}
-```
 
 ### Feature 3: Configuration Methods
 **Purpose**: Allow runtime updates to control visibility
@@ -70,22 +34,6 @@ if (config.showSpeed) {
 - Emit event when configuration changes
 - Update UI immediately when configuration changes
 
-**API Design**:
-```javascript
-// Set full configuration
-player.setControlsConfig({
-  showDownload: false,
-  showNavigation: false,
-  showSpeed: true
-});
-
-// Toggle individual control
-player.toggleControl('screenshot', false);
-
-// Get current config
-const config = player.getControlsConfig();
-```
-
 ### Feature 4: Preset Configurations
 **Purpose**: Quick setup for common scenarios
 
@@ -94,56 +42,6 @@ const config = player.getControlsConfig();
 - **Editor Mode**: Hide download, navigation, loop (keep playback essentials)
 - **Minimal Mode**: Only play/pause, progress, time
 - **Custom Mode**: User-defined configuration
-
-**Preset Definitions**:
-```javascript
-const PRESETS = {
-  player: {
-    showPlayPause: true,
-    showProgress: true,
-    showTime: true,
-    showVolume: true,
-    showFullscreen: true,
-    showSpeed: true,
-    showScreenshot: true,
-    showLoop: true,
-    showDownload: true,
-    showNavigation: true,
-    showSettings: true
-  },
-  
-  editor: {
-    showPlayPause: true,
-    showProgress: true,
-    showTime: true,
-    showVolume: true,
-    showFullscreen: true,
-    showSpeed: true,
-    showScreenshot: true,
-    showLoop: false,        // Not needed in editor
-    showDownload: false,    // Not needed in editor
-    showNavigation: false,  // Not needed in editor
-    showSettings: true
-  },
-  
-  minimal: {
-    showPlayPause: true,
-    showProgress: true,
-    showTime: true,
-    showVolume: false,
-    showFullscreen: false,
-    showSpeed: false,
-    showScreenshot: false,
-    showLoop: false,
-    showDownload: false,
-    showNavigation: false,
-    showSettings: false
-  }
-};
-
-// Usage
-player.setControlsPreset('editor');
-```
 
 ### Feature 5: Responsive Control Layout
 **Purpose**: Adjust control visibility based on available space
@@ -226,15 +124,6 @@ player.setControlsPreset('editor');
 - This phase prepares the architecture for optional controls
 - Later phases (23, 24, 25, 26, 27) will add specific controls
 - Each new control should integrate with this configuration system
-
-**Example Integration** (Phase 26 - Speed Control):
-```javascript
-// In Phase 26, check configuration
-if (config.showSpeed) {
-  const speedControl = createSpeedControl();
-  controlsContainer.appendChild(speedControl);
-}
-```
 
 ## Done When
 ✅ Configuration object defined  
