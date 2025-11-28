@@ -3,6 +3,19 @@
 ## Goal
 Create the HTML page structure for the landing page with navigation, hero section, features section, and footer.
 
+---
+
+## What to Build
+
+Landing page structure with:
+- Complete HTML5 document foundation
+- Sticky navigation header
+- Hero section container
+- Features section container
+- Footer
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Page Foundation
@@ -159,6 +172,8 @@ Create the HTML page structure for the landing page with navigation, hero sectio
 
 ---
 
+---
+
 ## Testing Checklist
 
 ### Structure Tests
@@ -186,6 +201,8 @@ Create the HTML page structure for the landing page with navigation, hero sectio
 - [ ] Heading hierarchy correct (h1 > h2)
 - [ ] Can navigate with keyboard only
 - [ ] Screen reader announces landmarks
+
+---
 
 ---
 

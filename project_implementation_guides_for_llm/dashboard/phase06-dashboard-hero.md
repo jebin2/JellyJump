@@ -3,6 +3,18 @@
 ## Goal
 Build impactful hero section with headline, tagline, and call-to-action buttons.
 
+---
+
+## What to Build
+
+Hero section content:
+- Large, bold headline
+- Supporting tagline
+- Two prominent CTA buttons (Player & Editor)
+- Center-aligned layout
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Main Headline
@@ -46,6 +58,8 @@ Build impactful hero section with headline, tagline, and call-to-action buttons.
 
 ---
 
+---
+
 ## Testing Checklist
 
 - [ ] All features implemented as described
@@ -55,6 +69,8 @@ Build impactful hero section with headline, tagline, and call-to-action buttons.
 - [ ] Screen reader accessible
 - [ ] No console errors
 - [ ] Cross-browser compatible
+
+---
 
 ## Done When
 

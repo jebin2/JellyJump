@@ -3,6 +3,18 @@
 ## Goal
 Display feature showcase cards in a grid layout describing key capabilities.
 
+---
+
+## What to Build
+
+Feature showcase section:
+- Responsive 2x2 grid layout
+- 4 feature cards (Player, Editor, Format Support, Keyboard Shortcuts)
+- Card styling with titles, descriptions, and CTAs
+- Responsive breakpoints
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Feature Grid Layout
@@ -63,6 +75,8 @@ Display feature showcase cards in a grid layout describing key capabilities.
 
 ---
 
+---
+
 ## Testing Checklist
 
 - [ ] All features implemented as described
@@ -72,6 +86,8 @@ Display feature showcase cards in a grid layout describing key capabilities.
 - [ ] Screen reader accessible
 - [ ] No console errors
 - [ ] Cross-browser compatible
+
+---
 
 ## Done When
 

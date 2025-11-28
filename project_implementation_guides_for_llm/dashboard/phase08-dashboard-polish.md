@@ -3,6 +3,18 @@
 ## Goal
 Make page responsive, SEO-optimized, accessible, and performant.
 
+---
+
+## What to Build
+
+Final polish and optimization:
+- Responsive design for all screen sizes
+- SEO meta tags and Open Graph
+- WCAG AA accessibility compliance
+- Performance optimization (Lighthouse 90+)
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Responsive Design Implementation
@@ -55,6 +67,8 @@ Make page responsive, SEO-optimized, accessible, and performant.
 
 ---
 
+---
+
 ## Testing Checklist
 
 - [ ] All features implemented as described
@@ -64,6 +78,8 @@ Make page responsive, SEO-optimized, accessible, and performant.
 - [ ] Screen reader accessible
 - [ ] No console errors
 - [ ] Cross-browser compatible
+
+---
 
 ## Done When
 
