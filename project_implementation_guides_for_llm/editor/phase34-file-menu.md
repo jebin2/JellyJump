@@ -3,8 +3,18 @@
 ## Goal
 Implement File menu dropdown with New, Open, Save, Save As options and toggle logic
 
-## Group
-**Navigation**
+---
+
+## What to Build
+
+File menu dropdown:
+- Dropdown triggered by File button
+- Menu items: New, Open, Save, Save As, Export
+- Keyboard shortcuts displayed
+- Click-outside-to-close behavior
+- Theme-styled menu
+
+---
 
 ## Feature to Implement
 
@@ -131,7 +141,9 @@ Use for JavaScript hooks:
 - **Code of Conduct**: Use event delegation, cache selectors, follow naming conventions
 - **Theme System**: Use CSS variables for colors, spacing, transitions
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click "File" button opens dropdown below it
 - [ ] Dropdown contains all 4 menu items with correct labels
 - [ ] Menu items show icons and keyboard shortcuts
@@ -146,6 +158,8 @@ Use for JavaScript hooks:
 - [ ] Smooth fade-in/slide-down animation when opening
 - [ ] Dark Neobrutalism styling applied (border, shadow)
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ File menu dropdown fully functional  

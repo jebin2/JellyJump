@@ -3,8 +3,18 @@
 ## Goal
 [X] button on each tab, remove tab from UI, switch to adjacent tab
 
-## Group
-**Tab Management**
+---
+
+## What to Build
+
+Close tab functionality:
+- Close button on each tab
+- Unsaved changes warning
+- Remove tab from DOM
+- Switch to adjacent tab
+- Prevent closing last tab
+
+---
 
 ## Feature to Implement
 
@@ -151,7 +161,9 @@ Extend TabManager class/module from Phase 33-34:
 - **Phase 37**: Will remove tab from localStorage
 - **Code of Conduct**: Use event delegation, clean up properly
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click close button [×] closes the tab
 - [ ] Tab is removed from UI (DOM)
 - [ ] Tab is removed from internal state
@@ -170,6 +182,8 @@ Extend TabManager class/module from Phase 33-34:
 - [ ] [+] button re-enabled if was at 10 tabs limit
 - [ ] Focus moves to newly active tab after close
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Close button [×] functional  

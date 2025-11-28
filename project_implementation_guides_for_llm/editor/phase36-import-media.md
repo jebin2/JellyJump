@@ -3,8 +3,18 @@
 ## Goal
 Implement Import button to open file picker for videos/audio/images and add them to media library
 
-## Group
-**Navigation**
+---
+
+## What to Build
+
+Import media functionality:
+- File picker for videos, audio, images
+- Drag-and-drop support
+- Format validation
+- Progress indicators
+- Add to media library
+
+---
 
 ## Feature to Implement
 
@@ -131,7 +141,9 @@ Alternative: Use HTML5 `<video>` element's `loadedmetadata` event for simpler ap
 - **IndexedDB**: Use standard IndexedDB API, no external libraries
 - **MediaBunny**: See mediabunny-llms-full.md for metadata extraction
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click Import button opens file picker dialog
 - [ ] File picker accepts video files (.mp4, .webm, .mov)
 - [ ] File picker accepts audio files (.mp3, .wav, .ogg)
@@ -148,6 +160,8 @@ Alternative: Use HTML5 `<video>` element's `loadedmetadata` event for simpler ap
 - [ ] Console shows no errors during import
 - [ ] IndexedDB database can be viewed in DevTools
 - [ ] Imported files persist after page reload
+
+---
 
 ## Done When
 ✅ Import button opens file picker  

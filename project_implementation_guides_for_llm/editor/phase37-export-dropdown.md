@@ -3,8 +3,18 @@
 ## Goal
 Implement Export dropdown with Video, Library, JSON options and toggle logic
 
-## Group
-**Navigation**
+---
+
+## What to Build
+
+Export dropdown menu:
+- Export format options
+- Quality/resolution settings
+- Export location picker
+- Progress tracking
+- Success/error feedback
+
+---
 
 ## Feature to Implement
 
@@ -149,7 +159,9 @@ Use for JavaScript hooks:
 - **Code of Conduct**: Use event delegation, cache selectors, follow naming conventions
 - **Theme System**: Use CSS variables for colors, spacing, transitions
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click "Export" button opens dropdown below it
 - [ ] Dropdown aligned to right edge of Export button
 - [ ] Dropdown contains all 3 menu items with correct labels
@@ -170,6 +182,8 @@ Use for JavaScript hooks:
 - [ ] Dark Neobrutalism styling applied (border, shadow)
 - [ ] Dropdown doesn't overflow off right edge of screen
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Export menu dropdown fully functional  

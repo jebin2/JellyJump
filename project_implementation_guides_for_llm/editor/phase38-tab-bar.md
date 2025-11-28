@@ -3,8 +3,18 @@
 ## Goal
 Create tab container below top nav with [+] button visual and styling
 
-## Group
-**Tab Management**
+---
+
+## What to Build
+
+Tab bar structure:
+- Horizontal tab container
+- New tab button
+- Individual tab elements
+- Active/inactive states
+- Visual styling
+
+---
 
 ## Feature to Implement
 
@@ -112,7 +122,9 @@ When no tabs exist (initial state):
 - **Dark Neobrutalism**: Thick borders, offset shadows, bold colors
 - **Theme System**: See `theme/` folder for CSS variables
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Tab bar appears below navigation bar
 - [ ] Tab bar height is 45px
 - [ ] Tab bar spans full viewport width
@@ -129,6 +141,8 @@ When no tabs exist (initial state):
 - [ ] Focus outline visible when using keyboard
 - [ ] Responsive on mobile screens (< 768px)
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Tab bar fully styled and positioned  

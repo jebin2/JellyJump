@@ -3,8 +3,18 @@
 ## Goal
 Create fixed top bar with branding, menu placeholders, styling and positioning
 
-## Group
-**Navigation**
+---
+
+## What to Build
+
+Top navigation bar:
+- Fixed position header spanning full width
+- Left: Branding (icon + title)
+- Center: Menu buttons (File, Edit, View, Effects)
+- Right: Action buttons (Import, Export)
+- Dark Neobrutalism styling
+
+---
 
 ## Feature to Implement
 
@@ -87,7 +97,9 @@ Apply Dark Neobrutalism theme:
 - **Code of Conduct**: Follow BEM naming, no inline styles, use CSS variables
 - **Dark Neobrutalism**: Thick borders, offset shadows, bold colors
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Navigation bar appears at top of page
 - [ ] Bar is fixed (test by adding scrollable content below)
 - [ ] Branding visible on left: 🎬 + "MediaBunny Editor"
@@ -100,6 +112,8 @@ Apply Dark Neobrutalism theme:
 - [ ] Text is readable with good contrast
 - [ ] Tab key navigates through all buttons
 - [ ] Focus outlines visible when using keyboard
+
+---
 
 ## Done When
 ✅ Navigation bar fully styled and positioned  

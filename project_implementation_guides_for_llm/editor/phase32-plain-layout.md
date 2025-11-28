@@ -3,6 +3,20 @@
 ## Goal
 Create the complete editor UI shell with HTML and CSS only (zero JavaScript functionality). This establishes the visual foundation for all subsequent phases.
 
+---
+
+## What to Build
+
+Complete editor UI shell:
+- Fixed top navigation bar with branding and menus
+- Multi-tab bar structure
+- Left media panel container
+- Center preview/player area
+- Right properties panel
+- Bottom timeline container
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Top Navigation Bar
@@ -192,7 +206,9 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
 - Existing theme CSS files
 - Dark Neobrutalism design tokens
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Open `editor.html` in browser
 - [ ] All 4 panels visible and sized correctly (20%-50%-30% + bottom)
 - [ ] Top navigation bar displays with branding and buttons
@@ -207,6 +223,8 @@ Create the complete editor UI shell with HTML and CSS only (zero JavaScript func
 - [ ] Layout responds to window resize
 - [ ] No console errors
 - [ ] **ZERO JavaScript functionality** - pure visual shell
+
+---
 
 ## Done When
 ✅ Complete HTML structure created  

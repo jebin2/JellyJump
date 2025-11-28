@@ -3,8 +3,18 @@
 ## Goal
 Implement Edit menu dropdown with Undo, Redo, Cut, Copy, Paste options and toggle logic
 
-## Group
-**Navigation**
+---
+
+## What to Build
+
+Edit menu dropdown:
+- Dropdown with edit operations
+- Items: Undo, Redo, Cut, Copy, Paste, Delete, Select All
+- Keyboard shortcuts shown
+- Enable/disable states
+- Proper positioning
+
+---
 
 ## Feature to Implement
 
@@ -145,7 +155,9 @@ Use for JavaScript hooks:
 - **Code of Conduct**: Use event delegation, cache selectors, follow naming conventions
 - **Theme System**: Use CSS variables for colors, spacing, transitions
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click "Edit" button opens dropdown below it
 - [ ] Dropdown contains all 5 menu items with correct labels
 - [ ] Menu items show icons and keyboard shortcuts
@@ -164,6 +176,8 @@ Use for JavaScript hooks:
 - [ ] Smooth fade-in/slide-down animation when opening
 - [ ] Dark Neobrutalism styling applied (border, shadow)
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Edit menu dropdown fully functional  

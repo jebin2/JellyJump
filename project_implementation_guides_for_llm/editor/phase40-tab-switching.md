@@ -3,8 +3,18 @@
 ## Goal
 Click tab to activate, visual active/inactive states, load tab's project data
 
-## Group
-**Tab Management**
+---
+
+## What to Build
+
+Tab switching:
+- Click tab to activate
+- Visual active state
+- Save/restore project state per tab
+- Keyboard shortcuts (Ctrl+Tab)
+- Smooth transitions
+
+---
 
 ## Feature to Implement
 
@@ -143,7 +153,9 @@ Extend TabManager class/module from Phase 33:
 - **Phase 37**: Will restore active tab on page load
 - **Code of Conduct**: Use event delegation, cache selectors
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click a tab activates it (visual change)
 - [ ] Previously active tab becomes inactive
 - [ ] Only one tab active at a time
@@ -160,6 +172,8 @@ Extend TabManager class/module from Phase 33:
 - [ ] Enter key activates focused tab
 - [ ] `aria-selected` attribute updates correctly
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Tab clicking switches active state  

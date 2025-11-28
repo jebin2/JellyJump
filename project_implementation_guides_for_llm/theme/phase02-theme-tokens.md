@@ -3,7 +3,11 @@
 ## Goal
 Define all CSS custom properties (variables) for the design system: colors, typography, spacing, borders, and shadows.
 
-## What to Define
+---
+
+## What to Build
+
+---
 
 ### Feature 1: Color System
 
@@ -34,6 +38,8 @@ Define all CSS custom properties (variables) for the design system: colors, typo
 
 ---
 
+---
+
 ### Feature 2: Typography System
 
 **Purpose**: Define font families, sizes, and weights
@@ -59,6 +65,8 @@ Define all CSS custom properties (variables) for the design system: colors, typo
 
 ---
 
+---
+
 ### Feature 3: Spacing Scale
 
 **Purpose**: Create consistent spacing system for margins and padding
@@ -76,6 +84,8 @@ Define all CSS custom properties (variables) for the design system: colors, typo
 - Use these consistently for margins, padding, gaps
 - Smaller values for compact UI
 - Larger values for generous spacing
+
+---
 
 ---
 
@@ -97,6 +107,8 @@ Define all CSS custom properties (variables) for the design system: colors, typo
 
 ---
 
+---
+
 ### Feature 5: Shadow System
 
 **Purpose**: Create brutalist shadows (solid, no blur)
@@ -114,6 +126,8 @@ Define all CSS custom properties (variables) for the design system: colors, typo
 - Magenta shadows: Using secondary accent
 
 **Critical**: Shadows MUST be solid (no blur) - this is key to neobrutalism
+
+---
 
 ---
 
@@ -147,7 +161,9 @@ Define all CSS custom properties (variables) for the design system: colors, typo
 
 ---
 
-## Testing Criteria
+---
+
+## Testing Checklist Criteria
 
 ### Variable Definition Tests
 - [ ] All color variables defined
@@ -170,6 +186,8 @@ Define all CSS custom properties (variables) for the design system: colors, typo
 - [ ] White text is clearly visible
 - [ ] Spacing looks proportional
 - [ ] Shadows are sharp and solid
+
+---
 
 ---
 

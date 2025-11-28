@@ -3,7 +3,20 @@
 ## Goal
 Add responsive design, accessibility features, utilities, and performance optimizations to complete the theme system.
 
-## Features to Add
+---
+
+## What to Build
+
+Polish and optimization:
+- Responsive breakpoints (mobile, tablet, desktop)
+- Accessibility features (focus states, screen reader support)
+- Utility classes (spacing, text, display)
+- Performance optimizations
+- Print styles
+
+---
+
+## Features to Implement
 
 ### Feature 1: Responsive Breakpoints
 
@@ -85,7 +98,7 @@ Add responsive design, accessibility features, utilities, and performance optimi
 
 ---
 
-## Testing Criteria
+## Testing Checklist
 
 ### Responsive Tests
 - [ ] Test on mobile (375px, 414px)

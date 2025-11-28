@@ -3,7 +3,11 @@
 ## Goal
 Create the foundational CSS file structure and configure fonts for the Dark Neobrutalism theme.
 
-## What to Create
+---
+
+## What to Build
+
+---
 
 ### Feature 1: Theme CSS File Structure
 
@@ -18,6 +22,8 @@ Create the foundational CSS file structure and configure fonts for the Dark Neob
 - File should be structured with clear sections for different concerns
 - Include comment headers to separate major sections
 - Leave space for CSS variables (added in Phase 02)
+
+---
 
 ---
 
@@ -40,6 +46,8 @@ Create the foundational CSS file structure and configure fonts for the Dark Neob
 
 ---
 
+---
+
 ### Feature 3: Font Configuration
 
 **Purpose**: Load and configure the typography system fonts
@@ -58,6 +66,8 @@ Create the foundational CSS file structure and configure fonts for the Dark Neob
 **Fallback Stack**:
 - Sans-serif fallbacks: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif
 - Monospace fallbacks: 'Courier New', Consolas, Monaco, monospace
+
+---
 
 ---
 
@@ -88,7 +98,9 @@ Create the foundational CSS file structure and configure fonts for the Dark Neob
 
 ---
 
-## Testing Criteria
+---
+
+## Testing Checklist Criteria
 
 ### Visual Tests
 - [ ] Open any HTML page in browser
@@ -109,6 +121,8 @@ Create the foundational CSS file structure and configure fonts for the Dark Neob
 - [ ] Test in Firefox
 - [ ] Test in Safari (if available)
 - [ ] Font rendering looks smooth in all browsers
+
+---
 
 ---
 

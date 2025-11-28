@@ -3,8 +3,18 @@
 ## Goal
 Click [+] to create tab with UUID, default name "Untitled Project", max 10 tabs limit warning
 
-## Group
-**Tab Management**
+---
+
+## What to Build
+
+Create new tab:
+- New tab button functionality
+- Generate unique tab IDs
+- Initialize empty project state
+- Switch to new tab automatically
+- Default naming (Untitled Project)
+
+---
 
 ## Feature to Implement
 
@@ -157,7 +167,9 @@ Create a TabManager class or module with methods:
 - **Phase 37**: Will implement tab persistence
 - **Code of Conduct**: Use event delegation, cache selectors, follow naming conventions
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click [+] button creates a new tab
 - [ ] New tab displays "Untitled Project" name
 - [ ] New tab has unique UUID (check in console or DevTools)
@@ -174,6 +186,8 @@ Create a TabManager class or module with methods:
 - [ ] Inactive tabs have dimmed visual style
 - [ ] No console errors
 - [ ] Tab bar scrolls horizontally if many tabs (overflow-x: auto)
+
+---
 
 ## Done When
 ✅ [+] button creates new tabs  
