@@ -3,8 +3,18 @@
 ## Goal
 Dialog on close if unsaved (*), Save/Don't Save/Cancel buttons
 
-## Group
-**Tab Management**
+---
+
+## What to Build
+
+Unsaved changes confirmation:
+- Detect unsaved changes in tabs
+- Warning modal on close/switch
+- Three options: Save, Don't Save, Cancel
+- Prevent data loss
+- Visual indicator for unsaved tabs
+
+---
 
 ## Feature to Implement
 
@@ -164,7 +174,9 @@ Extend TabManager class from Phase 35:
 - **Phase 101**: Will implement auto-save functionality
 - **Code of Conduct**: Follow BEM naming, use CSS variables
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Tab with unsaved changes shows asterisk (*) after name
 - [ ] Click close [×] on unsaved tab shows dialog
 - [ ] Dialog displays: title, message, 3 buttons
@@ -182,6 +194,8 @@ Extend TabManager class from Phase 35:
 - [ ] Dialog backdrop semi-transparent
 - [ ] No duplicate dialogs from rapid clicking
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Unsaved changes tracked per tab  

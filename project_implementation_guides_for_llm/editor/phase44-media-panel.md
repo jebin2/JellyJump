@@ -3,8 +3,18 @@
 ## Goal
 Create 20% width left panel container with styling
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Left media panel structure:
+- Fixed left sidebar container
+- Panel header with title
+- Content area for media items
+- Resizable width
+- Collapsible behavior
+
+---
 
 ## Feature to Implement
 
@@ -129,7 +139,9 @@ Phase 26 already created basic panel structure. This phase refines:
 - **Code of Conduct**: Follow BEM naming, no inline styles, use CSS variables
 - **Dark Neobrutalism**: Thick borders, layered backgrounds
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Media panel appears on left side of editor
 - [ ] Panel is 20% width (or ~300px)
 - [ ] Panel height fills from below tab bar to bottom
@@ -143,6 +155,8 @@ Phase 26 already created basic panel structure. This phase refines:
 - [ ] Responsive on tablet/mobile (simplified layout)
 - [ ] No horizontal scroll in panel
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Media panel structured with vertical tabs section + content area  

@@ -3,8 +3,19 @@
 ## Goal
 File picker for audio files, add to Audio category
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Upload audio files:
+- File picker for audio formats
+- Drag-and-drop support
+- Format validation (MP3, WAV, AAC)
+- Waveform preview generation
+- Add to Audio tab
+- Duration extraction
+
+---
 
 ## Feature to Implement
 
@@ -178,7 +189,9 @@ Extend MediaLibrary class:
 - **Phase 40**: Audio category tab switching
 - **Phase 45**: Full tile/grid display for audio
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click "+ Add Audio" button opens file picker
 - [ ] File picker accepts only audio files (.mp3, .wav, .ogg, .m4a)
 - [ ] Can select multiple audio files at once
@@ -193,6 +206,8 @@ Extend MediaLibrary class:
 - [ ] Console has no errors
 - [ ] Upload button keyboard accessible
 - [ ] Different audio formats supported (MP3, WAV, OGG)
+
+---
 
 ## Done When
 ✅ Upload button functional in Audio category  

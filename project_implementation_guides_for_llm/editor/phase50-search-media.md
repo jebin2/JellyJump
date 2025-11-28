@@ -3,8 +3,19 @@
 ## Goal
 Search input field, filter all categories in real-time, highlight results
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Search media library:
+- Search input field
+- Filter by filename
+- Real-time results
+- Clear search button
+- Highlight matching text
+- Search across all media types
+
+---
 
 ## Feature to Implement
 
@@ -177,7 +188,9 @@ Extend MediaLibrary class:
 - **Phase 45**: Tile display that shows filtered results
 - **Phase 40**: Category tab switching (search within active category)
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Search input visible at top of media panel
 - [ ] Typing in search filters items in real-time
 - [ ] Case-insensitive search works
@@ -195,6 +208,8 @@ Extend MediaLibrary class:
 - [ ] Search persists when switching categories (or resets - design choice)
 - [ ] Keyboard accessible (Tab to focus)
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Search input functional  

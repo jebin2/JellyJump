@@ -3,8 +3,19 @@
 ## Goal
 File picker for images, add to Images category
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Upload image files:
+- File picker for image formats
+- Drag-and-drop zone
+- Format validation (PNG, JPG, GIF)
+- Image preview thumbnails
+- Add to Images tab
+- Dimension detection
+
+---
 
 ## Feature to Implement
 
@@ -197,7 +208,9 @@ Extend MediaLibrary class:
 - **Phase 40**: Images category tab switching
 - **Phase 45**: Full tile/grid display for images
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click "+ Add Images" button opens file picker
 - [ ] File picker accepts only image files (.jpg, .png, .gif, .webp)
 - [ ] Can select multiple image files at once
@@ -214,6 +227,8 @@ Extend MediaLibrary class:
 - [ ] Animated GIF preserved correctly
 - [ ] Console has no errors
 - [ ] Upload button keyboard accessible
+
+---
 
 ## Done When
 ✅ Upload button functional in Images category  

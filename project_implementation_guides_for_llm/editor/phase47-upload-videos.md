@@ -3,8 +3,19 @@
 ## Goal
 File picker for videos, add to Videos category, store in IndexedDB
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Upload video files:
+- File picker for video formats
+- Drag-and-drop zone
+- Format validation (MP4, WebM, MOV)
+- Progress indicators
+- Add to Videos tab
+- Generate thumbnails
+
+---
 
 ## Feature to Implement
 
@@ -194,7 +205,9 @@ Extend MediaLibrary class:
 - **Phase 46**: Thumbnail generation
 - **MediaBunny Docs**: See mediabunny-llms-full.md for Player metadata extraction
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click "+ Add Videos" button opens file picker
 - [ ] File picker accepts only video files (.mp4, .webm, .mov)
 - [ ] Can select multiple video files at once
@@ -210,6 +223,8 @@ Extend MediaLibrary class:
 - [ ] Videos persist after page reload (IndexedDB)
 - [ ] Console has no errors
 - [ ] Upload button keyboard accessible
+
+---
 
 ## Done When
 ✅ Upload button functional in Videos category  

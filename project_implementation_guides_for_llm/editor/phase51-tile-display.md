@@ -3,8 +3,19 @@
 ## Goal
 Display media items as 2-3 tiles per row with filename and duration badge
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Tile display for media:
+- Grid layout for media items
+- Thumbnail + title display
+- Hover effects
+- Responsive columns
+- Icon badges for media type
+- Duration/size overlay
+
+---
 
 ## Feature to Implement
 
@@ -204,7 +215,9 @@ Extend MediaLibrary class:
 - **Phase 46**: Will add video thumbnail generation
 - **Phase 47**: Will make tiles draggable to timeline
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Media items displayed as tiles in grid layout
 - [ ] 2-3 tiles per row on desktop
 - [ ] Each tile shows filename
@@ -223,6 +236,8 @@ Extend MediaLibrary class:
 - [ ] `aria-selected` updates correctly
 - [ ] Integration with search (filtered tiles displayed)
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Media items displayed as tiles  

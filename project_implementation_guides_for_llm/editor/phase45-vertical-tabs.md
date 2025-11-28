@@ -3,8 +3,18 @@
 ## Goal
 Create 6 vertical tab buttons (Videos, Audio, Images, Text, Effects, Projects) with icons, labels, and counts
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Vertical tabs in media panel:
+- Tab buttons (Videos, Audio, Images)
+- Vertical layout
+- Active tab highlighting
+- Switch between media types
+- Icon + label display
+
+---
 
 ## Feature to Implement
 
@@ -159,7 +169,9 @@ Apply Dark Neobrutalism theme:
 - **Phase 45**: Will display media items
 - **Code of Conduct**: Follow BEM naming, use CSS variables
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] 6 vertical tab buttons visible
 - [ ] Buttons in correct order (Videos, Audio, Images, Text, Effects, Projects)
 - [ ] Each button shows icon + label + count "(0)"
@@ -178,6 +190,8 @@ Apply Dark Neobrutalism theme:
 - [ ] `aria-selected` attribute present
 - [ ] Dark Neobrutalism styling applied
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ 6 vertical tab buttons created  

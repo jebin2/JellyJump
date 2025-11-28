@@ -3,8 +3,18 @@
 ## Goal
 Save tab list to localStorage, restore tabs on page load, persist active tab
 
-## Group
-**Tab Management**
+---
+
+## What to Build
+
+Tab state persistence:
+- Save all tabs to localStorage
+- Store project data per tab
+- Restore tabs on page load
+- Restore active tab selection
+- Handle corrupted data gracefully
+
+---
 
 ## Feature to Implement
 
@@ -186,7 +196,9 @@ No new attributes needed for UI, but useful for debugging:
 - **Phase 101**: Auto-save will use this persistence system
 - **localStorage API**: Standard browser API, no external libraries
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Create tab, refresh page → tab restored
 - [ ] Create multiple tabs, refresh → all tabs restored in correct order
 - [ ] Close tab, refresh → tab remains closed
@@ -202,6 +214,8 @@ No new attributes needed for UI, but useful for debugging:
 - [ ] No flash of empty state if data exists
 - [ ] Debounced save works (check localStorage in DevTools)
 - [ ] localStorage doesn't grow excessively large
+
+---
 
 ## Done When
 ✅ Tabs save to localStorage automatically  

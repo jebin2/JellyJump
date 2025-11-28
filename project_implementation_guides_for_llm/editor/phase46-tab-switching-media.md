@@ -3,8 +3,18 @@
 ## Goal
 Click vertical tab to show category content, active/inactive states, persist active tab
 
-## Group
-**Media Library**
+---
+
+## What to Build
+
+Media tab switching:
+- Click to switch media type
+- Show/hide corresponding content
+- Update active state visually
+- Smooth transitions
+- Filter media library by type
+
+---
 
 ## Feature to Implement
 
@@ -179,7 +189,9 @@ Create or extend MediaLibrary class/module:
 - **Phase 45**: Will display media items as tiles
 - **Code of Conduct**: Use event delegation, cache selectors
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Click "Videos" tab activates it (visual change)
 - [ ] Click "Audio" tab switches to Audio
 - [ ] Previously active tab becomes inactive
@@ -199,6 +211,8 @@ Create or extend MediaLibrary class/module:
 - [ ] `aria-selected` attribute updates correctly
 - [ ] Smooth CSS transitions
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Tab clicking switches categories  
