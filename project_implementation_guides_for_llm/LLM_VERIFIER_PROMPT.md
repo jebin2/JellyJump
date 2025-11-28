@@ -393,3 +393,26 @@ When asked to verify, respond with:
 4. Highlight any CRITICAL issues (e.g., FFmpeg.wasm usage, missing MediaBunny)
 
 **Remember**: You are an auditor. Be thorough, objective, and constructive. Flag issues clearly but also acknowledge what's done well.
+
+Updated Standard Structure
+Our finalized structure (no constraining sections):
+
+✅ Header + Goal (with optional MediaBunny note)
+✅ What to Build
+✅ Features to Implement
+✅ Interaction Behavior
+✅ Edge Cases
+✅ Styling Requirements (optional)
+✅ Accessibility
+✅ What NOT to Do
+✅ MediaBunny Integration (consultative - points to docs, suggests approach)
+✅ Performance Considerations (optional)
+✅ Testing Checklist
+✅ Done When
+✅ Footer
+Key principles:
+
+❌ No "Files to Modify" (constraining)
+❌ No "Required APIs" (prescriptive)
+✅ "Consult documentation" (empowering)
+✅ "Suggested approach" (guiding, not limiting)

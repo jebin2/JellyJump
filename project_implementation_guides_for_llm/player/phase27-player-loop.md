@@ -1,16 +1,3 @@
-# Phase 27: Player A-B Loop
-
-## Goal
-Implement comprehensive loop functionality with three modes: current video loop, entire playlist loop, and A-B section loop for repeating video segments
-
-**MediaBunny Integration**: Use MediaBunny's seek and playback control for precise loop timing. **Consult** mediabunny-llms-full.md for timestamp management.
-
-## Features to Implement
-
-### Feature 1: Loop Mode Selector
-**Purpose**: Choose between three loop modes
-
-**Requirements**:
 - Loop button (🔁) in control bar with mode indicator
 - Three toggle states:
   1. **Loop Current Video**: Loops the entire current video
@@ -113,6 +100,8 @@ Implement comprehensive loop functionality with three modes: current video loop,
 - For Current Video mode: Show "Looping current video" status
 - For Playlist mode: Show "Looping playlist (X videos)" status
 
+---
+
 ## Testing Checklist
 - [ ] Loop button cycles through all three modes correctly
 - [ ] Loop Current Video repeats single video seamlessly
@@ -127,6 +116,8 @@ Implement comprehensive loop functionality with three modes: current video loop,
 - [ ] Works correctly with MediaBunny seeking
 - [ ] Mode indicator shows correct state
 - [ ] Switching between modes works smoothly
+
+---
 
 ## Done When
 ✅ All three loop modes implemented  

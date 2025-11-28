@@ -8,6 +8,14 @@ Implement remove, clear, and auto-play features with proper MediaBunny resource 
 - Proper decoder/sink cleanup
 - Switching between MediaBunny inputs for playlist navigationo on click, remove videos, next/previous navigation, auto-play next.
 
+---
+
+## What to Build
+
+Playlist management system with:\n- Click-to-play functionality\n- Remove video buttons\n- Next/Previous navigation\n- Auto-play next video\n- Clear all and bulk operations
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Click to Play
@@ -59,12 +67,16 @@ Implement remove, clear, and auto-play features with proper MediaBunny resource 
 - Sort options (by name, duration - optional)
 - Select all checkbox (optional)
 
+---
+
 ## Testing Checklist
 - [ ] Clicking item plays video
 - [ ] Can remove videos
 - [ ] Next/Prev buttons work
 - [ ] Auto-play next works
 - [ ] Clear all works
+
+---
 
 ## Done When
 ✅ Playlist management functional  

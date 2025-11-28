@@ -9,6 +9,14 @@ Add responsive mobile drawer, keyboard shortcuts, and MediaBunny performance opt
 - Memory management for large playlists
 - Performance optimization techniquesg for 100+ videos, accessibility, performance optimization.
 
+---
+
+## What to Build
+
+Polish and optimization:\n- Mobile responsive layout\n- Virtual scrolling for large playlists\n- Comprehensive keyboard shortcuts\n- Enhanced accessibility\n- Performance optimizations\n- Error handling
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Mobile Responsive Layout
@@ -71,6 +79,8 @@ Add responsive mobile drawer, keyboard shortcuts, and MediaBunny performance opt
 - Recover from errors without breaking
 - Log errors for debugging
 
+---
+
 ## Testing Checklist
 - [ ] Mobile layout works smoothly
 - [ ] Virtual scrolling works with large lists
@@ -78,6 +88,8 @@ Add responsive mobile drawer, keyboard shortcuts, and MediaBunny performance opt
 - [ ] Accessibility verified
 - [ ] Performance is good
 - [ ] Errors handled gracefully
+
+---
 
 ## Done When
 ✅ Polished, responsive player  

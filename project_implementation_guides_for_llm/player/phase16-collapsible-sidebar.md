@@ -3,6 +3,19 @@
 ## Goal
 Implement collapsible/expandable playlist sidebar with smooth transitions and persistent state.
 
+---
+
+## What to Build
+
+Collapsible sidebar system with:
+- Toggle button to collapse/expand
+- Smooth CSS transitions
+- localStorage state persistence
+- Responsive behavior across devices
+- Video section auto-expansion when sidebar collapses
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Sidebar Collapse/Expand Toggle
@@ -67,16 +80,7 @@ Implement collapsible/expandable playlist sidebar with smooth transitions and pe
 - Mobile (<768px): Sidebar already in drawer/modal (Phase 15), collapse may not apply
 - Adjust collapsed width for smaller screens (e.g., 0px on tablet)
 
-## Testing Checklist
-- [ ] Clicking toggle button collapses sidebar
-- [ ] Clicking again expands sidebar
-- [ ] Transition is smooth (no jumps)
-- [ ] Video section width adjusts correctly
-- [ ] Sidebar content hidden when collapsed
-- [ ] Only toggle button visible when collapsed
-- [ ] State persists after page reload
-- [ ] Works on desktop and tablet
-- [ ] Keyboard accessible (button focusable, Enter/Space to toggle)
+---
 
 ## Interaction Behavior
 
@@ -90,30 +94,51 @@ Implement collapsible/expandable playlist sidebar with smooth transitions and pe
 **Keyboard Shortcuts** (optional):
 - `Ctrl + B` or `Cmd + B`: Toggle sidebar
 
+---
+
 ## Edge Cases
+
 - Very narrow screens: Collapsed width may be 0px instead of 40px
 - No localStorage support: Default to expanded state
 - Rapid toggling: Debounce or disable button during transition
 - Sidebar contains scroll position: Preserve scroll position when re-expanding
 
+---
+
 ## Accessibility
+
 - Button has aria-label: "Collapse sidebar" / "Expand sidebar"
 - Button has aria-expanded="true" / "false"
 - Focus management: Keep focus on button after toggle
 - Reduced motion: Respect `prefers-reduced-motion` (instant transition)
 
-## Files to Modify
-- `player.html` - Add collapse/expand button
-- `player.css` - Add transition styles and collapsed state
-- `player.js` - Add toggle logic and localStorage persistence
+---
 
 ## What NOT to Do
+
 - ❌ Don't use JavaScript for animations (use CSS transitions)
 - ❌ Don't forget to hide overflow content
 - ❌ Don't make collapsed width too narrow (min 40px for button)
 - ❌ Don't ignore localStorage errors (wrap in try-catch)
 
+---
+
+## Testing Checklist
+
+- [ ] Sidebar can be collapsed and expanded
+- [ ] Smooth transitions implemented
+- [ ] Content visibility managed correctly
+- [ ] State persists across page reloads
+- [ ] Video section expands when sidebar collapses
+- [ ] Works on desktop and tablet
+- [ ] Keyboard accessible (button focusable, Enter/Space to toggle)
+- [ ] No layout jumps
+- [ ] Reduced motion preference respected
+
+---
+
 ## Done When
+
 ✅ Sidebar can be collapsed and expanded  
 ✅ Smooth transitions implemented  
 ✅ Content visibility managed correctly  
@@ -123,5 +148,6 @@ Implement collapsible/expandable playlist sidebar with smooth transitions and pe
 ✅ Ready for next phase
 
 ---
+
 **Phase**: 16 | **Component**: Player  
 **Estimated Time**: 40-60 minutes

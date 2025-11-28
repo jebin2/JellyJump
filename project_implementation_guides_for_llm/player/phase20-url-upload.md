@@ -3,6 +3,19 @@
 ## Goal
 Allow users to add videos to playlist from remote URLs (e.g., direct video links, CDN URLs).
 
+---
+
+## What to Build
+
+URL upload system with:
+- Upload button and modal interface
+- URL validation and fetch logic
+- CORS error handling
+- Loading indicators
+- Integration with playlist and MediaBunny
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Upload URL Button
@@ -92,6 +105,8 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 
 **Advanced: Progress Tracking**
 
+---
+
 ## Testing Checklist
 - [ ] "Upload URL" button visible and clickable
 - [ ] Modal opens on button click
@@ -107,6 +122,8 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 - [ ] Modal closes on Cancel/Escape
 - [ ] Loading state prevents double-submission
 - [ ] Keyboard accessible (Tab, Enter, Escape)
+
+---
 
 ## Interaction Behavior
 
@@ -138,6 +155,8 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 5. User corrects URL
 6. "Add" button enabled
 
+---
+
 ## Edge Cases
 - URL with query parameters: Extract clean filename
 - URL without file extension: Use generic name "Remote Video"
@@ -146,6 +165,8 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 - Non-video files: Detect MIME type, reject non-video
 - Duplicate URLs: Check if already in playlist, skip or warn
 - Special characters in URL: Properly encode/decode
+
+---
 
 ## Accessibility
 - Modal has aria-labelledby pointing to title
@@ -162,6 +183,8 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 - `player.js` - Add URL fetch logic
 - `playlist.js` - Integrate URL-sourced videos
 
+---
+
 ## What NOT to Do
 - ❌ Don't fetch without validating URL first
 - ❌ Don't store entire video in localStorage (too large)
@@ -169,6 +192,8 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 - ❌ Don't timeout too quickly (large videos need time)
 - ❌ Don't show technical error messages (be user-friendly)
 - ❌ Don't forget to abort fetch on cancel
+
+---
 
 ## MediaBunny Integration
 
@@ -186,6 +211,8 @@ Allow users to add videos to playlist from remote URLs (e.g., direct video links
 ## Integration with Phase 21
 - Single URL upload should auto-load (Phase 21)
 - Check: `if (playlistLength === 0) { autoLoad(video); }`
+
+---
 
 ## Done When
 ✅ "Upload URL" button added  

@@ -73,6 +73,8 @@ Automatically load and play single uploaded files or URLs in the player for imme
 - Smooth transition (fade in new video info)
 - Optional: Brief animation on playlist item
 
+---
+
 ## Testing Checklist
 - [ ] Uploading single file loads it in player
 - [ ] Uploading multiple files does NOT auto-load
@@ -120,6 +122,8 @@ Automatically load and play single uploaded files or URLs in the player for imme
 3. Video loads in player automatically
 4. Same as single file flow
 
+---
+
 ## Edge Cases
 - Uploading single file when playlist already has videos: Still auto-load new file
 - Uploading single file while video is playing: Pause current, load new
@@ -127,6 +131,8 @@ Automatically load and play single uploaded files or URLs in the player for imme
 - Very large file: Show loading indicator during load
 - Rapid uploads: Queue load requests, don't overlap
 - Empty playlist + single file: Auto-load and set as first item
+
+---
 
 ## Accessibility
 - Screen reader announces: "Video loaded: [filename]"
@@ -140,12 +146,16 @@ Automatically load and play single uploaded files or URLs in the player for imme
 - `upload.js` - Integrate with upload handlers
 - `url-upload.js` - Integrate with URL upload (Phase 20)
 
+---
+
 ## What NOT to Do
 - ❌ Don't auto-load multiple files (confusing UX)
 - ❌ Don't autoplay after load (browser restriction + UX)
 - ❌ Don't auto-load if user is actively watching something
 - ❌ Don't forget to highlight loaded video in playlist
 - ❌ Don't skip error handling (file may be corrupted)
+
+---
 
 ## MediaBunny Integration
 
@@ -171,6 +181,8 @@ Automatically load and play single uploaded files or URLs in the player for imme
 - This phase builds on upload infrastructure
 - Should be implemented after URL upload (Phase 20)
 - Before general upload/management phases
+
+---
 
 ## Done When
 ✅ Single file upload auto-loads  

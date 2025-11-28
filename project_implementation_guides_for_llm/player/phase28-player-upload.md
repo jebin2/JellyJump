@@ -3,6 +3,14 @@
 ## Goal
 Implement file upload button and drag-and-drop zone for adding videos to playlist.
 
+---
+
+## What to Build
+
+File upload system with:\n- Upload button and folder selection\n- Drag-and-drop zone\n- File validation\n- MediaBunny metadata extraction\n- Playlist integration
+
+---
+
 ## Features to Implement
 
 ### Feature 1: File Upload Button
@@ -66,6 +74,8 @@ Implement file upload button and drag-and-drop zone for adding videos to playlis
 - Handle videos that fail to load metadata gracefully
 - **Reference**: "Reading track metadata" and "CanvasSink" in mediabunny-llms-full.md
 
+---
+
 ## Testing Checklist
 - [ ] Upload button opens file picker
 - [ ] Can select multiple files
@@ -73,6 +83,8 @@ Implement file upload button and drag-and-drop zone for adding videos to playlis
 - [ ] Invalid files are rejected with error
 - [ ] Metadata extracted correctly
 - [ ] Videos added to playlist
+
+---
 
 ## Done When
 ✅ Upload functionality works  
