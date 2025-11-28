@@ -3,6 +3,18 @@
 ## Goal
 Implement toggle between overlay and fixed control bar modes to support both player and editor use cases.
 
+---
+
+## What to Build
+
+Two distinct control bar modes:
+- **Overlay Mode**: Auto-hiding controls that overlay the video (player default)
+- **Fixed Mode**: Always-visible controls below the video (editor mode)
+- Toggle button to switch between modes
+- localStorage persistence for user preference
+
+---
+
 ## Features to Implement
 
 ### Feature 1: Overlay Mode (Default for Player)
@@ -14,13 +26,9 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 - Show on mouse movement or hover
 - Video uses full container height
 - Controls positioned absolutely over video
-- Semi-transparent background (e.g., `rgba(0, 0, 0, 0.7)`)
-
-**Behavior**:
-- Mouse moves → Show controls, reset hide timer
-- Mouse stops moving for 3s → Fade out controls
-- Video paused → Keep controls visible
-- Video playing + no mouse → Hide controls
+- Semi-transparent background (e.g., rgba(0, 0, 0, 0.7))
+- Pause video → Keep controls visible
+- Playing + no mouse → Hide controls
 - Touch on mobile → Toggle controls visibility
 
 ### Feature 2: Fixed Mode (For Editor)
@@ -43,10 +51,6 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 - State indicator: Different icon/color for each mode
 - Tooltip: "Pin Controls" / "Unpin Controls"
 - Button accessible via keyboard
-
-**UI States**:
-- Overlay mode: Unpin icon (controls floating)
-- Fixed mode: Pin icon (controls docked)
 - Visual feedback on click
 - Animation on mode change
 
@@ -54,8 +58,9 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 **Purpose**: Remember user's preferred control mode
 
 **Requirements**:
-- Store mode in localStorage: `controlBarMode: 'overlay' | 'fixed'`
-- Default: `'overlay'` for player page
+- Store mode in localStorage with key: controlBarMode
+- Values: 'overlay' or 'fixed'
+- Default: 'overlay' for player page
 - Apply correct mode on page load
 - Update localStorage on mode change
 
@@ -69,22 +74,7 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 - Transition duration: 300ms
 - Maintain playback during transition
 
-**Transition Steps**:
-1. Fade out controls (100ms)
-2. Swap CSS classes and adjust layout (100ms)
-3. Fade in controls (100ms)
-
-## Testing Checklist
-- [ ] Overlay mode: Controls auto-hide after 3 seconds
-- [ ] Overlay mode: Controls show on mouse move
-- [ ] Overlay mode: Controls stay visible when paused
-- [ ] Fixed mode: Controls always visible
-- [ ] Fixed mode: Video height adjusts correctly
-- [ ] Toggle button switches modes
-- [ ] Mode persists after page reload
-- [ ] Smooth transitions between modes
-- [ ] No layout jumps or flickers
-- [ ] Keyboard accessible (toggle button focusable)
+---
 
 ## Interaction Behavior
 
@@ -106,37 +96,55 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 4. Controls fade in with new positioning
 5. Mode saved to localStorage
 
+---
+
 ## Edge Cases
+
 - Video at different aspect ratios: Ensure controls don't overlap in overlay mode
 - Fullscreen: Overlay mode preferred (fixed mode may not work in fullscreen)
 - Mobile: Touch events should toggle controls in overlay mode
 - Rapid mode switching: Debounce or queue transitions
 - Controls height changes: Recalculate video height in fixed mode
 
+---
+
 ## Accessibility
+
 - Toggle button has aria-label: "Pin controls" / "Unpin controls"
 - Button has aria-pressed="true" / "false"
 - Controls always accessible via keyboard (even when visually hidden in overlay)
 - Focus management: Don't lose focus when controls hide in overlay mode
+- Screen reader announces mode changes
 
-## Files to Modify
-- `player.html` - Add mode toggle button
-- `player.css` - Add overlay and fixed mode styles
-- `player.js` - Add mode switching logic, auto-hide timer, localStorage
+---
 
 ## What NOT to Do
+
 - ❌ Don't hide controls completely in overlay mode (keep accessible)
 - ❌ Don't forget to clear auto-hide timer on pause
 - ❌ Don't make fixed mode controls overlap video
 - ❌ Don't ignore fullscreen mode (overlay preferred)
 - ❌ Don't use JavaScript for fade animations (use CSS)
 
-## MediaBunny Integration
-- No direct MediaBunny APIs needed
-- Mode switching should not affect MediaBunny Player instance
-- Ensure playback continues smoothly during mode transitions
+---
+
+## Testing Checklist
+
+- [ ] Overlay mode: Controls auto-hide after 3 seconds
+- [ ] Overlay mode: Controls show on mouse move
+- [ ] Overlay mode: Controls stay visible when paused
+- [ ] Fixed mode: Controls always visible
+- [ ] Fixed mode: Video height adjusts correctly
+- [ ] Toggle button switches modes
+- [ ] Mode persists after page reload
+- [ ] Smooth transitions between modes
+- [ ] No layout jumps or flickers
+- [ ] Keyboard accessible (toggle button focusable)
+
+---
 
 ## Done When
+
 ✅ Overlay mode works with auto-hide  
 ✅ Fixed mode keeps controls always visible  
 ✅ Toggle button switches modes smoothly  
@@ -147,5 +155,6 @@ Implement toggle between overlay and fixed control bar modes to support both pla
 ✅ Ready for next phase
 
 ---
+
 **Phase**: 17 | **Component**: Player  
 **Estimated Time**: 50-70 minutes
