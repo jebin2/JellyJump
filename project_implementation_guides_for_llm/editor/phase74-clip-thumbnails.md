@@ -3,8 +3,19 @@
 ## Goal
 Display video frame thumbnails inside clip rectangles for visual reference
 
-## Group
-**Timeline Interaction**
+---
+
+## What to Build
+
+Clip thumbnails:
+- Generate thumbnail strip
+- Show frames across duration
+- Update on zoom level
+- Cache thumbnails
+- Lazy load for performance
+- Handle audio waveforms
+
+---
 
 ## Feature to Implement
 
@@ -237,7 +248,9 @@ await input.release();
 - **MediaBunny Docs**: Player API, Input.fromBlob, seek, drawImage
 - **Code of Conduct**: Async/await for MediaBunny, resource cleanup
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Thumbnail extraction triggered on video clip drop
 - [ ] First frame extracted successfully
 - [ ] Thumbnail displayed as clip background
@@ -250,6 +263,8 @@ await input.release();
 - [ ] MediaBunny resources cleaned up (no memory leaks)
 - [ ] No console errors
 - [ ] Thumbnail blends well with clip color
+
+---
 
 ## Done When
 ✅ First frame extraction functional  

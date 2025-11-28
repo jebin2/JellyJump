@@ -3,8 +3,19 @@
 ## Goal
 Header with controls, duration, settings, fixed position
 
-## Group
-**Timeline Foundation**
+---
+
+## What to Build
+
+Timeline header:
+- Toolbar with edit buttons
+- Zoom slider
+- Playback controls
+- Time format toggle
+- Snap toggle
+- Grid overlay options
+
+---
 
 ## Feature to Implement
 
@@ -149,7 +160,9 @@ Create Timeline class/module:
 - **Phase 60**: Timeline container structure
 - **Phase 72**: Will implement zoom functionality
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Timeline header shows all controls
 - [ ] Play/Pause button visible
 - [ ] Click Play/Pause starts preview player
@@ -165,6 +178,8 @@ Create Timeline class/module:
 - [ ] Adequate spacing between controls
 - [ ] All buttons keyboard accessible
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Timeline header populated with controls  

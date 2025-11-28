@@ -3,8 +3,19 @@
 ## Goal
 Implement drag interaction to trim clip start/end points
 
-## Group
-**Clip Selection & Editing**
+---
+
+## What to Build
+
+Drag to trim clips:
+- Drag trim handles
+- Resize clip duration
+- Visual feedback during drag
+- Snap to frames/markers
+- Ripple or gap mode
+- Update timeline layout
+
+---
 
 ## Feature to Implement
 
@@ -57,7 +68,9 @@ Implement drag interaction to trim clip start/end points
 - ❌ Do NOT implement Ripple Edit yet
 - ❌ Do NOT implement Slip/Slide tools yet
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Drag right handle changes duration
 - [ ] Drag left handle changes start time and duration
 - [ ] Cannot drag past minimum duration
@@ -65,6 +78,8 @@ Implement drag interaction to trim clip start/end points
 - [ ] Visuals update smoothly
 - [ ] Data model updates correctly after drag
 - [ ] Undo/Redo works (if Phase 80 ready, otherwise note it)
+
+---
 
 ## Done When
 ✅ Can trim start and end of clips  

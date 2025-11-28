@@ -3,8 +3,19 @@
 ## Goal
 Handle drag-and-drop from library to timeline, create clip data structure
 
-## Group
-**Timeline Interaction**
+---
+
+## What to Build
+
+Drop media onto timeline:
+- Accept drops from media panel
+- Calculate drop position
+- Create clip on track
+- Snap to grid/playhead
+- Visual drop indicator
+- Handle multiple clips
+
+---
 
 ## Feature to Implement
 
@@ -251,7 +262,9 @@ Fetch full media details from IndexedDB using mediaId.
 - **Phase 67**: Clip rendering (called after drop)
 - **IndexedDB**: Media storage from Phase 42
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Can drag video from library over video track
 - [ ] Track highlights when dragging over valid drop zone
 - [ ] Track shows error state when dragging invalid media type
@@ -268,6 +281,8 @@ Fetch full media details from IndexedDB using mediaId.
 - [ ] Drop on audio track accepts audio files only
 - [ ] No console errors
 - [ ] Clip rendering triggered (visual clip appears - Phase 67)
+
+---
 
 ## Done When
 ✅ Drop zones accept valid media  

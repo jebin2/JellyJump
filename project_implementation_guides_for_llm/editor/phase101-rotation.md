@@ -3,8 +3,19 @@
 ## Goal
 Rotate video clips
 
-## Group
-**Transform Controls**
+---
+
+## What to Build
+
+Rotation transform:
+- Rotation angle slider
+- Range: -180 to +180 degrees
+- Numeric input
+- Snap to 45� increments
+- Rotate left/right buttons
+- Center anchor point
+
+---
 
 ## Feature to Implement
 
@@ -31,10 +42,14 @@ Rotate video clips
 #### 5. What NOT to Do
 - ❌ Do NOT implement 3D rotation. 2D only.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Rotation slider works
 - [ ] 90, 180, 270 degrees look correct
 - [ ] Center anchor point
+
+---
 
 ## Done When
 ✅ Rotation works  

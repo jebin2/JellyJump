@@ -3,8 +3,19 @@
 ## Goal
 Enable clicking on a clip to select it and update the UI
 
-## Group
-**Clip Selection**
+---
+
+## What to Build
+
+Select clip:
+- Click to select clip
+- Visual selection state
+- Deselect on empty click
+- Keyboard navigation
+- Update properties panel
+- Selection outline
+
+---
 
 ## Feature to Implement
 
@@ -43,12 +54,16 @@ Enable clicking on a clip to select it and update the UI
 
 **MediaBunny Integration**: Not applicable directly, but selected clip determines what `clip` object we manipulate later.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Clicking a clip adds .selected class
 - [ ] Clicking another clip moves the selection
 - [ ] Clicking background clears selection
 - [ ] Properties panel updates with clip info
 - [ ] Selected clip has visible border/highlight
+
+---
 
 ## Done When
 ✅ Can select single clips  

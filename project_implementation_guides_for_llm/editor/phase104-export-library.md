@@ -3,8 +3,19 @@
 ## Goal
 Save the rendered video back to the Media Library
 
-## Group
-**Export**
+---
+
+## What to Build
+
+Export to library:
+- Save to media library option
+- Auto-add exported video
+- Generate thumbnail
+- Store metadata
+- Quick re-import
+- Version management
+
+---
 
 ## Feature to Implement
 
@@ -31,10 +42,14 @@ Save the rendered video back to the Media Library
 #### 4. What NOT to Do
 - ❌ Do NOT implement automatic re-import without user consent.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Checkbox works
 - [ ] Exported video appears in library
 - [ ] Can be dragged to timeline immediately
+
+---
 
 ## Done When
 ✅ Can export directly to library  

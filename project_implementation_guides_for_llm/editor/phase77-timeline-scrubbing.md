@@ -3,8 +3,19 @@
 ## Goal
 Enable user to drag the playhead or click ruler to seek (scrubbing)
 
-## Group
-**Timeline Interaction**
+---
+
+## What to Build
+
+Timeline scrubbing:
+- Click ruler to seek
+- Drag playhead to scrub
+- Update preview in real-time
+- Show time tooltip
+- Snap to clip edges
+- Smooth interaction
+
+---
 
 ## Feature to Implement
 
@@ -97,7 +108,9 @@ Timeline class extensions:
 - **Phase 70**: Playback Sync (infrastructure for seeking)
 - **Phase 62**: Ruler Structure (interaction target)
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Clicking ruler moves playhead to correct time
 - [ ] Video updates to frame at clicked time
 - [ ] Dragging playhead moves it smoothly
@@ -107,6 +120,8 @@ Timeline class extensions:
 - [ ] Keyboard arrows move playhead
 - [ ] Auto-scroll works when dragging to edge (optional)
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Click-to-seek working  

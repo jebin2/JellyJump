@@ -41,10 +41,14 @@ Properties Panel Group (Phases 54-59)
 ## What NOT to Do
 - Do not implement dynamic data binding yet (Phase 59).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Info tab shows the list of metadata fields.
 - [ ] Layout is clean and aligned.
 - [ ] Long text handles gracefully (doesn't break layout).
+
+---
 
 ## Done When
 - [ ] HTML structure for metadata fields is added.

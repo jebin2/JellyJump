@@ -3,8 +3,19 @@
 ## Goal
 Customize font, size, and color of text clips
 
-## Group
-**Text Overlays**
+---
+
+## What to Build
+
+Text styling:
+- Font family selector
+- Font size slider
+- Color picker
+- Bold/Italic toggles
+- Text alignment options
+- Live preview updates
+
+---
 
 ## Feature to Implement
 
@@ -36,11 +47,15 @@ Customize font, size, and color of text clips
 #### 4. What NOT to Do
 - ❌ Do NOT implement custom font upload yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Font family changes work
 - [ ] Size changes work
 - [ ] Color picker updates text color
 - [ ] Background color works (if implemented)
+
+---
 
 ## Done When
 ✅ Text styling controls functional  

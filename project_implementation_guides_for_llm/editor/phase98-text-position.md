@@ -3,8 +3,19 @@
 ## Goal
 Position text elements on the video canvas
 
-## Group
-**Text Overlays**
+---
+
+## What to Build
+
+Text position:
+- Position presets (top/center/bottom)
+- Custom X/Y coordinates
+- Drag on preview to position
+- Safe area guides
+- Pixel-perfect placement
+- Anchor points
+
+---
 
 ## Feature to Implement
 
@@ -38,10 +49,14 @@ Position text elements on the video canvas
 #### 5. What NOT to Do
 - ❌ Do NOT implement complex constraints or snapping in the preview window.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] X/Y sliders move text
 - [ ] Alignment buttons work (center text around point)
 - [ ] Text stays within bounds (or not, up to user)
+
+---
 
 ## Done When
 ✅ Text can be positioned  

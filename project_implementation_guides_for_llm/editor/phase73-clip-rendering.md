@@ -3,8 +3,19 @@
 ## Goal
 Render clip rectangles on timeline with position, duration, and basic styling
 
-## Group
-**Timeline Interaction**
+---
+
+## What to Build
+
+Clip rendering:
+- Render clip rectangles on tracks
+- Show clip duration visually
+- Display clip title/label
+- Color-code by media type
+- Borders and shadows
+- Selection highlight
+
+---
 
 ## Feature to Implement
 
@@ -237,7 +248,9 @@ Provides foundation for:
 - **Phase 72**: Zoom will trigger re-rendering
 - **Code of Conduct**: Use BEM, cache selectors, DocumentFragment
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Clip rectangle appears on track after drop (Phase 66)
 - [ ] Clip positioned correctly based on startTime
 - [ ] Clip width matches duration (visual verification)
@@ -252,6 +265,8 @@ Provides foundation for:
 - [ ] Data attributes present (clip-id, media-id, etc.)
 - [ ] No console errors
 - [ ] Smooth rendering performance
+
+---
 
 ## Done When
 ✅ Clips render as visual rectangles  

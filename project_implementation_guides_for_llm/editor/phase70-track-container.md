@@ -3,8 +3,19 @@
 ## Goal
 Create scrollable track area below ruler for video/audio clips
 
-## Group
-**Timeline Foundation**
+---
+
+## What to Build
+
+Track container structure:
+- Multiple track lanes
+- Video tracks (top)
+- Audio tracks (bottom)
+- Track headers with labels
+- Add/remove track buttons
+- Track height adjustment
+
+---
 
 ## Feature to Implement
 
@@ -193,7 +204,9 @@ CSS classes:
 - **Phase 67**: Will render clip elements in tracks
 - **Code of Conduct**: Use event delegation, cache selectors
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Track container visible below ruler
 - [ ] Three tracks present: Video 1, Video 2, Audio 1
 - [ ] Track headers visible on left (150px wide)
@@ -208,6 +221,8 @@ CSS classes:
 - [ ] Dark Neobrutalism styling (borders, backgrounds)
 - [ ] Clear visual separation between tracks
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Track container structured with 3 default tracks  

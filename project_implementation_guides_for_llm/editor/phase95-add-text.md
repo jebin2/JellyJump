@@ -3,8 +3,19 @@
 ## Goal
 Create a new text element on the timeline
 
-## Group
-**Text Overlays**
+---
+
+## What to Build
+
+Add text overlay:
+- Text tool button
+- Click timeline to add
+- Text layer on track
+- Duration control
+- Position on timeline
+- Default text properties
+
+---
 
 ## Feature to Implement
 
@@ -41,11 +52,15 @@ Create a new text element on the timeline
 #### 5. What NOT to Do
 - ❌ Do NOT implement rich text editor (bold/italic per character). Global style only.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] "Add Text" button creates a clip
 - [ ] Clip appears on Text track
 - [ ] Default text is visible in preview
 - [ ] Clip has correct default duration
+
+---
 
 ## Done When
 ✅ Text clip appears on timeline  

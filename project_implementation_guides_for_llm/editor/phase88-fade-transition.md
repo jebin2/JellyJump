@@ -3,8 +3,19 @@
 ## Goal
 Apply Fade In and Fade Out effects to individual clips
 
-## Group
-**Transitions**
+---
+
+## What to Build
+
+Fade transition:
+- Fade in/out effect
+- Apply to clip edges
+- Duration control
+- Visual curve indicator
+- Real-time preview
+- MediaBunny integration
+
+---
 
 ## Feature to Implement
 
@@ -37,12 +48,16 @@ Apply Fade In and Fade Out effects to individual clips
 #### 5. What NOT to Do
 - ❌ Do NOT implement drag handles for fades on the timeline yet (Phase 100+). Use Properties panel.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Fade In slider updates clip data
 - [ ] Fade Out slider updates clip data
 - [ ] Video actually fades in/out during playback
 - [ ] Visual indicator on clip (optional)
 - [ ] Zero duration disables fade
+
+---
 
 ## Done When
 ✅ Can apply fade in/out to a clip  

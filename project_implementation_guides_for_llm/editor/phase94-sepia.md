@@ -3,8 +3,19 @@
 ## Goal
 Apply a preset Sepia look
 
-## Group
-**Video Filters**
+---
+
+## What to Build
+
+Sepia filter:
+- Vintage sepia tone effect
+- Intensity slider (0-100%)
+- Warm brown tones
+- Real-time preview
+- Apply to selected clip
+- Classic film look
+
+---
 
 ## Feature to Implement
 
@@ -28,9 +39,13 @@ Apply a preset Sepia look
 #### 4. What NOT to Do
 - ❌ Do NOT implement Film Grain yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Sepia slider works
 - [ ] Visuals look correct
+
+---
 
 ## Done When
 ✅ Sepia filter works  

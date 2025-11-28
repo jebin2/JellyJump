@@ -3,8 +3,19 @@
 ## Goal
 Split the selected clip into two separate clips at the current playhead position
 
-## Group
-**Clip Selection & Editing**
+---
+
+## What to Build
+
+Split clip:
+- Split tool or keyboard shortcut
+- Cut at playhead position
+- Create two separate clips
+- Preserve properties
+- Update clip IDs
+- Maintain timeline sync
+
+---
 
 ## Feature to Implement
 
@@ -49,13 +60,17 @@ Split the selected clip into two separate clips at the current playhead position
 #### 6. What NOT to Do
 - ❌ Do NOT implement "Razor Tool" (mouse click to split) yet. Just Playhead split.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Split button works on selected clip
 - [ ] Original clip duration is correct
 - [ ] New clip starts exactly where split happened
 - [ ] New clip source time is correct (video continuity)
 - [ ] Undo/Redo works
 - [ ] Splitting at edges is prevented
+
+---
 
 ## Done When
 ✅ Can split a clip into two correct parts  

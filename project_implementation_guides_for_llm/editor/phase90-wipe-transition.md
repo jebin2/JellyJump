@@ -3,8 +3,19 @@
 ## Goal
 Implement a linear wipe transition between clips
 
-## Group
-**Transitions**
+---
+
+## What to Build
+
+Wipe transition:
+- Directional wipe effect
+- Direction options (L/R/U/D)
+- Edge softness control
+- Duration slider
+- Live preview
+- Multiple wipe patterns
+
+---
 
 ## Feature to Implement
 
@@ -37,11 +48,15 @@ Implement a linear wipe transition between clips
 #### 5. What NOT to Do
 - ❌ Do NOT implement 50 different wipe shapes. Just Linear (Left/Right).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Wipe effect renders correctly
 - [ ] Direction can be changed
 - [ ] Duration works
 - [ ] Performance is acceptable
+
+---
 
 ## Done When
 ✅ Wipe transition works  

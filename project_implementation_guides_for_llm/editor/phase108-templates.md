@@ -3,8 +3,19 @@
 ## Goal
 Start new projects from predefined templates
 
-## Group
-**Project Management**
+---
+
+## What to Build
+
+Project templates:
+- Template gallery
+- Pre-configured layouts
+- Load template button
+- Apply to new project
+- Customize after load
+- Save custom templates
+
+---
 
 ## Feature to Implement
 
@@ -30,9 +41,13 @@ Start new projects from predefined templates
 #### 3. What NOT to Do
 - ❌ Do NOT build a template editor. Just hardcode 2-3 JSONs.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Selecting template sets correct resolution
 - [ ] Selecting template adds default clips (if any)
+
+---
 
 ## Done When
 ✅ Templates work  

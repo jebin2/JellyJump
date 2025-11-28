@@ -54,12 +54,16 @@ Properties Panel Group (Phases 54-59)
 ## What NOT to Do
 - Do not add the actual content inside the tabs yet (Phases 57, 58).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Tab bar appears at the top of the properties panel.
 - [ ] "Info" and "Settings" buttons are visible.
 - [ ] Clicking "Settings" switches the active style and hides Info content.
 - [ ] Clicking "Info" switches back.
 - [ ] Default state is Info tab active.
+
+---
 
 ## Done When
 - [ ] Tab HTML structure is in place.

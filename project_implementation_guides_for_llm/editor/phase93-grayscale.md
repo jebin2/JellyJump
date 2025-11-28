@@ -3,8 +3,19 @@
 ## Goal
 Apply a preset Grayscale look
 
-## Group
-**Video Filters**
+---
+
+## What to Build
+
+Grayscale filter:
+- Convert to black and white
+- Toggle on/off
+- Preserve luminance
+- Instant preview
+- Apply to clip
+- MediaBunny processing
+
+---
 
 ## Feature to Implement
 
@@ -28,9 +39,13 @@ Apply a preset Grayscale look
 #### 4. What NOT to Do
 - ❌ Do NOT mix with Saturation slider (if they conflict). Usually Grayscale overrides saturation.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Grayscale toggle works
 - [ ] Can be disabled
+
+---
 
 ## Done When
 ✅ Grayscale filter works  

@@ -3,8 +3,19 @@
 ## Goal
 Render the timeline to a video file and download it
 
-## Group
-**Export**
+---
+
+## What to Build
+
+Export video:
+- Export button/modal
+- Format selection (MP4, WebM)
+- Resolution options
+- Quality/bitrate settings
+- MediaBunny encoding
+- Progress indicator
+
+---
 
 ## Feature to Implement
 
@@ -43,12 +54,16 @@ Render the timeline to a video file and download it
 #### 4. What NOT to Do
 - ❌ Do NOT implement server-side rendering. Client-side only (WASM).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Export modal opens
 - [ ] Start button triggers conversion
 - [ ] Progress bar updates
 - [ ] File downloads upon completion
 - [ ] Video plays correctly in external player
+
+---
 
 ## Done When
 ✅ Can export a playable video file  

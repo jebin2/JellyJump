@@ -3,8 +3,19 @@
 ## Goal
 Add time labels and tick marks to ruler for time reference
 
-## Group
-**Timeline Foundation**
+---
+
+## What to Build
+
+Ruler time markers:
+- Calculate tick positions
+- Draw major ticks (seconds)
+- Draw minor ticks (frames)
+- Add time labels
+- Update on zoom
+- Snap to frame boundaries
+
+---
 
 ## Feature to Implement
 
@@ -186,7 +197,9 @@ Store in array for reference: `this.timeMarkers = []`
 - **Phase 72**: Zoom functionality will trigger marker updates
 - **Code of Conduct**: Cache selectors, minimize DOM manipulation
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Time labels appear at 5-second intervals (0:00, 0:05, 0:10...)
 - [ ] Labels show correct M:SS format
 - [ ] Major tick marks at 5-second intervals (2px, full height)
@@ -201,6 +214,8 @@ Store in array for reference: `this.timeMarkers = []`
 - [ ] At least 6 labels visible for 30-second timeline
 - [ ] No console errors
 - [ ] Smooth rendering (no performance issues)
+
+---
 
 ## Done When
 ✅ Time labels generated and displayed  

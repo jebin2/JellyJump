@@ -3,8 +3,19 @@
 ## Goal
 Resize video clips
 
-## Group
-**Transform Controls**
+---
+
+## What to Build
+
+Scale transform:
+- Scale slider (percentage)
+- Uniform or separate X/Y
+- Zoom in/out effect
+- Maintain aspect ratio option
+- Preview in real-time
+- Reset to 100%
+
+---
 
 ## Feature to Implement
 
@@ -33,10 +44,14 @@ Resize video clips
 #### 5. What NOT to Do
 - ❌ Do NOT implement non-uniform scaling (stretching) unless requested. Keep it simple.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Scale slider resizes video
 - [ ] Center anchor point is maintained
 - [ ] 1.0 is original size
+
+---
 
 ## Done When
 ✅ Scale control works  

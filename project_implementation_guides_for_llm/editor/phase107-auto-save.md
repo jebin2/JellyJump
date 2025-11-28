@@ -3,8 +3,19 @@
 ## Goal
 Automatically save project state to LocalStorage
 
-## Group
-**Project Management**
+---
+
+## What to Build
+
+Auto-save functionality:
+- Periodic auto-save (every 2 min)
+- Save to localStorage
+- Recovery on crash
+- Visual save indicator
+- Manual save trigger
+- Clear old auto-saves
+
+---
 
 ## Feature to Implement
 
@@ -30,10 +41,14 @@ Automatically save project state to LocalStorage
 #### 4. What NOT to Do
 - ❌ Do NOT save to server yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Changes persist after page refresh
 - [ ] "Saved" indicator updates
 - [ ] Performance is not impacted (don't save on every mousemove)
+
+---
 
 ## Done When
 ✅ Auto-save functional  

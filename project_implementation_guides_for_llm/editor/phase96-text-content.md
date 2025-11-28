@@ -3,8 +3,19 @@
 ## Goal
 Edit the content of a selected text clip
 
-## Group
-**Text Overlays**
+---
+
+## What to Build
+
+Edit text content:
+- Text input field
+- Edit overlay text
+- Multi-line support
+- Character limit
+- Real-time preview
+- Font fallbacks
+
+---
 
 ## Feature to Implement
 
@@ -35,11 +46,15 @@ Edit the content of a selected text clip
 #### 5. What NOT to Do
 - ❌ Do NOT implement on-canvas editing (typing directly on the video). Use the side panel.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Input field appears for text clips
 - [ ] Typing updates the preview instantly
 - [ ] Typing updates the timeline clip label (optional but nice)
 - [ ] Empty text is handled gracefully
+
+---
 
 ## Done When
 ✅ Can edit text content  

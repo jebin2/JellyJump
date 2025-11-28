@@ -3,8 +3,19 @@
 ## Goal
 Remove selected clips from the timeline
 
-## Group
-**Clip Selection & Editing**
+---
+
+## What to Build
+
+Delete clip:
+- Delete key or button
+- Remove from timeline
+- Gap or ripple delete
+- Update track layout
+- Add to undo stack
+- Clear from memory
+
+---
 
 ## Feature to Implement
 
@@ -39,12 +50,16 @@ Remove selected clips from the timeline
 #### 5. What NOT to Do
 - ❌ Do NOT implement Ripple Delete (closing the gap) yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Delete key removes selected clip(s)
 - [ ] Toolbar trash button removes selected clip(s)
 - [ ] Multi-selection delete works
 - [ ] Undo restores the deleted clips
 - [ ] No errors if nothing selected
+
+---
 
 ## Done When
 ✅ Selected clips can be deleted  

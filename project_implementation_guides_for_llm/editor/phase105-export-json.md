@@ -3,8 +3,19 @@
 ## Goal
 Save the project state to a JSON file
 
-## Group
-**Export**
+---
+
+## What to Build
+
+Export project JSON:
+- Save project to JSON file
+- Serialize timeline data
+- Include all clip properties
+- Store effects and transitions
+- Download JSON file
+- Project versioning
+
+---
 
 ## Feature to Implement
 
@@ -41,10 +52,14 @@ Save the project state to a JSON file
 #### 4. What NOT to Do
 - ❌ Do NOT bundle media files into the JSON (too huge). Just references.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] JSON file downloads
 - [ ] Structure is valid
 - [ ] All clip properties are preserved
+
+---
 
 ## Done When
 ✅ Can save project to JSON  

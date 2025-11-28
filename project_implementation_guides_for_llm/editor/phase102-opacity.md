@@ -3,8 +3,19 @@
 ## Goal
 Adjust transparency of video clips
 
-## Group
-**Transform Controls**
+---
+
+## What to Build
+
+Opacity transform:
+- Opacity slider (0-100%)
+- Fade effect control
+- Transparency adjustment
+- Real-time preview
+- Apply to any clip
+- Keyframe animation support
+
+---
 
 ## Feature to Implement
 
@@ -32,10 +43,14 @@ Adjust transparency of video clips
 #### 5. What NOT to Do
 - ❌ Do NOT confuse with Fade In/Out. This is the base opacity.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Opacity slider works
 - [ ] 0% is invisible
 - [ ] 50% shows background (if any)
+
+---
 
 ## Done When
 ✅ Opacity control works  

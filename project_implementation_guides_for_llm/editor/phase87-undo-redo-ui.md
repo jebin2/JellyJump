@@ -3,8 +3,19 @@
 ## Goal
 Add Undo/Redo buttons and keyboard shortcuts
 
-## Group
-**Undo/Redo**
+---
+
+## What to Build
+
+Undo/redo UI:
+- Undo/Redo buttons
+- Keyboard shortcuts (Ctrl+Z, Ctrl+Y)
+- Enable/disable states
+- Visual feedback
+- Tooltips with action name
+- Status indicators
+
+---
 
 ## Feature to Implement
 
@@ -40,11 +51,15 @@ Add Undo/Redo buttons and keyboard shortcuts
 #### 5. What NOT to Do
 - ❌ Do NOT implement a visual history list (Photoshop style) yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Buttons appear in toolbar
 - [ ] Buttons enable/disable correctly based on stack
 - [ ] Keyboard shortcuts work
 - [ ] Tooltips show "Undo (Ctrl+Z)"
+
+---
 
 ## Done When
 ✅ Undo/Redo buttons visible  

@@ -3,8 +3,19 @@
 ## Goal
 Move clips around the timeline by dragging them
 
-## Group
-**Clip Selection & Editing**
+---
+
+## What to Build
+
+Rearrange clips:
+- Drag clips horizontally
+- Change position on timeline
+- Snap to grid/clips
+- Visual drag ghost
+- Prevent overlaps
+- Update all affected clips
+
+---
 
 ## Feature to Implement
 
@@ -51,12 +62,16 @@ Move clips around the timeline by dragging them
 - ❌ Do NOT implement "Insert Mode" (pushing other clips away).
 - ❌ Do NOT implement complex collision resolution (ripple).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Can drag clip along time axis
 - [ ] Can drag clip to different track
 - [ ] Snapping to playhead/clips works
 - [ ] Position updates correctly on drop
 - [ ] Undo/Redo works
+
+---
 
 ## Done When
 ✅ Clips can be moved freely  

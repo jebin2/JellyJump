@@ -3,8 +3,19 @@
 ## Goal
 Create a smooth transition between two overlapping clips
 
-## Group
-**Transitions**
+---
+
+## What to Build
+
+Crossfade transition:
+- Blend between two clips
+- Overlap region
+- Duration adjustment
+- Smooth blending
+- Preview during edit
+- Apply to adjacent clips
+
+---
 
 ## Feature to Implement
 
@@ -42,10 +53,14 @@ Create a smooth transition between two overlapping clips
 #### 4. What NOT to Do
 - ❌ Do NOT build a complex "Transition Track" or specific Transition Object yet if the engine doesn't support it natively.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Overlapping clips blend correctly
 - [ ] "Crossfade" helper sets fade durations correctly
 - [ ] Playback is smooth
+
+---
 
 ## Done When
 ✅ Can create a crossfade effect  

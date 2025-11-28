@@ -3,8 +3,19 @@
 ## Goal
 Ruler container, background grid
 
-## Group
-**Timeline Foundation**
+---
+
+## What to Build
+
+Ruler structure:
+- Time ruler at top of timeline
+- Tick marks for time intervals
+- Time labels (HH:MM:SS)
+- Major/minor divisions
+- Scroll synchronized
+- Zoom responsive
+
+---
 
 ## Feature to Implement
 
@@ -129,7 +140,9 @@ Extend Timeline class:
 - **Phase 63**: Will add time markers
 - **Phase 72**: Will implement zoom
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Ruler visible below timeline header
 - [ ] Ruler height is 30px
 - [ ] Background grid pattern visible
@@ -143,6 +156,8 @@ Extend Timeline class:
 - [ ] Grid lines contrasting and readable
 - [ ] Bottom border separates from tracks
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Ruler container structured  

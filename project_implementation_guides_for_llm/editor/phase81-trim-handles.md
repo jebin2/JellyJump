@@ -3,8 +3,19 @@
 ## Goal
 Render interactive handles on the edges of selected clips for trimming
 
-## Group
-**Clip Selection & Editing**
+---
+
+## What to Build
+
+Trim handles:
+- Show handles on selected clip
+- Left and right edges
+- Hover to highlight
+- Cursor change on hover
+- Visual indicators
+- Touch-friendly size
+
+---
 
 ## Feature to Implement
 
@@ -46,13 +57,17 @@ Render interactive handles on the edges of selected clips for trimming
 
 **MediaBunny Integration**: Not applicable
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Selecting a clip shows handles
 - [ ] Deselecting hides handles
 - [ ] Handles are positioned correctly (left/right edges)
 - [ ] Cursor changes to resize arrow on hover
 - [ ] Handles do not obscure clip content too much
 - [ ] Multi-selection: Show handles on ALL selected clips? (Yes, usually)
+
+---
 
 ## Done When
 ✅ Handles appear on selected clips  

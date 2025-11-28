@@ -3,8 +3,19 @@
 ## Goal
 Finalize the editor with shortcuts and UX improvements
 
-## Group
-**Polish**
+---
+
+## What to Build
+
+Editor polish:
+- Performance optimization
+- Loading states
+- Error boundaries
+- Tooltips everywhere
+- Keyboard shortcuts help
+- Final UX refinements
+
+---
 
 ## Feature to Implement
 
@@ -41,11 +52,15 @@ Finalize the editor with shortcuts and UX improvements
 #### 4. What NOT to Do
 - ❌ Do NOT start new features. Fix only.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] All shortcuts work
 - [ ] No conflicts with browser shortcuts (prevent default where needed)
 - [ ] Tooltips appear on hover
 - [ ] UI feels responsive
+
+---
 
 ## Done When
 ✅ Editor feels complete  

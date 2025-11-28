@@ -3,8 +3,19 @@
 ## Goal
 Add toolbar below timeline with edit tools (cut, delete, undo, redo)
 
-## Group
-**Timeline Foundation**
+---
+
+## What to Build
+
+Edit toolbar:
+- Tool buttons (Select, Trim, Split)
+- Cut/Copy/Paste buttons
+- Delete button
+- Undo/Redo buttons
+- Active tool highlighting
+- Tooltips on hover
+
+---
 
 ## Feature to Implement
 
@@ -195,7 +206,9 @@ Toolbar will integrate with:
 - **Code of Conduct**: Use data attributes, BEM naming, event delegation
 - **Theme System**: CSS variables for consistent styling
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Toolbar visible below timeline tracks
 - [ ] Toolbar spans full width
 - [ ] Six buttons present: Cut, Copy, Paste, Delete, Undo, Redo
@@ -210,6 +223,8 @@ Toolbar will integrate with:
 - [ ] Buttons keyboard focusable
 - [ ] Responsive: Labels hidden on small screens
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Toolbar structured and positioned  

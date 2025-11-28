@@ -3,8 +3,19 @@
 ## Goal
 Load a saved project from a JSON file
 
-## Group
-**Project Management**
+---
+
+## What to Build
+
+Import project JSON:
+- Import JSON button
+- File picker for JSON
+- Parse and validate
+- Reconstruct timeline
+- Restore all properties
+- Error handling
+
+---
 
 ## Feature to Implement
 
@@ -35,11 +46,15 @@ Load a saved project from a JSON file
 #### 4. What NOT to Do
 - ❌ Do NOT try to auto-find moved media files.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Loading JSON restores clips
 - [ ] Correctly links existing media
 - [ ] Handles missing media gracefully (no crash)
 - [ ] Timeline renders correctly after load
+
+---
 
 ## Done When
 ✅ Can load project from JSON  

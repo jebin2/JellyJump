@@ -39,11 +39,15 @@ Properties Panel Group (Phases 54-59)
 ## What NOT to Do
 - Do not implement the actual click listeners on the timeline/library yet (those are in their respective groups). Just the *response* logic.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Calling `updatePropertiesPanel('none')` shows the empty state.
 - [ ] Calling `updatePropertiesPanel('library', ...)` shows the Info tab and populates data.
 - [ ] Calling `updatePropertiesPanel('timeline', ...)` shows the Info tab and enables Settings.
 - [ ] Switching between types works correctly without refreshing.
+
+---
 
 ## Done When
 - [ ] JavaScript function for context switching is implemented.

@@ -3,8 +3,19 @@
 ## Goal
 Synchronize timeline playhead movement with the preview player playback
 
-## Group
-**Timeline Interaction**
+---
+
+## What to Build
+
+Playhead sync:
+- Sync with preview player
+- Update position on playback
+- Move with scrubbing
+- Snap to frames
+- Performance optimization
+- Accurate positioning
+
+---
 
 ## Feature to Implement
 
@@ -91,7 +102,9 @@ Centralize time management (e.g., `PlaybackManager` or `EditorState`):
 - **Phase 69**: Playhead Visual (target for movement)
 - **Phase 48**: Preview Player Foundation
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Pressing Play button starts video AND moves playhead
 - [ ] Playhead moves smoothly (not jumpy)
 - [ ] Pressing Pause stops video AND playhead
@@ -100,6 +113,8 @@ Centralize time management (e.g., `PlaybackManager` or `EditorState`):
 - [ ] Time display updates correctly during playback
 - [ ] "Go to Start" moves playhead to 0 and seeks video
 - [ ] No console errors during loop
+
+---
 
 ## Done When
 ✅ Playhead moves in sync with video playback  

@@ -3,8 +3,19 @@
 ## Goal
 Implement zoom in/out functionality for the timeline
 
-## Group
-**Timeline Interaction**
+---
+
+## What to Build
+
+Timeline zoom:
+- Zoom in/out controls
+- Slider or buttons
+- Keyboard shortcuts (+/-)
+- Update ruler divisions
+- Maintain playhead position
+- Min/max zoom limits
+
+---
 
 ## Feature to Implement
 
@@ -88,7 +99,9 @@ Timeline class methods:
 - **Phase 63**: Ruler Markers (needs update)
 - **Phase 67**: Clip Rendering (needs update)
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Zoom slider changes timeline scale
 - [ ] Ctrl+Wheel zooms in/out
 - [ ] Ruler width updates correctly
@@ -98,6 +111,8 @@ Timeline class methods:
 - [ ] Zoom limits (min/max) respected
 - [ ] No visual glitches (overlapping clips, broken ruler)
 - [ ] Performance is acceptable (not freezing)
+
+---
 
 ## Done When
 ✅ Zoom controls visible and functional  

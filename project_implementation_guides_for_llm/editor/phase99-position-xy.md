@@ -3,8 +3,19 @@
 ## Goal
 Move video clips on the canvas (Picture-in-Picture)
 
-## Group
-**Transform Controls**
+---
+
+## What to Build
+
+Position XY transform:
+- X and Y position sliders
+- Numeric input fields
+- Apply to video clips
+- Pan and scan effect
+- Keyframe support
+- Center/reset button
+
+---
 
 ## Feature to Implement
 
@@ -36,11 +47,15 @@ Move video clips on the canvas (Picture-in-Picture)
 #### 5. What NOT to Do
 - ❌ Do NOT implement on-canvas drag handles for video yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] X slider moves video horizontally
 - [ ] Y slider moves video vertically
 - [ ] Values persist
 - [ ] Reset button works
+
+---
 
 ## Done When
 ✅ Video positioning works  

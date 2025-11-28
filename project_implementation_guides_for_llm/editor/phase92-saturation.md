@@ -3,8 +3,19 @@
 ## Goal
 Adjust color intensity of video clips
 
-## Group
-**Video Filters**
+---
+
+## What to Build
+
+Saturation filter:
+- Saturation adjustment slider
+- Range: -100 to +100
+- Desaturate to grayscale
+- Oversaturate for vivid colors
+- Real-time preview
+- Apply to selected clip
+
+---
 
 ## Feature to Implement
 
@@ -29,10 +40,14 @@ Adjust color intensity of video clips
 #### 4. What NOT to Do
 - ❌ Do NOT implement Hue Rotate yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Saturation slider works
 - [ ] 0.0 makes it grayscale
 - [ ] >1.0 makes it vivid
+
+---
 
 ## Done When
 ✅ Saturation control functional  

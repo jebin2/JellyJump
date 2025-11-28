@@ -3,8 +3,19 @@
 ## Goal
 Create the visual playhead (vertical line) indicating current playback time
 
-## Group
-**Timeline Interaction**
+---
+
+## What to Build
+
+Playhead visual:
+- Vertical line indicator
+- Extends across all tracks
+- Current time marker
+- High contrast color
+- Always visible on top
+- Smooth rendering
+
+---
 
 ## Feature to Implement
 
@@ -110,7 +121,9 @@ Extend Timeline class:
 - **Phase 70**: Will drive playhead movement during playback
 - **Phase 71**: Will enable dragging the playhead
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Playhead visible at 0:00 on load
 - [ ] Handle appears in ruler area
 - [ ] Line extends full height of tracks
@@ -120,6 +133,8 @@ Extend Timeline class:
 - [ ] Position accurate at different zoom levels (manual test)
 - [ ] Playhead scrolls with timeline content
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Playhead DOM element created  

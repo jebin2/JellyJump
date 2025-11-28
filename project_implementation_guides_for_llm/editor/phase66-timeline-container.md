@@ -3,8 +3,19 @@
 ## Goal
 Create bottom 30% panel with container styling
 
-## Group
-**Timeline Foundation**
+---
+
+## What to Build
+
+Timeline container:
+- Bottom panel structure
+- Resizable height
+- Scrollable horizontally
+- Zoom controls
+- Ruler at top
+- Track area below
+
+---
 
 ## Feature to Implement
 
@@ -160,7 +171,9 @@ Phase 26 already created basic panel structure. This phase refines:
 - **Phase 64**: Will add track lanes
 - **Code of Conduct**: Follow BEM naming, no inline styles, use CSS variables
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Timeline panel appears at bottom of editor
 - [ ] Panel is 30% of viewport height
 - [ ] Panel spans full viewport width
@@ -176,6 +189,8 @@ Phase 26 already created basic panel structure. This phase refines:
 - [ ] Scrollable areas work (test with overflow content)
 - [ ] No overlap with other panels
 - [ ] No console errors
+
+---
 
 ## Done When
 ✅ Timeline panel structured with header + ruler + tracks  

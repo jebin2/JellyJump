@@ -3,8 +3,19 @@
 ## Goal
 Implement a robust Undo/Redo system using the Command Pattern
 
-## Group
-**Undo/Redo**
+---
+
+## What to Build
+
+Undo/redo stack:
+- Track all editing actions
+- Store state snapshots
+- Stack data structure
+- Maximum history limit
+- Clear on project change
+- Memory management
+
+---
 
 ## Feature to Implement
 
@@ -44,12 +55,16 @@ Implement a robust Undo/Redo system using the Command Pattern
 #### 5. What NOT to Do
 - ❌ Do NOT implement state snapshotting (saving entire JSON every time). It's too heavy. Use Command Pattern.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Performing an action adds to undo stack
 - [ ] Undo reverts the action correctly
 - [ ] Redo re-applies the action correctly
 - [ ] Performing a new action clears the redo stack
 - [ ] Stack limit (e.g., 50 items) works (optional)
+
+---
 
 ## Done When
 ✅ HistoryManager is implemented  

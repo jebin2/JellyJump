@@ -3,8 +3,19 @@
 ## Goal
 Enable selection of multiple clips on the timeline using keyboard modifiers
 
-## Group
-**Clip Selection & Editing**
+---
+
+## What to Build
+
+Multi-select clips:
+- Ctrl+Click for multiple
+- Shift+Click for range
+- Selection box drag
+- Visual feedback
+- Bulk operations
+- Clear selection
+
+---
 
 ## Feature to Implement
 
@@ -49,13 +60,17 @@ Enable selection of multiple clips on the timeline using keyboard modifiers
 
 **MediaBunny Integration**: Not applicable
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Clicking a clip selects it
 - [ ] Ctrl+Click adds another clip to selection
 - [ ] Ctrl+Click on selected clip removes it
 - [ ] Clicking empty space clears selection
 - [ ] Properties panel handles multi-selection state gracefully
 - [ ] Visual highlighting works for multiple items
+
+---
 
 ## Done When
 ✅ Can select multiple clips via Ctrl+Click  

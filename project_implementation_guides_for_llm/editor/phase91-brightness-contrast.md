@@ -3,8 +3,19 @@
 ## Goal
 Adjust brightness and contrast of video clips
 
-## Group
-**Video Filters**
+---
+
+## What to Build
+
+Brightness/Contrast filter:
+- Adjustment sliders
+- Range: -100 to +100
+- Real-time preview
+- Apply to selected clip
+- Reset to defaults
+- MediaBunny processing
+
+---
 
 ## Feature to Implement
 
@@ -40,11 +51,15 @@ Adjust brightness and contrast of video clips
 #### 5. What NOT to Do
 - ❌ Do NOT implement Curves or Levels yet.
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Brightness slider affects video
 - [ ] Contrast slider affects video
 - [ ] Values persist in project data
 - [ ] Reset button works (optional)
+
+---
 
 ## Done When
 ✅ Brightness/Contrast adjustable  

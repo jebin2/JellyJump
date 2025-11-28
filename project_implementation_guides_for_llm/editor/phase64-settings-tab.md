@@ -38,10 +38,14 @@ Properties Panel Group (Phases 54-59)
 ## What NOT to Do
 - Do not implement actual functional controls (Volume, Position, etc. come in later phases).
 
-## Testing Checklist
+---
+
+## Testing Checklist Checklist
 - [ ] Settings tab shows placeholder sections.
 - [ ] Layout allows for scrolling if content is tall.
 - [ ] Visual hierarchy (Headers vs Controls) is clear.
+
+---
 
 ## Done When
 - [ ] HTML structure for settings container is added.
