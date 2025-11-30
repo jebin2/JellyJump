@@ -34,7 +34,7 @@
 }
 
 .nav-logo-img {
-    height: 48px;
+    height: 40px;
     width: auto;
     border-radius: var(--radius-none);
     /* Optional: Blend mode if background isn't perfectly matching */
