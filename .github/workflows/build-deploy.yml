@@ -108,8 +108,10 @@ jobs:
           # Move build back from temp location
           mv "$TEMP_BUILD" build
           
-          # Stage and commit changes
-          git add build/
+          # Force add build directory (it's in .gitignore but we want it in release branch)
+          git add -f build/
+          
+          # Commit if there are changes
           git diff --staged --quiet || git commit -m "Build: Update minified assets from main [skip ci]"
           
           # Push to release branch
