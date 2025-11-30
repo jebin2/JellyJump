@@ -20,7 +20,11 @@
     background: var(--bg-secondary, #1a1a1a);
     border: 2px solid var(--accent-primary, #00ff88);
     padding: 20px;
-    max-width: 90%;
+    width: 90%;
+    max-width: 1200px;
+    /* Reasonable max width */
+    height: 90%;
+    /* Force definite height */
     max-height: 90%;
     display: flex;
     flex-direction: column;
@@ -71,13 +75,19 @@
 }
 
 .mediabunny-screenshot-preview-container {
-    max-width: 100%;
-    max-height: 60vh;
+    width: 100%;
+    flex: 1;
+    height: 0;
+    /* Force flex item to respect parent height */
+    min-height: 0;
+    /* Allow shrinking */
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     position: relative;
+    background: #000;
+    /* distinct background for letterboxing */
 }
 
 .mediabunny-screenshot-preview {
@@ -131,11 +141,18 @@
     .mediabunny-screenshot-modal-content {
         max-width: 95%;
         max-height: 95%;
+        height: auto;
+        /* Shrink wrap on mobile */
         padding: 15px;
     }
 
     .mediabunny-screenshot-preview-container {
-        max-height: 50vh;
+        height: auto;
+        /* Reset fixed height */
+        flex: none;
+        /* Disable flex grow */
+        max-height: 60vh;
+        /* Constrain height */
     }
 
     .mediabunny-screenshot-actions {
