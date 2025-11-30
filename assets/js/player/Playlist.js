@@ -31,7 +31,6 @@ export class Playlist {
 
         // Start periodic state saving (every 1 second)
         setInterval(() => {
-            // console.log('Periodic save check. isPlaying:', this.player && this.player.isPlaying);
             if (this.player && this.player.isPlaying) {
                 this._savePlaybackProgress();
             }
@@ -374,7 +373,6 @@ export class Playlist {
     _savePlaybackProgress() {
         const activeItem = this.items[this.activeIndex];
         if (activeItem) {
-            // console.log('Saving progress:', this.player.currentTime);
             const currentTime = this.player.currentTime || 0;
 
             // 1. Save to IndexedDB (for playlist restoration)
