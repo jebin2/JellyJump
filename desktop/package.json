@@ -1,7 +1,7 @@
 {
   "name": "desktop",
   "version": "1.0.0",
-  "description": "MediaBunny Video Player",
+  "description": "JellyJump Video Player",
   "author": "Jebin <jebin@example.com>",
   "homepage": "https://github.com/jebin/gemini_video_platform",
   "repository": {
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.mediabunny.player",
-    "productName": "MediaBunny",
+    "productName": "JellyJump",
     "directories": {
       "output": "dist"
     },

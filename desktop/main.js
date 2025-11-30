@@ -11,7 +11,7 @@ function createWindow() {
             webSecurity: true // Important for loading local resources properly
         },
         autoHideMenuBar: true,
-        title: "MediaBunny Player"
+        title: "JellyJump Player"
     });
 
     // Load the index.html from the build folder
