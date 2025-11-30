@@ -3,7 +3,7 @@
 # Exit on error
 set -e
 
-echo "🚀 Starting MediaBunny Desktop Build..."
+echo "🚀 Starting JellyJump Desktop Build..."
 
 # 1. Build the Web Application
 echo "📦 Building Web Application..."
