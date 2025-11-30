@@ -1833,19 +1833,15 @@ export class CorePlayer {
         } else {
             // Default: 50% frame
             console.log('No saved state, using default frame');
-            // We want to show the 50% frame, but start playback from 0
-            // So we'll extract and draw the 50% frame, but keep playbackTimeAtStart at 0
-            const middleTimestamp = this.duration * 0.5;
-            await this._extractAndDrawFrame(middleTimestamp);
 
-            if (autoplay) {
-                // If autoplaying, we start from 0 (or should we? usually new video starts at 0)
-                // But wait, if we are autoplaying a NEW video, we definitely start at 0.
-                // If we are restoring state, we start at saved timestamp.
-                // Let's handle the autoplay logic below.
-            } else {
+            if (!autoplay) {
+                // We want to show the 50% frame, but start playback from 0
+                // So we'll extract and draw the 50% frame, but keep playbackTimeAtStart at 0
+                const middleTimestamp = this.duration * 0.5;
+                await this._extractAndDrawFrame(middleTimestamp);
                 return; // Done, we stay at 0 for playback
             }
+            // If autoplaying, we skip the default frame and start from 0
         }
 
         // If we have a saved state, we seek to it
