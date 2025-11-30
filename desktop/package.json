@@ -21,7 +21,6 @@
     "directories": {
       "output": "dist"
     },
-    "backgroundColor": "#0a0a0a",
     "icon": "build/assets/icons/jelly_center_transparent_bg.jpeg",
     "files": [
       "main.js",
