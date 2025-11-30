@@ -760,3 +760,31 @@ button:focus-visible {
     background: var(--accent-primary, #00ff88);
     color: black;
 }
+
+/* -----------------------------------------
+   Responsive Controls (ResizeObserver)
+   ----------------------------------------- */
+
+/* Compact Mode (< 600px) */
+.mediabunny-controls.size-compact .mediabunny-volume-slider {
+    display: none;
+}
+
+.mediabunny-controls.size-compact .mediabunny-time {
+    font-size: 10px;
+}
+
+/* Minimal Mode (< 400px) */
+.mediabunny-controls.size-minimal .mediabunny-volume-container {
+    display: none;
+}
+
+.mediabunny-controls.size-minimal [data-control="speed"],
+.mediabunny-controls.size-minimal [data-control="loop"],
+.mediabunny-controls.size-minimal [data-control="captions"] {
+    display: none;
+}
+
+.mediabunny-controls.size-minimal .mediabunny-time {
+    display: none;
+}

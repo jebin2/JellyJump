@@ -182,6 +182,9 @@ export class CorePlayer {
 
         // Load control bar mode preference
         this._loadControlBarMode();
+
+        // Initialize ResizeObserver for responsive controls
+        this._initResizeObserver();
     }
 
     /**
@@ -1542,6 +1545,11 @@ export class CorePlayer {
 
         this.container.classList.remove('mediabunny-container');
         this.container = null;
+
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
     }
 
     // ========================================
@@ -1730,5 +1738,44 @@ export class CorePlayer {
                 }
             }
         });
+    }
+
+    /**
+     * Initialize ResizeObserver to handle responsive layout
+     * @private
+     */
+    _initResizeObserver() {
+        if (!this.ui.controls) return;
+
+        this.resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                this._handleResize(entry);
+            }
+        });
+
+        // Observe the controls container itself to react to its width changes
+        this.resizeObserver.observe(this.ui.controls);
+    }
+
+    /**
+     * Handle resize events
+     * @param {ResizeObserverEntry} entry 
+     * @private
+     */
+    _handleResize(entry) {
+        const width = entry.contentRect.width;
+
+        // Breakpoints
+        const COMPACT_WIDTH = 600;
+        const MINIMAL_WIDTH = 400;
+
+        // Reset classes
+        this.ui.controls.classList.remove('size-compact', 'size-minimal');
+
+        if (width < MINIMAL_WIDTH) {
+            this.ui.controls.classList.add('size-minimal');
+        } else if (width < COMPACT_WIDTH) {
+            this.ui.controls.classList.add('size-compact');
+        }
     }
 }
