@@ -3,11 +3,11 @@ name: Build and Deploy
 on:
   push:
     branches:
-      - main  # Change to your default branch if different
+      - main
   pull_request:
     branches:
       - main
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for proper git operations
+          fetch-depth: 0
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -35,59 +35,70 @@ jobs:
       
       - name: Minify JavaScript files
         run: |
-          find . -name "*.js" -not -path "./node_modules/*" -not -path "./build/*" -not -path "./.git/*" | while read file; do
-            output_file="build/${file#./}"
-            mkdir -p "$(dirname "$output_file")"
-            npx terser "$file" --compress --mangle --output "$output_file"
-          done
+          find . -name "*.js" \
+            -not -path "./node_modules/*" \
+            -not -path "./build/*" \
+            -not -path "./desktop/*" \
+            -not -path "./.git/*" | while read file; do
+              output_file="build/${file#./}"
+              mkdir -p "$(dirname "$output_file")"
+              npx terser "$file" --compress --mangle --output "$output_file"
+            done
       
       - name: Minify CSS files
         run: |
-          find . -name "*.css" -not -path "./node_modules/*" -not -path "./build/*" -not -path "./.git/*" | while read file; do
-            output_file="build/${file#./}"
-            mkdir -p "$(dirname "$output_file")"
-            npx cleancss -o "$output_file" "$file"
-          done
+          find . -name "*.css" \
+            -not -path "./node_modules/*" \
+            -not -path "./build/*" \
+            -not -path "./desktop/*" \
+            -not -path "./.git/*" | while read file; do
+              output_file="build/${file#./}"
+              mkdir -p "$(dirname "$output_file")"
+              npx cleancss -o "$output_file" "$file"
+            done
       
       - name: Minify HTML files
         run: |
-          find . -name "*.html" -not -path "./node_modules/*" -not -path "./build/*" -not -path "./.git/*" | while read file; do
-            output_file="build/${file#./}"
-            mkdir -p "$(dirname "$output_file")"
-            npx html-minifier-terser \
-              --collapse-whitespace \
-              --remove-comments \
-              --minify-css true \
-              --minify-js true \
-              --output "$output_file" \
-              "$file"
-          done
+          find . -name "*.html" \
+            -not -path "./node_modules/*" \
+            -not -path "./build/*" \
+            -not -path "./desktop/*" \
+            -not -path "./.git/*" | while read file; do
+              output_file="build/${file#./}"
+              mkdir -p "$(dirname "$output_file")"
+              npx html-minifier-terser \
+                --collapse-whitespace \
+                --remove-comments \
+                --minify-css true \
+                --minify-js true \
+                --output "$output_file" \
+                "$file"
+            done
       
       - name: Copy other assets
         run: |
-          # Copy images, fonts, and other assets
-          find . \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.svg" -o -name "*.ico" -o -name "*.woff" -o -name "*.woff2" -o -name "*.ttf" -o -name "*.eot" \) \
+          find . \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" \
+                  -o -name "*.svg" -o -name "*.ico" -o -name "*.woff" -o -name "*.woff2" \
+                  -o -name "*.ttf" -o -name "*.eot" \) \
             -not -path "./node_modules/*" \
             -not -path "./build/*" \
+            -not -path "./desktop/*" \
             -not -path "./.git/*" | while read file; do
-            output_file="build/${file#./}"
-            mkdir -p "$(dirname "$output_file")"
-            cp "$file" "$output_file"
-          done
+              output_file="build/${file#./}"
+              mkdir -p "$(dirname "$output_file")"
+              cp "$file" "$output_file"
+            done
       
       - name: Deploy to MediaBunnyPlayer repository
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          # Clone the target repository
           git clone https://x-access-token:${{ secrets.DEPLOY_TOKEN }}@github.com/jebin2/MediaBunnyPlayer.git target-repo
           
-          # Remove old build folder and copy new one
           rm -rf target-repo/build
           cp -r build target-repo/
           
-          # Commit and push to target repository
           cd target-repo
           git add build/
           git diff --staged --quiet || git commit -m "Build: Update minified assets from gemini_video_platform [skip ci]"
