@@ -771,7 +771,9 @@ button:focus-visible {
    ----------------------------------------- */
 
 /* Compact Mode (< 600px) */
-.mediabunny-controls.size-compact .mediabunny-volume-slider {
+.mediabunny-controls.size-compact .mediabunny-volume-slider,
+.mediabunny-controls.size-compact #mb-next-btn,
+.mediabunny-controls.size-compact #mb-prev-btn {
     display: none;
 }
 
@@ -781,6 +783,15 @@ button:focus-visible {
 
 /* Minimal Mode (< 400px) */
 .mediabunny-controls.size-minimal .mediabunny-volume-container {
+    display: flex;
+    /* Keep container visible */
+}
+
+.mediabunny-controls.size-minimal #mb-mute-btn,
+.mediabunny-controls.size-minimal .mediabunny-volume-slider,
+.mediabunny-controls.size-minimal #mb-audio-container,
+.mediabunny-controls.size-minimal #mb-next-btn,
+.mediabunny-controls.size-minimal #mb-prev-btn {
     display: none;
 }
 
