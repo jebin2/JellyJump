@@ -89,19 +89,24 @@ jobs:
               cp "$file" "$output_file"
             done
       
-      - name: Deploy to MediaBunnyPlayer repository
+      - name: Deploy to release branch
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          git clone https://x-access-token:${{ secrets.DEPLOY_TOKEN }}@github.com/jebin2/MediaBunnyPlayer.git target-repo
+          # Create or checkout release branch
+          git fetch origin release:release 2>/dev/null || git checkout -b release
+          git checkout release || git checkout -b release
           
-          rm -rf target-repo/build
-          cp -r build target-repo/
+          # Remove old build directory if it exists
+          rm -rf build
           
-          cd target-repo
+          # Copy new build
+          cp -r build ./
+          
+          # Stage and commit changes
           git add build/
-          git diff --staged --quiet || git commit -m "Build: Update minified assets from gemini_video_platform [skip ci]"
-          git push
-        env:
-          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          git diff --staged --quiet || git commit -m "Build: Update minified assets from main [skip ci]"
+          
+          # Push to release branch
+          git push origin release
