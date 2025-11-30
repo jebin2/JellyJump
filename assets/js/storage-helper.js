@@ -62,9 +62,7 @@ export class StorageHelper {
     static clear() {
         try {
             Object.keys(localStorage).forEach(key => {
-                if (key.startsWith(this.PREFIX)) {
-                    localStorage.removeItem(key);
-                }
+                localStorage.removeItem(key);
             });
         } catch (e) {
             console.error('Error clearing localStorage:', e);

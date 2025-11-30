@@ -972,6 +972,7 @@ export class CorePlayer {
         this.videoFrameIterator = null;
         this.audioBufferIterator = null;
         this.nextFrame = null;
+        this.currentVideoId = null; // Clear current video ID
 
         // Update UI
         this._updateTimeDisplay();

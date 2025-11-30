@@ -697,14 +697,22 @@ export class Playlist {
      * Clear the playlist
      */
     clear() {
-        if (confirm('Are you sure you want to clear the playlist?')) {
+        if (confirm('Are you sure you want to clear the playlist? This will reset the application state.')) {
+            // 1. Reset Player State
+            this.player.reset();
+
+            // 2. Clear Playlist Data
             this.items = [];
             this.activeIndex = -1;
-            this.player.pause();
-            // this.player.mediaElement.src = '';
+
+            // 3. Clear IndexedDB
             this.storage.clear();
+
+            // 4. Update UI
             this.render();
             this._updatePlayerNavigationState();
+
+            console.log('Application state reset successfully');
         }
     }
 
