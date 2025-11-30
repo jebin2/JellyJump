@@ -2,7 +2,11 @@
 node_modules/
 desktop/node_modules/
 
-# Electron build output
+# Frontend build output (generated)
+build/
+desktop/build/
+
+# Electron dist output
 desktop/dist/
 desktop/linux-unpacked/
 desktop/*.AppImage
@@ -10,9 +14,4 @@ desktop/*.deb
 desktop/*.rpm
 desktop/*.exe
 desktop/*.dmg
-
-# Ignore root-level build folder only if you have one
-/build/
-
-# ALLOW the Electron frontend build:
-!desktop/build/
+desktop/*.zip

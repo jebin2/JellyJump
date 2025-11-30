@@ -27,6 +27,19 @@
         "AppImage"
       ],
       "category": "Video"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.video"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
     }
   },
   "keywords": [],
