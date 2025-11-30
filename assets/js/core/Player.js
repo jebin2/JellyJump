@@ -1181,9 +1181,19 @@ export class CorePlayer {
     }
 
     /**
-     * Toggle playback state
+     * Toggle play/pause
      */
     togglePlay() {
+        // If no video loaded (or no src), try to request play from playlist
+        if ((!this.video || !this.video.src) && !this.currentVideoId) {
+            if (this.onPlayRequest) {
+                this.onPlayRequest();
+            }
+            return;
+        }
+
+        if (!this.video) return;
+
         if (this.isPlaying) {
             this.pause();
         } else {
@@ -1516,6 +1526,15 @@ export class CorePlayer {
         } else {
             use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
         }
+    }
+
+    /**
+     * Set callback for when play is requested but no video is loaded
+     * @param {Function} callback 
+     */
+    setPlayCallback(callback) {
+        console.log('Player: setPlayCallback called');
+        this.onPlayRequest = callback;
     }
 
     /**

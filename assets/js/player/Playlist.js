@@ -13,6 +13,7 @@ export class Playlist {
     constructor(container, player) {
         this.container = container;
         this.player = player;
+        console.log('Playlist: Constructor started');
         this.items = [];
         this.activeIndex = -1;
         this.storage = new IndexedDBService();
@@ -56,13 +57,41 @@ export class Playlist {
         this._initKeyboardShortcuts();
 
         // Setup player navigation
-        this._setupPlayerNavigation();
+        console.log('Playlist: Calling _initPlayerNavigation');
+        this._initPlayerNavigation();
 
         // Initialize URL Upload
         this._initUrlUpload();
 
         // Load saved playlist
         this._loadSavedPlaylist();
+    }
+
+    /**
+     * Setup player navigation callbacks
+     * @private
+     */
+    _initPlayerNavigation() {
+        console.log('Playlist: _initPlayerNavigation executing');
+        if (!this.player) {
+            console.error('Playlist: Player instance is missing!');
+            return;
+        }
+        this.player.setNavigationCallbacks(
+            () => this.playPrevious(),
+            () => this.playNext()
+        );
+
+        // Auto-play first item if play button clicked with no video loaded
+        this.player.setPlayCallback(() => {
+            console.log('Playlist: onPlayRequest triggered');
+            if (this.items.length > 0) {
+                console.log('Playlist: Auto-playing first item');
+                this.selectItem(0);
+            } else {
+                console.warn('Playlist: No items to auto-play');
+            }
+        });
     }
 
 
