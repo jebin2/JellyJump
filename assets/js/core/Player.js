@@ -1184,15 +1184,13 @@ export class CorePlayer {
      * Toggle play/pause
      */
     togglePlay() {
-        // If no video loaded (or no src), try to request play from playlist
-        if ((!this.video || !this.video.src) && !this.currentVideoId) {
+        // If no video loaded, try to request play from playlist
+        if (!this.videoTrack && !this.audioTrack && !this.currentVideoId) {
             if (this.onPlayRequest) {
                 this.onPlayRequest();
             }
             return;
         }
-
-        if (!this.video) return;
 
         if (this.isPlaying) {
             this.pause();
@@ -1533,7 +1531,6 @@ export class CorePlayer {
      * @param {Function} callback 
      */
     setPlayCallback(callback) {
-        console.log('Player: setPlayCallback called');
         this.onPlayRequest = callback;
     }
 
