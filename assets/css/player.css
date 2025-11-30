@@ -505,7 +505,7 @@ button:focus-visible {
     border: 5px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
     border-top-color: var(--accent-primary);
-    animation: spin 1s ease-in-out infinite;
+    animation: spin-centered 1s ease-in-out infinite;
     display: none;
     pointer-events: none;
     z-index: 5;
@@ -522,6 +522,16 @@ button:focus-visible {
 
     to {
         transform: rotate(360deg);
+    }
+}
+
+@keyframes spin-centered {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
     }
 }
 
