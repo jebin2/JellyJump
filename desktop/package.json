@@ -1,12 +1,12 @@
 {
-  "name": "desktop",
+  "name": "jellyjump",
   "version": "1.0.0",
   "description": "JellyJump Video Player",
   "author": "Jebin <jebin@example.com>",
-  "homepage": "https://github.com/jebin/gemini_video_platform",
+  "homepage": "https://github.com/jebin/JellyJump",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jebin/gemini_video_platform.git"
+    "url": "https://github.com/jebin/JellyJump.git"
   },
   "main": "main.js",
   "scripts": {
@@ -15,8 +15,9 @@
     "dist": "electron-builder"
   },
   "build": {
-    "appId": "com.jellyjump.player",
+    "appId": "com.jellyjump.app",
     "productName": "JellyJump",
+    "artifactName": "JellyJump.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -48,8 +49,14 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        {
+          "target": "nsis",
+          "artifactName": "JellyJump.Setup.${ext}"
+        },
+        {
+          "target": "portable",
+          "artifactName": "JellyJump.Portable.${ext}"
+        }
       ]
     }
   },

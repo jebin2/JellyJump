@@ -234,7 +234,7 @@ $phases = @(
       desc="All keyboard shortcuts, performance optimization, cross-browser testing"}
 )
 
-$basePath = "c:\Users\jebinwin\Documents\git\gemini_video_platform\project_implementation_guides_for_llm\editor"
+$basePath = "c:\Users\jebinwin\Documents\git\JellyJump\project_implementation_guides_for_llm\editor"
 
 foreach ($phase in $phases) {
     $fileName = "phase$($phase.num)-$($phase.name).md"
