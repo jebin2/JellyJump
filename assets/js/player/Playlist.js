@@ -25,6 +25,18 @@ export class Playlist {
         // Clear placeholder
         this.container.innerHTML = '';
 
+        // Initialize sortable
+        // Initialize sortable
+        // this._initSortable(); // Not implemented yet
+
+        // Start periodic state saving (every 1 second)
+        setInterval(() => {
+            // console.log('Periodic save check. isPlaying:', this.player && this.player.isPlaying);
+            if (this.player && this.player.isPlaying) {
+                this._savePlaybackProgress();
+            }
+        }, 1000);
+
         // Initialize UI
         this._createHeader();
         this._createListContainer();
@@ -353,6 +365,38 @@ export class Playlist {
             activeId: activeItem ? activeItem.id : null,
             time: this.player.currentTime || 0
         });
+    }
+
+    /**
+     * Save only playback progress (optimized for frequent calls)
+     * @private
+     */
+    _savePlaybackProgress() {
+        const activeItem = this.items[this.activeIndex];
+        if (activeItem) {
+            // console.log('Saving progress:', this.player.currentTime);
+            const currentTime = this.player.currentTime || 0;
+
+            // 1. Save to IndexedDB (for playlist restoration)
+            this.storage.savePlaybackState({
+                index: this.activeIndex,
+                activeId: activeItem.id,
+                time: currentTime
+            });
+
+            // 2. Save to localStorage (for Player.js internal restoration)
+            // This ensures Player.js finds the state on reload
+            try {
+                const state = {
+                    videoIdentifier: activeItem.id,
+                    timestamp: currentTime,
+                    savedAt: new Date().toISOString()
+                };
+                localStorage.setItem(`mediabunny-state-${activeItem.id}`, JSON.stringify(state));
+            } catch (e) {
+                console.warn('Failed to sync state to localStorage:', e);
+            }
+        }
     }
 
     /**

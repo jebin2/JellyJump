@@ -195,6 +195,7 @@ export class IndexedDBService {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([this.STORES.STATE], 'readwrite');
             const store = transaction.objectStore(this.STORES.STATE);
+            // console.log('IndexedDB saving state:', state);
             store.put({ key: 'playback', ...state });
             transaction.oncomplete = () => resolve();
             transaction.onerror = () => reject(transaction.error);
