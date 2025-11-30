@@ -1923,7 +1923,23 @@ export class CorePlayer {
 
         // If autoplay is requested, we play immediately
         if (autoplay) {
-            await this.play();
+            try {
+                // Race play against a timeout to prevent hanging on iOS/Autoplay restrictions
+                const playPromise = this.play();
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Autoplay timeout')), 1000)
+                );
+                await Promise.race([playPromise, timeoutPromise]);
+            } catch (e) {
+                console.warn('Autoplay failed or timed out, falling back to paused state:', e);
+                // Ensure we are in a clean state
+                this.isPlaying = false;
+                this._updatePlayPauseUI();
+
+                // Fallback: Draw frame and show overlay
+                await this._startVideoIterator();
+                if (this.ui.playOverlay) this.ui.playOverlay.style.display = 'flex';
+            }
         } else {
             // Otherwise just draw the frame
             await this._startVideoIterator(); // This draws the frame at startTimestamp
