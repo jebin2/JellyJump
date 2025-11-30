@@ -98,25 +98,34 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          # Move build directory to temp location outside git repo
-          TEMP_BUILD=/tmp/build-artifacts
-          mv build "$TEMP_BUILD"
+          # Move build directory and files to temp location
+          TEMP_DIR=/tmp/release-artifacts
+          mkdir -p "$TEMP_DIR"
+          mv build "$TEMP_DIR/"
+          cp build.sh "$TEMP_DIR/" 2>/dev/null || true
+          cp -r desktop "$TEMP_DIR/" 2>/dev/null || true
+          cp build-desktop.sh "$TEMP_DIR/" 2>/dev/null || true
+          cp package-lock.json "$TEMP_DIR/" 2>/dev/null || true
+          cp package.json "$TEMP_DIR/" 2>/dev/null || true
           
           # Create or checkout release branch
           git fetch origin
-          git checkout release 2>/dev/null || git checkout -b release
+          git checkout release 2>/dev/null || git checkout --orphan release
           
-          # Remove old build directory if it exists in release branch
-          rm -rf build
+          # Clear everything in release branch
+          git rm -rf . 2>/dev/null || true
+          rm -rf * 2>/dev/null || true
           
-          # Move build back from temp location
-          mv "$TEMP_BUILD" build
+          # Move selected files/folders back
+          mv "$TEMP_DIR"/* . 2>/dev/null || true
           
-          # Force add build directory (it's in .gitignore but we want it in release branch)
-          git add -f build/
+          # Force add all files (override .gitignore)
+          git add -f build/ build.sh desktop/ build-desktop.sh package-lock.json package.json 2>/dev/null || true
           
           # Commit if there are changes
-          git diff --staged --quiet || git commit -m "Build: Update minified assets from main [skip ci]"
+          if ! git diff --staged --quiet 2>/dev/null; then
+            git commit -m "Build: Update release artifacts from main [skip ci]"
+          fi
           
           # Push to release branch
-          git push origin release
+          git push -f origin release
