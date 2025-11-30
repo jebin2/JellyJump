@@ -1003,10 +1003,15 @@ button:focus-visible {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+    width: 100vw !important;
+    width: 100dvw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
     z-index: 9999 !important;
     background: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
 }
 
 body.fullscreen-active {
