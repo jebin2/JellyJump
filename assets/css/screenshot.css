@@ -125,38 +125,7 @@
     justify-content: flex-end;
 }
 
-.mediabunny-btn-primary {
-    background: transparent;
-    border: 2px solid var(--accent-primary, #00ff88);
-    color: var(--accent-primary, #00ff88);
-    padding: 10px 20px;
-    font-family: var(--font-mono, monospace);
-    text-transform: uppercase;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s;
-}
 
-.mediabunny-btn-primary:hover {
-    background: var(--accent-primary, #00ff88);
-    color: #000;
-}
-
-.mediabunny-btn-secondary {
-    background: transparent;
-    border: 2px solid var(--text-secondary, #666);
-    color: var(--text-secondary, #666);
-    padding: 10px 20px;
-    font-family: var(--font-mono, monospace);
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.mediabunny-btn-secondary:hover {
-    border-color: var(--text-primary, #fff);
-    color: var(--text-primary, #fff);
-}
 
 @media (max-width: 640px) {
     .mediabunny-screenshot-modal-content {

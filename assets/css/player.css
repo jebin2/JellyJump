@@ -862,6 +862,10 @@ button:focus-visible {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
+    z-index: 1001;
+    /* Ensure it sits above overlay if stacking context is weird */
+    position: relative;
+    /* Establish stacking context */
 }
 
 .mb-modal-header {
@@ -917,8 +921,8 @@ button:focus-visible {
 }
 
 .mb-input:focus {
-    outline: 2px solid var(--primary-color);
-    border-color: var(--primary-color);
+    outline: 2px solid var(--accent-primary);
+    border-color: var(--accent-primary);
 }
 
 .mb-modal-error {
@@ -961,7 +965,24 @@ button:focus-visible {
     border-color: var(--text-secondary);
 }
 
+.mediabunny-btn-primary {
+    background: transparent;
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.mediabunny-btn-primary:hover {
+    background: var(--accent-primary);
+    color: #000;
+}
+
 .mediabunny-btn-primary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    filter: none;
 }
