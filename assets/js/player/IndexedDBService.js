@@ -73,7 +73,10 @@ export class IndexedDBService {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([this.STORES.PLAYLIST, this.STORES.FILES], 'readwrite');
 
-            transaction.oncomplete = () => resolve();
+            transaction.oncomplete = () => {
+                localStorage.setItem('MediaBunnyDB-playlist', 'true');
+                resolve();
+            };
             transaction.onerror = (event) => reject(event.target.error);
 
             const playlistStore = transaction.objectStore(this.STORES.PLAYLIST);
@@ -219,7 +222,10 @@ export class IndexedDBService {
         transaction.objectStore(this.STORES.FILES).clear();
         transaction.objectStore(this.STORES.STATE).clear();
         return new Promise((resolve) => {
-            transaction.oncomplete = () => resolve();
+            transaction.oncomplete = () => {
+                localStorage.removeItem('MediaBunnyDB-playlist');
+                resolve();
+            };
         });
     }
 }

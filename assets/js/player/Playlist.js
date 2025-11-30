@@ -304,19 +304,31 @@ export class Playlist {
 
                 // Restore playback state
                 const state = await this.storage.loadPlaybackState();
-                if (state && state.index >= 0 && state.index < this.items.length) {
-                    // Don't auto-play on restore, just load
-                    this.activeIndex = state.index;
-                    const video = this.items[this.activeIndex];
 
-                    if (!video.needsReload) {
-                        this.player.load(video.url);
-                        // Use the new seek method
-                        if (typeof this.player.seek === 'function') {
-                            this.player.seek(state.time || 0);
+                if (state) {
+                    let indexToRestore = -1;
+
+                    // Try to restore by ID first (more robust)
+                    if (state.activeId) {
+                        indexToRestore = this.items.findIndex(item => item.id === state.activeId);
+                    }
+
+                    // Fallback to index if ID not found or not present
+                    if (indexToRestore === -1 && typeof state.index === 'number') {
+                        indexToRestore = state.index;
+                    }
+
+                    if (indexToRestore >= 0 && indexToRestore < this.items.length) {
+                        // Don't auto-play on restore, just load
+                        this.activeIndex = indexToRestore;
+                        const video = this.items[this.activeIndex];
+
+                        if (!video.needsReload) {
+                            await this.player.load(video.url, false); // Autoplay false for restoration
+                            // Seek is now handled internally by player.load -> _handleInitialFrame
+                            this._updateUI();
+                            this._updatePlayerNavigationState();
                         }
-                        this._updateUI();
-                        this._updatePlayerNavigationState();
                     }
                 }
             } else {
@@ -334,7 +346,13 @@ export class Playlist {
      */
     _saveState() {
         this.storage.savePlaylist(this.items);
-        this.storage.savePlaybackState(this.activeIndex, this.player.currentTime || 0);
+
+        const activeItem = this.items[this.activeIndex];
+        this.storage.savePlaybackState({
+            index: this.activeIndex,
+            activeId: activeItem ? activeItem.id : null,
+            time: this.player.currentTime || 0
+        });
     }
 
     /**

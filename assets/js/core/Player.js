@@ -1047,6 +1047,11 @@ export class CorePlayer {
 
                 // Render first frame or saved state
                 await this._handleInitialFrame(autoplay);
+
+                // Ensure overlay is visible if not autoplaying
+                if (!autoplay && this.ui.playOverlay) {
+                    this.ui.playOverlay.style.display = 'flex';
+                }
             }
 
             // Setup Audio Track
