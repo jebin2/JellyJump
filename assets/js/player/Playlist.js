@@ -625,10 +625,16 @@ export class Playlist {
      */
     addItems(videos) {
         videos.forEach(v => { if (!v.id) v.id = this._generateId(); });
+        const startIndex = this.items.length;
         this.items = [...this.items, ...videos];
         this._saveState();
         this.render();
         this._updatePlayerNavigationState();
+
+        // Auto-load if single file added (Phase 21)
+        if (videos.length === 1) {
+            this.selectItem(startIndex);
+        }
     }
 
     /**
