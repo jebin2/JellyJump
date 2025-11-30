@@ -650,7 +650,7 @@ export class Playlist {
         this.activeIndex = index;
 
         // Load video into player
-        await this.player.load(video.url);
+        await this.player.load(video.url, true);
 
         // Update UI
         this._updateUI();

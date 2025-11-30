@@ -145,13 +145,18 @@ export class CorePlayer {
             loopRegion: null,
             loopPanel: null,
             loopStartInput: null,
-            loopEndInput: null
+            loopStartInput: null,
+            loopEndInput: null,
+            playOverlay: null
         };
 
         // Navigation callbacks
         this.onNext = null;
         this.onPrevious = null;
         this.onEnded = null;
+
+        // Current loaded video ID (url)
+        this.currentVideoId = null;
 
         this._init();
     }
@@ -267,6 +272,7 @@ export class CorePlayer {
 
         // Cache elements
         this.ui.controls = this.container.querySelector('.mediabunny-controls');
+        this.ui.playOverlay = this.container.querySelector('.mediabunny-play-overlay');
         this.ui.playBtn = this.container.querySelector('#mb-play-btn');
         this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');
         this.ui.nextBtn = this.container.querySelector('#mb-next-btn');
@@ -310,6 +316,9 @@ export class CorePlayer {
         // Play/Pause
         this.ui.playBtn.addEventListener('click', () => this.togglePlay());
         this.canvas.addEventListener('click', () => this.togglePlay());
+        if (this.ui.playOverlay) {
+            this.ui.playOverlay.addEventListener('click', () => this.play());
+        }
 
         // Navigation
         this.ui.prevBtn.addEventListener('click', () => {
@@ -974,11 +983,12 @@ export class CorePlayer {
     /**
      * Load a media source
      * @param {string} url - URL of the media file
+     * @param {boolean} autoplay - Whether to start playing automatically
      */
-    async load(url) {
+    async load(url, autoplay = false) {
         try {
             // Stop any current playback
-            this.pause();
+            this.pause(false);
             this.currentTime = 0;
 
             // Reset new state
@@ -1003,6 +1013,7 @@ export class CorePlayer {
 
             this.ui.loader.classList.add('visible');
             console.log(`Loading media: ${url}`);
+            this.currentVideoId = url;
 
             // Initialize MediaBunny Input with UrlSource
             this.input = new MediaBunny.Input({
@@ -1034,8 +1045,8 @@ export class CorePlayer {
                 this.canvas.width = this.videoTrack.displayWidth;
                 this.canvas.height = this.videoTrack.displayHeight;
 
-                // Render first frame
-                await this._startVideoIterator();
+                // Render first frame or saved state
+                await this._handleInitialFrame(autoplay);
             }
 
             // Setup Audio Track
@@ -1189,6 +1200,9 @@ export class CorePlayer {
             // If we're at the end, let's snap back to the start
             this.playbackTimeAtStart = 0;
             await this._startVideoIterator();
+        } else if (!this.videoFrameIterator) {
+            // If iterator wasn't started (e.g. default frame mode), start it now
+            await this._startVideoIterator();
         }
 
         this.audioContextStartTime = this.audioContext.currentTime;
@@ -1213,9 +1227,14 @@ export class CorePlayer {
                 }
             }, 500);
         }
+
+        // Hide overlay
+        if (this.ui.playOverlay) {
+            this.ui.playOverlay.style.display = 'none';
+        }
     }
 
-    pause() {
+    pause(showOverlay = true) {
         console.log("Player.pause() called");
         this.playbackTimeAtStart = this._getPlaybackTime();
         this.isPlaying = false;
@@ -1243,6 +1262,14 @@ export class CorePlayer {
             } catch (e) { }
         }
         this.queuedAudioNodes.clear();
+
+        // Save state
+        this._savePlaybackState();
+
+        // Show/Hide overlay
+        if (this.ui.playOverlay) {
+            this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
+        }
     }
 
     /**
@@ -1396,17 +1423,24 @@ export class CorePlayer {
     async _seekTo(time) {
         console.log(`_seekTo called with time: ${time}`);
 
+        // Show loader during seek
+        this.ui.loader.classList.add('visible');
+
         const wasPlaying = this.isPlaying;
 
         if (wasPlaying) {
-            this.pause();
+            this.pause(false); // Don't show overlay during seek pause
         }
 
         this.playbackTimeAtStart = Math.max(0, Math.min(this.duration, time));
         this.currentTime = this.playbackTimeAtStart; // Sync internal currentTime for UI
         this._updateProgress(); // Update UI immediately
 
-        await this._startVideoIterator();
+        try {
+            await this._startVideoIterator();
+        } finally {
+            this.ui.loader.classList.remove('visible');
+        }
 
         if (wasPlaying && this.playbackTimeAtStart < this.duration) {
             await this.play();
@@ -1776,6 +1810,101 @@ export class CorePlayer {
             this.ui.controls.classList.add('size-minimal');
         } else if (width < COMPACT_WIDTH) {
             this.ui.controls.classList.add('size-compact');
+        }
+    }
+
+    // ========================================
+    // Phase 19: Default Frame & State
+    // ========================================
+
+    /**
+     * Handle initial frame display (Saved state or Default)
+     * @param {boolean} autoplay - Whether to autoplay
+     */
+    async _handleInitialFrame(autoplay = false) {
+        if (!this.videoTrack) return;
+
+        const savedState = this._loadPlaybackState();
+        let startTimestamp = 0;
+
+        if (savedState && savedState.videoIdentifier === this.currentVideoId) {
+            console.log('Restoring playback state:', savedState);
+            startTimestamp = savedState.timestamp;
+        } else {
+            // Default: 50% frame
+            console.log('No saved state, using default frame');
+            // We want to show the 50% frame, but start playback from 0
+            // So we'll extract and draw the 50% frame, but keep playbackTimeAtStart at 0
+            const middleTimestamp = this.duration * 0.5;
+            await this._extractAndDrawFrame(middleTimestamp);
+
+            if (autoplay) {
+                // If autoplaying, we start from 0 (or should we? usually new video starts at 0)
+                // But wait, if we are autoplaying a NEW video, we definitely start at 0.
+                // If we are restoring state, we start at saved timestamp.
+                // Let's handle the autoplay logic below.
+            } else {
+                return; // Done, we stay at 0 for playback
+            }
+        }
+
+        // If we have a saved state, we seek to it
+        this.playbackTimeAtStart = startTimestamp;
+        this.currentTime = startTimestamp;
+        this._updateProgress();
+
+        // If autoplay is requested, we play immediately
+        if (autoplay) {
+            await this.play();
+        } else {
+            // Otherwise just draw the frame
+            await this._startVideoIterator(); // This draws the frame at startTimestamp
+        }
+    }
+
+    /**
+     * Extract and draw a frame at a specific timestamp without changing playback state
+     * @param {number} timestamp 
+     */
+    async _extractAndDrawFrame(timestamp) {
+        if (!this.videoSink) return;
+
+        // Create a temporary iterator just for this frame
+        const iterator = this.videoSink.canvases(timestamp);
+        const result = await iterator.next();
+        const frame = result.value;
+
+        if (frame) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.drawImage(frame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        await iterator.return();
+    }
+
+    _savePlaybackState() {
+        if (!this.currentVideoId || this.duration < 1) return;
+
+        const state = {
+            videoIdentifier: this.currentVideoId,
+            timestamp: this.currentTime,
+            savedAt: new Date().toISOString()
+        };
+
+        try {
+            localStorage.setItem(`mediabunny-state-${this.currentVideoId}`, JSON.stringify(state));
+        } catch (e) {
+            console.warn('Failed to save playback state:', e);
+        }
+    }
+
+    _loadPlaybackState() {
+        if (!this.currentVideoId) return null;
+        try {
+            const item = localStorage.getItem(`mediabunny-state-${this.currentVideoId}`);
+            return item ? JSON.parse(item) : null;
+        } catch (e) {
+            return null;
         }
     }
 }
