@@ -1,0 +1,1 @@
+export const PLAYER_CONFIG={autoplay:!1,loop:!1,muted:!1,volume:1,playbackRate:1,theme:"dark",showControls:!0,mode:"player",bufferSize:30,maxRetries:3};
