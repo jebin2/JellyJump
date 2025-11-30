@@ -830,3 +830,132 @@ button:focus-visible {
     border-color: var(--accent-primary);
     color: #000;
 }
+/* -----------------------------------------
+   Modals (Phase 20)
+   ----------------------------------------- */
+.mb-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.mb-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.mb-modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mb-modal-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    color: var(--text-primary);
+}
+
+.mb-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.mb-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.mb-modal-body {
+    padding: 20px;
+}
+
+.mb-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mb-input-group label {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+.mb-input {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+.mb-input:focus {
+    outline: 2px solid var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.mb-modal-error {
+    margin-top: 10px;
+    color: var(--error-color);
+    font-size: 0.9em;
+    background: rgba(255, 0, 0, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.mb-modal-loading {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-secondary);
+}
+
+.mb-modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.mediabunny-btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mediabunny-btn-secondary:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-secondary);
+}
+
+.mediabunny-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

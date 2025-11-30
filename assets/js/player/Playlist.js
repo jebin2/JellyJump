@@ -58,6 +58,9 @@ export class Playlist {
         // Setup player navigation
         this._setupPlayerNavigation();
 
+        // Initialize URL Upload
+        this._initUrlUpload();
+
         // Load saved playlist
         this._loadSavedPlaylist();
     }
@@ -1161,6 +1164,167 @@ export class Playlist {
         duration.textContent = item.duration || '--:--';
 
         return clone;
+    }
+
+    /**
+     * Initialize URL Upload Feature
+     * @private
+     */
+    _initUrlUpload() {
+        // Add event listener to "URL" button
+        // Note: Header is a sibling of container, so we use getElementById
+        const urlBtn = document.getElementById('mb-add-url');
+        if (urlBtn) {
+            urlBtn.addEventListener('click', () => {
+                this._openUrlModal();
+            });
+        } else {
+            console.warn('URL Upload button not found');
+        }
+    }
+
+    /**
+     * Open URL Upload Modal
+     * @private
+     */
+    _openUrlModal() {
+        const template = document.getElementById('url-upload-modal-template');
+        if (!template) return;
+
+        const modalOverlay = template.content.cloneNode(true).firstElementChild;
+        document.body.appendChild(modalOverlay);
+
+        const input = modalOverlay.querySelector('#url-input');
+        const addBtn = modalOverlay.querySelector('.mb-modal-add');
+        const cancelBtn = modalOverlay.querySelector('.mb-modal-cancel');
+        const closeBtn = modalOverlay.querySelector('.mb-modal-close');
+        const errorDiv = modalOverlay.querySelector('.mb-modal-error');
+        const loadingDiv = modalOverlay.querySelector('.mb-modal-loading');
+
+        // Focus input
+        setTimeout(() => input.focus(), 100);
+
+        // Validate input
+        input.addEventListener('input', () => {
+            const isValid = this._isValidUrl(input.value);
+            addBtn.disabled = !isValid;
+            errorDiv.style.display = 'none';
+        });
+
+        // Handle Add
+        addBtn.addEventListener('click', async () => {
+            const url = input.value.trim();
+            if (!url) return;
+
+            // Show loading
+            input.disabled = true;
+            addBtn.disabled = true;
+            cancelBtn.disabled = true;
+            loadingDiv.style.display = 'flex';
+            errorDiv.style.display = 'none';
+
+            try {
+                await this._handleUrlUpload(url);
+                // Close modal on success
+                document.body.removeChild(modalOverlay);
+            } catch (error) {
+                // Show error
+                input.disabled = false;
+                addBtn.disabled = false;
+                cancelBtn.disabled = false;
+                loadingDiv.style.display = 'none';
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            }
+        });
+
+        // Handle Close/Cancel
+        const closeModal = () => {
+            if (document.body.contains(modalOverlay)) {
+                document.body.removeChild(modalOverlay);
+            }
+        };
+
+        cancelBtn.addEventListener('click', closeModal);
+        closeBtn.addEventListener('click', closeModal);
+
+        // Close on click outside
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+
+        // Handle Enter key
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !addBtn.disabled) {
+                addBtn.click();
+            }
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    }
+
+    /**
+     * Validate URL
+     * @private
+     * @param {string} string 
+     * @returns {boolean}
+     */
+    _isValidUrl(string) {
+        try {
+            const url = new URL(string);
+            return url.protocol === "http:" || url.protocol === "https:";
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /**
+     * Handle URL Upload logic
+     * @private
+     * @param {string} url 
+     */
+    async _handleUrlUpload(url) {
+        try {
+            // Fetch the video to verify access and get blob
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch video: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+
+            // Basic validation
+            if (!blob.type.startsWith('video/')) {
+                throw new Error('The URL does not point to a valid video file.');
+            }
+
+            // Create MediaBunny Input to extract metadata
+            // Note: For remote URLs, we might want to use UrlSource, but fetching as Blob ensures we have access
+            // and avoids some CORS issues during playback if we store the blob.
+            // However, storing large blobs in IndexedDB might be heavy.
+            // For Phase 20, let's store the URL and re-fetch, OR store the blob if small enough.
+            // The requirement says "Add to playlist with URL as identifier".
+
+            // Let's use the Blob for metadata extraction, but store the URL if possible?
+            // Actually, if we fetched it as a blob, we have it. Let's use it.
+            // But wait, if we refresh, the blob is gone.
+            // So we should probably treat it like a local file (store in IndexedDB) OR just store the URL.
+            // If we store the URL, we need to handle CORS again on reload.
+            // Let's try to store the Blob in IndexedDB (IndexedDBService handles size limits).
+
+            const file = new File([blob], url.split('/').pop() || 'remote-video.mp4', { type: blob.type });
+
+            // Use handleFiles to process the file and create the item object correctly
+            this.handleFiles([file]);
+
+        } catch (error) {
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error('CORS Error: Cannot access this URL. The server must allow cross-origin requests.');
+            }
+            throw error;
+        }
     }
 
     /**
