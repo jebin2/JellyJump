@@ -2,7 +2,7 @@
    Screenshot Modal Styles (Phase 17)
    ========================================= */
 
-.mediabunny-screenshot-modal {
+.jellyjump-screenshot-modal {
     position: absolute;
     top: 0;
     left: 0;
@@ -16,7 +16,7 @@
     backdrop-filter: blur(5px);
 }
 
-.mediabunny-screenshot-modal-content {
+.jellyjump-screenshot-modal-content {
     background: var(--bg-secondary, #1a1a1a);
     border: 2px solid var(--accent-primary, #00ff88);
     padding: 20px;
@@ -32,7 +32,7 @@
     box-shadow: 8px 8px 0 0 var(--accent-primary, #00ff88);
 }
 
-.mediabunny-screenshot-header {
+.jellyjump-screenshot-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -41,7 +41,7 @@
     padding-bottom: 10px;
 }
 
-.mediabunny-screenshot-header h3 {
+.jellyjump-screenshot-header h3 {
     margin: 0;
     color: var(--text-primary, #fff);
     font-family: var(--font-mono, monospace);
@@ -49,13 +49,13 @@
     font-size: 16px;
 }
 
-.mediabunny-screenshot-timestamp {
+.jellyjump-screenshot-timestamp {
     color: var(--text-secondary, #aaa);
     font-family: var(--font-mono, monospace);
     font-size: 12px;
 }
 
-.mediabunny-screenshot-close {
+.jellyjump-screenshot-close {
     background: transparent;
     border: none;
     color: var(--text-primary, #fff);
@@ -70,11 +70,11 @@
     transition: color 0.2s;
 }
 
-.mediabunny-screenshot-close:hover {
+.jellyjump-screenshot-close:hover {
     color: var(--accent-primary, #00ff88);
 }
 
-.mediabunny-screenshot-preview-container {
+.jellyjump-screenshot-preview-container {
     width: 100%;
     flex: 1;
     height: 0;
@@ -90,7 +90,7 @@
     /* distinct background for letterboxing */
 }
 
-.mediabunny-screenshot-preview {
+.jellyjump-screenshot-preview {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
@@ -99,7 +99,7 @@
     z-index: 1;
 }
 
-.mediabunny-screenshot-nav {
+.jellyjump-screenshot-nav {
     position: absolute;
     background: rgba(0, 0, 0, 0.8);
     border: 2px solid var(--accent-primary, #00ff88);
@@ -116,20 +116,20 @@
     transform: translateY(-50%);
 }
 
-.mediabunny-screenshot-nav:hover {
+.jellyjump-screenshot-nav:hover {
     background: var(--accent-primary, #00ff88);
     color: #000;
 }
 
-.mediabunny-screenshot-prev {
+.jellyjump-screenshot-prev {
     left: 10px;
 }
 
-.mediabunny-screenshot-next {
+.jellyjump-screenshot-next {
     right: 10px;
 }
 
-.mediabunny-screenshot-actions {
+.jellyjump-screenshot-actions {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
@@ -138,7 +138,7 @@
 
 
 @media (max-width: 640px) {
-    .mediabunny-screenshot-modal-content {
+    .jellyjump-screenshot-modal-content {
         max-width: 95%;
         max-height: 95%;
         height: auto;
@@ -146,7 +146,7 @@
         padding: 15px;
     }
 
-    .mediabunny-screenshot-preview-container {
+    .jellyjump-screenshot-preview-container {
         height: auto;
         /* Reset fixed height */
         flex: none;
@@ -155,12 +155,12 @@
         /* Constrain height */
     }
 
-    .mediabunny-screenshot-actions {
+    .jellyjump-screenshot-actions {
         flex-direction: column;
     }
 
-    .mediabunny-btn-primary,
-    .mediabunny-btn-secondary {
+    .jellyjump-btn-primary,
+    .jellyjump-btn-secondary {
         width: 100%;
     }
 }

@@ -65,7 +65,7 @@ export class ScreenshotManager {
     _cacheElements() {
         const container = this.player.container;
         this.ui.btn = container.querySelector('#mb-screenshot-btn');
-        this.ui.modal = document.querySelector('.mediabunny-screenshot-modal');
+        this.ui.modal = document.querySelector('.jellyjump-screenshot-modal');
         // Note: Preview and other elements are inside the modal, so we should query from modal
         if (this.ui.modal) {
             this.ui.preview = this.ui.modal.querySelector('#mb-screenshot-preview');

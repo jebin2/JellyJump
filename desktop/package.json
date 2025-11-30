@@ -15,7 +15,7 @@
     "dist": "electron-builder"
   },
   "build": {
-    "appId": "com.mediabunny.player",
+    "appId": "com.jellyjump.player",
     "productName": "JellyJump",
     "directories": {
       "output": "dist"

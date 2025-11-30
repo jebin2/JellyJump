@@ -166,7 +166,7 @@ export class CorePlayer {
      * @private
      */
     _init() {
-        this.container.classList.add('mediabunny-container');
+        this.container.classList.add('jellyjump-container');
 
         // Create canvas element using template
         const canvasTemplate = document.getElementById('player-canvas-template');
@@ -213,15 +213,15 @@ export class CorePlayer {
         }
 
         // Update title
-        const title = clone.querySelector('.mediabunny-help-title');
+        const title = clone.querySelector('.jellyjump-help-title');
         if (title) {
             title.textContent = `Keyboard Shortcuts ${this.config.mode === 'editor' ? '(Editor Mode)' : '(Player Mode)'}`;
         }
 
         this.container.appendChild(clone);
 
-        this.ui.helpOverlay = this.container.querySelector('.mediabunny-help-overlay');
-        this.ui.closeHelpBtn = this.container.querySelector('.mediabunny-close-help');
+        this.ui.helpOverlay = this.container.querySelector('.jellyjump-help-overlay');
+        this.ui.closeHelpBtn = this.container.querySelector('.jellyjump-close-help');
 
         this.ui.closeHelpBtn.addEventListener('click', () => this._toggleHelp());
         this.ui.helpOverlay.addEventListener('click', (e) => {
@@ -255,7 +255,7 @@ export class CorePlayer {
         // Loader
         const loaderTemplate = document.getElementById('player-loader-template');
         this.container.appendChild(loaderTemplate.content.cloneNode(true));
-        this.ui.loader = this.container.querySelector('.mediabunny-loader');
+        this.ui.loader = this.container.querySelector('.jellyjump-loader');
 
         // Controls
         const controlsTemplate = document.getElementById('player-controls-template');
@@ -271,13 +271,13 @@ export class CorePlayer {
         }
 
         // Cache elements
-        this.ui.controls = this.container.querySelector('.mediabunny-controls');
-        this.ui.playOverlay = this.container.querySelector('.mediabunny-play-overlay');
+        this.ui.controls = this.container.querySelector('.jellyjump-controls');
+        this.ui.playOverlay = this.container.querySelector('.jellyjump-play-overlay');
         this.ui.playBtn = this.container.querySelector('#mb-play-btn');
         this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');
         this.ui.nextBtn = this.container.querySelector('#mb-next-btn');
-        this.ui.progressContainer = this.container.querySelector('.mediabunny-progress-container');
-        this.ui.progressBar = this.container.querySelector('.mediabunny-progress-bar');
+        this.ui.progressContainer = this.container.querySelector('.jellyjump-progress-container');
+        this.ui.progressBar = this.container.querySelector('.jellyjump-progress-bar');
         this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
         this.ui.muteBtn = this.container.querySelector('#mb-mute-btn');
         this.ui.volumeSlider = this.container.querySelector('#mb-volume-slider');
@@ -292,18 +292,18 @@ export class CorePlayer {
         this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
         this.ui.speedMenu = this.container.querySelector('#mb-speed-menu');
         this.ui.loopBtn = this.container.querySelector('#mb-loop-btn');
-        this.ui.loopMarkerA = this.container.querySelector('.mediabunny-marker.marker-a');
-        this.ui.loopMarkerB = this.container.querySelector('.mediabunny-marker.marker-b');
-        this.ui.loopRegion = this.container.querySelector('.mediabunny-loop-region');
+        this.ui.loopMarkerA = this.container.querySelector('.jellyjump-marker.marker-a');
+        this.ui.loopMarkerB = this.container.querySelector('.jellyjump-marker.marker-b');
+        this.ui.loopRegion = this.container.querySelector('.jellyjump-loop-region');
 
-        this.ui.loopPanel = this.container.querySelector('.mediabunny-loop-panel');
+        this.ui.loopPanel = this.container.querySelector('.jellyjump-loop-panel');
         this.ui.loopStartInput = this.container.querySelector('#mb-loop-start');
         this.ui.loopEndInput = this.container.querySelector('#mb-loop-end');
         this.ui.loopStatus = this.container.querySelector('#mb-loop-status');
         this.ui.setABtn = this.container.querySelector('#mb-set-a-btn');
         this.ui.setBBtn = this.container.querySelector('#mb-set-b-btn');
         this.ui.clearLoopBtn = this.container.querySelector('#mb-clear-loop-btn');
-        this.ui.closeLoopPanelBtn = this.container.querySelector('.mediabunny-loop-panel .mediabunny-close-btn');
+        this.ui.closeLoopPanelBtn = this.container.querySelector('.jellyjump-loop-panel .jellyjump-close-btn');
 
         this._updateSpeedMenu();
     }
@@ -397,7 +397,7 @@ export class CorePlayer {
         });
 
         this.ui.ccMenu.addEventListener('click', (e) => {
-            const item = e.target.closest('.mediabunny-menu-item');
+            const item = e.target.closest('.jellyjump-menu-item');
             if (!item) return;
 
             if (item.id === 'mb-upload-cc') {
@@ -430,7 +430,7 @@ export class CorePlayer {
         });
 
         this.ui.audioMenu.addEventListener('click', (e) => {
-            const item = e.target.closest('.mediabunny-menu-item');
+            const item = e.target.closest('.jellyjump-menu-item');
             if (!item) return;
 
             const trackId = parseInt(item.dataset.value);
@@ -445,7 +445,7 @@ export class CorePlayer {
         });
 
         this.ui.speedMenu.addEventListener('click', (e) => {
-            const item = e.target.closest('.mediabunny-menu-item');
+            const item = e.target.closest('.jellyjump-menu-item');
             if (!item) return;
 
             const speed = parseFloat(item.dataset.value);
@@ -512,7 +512,7 @@ export class CorePlayer {
     }
 
     _updateSpeedMenu() {
-        const items = this.ui.speedMenu.querySelectorAll('.mediabunny-menu-item');
+        const items = this.ui.speedMenu.querySelectorAll('.jellyjump-menu-item');
         items.forEach(item => {
             const speed = parseFloat(item.dataset.value);
             if (speed === this.playbackRate) {
@@ -686,7 +686,7 @@ export class CorePlayer {
     }
 
     _updateSubtitleMenu() {
-        const items = this.ui.ccMenu.querySelectorAll('.mediabunny-menu-item');
+        const items = this.ui.ccMenu.querySelectorAll('.jellyjump-menu-item');
         items.forEach(item => item.classList.remove('active'));
 
         if (!this.isSubtitlesEnabled) {
@@ -736,7 +736,7 @@ export class CorePlayer {
         const template = document.getElementById('player-menu-item-template');
 
         tracks.forEach((track, index) => {
-            const item = template.content.cloneNode(true).querySelector('.mediabunny-menu-item');
+            const item = template.content.cloneNode(true).querySelector('.jellyjump-menu-item');
             item.textContent = track.languageCode || `Track ${index + 1}`;
             item.dataset.value = track.id;
 
@@ -1650,7 +1650,7 @@ export class CorePlayer {
             this.ui.loader.remove();
         }
 
-        this.container.classList.remove('mediabunny-container');
+        this.container.classList.remove('jellyjump-container');
         this.container = null;
 
         if (this.resizeObserver) {
