@@ -6,19 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MediaBunny Player - Video Player & Editor</title>
     <meta name="description" content="A modern, dark neobrutalism video player and editor for the web.">
-    
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://mediabunny.example.com/">
     <meta property="og:title" content="MediaBunny Player - Video Player & Editor">
-    <meta property="og:description" content="A modern, dark neobrutalism video player and editor for the web. Play, edit, and create videos with style.">
+    <meta property="og:description"
+        content="A modern, dark neobrutalism video player and editor for the web. Play, edit, and create videos with style.">
     <meta property="og:image" content="https://mediabunny.example.com/assets/images/og-image.jpg">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://mediabunny.example.com/">
     <meta property="twitter:title" content="MediaBunny Player - Video Player & Editor">
-    <meta property="twitter:description" content="A modern, dark neobrutalism video player and editor for the web. Play, edit, and create videos with style.">
+    <meta property="twitter:description"
+        content="A modern, dark neobrutalism video player and editor for the web. Play, edit, and create videos with style.">
     <meta property="twitter:image" content="https://mediabunny.example.com/assets/images/og-image.jpg">
 
     <!-- Theme CSS (First) -->
@@ -34,6 +36,7 @@
             <a href="#" class="nav-logo">MediaBunny</a>
             <nav class="nav-links">
                 <a href="#features" class="nav-link">Features</a>
+                <a href="#downloads" class="nav-link">Download</a>
                 <a href="player.html" class="btn btn-secondary">Player</a>
                 <a href="editor.html" class="btn btn-primary">Editor</a>
             </nav>
@@ -93,6 +96,81 @@
                         <p class="text-secondary">Complete keyboard control. Industry-standard shortcuts for efficient
                             workflow.</p>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Downloads Section -->
+        <section id="downloads" class="downloads section-padding" style="padding: var(--space-3xl) 0;">
+            <div class="container">
+                <div class="features-header mb-xl">
+                    <h2 class="text-2xl font-bold uppercase text-accent">Get Desktop App</h2>
+                    <p class="text-secondary mt-sm">Download MediaBunny for your operating system.</p>
+                </div>
+
+                <div class="grid-3 gap-lg">
+                    <!-- Linux -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Linux</h3>
+                        </div>
+                        <div class="flex flex-col gap-md">
+                            <a href="https://github.com/jebin2/gemini_video_platform/releases/download/v0.1/desktop_1.0.0_amd64.deb"
+                                class="btn btn-primary w-full">
+                                Download .deb
+                                <span class="text-xs ml-sm block" style="margin-left: auto;">75.8 MB</span>
+                            </a>
+                            <a href="https://github.com/jebin2/gemini_video_platform/releases/download/v0.1/MediaBunny-1.0.0.AppImage"
+                                class="btn btn-secondary w-full">
+                                Download .AppImage
+                                <span class="text-xs ml-sm block" style="margin-left: auto;">110 MB</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Mac -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">macOS</h3>
+                        </div>
+                        <div class="flex flex-col gap-md">
+                            <a href="https://github.com/jebin2/gemini_video_platform/releases/download/v0.1/MediaBunny-1.0.0-arm64.dmg"
+                                class="btn btn-primary w-full">
+                                Download .dmg
+                                <span class="text-xs ml-sm block" style="margin-left: auto;">105 MB</span>
+                            </a>
+                            <a href="https://github.com/jebin2/gemini_video_platform/releases/download/v0.1/MediaBunny-1.0.0-arm64-mac.zip"
+                                class="btn btn-secondary w-full">
+                                Download .zip
+                                <span class="text-xs ml-sm block" style="margin-left: auto;">102 MB</span>
+                            </a>
+                            <p class="text-xs text-muted mt-sm">* Apple Silicon (arm64)</p>
+                        </div>
+                    </div>
+
+                    <!-- Windows -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Windows</h3>
+                        </div>
+                        <div class="flex flex-col gap-md">
+                            <a href="https://github.com/jebin2/gemini_video_platform/releases/download/v0.1/MediaBunny.Setup.1.0.0.exe"
+                                class="btn btn-primary w-full">
+                                Download Installer
+                                <span class="text-xs ml-sm block" style="margin-left: auto;">90.5 MB</span>
+                            </a>
+                            <a href="https://github.com/jebin2/gemini_video_platform/releases/download/v0.1/MediaBunny.1.0.0.exe"
+                                class="btn btn-secondary w-full">
+                                Download Portable
+                                <span class="text-xs ml-sm block" style="margin-left: auto;">90.4 MB</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-xl text-center">
+                    <a href="https://github.com/jebin2/gemini_video_platform/releases/tag/v0.1"
+                        class="text-accent hover:underline" target="_blank">View full release notes on GitHub &rarr;</a>
                 </div>
             </div>
         </section>
