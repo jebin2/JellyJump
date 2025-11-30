@@ -54,10 +54,11 @@ find . -name "*.html" \
 done
 
 echo "🖼 Copying image and font assets..."
-find . \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
-           -name "*.gif" -o -name "*.svg" -o -name "*.ico" \
-           -name "*.woff" -o -name "*.woff2" -name "*.ttf" \
-           -name "*.eot" \) \
+find . \
+  \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
+     -o -name "*.gif" -o -name "*.svg" -o -name "*.ico" \
+     -o -name "*.woff" -o -name "*.woff2" -o -name "*.ttf" \
+     -o -name "*.eot" \) \
   -not -path "./node_modules/*" \
   -not -path "./build/*" \
   -not -path "./desktop/*" \
