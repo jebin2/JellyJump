@@ -96,7 +96,7 @@
             );
 
             // Demo Videos (optional)
-            if (!localStorage.getItem('JellyJumpDB-playlist')) {
+            if (!localStorage.getItem('JellyJumpDB-playlist') && window.location.href.includes('//localhost:')) {
                 playlist.addItems([
                     {
                         title: 'Big Buck Bunny',
