@@ -1,6 +1,6 @@
 /**
  * Preview Player Module
- * Phase 49: MediaBunny Player Integration
+ * Phase 49: JellyJump Player Integration
  * 
  * Manages the CorePlayer instance in the editor preview panel
  */

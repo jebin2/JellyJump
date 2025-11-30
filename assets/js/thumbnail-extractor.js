@@ -77,7 +77,6 @@ class ThumbnailExtractor {
 
     /**
      * Generate thumbnail from file using a hidden video element
-     * (Simpler than full MediaBunny Player for just one frame, but can switch if needed)
      * @param {File|Blob} file 
      * @returns {Promise<string>} Data URL
      */

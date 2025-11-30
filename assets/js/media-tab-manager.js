@@ -1,5 +1,5 @@
 /**
- * MediaBunny Editor - Media Tab Manager
+ * JellyJump Editor - Media Tab Manager
  * Handles switching between media categories (Videos, Audio, Images, Text, Effects, Projects).
  * Phase: 40
  */

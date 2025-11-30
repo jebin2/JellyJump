@@ -5,7 +5,7 @@
  */
 export class IndexedDBService {
     constructor() {
-        this.DB_NAME = 'MediaBunnyDB';
+        this.DB_NAME = 'JellyJumpDB';
         this.DB_VERSION = 1;
         this.STORES = {
             PLAYLIST: 'playlist',
@@ -75,9 +75,9 @@ export class IndexedDBService {
 
             transaction.oncomplete = () => {
                 if (items.length > 0) {
-                    localStorage.setItem('MediaBunnyDB-playlist', 'true');
+                    localStorage.setItem(this.DB_NAME + '-playlist', 'true');
                 } else {
-                    localStorage.removeItem('MediaBunnyDB-playlist');
+                    localStorage.removeItem(this.DB_NAME + '-playlist');
                 }
                 resolve();
             };
@@ -227,7 +227,7 @@ export class IndexedDBService {
         transaction.objectStore(this.STORES.STATE).clear();
         return new Promise((resolve) => {
             transaction.oncomplete = () => {
-                localStorage.removeItem('MediaBunnyDB-playlist');
+                localStorage.removeItem(this.DB_NAME + '-playlist');
                 resolve();
             };
         });

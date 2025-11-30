@@ -2,7 +2,7 @@ import { modalDialog } from './modal-dialog.js';
 import { StorageHelper } from './storage-helper.js';
 
 /**
- * MediaBunny Editor - Tab Manager
+ * JellyJump Editor - Tab Manager
  * Handles creation, state management, and rendering of project tabs.
  * Phase: 37
  */

@@ -1,6 +1,6 @@
 /**
  * Player Configuration
- * Default settings for the MediaBunny Player.
+ * Default settings for the JellyJump Player.
  */
 
 export const PLAYER_CONFIG = {

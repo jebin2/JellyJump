@@ -1,5 +1,5 @@
 /**
- * MediaBunny Editor - Modal Dialog
+ * JellyJump Editor - Modal Dialog
  * Reusable modal dialog component.
  * Phase: 36
  */

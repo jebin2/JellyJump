@@ -1,5 +1,5 @@
 /**
- * MediaBunny Editor - Storage Helper
+ * JellyJump Editor - Storage Helper
  * Utilities for managing localStorage with error handling and quota checks.
  * Phase: 37
  */
