@@ -19,8 +19,7 @@
     "productName": "JellyJump",
     "artifactName": "JellyJump.${ext}",
     "directories": {
-      "output": "dist",
-      "backgroundColor": "#0a0a0a"
+      "output": "dist"
     },
     "icon": "build/assets/icons/jelly_jump_logo.png",
     "files": [
