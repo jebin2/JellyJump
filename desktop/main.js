@@ -11,7 +11,8 @@ function createWindow() {
             webSecurity: true // Important for loading local resources properly
         },
         autoHideMenuBar: true,
-        title: "JellyJump Player"
+        title: "JellyJump Player",
+        icon: path.join(__dirname, 'build/assets/icons/jelly_jump_logo.png')
     });
 
     // Load the index.html from the build folder
