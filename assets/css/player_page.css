@@ -228,6 +228,11 @@
         transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
 
+    /* No need of playlist minimise for now as pin function working for thi same case */
+    .sidebar-collapse-btn {
+        display: none !important;
+    }
+
     /* Hide the regular sidebar button when collapsed in mobile */
     .playlist-section.collapsed .sidebar-collapse-btn {
         display: none !important;
