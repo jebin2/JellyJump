@@ -50,10 +50,10 @@ export class ScreenshotManager {
             fullscreenBtn.parentNode.insertBefore(btnClone, fullscreenBtn);
         }
 
-        // Insert modal at end of container
+        // Insert modal at end of body to avoid layout constraints
         const modalTemplate = document.getElementById('screenshot-modal-template');
         const modalClone = modalTemplate.content.cloneNode(true);
-        this.player.container.appendChild(modalClone);
+        document.body.appendChild(modalClone);
     }
 
 
@@ -65,14 +65,17 @@ export class ScreenshotManager {
     _cacheElements() {
         const container = this.player.container;
         this.ui.btn = container.querySelector('#mb-screenshot-btn');
-        this.ui.modal = container.querySelector('.mediabunny-screenshot-modal');
-        this.ui.preview = container.querySelector('#mb-screenshot-preview');
-        this.ui.timestamp = container.querySelector('#mb-screenshot-timestamp');
-        this.ui.downloadBtn = container.querySelector('#mb-screenshot-download');
-        this.ui.cancelBtn = container.querySelector('#mb-screenshot-cancel');
-        this.ui.closeBtn = container.querySelector('#mb-screenshot-close');
-        this.ui.prevBtn = container.querySelector('#mb-screenshot-prev');
-        this.ui.nextBtn = container.querySelector('#mb-screenshot-next');
+        this.ui.modal = document.querySelector('.mediabunny-screenshot-modal');
+        // Note: Preview and other elements are inside the modal, so we should query from modal
+        if (this.ui.modal) {
+            this.ui.preview = this.ui.modal.querySelector('#mb-screenshot-preview');
+            this.ui.timestamp = this.ui.modal.querySelector('#mb-screenshot-timestamp');
+            this.ui.downloadBtn = this.ui.modal.querySelector('#mb-screenshot-download');
+            this.ui.cancelBtn = this.ui.modal.querySelector('#mb-screenshot-cancel');
+            this.ui.closeBtn = this.ui.modal.querySelector('#mb-screenshot-close');
+            this.ui.prevBtn = this.ui.modal.querySelector('#mb-screenshot-prev');
+            this.ui.nextBtn = this.ui.modal.querySelector('#mb-screenshot-next');
+        }
     }
 
     /**
