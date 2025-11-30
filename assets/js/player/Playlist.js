@@ -677,10 +677,7 @@ export class Playlist {
                     this.selectItem(index - 1);
                 }
             } else {
-                // List will be empty
-                this.player.pause();
-                // this.player.mediaElement.src = ''; // CorePlayer doesn't support this directly, pause is enough
-                this.activeIndex = -1;
+                this.clear(false);
             }
         } else if (index < this.activeIndex) {
             // If removing an item before current, adjust active index
@@ -696,8 +693,8 @@ export class Playlist {
     /**
      * Clear the playlist
      */
-    async clear() {
-        if (confirm('Are you sure you want to clear the playlist? This will reset the application state.')) {
+    async clear(ask_confirm = true) {
+        if (!ask_confirm || (ask_confirm && confirm('Are you sure you want to clear the playlist? This will reset the application state.'))) {
             // 1. Reset Player State
             this.player.reset();
 
