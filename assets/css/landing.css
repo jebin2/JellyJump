@@ -21,26 +21,6 @@
     align-items: center;
 }
 
-.nav-logo {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    font-family: var(--font-primary);
-    font-weight: var(--font-black);
-    font-size: var(--text-xl);
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.nav-logo-img {
-    height: 40px;
-    width: auto;
-    border-radius: var(--radius-none);
-    /* Optional: Blend mode if background isn't perfectly matching */
-    /* mix-blend-mode: screen; */
-}
-
 .nav-links {
     display: flex;
     gap: var(--space-md);
