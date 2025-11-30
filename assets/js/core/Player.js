@@ -453,6 +453,13 @@ export class CorePlayer {
             this.ui.speedMenu.classList.remove('visible');
         });
 
+        // Fullscreen Change Events
+        const handleFullscreenChange = () => this._updateFullscreenUI();
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
         // Loop Control
         this.ui.loopBtn.addEventListener('click', () => this.toggleLoopMode());
         // Long press or right click to open panel? Or just a separate button?
@@ -1506,6 +1513,9 @@ export class CorePlayer {
             this.container.classList.remove('fullscreen-fallback');
             document.body.classList.remove('fullscreen-active');
         }
+
+        // Update UI immediately for fallback case (native events handle the rest)
+        this._updateFullscreenUI();
     }
 
     _updatePlayPauseUI() {
@@ -1538,6 +1548,23 @@ export class CorePlayer {
         const m = Math.floor(seconds / 60);
         const s = Math.floor(seconds % 60);
         return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    _updateFullscreenUI() {
+        const use = this.ui.fullscreenBtn.querySelector('use');
+        const isFullscreen = document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement ||
+            this.container.classList.contains('fullscreen-fallback');
+
+        if (isFullscreen) {
+            this.ui.fullscreenBtn.setAttribute('aria-label', 'Exit Fullscreen');
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-fullscreen-exit');
+        } else {
+            this.ui.fullscreenBtn.setAttribute('aria-label', 'Fullscreen');
+            use.setAttribute('href', 'assets/icons/sprite.svg#icon-fullscreen');
+        }
     }
 
     _updateVolumeIcon() {
