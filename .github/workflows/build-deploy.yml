@@ -94,8 +94,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          # Store the build directory path
-          BUILD_DIR=$(pwd)/build
+          # Move build directory to temp location outside git repo
+          TEMP_BUILD=/tmp/build-artifacts
+          mv build "$TEMP_BUILD"
           
           # Create or checkout release branch
           git fetch origin
@@ -104,8 +105,8 @@ jobs:
           # Remove old build directory if it exists in release branch
           rm -rf build
           
-          # Copy new build from stored location
-          cp -r "$BUILD_DIR" ./
+          # Move build back from temp location
+          mv "$TEMP_BUILD" build
           
           # Stage and commit changes
           git add build/
