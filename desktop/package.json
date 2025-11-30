@@ -25,6 +25,10 @@
       "package.json",
       "build/**/*"
     ],
+    "publish": {
+      "provider": "github",
+      "releaseType": "draft"
+    },
     "linux": {
       "target": [
         "deb",
@@ -37,7 +41,10 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.video"
+      "category": "public.app-category.video",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
     },
     "win": {
       "target": [
