@@ -4,6 +4,10 @@
   "description": "MediaBunny Video Player",
   "author": "Jebin <jebin@example.com>",
   "homepage": "https://github.com/jebin/gemini_video_platform",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jebin/gemini_video_platform.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
