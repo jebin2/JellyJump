@@ -985,7 +985,7 @@ export class CorePlayer {
      * @param {string} url - URL of the media file
      * @param {boolean} autoplay - Whether to start playing automatically
      */
-    async load(url, autoplay = false) {
+    async load(url, autoplay = false, videoId = null) {
         try {
             // Stop any current playback
             this.pause(false);
@@ -1013,7 +1013,7 @@ export class CorePlayer {
 
             this.ui.loader.classList.add('visible');
             console.log(`Loading media: ${url}`);
-            this.currentVideoId = url;
+            this.currentVideoId = videoId || url;
 
             // Initialize MediaBunny Input with UrlSource
             this.input = new MediaBunny.Input({

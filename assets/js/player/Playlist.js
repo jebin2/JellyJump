@@ -324,7 +324,7 @@ export class Playlist {
                         const video = this.items[this.activeIndex];
 
                         if (!video.needsReload) {
-                            await this.player.load(video.url, false); // Autoplay false for restoration
+                            await this.player.load(video.url, false, video.id); // Autoplay false for restoration, pass ID
                             // Seek is now handled internally by player.load -> _handleInitialFrame
                             this._updateUI();
                             this._updatePlayerNavigationState();
@@ -668,7 +668,7 @@ export class Playlist {
         this.activeIndex = index;
 
         // Load video into player
-        await this.player.load(video.url, true);
+        await this.player.load(video.url, true, video.id);
 
         // Update UI
         this._updateUI();
