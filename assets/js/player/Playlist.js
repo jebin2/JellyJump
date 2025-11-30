@@ -415,7 +415,7 @@ export class Playlist {
                     timestamp: currentTime,
                     savedAt: new Date().toISOString()
                 };
-                localStorage.setItem(`mediabunny-state-${activeItem.id}`, JSON.stringify(state));
+                localStorage.setItem(`jellyjump-state-${activeItem.id}`, JSON.stringify(state));
             } catch (e) {
                 console.warn('Failed to sync state to localStorage:', e);
             }

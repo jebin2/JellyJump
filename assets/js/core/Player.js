@@ -22,7 +22,7 @@ export class CorePlayer {
         this.isPlaying = false;
         this.currentTime = 0;
         this.duration = 0;
-        this.playbackRate = parseFloat(localStorage.getItem('mediabunny-speed')) || 1.0;
+        this.playbackRate = parseFloat(localStorage.getItem('jellyjump-speed')) || 1.0;
         this.loopMode = 'off'; // 'off', 'all', 'ab'
         this.loopStart = null;
         this.loopEnd = null;
@@ -677,7 +677,7 @@ export class CorePlayer {
         }
 
         this.playbackRate = rate;
-        localStorage.setItem('mediabunny-speed', rate);
+        localStorage.setItem('jellyjump-speed', rate);
         this._updateSpeedMenu();
 
         if (wasPlaying) {
@@ -1977,7 +1977,7 @@ export class CorePlayer {
         };
 
         try {
-            localStorage.setItem(`mediabunny-state-${this.currentVideoId}`, JSON.stringify(state));
+            localStorage.setItem(`jellyjump-state-${this.currentVideoId}`, JSON.stringify(state));
         } catch (e) {
             console.warn('Failed to save playback state:', e);
         }
@@ -1986,7 +1986,7 @@ export class CorePlayer {
     _loadPlaybackState() {
         if (!this.currentVideoId) return null;
         try {
-            const item = localStorage.getItem(`mediabunny-state-${this.currentVideoId}`);
+            const item = localStorage.getItem(`jellyjump-state-${this.currentVideoId}`);
             return item ? JSON.parse(item) : null;
         } catch (e) {
             return null;

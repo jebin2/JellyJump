@@ -5,7 +5,7 @@
  */
 
 export class StorageHelper {
-    static PREFIX = 'mediabunny_editor_';
+    static PREFIX = 'jellyjump_editor_';
 
     /**
      * Saves data to localStorage
