@@ -1,3 +1,18 @@
-build/
+# Node modules
 node_modules/
-package-lock.json
+desktop/node_modules/
+
+# Electron build output
+desktop/dist/
+desktop/linux-unpacked/
+desktop/*.AppImage
+desktop/*.deb
+desktop/*.rpm
+desktop/*.exe
+desktop/*.dmg
+
+# Ignore root-level build folder only if you have one
+/build/
+
+# ALLOW the Electron frontend build:
+!desktop/build/

@@ -1,0 +1,39 @@
+{
+  "name": "desktop",
+  "version": "1.0.0",
+  "description": "MediaBunny Video Player",
+  "author": "Jebin <jebin@example.com>",
+  "homepage": "https://github.com/jebin/gemini_video_platform",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.mediabunny.player",
+    "productName": "MediaBunny",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "build/**/*"
+    ],
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Video"
+    }
+  },
+  "keywords": [],
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^39.2.4",
+    "electron-builder": "^26.0.12"
+  }
+}
