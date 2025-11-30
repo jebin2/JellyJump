@@ -12,7 +12,8 @@ function createWindow() {
         },
         autoHideMenuBar: true,
         title: "JellyJump Player",
-        icon: path.join(__dirname, 'build/assets/icons/jelly_jump_logo.png')
+        icon: path.join(__dirname, 'build/assets/icons/jelly_jump_logo.png'),
+        backgroundColor: '#0a0a0a'
     });
 
     // Load the index.html from the build folder
