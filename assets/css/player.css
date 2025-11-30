@@ -645,10 +645,15 @@ button:focus-visible {
     background: var(--bg-tertiary);
     border: 1px solid var(--accent-primary);
     color: var(--accent-primary);
-    padding: 2px 8px;
+    padding: 6px;
     font-size: 10px;
     cursor: pointer;
     text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
 }
 
 .mediabunny-btn-small:hover {
@@ -830,6 +835,7 @@ button:focus-visible {
     border-color: var(--accent-primary);
     color: #000;
 }
+
 /* -----------------------------------------
    Modals (Phase 20)
    ----------------------------------------- */
