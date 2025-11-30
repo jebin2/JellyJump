@@ -696,7 +696,7 @@ export class Playlist {
     /**
      * Clear the playlist
      */
-    clear() {
+    async clear() {
         if (confirm('Are you sure you want to clear the playlist? This will reset the application state.')) {
             // 1. Reset Player State
             this.player.reset();
@@ -706,7 +706,7 @@ export class Playlist {
             this.activeIndex = -1;
 
             // 3. Clear IndexedDB
-            this.storage.clear();
+            await this.storage.clear();
 
             // 4. Update UI
             this.render();

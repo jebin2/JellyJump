@@ -74,7 +74,11 @@ export class IndexedDBService {
             const transaction = this.db.transaction([this.STORES.PLAYLIST, this.STORES.FILES], 'readwrite');
 
             transaction.oncomplete = () => {
-                localStorage.setItem('MediaBunnyDB-playlist', 'true');
+                if (items.length > 0) {
+                    localStorage.setItem('MediaBunnyDB-playlist', 'true');
+                } else {
+                    localStorage.removeItem('MediaBunnyDB-playlist');
+                }
                 resolve();
             };
             transaction.onerror = (event) => reject(event.target.error);
