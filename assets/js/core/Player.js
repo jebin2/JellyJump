@@ -1475,12 +1475,36 @@ export class CorePlayer {
     }
 
     toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            this.container.requestFullscreen().catch(err => {
-                console.error(`Error attempting to enable fullscreen: ${err.message}`);
-            });
+        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+            if (this.container.requestFullscreen) {
+                this.container.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else if (this.container.webkitRequestFullscreen) {
+                this.container.webkitRequestFullscreen();
+            } else if (this.container.mozRequestFullScreen) {
+                this.container.mozRequestFullScreen();
+            } else if (this.container.msRequestFullscreen) {
+                this.container.msRequestFullscreen();
+            } else {
+                // Fallback: CSS Fullscreen
+                this.container.classList.toggle('fullscreen-fallback');
+                document.body.classList.toggle('fullscreen-active');
+            }
         } else {
-            document.exitFullscreen();
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+
+            // Remove fallback classes
+            this.container.classList.remove('fullscreen-fallback');
+            document.body.classList.remove('fullscreen-active');
         }
     }
 

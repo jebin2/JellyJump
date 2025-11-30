@@ -23,6 +23,38 @@
     align-items: center;
 }
 
+/* Remove border in fullscreen */
+/* Split selectors to avoid invalidation of the entire block if one is unsupported */
+.video-section:fullscreen {
+    border: none !important;
+    border-right: none !important;
+    outline: none !important;
+}
+
+.video-section:-webkit-full-screen {
+    border: none !important;
+    border-right: none !important;
+    outline: none !important;
+}
+
+.video-section:-moz-full-screen {
+    border: none !important;
+    border-right: none !important;
+    outline: none !important;
+}
+
+.video-section:-ms-fullscreen {
+    border: none !important;
+    border-right: none !important;
+    outline: none !important;
+}
+
+.video-section.fullscreen-fallback {
+    border: none !important;
+    border-right: none !important;
+    outline: none !important;
+}
+
 /* -----------------------------------------
    Playlist Section (Right)
    ----------------------------------------- */
