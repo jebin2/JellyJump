@@ -39,6 +39,15 @@
     color: var(--accent-primary);
 }
 
+.nav-logo-img {
+    transition: opacity var(--transition-fast);
+}
+
+/* Hover effect: Show animated GIF */
+.nav-logo:hover .nav-logo-img {
+    content: url('../../assets/icons/jelly_jump_logo.gif');
+}
+
 /* -----------------------------------------
    2. Hero Section
    ----------------------------------------- */
