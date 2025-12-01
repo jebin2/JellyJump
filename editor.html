@@ -17,6 +17,11 @@
 </head>
 
 <body>
+    <!-- Page Loading Overlay -->
+    <div class="page-loader" id="page-loader">
+        <div class="page-loader-logo"></div>
+    </div>
+
     <!-- Top Navigation Bar -->
     <nav class="editor-nav">
         <div class="nav-left">
@@ -440,6 +445,15 @@
     <script type="module" src="assets/js/playback-manager.js"></script>
     <script type="module" src="assets/js/properties-panel.js"></script>
 
+    <script>
+        // Hide page loader after all scripts are loaded
+        window.addEventListener('load', function () {
+            const loader = document.getElementById('page-loader');
+            if (loader) {
+                loader.classList.add('hidden');
+            }
+        });
+    </script>
 </body>
 
 </html>

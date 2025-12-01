@@ -22,6 +22,10 @@
 </head>
 
 <body>
+    <!-- Page Loading Overlay -->
+    <div class="page-loader" id="page-loader">
+        <div class="page-loader-logo"></div>
+    </div>
 
     <!-- SVG Icon Sprite (loaded first for immediate use) -->
     <div style="display: none;">
@@ -138,6 +142,14 @@
         } else {
             initializeApp();
         }
+
+        // Hide page loader after initialization
+        window.addEventListener('load', function () {
+            const loader = document.getElementById('page-loader');
+            if (loader) {
+                loader.classList.add('hidden');
+            }
+        });
     </script>
 
 </body>

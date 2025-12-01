@@ -36,6 +36,11 @@
 </head>
 
 <body>
+    <!-- Page Loading Overlay -->
+    <div class="page-loader" id="page-loader">
+        <div class="page-loader-logo"></div>
+    </div>
+
     <!-- Navigation Header -->
     <header class="navbar">
         <div class="container nav-container">
@@ -191,6 +196,43 @@
             <p class="footer-text">&copy; 2025 JellyJump Player. All rights reserved.</p>
         </div>
     </footer>
+
+    <script>
+        const loader = document.getElementById('page-loader');
+
+        // Function to hide loader
+        function hideLoader() {
+            if (loader) {
+                loader.classList.add('hidden');
+            }
+        }
+
+        // Hide page loader after page is fully loaded
+        window.addEventListener('load', hideLoader);
+
+        // Handle browser back/forward cache (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            // If page is loaded from cache, hide the loader
+            if (event.persisted) {
+                hideLoader();
+            }
+        });
+
+        // Show loader when clicking navigation links
+        document.addEventListener('DOMContentLoaded', function () {
+            const navLinks = document.querySelectorAll('a[href="player.html"], a[href="editor.html"]');
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    // Show loader immediately
+                    if (loader) {
+                        loader.classList.remove('hidden');
+                    }
+                    // Let the browser navigate naturally (don't preventDefault)
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>
