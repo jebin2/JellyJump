@@ -36,15 +36,14 @@ Settings menu system with:
 
 **Requirements**:
 - Menu appears below/above settings icon (smart positioning)
-- Contains 8 menu items:
+- Contains 7 menu items:
   1. 🔄 Convert Format...
-  2. 📥 Download Video Only
-  3. 🎵 Download Audio Only
-  4. ✂️ Trim Video...
-  5. 📐 Resize Video...
-  6. ℹ️ Video Info
-  7. 🔗 Merge with Next
-  8. 🎧 Extract Audio to Playlist
+  2. 🎬 Download/Manage Tracks...
+  3. ✂️ Trim Video...
+  4. 📐 Resize Video...
+  5. ℹ️ Video Info
+  6. 🔗 Merge Videos...
+  7. �️ Create GIF...
 - Each item has icon + label
 - Hover states clearly visible
 - Click executes action or opens modal
@@ -85,11 +84,10 @@ Settings menu system with:
 **Purpose**: Show/hide menu options based on context
 
 **Requirements**:
-- "Merge with Next" disabled if last item in playlist
-- "Merge with Previous" disabled if first item (optional future feature)
-- Greyed-out disabled items with tooltip explanation
-- Show item count in merge option: "Merge with Next (video-2.mp4)"
-- Context-aware labeling
+- Show/hide menu options based on context
+- All items generally available
+- Context-aware labeling where applicable
+- No disabled items in current implementation (all operations work on any video)
 
 ---
 
@@ -207,7 +205,7 @@ This phase is primarily UI-focused. MediaBunny integration occurs in subsequent 
 
 - [ ] Settings icon appears on playlist item hover
 - [ ] Clicking icon opens dropdown menu
-- [ ] Menu displays all 8 operation options
+- [ ] Menu displays all 7 operation options
 - [ ] Menu positioning works (below, above, left, right)
 - [ ] Click outside menu closes it
 - [ ] ESC key closes menu
