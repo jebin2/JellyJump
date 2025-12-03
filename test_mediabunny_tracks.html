@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MediaBunny Track Test</title>
+</head>
+
+<body>
+    <h1>MediaBunny Track Test</h1>
+    <script type="module">
+        import { MediaBunny } from './assets/js/core/MediaBunny.js';
+
+        async function test() {
+            try {
+                // Create a dummy video blob (or fetch one if needed)
+                // For now, let's try to inspect the prototype of Input
+                console.log('MediaBunny:', MediaBunny);
+                console.log('MediaBunny.Input prototype:', MediaBunny.Input.prototype);
+
+                // If we can, let's try to load a real file
+                const response = await fetch('assets/video/video1.mp4');
+                const blob = await response.blob();
+                const source = new MediaBunny.BlobSource(blob);
+                const input = new MediaBunny.Input({
+                    source: source,
+                    formats: MediaBunny.ALL_FORMATS
+                });
+
+                // Wait for input to be ready if necessary (though constructor is sync, analysis might be async)
+                // Usually Input analyzes on demand or we might need to call something.
+                // Let's check available methods on 'input' instance
+                console.log('Input instance:', input);
+
+                // Check for getTracks-like methods
+                if (input.getVideoTracks) {
+                    console.log('Has getVideoTracks');
+                    const vTracks = await input.getVideoTracks();
+                    console.log('Video Tracks:', vTracks);
+                }
+                if (input.getAudioTracks) {
+                    console.log('Has getAudioTracks');
+                    const aTracks = await input.getAudioTracks();
+                    console.log('Audio Tracks:', aTracks);
+                }
+                if (input.getTracks) {
+                    console.log('Has getTracks');
+                    const tracks = await input.getTracks();
+                    console.log('Tracks:', tracks);
+                }
+
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        }
+
+        test();
+    </script>
+</body>
+
+</html>

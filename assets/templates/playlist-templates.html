@@ -336,3 +336,82 @@
         </div>
     </div>
 </template>
+
+<!-- Track Management Modal Template -->
+<template id="track-management-modal-template">
+    <div class="mb-modal-overlay">
+        <div class="mb-modal" style="max-width: 700px;">
+            <div class="mb-modal-header">
+                <h3 class="mb-modal-title">Video & Audio Tracks</h3>
+                <button class="mb-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="mb-modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div class="source-filename text-sm text-muted mb-md font-mono break-all"></div>
+
+                <div class="track-section video-tracks-section">
+                    <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                        <span>📹 Video Tracks</span>
+                        <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+                    </h4>
+                    <div class="track-list video-track-list grid gap-sm">
+                        <!-- Video tracks injected here -->
+                        <div class="no-tracks-message text-muted text-sm italic hidden">No video tracks available</div>
+                    </div>
+                </div>
+
+                <div class="track-section audio-tracks-section mt-lg">
+                    <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                        <span>🎵 Audio Tracks</span>
+                        <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+                    </h4>
+                    <div class="track-list audio-track-list grid gap-sm">
+                        <!-- Audio tracks injected here -->
+                        <div class="no-tracks-message text-muted text-sm italic hidden">No audio tracks available</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn jellyjump-btn-small close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Track Card Template -->
+<template id="track-card-template">
+    <div class="track-card border border-border rounded p-sm bg-secondary hover:bg-tertiary transition-colors">
+        <div class="flex justify-between items-start gap-md">
+            <div class="track-info flex-1">
+                <div class="track-title font-bold text-md mb-xs">Track #<span class="track-index">1</span></div>
+                <div class="track-metadata text-sm text-muted grid gap-xs">
+                    <div class="meta-item"><span class="meta-label font-semibold">Codec:</span> <span
+                            class="meta-codec font-mono"></span></div>
+                    <div class="meta-item"><span class="meta-label font-semibold">Details:</span> <span
+                            class="meta-details"></span></div>
+                    <div class="meta-item"><span class="meta-label font-semibold">Language:</span> <span
+                            class="meta-language"></span></div>
+                </div>
+            </div>
+            <div class="track-actions flex flex-col gap-sm items-end shrink-0">
+                <button class="btn jellyjump-btn-small download-track-btn flex items-center gap-xs"
+                    title="Download Track">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-download"></use>
+                    </svg>
+                    <span>Download</span>
+                </button>
+                <div class="progress-container hidden flex items-center gap-xs text-primary">
+                    <div
+                        class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                    </div>
+                    <span class="text-xs font-bold">Extracting...</span>
+                </div>
+                <label
+                    class="flex items-center gap-xs text-sm cursor-pointer select-none hover:text-primary transition-colors">
+                    <input type="checkbox" class="add-to-playlist-checkbox accent-primary">
+                    <span>Add to playlist</span>
+                </label>
+            </div>
+        </div>
+    </div>
+</template>

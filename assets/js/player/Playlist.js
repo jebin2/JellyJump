@@ -1529,12 +1529,14 @@ export class Playlist {
             case 'convert':
                 this._openConversionModal(index);
                 break;
+            case 'download-manage':
+                this._openTrackManager(index);
+                break;
             case 'trim':
             case 'resize':
             case 'info':
             case 'merge':
             case 'create-gif':
-            case 'download-manage':
                 alert(`Feature "${action}" coming in Phase 33+`);
                 break;
         }
@@ -1793,6 +1795,220 @@ export class Playlist {
                 file: new File([blob], newFilename, { type: blob.type }),
                 duration: originalItem.duration, // Approx same duration
                 type: 'video'
+            };
+
+            // Insert after original item
+            const index = this.items.indexOf(originalItem);
+            this.items.splice(index + 1, 0, newItem);
+
+            // Re-render playlist
+            this.render();
+        }
+    }
+
+
+    /**
+     * Open track manager modal
+     * @param {number} index 
+     * @private
+     */
+    async _openTrackManager(index) {
+        const item = this.items[index];
+        const template = document.getElementById('track-management-modal-template');
+        if (!template) return;
+
+        const clone = template.content.cloneNode(true);
+        const modalOverlay = clone.querySelector('.mb-modal-overlay');
+        const modal = clone.querySelector('.mb-modal');
+
+        // Populate Source Info
+        const sourceFilename = modal.querySelector('.source-filename');
+        sourceFilename.textContent = `Source: ${item.title}`;
+
+        // Close Event
+        const closeBtn = modal.querySelector('.mb-modal-close');
+        const footerCloseBtn = modal.querySelector('.close-btn');
+        const close = () => {
+            modalOverlay.classList.remove('visible');
+            setTimeout(() => modalOverlay.remove(), 300);
+        };
+        closeBtn.addEventListener('click', close);
+        footerCloseBtn.addEventListener('click', close);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) close();
+        });
+
+        document.body.appendChild(modalOverlay);
+        requestAnimationFrame(() => modalOverlay.classList.add('visible'));
+
+        // Fetch Tracks
+        try {
+            let source;
+            if (item.file) {
+                source = item.file;
+            } else {
+                const response = await fetch(item.url);
+                source = await response.blob();
+            }
+
+            const tracks = await MediaConverter.getTracks(source);
+            this._renderTracks(tracks, item, modal);
+        } catch (e) {
+            console.error('Failed to load tracks:', e);
+            modal.querySelector('.mb-modal-body').innerHTML = `<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`;
+        }
+    }
+
+    /**
+     * Render tracks in the modal
+     * @param {Object} tracks 
+     * @param {Object} item 
+     * @param {HTMLElement} modal 
+     * @private
+     */
+    _renderTracks(tracks, item, modal) {
+        const videoList = modal.querySelector('.video-track-list');
+        const audioList = modal.querySelector('.audio-track-list');
+        const videoCount = modal.querySelector('.video-tracks-section .track-count');
+        const audioCount = modal.querySelector('.audio-tracks-section .track-count');
+        const noVideoMsg = modal.querySelector('.video-tracks-section .no-tracks-message');
+        const noAudioMsg = modal.querySelector('.audio-tracks-section .no-tracks-message');
+
+        videoCount.textContent = tracks.video.length;
+        audioCount.textContent = tracks.audio.length;
+
+        if (tracks.video.length === 0) noVideoMsg.classList.remove('hidden');
+        if (tracks.audio.length === 0) noAudioMsg.classList.remove('hidden');
+
+        const cardTemplate = document.getElementById('track-card-template');
+
+        const renderList = (list, trackList, type) => {
+            list.forEach((track, i) => {
+                const card = cardTemplate.content.cloneNode(true);
+                const el = card.querySelector('.track-card');
+
+                el.querySelector('.track-index').textContent = i + 1;
+                el.querySelector('.meta-codec').textContent = track.codecString || track.codec || 'Unknown';
+                el.querySelector('.meta-language').textContent = track.language || 'und';
+
+                let details = '';
+                if (type === 'video') {
+                    details = `${track.width}x${track.height}`;
+                } else {
+                    details = `${track.channels}ch, ${track.sampleRate}Hz`;
+                }
+                el.querySelector('.meta-details').textContent = details;
+
+                // Events
+                const downloadBtn = el.querySelector('.download-track-btn');
+                const progressContainer = el.querySelector('.progress-container');
+                const addToPlaylistCheckbox = el.querySelector('.add-to-playlist-checkbox');
+
+                // Determine format based on codec
+                let format = 'mp4';
+                if (type === 'audio') {
+                    const codec = (track.codec || '').toLowerCase();
+                    if (codec.includes('mp3')) {
+                        format = 'mp3';
+                    } else if (codec.includes('aac') || codec.includes('mp4a')) {
+                        format = 'aac';
+                    } else {
+                        format = 'm4a'; // Default to M4A (AAC)
+                    }
+                }
+
+                downloadBtn.addEventListener('click', () => {
+                    this._extractTrack(this.items.indexOf(item), i, type, format, addToPlaylistCheckbox.checked, progressContainer, downloadBtn);
+                });
+
+                trackList.appendChild(el);
+            });
+        };
+
+        renderList(tracks.video, videoList, 'video');
+        renderList(tracks.audio, audioList, 'audio');
+    }
+
+    /**
+     * Extract track
+     * @param {number} index 
+     * @param {number} trackIndex 
+     * @param {string} trackType 
+     * @param {string} format
+     * @param {boolean} addToPlaylist 
+     * @param {HTMLElement} progressContainer 
+     * @param {HTMLElement} downloadBtn 
+     * @private
+     */
+    async _extractTrack(index, trackIndex, trackType, format, addToPlaylist, progressContainer, downloadBtn) {
+        const item = this.items[index];
+
+        // UI State
+        downloadBtn.classList.add('hidden');
+        progressContainer.classList.remove('hidden');
+
+        try {
+            let source;
+            if (item.file) {
+                source = item.file;
+            } else {
+                const response = await fetch(item.url);
+                source = await response.blob();
+            }
+
+            // format is passed as argument now
+
+            const blob = await MediaConverter.extractTrack({
+                source,
+                trackIndex,
+                trackType,
+                format,
+                onProgress: (p) => {
+                    // Optional: Update progress text if we had a percentage
+                }
+            });
+
+            this._handleExtractionSuccess(blob, item, trackType, trackIndex, format, addToPlaylist);
+        } catch (e) {
+            console.error('Extraction failed:', e);
+            alert(`Extraction failed: ${e.message}`);
+        } finally {
+            downloadBtn.classList.remove('hidden');
+            progressContainer.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Handle extraction success
+     * @param {Blob} blob 
+     * @param {Object} originalItem 
+     * @param {string} trackType 
+     * @param {number} trackIndex 
+     * @param {string} format
+     * @param {boolean} addToPlaylist 
+     * @private
+     */
+    _handleExtractionSuccess(blob, originalItem, trackType, trackIndex, format, addToPlaylist) {
+        const ext = format;
+        const newFilename = `${originalItem.title.replace(/\.[^/.]+$/, "")}-${trackType}-track${trackIndex + 1}.${ext}`;
+        const url = URL.createObjectURL(blob);
+
+        // Trigger Download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = newFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        if (addToPlaylist) {
+            const newItem = {
+                title: newFilename,
+                url: url,
+                file: new File([blob], newFilename, { type: blob.type }),
+                duration: originalItem.duration, // Approx
+                type: trackType === 'video' ? 'video' : 'audio',
+                isAudioOnly: trackType === 'audio'
             };
 
             // Insert after original item

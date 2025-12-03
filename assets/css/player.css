@@ -1406,3 +1406,63 @@ body.fullscreen-active {
 .format-group {
     grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 }
+
+/* Track Management */
+.track-section-title {
+    font-size: 1.1em;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color, #444);
+    padding-bottom: 8px;
+}
+
+.track-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color, #444);
+    transition: border-color 0.2s, background-color 0.2s;
+}
+
+.track-card:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-tertiary);
+}
+
+.track-index {
+    color: var(--accent-primary);
+}
+
+.meta-label {
+    color: var(--text-secondary);
+    margin-right: 4px;
+}
+
+.meta-codec {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* Audio Playlist Item Styling */
+.playlist-item.audio-only {
+    border-left: 3px solid var(--accent-secondary, #00d2ff);
+    background: linear-gradient(90deg, rgba(0, 210, 255, 0.05) 0%, transparent 100%);
+}
+
+.playlist-item.audio-only .playlist-thumbnail {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    color: var(--accent-secondary, #00d2ff);
+}
+
+.audio-badge {
+    background: var(--accent-secondary, #00d2ff);
+    color: #000;
+    font-size: 0.7em;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 6px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
