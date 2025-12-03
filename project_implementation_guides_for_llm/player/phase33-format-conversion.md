@@ -9,11 +9,14 @@ Enable users to convert videos to different formats (MP4, WebM, AVI, MOV) using 
 
 ## What to Build
 
-Video format conversion system with:
-- Modal dialog for format selection
-- Support for common video formats
+Video format conversion and optimization system with:
+- Modal dialog for operation mode and format selection
+- Three operation modes: convert format, reduce file size, or both
+- Support for common video formats (all shown, unsupported disabled with "Coming Soon" tooltip)
+- Quality slider for file size reduction
 - Progress tracking during conversion
-- Option to add converted video to playlist
+- Option to add processed video to playlist
+- Download button for processed file
 - Error handling for unsupported codecs
 
 ---
@@ -25,40 +28,87 @@ Video format conversion system with:
 
 **Requirements**:
 - Modal opens when "Convert Format..." clicked in settings menu
-- Modal title: "Convert Video Format"
+- Modal title: "Convert & Optimize Video"
 - Display source video filename and current format
-- Radio button group for format selection
+- Radio button group for operation mode selection
+- Quality slider (conditionally shown based on mode)
+- Radio button group for format selection (conditionally shown/enabled)
 - Checkbox: "Add to playlist after conversion"
 - Cancel and Convert buttons
 - Apply theme modal styling (dark neobrutalism)
 
 ### Feature 2: Format Options
-**Purpose**: Support common video container formats
+**Purpose**: Show all common video formats for conversion
 
 **Requirements**:
 - Format options presented as radio buttons:
-  - ○ MP4 (H.264/AAC) - Most compatible
-  - ○ WebM (VP8/VP9/Opus) - Web optimized
-  - ○ AVI (MPEG-4) - Legacy support
-  - ○ MOV (QuickTime) - Apple ecosystem
-- Each option shows codec information
+  - ○ MP4 (H.264/AAC) - Most compatible ✅ **Supported**
+  - ○ WebM (VP9/Opus) - Web optimized ✅ **Supported**
+  - ○ AVI (MPEG-4) - Legacy support ⚠️ **Disabled** (Coming Soon)
+  - ○ MOV (H.264/AAC) - Apple ecosystem ✅ **Supported**
+  - ○ MKV (Matroska) - High quality ⚠️ **Disabled** (Coming Soon)
+  - ○ FLV (Flash Video) - Legacy streaming ⚠️ **Disabled** (Coming Soon)
+  - ○ WMV (Windows Media) - Microsoft ⚠️ **Disabled** (Coming Soon)
+  - ○ MPEG (MPEG-1/2) - Classic format ⚠️ **Disabled** (Coming Soon)
+- Each option shows codec information and compatibility status
+- Disabled formats show tooltip on hover: "Coming Soon"
+- Disabled formats are not clickable (greyed out)
 - Indicate recommended format (MP4 marked as default)
-- One format selected by default (MP4)
+- One supported format selected by default (MP4)
+
+### Feature 2.5: Operation Mode Selection
+**Purpose**: Allow users to choose between conversion, quality reduction, or both
+
+**Requirements**:
+- Radio button group for operation mode:
+  - ○ **Convert format only** - Change container/codec to selected format
+  - ○ **Reduce file size only** - Compress video by reducing quality/bitrate (keeps current format)
+  - ○ **Convert + Reduce size** - Change format AND reduce quality in one operation
+- Default mode: "Convert format only"
+- When "Reduce file size only" or "Convert + Reduce size" selected:
+  - Show quality slider or dropdown below mode selection
+  - Quality options:
+    - High Quality (80% - minimal size reduction)
+    - Medium Quality (60% - balanced)
+    - Low Quality (40% - maximum compression)
+  - Show estimated size reduction percentage (e.g., "~50% smaller")
+- Format selection:
+  - Enabled for "Convert format only" and "Convert + Reduce size" modes
+  - Disabled/hidden for "Reduce file size only" mode
+- Visual grouping: Mode selection at top, then quality settings (if applicable), then format selection (if applicable)
 
 ### Feature 3: MediaBunny Conversion
-**Purpose**: Execute video format conversion
+**Purpose**: Execute video processing based on selected operation mode
 
 **Requirements**:
 - Create MediaBunny Conversion instance
 - Add Input from source video
-- Configure output format based on selection:
-  - MP4: Container format mp4, video codec h264, audio codec aac
-  - WebM: Container format webm, video codec vp9, audio codec opus
-  - AVI: Container format avi
-  - MOV: Container format mov, video codec h264
-- Set appropriate quality settings (maintain source quality if possible)
+- **Configure based on operation mode**:
+
+  **Mode 1: Convert format only**
+  - Configure output format based on selection (supported formats only):
+    - MP4: Container format mp4, video codec h264, audio codec aac
+    - WebM: Container format webm, video codec vp9, audio codec opus
+    - MOV: Container format mov, video codec h264
+  - Maintain source quality settings (no quality reduction)
+  
+  **Mode 2: Reduce file size only**
+  - Keep source container format and codecs
+  - Apply quality reduction based on slider selection:
+    - High Quality (80%): Set bitrate to 80% of source
+    - Medium Quality (60%): Set bitrate to 60% of source
+    - Low Quality (40%): Set bitrate to 40% of source
+  - Adjust video encoding parameters (CRF/bitrate)
+  - Maintain audio codec but reduce audio bitrate proportionally
+  
+  **Mode 3: Convert + Reduce size**
+  - Apply format conversion to selected format (MP4/WebM/MOV)
+  - Apply quality reduction as per quality slider
+  - Combine both transformations in single conversion pass
+
 - Execute conversion and collect output blob
 - Handle conversion errors gracefully
+- Clean up resources after completion
 
 ### Feature 4: Progress Indicator
 **Purpose**: Show conversion progress to user
@@ -118,31 +168,55 @@ Video format conversion system with:
 
 ## Interaction Behavior
 
-**User Flow 1: Basic Conversion**:
+**User Flow 1: Convert Format Only**:
 1. User clicks settings menu → "Convert Format..."
-2. Modal opens showing format options
-3. User selects "WebM"
-4. User checks "Add to playlist"
-5. User clicks "Convert"
-6. Progress bar appears
-7. Conversion completes (e.g., 30 seconds)
-8. Success message: "Video converted! Click Download to save."
-9. Download button appears
-10. New playlist item appears below source
-11. User clicks "Download" button
-12. File downloads
+2. Modal opens showing operation modes
+3. "Convert format only" is selected by default
+4. User selects "WebM" from format options
+5. User checks "Add to playlist"
+6. User clicks "Convert"
+7. Progress bar appears
+8. Conversion completes (e.g., 30 seconds)
+9. Success message: "Video converted! Click Download to save."
+10. Download button appears
+11. New playlist item appears below source
+12. User clicks "Download" button
+13. File downloads as WebM
 
-**User Flow 2: Error Handling**:
-1. User selects format (e.g., AVI)
-2. Clicks "Convert"
-3. Conversion fails (codec unsupported)
-4. Error message: "AVI format not supported by your browser. Try MP4 instead."
-5. User selects MP4
-6. Retry succeeds
+**User Flow 2: Reduce File Size Only**:
+1. User clicks settings menu → "Convert Format..."
+2. Modal opens
+3. User selects "Reduce file size only" operation mode
+4. Format options become disabled/hidden
+5. Quality slider appears
+6. User selects "Medium Quality (60%)"
+7. Estimated size reduction shows: "~40% smaller"
+8. User clicks "Convert"
+9. Progress bar appears
+10. Compression completes
+11. Success message shows
+12. Download button appears
+13. File downloads in original format but smaller size
 
-**User Flow 3: Download Only (No Playlist)**:
+**User Flow 3: Convert + Reduce Size (Combined)**:
+1. User selects "Convert + Reduce size" operation mode
+2. Quality slider appears
+3. User sets quality to "Low Quality (40%)"
+4. User selects "MP4" format
+5. Estimated size: "~60% smaller"
+6. User clicks "Convert"
+7. Both conversion and compression applied
+8. File downloads as smaller MP4
+
+**User Flow 4: Error Handling (Unsupported Format)**:
+1. User tries to select disabled format (e.g., AVI)
+2. Radio button is disabled (not clickable)
+3. Hover shows tooltip: "Coming Soon"
+4. User must select supported format (MP4/WebM/MOV)
+
+**User Flow 5: Download Only (No Playlist)**:
 1. User unchecks "Add to playlist"
-2. Selects format and converts
+2. Selects operation mode and settings
 3. Conversion completes
 4. Download button appears
 5. User clicks "Download"
@@ -178,6 +252,21 @@ Video format conversion system with:
 - Large, clickable targets (40px height)
 - Selected state: Primary color accent
 - Label shows format + codec info clearly
+- **Disabled state**:
+  - Greyed out appearance (opacity: 0.5)
+  - Not clickable (pointer-events: none on radio input)
+  - Cursor changes to not-allowed on hover
+  - Tooltip appears on hover: "Coming Soon"
+  - Format name still visible but clearly inactive
+
+**Quality Slider** (when shown):
+- Full-width horizontal slider
+- Min: 40% (Low), Max: 80% (High), Default: 60% (Medium)
+- Three labeled stops: Low (40%), Medium (60%), High (80%)
+- Current value displayed: "Medium Quality (60%)"
+- Estimated size reduction text below: "~40% smaller"
+- Theme-styled track and thumb
+- Smooth animation on value change
 
 **Progress Bar**:
 - Height: 8px
@@ -241,20 +330,47 @@ This phase requires MediaBunny Conversion API.
 
 ## Testing Checklist
 
+**Modal & UI**:
 - [ ] Modal opens from settings menu
-- [ ] All format options displayed correctly
+- [ ] Modal title: "Convert & Optimize Video"
+- [ ] All format options displayed (supported and disabled)
+- [ ] Disabled formats show "Coming Soon" tooltip on hover
+- [ ] Disabled formats are not clickable
+
+**Operation Modes**:
+- [ ] "Convert format only" mode works
+- [ ] "Reduce file size only" mode works
+- [ ] "Convert + Reduce size" mode works
+- [ ] Format selection disabled when "Reduce file size only" selected
+- [ ] Quality slider appears for size reduction modes
+- [ ] Quality slider hidden for "Convert format only"
+
+**Format Conversion (Supported)**:
 - [ ] MP4 conversion works
 - [ ] WebM conversion works
-- [ ] AVI conversion works (if supported)
-- [ ] MOV conversion works (if supported)
+- [ ] MOV conversion works
+
+**Quality Reduction**:
+- [ ] High quality (80%) compression works
+- [ ] Medium quality (60%) compression works
+- [ ] Low quality (40%) compression works
+- [ ] Estimated size reduction displayed
+- [ ] Actual output size matches estimate (±10%)
+- [ ] Quality reduction maintains playback compatibility
+
+**Combined Operations**:
+- [ ] Convert to MP4 + reduce size works
+- [ ] Convert to WebM + reduce size works
+- [ ] Combined operation produces smaller file in new format
+
+**General**:
 - [ ] Progress indicator shows during conversion
 - [ ] Converted video added to playlist (when checked)
-- [ ] Download triggered automatically
+- [ ] Download button appears after completion
 - [ ] Filename generated correctly
-- [ ] Error handling works for unsupported formats
-- [ ] Cancel button works (if implemented)
+- [ ] Error handling works
 - [ ] Modal closes after successful conversion
-- [ ] Converted video plays correctly
+- [ ] Converted/compressed video plays correctly
 
 ---
 
