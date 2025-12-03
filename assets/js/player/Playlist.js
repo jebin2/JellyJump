@@ -1609,7 +1609,7 @@ export class Playlist {
 
         // Close Handler
         const closeModal = () => {
-            if (convertBtn.disabled && !downloadBtn.classList.contains('hidden') === false) {
+            if (convertBtn.disabled && !downloadBtn.classList.contains('hidden')) {
                 // Converting... don't close
                 return;
             }
@@ -1647,6 +1647,7 @@ export class Playlist {
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
+            downloadBtn.classList.add('hidden'); // Hide previous download if any
 
             try {
                 await this._startConversion(index, format, quality, addToPlaylist, (progress) => {
@@ -1663,6 +1664,15 @@ export class Playlist {
                 downloadBtn.classList.remove('hidden');
                 const downloadFormat = (format === 'keep') ? item.title.split('.').pop() : format;
                 downloadBtn.textContent = `Download ${downloadFormat.toUpperCase()}`;
+
+                // Re-enable Inputs for new conversion
+                inputs.forEach(input => {
+                    if (!input.parentElement.classList.contains('disabled')) {
+                        input.disabled = false;
+                    }
+                });
+                qualitySlider.disabled = false;
+                convertBtn.disabled = false;
 
                 // Allow closing
                 cancelBtn.disabled = false;

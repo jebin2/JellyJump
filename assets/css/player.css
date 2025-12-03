@@ -1005,6 +1005,7 @@ button:focus-visible {
 
 .mb-modal-body {
     padding: 20px;
+    overflow-y: auto;
 }
 
 .mb-input-group {
@@ -1145,6 +1146,7 @@ body.fullscreen-active {
     border-radius: 8px;
     width: 90%;
     max-width: 500px;
+    max-height: 90vh;
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
     display: flex;
     flex-direction: column;
@@ -1176,6 +1178,9 @@ body.fullscreen-active {
 
 .modal-body {
     padding: 24px;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 /* Radio Group */
@@ -1216,6 +1221,7 @@ body.fullscreen-active {
     margin-right: 12px;
     position: relative;
     transition: all 0.2s;
+    flex-shrink: 0;
 }
 
 .radio-option input:checked~.radio-custom {
@@ -1264,6 +1270,7 @@ body.fullscreen-active {
     position: relative;
     transition: all 0.2s;
     background: var(--bg-primary);
+    flex-shrink: 0;
 }
 
 .checkbox-option:hover .checkbox-custom {
@@ -1395,5 +1402,5 @@ body.fullscreen-active {
 
 /* Responsive Grid for Formats */
 .format-group {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 }
