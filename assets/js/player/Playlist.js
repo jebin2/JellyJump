@@ -1,6 +1,6 @@
 import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
-import { MediaConverter } from '../core/MediaConverter.js';
+import { MediaProcessor } from '../core/MediaProcessor.js';
 import { Modal } from './Modal.js';
 
 /**
@@ -1760,7 +1760,7 @@ export class Playlist {
         }
 
         try {
-            const resultBlob = await MediaConverter.convert({
+            const resultBlob = await MediaProcessor.process({
                 source: source,
                 format: targetFormat,
                 quality: quality,
@@ -2063,7 +2063,7 @@ export class Playlist {
                 }
 
                 // Convert/Trim
-                const blob = await MediaConverter.convert({
+                const blob = await MediaProcessor.process({
                     source: source,
                     format: 'mp4', // Default to MP4 for now, could detect source format
                     quality: 100, // Keep original quality
@@ -2156,7 +2156,7 @@ export class Playlist {
                 source = await response.blob();
             }
 
-            const tracks = await MediaConverter.getTracks(source);
+            const tracks = await MediaProcessor.getTracks(source);
 
             // Hide loading, show content
             modalContent.querySelector('.tracks-loading').classList.add('hidden');
@@ -2287,7 +2287,7 @@ export class Playlist {
 
             // format is passed as argument now
 
-            const blob = await MediaConverter.extractTrack({
+            const blob = await MediaProcessor.extractTrack({
                 source,
                 trackIndex,
                 trackType,
