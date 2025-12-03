@@ -509,20 +509,21 @@
         <div id="trim-player-container" class="mb-lg aspect-video bg-black rounded overflow-hidden relative"></div>
 
         <!-- Time Inputs -->
-        <div class="time-inputs-container flex-between mb-lg">
-            <div class="time-input-group">
-                <label for="trim-start-input" class="text-xs text-secondary font-mono mb-xs block">START TIME</label>
-                <input type="text" id="trim-start-input" class="mb-input font-mono text-center" placeholder="00:00:00"
-                    value="00:00:00">
+        <div class="time-inputs-container mb-lg"
+            style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px; align-items: end;">
+            <div class="time-input-group" style="min-width: 0;">
+                <label for="trim-start-input" class="text-xs text-secondary font-mono mb-xs block">START</label>
+                <input type="text" id="trim-start-input" class="mb-input font-mono text-center"
+                    style="width: 100%; padding: 8px 4px; font-size: 0.9em;" placeholder="00:00:00" value="00:00:00">
             </div>
-            <div class="duration-display flex flex-col items-center justify-center">
-                <span class="text-xs text-secondary font-mono">DURATION</span>
+            <div class="duration-display flex flex-col items-center justify-center" style="padding: 0 4px;">
+                <span class="text-xs text-secondary font-mono">DUR</span>
                 <span class="trim-duration text-sm font-bold text-accent">00:00:00</span>
             </div>
-            <div class="time-input-group">
-                <label for="trim-end-input" class="text-xs text-secondary font-mono mb-xs block">END TIME</label>
-                <input type="text" id="trim-end-input" class="mb-input font-mono text-center" placeholder="00:00:00"
-                    value="00:00:00">
+            <div class="time-input-group" style="min-width: 0;">
+                <label for="trim-end-input" class="text-xs text-secondary font-mono mb-xs block">END</label>
+                <input type="text" id="trim-end-input" class="mb-input font-mono text-center"
+                    style="width: 100%; padding: 8px 4px; font-size: 0.9em;" placeholder="00:00:00" value="00:00:00">
             </div>
         </div>
 
