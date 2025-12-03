@@ -798,6 +798,7 @@ button:focus-visible {
 }
 
 .jellyjump-help-content {
+
     background: var(--bg-secondary, #1a1a1a);
     border: 2px solid var(--accent-primary, #00ff88);
     padding: 30px;
@@ -1585,4 +1586,30 @@ body.fullscreen-active {
     75% {
         transform: translateX(5px);
     }
+}
+
+/* -----------------------------------------
+   Button Variants
+   ----------------------------------------- */
+.jellyjump-btn-primary {
+    background-color: var(--accent-primary);
+    color: #000;
+    border: 1px solid var(--accent-primary);
+}
+
+.jellyjump-btn-primary:hover {
+    background-color: var(--accent-secondary, #fff);
+    color: #000;
+}
+
+.jellyjump-btn-secondary {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-dark);
+}
+
+.jellyjump-btn-secondary:hover {
+    background-color: var(--bg-secondary);
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
 }

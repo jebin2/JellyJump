@@ -2471,9 +2471,9 @@ export class Playlist {
         lockBtn.addEventListener('click', () => {
             isLocked = !isLocked;
             lockBtn.setAttribute('aria-pressed', isLocked);
-            lockBtn.querySelector('use').setAttribute('href', `assets/icons/sprite.svg#icon-${isLocked ? 'lock' : 'unlock'}`);
-            lockBtn.classList.toggle('text-accent', isLocked);
-            lockBtn.classList.toggle('text-secondary', !isLocked);
+            // Toggle button styles
+            lockBtn.classList.toggle('jellyjump-btn-primary', isLocked);
+            lockBtn.classList.toggle('jellyjump-btn-secondary', !isLocked);
 
             if (isLocked) {
                 // Re-sync height to width
