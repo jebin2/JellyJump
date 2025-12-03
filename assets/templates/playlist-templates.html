@@ -773,19 +773,22 @@
         </label>
     </div>
 
-    <!-- Progress & Status -->
-    <div class="resize-progress hidden mb-lg">
-        <div class="flex-between text-xs text-secondary mb-xs">
-            <span class="status-text">Resizing...</span>
-            <span class="progress-percentage">0%</span>
+    <!-- Progress Section (Hidden by default) -->
+    <div class="resize-progress hidden">
+        <div class="flex-between mb-xs">
+            <span class="status-text text-sm font-mono">Resizing video...</span>
+            <span class="progress-percentage text-sm font-bold">0%</span>
         </div>
-        <div class="progress-track h-2 bg-tertiary rounded overflow-hidden">
-            <div class="progress-bar h-full bg-accent transition-all duration-300" style="width: 0%"></div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: 0%"></div>
         </div>
     </div>
 
-    <div class="resize-error hidden mb-modal-error p-sm rounded text-sm"></div>
-    <div class="resize-success hidden mb-modal-success p-sm rounded text-sm text-success bg-success-dim">
+    <!-- Error Message (Hidden by default) -->
+    <div class="resize-error hidden mt-md p-sm border-danger text-danger text-sm"></div>
+
+    <!-- Success Message (Hidden by default) -->
+    <div class="resize-success hidden mt-md p-sm border-success text-success text-sm">
         Resize complete!
     </div>
 </template>
@@ -799,7 +802,14 @@
             </svg>
         </a>
         <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
-            <span class="font-bold">Resize</span>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-check"></use>
+            </svg>
         </button>
     </div>
+</template>
+<button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
+    <span class="font-bold">Resize</span>
+</button>
+</div>
 </template>

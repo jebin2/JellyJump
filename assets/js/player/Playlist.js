@@ -2405,7 +2405,7 @@ export class Playlist {
         const resizeBtn = modalContent.querySelector('.resize-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.resize-progress');
-        const progressBar = modalContent.querySelector('.progress-bar');
+        const progressBarFill = modalContent.querySelector('.progress-bar-fill');
         const progressText = modalContent.querySelector('.progress-percentage');
         const statusText = modalContent.querySelector('.status-text');
         const errorDisplay = modalContent.querySelector('.resize-error');
@@ -2565,7 +2565,7 @@ export class Playlist {
                     resize: { width: targetW, height: targetH },
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
-                        progressBar.style.width = `${percent}%`;
+                        progressBarFill.style.width = `${percent}%`;
                         progressText.textContent = `${percent}%`;
                     }
                 });
@@ -2582,7 +2582,13 @@ export class Playlist {
                 downloadBtn.href = url;
                 downloadBtn.download = filename;
                 downloadBtn.classList.remove('hidden');
-                resizeBtn.classList.add('hidden');
+
+                // Allow another resize
+                resizeBtn.disabled = false;
+                resizeBtn.classList.remove('hidden');
+                statusText.textContent = 'Resizing video...';
+                progressBarFill.style.width = '0%';
+                progressText.textContent = '0%';
 
                 // Add to Playlist
                 if (addToPlaylistCheckbox.checked) {
