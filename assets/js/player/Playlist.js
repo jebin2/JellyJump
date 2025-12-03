@@ -2087,7 +2087,8 @@ export class Playlist {
                 downloadBtn.href = url;
                 downloadBtn.download = filename;
                 downloadBtn.classList.remove('hidden');
-                trimBtn.classList.add('hidden');
+                downloadBtn.classList.remove('hidden');
+                // trimBtn.classList.add('hidden'); // Keep trim button visible
 
                 // Add to Playlist
                 if (addToPlaylistCheckbox.checked) {
