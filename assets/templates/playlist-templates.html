@@ -720,4 +720,86 @@
             </div>
         </div>
     </div>
+</template><!-- Resize Content Template -->
+<template id="resize-content-template">
+    <div class="source-info mb-lg p-sm bg-tertiary rounded flex-between items-center">
+        <div class="flex flex-col">
+            <span class="text-xs text-secondary font-mono">CURRENT RESOLUTION</span>
+            <span class="current-resolution text-sm font-bold text-primary">Checking...</span>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-xs text-secondary font-mono">ASPECT RATIO</span>
+            <span class="current-aspect-ratio text-sm font-bold text-accent">--:--</span>
+        </div>
+    </div>
+
+    <!-- Dimension Inputs -->
+    <div class="dimension-inputs-container mb-lg"
+        style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: end;">
+        <div class="input-group" style="min-width: 0;">
+            <label for="resize-width" class="text-xs text-secondary font-mono mb-xs block">WIDTH (px)</label>
+            <input type="number" id="resize-width" class="mb-input font-mono text-center" style="width: 100%;"
+                placeholder="1920" min="128" max="7680" step="2">
+        </div>
+        <div class="aspect-lock-container flex flex-col items-center justify-center pb-xs">
+            <button class="aspect-lock-btn btn-icon text-accent" title="Lock Aspect Ratio" aria-pressed="true">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-lock"></use>
+                </svg>
+            </button>
+        </div>
+        <div class="input-group" style="min-width: 0;">
+            <label for="resize-height" class="text-xs text-secondary font-mono mb-xs block">HEIGHT (px)</label>
+            <input type="number" id="resize-height" class="mb-input font-mono text-center" style="width: 100%;"
+                placeholder="1080" min="128" max="7680" step="2">
+        </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="presets-container mb-lg">
+        <label class="text-xs text-secondary font-mono mb-xs block">PRESETS</label>
+        <div class="presets-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="1080p">1080p (FHD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="720p">720p (HD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="480p">480p (SD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="360p">360p</button>
+        </div>
+    </div>
+
+    <div class="options-group mb-lg">
+        <label class="checkbox-option flex items-center gap-sm cursor-pointer select-none">
+            <input type="checkbox" name="addToPlaylist" checked class="accent-primary">
+            <span class="text-sm">Add to playlist after resizing</span>
+        </label>
+    </div>
+
+    <!-- Progress & Status -->
+    <div class="resize-progress hidden mb-lg">
+        <div class="flex-between text-xs text-secondary mb-xs">
+            <span class="status-text">Resizing...</span>
+            <span class="progress-percentage">0%</span>
+        </div>
+        <div class="progress-track h-2 bg-tertiary rounded overflow-hidden">
+            <div class="progress-bar h-full bg-accent transition-all duration-300" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <div class="resize-error hidden mb-modal-error p-sm rounded text-sm"></div>
+    <div class="resize-success hidden mb-modal-success p-sm rounded text-sm text-success bg-success-dim">
+        Resize complete!
+    </div>
+</template>
+
+<!-- Resize Footer Template -->
+<template id="resize-footer-template">
+    <div class="action-buttons flex gap-sm">
+        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-download"></use>
+            </svg>
+        </a>
+        <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
+            <span class="font-bold">Resize</span>
+        </button>
+    </div>
 </template>

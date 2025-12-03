@@ -1534,6 +1534,8 @@ export class Playlist {
                 this._openTrimModal(index);
                 break;
             case 'resize':
+                this._openResizeModal(index);
+                break;
             case 'info':
             case 'merge':
             case 'create-gif':
@@ -2372,5 +2374,244 @@ export class Playlist {
             document.body.removeChild(a);
         }
     }
-}
 
+    /**
+     * Open resize modal
+     * @param {number} index
+     * @private
+     */
+    async _openResizeModal(index) {
+        const item = this.items[index];
+        const contentTemplate = document.getElementById('resize-content-template');
+        const footerTemplate = document.getElementById('resize-footer-template');
+
+        if (!contentTemplate || !footerTemplate) return;
+
+        const modal = new Modal({ maxWidth: '550px' });
+        modal.setTitle('Resize Video');
+        modal.setBody(contentTemplate.content.cloneNode(true));
+        modal.setFooter(footerTemplate.content.cloneNode(true));
+
+        const modalContent = modal.modal;
+
+        // Elements
+        const resolutionDisplay = modalContent.querySelector('.current-resolution');
+        const aspectRatioDisplay = modalContent.querySelector('.current-aspect-ratio');
+        const widthInput = modalContent.querySelector('#resize-width');
+        const heightInput = modalContent.querySelector('#resize-height');
+        const lockBtn = modalContent.querySelector('.aspect-lock-btn');
+        const presetBtns = modalContent.querySelectorAll('.preset-btn');
+        const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
+        const resizeBtn = modalContent.querySelector('.resize-btn');
+        const downloadBtn = modalContent.querySelector('.download-btn');
+        const progressSection = modalContent.querySelector('.resize-progress');
+        const progressBar = modalContent.querySelector('.progress-bar');
+        const progressText = modalContent.querySelector('.progress-percentage');
+        const statusText = modalContent.querySelector('.status-text');
+        const errorDisplay = modalContent.querySelector('.resize-error');
+        const successDisplay = modalContent.querySelector('.resize-success');
+
+        modal.open();
+
+        // State
+        let originalWidth = 0;
+        let originalHeight = 0;
+        let aspectRatio = 0;
+        let isLocked = true;
+
+        // Helper: Calculate Aspect Ratio String
+        const getAspectRatioString = (w, h) => {
+            const gcd = (a, b) => b ? gcd(b, a % b) : a;
+            const divisor = gcd(w, h);
+            return `${w / divisor}:${h / divisor}`;
+        };
+
+        // Helper: Update Inputs
+        const updateInputs = (w, h, source) => {
+            if (source !== 'width') widthInput.value = Math.round(w);
+            if (source !== 'height') heightInput.value = Math.round(h);
+        };
+
+        // Load Metadata
+        try {
+            let source;
+            if (item.file) {
+                source = item.file;
+            } else {
+                const response = await fetch(item.url);
+                source = await response.blob();
+            }
+
+            const tracks = await MediaProcessor.getTracks(source);
+            const videoTrack = tracks.video[0]; // Assume first video track
+
+            if (videoTrack) {
+                originalWidth = videoTrack.width;
+                originalHeight = videoTrack.height;
+                aspectRatio = originalWidth / originalHeight;
+
+                resolutionDisplay.textContent = `${originalWidth}x${originalHeight}`;
+                aspectRatioDisplay.textContent = getAspectRatioString(originalWidth, originalHeight);
+
+                // Init inputs
+                updateInputs(originalWidth, originalHeight);
+            } else {
+                throw new Error('No video track found');
+            }
+        } catch (e) {
+            console.error('Failed to load video info:', e);
+            resolutionDisplay.textContent = 'Unknown';
+            errorDisplay.textContent = 'Failed to load video info. Resizing may not work.';
+            errorDisplay.classList.remove('hidden');
+        }
+
+        // Event Listeners
+
+        // Aspect Lock Toggle
+        lockBtn.addEventListener('click', () => {
+            isLocked = !isLocked;
+            lockBtn.setAttribute('aria-pressed', isLocked);
+            lockBtn.querySelector('use').setAttribute('href', `assets/icons/sprite.svg#icon-${isLocked ? 'lock' : 'unlock'}`);
+            lockBtn.classList.toggle('text-accent', isLocked);
+            lockBtn.classList.toggle('text-secondary', !isLocked);
+
+            if (isLocked) {
+                // Re-sync height to width
+                const w = parseInt(widthInput.value) || originalWidth;
+                updateInputs(w, w / aspectRatio, 'width');
+            }
+        });
+
+        // Width Input
+        widthInput.addEventListener('input', () => {
+            const w = parseInt(widthInput.value);
+            if (isLocked && w && aspectRatio) {
+                updateInputs(w, w / aspectRatio, 'width');
+            }
+        });
+
+        // Height Input
+        heightInput.addEventListener('input', () => {
+            const h = parseInt(heightInput.value);
+            if (isLocked && h && aspectRatio) {
+                updateInputs(h * aspectRatio, h, 'height');
+            }
+        });
+
+        // Presets
+        presetBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const preset = btn.dataset.preset;
+                let targetH;
+
+                switch (preset) {
+                    case '1080p': targetH = 1080; break;
+                    case '720p': targetH = 720; break;
+                    case '480p': targetH = 480; break;
+                    case '360p': targetH = 360; break;
+                }
+
+                if (targetH) {
+                    // Always respect aspect ratio for presets
+                    updateInputs(targetH * aspectRatio, targetH);
+
+                    // Highlight active preset
+                    presetBtns.forEach(b => b.classList.remove('jellyjump-btn-primary'));
+                    presetBtns.forEach(b => b.classList.add('jellyjump-btn-secondary'));
+                    btn.classList.remove('jellyjump-btn-secondary');
+                    btn.classList.add('jellyjump-btn-primary');
+                }
+            });
+        });
+
+        // Resize Action
+        resizeBtn.addEventListener('click', async () => {
+            const targetW = parseInt(widthInput.value);
+            const targetH = parseInt(heightInput.value);
+
+            // Validation
+            if (!targetW || !targetH || targetW < 128 || targetH < 128) {
+                errorDisplay.textContent = 'Dimensions must be at least 128px.';
+                errorDisplay.classList.remove('hidden');
+                return;
+            }
+
+            // Even numbers check (codec requirement)
+            if (targetW % 2 !== 0 || targetH % 2 !== 0) {
+                errorDisplay.textContent = 'Dimensions must be even numbers.';
+                errorDisplay.classList.remove('hidden');
+                return;
+            }
+
+            errorDisplay.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            resizeBtn.disabled = true;
+            modal.closeBtn.disabled = true;
+            statusText.textContent = `Resizing to ${targetW}x${targetH}...`;
+
+            try {
+                let source;
+                if (item.file) {
+                    source = item.file;
+                } else {
+                    const response = await fetch(item.url);
+                    source = await response.blob();
+                }
+
+                const blob = await MediaProcessor.process({
+                    source: source,
+                    format: 'mp4',
+                    quality: 100, // High quality for resize
+                    resize: { width: targetW, height: targetH },
+                    onProgress: (progress) => {
+                        const percent = Math.round(progress * 100);
+                        progressBar.style.width = `${percent}%`;
+                        progressText.textContent = `${percent}%`;
+                    }
+                });
+
+                // Success
+                successDisplay.classList.remove('hidden');
+                progressSection.classList.add('hidden');
+
+                // Configure Download
+                const ext = 'mp4';
+                const filename = item.title.replace(/\.[^/.]+$/, "") + `-${targetW}x${targetH}.${ext}`;
+                const url = URL.createObjectURL(blob);
+
+                downloadBtn.href = url;
+                downloadBtn.download = filename;
+                downloadBtn.classList.remove('hidden');
+                resizeBtn.classList.add('hidden');
+
+                // Add to Playlist
+                if (addToPlaylistCheckbox.checked) {
+                    const newItem = {
+                        id: Date.now().toString(),
+                        title: filename,
+                        url: url,
+                        file: new File([blob], filename, { type: `video/${ext}` }),
+                        duration: item.duration, // Duration shouldn't change
+                        type: 'video',
+                        isLocal: true,
+                        isNew: true
+                    };
+
+                    const insertIndex = this.items.indexOf(item) + 1;
+                    this.items.splice(insertIndex, 0, newItem);
+                    this.render();
+                }
+
+                modal.closeBtn.disabled = false;
+
+            } catch (e) {
+                console.error('Resize failed:', e);
+                errorDisplay.textContent = `Resize failed: ${e.message}`;
+                errorDisplay.classList.remove('hidden');
+                progressSection.classList.add('hidden');
+                resizeBtn.disabled = false;
+                modal.closeBtn.disabled = false;
+            }
+        });
+    }
+}

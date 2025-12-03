@@ -15,7 +15,18 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async process({ source, format, quality, trim, onProgress }) {
+    /**
+     * Process video (transcode, trim, resize, etc.)
+     * @param {Object} options
+     * @param {Blob|File} options.source
+     * @param {string} options.format - 'mp4', 'webm', 'mov', 'keep'
+     * @param {number} options.quality - 0-100
+     * @param {Object} [options.trim] - { start: number, end: number }
+     * @param {Object} [options.resize] - { width: number, height: number }
+     * @param {Function} [options.onProgress]
+     * @returns {Promise<Blob>}
+     */
+    static async process({ source, format, quality, trim, resize, onProgress }) {
         const blobSource = new MediaBunny.BlobSource(source);
         const input = new MediaBunny.Input({ source: blobSource, formats: MediaBunny.ALL_FORMATS });
 
@@ -58,6 +69,14 @@ export class MediaProcessor {
                 bitrate: bitrate,
                 forceTranscode: true
             };
+        }
+
+        // Configure Resize
+        if (resize && resize.width && resize.height) {
+            videoConfig.width = resize.width;
+            videoConfig.height = resize.height;
+            videoConfig.fit = 'fill'; // Match exact dimensions
+            videoConfig.forceTranscode = true;
         }
 
         const conversion = await MediaBunny.Conversion.init({
