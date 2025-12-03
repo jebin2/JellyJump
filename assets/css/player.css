@@ -1321,6 +1321,8 @@ body.fullscreen-active {
     padding: 20px;
     border-top: 2px solid var(--border-color, #444);
     background: var(--bg-tertiary);
+    display: flex;
+    justify-content: flex-end;
 }
 
 .border-danger {
