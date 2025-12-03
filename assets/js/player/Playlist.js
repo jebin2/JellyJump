@@ -1526,6 +1526,8 @@ export class Playlist {
 
         switch (action) {
             case 'convert':
+                this._openConversionModal(index);
+                break;
             case 'trim':
             case 'resize':
             case 'info':
@@ -1534,6 +1536,217 @@ export class Playlist {
             case 'download-manage':
                 alert(`Feature "${action}" coming in Phase 33+`);
                 break;
+        }
+    }
+
+    /**
+     * Open the format conversion modal
+     * @param {number} index 
+     * @private
+     */
+    _openConversionModal(index) {
+        const item = this.items[index];
+        const template = document.getElementById('conversion-modal-template');
+        if (!template) return;
+
+        const clone = template.content.cloneNode(true);
+        const modalOverlay = clone.querySelector('.modal-overlay');
+        const modalContent = clone.querySelector('.modal-content');
+
+        // Populate Source Info
+        modalContent.querySelector('.source-filename').textContent = item.title;
+        modalContent.querySelector('.source-filename').title = item.title;
+
+        // Elements
+        const closeBtn = modalContent.querySelector('.modal-close-btn');
+        const cancelBtn = modalContent.querySelector('.cancel-btn');
+        const convertBtn = modalContent.querySelector('.convert-btn');
+        const downloadBtn = modalContent.querySelector('.download-btn');
+        const progressSection = modalContent.querySelector('.progress-section');
+        const progressBarFill = modalContent.querySelector('.progress-bar-fill');
+        const progressPercentage = modalContent.querySelector('.progress-percentage');
+        const successMessage = modalContent.querySelector('.success-message');
+        const errorMessage = modalContent.querySelector('.error-message');
+        const inputs = modalContent.querySelectorAll('input');
+
+        // Close Handler
+        const closeModal = () => {
+            if (convertBtn.disabled && !downloadBtn.classList.contains('hidden') === false) {
+                // Converting... don't close
+                return;
+            }
+            modalOverlay.classList.remove('visible');
+            setTimeout(() => {
+                if (modalOverlay.parentNode) modalOverlay.parentNode.removeChild(modalOverlay);
+            }, 200);
+        };
+
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+
+        // Convert Handler
+        convertBtn.addEventListener('click', async () => {
+            const format = modalContent.querySelector('input[name="format"]:checked').value;
+            const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
+
+            // UI Updates
+            inputs.forEach(input => input.disabled = true);
+            convertBtn.disabled = true;
+            cancelBtn.disabled = true;
+            closeBtn.disabled = true; // Prevent closing during conversion
+            progressSection.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+
+            try {
+                await this._startConversion(index, format, addToPlaylist, (progress) => {
+                    const percent = Math.round(progress * 100) + '%';
+                    progressBarFill.style.width = percent;
+                    progressPercentage.textContent = percent;
+                });
+
+                // Success
+                successMessage.classList.remove('hidden');
+                progressSection.classList.add('hidden');
+
+                // Enable Download
+                downloadBtn.classList.remove('hidden');
+                downloadBtn.textContent = `Download ${format.toUpperCase()}`;
+
+                // Allow closing
+                cancelBtn.disabled = false;
+                cancelBtn.textContent = "Close";
+                closeBtn.disabled = false;
+
+            } catch (error) {
+                console.error('Conversion failed:', error);
+                errorMessage.textContent = `Conversion failed: ${error.message}`;
+                errorMessage.classList.remove('hidden');
+                progressSection.classList.add('hidden');
+
+                // Re-enable inputs
+                inputs.forEach(input => input.disabled = false);
+                convertBtn.disabled = false;
+                cancelBtn.disabled = false;
+                closeBtn.disabled = false;
+            }
+        });
+
+        document.body.appendChild(modalOverlay);
+
+        // Animate In
+        requestAnimationFrame(() => {
+            modalOverlay.classList.add('visible');
+        });
+    }
+
+    /**
+     * Start the conversion process using MediaBunny
+     * @param {number} index 
+     * @param {string} format 
+     * @param {boolean} addToPlaylist 
+     * @param {Function} onProgress 
+     * @private
+     */
+    async _startConversion(index, format, addToPlaylist, onProgress) {
+        const item = this.items[index];
+
+        // Ensure we have the file blob
+        // In a real app, we might need to fetch it if it's a URL
+        // For now, assuming we have access to the file object or can fetch it
+        let source;
+        if (item.file) {
+            source = new MediaBunny.BlobSource(item.file);
+        } else {
+            // Fetch from URL
+            const response = await fetch(item.url);
+            const blob = await response.blob();
+            source = new MediaBunny.BlobSource(blob);
+        }
+
+        const input = new MediaBunny.Input({
+            source: source,
+            formats: MediaBunny.ALL_FORMATS
+        });
+
+        let outputFormat;
+        switch (format) {
+            case 'mp4':
+                outputFormat = new MediaBunny.Mp4OutputFormat();
+                break;
+            case 'webm':
+                outputFormat = new MediaBunny.WebMOutputFormat();
+                break;
+            case 'avi':
+                // AVI might not be supported by MediaBunny core, checking docs...
+                // Docs say "Container format avi" is supported for reading, but writing?
+                // Assuming basic support or fallback
+                throw new Error("AVI export not fully supported in this version.");
+            case 'mov':
+                outputFormat = new MediaBunny.QuickTimeOutputFormat();
+                break;
+            default:
+                throw new Error(`Unsupported format: ${format}`);
+        }
+
+        const output = new MediaBunny.Output({
+            format: outputFormat,
+            target: new MediaBunny.BufferTarget()
+        });
+
+        const conversion = await MediaBunny.Conversion.init({
+            input,
+            output,
+            // Basic settings for now, can be enhanced
+        });
+
+        conversion.onProgress = onProgress;
+
+        await conversion.execute();
+
+        const resultBlob = new Blob([output.target.buffer], { type: `video/${format}` });
+
+        // Handle Success
+        this._handleConversionSuccess(resultBlob, item, format, addToPlaylist);
+    }
+
+    /**
+     * Handle successful conversion
+     * @param {Blob} blob 
+     * @param {Object} originalItem 
+     * @param {string} format 
+     * @param {boolean} addToPlaylist 
+     * @private
+     */
+    _handleConversionSuccess(blob, originalItem, format, addToPlaylist) {
+        const newFilename = originalItem.title.replace(/\.[^/.]+$/, "") + `-converted.${format}`;
+        const url = URL.createObjectURL(blob);
+
+        // Update Download Button in Modal
+        const downloadBtn = document.querySelector('.conversion-modal .download-btn');
+        if (downloadBtn) {
+            downloadBtn.href = url;
+            downloadBtn.download = newFilename;
+        }
+
+        if (addToPlaylist) {
+            const newItem = {
+                title: newFilename,
+                url: url,
+                file: new File([blob], newFilename, { type: blob.type }),
+                duration: originalItem.duration, // Approx same duration
+                type: 'video'
+            };
+
+            // Insert after original item
+            const index = this.items.indexOf(originalItem);
+            this.items.splice(index + 1, 0, newItem);
+
+            // Re-render playlist
+            this.render();
         }
     }
 }
