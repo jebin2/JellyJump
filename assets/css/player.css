@@ -1613,3 +1613,85 @@ body.fullscreen-active {
     color: var(--accent-primary);
     border-color: var(--accent-primary);
 }
+
+/* -----------------------------------------
+   Modal Refactoring Utilities (Phase 37)
+   ----------------------------------------- */
+.mb-modal-body-scrollable {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.mb-modal-error-text {
+    color: var(--error-color);
+    font-size: 0.7em;
+}
+
+.mb-modal-loading-container {
+    display: none;
+}
+
+.mb-modal-large {
+    max-width: 700px;
+}
+
+.mb-modal-max-500 {
+    max-width: 500px;
+}
+
+/* Time Inputs */
+.time-inputs-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 4px;
+    align-items: end;
+}
+
+.time-input-group {
+    min-width: 0;
+}
+
+.duration-display-container {
+    padding: 0 4px;
+}
+
+.time-input-field {
+    width: 100%;
+    padding: 8px 4px;
+    font-size: 0.9em;
+}
+
+/* Timeline */
+.timeline-range-initial {
+    left: 0%;
+    width: 100%;
+}
+
+.timeline-handle-start {
+    left: 0%;
+}
+
+.timeline-handle-end {
+    left: 100%;
+}
+
+/* Resize Modal */
+.dimension-inputs-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 10px;
+    align-items: end;
+}
+
+.aspect-lock-btn-container {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.presets-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
