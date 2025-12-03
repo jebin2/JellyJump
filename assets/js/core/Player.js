@@ -158,6 +158,13 @@ export class CorePlayer {
         // Current loaded video ID (url)
         this.currentVideoId = null;
 
+        // Global Event Handlers
+        this._handlers = {
+            fullscreen: this._updateFullscreenUI.bind(this),
+            keydown: (e) => this._handleKeyboard(e),
+            click: (e) => this._handleDocumentClick(e)
+        };
+
         this._init();
     }
 
@@ -306,6 +313,38 @@ export class CorePlayer {
         this.ui.closeLoopPanelBtn = this.container.querySelector('.jellyjump-loop-panel .jellyjump-close-btn');
 
         this._updateSpeedMenu();
+        this._applyControlVisibility();
+    }
+
+    /**
+     * Apply visibility based on config
+     * @private
+     */
+    _applyControlVisibility() {
+        const c = this.config.controls;
+
+        // Helper to toggle visibility
+        const toggle = (el, visible) => {
+            if (el) el.style.display = visible ? '' : 'none';
+        };
+
+        toggle(this.ui.playBtn, c.playPause);
+        toggle(this.ui.muteBtn, c.volume);
+        toggle(this.ui.volumeSlider, c.volume);
+        toggle(this.ui.timeDisplay, c.time);
+        toggle(this.ui.progressContainer, c.progress);
+        toggle(this.ui.ccBtn, c.captions);
+        toggle(this.ui.fullscreenBtn, c.fullscreen);
+        toggle(this.ui.loopBtn, c.loop);
+        toggle(this.ui.speedBtn, c.speed);
+        toggle(this.ui.modeToggleBtn, c.modeToggle);
+
+        // Special case for audio menu (container)
+        // It's handled dynamically by _updateAudioTracks, but we should respect config
+        if (!c.settings) {
+            // If settings are off, maybe hide audio/speed/cc? 
+            // The config has specific flags for them, so we use those.
+        }
     }
 
     /**
@@ -454,11 +493,10 @@ export class CorePlayer {
         });
 
         // Fullscreen Change Events
-        const handleFullscreenChange = () => this._updateFullscreenUI();
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+        document.addEventListener('fullscreenchange', this._handlers.fullscreen);
+        document.addEventListener('webkitfullscreenchange', this._handlers.fullscreen);
+        document.addEventListener('mozfullscreenchange', this._handlers.fullscreen);
+        document.addEventListener('MSFullscreenChange', this._handlers.fullscreen);
 
         // Loop Control
         this.ui.loopBtn.addEventListener('click', () => this.toggleLoopMode());
@@ -495,20 +533,22 @@ export class CorePlayer {
         });
 
         // Close menus when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!this.ui.ccBtn.contains(e.target) && !this.ui.ccMenu.contains(e.target)) {
-                this.ui.ccMenu.classList.remove('visible');
-            }
-            if (!this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
-                this.ui.audioMenu.classList.remove('visible');
-            }
-            if (!this.ui.speedBtn.contains(e.target) && !this.ui.speedMenu.contains(e.target)) {
-                this.ui.speedMenu.classList.remove('visible');
-            }
-        });
+        document.addEventListener('click', this._handlers.click);
 
         // Keyboard Shortcuts
-        document.addEventListener('keydown', (e) => this._handleKeyboard(e));
+        document.addEventListener('keydown', this._handlers.keydown);
+    }
+
+    _handleDocumentClick(e) {
+        if (!this.ui.ccBtn.contains(e.target) && !this.ui.ccMenu.contains(e.target)) {
+            this.ui.ccMenu.classList.remove('visible');
+        }
+        if (!this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
+            this.ui.audioMenu.classList.remove('visible');
+        }
+        if (!this.ui.speedBtn.contains(e.target) && !this.ui.speedMenu.contains(e.target)) {
+            this.ui.speedMenu.classList.remove('visible');
+        }
     }
 
     _updateSpeedMenu() {
@@ -986,6 +1026,30 @@ export class CorePlayer {
             });
             this.activeSources = [];
         }
+    }
+
+    /**
+     * Destroy the player and clean up listeners
+     */
+    destroy() {
+        this.reset();
+
+        // Remove global listeners
+        document.removeEventListener('fullscreenchange', this._handlers.fullscreen);
+        document.removeEventListener('webkitfullscreenchange', this._handlers.fullscreen);
+        document.removeEventListener('mozfullscreenchange', this._handlers.fullscreen);
+        document.removeEventListener('MSFullscreenChange', this._handlers.fullscreen);
+        document.removeEventListener('click', this._handlers.click);
+        document.removeEventListener('keydown', this._handlers.keydown);
+
+        // Remove ResizeObserver
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+
+        // Remove elements if needed (optional, but good for cleanup)
+        this.container.innerHTML = '';
     }
 
     /**

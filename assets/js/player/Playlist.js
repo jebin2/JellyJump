@@ -1,6 +1,7 @@
 import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
+import { CorePlayer } from '../core/Player.js';
 import { Modal } from './Modal.js';
 
 /**
@@ -1834,6 +1835,42 @@ export class Playlist {
         // Open Modal Immediately
         modal.open();
 
+        // Initialize Player
+        const playerContainer = modalContent.querySelector('#trim-player-container');
+        let player = null;
+
+        if (playerContainer) {
+            // Use a unique ID for the container to avoid conflicts if multiple modals (unlikely but good practice)
+            // But CorePlayer takes an ID string, so we need to give the element an ID if it doesn't have one unique enough
+            // The template has id="trim-player-container", which is fine for a modal that is only open once.
+            // However, CorePlayer expects the ID of the element, not the element itself.
+            // Wait, CorePlayer constructor: constructor(containerId, options = {})
+            // It does document.getElementById(containerId).
+            // Since the modal content is cloned, the ID "trim-player-container" might be duplicated if we don't be careful,
+            // but modal content is usually removed on close.
+            // Let's ensure we pass the ID.
+
+            // Actually, since we cloned the node, it's not in the document yet? 
+            // modal.open() appends it to body. So it is in document.
+
+            player = new CorePlayer('trim-player-container', {
+                mode: 'player',
+                controls: {
+                    playPause: true,
+                    volume: false,
+                    time: false,
+                    progress: true,
+                    captions: false,
+                    settings: false,
+                    fullscreen: false,
+                    loop: false,
+                    speed: false,
+                    modeToggle: false
+                },
+                autoplay: false
+            });
+        }
+
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
         const trimContent = modalContent.querySelector('.trim-content');
@@ -1846,8 +1883,6 @@ export class Playlist {
         const timelineRange = modalContent.querySelector('.timeline-range');
         const startHandle = modalContent.querySelector('.start-handle');
         const endHandle = modalContent.querySelector('.end-handle');
-        const previewBtn = modalContent.querySelector('.preview-btn');
-        const stopPreviewBtn = modalContent.querySelector('.stop-preview-btn');
         const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
         const trimBtn = modalContent.querySelector('.trim-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
@@ -1914,11 +1949,15 @@ export class Playlist {
 
         totalDurationDisplay.textContent = formatTime(duration);
 
+        // Load Video into Player
+        if (player) {
+            const videoUrl = item.url || URL.createObjectURL(item.file);
+            await player.load(videoUrl, false);
+        }
+
         // State
         let startTime = 0;
         let endTime = duration;
-        let isPreviewing = false;
-        let previewInterval;
 
         // Update UI
         const updateUI = () => {
@@ -1978,8 +2017,10 @@ export class Playlist {
 
             if (isStart) {
                 if (time < endTime - 1) startTime = time;
+                if (player) player.seek(startTime);
             } else {
                 if (time > startTime + 1) endTime = time;
+                if (player) player.seek(endTime);
             }
             updateUI();
         };
@@ -2000,51 +2041,17 @@ export class Playlist {
         initDrag(startHandle, true);
         initDrag(endHandle, false);
 
-        // Preview Logic
-        previewBtn.addEventListener('click', () => {
-            if (isPreviewing) return;
-
-            // Use main player for preview
-            const player = document.querySelector('video'); // Assuming main player video element
-            if (!player) return;
-
-            isPreviewing = true;
-            previewBtn.classList.add('hidden');
-            stopPreviewBtn.classList.remove('hidden');
-
-            player.currentTime = startTime;
-            player.play();
-
-            previewInterval = setInterval(() => {
-                if (player.currentTime >= endTime) {
-                    player.currentTime = startTime; // Loop
-                }
-            }, 100);
-        });
-
-        stopPreviewBtn.addEventListener('click', () => {
-            if (!isPreviewing) return;
-
-            const player = document.querySelector('video');
-            if (player) player.pause();
-
-            isPreviewing = false;
-            clearInterval(previewInterval);
-            previewBtn.classList.remove('hidden');
-            stopPreviewBtn.classList.add('hidden');
-        });
-
-        // Ensure preview stops on close
+        // Ensure player is cleaned up on close
         const originalClose = modal.close.bind(modal);
         modal.close = () => {
-            if (isPreviewing) stopPreviewBtn.click();
+            if (player) {
+                player.destroy();
+            }
             originalClose();
         };
 
         // Trim Action
         trimBtn.addEventListener('click', async () => {
-            if (isPreviewing) stopPreviewBtn.click();
-
             // UI State
             modalContent.classList.add('processing');
             trimBtn.disabled = true;
@@ -2065,8 +2072,8 @@ export class Playlist {
                 // Convert/Trim
                 const blob = await MediaProcessor.process({
                     source: source,
-                    format: 'mp4', // Default to MP4 for now, could detect source format
-                    quality: 100, // Keep original quality
+                    format: 'mp4',
+                    quality: 100,
                     startTime: startTime,
                     endTime: endTime,
                     onProgress: (progress) => {
@@ -2087,8 +2094,6 @@ export class Playlist {
                 downloadBtn.href = url;
                 downloadBtn.download = filename;
                 downloadBtn.classList.remove('hidden');
-                downloadBtn.classList.remove('hidden');
-                // trimBtn.classList.add('hidden'); // Keep trim button visible
 
                 // Add to Playlist
                 if (addToPlaylistCheckbox.checked) {
@@ -2119,8 +2124,6 @@ export class Playlist {
                 progressSection.classList.add('hidden');
             }
         });
-
-
     }
 
 
