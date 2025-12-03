@@ -1,5 +1,6 @@
 import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
+import { MediaConverter } from '../core/MediaConverter.js';
 
 /**
  * Playlist Manager
@@ -1712,98 +1713,58 @@ export class Playlist {
      * @param {Function} onProgress 
      * @private
      */
+    /**
+     * Start the conversion process using MediaBunny
+     * @param {number} index 
+     * @param {string} format 
+     * @param {number} quality - 40, 60, 80, 100
+     * @param {boolean} addToPlaylist 
+     * @param {Function} onProgress 
+     * @private
+     */
     async _startConversion(index, format, quality, addToPlaylist, onProgress) {
         const item = this.items[index];
 
         // Ensure we have the file blob
         let source;
         if (item.file) {
-            source = new MediaBunny.BlobSource(item.file);
+            source = item.file;
         } else {
             // Fetch from URL
             const response = await fetch(item.url);
-            const blob = await response.blob();
-            source = new MediaBunny.BlobSource(blob);
+            source = await response.blob();
         }
 
-        const input = new MediaBunny.Input({
-            source: source,
-            formats: MediaBunny.ALL_FORMATS
-        });
-
-        // Determine Output Format
-        let outputFormat;
+        // Determine Target Format
         let targetFormat = format;
-
         if (format === 'keep') {
             // Try to detect format from filename
             const ext = item.title.split('.').pop().toLowerCase();
             // Map extension to format string if needed, or use as is if supported
             // Assuming common extensions match format keys
             targetFormat = ext;
+
+            // Fallback for 'keep' if extension is not one of the explicit writers
+            if (!['mp4', 'webm', 'mov'].includes(targetFormat)) {
+                console.warn(`Format ${targetFormat} not explicitly supported for writing, defaulting to MP4.`);
+                targetFormat = 'mp4';
+            }
         }
 
-        switch (targetFormat) {
-            case 'mp4':
-                outputFormat = new MediaBunny.Mp4OutputFormat();
-                break;
-            case 'webm':
-                outputFormat = new MediaBunny.WebMOutputFormat();
-                break;
-            case 'mov':
-                outputFormat = new MediaBunny.QuickTimeOutputFormat();
-                break;
-            default:
-                // Fallback for 'keep' if extension is not one of the explicit writers
-                // If we are just reducing size, we might need to default to MP4 if original is AVI/etc
-                if (format === 'keep') {
-                    // Warn or default? Let's default to MP4 for safety if unknown
-                    console.warn(`Format ${targetFormat} not explicitly supported for writing, defaulting to MP4.`);
-                    targetFormat = 'mp4';
-                    outputFormat = new MediaBunny.Mp4OutputFormat();
-                } else {
-                    throw new Error(`Unsupported format: ${targetFormat}`);
-                }
+        try {
+            const resultBlob = await MediaConverter.convert({
+                source: source,
+                format: targetFormat,
+                quality: quality,
+                onProgress: onProgress
+            });
+
+            // Handle Success
+            this._handleConversionSuccess(resultBlob, item, targetFormat, addToPlaylist);
+        } catch (error) {
+            console.error("Conversion failed:", error);
+            throw error; // Re-throw to be caught by caller
         }
-
-        const output = new MediaBunny.Output({
-            format: outputFormat,
-            target: new MediaBunny.BufferTarget()
-        });
-
-        // Configure Video Options based on Quality
-        let videoOptions = {};
-
-        if (quality < 100) {
-            // Calculate bitrate reduction
-            let targetBitrate;
-            if (quality >= 80) targetBitrate = 2500000;
-            else if (quality >= 60) targetBitrate = 1500000;
-            else targetBitrate = 800000;
-
-            videoOptions = {
-                bitrate: targetBitrate,
-                forceTranscode: true
-            };
-        } else {
-            // Quality 100: Try to copy if codecs match (Remux), else transcode high quality
-            // MediaBunny defaults usually handle this, but if format changed, it will transcode.
-        }
-
-        const conversion = await MediaBunny.Conversion.init({
-            input,
-            output,
-            video: videoOptions
-        });
-
-        conversion.onProgress = onProgress;
-
-        await conversion.execute();
-
-        const resultBlob = new Blob([output.target.buffer], { type: `video/${targetFormat}` });
-
-        // Handle Success
-        this._handleConversionSuccess(resultBlob, item, targetFormat, addToPlaylist);
     }
 
     /**
