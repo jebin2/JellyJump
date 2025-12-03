@@ -16,11 +16,56 @@
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
             </button>
+            <button class="playlist-settings-btn" title="Video Options" aria-label="Video options menu">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-more-vertical"></use>
+                </svg>
+            </button>
             <button class="playlist-remove-btn" title="Remove" aria-label="Remove">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-trash"></use>
                 </svg>
             </button>
+        </div>
+    </div>
+</template>
+
+<!-- Playlist Settings Menu Template -->
+<template id="playlist-settings-menu-template">
+    <div class="playlist-context-menu" role="menu">
+        <div class="playlist-menu-item" data-action="convert" role="menuitem">
+            <span class="menu-icon">🔄</span>
+            <span class="menu-label">Convert Format...</span>
+        </div>
+        <div class="playlist-menu-item" data-action="download-video" role="menuitem">
+            <span class="menu-icon">📥</span>
+            <span class="menu-label">Download Video Only</span>
+        </div>
+        <div class="playlist-menu-item" data-action="download-audio" role="menuitem">
+            <span class="menu-icon">🎵</span>
+            <span class="menu-label">Download Audio Only</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="playlist-menu-item" data-action="trim" role="menuitem">
+            <span class="menu-icon">✂️</span>
+            <span class="menu-label">Trim Video...</span>
+        </div>
+        <div class="playlist-menu-item" data-action="resize" role="menuitem">
+            <span class="menu-icon">📐</span>
+            <span class="menu-label">Resize Video...</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="playlist-menu-item" data-action="info" role="menuitem">
+            <span class="menu-icon">ℹ️</span>
+            <span class="menu-label">Video Info</span>
+        </div>
+        <div class="playlist-menu-item" data-action="merge" role="menuitem">
+            <span class="menu-icon">🔗</span>
+            <span class="menu-label">Merge with Next</span>
+        </div>
+        <div class="playlist-menu-item" data-action="extract-audio" role="menuitem">
+            <span class="menu-icon">🎧</span>
+            <span class="menu-label">Extract Audio to Playlist</span>
         </div>
     </div>
 </template>

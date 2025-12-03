@@ -63,6 +63,20 @@ export class Playlist {
 
         // Load saved playlist
         this._loadSavedPlaylist();
+
+        // Global click listener to close menus
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.playlist-context-menu') && !e.target.closest('.playlist-settings-btn')) {
+                this._closeAllMenus();
+            }
+        });
+
+        // Global ESC listener
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this._closeAllMenus();
+            }
+        });
     }
 
     /**
@@ -974,6 +988,16 @@ export class Playlist {
                 this.removeItem(index);
             });
         }
+
+        // Settings button
+        const settingsBtn = itemEl.querySelector('.playlist-settings-btn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt(itemEl.dataset.index);
+                this._toggleSettingsMenu(index, settingsBtn);
+            });
+        }
     }
 
     /**
@@ -1371,4 +1395,151 @@ export class Playlist {
         }
         return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     }
+
+    /**
+     * Toggle settings menu for an item
+     * @param {number} index 
+     * @param {HTMLElement} buttonEl 
+     * @private
+     */
+    _toggleSettingsMenu(index, buttonEl) {
+        // Check if this menu is already open
+        const existingMenu = document.querySelector('.playlist-context-menu');
+        const isSameMenu = existingMenu && existingMenu.dataset.index == index;
+
+        this._closeAllMenus();
+
+        if (!isSameMenu) {
+            this._createSettingsMenu(index, buttonEl);
+        }
+    }
+
+    /**
+     * Create and show settings menu
+     * @param {number} index 
+     * @param {HTMLElement} buttonEl 
+     * @private
+     */
+    _createSettingsMenu(index, buttonEl) {
+        const template = document.getElementById('playlist-settings-menu-template');
+        if (!template) return;
+
+        const clone = template.content.cloneNode(true);
+        const menu = clone.querySelector('.playlist-context-menu');
+        menu.dataset.index = index;
+
+        // Conditional Logic
+        const item = this.items[index];
+
+        // Disable "Merge with Next" if last item
+        if (index >= this.items.length - 1) {
+            const mergeBtn = menu.querySelector('[data-action="merge"]');
+            if (mergeBtn) {
+                mergeBtn.classList.add('disabled');
+                mergeBtn.setAttribute('title', 'Cannot merge: Last item in playlist');
+            }
+        } else {
+            // Show next item name in tooltip
+            const nextItem = this.items[index + 1];
+            const mergeBtn = menu.querySelector('[data-action="merge"]');
+            if (mergeBtn) {
+                mergeBtn.setAttribute('title', `Merge with "${nextItem.title}"`);
+            }
+        }
+
+        // Attach Event Listeners
+        menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
+            menuItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (menuItem.classList.contains('disabled')) return;
+
+                const action = menuItem.dataset.action;
+                this._handleMenuAction(action, index);
+                this._closeAllMenus();
+            });
+        });
+
+        document.body.appendChild(menu);
+
+        // Position the menu
+        this._positionSettingsMenu(menu, buttonEl);
+
+        // Show with animation
+        requestAnimationFrame(() => {
+            menu.classList.add('visible');
+        });
+    }
+
+    /**
+     * Position the settings menu intelligently
+     * @param {HTMLElement} menu 
+     * @param {HTMLElement} button 
+     * @private
+     */
+    _positionSettingsMenu(menu, button) {
+        const rect = button.getBoundingClientRect();
+        const menuRect = menu.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+
+        let top = rect.bottom + 5;
+        let left = rect.right - menuRect.width; // Align right edge by default
+
+        // Check vertical overflow
+        if (top + menuRect.height > viewportHeight - 10) {
+            // Position above
+            top = rect.top - menuRect.height - 5;
+        }
+
+        // Check horizontal overflow (left side)
+        if (left < 10) {
+            left = rect.left; // Align left edge
+        }
+
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+    }
+
+    /**
+     * Close all open context menus
+     * @private
+     */
+    _closeAllMenus() {
+        const menus = document.querySelectorAll('.playlist-context-menu');
+        menus.forEach(menu => {
+            menu.classList.remove('visible');
+            setTimeout(() => {
+                if (menu.parentNode) menu.parentNode.removeChild(menu);
+            }, 200); // Wait for transition
+        });
+    }
+
+    /**
+     * Handle menu actions
+     * @param {string} action 
+     * @param {number} index 
+     * @private
+     */
+    _handleMenuAction(action, index) {
+        const item = this.items[index];
+        console.log(`Menu Action: ${action} on item "${item.title}" (Index: ${index})`);
+
+        switch (action) {
+            case 'convert':
+            case 'trim':
+            case 'resize':
+            case 'info':
+            case 'merge':
+            case 'extract-audio':
+                alert(`Feature "${action}" coming in Phase 33+`);
+                break;
+            case 'download-video':
+                this._downloadItem(index);
+                break;
+            case 'download-audio':
+                alert('Audio download coming soon');
+                break;
+        }
+    }
 }
+
