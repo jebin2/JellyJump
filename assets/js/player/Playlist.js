@@ -1,6 +1,7 @@
 import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaConverter } from '../core/MediaConverter.js';
+import { Modal } from './Modal.js';
 
 /**
  * Playlist Manager
@@ -1246,18 +1247,24 @@ export class Playlist {
      * @private
      */
     _openUrlModal() {
-        const template = document.getElementById('url-upload-modal-template');
-        if (!template) return;
+        const contentTemplate = document.getElementById('url-upload-content-template');
+        const footerTemplate = document.getElementById('url-upload-footer-template');
+        if (!contentTemplate || !footerTemplate) return;
 
-        const modalOverlay = template.content.cloneNode(true).firstElementChild;
-        document.body.appendChild(modalOverlay);
+        const modal = new Modal({ maxWidth: '500px' });
+        modal.setTitle('Add Video from URL');
+        modal.setBody(contentTemplate.content.cloneNode(true));
+        modal.setFooter(footerTemplate.content.cloneNode(true));
 
-        const input = modalOverlay.querySelector('#url-input');
-        const addBtn = modalOverlay.querySelector('.mb-modal-add');
-        const cancelBtn = modalOverlay.querySelector('.mb-modal-cancel');
-        const closeBtn = modalOverlay.querySelector('.mb-modal-close');
-        const errorDiv = modalOverlay.querySelector('.mb-modal-error');
-        const loadingDiv = modalOverlay.querySelector('.mb-modal-loading');
+        const modalContent = modal.modal;
+
+        const input = modalContent.querySelector('#url-input');
+        const addBtn = modalContent.querySelector('.mb-modal-add');
+        const cancelBtn = modalContent.querySelector('.mb-modal-cancel');
+        const errorDiv = modalContent.querySelector('.mb-modal-error');
+        const loadingDiv = modalContent.querySelector('.mb-modal-loading');
+
+        modal.open();
 
         // Focus input
         setTimeout(() => input.focus(), 100);
@@ -1278,18 +1285,20 @@ export class Playlist {
             input.disabled = true;
             addBtn.disabled = true;
             cancelBtn.disabled = true;
+            modal.closeBtn.disabled = true;
             loadingDiv.style.display = 'flex';
             errorDiv.style.display = 'none';
 
             try {
                 await this._handleUrlUpload(url);
                 // Close modal on success
-                document.body.removeChild(modalOverlay);
+                modal.close();
             } catch (error) {
                 // Show error
                 input.disabled = false;
                 addBtn.disabled = false;
                 cancelBtn.disabled = false;
+                modal.closeBtn.disabled = false;
                 loadingDiv.style.display = 'none';
                 errorDiv.textContent = error.message;
                 errorDiv.style.display = 'block';
@@ -1297,19 +1306,7 @@ export class Playlist {
         });
 
         // Handle Close/Cancel
-        const closeModal = () => {
-            if (document.body.contains(modalOverlay)) {
-                document.body.removeChild(modalOverlay);
-            }
-        };
-
-        cancelBtn.addEventListener('click', closeModal);
-        closeBtn.addEventListener('click', closeModal);
-
-        // Close on click outside
-        modalOverlay.addEventListener('click', (e) => {
-            if (e.target === modalOverlay) closeModal();
-        });
+        cancelBtn.addEventListener('click', () => modal.close());
 
         // Handle Enter key
         input.addEventListener('keydown', (e) => {
@@ -1317,7 +1314,7 @@ export class Playlist {
                 addBtn.click();
             }
             if (e.key === 'Escape') {
-                closeModal();
+                modal.close();
             }
         });
     }
@@ -1549,16 +1546,22 @@ export class Playlist {
      */
     _openConversionModal(index) {
         const item = this.items[index];
-        const template = document.getElementById('conversion-modal-template');
-        console.log('Opening Conversion Modal', { index, template });
-        if (!template) {
-            console.error('Conversion modal template not found!');
+        const contentTemplate = document.getElementById('conversion-content-template');
+        const footerTemplate = document.getElementById('conversion-footer-template');
+
+        console.log('Opening Conversion Modal', { index });
+        if (!contentTemplate || !footerTemplate) {
+            console.error('Conversion modal templates not found!');
             return;
         }
 
-        const clone = template.content.cloneNode(true);
-        const modalOverlay = clone.querySelector('.mb-modal-overlay');
-        const modalContent = clone.querySelector('.mb-modal');
+        const modal = new Modal({ maxWidth: '500px' });
+        modal.setTitle('Convert & Optimize Video');
+        modal.setBody(contentTemplate.content.cloneNode(true));
+        modal.setFooter(footerTemplate.content.cloneNode(true));
+
+        // Get elements for interaction
+        const modalContent = modal.modal; // Use modal container for scoping
 
         // Populate Source Info
         const sourceFilename = modalContent.querySelector('.source-filename');
@@ -1568,7 +1571,6 @@ export class Playlist {
         }
 
         // Elements
-        const closeBtn = modalContent.querySelector('.mb-modal-close');
         const convertBtn = modalContent.querySelector('.convert-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
@@ -1609,22 +1611,39 @@ export class Playlist {
         // Initialize Slider
         updateQualityLabel();
 
-        // Close Handler
-        const closeModal = () => {
+        // Close Handler Wrapper
+        const attemptClose = () => {
             if (convertBtn.disabled && !downloadBtn.classList.contains('hidden')) {
                 // Converting... don't close
                 return;
             }
-            modalOverlay.classList.remove('visible');
-            setTimeout(() => {
-                if (modalOverlay.parentNode) modalOverlay.parentNode.removeChild(modalOverlay);
-            }, 200);
+            modal.close();
         };
 
-        closeBtn.addEventListener('click', closeModal);
-        modalOverlay.addEventListener('click', (e) => {
-            if (e.target === modalOverlay) closeModal();
-        });
+        // Override default close behavior to check for active conversion
+        // Remove default listeners first (cloning node removes listeners but we are using the instance)
+        // Actually Modal adds listeners to its own elements. We can overwrite the click handler or just hijack close()
+        // But Modal.close() doesn't check condition.
+        // We can replace the close button listener.
+        const newCloseBtn = modal.closeBtn.cloneNode(true);
+        modal.closeBtn.parentNode.replaceChild(newCloseBtn, modal.closeBtn);
+        modal.closeBtn = newCloseBtn; // Update reference
+        modal.closeBtn.addEventListener('click', attemptClose);
+
+        // Also overlay click
+        const newOverlay = modal.overlay.cloneNode(true);
+        // Wait, cloning overlay destroys the modal inside it if we are not careful.
+        // Better: just modify the close method of the instance?
+        // Or just let it close? The original code prevented closing during conversion.
+        // Let's just wrap modal.close
+        const originalClose = modal.close.bind(modal);
+        modal.close = () => {
+            if (convertBtn.disabled && !downloadBtn.classList.contains('hidden')) {
+                return;
+            }
+            originalClose();
+        };
+
 
         // Convert Handler
         convertBtn.addEventListener('click', async () => {
@@ -1643,7 +1662,7 @@ export class Playlist {
             inputs.forEach(input => input.disabled = true);
             qualitySlider.disabled = true;
             convertBtn.disabled = true;
-            closeBtn.disabled = true; // Prevent closing during conversion
+            modal.closeBtn.disabled = true; // Prevent closing during conversion
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
@@ -1677,7 +1696,7 @@ export class Playlist {
                 convertBtn.disabled = false;
 
                 // Allow closing
-                closeBtn.disabled = false;
+                modal.closeBtn.disabled = false;
 
             } catch (error) {
                 console.error('Conversion failed:', error);
@@ -1693,28 +1712,13 @@ export class Playlist {
                 });
                 qualitySlider.disabled = false;
                 convertBtn.disabled = false;
-                closeBtn.disabled = false;
+                modal.closeBtn.disabled = false;
             }
         });
 
-        document.body.appendChild(modalOverlay);
-
-        // Animate In
-        requestAnimationFrame(() => {
-            console.log('Animating modal in');
-            modalOverlay.classList.add('visible');
-        });
+        modal.open();
     }
 
-    /**
-     * Start the conversion process using MediaBunny
-     * @param {number} index 
-     * @param {string} format 
-     * @param {number} quality - 40, 60, 80, 100
-     * @param {boolean} addToPlaylist 
-     * @param {Function} onProgress 
-     * @private
-     */
     /**
      * Start the conversion process using MediaBunny
      * @param {number} index 
@@ -1814,30 +1818,20 @@ export class Playlist {
      */
     async _openTrackManager(index) {
         const item = this.items[index];
-        const template = document.getElementById('track-management-modal-template');
+        const template = document.getElementById('track-management-content-template');
         if (!template) return;
 
-        const clone = template.content.cloneNode(true);
-        const modalOverlay = clone.querySelector('.mb-modal-overlay');
-        const modal = clone.querySelector('.mb-modal');
+        const modal = new Modal({ maxWidth: '700px' });
+        modal.setTitle('Video & Audio Tracks');
+        modal.setBody(template.content.cloneNode(true));
+
+        const modalContent = modal.modal;
 
         // Populate Source Info
-        const sourceFilename = modal.querySelector('.source-filename');
+        const sourceFilename = modalContent.querySelector('.source-filename');
         sourceFilename.textContent = `Source: ${item.title}`;
 
-        // Close Event
-        const closeBtn = modal.querySelector('.mb-modal-close');
-        const close = () => {
-            modalOverlay.classList.remove('visible');
-            setTimeout(() => modalOverlay.remove(), 300);
-        };
-        closeBtn.addEventListener('click', close);
-        modalOverlay.addEventListener('click', (e) => {
-            if (e.target === modalOverlay) close();
-        });
-
-        document.body.appendChild(modalOverlay);
-        requestAnimationFrame(() => modalOverlay.classList.add('visible'));
+        modal.open();
 
         // Fetch Tracks
         try {
@@ -1852,14 +1846,14 @@ export class Playlist {
             const tracks = await MediaConverter.getTracks(source);
 
             // Hide loading, show content
-            modal.querySelector('.tracks-loading').classList.add('hidden');
-            modal.querySelector('.tracks-content').classList.remove('hidden');
+            modalContent.querySelector('.tracks-loading').classList.add('hidden');
+            modalContent.querySelector('.tracks-content').classList.remove('hidden');
 
-            this._renderTracks(tracks, item, modal);
+            this._renderTracks(tracks, item, modalContent);
         } catch (e) {
             console.error('Failed to load tracks:', e);
-            modal.querySelector('.tracks-loading').classList.add('hidden');
-            modal.querySelector('.mb-modal-body').insertAdjacentHTML('beforeend', `<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`);
+            modalContent.querySelector('.tracks-loading').classList.add('hidden');
+            modalContent.querySelector('.mb-modal-body').insertAdjacentHTML('beforeend', `<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`);
         }
     }
 
