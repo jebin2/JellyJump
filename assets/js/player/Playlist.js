@@ -2706,21 +2706,25 @@ export class Playlist {
 -----------------
 Filename: ${metadata.filename}
 Format: ${metadata.format}
+MIME Type: ${metadata.mimeType}
 Size: ${metadata.size}
 Duration: ${metadata.duration}
 
 Video Stream
 ------------
-Codec: ${metadata.videoCodec}
-Resolution: ${metadata.resolution}
+Codec: ${metadata.videoCodec} (${metadata.videoCodecString})
+Resolution: ${metadata.resolution} (Coded: ${metadata.codedResolution})
 Frame Rate: ${metadata.fps}
 Bitrate: ${metadata.videoBitrate}
+Rotation: ${metadata.rotation}
+HDR: ${metadata.hdr}
 
 Audio Stream
 ------------
-Codec: ${metadata.audioCodec}
+Codec: ${metadata.audioCodec} (${metadata.audioCodecString})
 Channels: ${metadata.channels}
 Sample Rate: ${metadata.sampleRate}
+Language: ${metadata.language}
 `;
                     await navigator.clipboard.writeText(text);
                     this._showToast('All info copied to clipboard!');
@@ -2739,9 +2743,15 @@ Sample Rate: ${metadata.sampleRate}
      * @private
      */
     async _getFormattedMetadata(blob, filename) {
-        const tracks = await MediaProcessor.getTracks(blob);
-        const videoTrack = tracks.video[0];
-        const audioTrack = tracks.audio[0];
+        const input = new MediaProcessor.Input({
+            source: new MediaProcessor.BlobSource(blob),
+            formats: MediaProcessor.ALL_FORMATS
+        });
+
+        const format = await input.getFormat();
+        const tracks = await input.getTracks();
+        const videoTrack = await input.getPrimaryVideoTrack();
+        const audioTrack = await input.getPrimaryAudioTrack();
 
         // Helper: Format Bytes
         const formatBytes = (bytes, decimals = 1) => {
@@ -2764,23 +2774,74 @@ Sample Rate: ${metadata.sampleRate}
                 .join(":");
         };
 
-        return {
+        // Helper: Get Codec Name
+        const getCodecName = (codec) => {
+            if (!codec) return 'N/A';
+            // Map common codec IDs to readable names if needed, or just return the ID
+            return codec.toUpperCase();
+        };
+
+        const metadata = {
             filename: filename,
-            format: blob.type.split('/')[1].toUpperCase(), // Simple format guess
+            format: format ? format.name : 'Unknown',
+            mimeType: format ? format.mimeType : blob.type,
             size: formatBytes(blob.size),
-            duration: formatDuration(videoTrack ? videoTrack.duration : 0),
+            duration: formatDuration(videoTrack ? await videoTrack.computeDuration() : (audioTrack ? await audioTrack.computeDuration() : 0)),
 
             // Video
-            videoCodec: videoTrack ? videoTrack.codec.split('.')[0].toUpperCase() : 'N/A', // Simple codec
-            resolution: videoTrack ? `${videoTrack.width}x${videoTrack.height}` : 'N/A',
-            fps: videoTrack ? `${Math.round(videoTrack.fps || 30)} fps` : 'N/A', // Fallback
-            videoBitrate: videoTrack ? `${Math.round((videoTrack.bitrate || 0) / 1000)} Kbps` : 'N/A',
+            videoCodec: videoTrack ? getCodecName(videoTrack.codec) : 'N/A',
+            videoCodecString: videoTrack ? await videoTrack.getCodecParameterString() : 'N/A',
+            resolution: videoTrack ? `${videoTrack.displayWidth}x${videoTrack.displayHeight}` : 'N/A',
+            codedResolution: videoTrack ? `${videoTrack.codedWidth}x${videoTrack.codedHeight}` : 'N/A',
+            fps: 'Calculating...', // Will be updated with packet stats
+            videoBitrate: 'Calculating...',
+            rotation: videoTrack ? `${videoTrack.rotation}°` : 'N/A',
+            hdr: videoTrack ? (await videoTrack.hasHighDynamicRange() ? 'Yes' : 'No') : 'N/A',
 
             // Audio
-            audioCodec: audioTrack ? audioTrack.codec.split('.')[0].toUpperCase() : 'N/A',
-            channels: audioTrack ? (audioTrack.channels === 2 ? 'Stereo (2)' : `${audioTrack.channels} Channels`) : 'N/A',
-            sampleRate: audioTrack ? `${(audioTrack.sampleRate / 1000).toFixed(1)} kHz` : 'N/A'
+            audioCodec: audioTrack ? getCodecName(audioTrack.codec) : 'N/A',
+            audioCodecString: audioTrack ? await audioTrack.getCodecParameterString() : 'N/A',
+            channels: audioTrack ? (audioTrack.numberOfChannels === 2 ? 'Stereo (2)' : `${audioTrack.numberOfChannels} Channels`) : 'N/A',
+            sampleRate: audioTrack ? `${(audioTrack.sampleRate / 1000).toFixed(1)} kHz` : 'N/A',
+            language: audioTrack ? (audioTrack.languageCode === 'und' ? 'Undetermined' : audioTrack.languageCode) : 'N/A'
         };
+
+        // Async update for stats
+        if (videoTrack) {
+            videoTrack.computePacketStats(50).then(stats => {
+                const fpsEl = document.querySelector('.info-value[data-key="fps"]');
+                const bitrateEl = document.querySelector('.info-value[data-key="videoBitrate"]');
+
+                if (fpsEl) {
+                    const fps = Math.round(stats.averagePacketRate);
+                    fpsEl.textContent = `${fps} fps`;
+                    // Update copy button
+                    const btn = fpsEl.parentElement.querySelector('.copy-btn');
+                    if (btn) btn.dataset.value = `${fps} fps`;
+                    metadata.fps = `${fps} fps`;
+                }
+
+                if (bitrateEl) {
+                    const bitrate = (stats.averageBitrate / 1000000).toFixed(1);
+                    bitrateEl.textContent = `${bitrate} Mbps`;
+                    // Update copy button
+                    const btn = bitrateEl.parentElement.querySelector('.copy-btn');
+                    if (btn) btn.dataset.value = `${bitrate} Mbps`;
+                    metadata.videoBitrate = `${bitrate} Mbps`;
+                }
+
+                // Update raw info for copy all
+                const modalContent = document.querySelector('.info-modal-content');
+                if (modalContent) {
+                    modalContent.dataset.rawInfo = JSON.stringify(metadata);
+                }
+            }).catch(console.error);
+        } else {
+            metadata.fps = 'N/A';
+            metadata.videoBitrate = 'N/A';
+        }
+
+        return metadata;
     }
 
     /**
