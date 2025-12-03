@@ -1831,7 +1831,12 @@ export class Playlist {
 
         const modalContent = modal.modal;
 
+        // Open Modal Immediately
+        modal.open();
+
         // Elements
+        const trimLoading = modalContent.querySelector('.trim-loading');
+        const trimContent = modalContent.querySelector('.trim-content');
         const sourceFilename = modalContent.querySelector('.source-filename');
         const startInput = modalContent.querySelector('#trim-start-input');
         const endInput = modalContent.querySelector('#trim-end-input');
@@ -1852,6 +1857,9 @@ export class Playlist {
         const errorMessage = modalContent.querySelector('.error-message');
         const successMessage = modalContent.querySelector('.success-message');
 
+        // Initial State: Show Loading, Disable Trim
+        trimBtn.disabled = true;
+
         // Helper: Format Time (HH:MM:SS)
         const formatTime = (seconds) => {
             const h = Math.floor(seconds / 3600);
@@ -1862,6 +1870,7 @@ export class Playlist {
 
         // Helper: Parse Time (HH:MM:SS)
         const parseTime = (timeStr) => {
+            if (typeof timeStr === 'number') return timeStr;
             const parts = timeStr.split(':').map(Number);
             if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
             if (parts.length === 2) return parts[0] * 60 + parts[1];
@@ -1876,7 +1885,7 @@ export class Playlist {
         let duration = 0;
         try {
             if (item.duration) {
-                duration = this._parseDuration(item.duration);
+                duration = parseTime(item.duration);
             } else {
                 // Fallback: load metadata
                 const video = document.createElement('video');
@@ -1887,12 +1896,21 @@ export class Playlist {
                         duration = video.duration;
                         resolve();
                     };
+                    video.onerror = () => {
+                        console.warn('Could not load video metadata');
+                        resolve();
+                    }
                 });
             }
         } catch (e) {
             console.error('Failed to get duration:', e);
             duration = 60; // Fallback
         }
+
+        // Ready: Hide Loading, Show Content
+        trimLoading.classList.add('hidden');
+        trimContent.classList.remove('hidden');
+        trimBtn.disabled = false;
 
         totalDurationDisplay.textContent = formatTime(duration);
 
@@ -2074,11 +2092,13 @@ export class Playlist {
                 // Add to Playlist
                 if (addToPlaylistCheckbox.checked) {
                     const newItem = {
+                        id: Date.now().toString(),
                         title: filename,
                         url: url,
                         file: new File([blob], filename, { type: `video/${ext}` }),
                         duration: formatTime(endTime - startTime),
                         type: 'video',
+                        isLocal: true,
                         isNew: true
                     };
 
@@ -2099,7 +2119,7 @@ export class Playlist {
             }
         });
 
-        modal.open();
+
     }
 
 
