@@ -213,14 +213,21 @@
                 </div>
             </div>
 
-            <div class="modal-footer flex-between mt-lg">
-                <button class="btn btn-secondary cancel-btn">Cancel</button>
-                <div class="action-buttons flex gap-sm">
-                    <a href="#" class="btn btn-primary download-btn hidden" download>Download</a>
-                    <button class="btn btn-primary convert-btn">Convert</button>
-                </div>
+            <div class="action-buttons flex gap-sm" style="width: 100%; justify-content: flex-end;">
+                <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                    download>
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-download"></use>
+                    </svg>
+                </a>
+                <button class="btn jellyjump-btn-small convert-btn" title="Convert" aria-label="Convert">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-convert"></use>
+                    </svg>
+                </button>
             </div>
         </div>
+    </div>
     </div>
 </template>
 

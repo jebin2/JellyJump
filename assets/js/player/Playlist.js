@@ -1566,7 +1566,6 @@ export class Playlist {
 
         // Elements
         const closeBtn = modalContent.querySelector('.modal-close-btn');
-        const cancelBtn = modalContent.querySelector('.cancel-btn');
         const convertBtn = modalContent.querySelector('.convert-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
@@ -1620,7 +1619,6 @@ export class Playlist {
         };
 
         closeBtn.addEventListener('click', closeModal);
-        cancelBtn.addEventListener('click', closeModal);
         modalOverlay.addEventListener('click', (e) => {
             if (e.target === modalOverlay) closeModal();
         });
@@ -1642,7 +1640,6 @@ export class Playlist {
             inputs.forEach(input => input.disabled = true);
             qualitySlider.disabled = true;
             convertBtn.disabled = true;
-            cancelBtn.disabled = true;
             closeBtn.disabled = true; // Prevent closing during conversion
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
@@ -1663,7 +1660,9 @@ export class Playlist {
                 // Enable Download
                 downloadBtn.classList.remove('hidden');
                 const downloadFormat = (format === 'keep') ? item.title.split('.').pop() : format;
-                downloadBtn.textContent = `Download ${downloadFormat.toUpperCase()}`;
+                // Update download button title/aria-label instead of text content since it's an icon button now
+                downloadBtn.title = `Download ${downloadFormat.toUpperCase()}`;
+                downloadBtn.setAttribute('aria-label', `Download ${downloadFormat.toUpperCase()}`);
 
                 // Re-enable Inputs for new conversion
                 inputs.forEach(input => {
@@ -1675,8 +1674,6 @@ export class Playlist {
                 convertBtn.disabled = false;
 
                 // Allow closing
-                cancelBtn.disabled = false;
-                cancelBtn.textContent = "Close";
                 closeBtn.disabled = false;
 
             } catch (error) {
@@ -1693,7 +1690,6 @@ export class Playlist {
                 });
                 qualitySlider.disabled = false;
                 convertBtn.disabled = false;
-                cancelBtn.disabled = false;
                 closeBtn.disabled = false;
             }
         });
