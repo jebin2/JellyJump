@@ -2627,9 +2627,15 @@ export class Playlist {
      * @param {number} index
      * @private
      */
+    /**
+     * Open Video Info Modal
+     * @param {number} index
+     * @private
+     */
     async _openInfoModal(index) {
         const item = this.items[index];
         const contentTemplate = document.getElementById('info-content-template');
+        const footerTemplate = document.getElementById('info-footer-template');
 
         if (!contentTemplate) return;
 
@@ -2637,13 +2643,20 @@ export class Playlist {
         modal.setTitle('Video Information');
         modal.setBody(contentTemplate.content.cloneNode(true));
 
-        // Remove footer as we don't need actions there
-        // modal.setFooter(...); 
+        if (footerTemplate) {
+            modal.setFooter(footerTemplate.content.cloneNode(true));
+        }
 
         const modalContent = modal.modal;
+        // Note: modal.modal is the .mb-modal element. 
+        // The body content is in modal.body, footer in modal.footer.
+        // But for querySelectorAll on the whole modal (including footer), modal.modal is fine.
 
         // Elements
+        const loadingEl = modalContent.querySelector('.info-loading');
+        const contentEl = modalContent.querySelector('.info-modal-content');
         const copyBtns = modalContent.querySelectorAll('.copy-btn');
+        // Copy All button is now in the footer
         const copyAllBtn = modalContent.querySelector('.copy-all-btn');
 
         modal.open();
@@ -2659,7 +2672,11 @@ export class Playlist {
             }
 
             // Get full metadata
-            const metadata = await this._getFormattedMetadata(source, item.title);
+            const { metadata, videoTrack } = await this._getFormattedMetadata(source, item.title);
+
+            // Hide loading, show content
+            loadingEl.classList.add('hidden');
+            contentEl.classList.remove('hidden');
 
             // Populate UI
             Object.keys(metadata).forEach(key => {
@@ -2673,16 +2690,68 @@ export class Playlist {
             });
 
             // Store raw metadata for "Copy All"
-            modalContent.dataset.rawInfo = JSON.stringify(metadata);
+            // We store it on the modal content wrapper or body to be accessible
+            modal.body.dataset.rawInfo = JSON.stringify(metadata);
+
+            // Async update for stats
+            if (videoTrack) {
+                videoTrack.computePacketStats(50).then(stats => {
+                    // Re-fetch elements as they are in the DOM now
+                    const fpsEl = modalContent.querySelector('.info-value[data-key="fps"]');
+                    const bitrateEl = modalContent.querySelector('.info-value[data-key="videoBitrate"]');
+
+                    // Update metadata object
+                    const currentMetadata = JSON.parse(modal.body.dataset.rawInfo || '{}');
+
+                    if (fpsEl) {
+                        const fps = Math.round(stats.averagePacketRate);
+                        const fpsText = `${fps} fps`;
+                        fpsEl.textContent = fpsText;
+
+                        // Update copy button
+                        const btn = fpsEl.parentElement.querySelector('.copy-btn');
+                        if (btn) btn.dataset.value = fpsText;
+
+                        currentMetadata.fps = fpsText;
+                    }
+
+                    if (bitrateEl) {
+                        const bitrate = (stats.averageBitrate / 1000000).toFixed(1);
+                        const bitrateText = `${bitrate} Mbps`;
+                        bitrateEl.textContent = bitrateText;
+
+                        // Update copy button
+                        const btn = bitrateEl.parentElement.querySelector('.copy-btn');
+                        if (btn) btn.dataset.value = bitrateText;
+
+                        currentMetadata.videoBitrate = bitrateText;
+                    }
+
+                    // Update raw info for copy all
+                    modal.body.dataset.rawInfo = JSON.stringify(currentMetadata);
+
+                }).catch(console.error);
+            }
 
         } catch (e) {
             console.error('Failed to load video info:', e);
-            // Show error in modal?
+            // Show error or partial content
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (contentEl) contentEl.classList.remove('hidden');
         }
 
         // Event Listeners
 
         // Copy Single Value
+        // Note: We need to re-query copy buttons if we want to be safe, 
+        // but the NodeList from querySelectorAll is static (not live) so it should be fine 
+        // as long as we don't replace the elements.
+        // However, the copy buttons for FPS/Bitrate are already there, we just updated their dataset.
+
+        // We need to attach listeners to the buttons we found earlier.
+        // BUT, if we used modalContent.querySelectorAll, it includes body and footer?
+        // Yes, modal.modal contains both.
+
         copyBtns.forEach(btn => {
             btn.addEventListener('click', async () => {
                 const value = btn.dataset.value;
@@ -2701,7 +2770,8 @@ export class Playlist {
         if (copyAllBtn) {
             copyAllBtn.addEventListener('click', async () => {
                 try {
-                    const metadata = JSON.parse(modalContent.dataset.rawInfo || '{}');
+                    // Retrieve from where we stored it
+                    const metadata = JSON.parse(modal.body.dataset.rawInfo || '{}');
                     const text = `Video Information
 -----------------
 Filename: ${metadata.filename}
@@ -2742,10 +2812,17 @@ Language: ${metadata.language}
      * @returns {Promise<Object>}
      * @private
      */
+    /**
+     * Get formatted metadata for a file
+     * @param {Blob} blob 
+     * @param {string} filename 
+     * @returns {Promise<Object>}
+     * @private
+     */
     async _getFormattedMetadata(blob, filename) {
-        const input = new MediaProcessor.Input({
-            source: new MediaProcessor.BlobSource(blob),
-            formats: MediaProcessor.ALL_FORMATS
+        const input = new MediaBunny.Input({
+            source: new MediaBunny.BlobSource(blob),
+            formats: MediaBunny.ALL_FORMATS
         });
 
         const format = await input.getFormat();
@@ -2806,42 +2883,7 @@ Language: ${metadata.language}
             language: audioTrack ? (audioTrack.languageCode === 'und' ? 'Undetermined' : audioTrack.languageCode) : 'N/A'
         };
 
-        // Async update for stats
-        if (videoTrack) {
-            videoTrack.computePacketStats(50).then(stats => {
-                const fpsEl = document.querySelector('.info-value[data-key="fps"]');
-                const bitrateEl = document.querySelector('.info-value[data-key="videoBitrate"]');
-
-                if (fpsEl) {
-                    const fps = Math.round(stats.averagePacketRate);
-                    fpsEl.textContent = `${fps} fps`;
-                    // Update copy button
-                    const btn = fpsEl.parentElement.querySelector('.copy-btn');
-                    if (btn) btn.dataset.value = `${fps} fps`;
-                    metadata.fps = `${fps} fps`;
-                }
-
-                if (bitrateEl) {
-                    const bitrate = (stats.averageBitrate / 1000000).toFixed(1);
-                    bitrateEl.textContent = `${bitrate} Mbps`;
-                    // Update copy button
-                    const btn = bitrateEl.parentElement.querySelector('.copy-btn');
-                    if (btn) btn.dataset.value = `${bitrate} Mbps`;
-                    metadata.videoBitrate = `${bitrate} Mbps`;
-                }
-
-                // Update raw info for copy all
-                const modalContent = document.querySelector('.info-modal-content');
-                if (modalContent) {
-                    modalContent.dataset.rawInfo = JSON.stringify(metadata);
-                }
-            }).catch(console.error);
-        } else {
-            metadata.fps = 'N/A';
-            metadata.videoBitrate = 'N/A';
-        }
-
-        return metadata;
+        return { metadata, videoTrack };
     }
 
     /**

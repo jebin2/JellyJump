@@ -821,7 +821,11 @@
 </template>
 
 <template id="info-content-template">
-    <div class="info-modal-content flex flex-col gap-md">
+    <div class="info-loading flex flex-col items-center justify-center py-xl">
+        <div class="loading-spinner mb-md"></div>
+        <div class="text-secondary">Loading video information...</div>
+    </div>
+    <div class="info-modal-content flex flex-col gap-md hidden">
         <!-- File Properties -->
         <div class="info-section">
             <h3 class="text-accent text-sm font-bold uppercase mb-sm border-b border-dark pb-xs">File Properties</h3>
@@ -872,7 +876,7 @@
 
                 <div class="text-secondary">Duration</div>
                 <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="duration">00:05:23</span>
+                    <span class="info-value" data-key="duration">--:--:--</span>
                     <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Copy" data-copy="duration">
                         <svg width="12" height="12" fill="currentColor">
@@ -1038,13 +1042,17 @@
             </div>
         </div>
 
-        <div class="flex justify-end mt-md">
-            <button class="btn jellyjump-btn-secondary copy-all-btn flex items-center gap-xs" title="Copy All Info">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-copy"></use>
-                </svg>
-                <span>Copy All</span>
-            </button>
-        </div>
+    </div>
+</template>
+
+<!-- Info Footer Template -->
+<template id="info-footer-template">
+    <div class="flex justify-end w-full">
+        <button class="btn jellyjump-btn-secondary copy-all-btn flex items-center gap-xs" title="Copy All Info">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-copy"></use>
+            </svg>
+            <span>Copy All</span>
+        </button>
     </div>
 </template>
