@@ -123,19 +123,25 @@ Video format conversion and optimization system with:
 - Prevent modal close during conversion
 
 ### Feature 5: Add to Playlist
-**Purpose**: Optionally add converted video to playlist
+**Purpose**: Optionally add converted/processed video to playlist
 
 **Requirements**:
 - Checkbox: "Add to playlist after conversion" (checked by default)
-- If checked: Insert converted video below source video in playlist
-- Generate new playlist item with:
-  - Filename: `{original-name}-converted.{ext}`
-  - Extract metadata using MediaBunny Input
-  - Generate thumbnail
-  - Mark as new (visual indicator or animation)
-- If unchecked: Never add to playlist, download button shown
-- Show "Download" button after conversion completes
-- User clicks button to download converted file
+- **CRITICAL**: This checkbox ONLY controls the NEW processed video
+- **CRITICAL**: The original source video ALWAYS remains in the playlist (never removed or affected)
+- If checked: Insert processed video below source video in playlist
+  - Generate new playlist item with:
+    - Filename: `{original-name}-converted.{ext}` (or `-compressed.{ext}` for size reduction)
+    - Extract metadata using MediaBunny Input
+    - Generate thumbnail
+    - Mark as new (visual indicator or animation)
+  - Both original and processed videos now in playlist
+- If unchecked: 
+  - Do NOT add processed video to playlist
+  - Original source video remains in playlist (unchanged)
+  - Download button shown for processed file
+- Show "Download" button after processing completes (regardless of checkbox state)
+- User clicks button to download processed file
 
 ### Feature 6: Download Button
 **Purpose**: Allow user to download converted video
@@ -300,6 +306,8 @@ Video format conversion and optimization system with:
 - ❌ Don't forget to clean up MediaBunny resources after conversion
 - ❌ Don't block UI thread during conversion (use async)
 - ❌ Don't lose source video if conversion fails
+- ❌ **Don't EVER remove the original source video from the playlist** (checkbox only controls NEW processed video)
+- ❌ Don't confuse "add to playlist" checkbox with removing anything from the playlist
 
 ---
 
