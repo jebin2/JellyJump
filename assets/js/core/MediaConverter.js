@@ -14,7 +14,18 @@ export class MediaConverter {
      * @param {Function} [options.onProgress] - Callback for progress updates (0-1)
      * @returns {Promise<Blob>} - The converted video blob
      */
-    static async convert({ source, format, quality, onProgress }) {
+    /**
+     * Convert a video blob/file to a target format with optional quality reduction.
+     * @param {Object} options
+     * @param {Blob|File} options.source - The source video file or blob
+     * @param {string} options.format - Target format ('mp4', 'webm', 'mov')
+     * @param {number} options.quality - Quality percentage (40, 60, 80, 100)
+     * @param {number} [options.startTime] - Start time in seconds
+     * @param {number} [options.endTime] - End time in seconds
+     * @param {Function} [options.onProgress] - Callback for progress updates (0-1)
+     * @returns {Promise<Blob>} - The converted video blob
+     */
+    static async convert({ source, format, quality, startTime, endTime, onProgress }) {
         const inputSource = new MediaBunny.BlobSource(source);
 
         const input = new MediaBunny.Input({
@@ -59,10 +70,23 @@ export class MediaConverter {
             };
         }
 
+        // Configure Trim Options
+        let trimOptions = undefined;
+        if ((typeof startTime === 'number' && startTime >= 0) || (typeof endTime === 'number' && endTime > 0)) {
+            trimOptions = {};
+            if (typeof startTime === 'number' && startTime >= 0) {
+                trimOptions.start = startTime;
+            }
+            if (typeof endTime === 'number' && endTime > (startTime || 0)) {
+                trimOptions.end = endTime;
+            }
+        }
+
         const conversion = await MediaBunny.Conversion.init({
             input,
             output,
-            video: videoOptions
+            video: videoOptions,
+            trim: trimOptions
         });
 
         if (onProgress) {

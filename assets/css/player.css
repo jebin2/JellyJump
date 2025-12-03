@@ -1050,9 +1050,14 @@ button:focus-visible {
     color: var(--text-secondary);
 }
 
+.hidden {
+    display: none !important;
+}
+
 .mb-modal-footer {
     padding: 15px 20px;
     border-top: 1px solid var(--border-light);
+    background: var(--bg-tertiary);
     display: flex;
     justify-content: flex-end;
     gap: 10px;
@@ -1465,4 +1470,119 @@ body.fullscreen-active {
     margin-left: 6px;
     font-weight: bold;
     text-transform: uppercase;
+}
+
+/* Trim Modal Styles */
+.time-inputs-container {
+    background: var(--bg-tertiary);
+    padding: var(--space-md);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+}
+
+.time-input-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.time-input-group input {
+    width: 100px;
+    font-family: monospace;
+    font-size: 1.1em;
+    padding: var(--space-xs) var(--space-sm);
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+}
+
+.time-input-group input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+}
+
+.time-input-group input.invalid {
+    border-color: var(--color-danger);
+    animation: shake 0.3s;
+}
+
+.trim-duration {
+    font-family: monospace;
+    font-size: 1.2em;
+}
+
+/* Timeline Slider */
+.timeline-slider-container {
+    padding: 0 var(--space-sm);
+}
+
+.timeline-slider {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    height: 60px;
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: visible;
+    /* Allow handles to overflow slightly */
+}
+
+.timeline-track {
+    background: linear-gradient(to right, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+}
+
+.timeline-range {
+    background: var(--color-primary);
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.timeline-handle {
+    width: 16px;
+    height: 100%;
+    /* Full height of slider */
+    top: 0;
+    background: var(--color-accent);
+    border: 2px solid var(--text-primary);
+    border-radius: 4px;
+    /* Rectangular with rounded corners */
+    cursor: ew-resize;
+    position: absolute;
+    z-index: 10;
+    transform: translateX(-50%);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+.timeline-handle:hover,
+.timeline-handle:focus {
+    transform: translateX(-50%) scale(1.1);
+    background: var(--color-primary);
+    outline: none;
+}
+
+.timeline-handle:focus {
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.5);
+}
+
+/* Preview Controls */
+.preview-controls button {
+    min-width: 140px;
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
 }

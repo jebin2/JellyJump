@@ -1530,6 +1530,8 @@ export class Playlist {
                 this._openTrackManager(index);
                 break;
             case 'trim':
+                this._openTrimModal(index);
+                break;
             case 'resize':
             case 'info':
             case 'merge':
@@ -1808,6 +1810,296 @@ export class Playlist {
             // Re-render playlist
             this.render();
         }
+    }
+
+    /**
+     * Open Trim Video Modal
+     * @param {number} index
+     * @private
+     */
+    async _openTrimModal(index) {
+        const item = this.items[index];
+        const contentTemplate = document.getElementById('trim-content-template');
+        const footerTemplate = document.getElementById('trim-footer-template');
+
+        if (!contentTemplate || !footerTemplate) return;
+
+        const modal = new Modal({ maxWidth: '600px' });
+        modal.setTitle('Trim Video');
+        modal.setBody(contentTemplate.content.cloneNode(true));
+        modal.setFooter(footerTemplate.content.cloneNode(true));
+
+        const modalContent = modal.modal;
+
+        // Elements
+        const sourceFilename = modalContent.querySelector('.source-filename');
+        const startInput = modalContent.querySelector('#trim-start-input');
+        const endInput = modalContent.querySelector('#trim-end-input');
+        const durationDisplay = modalContent.querySelector('.trim-duration');
+        const totalDurationDisplay = modalContent.querySelector('.total-duration');
+        const timelineSlider = modalContent.querySelector('.timeline-slider');
+        const timelineRange = modalContent.querySelector('.timeline-range');
+        const startHandle = modalContent.querySelector('.start-handle');
+        const endHandle = modalContent.querySelector('.end-handle');
+        const previewBtn = modalContent.querySelector('.preview-btn');
+        const stopPreviewBtn = modalContent.querySelector('.stop-preview-btn');
+        const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
+        const trimBtn = modalContent.querySelector('.trim-btn');
+        const downloadBtn = modalContent.querySelector('.download-btn');
+        const progressSection = modalContent.querySelector('.progress-section');
+        const progressBar = modalContent.querySelector('.progress-bar-fill');
+        const progressPercentage = modalContent.querySelector('.progress-percentage');
+        const errorMessage = modalContent.querySelector('.error-message');
+        const successMessage = modalContent.querySelector('.success-message');
+
+        // Helper: Format Time (HH:MM:SS)
+        const formatTime = (seconds) => {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        };
+
+        // Helper: Parse Time (HH:MM:SS)
+        const parseTime = (timeStr) => {
+            const parts = timeStr.split(':').map(Number);
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            if (parts.length === 2) return parts[0] * 60 + parts[1];
+            return 0;
+        };
+
+        // Initialize Data
+        sourceFilename.textContent = item.title;
+        sourceFilename.title = item.title;
+
+        // Get Video Duration
+        let duration = 0;
+        try {
+            if (item.duration) {
+                duration = this._parseDuration(item.duration);
+            } else {
+                // Fallback: load metadata
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.src = item.url || URL.createObjectURL(item.file);
+                await new Promise(resolve => {
+                    video.onloadedmetadata = () => {
+                        duration = video.duration;
+                        resolve();
+                    };
+                });
+            }
+        } catch (e) {
+            console.error('Failed to get duration:', e);
+            duration = 60; // Fallback
+        }
+
+        totalDurationDisplay.textContent = formatTime(duration);
+
+        // State
+        let startTime = 0;
+        let endTime = duration;
+        let isPreviewing = false;
+        let previewInterval;
+
+        // Update UI
+        const updateUI = () => {
+            // Update Inputs
+            if (document.activeElement !== startInput) startInput.value = formatTime(startTime);
+            if (document.activeElement !== endInput) endInput.value = formatTime(endTime);
+
+            // Update Duration
+            const trimDuration = Math.max(0, endTime - startTime);
+            durationDisplay.textContent = formatTime(trimDuration);
+
+            // Update Slider
+            const startPercent = (startTime / duration) * 100;
+            const endPercent = (endTime / duration) * 100;
+
+            startHandle.style.left = `${startPercent}%`;
+            endHandle.style.left = `${endPercent}%`;
+            timelineRange.style.left = `${startPercent}%`;
+            timelineRange.style.width = `${endPercent - startPercent}%`;
+
+            // Validation
+            const isValid = startTime < endTime && (endTime - startTime) >= 1;
+            trimBtn.disabled = !isValid;
+
+            if (!isValid) {
+                if (startTime >= endTime) errorMessage.textContent = "Start time must be before end time.";
+                else if ((endTime - startTime) < 1) errorMessage.textContent = "Duration must be at least 1 second.";
+                errorMessage.classList.remove('hidden');
+            } else {
+                errorMessage.classList.add('hidden');
+            }
+        };
+
+        // Initialize UI
+        updateUI();
+
+        // Input Handlers
+        const handleInput = (input, isStart) => {
+            const time = parseTime(input.value);
+            if (isStart) {
+                if (time >= 0 && time < duration) startTime = time;
+            } else {
+                if (time > 0 && time <= duration) endTime = time;
+            }
+            updateUI();
+        };
+
+        startInput.addEventListener('change', () => handleInput(startInput, true));
+        endInput.addEventListener('change', () => handleInput(endInput, false));
+
+        // Slider Drag Logic
+        const handleDrag = (e, isStart) => {
+            const rect = timelineSlider.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percent = Math.max(0, Math.min(1, x / rect.width));
+            const time = percent * duration;
+
+            if (isStart) {
+                if (time < endTime - 1) startTime = time;
+            } else {
+                if (time > startTime + 1) endTime = time;
+            }
+            updateUI();
+        };
+
+        const initDrag = (handle, isStart) => {
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const onMouseMove = (e) => handleDrag(e, isStart);
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        };
+
+        initDrag(startHandle, true);
+        initDrag(endHandle, false);
+
+        // Preview Logic
+        previewBtn.addEventListener('click', () => {
+            if (isPreviewing) return;
+
+            // Use main player for preview
+            const player = document.querySelector('video'); // Assuming main player video element
+            if (!player) return;
+
+            isPreviewing = true;
+            previewBtn.classList.add('hidden');
+            stopPreviewBtn.classList.remove('hidden');
+
+            player.currentTime = startTime;
+            player.play();
+
+            previewInterval = setInterval(() => {
+                if (player.currentTime >= endTime) {
+                    player.currentTime = startTime; // Loop
+                }
+            }, 100);
+        });
+
+        stopPreviewBtn.addEventListener('click', () => {
+            if (!isPreviewing) return;
+
+            const player = document.querySelector('video');
+            if (player) player.pause();
+
+            isPreviewing = false;
+            clearInterval(previewInterval);
+            previewBtn.classList.remove('hidden');
+            stopPreviewBtn.classList.add('hidden');
+        });
+
+        // Ensure preview stops on close
+        const originalClose = modal.close.bind(modal);
+        modal.close = () => {
+            if (isPreviewing) stopPreviewBtn.click();
+            originalClose();
+        };
+
+        // Trim Action
+        trimBtn.addEventListener('click', async () => {
+            if (isPreviewing) stopPreviewBtn.click();
+
+            // UI State
+            modalContent.classList.add('processing');
+            trimBtn.disabled = true;
+            modal.closeBtn.disabled = true;
+            progressSection.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+
+            try {
+                let source;
+                if (item.file) {
+                    source = item.file;
+                } else {
+                    const response = await fetch(item.url);
+                    source = await response.blob();
+                }
+
+                // Convert/Trim
+                const blob = await MediaConverter.convert({
+                    source: source,
+                    format: 'mp4', // Default to MP4 for now, could detect source format
+                    quality: 100, // Keep original quality
+                    startTime: startTime,
+                    endTime: endTime,
+                    onProgress: (progress) => {
+                        const percent = Math.round(progress * 100);
+                        progressBar.style.width = `${percent}%`;
+                        progressPercentage.textContent = `${percent}%`;
+                    }
+                });
+
+                // Success
+                successMessage.classList.remove('hidden');
+
+                // Configure Download
+                const ext = 'mp4';
+                const filename = item.title.replace(/\.[^/.]+$/, "") + `-trimmed-${Math.round(startTime)}-${Math.round(endTime)}.${ext}`;
+                const url = URL.createObjectURL(blob);
+
+                downloadBtn.href = url;
+                downloadBtn.download = filename;
+                downloadBtn.classList.remove('hidden');
+                trimBtn.classList.add('hidden');
+
+                // Add to Playlist
+                if (addToPlaylistCheckbox.checked) {
+                    const newItem = {
+                        title: filename,
+                        url: url,
+                        file: new File([blob], filename, { type: `video/${ext}` }),
+                        duration: formatTime(endTime - startTime),
+                        type: 'video',
+                        isNew: true
+                    };
+
+                    const insertIndex = this.items.indexOf(item) + 1;
+                    this.items.splice(insertIndex, 0, newItem);
+                    this.render();
+                }
+
+                modal.closeBtn.disabled = false;
+
+            } catch (e) {
+                console.error('Trimming failed:', e);
+                errorMessage.textContent = `Trimming failed: ${e.message}`;
+                errorMessage.classList.remove('hidden');
+                trimBtn.disabled = false;
+                modal.closeBtn.disabled = false;
+                progressSection.classList.add('hidden');
+            }
+        });
+
+        modal.open();
     }
 
 
