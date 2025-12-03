@@ -68,18 +68,14 @@
 
 <!-- Conversion Modal Template -->
 <template id="conversion-modal-template">
-    <div class="modal-overlay">
-        <div class="modal-content conversion-modal" role="dialog" aria-labelledby="conversion-modal-title">
-            <div class="modal-header">
-                <h3 id="conversion-modal-title" class="text-xl font-bold uppercase">Convert & Optimize Video</h3>
-                <button class="modal-close-btn" aria-label="Close modal">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-close"></use>
-                    </svg>
-                </button>
+    <div class="mb-modal-overlay">
+        <div class="mb-modal conversion-modal" role="dialog" aria-labelledby="conversion-modal-title">
+            <div class="mb-modal-header">
+                <h3 id="conversion-modal-title" class="mb-modal-title">Convert & Optimize Video</h3>
+                <button class="mb-modal-close" aria-label="Close modal">&times;</button>
             </div>
 
-            <div class="modal-body">
+            <div class="mb-modal-body" style="max-height: 70vh; overflow-y: auto;">
                 <div class="source-info mb-md">
                     <span class="text-secondary text-sm font-mono">SOURCE:</span>
                     <div class="source-filename text-base font-bold truncate" title=""></div>
@@ -213,7 +209,7 @@
                 </div>
             </div>
 
-            <div class="modal-footer">
+            <div class="mb-modal-footer">
                 <div class="action-buttons flex gap-sm">
                     <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download"
                         aria-label="Download" download>
@@ -229,7 +225,6 @@
                 </div>
             </div>
         </div>
-    </div>
     </div>
 </template>
 

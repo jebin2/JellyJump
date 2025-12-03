@@ -1557,8 +1557,8 @@ export class Playlist {
         }
 
         const clone = template.content.cloneNode(true);
-        const modalOverlay = clone.querySelector('.modal-overlay');
-        const modalContent = clone.querySelector('.modal-content');
+        const modalOverlay = clone.querySelector('.mb-modal-overlay');
+        const modalContent = clone.querySelector('.mb-modal');
 
         // Populate Source Info
         const sourceFilename = modalContent.querySelector('.source-filename');
@@ -1568,7 +1568,7 @@ export class Playlist {
         }
 
         // Elements
-        const closeBtn = modalContent.querySelector('.modal-close-btn');
+        const closeBtn = modalContent.querySelector('.mb-modal-close');
         const convertBtn = modalContent.querySelector('.convert-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
