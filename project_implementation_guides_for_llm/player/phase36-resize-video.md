@@ -118,14 +118,20 @@ Video resizing system with:
 
 **Requirements**:
 - Checkbox: "Add to playlist after resizing" (checked by default)
+- **CRITICAL**: This checkbox ONLY controls the NEW resized video
+- **CRITICAL**: The original source video ALWAYS remains in the playlist (never removed or affected)
 - If checked:
   - Create new playlist item below source
   - Filename: `{original-name}-{width}x{height}.{ext}`
   - Extract metadata from resized video
   - Generate thumbnail
   - Mark as new
-- If unchecked: Never add to playlist, download button shown
-- Show "Download" button after resizing completes
+  - Both original and resized videos now in playlist
+- If unchecked:
+  - Do NOT add resized video to playlist
+  - Original source video remains in playlist (unchanged)
+  - Download button shown for resized file
+- Show "Download" button after resizing completes (regardless of checkbox state)
 - User clicks button to download resized file
 
 ### Feature 8: Progress Tracking
@@ -255,6 +261,8 @@ Video resizing system with:
 - ❌ Don't calculate aspect ratios incorrectly
 - ❌ Don't use odd dimensions (causes codec issues)
 - ❌ Don't lose source video if resizing fails
+- ❌ **Don't EVER remove the original source video from the playlist** (checkbox only controls resized video)
+- ❌ Don't confuse "add to playlist" checkbox with removing anything from the playlist
 
 ---
 

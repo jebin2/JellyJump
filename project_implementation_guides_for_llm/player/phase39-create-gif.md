@@ -144,6 +144,8 @@ GIF creation system with:
 
 **Requirements**:
 - Checkbox: "Add to playlist after creation" (unchecked by default)
+- **CRITICAL**: This checkbox ONLY controls the NEW GIF file
+- **CRITICAL**: The original source video ALWAYS remains in the playlist (never removed or affected)
 - If checked:
   - Create new playlist item below source video
   - Filename: `{original-name}-gif.gif`
@@ -151,7 +153,11 @@ GIF creation system with:
   - Generate thumbnail (first frame of GIF)
   - Mark as GIF item (special badge/icon)
   - Display as animated preview on hover (optional)
-- If unchecked: Never add to playlist
+  - Both original video and GIF now in playlist
+- If unchecked:
+  - Never add GIF to playlist
+  - Original source video remains in playlist (unchanged)
+  - Download button shown for GIF file
 - Show download button regardless of checkbox state
 - User clicks download when ready
 
@@ -313,6 +319,8 @@ GIF creation system with:
 - ❌ Don't lose source video if GIF creation fails
 - ❌ Don't create GIF without user clicking "Create GIF" button
 - ❌ Don't forget to clean up MediaBunny resources
+- ❌ **Don't EVER remove the original source video from the playlist** (checkbox only controls GIF file)
+- ❌ Don't confuse "add to playlist" checkbox with removing anything from the playlist
 
 ---
 

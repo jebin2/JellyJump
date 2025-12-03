@@ -105,16 +105,20 @@ Video merging system with:
 
 **Requirements**:
 - Checkbox: "Add to playlist after merge" (checked by default)
+- **CRITICAL**: This checkbox ONLY controls the NEW merged video
+- **CRITICAL**: The selected source videos remain in playlist UNLESS the separate "Remove source videos" checkbox is checked
 - If checked:
   - Insert merged video at position of first selected video
   - Filename: `merged-{timestamp}.mp4` or `{first-name}+{second-name}+....mp4`
   - Extract metadata from merged video
   - Generate thumbnail
   - Mark as new
-- If unchecked: 
-  - Never add to playlist
-  - Download button shown
-- Show "Download" button after merge completes
+  - Source videos remain in playlist (unless separately removed via Feature 6)
+- If unchecked:
+  - Never add merged video to playlist
+  - Download button shown for merged file
+  - Source videos remain in playlist (unchanged)
+- Show "Download" button after merge completes (regardless of checkbox state)
 - User clicks button to download merged video
 
 ### Feature 6: Remove Source Option
@@ -282,6 +286,8 @@ Video merging system with:
 - ❌ Don't allow merging with fewer than 2 videos selected
 - ❌ Don't block UI during long merge operations
 - ❌ Don't add to playlist if checkbox unchecked
+- ❌ **Don't confuse "Add to playlist" with "Remove source videos"** - they are separate independent options
+- ❌ **Don't EVER remove source videos based on "Add to playlist" checkbox** (only "Remove source videos" checkbox controls that)
 
 ---
 

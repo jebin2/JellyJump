@@ -97,14 +97,20 @@ Video trimming system with:
 
 **Requirements**:
 - Checkbox: "Add to playlist after trimming" (checked by default)
+- **CRITICAL**: This checkbox ONLY controls the NEW trimmed video
+- **CRITICAL**: The original source video ALWAYS remains in the playlist (never removed or affected)
 - If checked:
   - Create new playlist item below source video
   - Filename: `{original-name}-trimmed-{start}-{end}.{ext}`
   - Extract metadata using MediaBunny
   - Generate thumbnail for trimmed segment
   - Mark as new with animation
-- If unchecked: Never add to playlist, download button shown
-- Show "Download" button after trimming completes
+  - Both original and trimmed videos now in playlist
+- If unchecked:
+  - Do NOT add trimmed video to playlist
+  - Original source video remains in playlist (unchanged)
+  - Download button shown for trimmed file
+- Show "Download" button after trimming completes (regardless of checkbox state)
 - User clicks button to download trimmed file
 
 ### Feature 7: Progress Tracking
@@ -243,6 +249,8 @@ Video trimming system with:
 - ❌ Don't re-encode unnecessarily (maintain quality)
 - ❌ Don't lose original video if trimming fails
 - ❌ Don't block UI during trimming operation
+- ❌ **Don't EVER remove the original source video from the playlist** (checkbox only controls trimmed video)
+- ❌ Don't confuse "add to playlist" checkbox with removing anything from the playlist
 
 ---
 

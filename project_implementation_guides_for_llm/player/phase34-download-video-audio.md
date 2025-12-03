@@ -108,8 +108,10 @@ Track management system with:
 **Requirements**:
 - Checkbox for each track: "Add to playlist"
 - Unchecked by default
+- **CRITICAL**: This checkbox ONLY controls the extracted track (NEW item)
+- **CRITICAL**: The original source video ALWAYS remains in the playlist (never removed or affected)
 - If checked:
-  - After extraction, create new playlist item
+  - After extraction, create new playlist item for the extracted track
   - Video tracks: Add as video-only playlist item
   - Audio tracks: Add as audio-only playlist item with special styling
     - Music icon or waveform icon
@@ -117,7 +119,11 @@ Track management system with:
     - "Audio" badge
   - Position: Below source video in playlist
   - Generate appropriate metadata
-- If unchecked: Extract but don't add to playlist
+  - Original source video remains in playlist alongside extracted track
+- If unchecked: 
+  - Extract track but don't add to playlist
+  - Original source video remains in playlist (unchanged)
+  - Download button shown for extracted track
 - Checkbox state remembered during session
 
 ### Feature 7: Track Metadata Display
@@ -284,6 +290,8 @@ Track management system with:
 - ❌ Don't forget to clean up MediaBunny resources
 - ❌ Don't use generic filenames
 - ❌ Don't add to playlist if checkbox unchecked
+- ❌ **Don't EVER remove the original source video from the playlist** (checkbox only controls extracted tracks)
+- ❌ Don't confuse "add to playlist" checkbox with removing anything from the playlist
 
 ---
 
