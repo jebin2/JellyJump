@@ -1827,13 +1827,11 @@ export class Playlist {
 
         // Close Event
         const closeBtn = modal.querySelector('.mb-modal-close');
-        const footerCloseBtn = modal.querySelector('.close-btn');
         const close = () => {
             modalOverlay.classList.remove('visible');
             setTimeout(() => modalOverlay.remove(), 300);
         };
         closeBtn.addEventListener('click', close);
-        footerCloseBtn.addEventListener('click', close);
         modalOverlay.addEventListener('click', (e) => {
             if (e.target === modalOverlay) close();
         });
@@ -1852,10 +1850,16 @@ export class Playlist {
             }
 
             const tracks = await MediaConverter.getTracks(source);
+
+            // Hide loading, show content
+            modal.querySelector('.tracks-loading').classList.add('hidden');
+            modal.querySelector('.tracks-content').classList.remove('hidden');
+
             this._renderTracks(tracks, item, modal);
         } catch (e) {
             console.error('Failed to load tracks:', e);
-            modal.querySelector('.mb-modal-body').innerHTML = `<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`;
+            modal.querySelector('.tracks-loading').classList.add('hidden');
+            modal.querySelector('.mb-modal-body').insertAdjacentHTML('beforeend', `<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`);
         }
     }
 
@@ -1901,8 +1905,8 @@ export class Playlist {
 
                 // Events
                 const downloadBtn = el.querySelector('.download-track-btn');
+                const addToPlaylistBtn = el.querySelector('.add-to-playlist-btn');
                 const progressContainer = el.querySelector('.progress-container');
-                const addToPlaylistCheckbox = el.querySelector('.add-to-playlist-checkbox');
 
                 // Determine format based on codec
                 let format = 'mp4';
@@ -1912,13 +1916,29 @@ export class Playlist {
                         format = 'mp3';
                     } else if (codec.includes('aac') || codec.includes('mp4a')) {
                         format = 'aac';
+                    } else if (codec.includes('pcm') || codec === '') {
+                        format = 'wav'; // Default to WAV for PCM or unknown
                     } else {
                         format = 'm4a'; // Default to M4A (AAC)
                     }
                 }
 
                 downloadBtn.addEventListener('click', () => {
-                    this._extractTrack(this.items.indexOf(item), i, type, format, addToPlaylistCheckbox.checked, progressContainer, downloadBtn);
+                    this._extractTrack(this.items.indexOf(item), i, type, format, false, progressContainer, downloadBtn, addToPlaylistBtn);
+                });
+
+                addToPlaylistBtn.addEventListener('click', () => {
+                    // Duplicate Check
+                    const ext = format;
+                    const newFilename = `${item.title.replace(/\.[^/.]+$/, "")}-${type}-track${i + 1}.${ext}`;
+
+                    const exists = this.items.some(it => it.title === newFilename);
+                    if (exists) {
+                        alert(`Track "${newFilename}" is already in the playlist.`);
+                        return;
+                    }
+
+                    this._extractTrack(this.items.indexOf(item), i, type, format, true, progressContainer, downloadBtn, addToPlaylistBtn);
                 });
 
                 trackList.appendChild(el);
@@ -1938,13 +1958,15 @@ export class Playlist {
      * @param {boolean} addToPlaylist 
      * @param {HTMLElement} progressContainer 
      * @param {HTMLElement} downloadBtn 
+     * @param {HTMLElement} addToPlaylistBtn
      * @private
      */
-    async _extractTrack(index, trackIndex, trackType, format, addToPlaylist, progressContainer, downloadBtn) {
+    async _extractTrack(index, trackIndex, trackType, format, addToPlaylist, progressContainer, downloadBtn, addToPlaylistBtn) {
         const item = this.items[index];
 
         // UI State
         downloadBtn.classList.add('hidden');
+        addToPlaylistBtn.classList.add('hidden');
         progressContainer.classList.remove('hidden');
 
         try {
@@ -1974,6 +1996,7 @@ export class Playlist {
             alert(`Extraction failed: ${e.message}`);
         } finally {
             downloadBtn.classList.remove('hidden');
+            addToPlaylistBtn.classList.remove('hidden');
             progressContainer.classList.add('hidden');
         }
     }
@@ -1993,14 +2016,6 @@ export class Playlist {
         const newFilename = `${originalItem.title.replace(/\.[^/.]+$/, "")}-${trackType}-track${trackIndex + 1}.${ext}`;
         const url = URL.createObjectURL(blob);
 
-        // Trigger Download
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = newFilename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
         if (addToPlaylist) {
             const newItem = {
                 title: newFilename,
@@ -2017,6 +2032,20 @@ export class Playlist {
 
             // Re-render playlist
             this.render();
+
+            // Scroll to new item
+            setTimeout(() => {
+                const newEl = this.container.querySelector(`[data-index="${index + 1}"]`);
+                if (newEl) newEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        } else {
+            // Trigger Download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = newFilename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
     }
 }

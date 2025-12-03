@@ -129,26 +129,27 @@ export class MediaConverter {
      * @returns {Promise<Blob>}
      */
     static async extractTrack({ source, trackIndex, trackType, format, onProgress }) {
-        const inputSource = new MediaBunny.BlobSource(source);
         const input = new MediaBunny.Input({
-            source: inputSource,
+            source: source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source),
             formats: MediaBunny.ALL_FORMATS
         });
 
-        // Determine Output Format
         let outputFormat;
         switch (format) {
             case 'mp4':
                 outputFormat = new MediaBunny.Mp4OutputFormat();
                 break;
-            case 'm4a':
-                outputFormat = new MediaBunny.Mp4OutputFormat(); // M4A is MP4 container
-                break;
             case 'mp3':
                 outputFormat = new MediaBunny.Mp3OutputFormat();
                 break;
+            case 'm4a':
+                outputFormat = new MediaBunny.Mp4OutputFormat();
+                break;
             case 'aac':
                 outputFormat = new MediaBunny.AdtsOutputFormat();
+                break;
+            case 'wav':
+                outputFormat = new MediaBunny.WavOutputFormat();
                 break;
             default:
                 throw new Error(`Unsupported format: ${format}`);
@@ -159,27 +160,22 @@ export class MediaConverter {
             target: new MediaBunny.BufferTarget()
         });
 
-        // Configure Conversion to select specific track
         const conversionOptions = {
-            input,
-            output,
+            input: input,
+            output: output,
+            video: (t, i) => {
+                // MediaBunny uses 1-based indexing for tracks in the callback
+                const keep = trackType === 'video' && (i - 1) === trackIndex;
+                console.log(`[MediaConverter] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
+                return keep ? {} : { discard: true };
+            },
+            audio: (t, i) => {
+                // MediaBunny uses 1-based indexing for tracks in the callback
+                const keep = trackType === 'audio' && (i - 1) === trackIndex;
+                console.log(`[MediaConverter] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
+                return keep ? {} : { discard: true };
+            }
         };
-
-        if (trackType === 'video') {
-            // Keep selected video track, discard others
-            conversionOptions.video = (track, index) => {
-                return index === trackIndex ? {} : { discard: true };
-            };
-            // Discard all audio
-            conversionOptions.audio = { discard: true };
-        } else if (trackType === 'audio') {
-            // Discard all video
-            conversionOptions.video = { discard: true };
-            // Keep selected audio track, discard others
-            conversionOptions.audio = (track, index) => {
-                return index === trackIndex ? {} : { discard: true };
-            };
-        }
 
         const conversion = await MediaBunny.Conversion.init(conversionOptions);
 

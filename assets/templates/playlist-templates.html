@@ -348,30 +348,39 @@
             <div class="mb-modal-body" style="max-height: 70vh; overflow-y: auto;">
                 <div class="source-filename text-sm text-muted mb-md font-mono break-all"></div>
 
-                <div class="track-section video-tracks-section">
-                    <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
-                        <span>📹 Video Tracks</span>
-                        <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
-                    </h4>
-                    <div class="track-list video-track-list grid gap-sm">
-                        <!-- Video tracks injected here -->
-                        <div class="no-tracks-message text-muted text-sm italic hidden">No video tracks available</div>
+                <!-- Loading State -->
+                <div class="tracks-loading flex flex-col items-center justify-center p-xl text-muted">
+                    <div
+                        class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
                     </div>
+                    <span>Scanning media tracks...</span>
                 </div>
 
-                <div class="track-section audio-tracks-section mt-lg">
-                    <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
-                        <span>🎵 Audio Tracks</span>
-                        <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
-                    </h4>
-                    <div class="track-list audio-track-list grid gap-sm">
-                        <!-- Audio tracks injected here -->
-                        <div class="no-tracks-message text-muted text-sm italic hidden">No audio tracks available</div>
+                <div class="tracks-content hidden">
+                    <div class="track-section video-tracks-section">
+                        <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                            <span>📹 Video Tracks</span>
+                            <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+                        </h4>
+                        <div class="track-list video-track-list grid gap-sm">
+                            <!-- Video tracks injected here -->
+                            <div class="no-tracks-message text-muted text-sm italic hidden">No video tracks available
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="track-section audio-tracks-section mt-lg">
+                        <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                            <span>🎵 Audio Tracks</span>
+                            <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+                        </h4>
+                        <div class="track-list audio-track-list grid gap-sm">
+                            <!-- Audio tracks injected here -->
+                            <div class="no-tracks-message text-muted text-sm italic hidden">No audio tracks available
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn jellyjump-btn-small close-btn">Close</button>
             </div>
         </div>
     </div>
@@ -398,7 +407,12 @@
                     <svg width="16" height="16" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-download"></use>
                     </svg>
-                    <span>Download</span>
+                </button>
+                <button class="btn jellyjump-btn-small add-to-playlist-btn flex items-center gap-xs"
+                    title="Add to Playlist">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-plus"></use>
+                    </svg>
                 </button>
                 <div class="progress-container hidden flex items-center gap-xs text-primary">
                     <div
@@ -406,11 +420,6 @@
                     </div>
                     <span class="text-xs font-bold">Extracting...</span>
                 </div>
-                <label
-                    class="flex items-center gap-xs text-sm cursor-pointer select-none hover:text-primary transition-colors">
-                    <input type="checkbox" class="add-to-playlist-checkbox accent-primary">
-                    <span>Add to playlist</span>
-                </label>
             </div>
         </div>
     </div>
