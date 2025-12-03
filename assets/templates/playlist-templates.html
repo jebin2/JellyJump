@@ -71,7 +71,7 @@
     <div class="modal-overlay">
         <div class="modal-content conversion-modal" role="dialog" aria-labelledby="conversion-modal-title">
             <div class="modal-header">
-                <h3 id="conversion-modal-title" class="text-xl font-bold uppercase">Convert Video Format</h3>
+                <h3 id="conversion-modal-title" class="text-xl font-bold uppercase">Convert & Optimize Video</h3>
                 <button class="modal-close-btn" aria-label="Close modal">
                     <svg width="24" height="24" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-close"></use>
@@ -85,15 +85,63 @@
                     <div class="source-filename text-base font-bold truncate" title=""></div>
                 </div>
 
+                <!-- Operation Mode Selection -->
+                <div class="operation-mode mb-lg">
+                    <div class="text-secondary text-sm font-mono mb-sm">OPERATION MODE:</div>
+                    <div class="radio-group mode-group" role="radiogroup">
+                        <label class="radio-option">
+                            <input type="radio" name="operationMode" value="convert" checked>
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="mode-name">Convert Format</span>
+                                <span class="mode-desc">Change container/codec</span>
+                            </div>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="operationMode" value="reduce">
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="mode-name">Reduce File Size</span>
+                                <span class="mode-desc">Compress video</span>
+                            </div>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="operationMode" value="both">
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="mode-name">Convert + Reduce</span>
+                                <span class="mode-desc">Both operations</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Quality Slider (Hidden by default) -->
+                <div class="quality-section mb-lg hidden">
+                    <div class="flex-between mb-sm">
+                        <span class="text-secondary text-sm font-mono">QUALITY:</span>
+                        <span class="quality-value text-sm font-bold">Medium (60%)</span>
+                    </div>
+                    <input type="range" class="quality-slider" min="40" max="80" step="20" value="60">
+                    <div class="flex-between mt-xs text-xs text-secondary">
+                        <span>Low</span>
+                        <span>Medium</span>
+                        <span>High</span>
+                    </div>
+                    <div class="estimated-reduction text-xs text-accent mt-sm">~40% smaller file size</div>
+                </div>
+
+                <!-- Format Selection -->
                 <div class="format-selection mb-lg">
                     <div class="text-secondary text-sm font-mono mb-sm">SELECT FORMAT:</div>
-                    <div class="radio-group" role="radiogroup">
+                    <div class="radio-group format-group" role="radiogroup">
+                        <!-- Supported Formats -->
                         <label class="radio-option">
                             <input type="radio" name="format" value="mp4" checked>
                             <span class="radio-custom"></span>
                             <div class="radio-label">
                                 <span class="format-name">MP4</span>
-                                <span class="format-desc">H.264 / AAC (Recommended)</span>
+                                <span class="format-desc">H.264 / AAC</span>
                             </div>
                         </label>
                         <label class="radio-option">
@@ -101,15 +149,7 @@
                             <span class="radio-custom"></span>
                             <div class="radio-label">
                                 <span class="format-name">WebM</span>
-                                <span class="format-desc">VP9 / Opus (Web Optimized)</span>
-                            </div>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="format" value="avi">
-                            <span class="radio-custom"></span>
-                            <div class="radio-label">
-                                <span class="format-name">AVI</span>
-                                <span class="format-desc">Legacy Support</span>
+                                <span class="format-desc">VP9 / Opus</span>
                             </div>
                         </label>
                         <label class="radio-option">
@@ -118,6 +158,48 @@
                             <div class="radio-label">
                                 <span class="format-name">MOV</span>
                                 <span class="format-desc">QuickTime</span>
+                            </div>
+                        </label>
+
+                        <!-- Disabled Formats -->
+                        <label class="radio-option disabled" title="Coming Soon">
+                            <input type="radio" name="format" value="avi" disabled>
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="format-name">AVI</span>
+                                <span class="format-desc">Legacy</span>
+                            </div>
+                        </label>
+                        <label class="radio-option disabled" title="Coming Soon">
+                            <input type="radio" name="format" value="mkv" disabled>
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="format-name">MKV</span>
+                                <span class="format-desc">Matroska</span>
+                            </div>
+                        </label>
+                        <label class="radio-option disabled" title="Coming Soon">
+                            <input type="radio" name="format" value="flv" disabled>
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="format-name">FLV</span>
+                                <span class="format-desc">Flash</span>
+                            </div>
+                        </label>
+                        <label class="radio-option disabled" title="Coming Soon">
+                            <input type="radio" name="format" value="wmv" disabled>
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="format-name">WMV</span>
+                                <span class="format-desc">Windows</span>
+                            </div>
+                        </label>
+                        <label class="radio-option disabled" title="Coming Soon">
+                            <input type="radio" name="format" value="mpeg" disabled>
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="format-name">MPEG</span>
+                                <span class="format-desc">Classic</span>
                             </div>
                         </label>
                     </div>
@@ -134,7 +216,7 @@
                 <!-- Progress Section (Hidden by default) -->
                 <div class="progress-section hidden">
                     <div class="flex-between mb-xs">
-                        <span class="progress-status text-sm font-mono">Converting...</span>
+                        <span class="progress-status text-sm font-mono">Processing...</span>
                         <span class="progress-percentage text-sm font-bold">0%</span>
                     </div>
                     <div class="progress-bar-container">
@@ -147,7 +229,7 @@
 
                 <!-- Success Message (Hidden by default) -->
                 <div class="success-message hidden mt-md p-sm border-success text-success text-sm">
-                    Conversion complete!
+                    Operation complete!
                 </div>
             </div>
 
