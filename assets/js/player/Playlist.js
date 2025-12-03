@@ -1858,7 +1858,7 @@ export class Playlist {
                 controls: {
                     playPause: true,
                     volume: false,
-                    time: false,
+                    time: true,
                     progress: true,
                     captions: false,
                     settings: false,
