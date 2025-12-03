@@ -1530,14 +1530,9 @@ export class Playlist {
             case 'resize':
             case 'info':
             case 'merge':
-            case 'extract-audio':
+            case 'create-gif':
+            case 'download-manage':
                 alert(`Feature "${action}" coming in Phase 33+`);
-                break;
-            case 'download-video':
-                this._downloadItem(index);
-                break;
-            case 'download-audio':
-                alert('Audio download coming soon');
                 break;
         }
     }
