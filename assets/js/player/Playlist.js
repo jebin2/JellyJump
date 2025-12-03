@@ -1537,6 +1537,8 @@ export class Playlist {
                 this._openResizeModal(index);
                 break;
             case 'info':
+                this._openInfoModal(index);
+                break;
             case 'merge':
             case 'create-gif':
                 alert(`Feature "${action}" coming in Phase 33+`);
@@ -2619,5 +2621,198 @@ export class Playlist {
                 modal.closeBtn.disabled = false;
             }
         });
+    }
+    /**
+     * Open Video Info Modal
+     * @param {number} index
+     * @private
+     */
+    async _openInfoModal(index) {
+        const item = this.items[index];
+        const contentTemplate = document.getElementById('info-content-template');
+
+        if (!contentTemplate) return;
+
+        const modal = new Modal({ maxWidth: '600px' });
+        modal.setTitle('Video Information');
+        modal.setBody(contentTemplate.content.cloneNode(true));
+
+        // Remove footer as we don't need actions there
+        // modal.setFooter(...); 
+
+        const modalContent = modal.modal;
+
+        // Elements
+        const copyBtns = modalContent.querySelectorAll('.copy-btn');
+        const copyAllBtn = modalContent.querySelector('.copy-all-btn');
+
+        modal.open();
+
+        // Load Metadata
+        try {
+            let source;
+            if (item.file) {
+                source = item.file;
+            } else {
+                const response = await fetch(item.url);
+                source = await response.blob();
+            }
+
+            // Get full metadata
+            const metadata = await this._getFormattedMetadata(source, item.title);
+
+            // Populate UI
+            Object.keys(metadata).forEach(key => {
+                const el = modalContent.querySelector(`[data-key="${key}"]`);
+                if (el) {
+                    el.textContent = metadata[key];
+                    // Update copy button data
+                    const btn = el.parentElement.querySelector('.copy-btn');
+                    if (btn) btn.dataset.value = metadata[key];
+                }
+            });
+
+            // Store raw metadata for "Copy All"
+            modalContent.dataset.rawInfo = JSON.stringify(metadata);
+
+        } catch (e) {
+            console.error('Failed to load video info:', e);
+            // Show error in modal?
+        }
+
+        // Event Listeners
+
+        // Copy Single Value
+        copyBtns.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const value = btn.dataset.value;
+                if (value) {
+                    try {
+                        await navigator.clipboard.writeText(value);
+                        this._showToast('Copied to clipboard!');
+                    } catch (err) {
+                        console.error('Failed to copy:', err);
+                    }
+                }
+            });
+        });
+
+        // Copy All
+        if (copyAllBtn) {
+            copyAllBtn.addEventListener('click', async () => {
+                try {
+                    const metadata = JSON.parse(modalContent.dataset.rawInfo || '{}');
+                    const text = `Video Information
+-----------------
+Filename: ${metadata.filename}
+Format: ${metadata.format}
+Size: ${metadata.size}
+Duration: ${metadata.duration}
+
+Video Stream
+------------
+Codec: ${metadata.videoCodec}
+Resolution: ${metadata.resolution}
+Frame Rate: ${metadata.fps}
+Bitrate: ${metadata.videoBitrate}
+
+Audio Stream
+------------
+Codec: ${metadata.audioCodec}
+Channels: ${metadata.channels}
+Sample Rate: ${metadata.sampleRate}
+`;
+                    await navigator.clipboard.writeText(text);
+                    this._showToast('All info copied to clipboard!');
+                } catch (err) {
+                    console.error('Failed to copy all:', err);
+                }
+            });
+        }
+    }
+
+    /**
+     * Get formatted metadata for a file
+     * @param {Blob} blob 
+     * @param {string} filename 
+     * @returns {Promise<Object>}
+     * @private
+     */
+    async _getFormattedMetadata(blob, filename) {
+        const tracks = await MediaProcessor.getTracks(blob);
+        const videoTrack = tracks.video[0];
+        const audioTrack = tracks.audio[0];
+
+        // Helper: Format Bytes
+        const formatBytes = (bytes, decimals = 1) => {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        };
+
+        // Helper: Format Duration
+        const formatDuration = (seconds) => {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return [h, m, s]
+                .map(v => v < 10 ? "0" + v : v)
+                .filter((v, i) => v !== "00" || i > 0)
+                .join(":");
+        };
+
+        return {
+            filename: filename,
+            format: blob.type.split('/')[1].toUpperCase(), // Simple format guess
+            size: formatBytes(blob.size),
+            duration: formatDuration(videoTrack ? videoTrack.duration : 0),
+
+            // Video
+            videoCodec: videoTrack ? videoTrack.codec.split('.')[0].toUpperCase() : 'N/A', // Simple codec
+            resolution: videoTrack ? `${videoTrack.width}x${videoTrack.height}` : 'N/A',
+            fps: videoTrack ? `${Math.round(videoTrack.fps || 30)} fps` : 'N/A', // Fallback
+            videoBitrate: videoTrack ? `${Math.round((videoTrack.bitrate || 0) / 1000)} Kbps` : 'N/A',
+
+            // Audio
+            audioCodec: audioTrack ? audioTrack.codec.split('.')[0].toUpperCase() : 'N/A',
+            channels: audioTrack ? (audioTrack.channels === 2 ? 'Stereo (2)' : `${audioTrack.channels} Channels`) : 'N/A',
+            sampleRate: audioTrack ? `${(audioTrack.sampleRate / 1000).toFixed(1)} kHz` : 'N/A'
+        };
+    }
+
+    /**
+     * Show toast notification
+     * @param {string} message 
+     * @private
+     */
+    _showToast(message) {
+        // Simple toast implementation or reuse existing if available
+        // For now, let's use a simple alert or console log if no toast system exists
+        // Actually, let's create a temporary element
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent-primary);
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            z-index: 3000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        `;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.style.opacity = '1');
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => document.body.removeChild(toast), 300);
+        }, 2000);
     }
 }
