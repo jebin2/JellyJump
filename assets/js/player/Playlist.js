@@ -1949,15 +1949,20 @@ export class Playlist {
 
         totalDurationDisplay.textContent = formatTime(duration);
 
+        // State
+        let startTime = 0;
+        let endTime = duration;
+
         // Load Video into Player
         if (player) {
             const videoUrl = item.url || URL.createObjectURL(item.file);
             await player.load(videoUrl, false);
-        }
 
-        // State
-        let startTime = 0;
-        let endTime = duration;
+            // Enable A-B Loop Mode
+            player.loopMode = 'ab';
+            player.loopStart = startTime;
+            player.loopEnd = endTime;
+        }
 
         // Update UI
         const updateUI = () => {
@@ -1976,7 +1981,16 @@ export class Playlist {
             startHandle.style.left = `${startPercent}%`;
             endHandle.style.left = `${endPercent}%`;
             timelineRange.style.left = `${startPercent}%`;
+            timelineRange.style.left = `${startPercent}%`;
             timelineRange.style.width = `${endPercent - startPercent}%`;
+
+            // Update Player Loop Points
+            if (player) {
+                player.loopStart = startTime;
+                player.loopEnd = endTime;
+                // Ensure we are in AB mode
+                if (player.loopMode !== 'ab') player.loopMode = 'ab';
+            }
 
             // Validation
             const isValid = startTime < endTime && (endTime - startTime) >= 1;
