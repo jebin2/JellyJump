@@ -1034,6 +1034,26 @@ button:focus-visible {
     border-color: var(--accent-primary);
 }
 
+.mb-select {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+    font-family: var(--font-mono);
+}
+
+.mb-select:focus {
+    outline: 2px solid var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.mb-select:hover {
+    border-color: var(--accent-primary);
+}
+
 .mb-modal-error {
     margin-top: 10px;
     color: var(--error-color);

@@ -807,6 +807,131 @@
         </a>
         <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
             <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-maximize"></use>
+            </svg>
+        </button>
+    </div>
+</template>
+
+<!-- Merge Modal Content Template -->
+<template id="merge-modal-content-template">
+    <div class="merge-container grid grid-cols-2 gap-md h-full">
+        <!-- Left Column: Available Videos -->
+        <div class="available-videos-section flex flex-col h-full border-r border-border pr-md">
+            <h4 class="text-sm font-bold mb-sm flex-between">
+                <span>Available Videos</span>
+                <span class="text-xs text-muted selection-count">0 selected</span>
+            </h4>
+            <div class="available-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs">
+                <!-- Items injected here -->
+                <div class="empty-state text-center p-md text-muted text-sm italic">No videos available
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Selected Videos (Order) -->
+        <div class="selected-videos-section flex flex-col h-full pl-sm">
+            <h4 class="text-sm font-bold mb-sm">Merge Order (Drag to Reorder)</h4>
+            <div class="selected-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs mb-md"
+                style="min-height: 150px;">
+                <!-- Selected items injected here -->
+                <div
+                    class="empty-selection-state text-center p-md text-muted text-sm italic h-full flex items-center justify-center">
+                    Select videos from the left to merge
+                </div>
+            </div>
+
+            <!-- Resolution Options -->
+            <div class="resolution-options mb-md">
+                <div class="text-xs text-secondary font-mono mb-xs">RESOLUTION STRATEGY</div>
+                <select class="mb-select w-full resolution-select">
+                    <option value="match-first">Match First Video (Default)</option>
+                    <option value="largest">Use Largest Resolution</option>
+                    <option value="smallest">Use Smallest Resolution</option>
+                </select>
+                <div class="resolution-warning text-xs text-accent mt-xs hidden">
+                    ⚠️ Videos have different resolutions. Scaling will occur.
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div class="options-group mb-md">
+                <label class="checkbox-option">
+                    <input type="checkbox" name="addToPlaylist" checked>
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-label">Add to playlist after merge</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Section (Hidden by default) -->
+    <div class="merge-progress hidden mt-md">
+        <div class="flex-between mb-xs">
+            <span class="status-text text-sm font-mono">Merging videos...</span>
+            <span class="progress-percentage text-sm font-bold">0%</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Error Message (Hidden by default) -->
+    <div class="merge-error hidden mt-md p-sm border-danger text-danger text-sm"></div>
+
+    <!-- Success Message (Hidden by default) -->
+    <div class="merge-success hidden mt-md p-sm border-success text-success text-sm">
+        Merge complete!
+    </div>
+</template>
+
+<!-- Merge Modal Footer Template -->
+<template id="merge-modal-footer-template">
+    <div class="action-buttons flex gap-sm">
+        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-download"></use>
+            </svg>
+        </a>
+        <button class="btn jellyjump-btn-small merge-btn" title="Merge" aria-label="Merge" disabled>
+            <span class="mr-xs">Merge</span>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-layers"></use>
+            </svg>
+        </button>
+    </div>
+</template>
+
+
+<!-- Merge Item Template -->
+<template id="merge-item-template">
+    <div class="merge-item flex items-center gap-sm p-xs rounded hover:bg-tertiary cursor-pointer border border-transparent mb-xs"
+        draggable="true">
+        <div class="drag-handle text-muted cursor-grab active:cursor-grabbing">⋮⋮</div>
+        <div class="item-thumb w-8 h-8 bg-black rounded overflow-hidden flex-shrink-0">
+            <!-- Thumb or placeholder -->
+        </div>
+        <div class="item-info flex-1 min-w-0">
+            <div class="item-title text-sm font-bold truncate"></div>
+            <div class="item-meta text-xs text-muted">
+                <span class="item-dur"></span>
+            </div>
+        </div>
+        <button class="remove-item-btn text-muted hover:text-danger" title="Remove">
+            &times;
+        </button>
+    </div>
+</template>
+
+<template id="resize-footer-template">
+    <div class="action-buttons flex gap-sm">
+        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-download"></use>
+            </svg>
+        </a>
+        <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
+            <svg width="16" height="16" fill="currentColor">
                 <use href="assets/icons/sprite.svg#icon-convert"></use>
             </svg>
         </button>

@@ -214,4 +214,221 @@ export class MediaProcessor {
         const mimeType = trackType === 'video' ? `video/${format}` : `audio/${format}`;
         return new Blob([output.target.buffer], { type: mimeType });
     }
+
+    /**
+     * Merge multiple videos using MediaBunny Output API
+     * Based on working implementation that uses CanvasSource and manual frame processing
+     * 
+     * @param {Object} options
+     * @param {Array<Blob|File>} options.inputs - List of input files/blobs
+     * @param {string} options.format - 'mp4', 'webm', etc.
+     * @param {Object} [options.resolution] - { width: number, height: number } (Optional target resolution)
+     * @param {Function} [options.onProgress]
+     * @returns {Promise<Blob>}
+     */
+    static async merge({ inputs, format = 'mp4', resolution, onProgress }) {
+        if (!inputs || inputs.length < 2) {
+            throw new Error('At least 2 videos are required for merging.');
+        }
+
+        console.log('[MediaProcessor] Starting merge of', inputs.length, 'videos');
+
+        // Skip standardization - work with source files directly
+        // MediaBunny Output API will handle format normalization
+        const sourceFiles = inputs;
+
+        // Step 1: Gather metadata from source clips
+        console.log('[MediaProcessor] Gathering metadata...');
+        const clipMetadata = [];
+        for (const file of sourceFiles) {
+            const input = new MediaBunny.Input({
+                source: new MediaBunny.BlobSource(file),
+                formats: MediaBunny.ALL_FORMATS
+            });
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error('No video track found in input file');
+
+            // TODO: Audio support - currently disabled due to timestamp concatenation issues
+            // Will need to decode/re-encode audio instead of direct packet concatenation
+            const audioTrack = null;
+            const audioConfig = null;
+
+            const videoConfig = await videoTrack.getDecoderConfig();
+            const duration = await videoTrack.computeDuration();
+
+            clipMetadata.push({ duration, videoTrack, audioTrack, videoConfig, audioConfig });
+        }
+
+        // Step 2: Setup output
+        const outputFps = 30; // Standard 30fps for merged output
+        const standardFormat = {
+            videoCodec: 'avc',
+            audioCodec: 'opus',
+            audioSampleRate: 48000
+        };
+
+        const firstClip = clipMetadata[0];
+        const outputWidth = resolution?.width || firstClip.videoConfig.codedWidth;
+        const outputHeight = resolution?.height || firstClip.videoConfig.codedHeight;
+        // Setup output with video track only (audio support coming later)
+        const output = new MediaBunny.Output({
+            target: new MediaBunny.BufferTarget(),
+            format: new MediaBunny.Mp4OutputFormat()
+        });
+
+        // Step 3: Setup canvas for video processing
+        const canvas = document.createElement('canvas');
+        canvas.width = outputWidth;
+        canvas.height = outputHeight;
+        const ctx = canvas.getContext('2d');
+
+        const canvasSource = new MediaBunny.CanvasSource(canvas, {
+            codec: standardFormat.videoCodec,
+            bitrate: 10000000 // 10 Mbps
+        });
+        output.addVideoTrack(canvasSource, { frameRate: outputFps });
+
+        await output.start();
+
+        // Step 4: Process video clips
+        console.log('[MediaProcessor] Processing video frames...');
+        let currentVideoTimestamp = 0;
+        let maxVideoTimestamp = 0;
+        let processedClips = 0;
+
+        for (const clip of clipMetadata) {
+            const frames = [];
+            let decoderError = null;
+
+            // Log the decoder config we're trying to use
+            console.log('[MediaProcessor] Decoder config:', JSON.stringify(clip.videoConfig, null, 2));
+
+            // Check codec support
+            const codecSupport = await VideoDecoder.isConfigSupported(clip.videoConfig);
+            console.log('[MediaProcessor] Codec support:', codecSupport);
+
+            if (!codecSupport.supported) {
+                throw new Error(`Video codec not supported: ${clip.videoConfig.codec}`);
+            }
+
+            const decoder = new VideoDecoder({
+                output: (frame) => frames.push(frame),
+                error: (e) => {
+                    console.error('[MediaProcessor] Video decoder error:', e);
+                    decoderError = e; // Store error instead of throwing
+                }
+            });
+
+            try {
+                decoder.configure(clip.videoConfig);
+
+                const videoPacketSink = new MediaBunny.EncodedPacketSink(clip.videoTrack);
+                let packetIndex = 0;
+
+                for await (const packet of videoPacketSink.packets()) {
+                    // Log first few packets
+                    if (packetIndex < 3) {
+                        console.log(`[MediaProcessor] Packet ${packetIndex}:`, {
+                            isKeyframe: packet.isKeyframe,
+                            timestamp: packet.timestamp,
+                            dataSize: packet.data?.byteLength || 0
+                        });
+                    }
+
+                    // Check if decoder encountered an error
+                    if (decoderError) {
+                        throw new Error(`Decoding failed at packet ${packetIndex}: ${decoderError.message}`);
+                    }
+
+                    // Skip very small packets (likely metadata/SEI that causes decoder errors)
+                    if (packet.data?.byteLength < 50) {
+                        packetIndex++;
+                        continue;
+                    }
+
+                    // MediaBunny packets may not have isKeyframe marked
+                    // Treat first packet as keyframe, all others as delta
+                    const isKey = (packetIndex === 0);
+
+                    decoder.decode(new EncodedVideoChunk({
+                        type: isKey ? 'key' : 'delta',
+                        timestamp: packet.timestamp * 1_000_000,
+                        duration: packet.duration ? packet.duration * 1_000_000 : undefined,
+                        data: packet.data
+                    }));
+
+                    packetIndex++;
+                }
+
+                console.log('[MediaProcessor] Processed', packetIndex, 'packets, flushing...');
+                await decoder.flush();
+
+                // Check for errors after flush
+                if (decoderError) {
+                    throw new Error(`Decoding failed during flush: ${decoderError.message}`);
+                }
+            } finally {
+                // Only close if decoder is not already closed
+                if (decoder.state !== 'closed') {
+                    decoder.close();
+                }
+            }
+
+            // Sort frames by timestamp to ensure correct order
+            frames.sort((a, b) => a.timestamp - b.timestamp);
+
+            if (frames.length > 0) {
+                const firstFrameTs = frames[0].timestamp;
+
+                for (let i = 0; i < frames.length; i++) {
+                    const frame = frames[i];
+
+                    // Calculate relative timestamp from start of this clip (in seconds)
+                    const relativeTs = (frame.timestamp - firstFrameTs) / 1_000_000;
+                    const newTimestamp = currentVideoTimestamp + relativeTs;
+
+                    // Determine duration: use frame duration if available, or calculate from next frame
+                    let duration;
+                    if (frame.duration) {
+                        duration = frame.duration / 1_000_000;
+                    } else if (i < frames.length - 1) {
+                        duration = (frames[i + 1].timestamp - frame.timestamp) / 1_000_000;
+                    } else {
+                        // Last frame: default to 1/30s or previous frame's duration
+                        duration = 1 / 30;
+                    }
+
+                    ctx.drawImage(frame, 0, 0, outputWidth, outputHeight);
+                    await canvasSource.add(newTimestamp, duration);
+                    maxVideoTimestamp = Math.max(maxVideoTimestamp, newTimestamp + duration);
+                    frame.close();
+                }
+            }
+
+            // Update timestamp for next clip based on actual frames processed
+            // Add a small buffer (e.g., 1 frame duration approx 33ms) to ensure no overlap
+            currentVideoTimestamp = maxVideoTimestamp + (1 / 30);
+
+            processedClips++;
+            if (onProgress) {
+                onProgress(processedClips / (clipMetadata.length * 2)); // Video is first half
+            }
+        }
+
+        // TODO: Step 5: Process audio clips (disabled - needs re-encoding approach)
+        // Current issue: Direct encoded packet concatenation creates timestamp conflicts
+        // Solution: Decode audio to PCM, concatenate, then re-encode
+        // For now, merged videos are video-only
+        console.log('[MediaProcessor] Audio processing skipped (video-only merge)');
+
+        // Step 6: Finalize
+        console.log('[MediaProcessor] Finalizing merge...');
+        canvasSource.close();
+        await output.finalize();
+
+        if (onProgress) onProgress(1.0);
+        console.log('[MediaProcessor] Merge complete!');
+
+        return new Blob([output.target.buffer], { type: `video/${format}` });
+    }
 }
