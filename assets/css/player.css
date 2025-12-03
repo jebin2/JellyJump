@@ -1332,21 +1332,7 @@ body.fullscreen-active {
     color: var(--accent-primary);
 }
 
-/* Operation Mode */
-.operation-mode .radio-group {
-    grid-template-columns: 1fr 1fr 1fr;
-}
 
-.mode-name {
-    font-weight: bold;
-    color: var(--text-primary);
-    font-size: 13px;
-}
-
-.mode-desc {
-    font-size: 10px;
-    color: var(--text-secondary);
-}
 
 /* Quality Slider */
 .quality-section {

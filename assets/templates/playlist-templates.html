@@ -85,59 +85,23 @@
                     <div class="source-filename text-base font-bold truncate" title=""></div>
                 </div>
 
-                <!-- Operation Mode Selection -->
-                <div class="operation-mode mb-lg">
-                    <div class="text-secondary text-sm font-mono mb-sm">OPERATION MODE:</div>
-                    <div class="radio-group mode-group" role="radiogroup">
-                        <label class="radio-option">
-                            <input type="radio" name="operationMode" value="convert" checked>
-                            <span class="radio-custom"></span>
-                            <div class="radio-label">
-                                <span class="mode-name">Convert Format</span>
-                                <span class="mode-desc">Change container/codec</span>
-                            </div>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="operationMode" value="reduce">
-                            <span class="radio-custom"></span>
-                            <div class="radio-label">
-                                <span class="mode-name">Reduce File Size</span>
-                                <span class="mode-desc">Compress video</span>
-                            </div>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="operationMode" value="both">
-                            <span class="radio-custom"></span>
-                            <div class="radio-label">
-                                <span class="mode-name">Convert + Reduce</span>
-                                <span class="mode-desc">Both operations</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Quality Slider (Hidden by default) -->
-                <div class="quality-section mb-lg hidden">
-                    <div class="flex-between mb-sm">
-                        <span class="text-secondary text-sm font-mono">QUALITY:</span>
-                        <span class="quality-value text-sm font-bold">Medium (60%)</span>
-                    </div>
-                    <input type="range" class="quality-slider" min="40" max="80" step="20" value="60">
-                    <div class="flex-between mt-xs text-xs text-secondary">
-                        <span>Low</span>
-                        <span>Medium</span>
-                        <span>High</span>
-                    </div>
-                    <div class="estimated-reduction text-xs text-accent mt-sm">~40% smaller file size</div>
-                </div>
-
                 <!-- Format Selection -->
                 <div class="format-selection mb-lg">
                     <div class="text-secondary text-sm font-mono mb-sm">SELECT FORMAT:</div>
                     <div class="radio-group format-group" role="radiogroup">
+                        <!-- Keep Original -->
+                        <label class="radio-option">
+                            <input type="radio" name="format" value="keep" checked>
+                            <span class="radio-custom"></span>
+                            <div class="radio-label">
+                                <span class="format-name">Original</span>
+                                <span class="format-desc">Keep Format</span>
+                            </div>
+                        </label>
+
                         <!-- Supported Formats -->
                         <label class="radio-option">
-                            <input type="radio" name="format" value="mp4" checked>
+                            <input type="radio" name="format" value="mp4">
                             <span class="radio-custom"></span>
                             <div class="radio-label">
                                 <span class="format-name">MP4</span>
@@ -203,6 +167,22 @@
                             </div>
                         </label>
                     </div>
+                </div>
+
+                <!-- Quality Slider (Always Visible) -->
+                <div class="quality-section mb-lg">
+                    <div class="flex-between mb-sm">
+                        <span class="text-secondary text-sm font-mono">QUALITY:</span>
+                        <span class="quality-value text-sm font-bold">Original (100%)</span>
+                    </div>
+                    <input type="range" class="quality-slider" min="40" max="100" step="20" value="100">
+                    <div class="flex-between mt-xs text-xs text-secondary">
+                        <span>Low</span>
+                        <span>Medium</span>
+                        <span>High</span>
+                        <span>Original</span>
+                    </div>
+                    <div class="estimated-reduction text-xs text-accent mt-sm">No size reduction</div>
                 </div>
 
                 <div class="options-group mb-lg">

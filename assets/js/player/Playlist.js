@@ -1547,15 +1547,22 @@ export class Playlist {
     _openConversionModal(index) {
         const item = this.items[index];
         const template = document.getElementById('conversion-modal-template');
-        if (!template) return;
+        console.log('Opening Conversion Modal', { index, template });
+        if (!template) {
+            console.error('Conversion modal template not found!');
+            return;
+        }
 
         const clone = template.content.cloneNode(true);
         const modalOverlay = clone.querySelector('.modal-overlay');
         const modalContent = clone.querySelector('.modal-content');
 
         // Populate Source Info
-        modalContent.querySelector('.source-filename').textContent = item.title;
-        modalContent.querySelector('.source-filename').title = item.title;
+        const sourceFilename = modalContent.querySelector('.source-filename');
+        if (sourceFilename) {
+            sourceFilename.textContent = item.title;
+            sourceFilename.title = item.title;
+        }
 
         // Elements
         const closeBtn = modalContent.querySelector('.modal-close-btn');
@@ -1570,37 +1577,9 @@ export class Playlist {
         const inputs = modalContent.querySelectorAll('input');
 
         // New Elements
-        const modeInputs = modalContent.querySelectorAll('input[name="operationMode"]');
-        const qualitySection = modalContent.querySelector('.quality-section');
         const qualitySlider = modalContent.querySelector('.quality-slider');
         const qualityValue = modalContent.querySelector('.quality-value');
         const estimatedReduction = modalContent.querySelector('.estimated-reduction');
-        const formatSection = modalContent.querySelector('.format-selection');
-        const formatInputs = modalContent.querySelectorAll('input[name="format"]');
-
-        // UI Logic: Handle Mode Switching
-        const updateUIForMode = (mode) => {
-            // Reset states
-            qualitySection.classList.add('hidden');
-            formatSection.classList.remove('disabled-section');
-            formatInputs.forEach(input => {
-                if (!input.parentElement.classList.contains('disabled')) {
-                    input.disabled = false;
-                }
-            });
-
-            if (mode === 'convert') {
-                // Default state
-            } else if (mode === 'reduce') {
-                qualitySection.classList.remove('hidden');
-                // Disable format selection
-                formatInputs.forEach(input => input.disabled = true);
-                formatSection.classList.add('disabled-section'); // Add visual cue if needed
-            } else if (mode === 'both') {
-                qualitySection.classList.remove('hidden');
-                // Enable format selection
-            }
-        };
 
         // UI Logic: Handle Quality Slider
         const updateQualityLabel = () => {
@@ -1608,7 +1587,10 @@ export class Playlist {
             let label = "Medium (60%)";
             let reduction = "~40% smaller";
 
-            if (val === 80) {
+            if (val === 100) {
+                label = "Original (100%)";
+                reduction = "No size reduction";
+            } else if (val === 80) {
                 label = "High (80%)";
                 reduction = "~20% smaller";
             } else if (val === 40) {
@@ -1617,14 +1599,13 @@ export class Playlist {
             }
 
             qualityValue.textContent = label;
-            estimatedReduction.textContent = `${reduction} file size`;
+            estimatedReduction.textContent = reduction;
         };
 
-        modeInputs.forEach(input => {
-            input.addEventListener('change', (e) => updateUIForMode(e.target.value));
-        });
-
         qualitySlider.addEventListener('input', updateQualityLabel);
+
+        // Initialize Slider
+        updateQualityLabel();
 
         // Close Handler
         const closeModal = () => {
@@ -1646,10 +1627,16 @@ export class Playlist {
 
         // Convert Handler
         convertBtn.addEventListener('click', async () => {
-            const mode = modalContent.querySelector('input[name="operationMode"]:checked').value;
             const format = modalContent.querySelector('input[name="format"]:checked').value;
             const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
             const quality = parseInt(qualitySlider.value);
+
+            // Validation: No Op check
+            if (format === 'keep' && quality === 100) {
+                errorMessage.textContent = "No changes selected. Please choose a different format or reduce quality.";
+                errorMessage.classList.remove('hidden');
+                return;
+            }
 
             // UI Updates
             inputs.forEach(input => input.disabled = true);
@@ -1662,7 +1649,7 @@ export class Playlist {
             successMessage.classList.add('hidden');
 
             try {
-                await this._startConversion(index, mode, format, quality, addToPlaylist, (progress) => {
+                await this._startConversion(index, format, quality, addToPlaylist, (progress) => {
                     const percent = Math.round(progress * 100) + '%';
                     progressBarFill.style.width = percent;
                     progressPercentage.textContent = percent;
@@ -1674,7 +1661,7 @@ export class Playlist {
 
                 // Enable Download
                 downloadBtn.classList.remove('hidden');
-                const downloadFormat = (mode === 'reduce') ? item.title.split('.').pop() : format;
+                const downloadFormat = (format === 'keep') ? item.title.split('.').pop() : format;
                 downloadBtn.textContent = `Download ${downloadFormat.toUpperCase()}`;
 
                 // Allow closing
@@ -1698,9 +1685,6 @@ export class Playlist {
                 convertBtn.disabled = false;
                 cancelBtn.disabled = false;
                 closeBtn.disabled = false;
-
-                // Re-run UI logic to ensure correct state
-                updateUIForMode(mode);
             }
         });
 
@@ -1708,6 +1692,7 @@ export class Playlist {
 
         // Animate In
         requestAnimationFrame(() => {
+            console.log('Animating modal in');
             modalOverlay.classList.add('visible');
         });
     }
@@ -1715,19 +1700,16 @@ export class Playlist {
     /**
      * Start the conversion process using MediaBunny
      * @param {number} index 
-     * @param {string} mode - 'convert', 'reduce', 'both'
      * @param {string} format 
-     * @param {number} quality - 40, 60, 80
+     * @param {number} quality - 40, 60, 80, 100
      * @param {boolean} addToPlaylist 
      * @param {Function} onProgress 
      * @private
      */
-    async _startConversion(index, mode, format, quality, addToPlaylist, onProgress) {
+    async _startConversion(index, format, quality, addToPlaylist, onProgress) {
         const item = this.items[index];
 
         // Ensure we have the file blob
-        // In a real app, we might need to fetch it if it's a URL
-        // For now, assuming we have access to the file object or can fetch it
         let source;
         if (item.file) {
             source = new MediaBunny.BlobSource(item.file);
@@ -1747,13 +1729,12 @@ export class Playlist {
         let outputFormat;
         let targetFormat = format;
 
-        if (mode === 'reduce') {
-            // Keep original format if possible, or default to MP4 if unknown
-            // For simplicity in this phase, we'll default to MP4 for reduction if original is not easily mapped
-            // Or we can try to detect.
-            // Let's assume MP4 for now as it's the most common container for "reduce size"
-            targetFormat = 'mp4';
-            // Ideally we should check input format and match it, but MediaBunny OutputFormat needs explicit class
+        if (format === 'keep') {
+            // Try to detect format from filename
+            const ext = item.title.split('.').pop().toLowerCase();
+            // Map extension to format string if needed, or use as is if supported
+            // Assuming common extensions match format keys
+            targetFormat = ext;
         }
 
         switch (targetFormat) {
@@ -1767,7 +1748,16 @@ export class Playlist {
                 outputFormat = new MediaBunny.QuickTimeOutputFormat();
                 break;
             default:
-                throw new Error(`Unsupported format: ${targetFormat}`);
+                // Fallback for 'keep' if extension is not one of the explicit writers
+                // If we are just reducing size, we might need to default to MP4 if original is AVI/etc
+                if (format === 'keep') {
+                    // Warn or default? Let's default to MP4 for safety if unknown
+                    console.warn(`Format ${targetFormat} not explicitly supported for writing, defaulting to MP4.`);
+                    targetFormat = 'mp4';
+                    outputFormat = new MediaBunny.Mp4OutputFormat();
+                } else {
+                    throw new Error(`Unsupported format: ${targetFormat}`);
+                }
         }
 
         const output = new MediaBunny.Output({
@@ -1775,34 +1765,11 @@ export class Playlist {
             target: new MediaBunny.BufferTarget()
         });
 
-        // Configure Video Options based on Mode and Quality
+        // Configure Video Options based on Quality
         let videoOptions = {};
 
-        if (mode === 'reduce' || mode === 'both') {
+        if (quality < 100) {
             // Calculate bitrate reduction
-            // Since we don't know original bitrate easily without probing, 
-            // we can use the 'bitrate' property with a multiplier if MediaBunny supports it,
-            // OR set a fixed CRF-like quality if supported.
-            // MediaBunny docs say: bitrate: number | Quality.
-            // Let's use Quality constants if available, or heuristic numbers.
-
-            // Mapping quality slider (40, 60, 80) to MediaBunny Quality
-            // Assuming MediaBunny has QUALITY_LOW, QUALITY_MEDIUM, QUALITY_HIGH
-
-            // If MediaBunny doesn't export Quality enum directly in the wrapper, we might need to use raw numbers
-            // or check the library.
-            // For now, let's try to set a reasonable bitrate cap or use a multiplier if possible.
-            // Since we can't easily get source bitrate in this sync flow without reading metadata first:
-
-            // Let's read metadata first to be smart
-            // Note: input.getFormat() is async.
-
-            // Simple approach: Use 'bitrate' option with a rough target.
-            // 80% -> 2.5 Mbps (High)
-            // 60% -> 1.5 Mbps (Medium)
-            // 40% -> 0.8 Mbps (Low)
-            // This is arbitrary but functional for a demo.
-
             let targetBitrate;
             if (quality >= 80) targetBitrate = 2500000;
             else if (quality >= 60) targetBitrate = 1500000;
@@ -1810,12 +1777,11 @@ export class Playlist {
 
             videoOptions = {
                 bitrate: targetBitrate,
-                // Force transcode to apply bitrate
                 forceTranscode: true
             };
         } else {
-            // Convert only: Try to copy if codecs match, else transcode with high quality
-            // MediaBunny defaults to smart copy/transcode.
+            // Quality 100: Try to copy if codecs match (Remux), else transcode high quality
+            // MediaBunny defaults usually handle this, but if format changed, it will transcode.
         }
 
         const conversion = await MediaBunny.Conversion.init({
