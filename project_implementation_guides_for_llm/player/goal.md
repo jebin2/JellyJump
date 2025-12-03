@@ -68,6 +68,16 @@ Focus on viewing experience:
 - Loop entire playlist
 - Shuffle (optional)
 
+### Video Operations
+- ✅ Settings menu on each playlist item
+- ✅ Convert video formats (MP4, WebM, AVI, MOV)
+- ✅ Download video-only or audio-only tracks
+- ✅ Trim videos by time range
+- ✅ Resize videos with aspect ratio control
+- ✅ View detailed video information/metadata
+- ✅ Merge consecutive videos
+- ✅ Extract audio to separate playlist item
+
 ## File Handling
 
 ### Supported Formats
