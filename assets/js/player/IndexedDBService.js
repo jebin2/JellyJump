@@ -70,6 +70,12 @@ export class IndexedDBService {
     async savePlaylist(items) {
         await this.ready();
 
+        // Check if database connection is still open
+        if (!this.db || this.db.statechanged) {
+            console.warn('IndexedDB connection not available, skipping savePlaylist');
+            return Promise.resolve();
+        }
+
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([this.STORES.PLAYLIST, this.STORES.FILES], 'readwrite');
 
@@ -196,6 +202,13 @@ export class IndexedDBService {
      */
     async savePlaybackState(state) {
         await this.ready();
+
+        // Check if database connection is still open
+        if (!this.db || this.db.statechanged) {
+            console.warn('IndexedDB connection not available, skipping savePlaybackState');
+            return Promise.resolve();
+        }
+
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([this.STORES.STATE], 'readwrite');
             const store = transaction.objectStore(this.STORES.STATE);
