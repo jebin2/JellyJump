@@ -3313,6 +3313,15 @@ export class Playlist {
             }
         });
 
+        // Ensure player is cleaned up on close
+        const originalClose = modal.close.bind(modal);
+        modal.close = () => {
+            if (player) {
+                player.destroy();
+            }
+            originalClose();
+        };
+
         validateAndUpdate(); // Initial validation
     }
 
