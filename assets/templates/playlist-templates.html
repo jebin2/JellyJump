@@ -978,6 +978,133 @@
 </div>
 </template>
 
+<!-- GIF Creation Content Template -->
+<template id="gif-content-template">
+    <div class="source-info mb-md">
+        <span class="text-secondary text-sm font-mono">SOURCE:</span>
+        <div class="source-filename text-base font-bold truncate" title=""></div>
+        <div class="source-details text-xs text-muted mt-xs">
+            <span class="source-duration"></span> • <span class="source-resolution"></span>
+        </div>
+    </div>
+
+    <!-- Time Selection -->
+    <div class="time-inputs-container mb-lg">
+        <div class="time-input-group">
+            <label for="gif-start-input" class="text-xs text-secondary font-mono mb-xs block">START TIME</label>
+            <input type="text" id="gif-start-input" class="mb-input font-mono text-center time-input-field"
+                placeholder="00:00:00" value="00:00:00">
+        </div>
+        <div class="duration-display flex flex-col items-center justify-center duration-display-container">
+            <span class="text-xs text-secondary font-mono">DURATION</span>
+            <span class="gif-duration text-sm font-bold text-accent">0.0s</span>
+        </div>
+        <div class="time-input-group">
+            <label for="gif-end-input" class="text-xs text-secondary font-mono mb-xs block">END TIME</label>
+            <input type="text" id="gif-end-input" class="mb-input font-mono text-center time-input-field"
+                placeholder="00:00:00" value="00:00:00">
+        </div>
+    </div>
+
+    <!-- Validation Error -->
+    <div class="time-validation-error hidden text-danger text-sm mb-sm"></div>
+
+    <!-- GIF Settings -->
+    <div class="gif-settings mb-lg">
+        <div class="text-xs text-secondary font-mono mb-sm">GIF SETTINGS</div>
+
+        <!-- Frame Rate -->
+        <div class="setting-group mb-sm">
+            <label class="text-xs font-bold mb-xs block">Frame Rate</label>
+            <select class="mb-select w-full" id="gif-fps">
+                <option value="5">5 FPS (Smallest file)</option>
+                <option value="10">10 FPS (Smooth)</option>
+                <option value="15" selected>15 FPS (Recommended)</option>
+                <option value="20">20 FPS (Very smooth)</option>
+            </select>
+        </div>
+
+        <!-- Size -->
+        <div class="setting-group mb-sm">
+            <label class="text-xs font-bold mb-xs block">Size</label>
+            <select class="mb-select w-full" id="gif-size">
+                <option value="original">Original Size</option>
+                <option value="720">720p (1280×720)</option>
+                <option value="480" selected>480p (854×480)</option>
+                <option value="360">360p (640×360)</option>
+            </select>
+        </div>
+
+        <!-- Quality -->
+        <div class="setting-group">
+            <label class="text-xs font-bold mb-xs block">Quality</label>
+            <div class="flex items-center gap-sm">
+                <span class="text-xs">Low</span>
+                <input type="range" class="flex-1" id="gif-quality" min="40" max="100" step="20" value="80">
+                <span class="text-xs">High</span>
+            </div>
+            <div class="text-xs text-muted mt-xs">Quality: <span id="gif-quality-value">High</span></div>
+        </div>
+    </div>
+
+    <!-- Preview & Add to Playlist Options -->
+    <div class="options-group mb-lg">
+        <button class="btn jellyjump-btn-secondary mb-sm preview-segment-btn w-full">
+            Preview Segment
+        </button>
+        <label class="checkbox-option">
+            <input type="checkbox" name="addToPlaylist">
+            <span class="checkbox-custom"></span>
+            <span class="checkbox-label">Add GIF to playlist after creation</span>
+        </label>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="progress-section hidden">
+        <div class="flex-between mb-xs">
+            <span class="progress-status text-sm font-mono">Creating GIF...</span>
+            <span class="progress-percentage text-sm font-bold">0%</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- GIF Preview Section -->
+    <div class="gif-preview-section hidden mt-md">
+        <div class="text-xs text-secondary font-mono mb-xs">PREVIEW</div>
+        <div class="gif-preview-container border border-border rounded p-sm bg-tertiary flex justify-center">
+            <img class="gif-preview-image" src="" alt="GIF preview"
+                style="max-width: 100%; height: auto; max-height: 400px;">
+        </div>
+        <div class="text-xs text-muted mt-xs">
+            GIF size: <span class="gif-file-size">-</span>
+        </div>
+    </div>
+
+    <!-- Error/Success Messages -->
+    <div class="error-message hidden mt-md p-sm border-danger text-danger text-sm"></div>
+    <div class="success-message hidden mt-md p-sm border-success text-success text-sm">
+        GIF created! Click Download to save.
+    </div>
+</template>
+
+<!-- GIF Footer Template -->
+<template id="gif-footer-template">
+    <div class="action-buttons flex gap-sm">
+        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download GIF" aria-label="Download GIF"
+            download>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-download"></use>
+            </svg>
+        </a>
+        <button class="btn jellyjump-btn-small create-gif-btn" title="Create GIF" aria-label="Create GIF">
+            <span class="mr-xs">Create GIF</span>
+            <span>🎞️</span>
+        </button>
+    </div>
+</template>
+
 <template id="info-content-template">
     <div class="info-loading flex flex-col items-center justify-center py-xl">
         <div class="loading-spinner mb-md"></div>

@@ -730,4 +730,120 @@ export class MediaProcessor {
             console.log('[MediaProcessor] Cleanup complete');
         }
     }
+
+    /**
+     * Create GIF from video segment using gif.js library
+     * Extracts frames from video using Canvas API and encodes to animated GIF
+     * 
+     * @param {Object} options
+     * @param {Blob|File} options.input - Source video file
+     * @param {number} options.startTime - Start time in seconds
+     * @param {number} options.duration - Duration in seconds
+     * @param {number} options.fps - Target frame rate
+     * @param {number} options.width - Target width
+     * @param {number} options.height - Target height
+     * @param {number} options.quality - Quality (40-100)
+     * @param {Function} [options.onProgress] - Progress callback
+     * @returns {Promise<Blob>} Actual GIF blob
+     */
+    static async createGif(options) {
+        const {
+            input,
+            startTime,
+            duration,
+            fps,
+            width,
+            height,
+            quality,
+            onProgress
+        } = options;
+
+        // Create video element to extract frames
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+
+        // Load video
+        const videoUrl = URL.createObjectURL(input);
+        video.src = videoUrl;
+
+        try {
+            // Wait for video to load
+            await new Promise((resolve, reject) => {
+                video.onloadedmetadata = resolve;
+                video.onerror = reject;
+            });
+
+            // Create canvas for frame extraction
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+            // Initialize GIF encoder with gif.js
+            const gif = new GIF({
+                workers: 2,
+                quality: Math.max(1, Math.round((100 - quality) / 10)), // gif.js quality: 1=best, 30=worst
+                workerScript: 'assets/js/lib/gif.worker.js',
+                width: width,
+                height: height
+            });
+
+            // Calculate frame timing
+            const frameDelay = Math.round(1000 / fps); // Delay in milliseconds
+            const totalFrames = Math.ceil(duration * fps);
+            const frameInterval = duration / totalFrames;
+
+            let framesProcessed = 0;
+
+            // Extract and encode frames
+            for (let i = 0; i < totalFrames; i++) {
+                const currentTime = startTime + (i * frameInterval);
+
+                // Seek to frame time
+                video.currentTime = currentTime;
+                await new Promise(resolve => {
+                    video.onseeked = resolve;
+                });
+
+                // Draw frame to canvas
+                ctx.drawImage(video, 0, 0, width, height);
+
+                // Add frame to GIF
+                gif.addFrame(canvas, { delay: frameDelay, copy: true });
+
+                framesProcessed++;
+
+                // Update progress (50% for frame extraction, 50% for encoding)
+                if (onProgress) {
+                    onProgress(framesProcessed / totalFrames * 0.5);
+                }
+            }
+
+            // Render GIF asynchronously
+            return new Promise((resolve, reject) => {
+                gif.on('finished', (blob) => {
+                    if (onProgress) onProgress(1.0);
+                    resolve(blob);
+                });
+
+                gif.on('progress', (p) => {
+                    if (onProgress) {
+                        // 0.5 (frame extraction done) + 0.5 (encoding progress)
+                        onProgress(0.5 + (p * 0.5));
+                    }
+                });
+
+                gif.on('error', reject);
+
+                gif.render();
+            });
+
+        } finally {
+            // Cleanup
+            URL.revokeObjectURL(videoUrl);
+            video.src = '';
+            video.load(); // Force release of video resources
+        }
+    }
 }

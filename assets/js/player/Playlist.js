@@ -1563,7 +1563,7 @@ export class Playlist {
                 this._openMergeModal(index);
                 break;
             case 'create-gif':
-                alert(`Feature "${action}" coming in Phase 33+`);
+                this._openGifModal(index);
                 break;
         }
     }
@@ -2991,6 +2991,290 @@ export class Playlist {
             }
         });
     }
+
+    /**
+     * Open GIF Creation Modal
+     * @param {number} index 
+     * @private
+     */
+    async _openGifModal(index) {
+        const item = this.items[index];
+        const contentTemplate = document.getElementById('gif-content-template');
+        const footerTemplate = document.getElementById('gif-footer-template');
+
+        if (!contentTemplate || !footerTemplate) {
+            console.error('GIF modal templates not found!');
+            return;
+        }
+
+        const modal = new Modal({ maxWidth: '600px' });
+        modal.setTitle('Create GIF');
+        modal.setBody(contentTemplate.content.cloneNode(true));
+        modal.setFooter(footerTemplate.content.cloneNode(true));
+
+        const modalContent = modal.modal;
+
+        // Populate source info
+        const sourceFilename = modalContent.querySelector('.source-filename');
+        const sourceDuration = modalContent.querySelector('.source-duration');
+        const sourceResolution = modalContent.querySelector('.source-resolution');
+
+        sourceFilename.textContent = item.title;
+        sourceFilename.title = item.title;
+
+        // Ensure metadata
+        await this._ensureMetadata(item);
+
+        // Get video duration - need to parse from formatted string or get raw value
+        let videoDuration = 0;
+
+        // Try to get duration from metadata
+        if (item.file || item.url) {
+            try {
+                let source;
+                if (item.file) {
+                    source = item.file;
+                } else {
+                    const response = await fetch(item.url);
+                    source = await response.blob();
+                }
+                const metadata = await MediaProcessor.getMetadata(source);
+                videoDuration = metadata.duration || 0;
+            } catch (e) {
+                console.error('Failed to get metadata for GIF modal:', e);
+                // Fallback: try to parse from item.duration string (e.g., "00:15")
+                if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
+                    const parts = item.duration.split(':').map(Number);
+                    if (parts.length === 2) {
+                        videoDuration = parts[0] * 60 + parts[1];
+                    } else if (parts.length === 3) {
+                        videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                    }
+                }
+            }
+        }
+
+        sourceDuration.textContent = this._formatDuration(videoDuration);
+        sourceResolution.textContent = item.videoInfo
+            ? `${item.videoInfo.width}×${item.videoInfo.height}`
+            : 'Unknown';
+
+        // Elements
+        const startInput = modalContent.querySelector('#gif-start-input');
+        const endInput = modalContent.querySelector('#gif-end-input');
+        const durationDisplay = modalContent.querySelector('.gif-duration');
+        const validationError = modalContent.querySelector('.time-validation-error');
+        const fpsSelect = modalContent.querySelector('#gif-fps');
+        const sizeSelect = modalContent.querySelector('#gif-size');
+        const qualitySlider = modalContent.querySelector('#gif-quality');
+        const qualityValue = modalContent.querySelector('#gif-quality-value');
+        const previewBtn = modalContent.querySelector('.preview-segment-btn');
+        const createBtn = modalContent.querySelector('.create-gif-btn');
+        const downloadBtn = modalContent.querySelector('.download-btn');
+        const progressSection = modalContent.querySelector('.progress-section');
+        const progressBar = modalContent.querySelector('.progress-bar-fill');
+        const progressText = modalContent.querySelector('.progress-percentage');
+        const gifPreviewSection = modalContent.querySelector('.gif-preview-section');
+        const gifPreviewImage = modalContent.querySelector('.gif-preview-image');
+        const gifFileSize = modalContent.querySelector('.gif-file-size');
+        const errorMessage = modalContent.querySelector('.error-message');
+        const successMessage = modalContent.querySelector('.success-message');
+
+        // Initialize end time to video duration (max 10s for reasonable GIF size)
+        endInput.value = this._formatTime(Math.min(videoDuration, 10));
+
+        // Validation and duration calculation
+        const validateAndUpdate = () => {
+            const start = this._parseTime(startInput.value);
+            const end = this._parseTime(endInput.value);
+            const duration = end - start;
+
+            validationError.classList.add('hidden');
+            createBtn.disabled = false;
+
+            if (start >= end) {
+                validationError.textContent = 'Start time must be before end time';
+                validationError.classList.remove('hidden');
+                createBtn.disabled = true;
+                return false;
+            }
+
+            if (duration < 0.5) {
+                validationError.textContent = 'GIF duration must be at least 0.5 seconds';
+                validationError.classList.remove('hidden');
+                createBtn.disabled = true;
+                return false;
+            }
+
+            if (duration > 60) {
+                validationError.textContent = 'GIF duration must not exceed 60 seconds';
+                validationError.classList.remove('hidden');
+                createBtn.disabled = true;
+                return false;
+            }
+
+            if (end > videoDuration) {
+                validationError.textContent = 'End time exceeds video duration';
+                validationError.classList.remove('hidden');
+                createBtn.disabled = true;
+                return false;
+            }
+
+            durationDisplay.textContent = `${duration.toFixed(1)}s`;
+            return true;
+        };
+
+        startInput.addEventListener('input', validateAndUpdate);
+        endInput.addEventListener('input', validateAndUpdate);
+
+        // Quality slider update
+        qualitySlider.addEventListener('input', () => {
+            const value = parseInt(qualitySlider.value);
+            const labels = { 40: 'Low', 60: 'Medium', 80: 'High', 100: 'Original' };
+            qualityValue.textContent = labels[value] || 'Medium';
+        });
+
+        // Preview segment functionality
+        previewBtn.addEventListener('click', () => {
+            const start = this._parseTime(startInput.value);
+            const end = this._parseTime(endInput.value);
+
+            if (!validateAndUpdate()) return;
+
+            // Seek player to start and play segment
+            if (this.player && this.player.currentTime !== undefined) {
+                this.player.currentTime = start;
+                this.player.play();
+                // TODO: Could implement auto-stop at end time
+            }
+        });
+
+        // Create GIF action
+        createBtn.addEventListener('click', async () => {
+            if (!validateAndUpdate()) return;
+
+            const start = this._parseTime(startInput.value);
+            const end = this._parseTime(endInput.value);
+            const fps = parseInt(fpsSelect.value);
+            const sizePreset = sizeSelect.value;
+            const quality = parseInt(qualitySlider.value);
+            const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
+
+            // Disable inputs
+            startInput.disabled = true;
+            endInput.disabled = true;
+            fpsSelect.disabled = true;
+            sizeSelect.disabled = true;
+            qualitySlider.disabled = true;
+            createBtn.disabled = true;
+            previewBtn.disabled = true;
+
+            progressSection.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+
+            try {
+                // Calculate target dimensions
+                let targetWidth, targetHeight;
+                if (sizePreset === 'original') {
+                    targetWidth = item.videoInfo.width;
+                    targetHeight = item.videoInfo.height;
+                } else {
+                    const heightMap = { '720': 720, '480': 480, '360': 360 };
+                    targetHeight = heightMap[sizePreset];
+                    targetWidth = Math.round((item.videoInfo.width / item.videoInfo.height) * targetHeight);
+                }
+
+                // Get source file
+                let sourceFile;
+                if (item.file) {
+                    sourceFile = item.file;
+                } else if (item.url) {
+                    const response = await fetch(item.url);
+                    const blob = await response.blob();
+                    sourceFile = new File([blob], item.title, { type: blob.type });
+                } else {
+                    throw new Error('Cannot access video file');
+                }
+
+                // Create GIF using MediaProcessor
+                const gifBlob = await MediaProcessor.createGif({
+                    input: sourceFile,
+                    startTime: start,
+                    duration: end - start,
+                    fps: fps,
+                    width: targetWidth,
+                    height: targetHeight,
+                    quality: quality,
+                    onProgress: (progress) => {
+                        const pct = Math.round(progress * 100);
+                        progressBar.style.width = `${pct}%`;
+                        progressText.textContent = `${pct}%`;
+                    }
+                });
+
+                // Success
+                successMessage.classList.remove('hidden');
+
+                // Show preview
+                const previewUrl = URL.createObjectURL(gifBlob);
+                gifPreviewImage.src = previewUrl;
+                gifFileSize.textContent = this._formatFileSize(gifBlob.size);
+                gifPreviewSection.classList.remove('hidden');
+
+                // Setup download
+                const timestamp = Math.round(start).toString().padStart(2, '0') + '-' + Math.round(end).toString().padStart(2, '0');
+                const filename = `${item.title.replace(/\.[^.]+$/, '')}-${timestamp}.gif`;
+
+                downloadBtn.href = previewUrl;
+                downloadBtn.download = filename;
+                downloadBtn.classList.remove('hidden');
+
+                // Add to playlist if requested
+                if (addToPlaylist) {
+                    const newItem = {
+                        title: filename,
+                        url: previewUrl,
+                        duration: this._formatDuration(end - start),
+                        thumbnail: previewUrl, // Use GIF itself as thumbnail
+                        isLocal: true,
+                        file: new File([gifBlob], filename, { type: 'image/gif' }),
+                        id: this._generateId(),
+                        type: 'image/gif'
+                    };
+
+                    // Insert after source video
+                    const sourceIndex = this.items.indexOf(item);
+                    if (sourceIndex !== -1) {
+                        this.items.splice(sourceIndex + 1, 0, newItem);
+                    } else {
+                        this.items.push(newItem);
+                    }
+
+                    this._saveState();
+                    this.render();
+                }
+
+            } catch (e) {
+                console.error('GIF creation failed:', e);
+                errorMessage.textContent = `GIF creation failed: ${e.message}`;
+                errorMessage.classList.remove('hidden');
+
+                // Re-enable inputs
+                startInput.disabled = false;
+                endInput.disabled = false;
+                fpsSelect.disabled = false;
+                sizeSelect.disabled = false;
+                qualitySlider.disabled = false;
+                createBtn.disabled = false;
+                previewBtn.disabled = false;
+            }
+        });
+
+        modal.open();
+        validateAndUpdate(); // Initial validation
+    }
+
     /**
      * Open Video Info Modal
      * @param {number} index
@@ -3338,5 +3622,52 @@ Language: ${metadata.language}
             toast.style.opacity = '0';
             setTimeout(() => document.body.removeChild(toast), 300);
         }, 2000);
+    }
+
+    /**
+     * Parse time string to seconds
+     * @param {string} timeStr - Format: HH:MM:SS or MM:SS or SS
+     * @returns {number}
+     * @private
+     */
+    _parseTime(timeStr) {
+        const parts = timeStr.split(':').map(p => parseFloat(p) || 0);
+        if (parts.length === 3) {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        } else if (parts.length === 2) {
+            return parts[0] * 60 + parts[1];
+        } else {
+            return parts[0] || 0;
+        }
+    }
+
+    /**
+     * Format seconds to HH:MM:SS string
+     * @param {number} seconds
+     * @returns {string}
+     * @private
+     */
+    _formatTime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * Format file size in bytes to human readable
+     * @param {number} bytes
+     * @returns {string}
+     * @private
+     */
+    _formatFileSize(bytes) {
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let size = bytes;
+        let unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 }
