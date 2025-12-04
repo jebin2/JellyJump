@@ -3080,7 +3080,7 @@ export class Playlist {
         const sizeSelect = modalContent.querySelector('#gif-size');
         const qualitySlider = modalContent.querySelector('#gif-quality');
         const qualityValue = modalContent.querySelector('#gif-quality-value');
-        const previewBtn = modalContent.querySelector('.preview-segment-btn');
+
         const createBtn = modalContent.querySelector('.create-gif-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
@@ -3153,20 +3153,7 @@ export class Playlist {
             qualityValue.textContent = labels[value] || 'Medium';
         });
 
-        // Preview segment functionality
-        previewBtn.addEventListener('click', () => {
-            const start = this._parseTime(startInput.value);
-            const end = this._parseTime(endInput.value);
 
-            if (!validateAndUpdate()) return;
-
-            // Seek player to start and play segment
-            if (player && player.currentTime !== undefined) {
-                player.currentTime = start;
-                player.play();
-                // TODO: Could implement auto-stop at end time
-            }
-        });
 
         // Create GIF action
         createBtn.addEventListener('click', async () => {
@@ -3186,7 +3173,7 @@ export class Playlist {
             sizeSelect.disabled = true;
             qualitySlider.disabled = true;
             createBtn.disabled = true;
-            previewBtn.disabled = true;
+
 
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
@@ -3281,7 +3268,7 @@ export class Playlist {
                 sizeSelect.disabled = false;
                 qualitySlider.disabled = false;
                 createBtn.disabled = false;
-                previewBtn.disabled = false;
+
 
             } catch (e) {
                 console.error('GIF creation failed:', e);
@@ -3295,7 +3282,6 @@ export class Playlist {
                 sizeSelect.disabled = false;
                 qualitySlider.disabled = false;
                 createBtn.disabled = false;
-                previewBtn.disabled = false;
             }
         });
 
