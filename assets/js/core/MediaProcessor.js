@@ -97,14 +97,38 @@ export class MediaProcessor {
 
             return new Blob([output.target.buffer], { type: `video/${format}` });
         } finally {
-            // CRITICAL: Clean up resources to prevent memory leaks
-            // MediaBunny objects must be disposed to free memory
-            // This prevents browser hangs after repeated resize operations
-            if (conversion) {
-                // Conversion cleanup handled by MediaBunny internally after execute()
+            // CRITICAL: Clean up all MediaBunny resources to prevent memory leaks
+            // These objects hold significant memory and must be explicitly disposed
+
+            // Dispose conversion first (if it was created)
+            if (conversion && typeof conversion.dispose === 'function') {
+                try {
+                    conversion.dispose();
+                } catch (e) {
+                    console.warn('Error disposing conversion:', e);
+                }
             }
-            // Input cleanup - MediaBunny handles internal cleanup
-            // Note: If memory issues persist, additional explicit cleanup may be needed
+
+            // Dispose output
+            if (output && typeof output.dispose === 'function') {
+                try {
+                    output.dispose();
+                } catch (e) {
+                    console.warn('Error disposing output:', e);
+                }
+            }
+
+            // Dispose input
+            if (input && typeof input.dispose === 'function') {
+                try {
+                    input.dispose();
+                } catch (e) {
+                    console.warn('Error disposing input:', e);
+                }
+            }
+
+            // Nullify references to help garbage collection
+            conversion = null;
         }
     }
     /**
@@ -119,37 +143,48 @@ export class MediaProcessor {
             formats: MediaBunny.ALL_FORMATS
         });
 
-        const videoTracks = await input.getVideoTracks();
-        const audioTracks = await input.getAudioTracks();
+        try {
+            const videoTracks = await input.getVideoTracks();
+            const audioTracks = await input.getAudioTracks();
 
-        // Enrich tracks with computed duration and codec string
-        const formatTrackInfo = async (tracks) => {
-            return Promise.all(tracks.map(async (track) => {
-                const duration = await track.computeDuration();
-                const codecString = await track.getCodecParameterString();
-                return {
-                    id: track.id,
-                    type: track.type,
-                    language: track.languageCode,
-                    codec: track.codec,
-                    codecString: codecString,
-                    duration: duration,
-                    // Video specific
-                    width: track.displayWidth,
-                    height: track.displayHeight,
-                    // Audio specific
-                    channels: track.numberOfChannels,
-                    sampleRate: track.sampleRate,
-                    // Original track object for reference if needed (but avoid passing complex objects if possible)
-                    // We'll use index for selection which is safer
-                };
-            }));
-        };
+            // Enrich tracks with computed duration and codec string
+            const formatTrackInfo = async (tracks) => {
+                return Promise.all(tracks.map(async (track) => {
+                    const duration = await track.computeDuration();
+                    const codecString = await track.getCodecParameterString();
+                    return {
+                        id: track.id,
+                        type: track.type,
+                        language: track.languageCode,
+                        codec: track.codec,
+                        codecString: codecString,
+                        duration: duration,
+                        // Video specific
+                        width: track.displayWidth,
+                        height: track.displayHeight,
+                        // Audio specific
+                        channels: track.numberOfChannels,
+                        sampleRate: track.sampleRate,
+                        // Original track object for reference if needed (but avoid passing complex objects if possible)
+                        // We'll use index for selection which is safer
+                    };
+                }));
+            };
 
-        return {
-            video: await formatTrackInfo(videoTracks),
-            audio: await formatTrackInfo(audioTracks)
-        };
+            return {
+                video: await formatTrackInfo(videoTracks),
+                audio: await formatTrackInfo(audioTracks)
+            };
+        } finally {
+            // Cleanup Input to prevent memory leaks
+            if (input && typeof input.dispose === 'function') {
+                try {
+                    input.dispose();
+                } catch (e) {
+                    console.warn('Error disposing input in getTracks:', e);
+                }
+            }
+        }
     }
 
     /**
@@ -193,39 +228,68 @@ export class MediaProcessor {
             target: new MediaBunny.BufferTarget()
         });
 
-        const config = {
-            input: input,
-            output: output,
-            video: (t, i) => {
-                // MediaBunny uses 1-based indexing for tracks in the callback
-                const keep = trackType === 'video' && (i - 1) === trackIndex;
-                console.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
-                return keep ? {} : { discard: true };
-            },
-            audio: (t, i) => {
-                // MediaBunny uses 1-based indexing for tracks in the callback
-                const keep = trackType === 'audio' && (i - 1) === trackIndex;
-                console.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
-                return keep ? {} : { discard: true };
+        let conversion = null;
+
+        try {
+            const config = {
+                input: input,
+                output: output,
+                video: (t, i) => {
+                    // MediaBunny uses 1-based indexing for tracks in the callback
+                    const keep = trackType === 'video' && (i - 1) === trackIndex;
+                    console.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
+                    return keep ? {} : { discard: true };
+                },
+                audio: (t, i) => {
+                    // MediaBunny uses 1-based indexing for tracks in the callback
+                    const keep = trackType === 'audio' && (i - 1) === trackIndex;
+                    console.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
+                    return keep ? {} : { discard: true };
+                }
+            };
+
+            conversion = await MediaBunny.Conversion.init(config);
+
+            if (!conversion.isValid) {
+                console.error('Conversion invalid:', conversion.discardedTracks);
+                const reasons = conversion.discardedTracks.map(d => `${d.track.type}: ${d.reason}`).join(', ');
+                throw new Error(`Cannot execute conversion: ${reasons}`);
             }
-        };
 
-        const conversion = await MediaBunny.Conversion.init(config);
+            if (onProgress) {
+                conversion.onProgress = onProgress;
+            }
 
-        if (!conversion.isValid) {
-            console.error('Conversion invalid:', conversion.discardedTracks);
-            const reasons = conversion.discardedTracks.map(d => `${d.track.type}: ${d.reason}`).join(', ');
-            throw new Error(`Cannot execute conversion: ${reasons}`);
+            await conversion.execute();
+
+            const mimeType = trackType === 'video' ? `video/${format}` : `audio/${format}`;
+            return new Blob([output.target.buffer], { type: mimeType });
+        } finally {
+            // Cleanup all MediaBunny resources
+            if (conversion && typeof conversion.dispose === 'function') {
+                try {
+                    conversion.dispose();
+                } catch (e) {
+                    console.warn('Error disposing conversion in extractTrack:', e);
+                }
+            }
+
+            if (output && typeof output.dispose === 'function') {
+                try {
+                    output.dispose();
+                } catch (e) {
+                    console.warn('Error disposing output in extractTrack:', e);
+                }
+            }
+
+            if (input && typeof input.dispose === 'function') {
+                try {
+                    input.dispose();
+                } catch (e) {
+                    console.warn('Error disposing input in extractTrack:', e);
+                }
+            }
         }
-
-        if (onProgress) {
-            conversion.onProgress = onProgress;
-        }
-
-        await conversion.execute();
-
-        const mimeType = trackType === 'video' ? `video/${format}` : `audio/${format}`;
-        return new Blob([output.target.buffer], { type: mimeType });
     }
 
     /**
@@ -452,13 +516,46 @@ export class MediaProcessor {
 
             return new Blob([output.target.buffer], { type: `video/${format}` });
         } finally {
-            // CRITICAL: Clean up all Input objects to prevent memory leaks
+            // CRITICAL: Clean up all MediaBunny resources to prevent memory leaks
             // This is essential for preventing browser hangs during merge operations
+
+            // Dispose Output
+            if (typeof output !== 'undefined' && output && typeof output.dispose === 'function') {
+                try {
+                    output.dispose();
+                } catch (e) {
+                    console.warn('Error disposing output during merge cleanup:', e);
+                }
+            }
+
+            // Dispose CanvasSource
+            if (typeof canvasSource !== 'undefined' && canvasSource && typeof canvasSource.dispose === 'function') {
+                try {
+                    canvasSource.dispose();
+                } catch (e) {
+                    console.warn('Error disposing canvasSource during merge cleanup:', e);
+                }
+            }
+
+            // Dispose all Input objects
             for (const input of inputObjects) {
-                // Input objects cleanup - MediaBunny handles internal disposal
-                // Explicitly nulling references helps garbage collection
+                if (input && typeof input.dispose === 'function') {
+                    try {
+                        input.dispose();
+                    } catch (e) {
+                        console.warn('Error disposing input during merge cleanup:', e);
+                    }
+                }
             }
             inputObjects.length = 0; // Clear the array
+
+            // Clean up canvas context - helps browser release graphics memory
+            if (typeof canvas !== 'undefined' && canvas) {
+                const context = canvas.getContext('2d');
+                if (context) {
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
         }
     }
 }
