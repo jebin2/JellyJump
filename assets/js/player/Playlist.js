@@ -3014,7 +3014,35 @@ export class Playlist {
 
         const modalContent = modal.modal;
 
-        // Populate source info
+        // Open Modal Immediately
+        modal.open();
+
+        // Initialize Player
+        const playerContainer = modalContent.querySelector('#gif-player-container');
+        let player = null;
+
+        if (playerContainer) {
+            player = new CorePlayer('gif-player-container', {
+                mode: 'player',
+                controls: {
+                    playPause: true,
+                    volume: false,
+                    time: true,
+                    progress: true,
+                    captions: false,
+                    settings: false,
+                    fullscreen: false,
+                    loop: false,
+                    speed: false,
+                    modeToggle: false
+                },
+                autoplay: false
+            });
+        }
+
+        // Elements
+        const gifLoading = modalContent.querySelector('.gif-loading');
+        const gifContent = modalContent.querySelector('.gif-content');
         const sourceFilename = modalContent.querySelector('.source-filename');
         const sourceDuration = modalContent.querySelector('.source-duration');
         const sourceResolution = modalContent.querySelector('.source-resolution');
@@ -3059,6 +3087,21 @@ export class Playlist {
             ? `${item.videoInfo.width}×${item.videoInfo.height}`
             : 'Unknown';
 
+        // Load Video into Player
+        if (player) {
+            const videoUrl = item.url || URL.createObjectURL(item.file);
+            await player.load(videoUrl, false);
+
+            // Enable A-B Loop Mode
+            player.loopMode = 'ab';
+            player.loopStart = 0;
+            player.loopEnd = Math.min(videoDuration, 10);
+        }
+
+        // Ready: Hide Loading, Show Content
+        gifLoading.classList.add('hidden');
+        gifContent.classList.remove('hidden');
+
         // Elements
         const startInput = modalContent.querySelector('#gif-start-input');
         const endInput = modalContent.querySelector('#gif-end-input');
@@ -3088,6 +3131,12 @@ export class Playlist {
             const start = this._parseTime(startInput.value);
             const end = this._parseTime(endInput.value);
             const duration = end - start;
+
+            // Update A-B loop points
+            if (player) {
+                player.loopStart = start;
+                player.loopEnd = end;
+            }
 
             validationError.classList.add('hidden');
             createBtn.disabled = false;
@@ -3124,6 +3173,7 @@ export class Playlist {
             return true;
         };
 
+        // Update loop points when time inputs change
         startInput.addEventListener('input', validateAndUpdate);
         endInput.addEventListener('input', validateAndUpdate);
 
@@ -3142,9 +3192,9 @@ export class Playlist {
             if (!validateAndUpdate()) return;
 
             // Seek player to start and play segment
-            if (this.player && this.player.currentTime !== undefined) {
-                this.player.currentTime = start;
-                this.player.play();
+            if (player && player.currentTime !== undefined) {
+                player.currentTime = start;
+                player.play();
                 // TODO: Could implement auto-stop at end time
             }
         });
@@ -3160,7 +3210,7 @@ export class Playlist {
             const quality = parseInt(qualitySlider.value);
             const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
 
-            // Disable inputs
+            // Disable inputs during creation
             startInput.disabled = true;
             endInput.disabled = true;
             fpsSelect.disabled = true;
@@ -3255,6 +3305,15 @@ export class Playlist {
                     this.render();
                 }
 
+                // Re-enable inputs for another creation
+                startInput.disabled = false;
+                endInput.disabled = false;
+                fpsSelect.disabled = false;
+                sizeSelect.disabled = false;
+                qualitySlider.disabled = false;
+                createBtn.disabled = false;
+                previewBtn.disabled = false;
+
             } catch (e) {
                 console.error('GIF creation failed:', e);
                 errorMessage.textContent = `GIF creation failed: ${e.message}`;
@@ -3271,7 +3330,6 @@ export class Playlist {
             }
         });
 
-        modal.open();
         validateAndUpdate(); // Initial validation
     }
 
