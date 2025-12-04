@@ -336,7 +336,51 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async merge({ inputs, format = 'mp4', resolution, onProgress }) {
+    static _calculateScale(videoWidth, videoHeight, targetWidth, targetHeight, scaleMode) {
+        if (scaleMode === 'fill') {
+            // Fill entire canvas (may distort)
+            return {
+                x: 0,
+                y: 0,
+                width: targetWidth,
+                height: targetHeight
+            };
+        }
+
+        if (scaleMode === 'center') {
+            // Keep original size, center placement
+            return {
+                x: (targetWidth - videoWidth) / 2,
+                y: (targetHeight - videoHeight) / 2,
+                width: videoWidth,
+                height: videoHeight
+            };
+        }
+
+        // Default: 'proportional' - fit within canvas, maintain aspect ratio
+        const videoAspect = videoWidth / videoHeight;
+        const targetAspect = targetWidth / targetHeight;
+
+        let drawWidth, drawHeight;
+        if (videoAspect > targetAspect) {
+            // Video is wider - fit to width
+            drawWidth = targetWidth;
+            drawHeight = targetWidth / videoAspect;
+        } else {
+            // Video is taller/same - fit to height
+            drawHeight = targetHeight;
+            drawWidth = targetHeight * videoAspect;
+        }
+
+        return {
+            x: (targetWidth - drawWidth) / 2,
+            y: (targetHeight - drawHeight) / 2,
+            width: drawWidth,
+            height: drawHeight
+        };
+    }
+
+    static async merge({ inputs, format = 'mp4', resolution, scaleMode = 'proportional', backgroundColor = '#000000', onProgress }) {
         if (!inputs || inputs.length < 2) {
             throw new Error('At least 2 videos are required for merging.');
         }
@@ -493,16 +537,21 @@ export class MediaProcessor {
                         const absoluteTimestamp = currentTimestamp + relativeTimestamp;
                         const duration = sample.duration || (1 / targetFps);
 
-                        ctx.fillStyle = 'black';
+                        //Fill canvas with background color
+                        ctx.fillStyle = backgroundColor;
                         ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-                        const scale = Math.min(targetWidth / sample.displayWidth, targetHeight / sample.displayHeight);
-                        const scaledWidth = sample.displayWidth * scale;
-                        const scaledHeight = sample.displayHeight * scale;
-                        const x = (targetWidth - scaledWidth) / 2;
-                        const y = (targetHeight - scaledHeight) / 2;
+                        // Calculate scaling based on selected mode
+                        const scaleParams = MediaProcessor._calculateScale(
+                            sample.displayWidth,
+                            sample.displayHeight,
+                            targetWidth,
+                            targetHeight,
+                            scaleMode
+                        );
 
-                        sample.draw(ctx, x, y, scaledWidth, scaledHeight);
+                        // Draw frame with calculated parameters
+                        sample.draw(ctx, scaleParams.x, scaleParams.y, scaleParams.width, scaleParams.height);
                         await canvasSource.add(absoluteTimestamp, duration);
 
                         frameCount++;
