@@ -578,6 +578,10 @@ export class Playlist {
     async _processMetadata(items) {
         for (const item of items) {
             if (item.isLocal && item.file) {
+                // Show loading state immediately
+                item.duration = 'Loading...';
+                this._updateItemUI(item);
+
                 try {
                     // Use centralized metadata extraction
                     const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(item.file);
@@ -586,7 +590,7 @@ export class Playlist {
                     item.videoInfo = videoInfo;
                     item.audioInfo = audioInfo;
 
-                    // Update UI if this item is rendered
+                    // Update UI with actual data
                     this._updateItemUI(item);
                     this._saveState();
                 } catch (e) {
@@ -625,7 +629,8 @@ export class Playlist {
         item.videoInfo = videoInfo;
         item.audioInfo = audioInfo;
 
-        if (!item.duration || item.duration === '--:--') {
+        // Update duration if missing, placeholder, or loading
+        if (!item.duration || item.duration === '--:--' || item.duration === 'Loading...') {
             item.duration = this._formatDuration(duration);
         }
 
@@ -1586,14 +1591,66 @@ export class Playlist {
         const mergeBtn = modalContent.querySelector('.merge-btn');
         const selectionCount = modalContent.querySelector('.selection-count');
         const emptySelectionState = modalContent.querySelector('.empty-selection-state');
-        const resolutionSelect = modalContent.querySelector('.resolution-select');
-        const resolutionWarning = modalContent.querySelector('.resolution-warning');
+
+        // New resolution controls
+        const widthInput = modalContent.querySelector('#merge-width');
+        const heightInput = modalContent.querySelector('#merge-height');
+        const maxResolutionHint = modalContent.querySelector('.max-resolution-hint');
+        const scaleSelect = modalContent.querySelector('.scale-select');
+        const bgColorInput = modalContent.querySelector('#merge-bg-color');
 
         // State
         let selectedVideos = []; // Array of playlist items
 
+        // Helper: Detect Max Resolution from Selected Videos
+        const detectMaxResolution = async () => {
+            if (selectedVideos.length === 0) {
+                widthInput.value = '';
+                heightInput.value = '';
+                maxResolutionHint.textContent = 'Select videos to detect resolution';
+                return;
+            }
+
+            // Show loading hint
+            maxResolutionHint.textContent = 'Detecting resolution...';
+
+            let maxWidth = 0;
+            let maxHeight = 0;
+
+            for (const item of selectedVideos) {
+                // Show loading in UI for this item if no metadata yet
+                if (!item.videoInfo) {
+                    const oldDuration = item.duration;
+                    item.duration = 'Loading...';
+                    renderSelected(); // Update UI to show "Loading..."
+
+                    // Ensure metadata is cached (this will set item.duration properly)
+                    await this._ensureMetadata(item);
+
+                    // Re-render to show updated duration
+                    renderSelected();
+                } else {
+                    // Metadata already cached
+                    await this._ensureMetadata(item);
+                }
+
+                if (item.videoInfo) {
+                    maxWidth = Math.max(maxWidth, item.videoInfo.width);
+                    maxHeight = Math.max(maxHeight, item.videoInfo.height);
+                }
+            }
+
+            if (maxWidth > 0 && maxHeight > 0) {
+                widthInput.value = maxWidth;
+                heightInput.value = maxHeight;
+                maxResolutionHint.textContent = `Max detected: ${maxWidth}×${maxHeight}`;
+            } else {
+                maxResolutionHint.textContent = 'Could not detect resolution';
+            }
+        };
+
         // Helper: Update UI
-        const updateUI = () => {
+        const updateUI = async () => {
             // Update Selection Count
             selectionCount.textContent = `${selectedVideos.length} selected`;
 
@@ -1611,17 +1668,8 @@ export class Playlist {
                 emptySelectionState.classList.remove('hidden');
             }
 
-            // Check Resolutions (with defensive checks)
-            const resolutions = selectedVideos
-                .filter(v => v) // Filter out undefined items
-                .map(v => v.resolution || 'Unknown');
-
-            const uniqueResolutions = new Set(resolutions);
-            if (uniqueResolutions.size > 1) {
-                resolutionWarning.classList.remove('hidden');
-            } else {
-                resolutionWarning.classList.add('hidden');
-            }
+            // Auto-detect max resolution
+            await detectMaxResolution();
         };
 
         // Helper: Render Available Videos (only video files, not audio)
@@ -1760,11 +1808,26 @@ export class Playlist {
         mergeBtn.addEventListener('click', async () => {
             if (selectedVideos.length < 2) return;
 
+            // Read values from new controls
+            const targetWidth = parseInt(widthInput.value);
+            const targetHeight = parseInt(heightInput.value);
+            const scaleMode = scaleSelect.value;
+            const backgroundColor = bgColorInput.value;
             const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
-            const resolutionStrategy = resolutionSelect.value;
+
+            // Validate resolution
+            if (!targetWidth || !targetHeight || targetWidth < 128 || targetHeight < 128) {
+                alert('Please enter valid resolution dimensions (minimum 128×128)');
+                return;
+            }
 
             // UI State
             modalContent.querySelector('.options-group').classList.add('disabled');
+            widthInput.disabled = true;
+            heightInput.disabled = true;
+            scaleSelect.disabled = true;
+            bgColorInput.disabled = true;
+
             mergeBtn.disabled = true;
             mergeBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Merging...';
 
@@ -1781,16 +1844,11 @@ export class Playlist {
 
             try {
                 // Prepare Inputs
-                // We need actual File/Blob objects. 
-                // If items are local files, we have item.file
-                // If items are URLs, we might need to fetch them (not supported fully yet for merge)
-
                 const inputs = [];
                 for (const item of selectedVideos) {
                     if (item.file) {
                         inputs.push(item.file);
                     } else if (item.url) {
-                        // Fetch blob from URL
                         const response = await fetch(item.url);
                         const blob = await response.blob();
                         inputs.push(blob);
@@ -1799,27 +1857,13 @@ export class Playlist {
                     }
                 }
 
-                // Determine Resolution
-                let targetResolution = null;
-                if (resolutionStrategy === 'match-first') {
-                    // We need to get resolution of first video. 
-                    // For now, let's rely on MediaProcessor to handle defaults or 
-                    // we'd need to probe it. 
-                    // If we don't pass resolution, MediaBunny usually matches first input or max.
-                    // Let's explicitly probe if needed, but for MVP let's trust MediaBunny's default
-                    // which is usually based on the first input.
-                } else if (resolutionStrategy === 'largest' || resolutionStrategy === 'smallest') {
-                    // We would need to probe all videos first.
-                    // This is complex without async probing all.
-                    // For this phase, let's stick to 'match-first' as implicit default
-                    // and maybe implement explicit probing later if needed.
-                    console.warn('Resolution strategy other than match-first not fully implemented, falling back to default');
-                }
-
+                // Call MediaProcessor with new options
                 const mergedBlob = await MediaProcessor.merge({
                     inputs: inputs,
                     format: 'mp4',
-                    resolution: targetResolution,
+                    resolution: { width: targetWidth, height: targetHeight },
+                    scaleMode: scaleMode,
+                    backgroundColor: backgroundColor,
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
                         progressBar.style.width = `${pct}%`;

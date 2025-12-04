@@ -816,42 +816,74 @@
 
 <!-- Merge Modal Content Template -->
 <template id="merge-modal-content-template">
-    <div class="merge-container grid grid-cols-2 gap-md h-full">
-        <!-- Left Column: Available Videos -->
-        <div class="available-videos-section flex flex-col h-full border-r border-border pr-md">
-            <h4 class="text-sm font-bold mb-sm flex-between">
-                <span>Available Videos</span>
-                <span class="text-xs text-muted selection-count">0 selected</span>
-            </h4>
-            <div class="available-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs">
-                <!-- Items injected here -->
-                <div class="empty-state text-center p-md text-muted text-sm italic">No videos available
+    <div class="merge-container">
+        <!-- Two-Column Grid for Video Selection -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-height: 300px; margin-bottom: 1rem;">
+            <!-- Left Column: Available Videos -->
+            <div class="available-videos-section"
+                style="display: flex; flex-direction: column; height: 100%; border-right: 1px solid var(--color-border); padding-right: 1rem;">
+                <h4 class="text-sm font-bold mb-sm flex-between">
+                    <span>Available Videos</span>
+                    <span class="text-xs text-muted selection-count">0 selected</span>
+                </h4>
+                <div class="available-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs">
+                    <!-- Items injected here -->
+                    <div class="empty-state text-center p-md text-muted text-sm italic">No videos available</div>
+                </div>
+            </div>
+
+            <!-- Right Column: Selected Videos (Order) -->
+            <div class="selected-videos-section"
+                style="display: flex; flex-direction: column; height: 100%; padding-left: 0.5rem;">
+                <h4 class="text-sm font-bold mb-sm">Merge Order (Drag to Reorder)</h4>
+                <div class="selected-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs">
+                    <!-- Selected items injected here -->
+                    <div
+                        class="empty-selection-state text-center p-md text-muted text-sm italic h-full flex items-center justify-center">
+                        Select videos from the left to merge
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Column: Selected Videos (Order) -->
-        <div class="selected-videos-section flex flex-col h-full pl-sm">
-            <h4 class="text-sm font-bold mb-sm">Merge Order (Drag to Reorder)</h4>
-            <div class="selected-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs mb-md"
-                style="min-height: 150px;">
-                <!-- Selected items injected here -->
-                <div
-                    class="empty-selection-state text-center p-md text-muted text-sm italic h-full flex items-center justify-center">
-                    Select videos from the left to merge
+        <!-- Merge Options (Outside Grid) -->
+        <div class="merge-options">
+            <!-- Target Resolution -->
+            <div class="resolution-options mb-md">
+                <div class="text-xs text-secondary font-mono mb-xs">TARGET RESOLUTION</div>
+                <div class="flex items-center gap-sm mb-sm">
+                    <div class="flex-1">
+                        <input type="number" id="merge-width" class="mb-input font-mono text-center" placeholder="Width"
+                            min="128" max="7680" step="2">
+                    </div>
+                    <span class="text-secondary font-bold">×</span>
+                    <div class="flex-1">
+                        <input type="number" id="merge-height" class="mb-input font-mono text-center"
+                            placeholder="Height" min="128" max="7680" step="2">
+                    </div>
+                </div>
+                <div class="text-xs text-muted mb-xs">
+                    <span class="max-resolution-hint">Select videos to detect resolution</span>
                 </div>
             </div>
 
-            <!-- Resolution Options -->
-            <div class="resolution-options mb-md">
-                <div class="text-xs text-secondary font-mono mb-xs">RESOLUTION STRATEGY</div>
-                <select class="mb-select w-full resolution-select">
-                    <option value="match-first">Match First Video (Default)</option>
-                    <option value="largest">Use Largest Resolution</option>
-                    <option value="smallest">Use Smallest Resolution</option>
+            <!-- Scale Mode -->
+            <div class="scale-options mb-md">
+                <div class="text-xs text-secondary font-mono mb-xs">SCALE MODE</div>
+                <select class="mb-select w-full scale-select">
+                    <option value="proportional">Scale Proportionally (Maintain Aspect Ratio)</option>
+                    <option value="center">Keep Original Size (Center)</option>
+                    <option value="fill">Scale to Fill (May Distort)</option>
                 </select>
-                <div class="resolution-warning text-xs text-accent mt-xs hidden">
-                    ⚠️ Videos have different resolutions. Scaling will occur.
+            </div>
+
+            <!-- Background Color -->
+            <div class="bg-color-options mb-md">
+                <div class="text-xs text-secondary font-mono mb-xs">BACKGROUND COLOR</div>
+                <div class="flex items-center gap-sm">
+                    <input type="color" id="merge-bg-color" class="h-8 w-16 rounded border border-border cursor-pointer"
+                        value="#000000">
+                    <span class="text-xs text-muted">Used when videos don't fill target resolution</span>
                 </div>
             </div>
 
