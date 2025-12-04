@@ -444,6 +444,69 @@
 }
 
 /* -----------------------------------------
+   Merge Modal Grid Layout
+   ----------------------------------------- */
+.merge-grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    max-height: 200px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.available-section,
+.selected-section {
+    display: flex;
+    flex-direction: column;
+    height: 50%;
+    min-width: 0;
+}
+
+.available-section {
+    padding-right: 1rem;
+    border-right: 2px solid var(--color-border);
+}
+
+.section-header {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border-subtle);
+    flex-shrink: 0;
+}
+
+.scroll-list {
+    margin-top: 0.75rem;
+    overflow-x: hidden;
+    min-height: 0;
+}
+
+/* -----------------------------------------
+   Merge Item Template
+   ----------------------------------------- */
+.merge-item {
+    overflow: hidden;
+}
+
+.merge-item__drag-handle {
+    flex-shrink: 0;
+}
+
+.merge-item__info {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.merge-item__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.merge-item__remove {
+    flex-shrink: 0;
+}
+
+/* -----------------------------------------
    Accessibility: Reduced Motion
    ----------------------------------------- */
 @media (prefers-reduced-motion: reduce) {

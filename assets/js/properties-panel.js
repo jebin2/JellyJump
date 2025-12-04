@@ -49,8 +49,8 @@ class PropertiesPanel {
         if (!clipData) return;
 
         // Show content, hide empty state
-        if (this.content) this.content.style.display = 'block';
-        if (this.emptyState) this.emptyState.style.display = 'none';
+        if (this.content) this.content.classList.remove('hidden');
+        if (this.emptyState) this.emptyState.classList.add('hidden');
 
         // Update fields
         if (this.nameField) {
@@ -70,8 +70,8 @@ class PropertiesPanel {
 
     showMultiSelectState(count) {
         // Show content, hide empty state
-        if (this.content) this.content.style.display = 'block';
-        if (this.emptyState) this.emptyState.style.display = 'none';
+        if (this.content) this.content.classList.remove('hidden');
+        if (this.emptyState) this.emptyState.classList.add('hidden');
 
         // Update fields to show mixed state
         if (this.nameField) {
@@ -91,8 +91,8 @@ class PropertiesPanel {
 
     showEmptyState() {
         // Hide content, show empty state
-        if (this.content) this.content.style.display = 'none';
-        if (this.emptyState) this.emptyState.style.display = 'flex';
+        if (this.content) this.content.classList.add('hidden');
+        if (this.emptyState) this.emptyState.classList.remove('hidden');
     }
 
     formatTime(seconds) {

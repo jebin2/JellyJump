@@ -161,9 +161,9 @@ class PreviewPlayerManager {
             const fps = Math.round(this.player.frameRate || 0);
 
             this.metadataOverlay.textContent = `${width}x${height} @ ${fps}fps`;
-            this.metadataOverlay.style.display = 'block';
+            this.metadataOverlay.classList.remove('hidden');
         } else {
-            this.metadataOverlay.style.display = 'none';
+            this.metadataOverlay.classList.add('hidden');
         }
     }
 

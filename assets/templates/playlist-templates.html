@@ -818,32 +818,27 @@
 <template id="merge-modal-content-template">
     <div class="merge-container">
         <!-- Two-Column Grid for Video Selection -->
-        <div
-            style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-height: 200px; margin-bottom: 1.5rem; overflow: hidden;">
+        <div class="merge-grid-container">
             <!-- Left Column: Available Videos -->
-            <div class="available-videos-section"
-                style="display: flex; flex-direction: column; height: 50%; padding-right: 1rem; border-right: 2px solid var(--color-border); min-width: 0;">
-                <h4 class="text-sm font-bold mb-sm flex-between"
-                    style="padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-border-subtle); flex-shrink: 0;">
+            <div class="available-videos-section available-section">
+                <h4 class="text-sm font-bold mb-sm flex-between section-header">
                     <span>Available Videos</span>
                     <span class="text-xs text-muted selection-count">0 selected</span>
                 </h4>
-                <div class="available-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs"
-                    style="margin-top: 0.75rem; overflow-x: hidden; min-height: 0;">
+                <div
+                    class="available-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs scroll-list">
                     <!-- Items injected here -->
                     <div class="empty-state text-center p-md text-muted text-sm italic">No videos available</div>
                 </div>
             </div>
 
             <!-- Right Column: Selected Videos (Order) -->
-            <div class="selected-videos-section"
-                style="display: flex; flex-direction: column; height: 50%; min-width: 0;">
-                <h4 class="text-sm font-bold mb-sm"
-                    style="padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-border-subtle); flex-shrink: 0;">
+            <div class="selected-videos-section selected-section">
+                <h4 class="text-sm font-bold mb-sm section-header">
                     Merge Order
                     (Drag to Reorder)</h4>
-                <div class="selected-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs"
-                    style="margin-top: 0.75rem; overflow-x: hidden; min-height: 0;">
+                <div
+                    class="selected-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs scroll-list">
                     <!-- Selected items injected here -->
                     <div
                         class="empty-selection-state text-center p-md text-muted text-sm italic h-full flex items-center justify-center">
@@ -946,19 +941,18 @@
 <!-- Merge Item Template -->
 <template id="merge-item-template">
     <div class="merge-item flex items-center gap-sm p-xs rounded hover:bg-tertiary cursor-pointer border border-transparent mb-xs"
-        draggable="true" style="overflow: hidden;">
-        <div class="drag-handle text-muted cursor-grab active:cursor-grabbing" style="flex-shrink: 0;">⋮⋮</div>
+        draggable="true">
+        <div class="drag-handle text-muted cursor-grab active:cursor-grabbing merge-item__drag-handle">⋮⋮</div>
         <div class="item-thumb w-8 h-8 bg-black rounded overflow-hidden flex-shrink-0">
             <!-- Thumb or placeholder -->
         </div>
-        <div class="item-info flex-1" style="min-width: 0; overflow: hidden;">
-            <div class="item-title text-sm font-bold"
-                style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+        <div class="item-info flex-1 merge-item__info">
+            <div class="item-title text-sm font-bold merge-item__title"></div>
             <div class="item-meta text-xs text-muted">
                 <span class="item-dur"></span>
             </div>
         </div>
-        <button class="remove-item-btn text-muted hover:text-danger" style="flex-shrink: 0;" title="Remove">
+        <button class="remove-item-btn text-muted hover:text-danger merge-item__remove" title="Remove">
             &times;
         </button>
     </div>

@@ -48,3 +48,21 @@
     background-repeat: no-repeat;
     background-position: center;
 }
+
+/* -----------------------------------------
+   Utility Classes
+   ----------------------------------------- */
+/* Display Utilities */
+.hidden {
+    display: none;
+}
+
+/* Spacing Utilities */
+.ml-auto {
+    margin-left: auto;
+}
+
+.section-padding-y-large {
+    padding-top: var(--space-3xl);
+    padding-bottom: var(--space-3xl);
+}

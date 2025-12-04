@@ -709,6 +709,12 @@ mark {
 /* -----------------------------------------
    6. Properties Panel (Right - 30%)
    ----------------------------------------- */
+.panel-header {
+    padding: var(--space-md);
+    border-bottom: 3px solid var(--border-color);
+    font-weight: bold;
+}
+
 .properties-panel {
     width: 30%;
     min-width: 300px;
@@ -729,6 +735,10 @@ mark {
     padding: var(--space-xl);
     text-align: center;
     color: var(--text-secondary);
+}
+
+.properties-empty-state.hidden {
+    display: none;
 }
 
 .empty-state-icon {
