@@ -3050,38 +3050,21 @@ export class Playlist {
         sourceFilename.textContent = item.title;
         sourceFilename.title = item.title;
 
-        // Ensure metadata
+        // Ensure metadata (this caches videoInfo and duration on the item)
         await this._ensureMetadata(item);
 
-        // Get video duration - need to parse from formatted string or get raw value
+        // Get video duration from cached metadata
         let videoDuration = 0;
 
-        // Try to get duration from metadata
-        if (item.file || item.url) {
-            try {
-                let source;
-                if (item.file) {
-                    source = item.file;
-                } else {
-                    const response = await fetch(item.url);
-                    source = await response.blob();
-                }
-                const metadata = await MediaProcessor.getMetadata(source);
-                videoDuration = metadata.duration || 0;
-            } catch (e) {
-                console.error('Failed to get metadata for GIF modal:', e);
-                // Fallback: try to parse from item.duration string (e.g., "00:15")
-                if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
-                    const parts = item.duration.split(':').map(Number);
-                    if (parts.length === 2) {
-                        videoDuration = parts[0] * 60 + parts[1];
-                    } else if (parts.length === 3) {
-                        videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
-                    }
-                }
+        // Parse from item.duration string (already populated by _ensureMetadata)
+        if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
+            const parts = item.duration.split(':').map(Number);
+            if (parts.length === 2) {
+                videoDuration = parts[0] * 60 + parts[1];
+            } else if (parts.length === 3) {
+                videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
             }
         }
-
         sourceDuration.textContent = this._formatDuration(videoDuration);
         sourceResolution.textContent = item.videoInfo
             ? `${item.videoInfo.width}×${item.videoInfo.height}`
