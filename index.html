@@ -52,7 +52,7 @@
                 <a href="#features" class="nav-link">Features</a>
                 <a href="#downloads" class="nav-link">Download</a>
                 <a href="player.html" class="btn btn-secondary">Player</a>
-                <a href="editor.html" class="btn btn-primary">Editor</a>
+                <button class="btn btn-primary" disabled title="Coming Soon">Editor (Coming Soon)</button>
             </nav>
         </div>
     </header>
@@ -69,7 +69,7 @@
                 <p class="hero-subtitle">Powerful video tools. Brutally simple.</p>
                 <div class="hero-actions">
                     <a href="player.html" class="btn btn-primary btn-lg">LAUNCH PLAYER</a>
-                    <a href="editor.html" class="btn btn-secondary btn-lg">OPEN EDITOR</a>
+                    <button class="btn btn-secondary btn-lg" disabled title="Coming Soon">EDITOR (COMING SOON)</button>
                 </div>
             </div>
         </section>
@@ -79,36 +79,106 @@
             <div class="container">
                 <div class="features-header">
                     <h2 class="text-2xl font-bold uppercase text-accent">Features</h2>
+                    <p class="text-secondary mt-sm">Powerful video tools. 100% client-side. Complete privacy.</p>
                 </div>
                 <div class="grid-2 gap-lg">
-                    <!-- Feature 1: Video Player -->
+                    <!-- Feature 1: Advanced Player -->
                     <div class="card feature-card">
-                        <h3 class="card-title mb-md">VIDEO PLAYER</h3>
-                        <p class="text-secondary mb-lg">Advanced playback controls, playlist management, subtitle
-                            support, keyboard shortcuts.</p>
+                        <h3 class="card-title mb-md">🎬 ADVANCED PLAYER</h3>
+                        <ul class="text-secondary mb-lg space-y-xs">
+                            <li>• Custom playback controls with speed adjustment</li>
+                            <li>• A-B loop mode for segment practice</li>
+                            <li>• Frame-by-frame stepping</li>
+                            <li>• Playlist management with drag-and-drop</li>
+                        </ul>
                         <a href="player.html" class="feature-link">Try Player &rarr;</a>
                     </div>
 
-                    <!-- Feature 2: Video Editor -->
+                    <!-- Feature 2: Trim Video -->
                     <div class="card feature-card">
-                        <h3 class="card-title mb-md">VIDEO EDITOR</h3>
-                        <p class="text-secondary mb-lg">Timeline-based editing, trim and cut, transitions, effects,
-                            export in multiple formats.</p>
-                        <a href="editor.html" class="feature-link">Try Editor &rarr;</a>
+                        <h3 class="card-title mb-md">✂️ TRIM VIDEO</h3>
+                        <ul class="text-secondary mb-lg space-y-xs">
+                            <li>• Visual timeline with drag handles</li>
+                            <li>• Live video preview with A-B loop</li>
+                            <li>• Precise time input controls</li>
+                            <li>• Real-time duration calculation</li>
+                            <li>• Instant preview of trimmed segment</li>
+                        </ul>
+                        <a href="player.html" class="feature-link">Try Trimming &rarr;</a>
                     </div>
 
-                    <!-- Feature 3: Format Support -->
+                    <!-- Feature 3: Convert & Optimize -->
                     <div class="card feature-card">
-                        <h3 class="card-title mb-md">FORMAT SUPPORT</h3>
-                        <p class="text-secondary">MP4, WebM, MOV support. Multiple codecs, subtitle formats, audio
-                            tracks.</p>
+                        <h3 class="card-title mb-md">🔄 CONVERT & OPTIMIZE</h3>
+                        <ul class="text-secondary mb-lg space-y-xs">
+                            <li>• Multi-format support (MP4, WebM, MOV)</li>
+                            <li>• Quality control (Low to Original)</li>
+                            <li>• Modern codecs (H.264, VP9, AAC, Opus)</li>
+                            <li>• Estimated file size reduction</li>
+                        </ul>
+                        <a href="player.html" class="feature-link">Convert Videos &rarr;</a>
                     </div>
 
-                    <!-- Feature 4: Keyboard Shortcuts -->
+                    <!-- Feature 4: Resize Video -->
                     <div class="card feature-card">
-                        <h3 class="card-title mb-md">KEYBOARD SHORTCUTS</h3>
-                        <p class="text-secondary">Complete keyboard control. Industry-standard shortcuts for efficient
-                            workflow.</p>
+                        <h3 class="card-title mb-md">📐 RESIZE VIDEO</h3>
+                        <ul class="text-secondary mb-lg space-y-xs">
+                            <li>• Multiple resolution presets (720p, 480p, 360p)</li>
+                            <li>• Maintain aspect ratio</li>
+                            <li>• Quality preservation options</li>
+                            <li>• Instant resolution preview</li>
+                        </ul>
+                        <a href="player.html" class="feature-link">Resize Videos &rarr;</a>
+                    </div>
+
+                    <!-- Feature 5: Merge Videos -->
+                    <div class="card feature-card">
+                        <h3 class="card-title mb-md">➕ MERGE VIDEOS</h3>
+                        <ul class="text-secondary mb-lg space-y-xs">
+                            <li>• Combine multiple videos seamlessly</li>
+                            <li>• Drag-and-drop reordering</li>
+                            <li>• Automatic format matching</li>
+                            <li>• Smooth transitions</li>
+                            <li>• Real-time progress tracking</li>
+                        </ul>
+                        <a href="player.html" class="feature-link">Merge Videos &rarr;</a>
+                    </div>
+
+                    <!-- Feature 6: Create GIF -->
+                    <div class="card feature-card">
+                        <h3 class="card-title mb-md">🎞️ CREATE GIF</h3>
+                        <ul class="text-secondary mb-lg space-y-xs">
+                            <li>• Convert video segments to animated GIFs</li>
+                            <li>• Live preview with A-B loop</li>
+                            <li>• Customizable frame rate (5-20 FPS)</li>
+                            <li>• Quality control and size options</li>
+                            <li>• Powered by gif.js library</li>
+                        </ul>
+                        <a href="player.html" class="feature-link">Create GIFs &rarr;</a>
+                    </div>
+
+                    <!-- Feature 7: Client-Side Processing -->
+                    <div class="card feature-card">
+                        <h3 class="card-title mb-md">🔒 100% CLIENT-SIDE</h3>
+                        <ul class="text-secondary space-y-xs">
+                            <li>• No server uploads - complete privacy</li>
+                            <li>• WebCodecs API for native performance</li>
+                            <li>• Process videos locally in your browser</li>
+                            <li>• No data leaves your device</li>
+                            <li>• Lightning-fast processing</li>
+                        </ul>
+                    </div>
+
+                    <!-- Feature 8: Powered by MediaBunny -->
+                    <div class="card feature-card">
+                        <h3 class="card-title mb-md">📚 POWERED BY MEDIABUNNY</h3>
+                        <ul class="text-secondary space-y-xs">
+                            <li>• WebCodecs-based video processing library</li>
+                            <li>• Hardware-accelerated encoding/decoding</li>
+                            <li>• Built on modern web standards</li>
+                            <li>• Zero external dependencies</li>
+                            <li>• Open-source and lightweight</li>
+                        </ul>
                     </div>
                 </div>
             </div>
