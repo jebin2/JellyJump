@@ -2297,30 +2297,18 @@ export class Playlist {
         sourceFilename.textContent = item.title;
         sourceFilename.title = item.title;
 
-        // Get Video Duration
+        // Ensure metadata (this caches videoInfo and duration on the item)
+        await this._ensureMetadata(item);
+
+        // Get Video Duration from cached metadata
         let duration = 0;
-        try {
-            if (item.duration) {
-                duration = parseTime(item.duration);
-            } else {
-                // Fallback: load metadata
-                const video = document.createElement('video');
-                video.preload = 'metadata';
-                video.src = item.url || URL.createObjectURL(item.file);
-                await new Promise(resolve => {
-                    video.onloadedmetadata = () => {
-                        duration = video.duration;
-                        resolve();
-                    };
-                    video.onerror = () => {
-                        console.warn('Could not load video metadata');
-                        resolve();
-                    }
-                });
+        if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
+            const parts = item.duration.split(':').map(Number);
+            if (parts.length === 3) {
+                duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+            } else if (parts.length === 2) {
+                duration = parts[0] * 60 + parts[1];
             }
-        } catch (e) {
-            console.error('Failed to get duration:', e);
-            duration = 60; // Fallback
         }
 
         // Ready: Hide Loading, Show Content
@@ -3052,6 +3040,8 @@ export class Playlist {
 
         // Ensure metadata (this caches videoInfo and duration on the item)
         await this._ensureMetadata(item);
+        gifLoading.classList.add('hidden');
+        gifContent.classList.remove('hidden');
 
         // Get video duration from cached metadata
         let videoDuration = 0;
@@ -3080,10 +3070,6 @@ export class Playlist {
             player.loopStart = 0;
             player.loopEnd = Math.min(videoDuration, 10);
         }
-
-        // Ready: Hide Loading, Show Content
-        gifLoading.classList.add('hidden');
-        gifContent.classList.remove('hidden');
 
         // Elements
         const startInput = modalContent.querySelector('#gif-start-input');
