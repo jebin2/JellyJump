@@ -19,7 +19,7 @@ function createWindow() {
     // Load the index.html from the build folder
     // In development, we might want to load from ../build, but for packaging, 
     // we will copy build to ./build
-    const buildPath = path.join(__dirname, 'build/index.html');
+    const buildPath = path.join(__dirname, 'build/player.html');
 
     win.loadFile(buildPath).catch(err => {
         console.error('Failed to load index.html:', err);
