@@ -1,9 +1,0 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Player Mode Test</title><link rel="stylesheet" href="assets/css/theme.css"><style>body{background:#0a0a0a;color:#fff;padding:20px}#player-container{width:800px;height:450px;background:#000;margin:20px auto}.info{max-width:800px;margin:20px auto;text-align:center}.info h2{color:#0f8;margin-bottom:10px}</style></head><body><div class="info"><h2>Player Mode Test</h2><p>Press <strong>?</strong> to verify help shows "Player Mode" and NO editor shortcuts</p></div><div id="player-container"></div><script type="module">import { CorePlayer } from './assets/js/core/Player.js?t=' + Date.now();
-
-        // Player mode (default)
-        const player = new CorePlayer('player-container');
-
-        (async () => {
-            await player.load("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4");
-            console.log('Player Mode - Video loaded');
-        })();</script></body></html>
