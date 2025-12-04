@@ -6,20 +6,10 @@ import { MediaBunny } from './MediaBunny.js';
  */
 export class MediaProcessor {
     /**
-     * Process video (transcode, trim, etc.)
-     * @param {Object} options
-     * @param {Blob|File} options.source
-     * @param {string} options.format - 'mp4', 'webm', 'mov', 'keep'
-     * @param {number} options.quality - 0-100
-     * @param {Object} [options.trim] - { start: number, end: number }
-     * @param {Function} [options.onProgress]
-     * @returns {Promise<Blob>}
-     */
-    /**
      * Process video (transcode, trim, resize, etc.)
      * @param {Object} options
      * @param {Blob|File} options.source
-     * @param {string} options.format - 'mp4', 'webm', 'mov', 'keep'
+     * @param {string} options.format - 'mp4', 'webm', 'mov'
      * @param {number} options.quality - 0-100
      * @param {Object} [options.trim] - { start: number, end: number }
      * @param {Object} [options.resize] - { width: number, height: number }
@@ -30,7 +20,6 @@ export class MediaProcessor {
         const blobSource = new MediaBunny.BlobSource(source);
         const input = new MediaBunny.Input({ source: blobSource, formats: MediaBunny.ALL_FORMATS });
 
-        // Determine Output Format
         let outputFormat;
         switch (format) {
             case 'mp4':
@@ -54,19 +43,13 @@ export class MediaProcessor {
         let conversion = null;
 
         try {
-            // Configure Video Encoder
             let videoConfig = {};
 
             if (quality < 100) {
-                // Simple bitrate calculation based on quality
-                // 100 = Copy (if possible) or High Bitrate
-                // 80 = High
-                // 60 = Medium
-                // 40 = Low
                 let bitrate;
-                if (quality >= 80) bitrate = 2500000; // 2.5 Mbps
-                else if (quality >= 60) bitrate = 1500000; // 1.5 Mbps
-                else bitrate = 800000; // 800 Kbps
+                if (quality >= 80) bitrate = 2500000;
+                else if (quality >= 60) bitrate = 1500000;
+                else bitrate = 800000;
 
                 videoConfig = {
                     bitrate: bitrate,
@@ -74,11 +57,10 @@ export class MediaProcessor {
                 };
             }
 
-            // Configure Resize
             if (resize && resize.width && resize.height) {
                 videoConfig.width = resize.width;
                 videoConfig.height = resize.height;
-                videoConfig.fit = 'fill'; // Match exact dimensions
+                videoConfig.fit = 'fill';
                 videoConfig.forceTranscode = true;
             }
 
@@ -86,7 +68,7 @@ export class MediaProcessor {
                 input: input,
                 output: output,
                 video: videoConfig,
-                trim: trim // Pass trim options directly to init
+                trim: trim
             });
 
             if (onProgress) {
@@ -98,9 +80,6 @@ export class MediaProcessor {
             return new Blob([output.target.buffer], { type: `video/${format}` });
         } finally {
             // CRITICAL: Clean up all MediaBunny resources to prevent memory leaks
-            // These objects hold significant memory and must be explicitly disposed
-
-            // Dispose conversion first (if it was created)
             if (conversion && typeof conversion.dispose === 'function') {
                 try {
                     conversion.dispose();
@@ -109,7 +88,6 @@ export class MediaProcessor {
                 }
             }
 
-            // Dispose output
             if (output && typeof output.dispose === 'function') {
                 try {
                     output.dispose();
@@ -118,7 +96,6 @@ export class MediaProcessor {
                 }
             }
 
-            // Dispose input
             if (input && typeof input.dispose === 'function') {
                 try {
                     input.dispose();
@@ -127,10 +104,10 @@ export class MediaProcessor {
                 }
             }
 
-            // Nullify references to help garbage collection
             conversion = null;
         }
     }
+
     /**
      * Get tracks from media
      * @param {Blob|File} source
@@ -147,7 +124,6 @@ export class MediaProcessor {
             const videoTracks = await input.getVideoTracks();
             const audioTracks = await input.getAudioTracks();
 
-            // Enrich tracks with computed duration and codec string
             const formatTrackInfo = async (tracks) => {
                 return Promise.all(tracks.map(async (track) => {
                     const duration = await track.computeDuration();
@@ -159,14 +135,10 @@ export class MediaProcessor {
                         codec: track.codec,
                         codecString: codecString,
                         duration: duration,
-                        // Video specific
                         width: track.displayWidth,
                         height: track.displayHeight,
-                        // Audio specific
                         channels: track.numberOfChannels,
                         sampleRate: track.sampleRate,
-                        // Original track object for reference if needed (but avoid passing complex objects if possible)
-                        // We'll use index for selection which is safer
                     };
                 }));
             };
@@ -235,15 +207,13 @@ export class MediaProcessor {
                 input: input,
                 output: output,
                 video: (t, i) => {
-                    // MediaBunny uses 1-based indexing for tracks in the callback
                     const keep = trackType === 'video' && (i - 1) === trackIndex;
-                    console.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
+                    console.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
                     return keep ? {} : { discard: true };
                 },
                 audio: (t, i) => {
-                    // MediaBunny uses 1-based indexing for tracks in the callback
                     const keep = trackType === 'audio' && (i - 1) === trackIndex;
-                    console.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'} (Target: ${trackType} #${trackIndex})`);
+                    console.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
                     return keep ? {} : { discard: true };
                 }
             };
@@ -293,13 +263,12 @@ export class MediaProcessor {
     }
 
     /**
-     * Merge multiple videos using MediaBunny Output API
-     * Based on working implementation that uses CanvasSource and manual frame processing
+     * Merge multiple videos using MediaBunny
      * 
      * @param {Object} options
      * @param {Array<Blob|File>} options.inputs - List of input files/blobs
      * @param {string} options.format - 'mp4', 'webm', etc.
-     * @param {Object} [options.resolution] - { width: number, height: number } (Optional target resolution)
+     * @param {Object} [options.resolution] - { width: number, height: number }
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
@@ -310,217 +279,291 @@ export class MediaProcessor {
 
         console.log('[MediaProcessor] Starting merge of', inputs.length, 'videos');
 
-        // Skip standardization - work with source files directly
-        // MediaBunny Output API will handle format normalization
-        const sourceFiles = inputs;
-
-        // Step 1: Gather metadata from source clips
-        console.log('[MediaProcessor] Gathering metadata...');
-        const clipMetadata = [];
-        const inputObjects = []; // Track Input objects for cleanup
-
-        for (const file of sourceFiles) {
-            const input = new MediaBunny.Input({
-                source: new MediaBunny.BlobSource(file),
-                formats: MediaBunny.ALL_FORMATS
-            });
-            inputObjects.push(input); // Track for cleanup
-
-            const videoTrack = await input.getPrimaryVideoTrack();
-            if (!videoTrack) throw new Error('No video track found in input file');
-
-            // TODO: Audio support - currently disabled due to timestamp concatenation issues
-            // Will need to decode/re-encode audio instead of direct packet concatenation
-            const audioTrack = null;
-            const audioConfig = null;
-
-            const videoConfig = await videoTrack.getDecoderConfig();
-            const duration = await videoTrack.computeDuration();
-
-            clipMetadata.push({ duration, videoTrack, audioTrack, videoConfig, audioConfig });
-        }
-
-
-        // Step 2: Setup output
-        const outputFps = 30; // Standard 30fps for merged output
-        const standardFormat = {
-            videoCodec: 'avc',
-            audioCodec: 'opus',
-            audioSampleRate: 48000
-        };
-
-        const firstClip = clipMetadata[0];
-        const outputWidth = resolution?.width || firstClip.videoConfig.codedWidth;
-        const outputHeight = resolution?.height || firstClip.videoConfig.codedHeight;
-
-        // Setup output with video track only (audio support coming later)
-        const output = new MediaBunny.Output({
-            target: new MediaBunny.BufferTarget(),
-            format: new MediaBunny.Mp4OutputFormat()
-        });
-
-        // Step 3: Setup canvas for video processing
+        // Track all objects for cleanup
+        const inputObjects = [];
+        let output = null;
+        let canvasSource = null;
+        let audioSource = null;
         const canvas = document.createElement('canvas');
-        canvas.width = outputWidth;
-        canvas.height = outputHeight;
-        const ctx = canvas.getContext('2d');
-
-        const canvasSource = new MediaBunny.CanvasSource(canvas, {
-            codec: standardFormat.videoCodec,
-            bitrate: 10000000 // 10 Mbps
-        });
 
         try {
-            output.addVideoTrack(canvasSource, { frameRate: outputFps });
+            // Step 1: Analyze all input videos
+            console.log('[MediaProcessor] Step 1: Analyzing input videos...');
+            const videoInfos = [];
+            let maxWidth = 0;
+            let maxHeight = 0;
 
-            await output.start();
+            for (let i = 0; i < inputs.length; i++) {
+                const input = new MediaBunny.Input({
+                    source: new MediaBunny.BlobSource(inputs[i]),
+                    formats: MediaBunny.ALL_FORMATS
+                });
+                inputObjects.push(input); // Track for cleanup
 
-            // Step 4: Process video clips
-            console.log('[MediaProcessor] Processing video frames...');
-            let currentVideoTimestamp = 0;
-            let maxVideoTimestamp = 0;
-            let processedClips = 0;
-
-            for (const clip of clipMetadata) {
-                const frames = [];
-                let decoderError = null;
-
-                // Log the decoder config we're trying to use
-                console.log('[MediaProcessor] Decoder config:', JSON.stringify(clip.videoConfig, null, 2));
-
-                // Check codec support
-                const codecSupport = await VideoDecoder.isConfigSupported(clip.videoConfig);
-                console.log('[MediaProcessor] Codec support:', codecSupport);
-
-                if (!codecSupport.supported) {
-                    throw new Error(`Video codec not supported: ${clip.videoConfig.codec}`);
+                const videoTrack = await input.getPrimaryVideoTrack();
+                if (!videoTrack) {
+                    throw new Error(`No video track found in input file ${i + 1}`);
                 }
 
-                const decoder = new VideoDecoder({
-                    output: (frame) => frames.push(frame),
-                    error: (e) => {
-                        console.error('[MediaProcessor] Video decoder error:', e);
-                        decoderError = e; // Store error instead of throwing
-                    }
+                const duration = await videoTrack.computeDuration();
+                const width = videoTrack.displayWidth || videoTrack.codedWidth;
+                const height = videoTrack.displayHeight || videoTrack.codedHeight;
+
+                console.log(`[MediaProcessor] Video ${i + 1}: ${width}x${height}, ${duration}s, codec: ${videoTrack.codec}`);
+
+                maxWidth = Math.max(maxWidth, width);
+                maxHeight = Math.max(maxHeight, height);
+
+                videoInfos.push({
+                    index: i,
+                    input: input,
+                    width,
+                    height,
+                    duration,
+                    codec: videoTrack.codec
                 });
 
-                try {
-                    decoder.configure(clip.videoConfig);
-
-                    const videoPacketSink = new MediaBunny.EncodedPacketSink(clip.videoTrack);
-                    let packetIndex = 0;
-
-                    for await (const packet of videoPacketSink.packets()) {
-                        // Log first few packets
-                        if (packetIndex < 3) {
-                            console.log(`[MediaProcessor] Packet ${packetIndex}:`, {
-                                isKeyframe: packet.isKeyframe,
-                                timestamp: packet.timestamp,
-                                dataSize: packet.data?.byteLength || 0
-                            });
-                        }
-
-                        // Check if decoder encountered an error
-                        if (decoderError) {
-                            throw new Error(`Decoding failed at packet ${packetIndex}: ${decoderError.message}`);
-                        }
-
-                        // Skip very small packets (likely metadata/SEI that causes decoder errors)
-                        if (packet.data?.byteLength < 50) {
-                            packetIndex++;
-                            continue;
-                        }
-
-                        // MediaBunny packets may not have isKeyframe marked
-                        // Treat first packet as keyframe, all others as delta
-                        const isKey = (packetIndex === 0);
-
-                        decoder.decode(new EncodedVideoChunk({
-                            type: isKey ? 'key' : 'delta',
-                            timestamp: packet.timestamp * 1_000_000,
-                            duration: packet.duration ? packet.duration * 1_000_000 : undefined,
-                            data: packet.data
-                        }));
-
-                        packetIndex++;
-                    }
-
-                    console.log('[MediaProcessor] Processed', packetIndex, 'packets, flushing...');
-                    await decoder.flush();
-
-                    // Check for errors after flush
-                    if (decoderError) {
-                        throw new Error(`Decoding failed during flush: ${decoderError.message}`);
-                    }
-                } finally {
-                    // Only close if decoder is not already closed
-                    if (decoder.state !== 'closed') {
-                        decoder.close();
-                    }
-                }
-
-                // Sort frames by timestamp to ensure correct order
-                frames.sort((a, b) => a.timestamp - b.timestamp);
-
-                if (frames.length > 0) {
-                    const firstFrameTs = frames[0].timestamp;
-
-                    for (let i = 0; i < frames.length; i++) {
-                        const frame = frames[i];
-
-                        // Calculate relative timestamp from start of this clip (in seconds)
-                        const relativeTs = (frame.timestamp - firstFrameTs) / 1_000_000;
-                        const newTimestamp = currentVideoTimestamp + relativeTs;
-
-                        // Determine duration: use frame duration if available, or calculate from next frame
-                        let duration;
-                        if (frame.duration) {
-                            duration = frame.duration / 1_000_000;
-                        } else if (i < frames.length - 1) {
-                            duration = (frames[i + 1].timestamp - frame.timestamp) / 1_000_000;
-                        } else {
-                            // Last frame: default to 1/30s or previous frame's duration
-                            duration = 1 / 30;
-                        }
-
-                        ctx.drawImage(frame, 0, 0, outputWidth, outputHeight);
-                        await canvasSource.add(newTimestamp, duration);
-                        maxVideoTimestamp = Math.max(maxVideoTimestamp, newTimestamp + duration);
-                        frame.close();
-                    }
-                }
-
-                // Update timestamp for next clip based on actual frames processed
-                // Add a small buffer (e.g., 1 frame duration approx 33ms) to ensure no overlap
-                currentVideoTimestamp = maxVideoTimestamp + (1 / 30);
-
-                processedClips++;
                 if (onProgress) {
-                    onProgress(processedClips / (clipMetadata.length * 2)); // Video is first half
+                    onProgress((i + 1) / (inputs.length * 2));
                 }
             }
 
-            // TODO: Step 5: Process audio clips (disabled - needs re-encoding approach)
-            // Current issue: Direct encoded packet concatenation creates timestamp conflicts
-            // Solution: Decode audio to PCM, concatenate, then re-encode
-            // For now, merged videos are video-only
-            console.log('[MediaProcessor] Audio processing skipped (video-only merge)');
+            const targetWidth = resolution?.width || maxWidth;
+            const targetHeight = resolution?.height || maxHeight;
+            const targetFps = 30;
 
-            // Step 6: Finalize
+            console.log(`[MediaProcessor] Target specs: ${targetWidth}x${targetHeight} @ ${targetFps}fps`);
+
+            // Step 2: Create output
+            console.log('[MediaProcessor] Step 2: Setting up output...');
+
+            let outputFormat;
+            switch (format) {
+                case 'mp4':
+                    outputFormat = new MediaBunny.Mp4OutputFormat();
+                    break;
+                case 'webm':
+                    outputFormat = new MediaBunny.WebMOutputFormat();
+                    break;
+                case 'mov':
+                    outputFormat = new MediaBunny.QuickTimeOutputFormat();
+                    break;
+                default:
+                    throw new Error(`Unsupported format: ${format}`);
+            }
+
+            output = new MediaBunny.Output({
+                format: outputFormat,
+                target: new MediaBunny.BufferTarget()
+            });
+
+            // Setup canvas for video
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            const ctx = canvas.getContext('2d');
+
+            canvasSource = new MediaBunny.CanvasSource(canvas, {
+                codec: format === 'webm' ? 'vp9' : 'avc',
+                bitrate: 5000000,
+                frameRate: targetFps
+            });
+
+            output.addVideoTrack(canvasSource, { frameRate: targetFps });
+
+            // Setup audio with codec detection
+            let audioCodec;
+            let audioBitrate = 128000;
+            const targetSampleRate = 48000; // Standard sample rate for merged audio
+            const targetChannels = 2; // Stereo
+
+            if (format === 'webm') {
+                audioCodec = 'opus';
+            } else {
+                const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
+
+                if (supportedCodecs.length === 0) {
+                    console.warn('[MediaProcessor] No supported audio codecs found, merge will be video-only');
+                    audioCodec = null;
+                } else {
+                    audioCodec = supportedCodecs[0];
+                    console.log(`[MediaProcessor] Using audio codec: ${audioCodec}`);
+                }
+            }
+
+            if (audioCodec) {
+                audioSource = new MediaBunny.AudioSampleSource({
+                    codec: audioCodec,
+                    bitrate: audioBitrate
+                });
+                output.addAudioTrack(audioSource);
+                console.log(`[MediaProcessor] Audio output: ${targetChannels} channels @ ${targetSampleRate}Hz`);
+            }
+
+            await output.start();
+
+            // Step 3: Process each video
+            let currentTimestamp = 0;
+
+            for (let i = 0; i < videoInfos.length; i++) {
+                console.log(`[MediaProcessor] Processing video ${i + 1}/${videoInfos.length}...`);
+
+                const info = videoInfos[i];
+                const input = info.input;
+
+                const videoTrack = await input.getPrimaryVideoTrack();
+                const audioTrack = await input.getPrimaryAudioTrack();
+
+                // Process video
+                const canDecodeVideo = await videoTrack.canDecode();
+                if (!canDecodeVideo) {
+                    throw new Error(`Cannot decode video ${i + 1}. Codec ${videoTrack.codec} not supported.`);
+                }
+
+                const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
+                const videoStartTime = await videoTrack.getFirstTimestamp();
+                let frameCount = 0;
+
+                for await (const sample of videoSink.samples()) {
+                    try {
+                        const relativeTimestamp = sample.timestamp - videoStartTime;
+                        const absoluteTimestamp = currentTimestamp + relativeTimestamp;
+                        const duration = sample.duration || (1 / targetFps);
+
+                        ctx.fillStyle = 'black';
+                        ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+                        const scale = Math.min(targetWidth / sample.displayWidth, targetHeight / sample.displayHeight);
+                        const scaledWidth = sample.displayWidth * scale;
+                        const scaledHeight = sample.displayHeight * scale;
+                        const x = (targetWidth - scaledWidth) / 2;
+                        const y = (targetHeight - scaledHeight) / 2;
+
+                        sample.draw(ctx, x, y, scaledWidth, scaledHeight);
+                        await canvasSource.add(absoluteTimestamp, duration);
+
+                        frameCount++;
+                    } finally {
+                        sample.close();
+                    }
+                }
+
+                console.log(`[MediaProcessor] Processed ${frameCount} frames from video ${i + 1}`);
+
+                // Process audio
+                if (audioSource && audioTrack) {
+                    const canDecodeAudio = await audioTrack.canDecode();
+                    if (canDecodeAudio) {
+                        console.log(`[MediaProcessor] Processing audio from video ${i + 1}...`);
+
+                        const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
+                        const audioStartTime = await audioTrack.getFirstTimestamp();
+                        let audioSampleCount = 0;
+
+                        // Check if audio needs resampling or channel remixing
+                        const needsResampling = audioTrack.sampleRate !== targetSampleRate;
+                        const needsRemixing = audioTrack.numberOfChannels !== targetChannels;
+
+                        if (needsResampling || needsRemixing) {
+                            console.log(`[MediaProcessor] Audio conversion needed: ${audioTrack.numberOfChannels}ch @ ${audioTrack.sampleRate}Hz -> ${targetChannels}ch @ ${targetSampleRate}Hz`);
+                        }
+
+                        for await (const sample of audioSink.samples()) {
+                            const relativeTimestamp = sample.timestamp - audioStartTime;
+                            const absoluteTimestamp = currentTimestamp + relativeTimestamp;
+
+                            let processedSample = sample;
+
+                            // Resample/remix if needed using Web Audio API
+                            if (needsResampling || needsRemixing) {
+                                try {
+                                    // Create an offline audio context for resampling
+                                    const offlineCtx = new OfflineAudioContext(
+                                        targetChannels,
+                                        Math.ceil(sample.numberOfFrames * (targetSampleRate / sample.sampleRate)),
+                                        targetSampleRate
+                                    );
+
+                                    // Convert sample to AudioBuffer
+                                    const sourceBuffer = sample.toAudioBuffer();
+
+                                    // Create source node
+                                    const source = offlineCtx.createBufferSource();
+                                    source.buffer = sourceBuffer;
+                                    source.connect(offlineCtx.destination);
+                                    source.start(0);
+
+                                    // Render the resampled audio
+                                    const resampledBuffer = await offlineCtx.startRendering();
+
+                                    // Convert back to AudioSample with adjusted timestamp
+                                    const resampledSamples = MediaBunny.AudioSample.fromAudioBuffer(
+                                        resampledBuffer,
+                                        absoluteTimestamp
+                                    );
+
+                                    // fromAudioBuffer can return multiple samples, use the first one
+                                    processedSample = Array.isArray(resampledSamples) ? resampledSamples[0] : resampledSamples;
+
+                                    sample.close(); // Close original sample
+                                } catch (resampleError) {
+                                    console.error(`[MediaProcessor] Error resampling audio:`, resampleError);
+                                    sample.close();
+                                    throw resampleError;
+                                }
+                            } else {
+                                // No resampling needed, just adjust timestamp
+                                processedSample.setTimestamp(absoluteTimestamp);
+                            }
+
+                            await audioSource.add(processedSample);
+
+                            // Close the processed sample if it's different from the original
+                            if (processedSample !== sample) {
+                                processedSample.close();
+                            }
+
+                            audioSampleCount++;
+                        }
+
+                        console.log(`[MediaProcessor] Processed ${audioSampleCount} audio samples from video ${i + 1}`);
+                    } else {
+                        console.warn(`[MediaProcessor] Cannot decode audio from video ${i + 1}, skipping`);
+                    }
+                } else if (!audioSource && audioTrack) {
+                    console.log(`[MediaProcessor] No audio encoder available, skipping audio`);
+                }
+
+                // Update timestamp for next video
+                currentTimestamp += info.duration;
+
+                if (onProgress) {
+                    const overallProgress = 0.5 + ((i + 1) / (videoInfos.length * 2));
+                    onProgress(overallProgress);
+                }
+            }
+
+            // Step 4: Finalize
             console.log('[MediaProcessor] Finalizing merge...');
             canvasSource.close();
+            if (audioSource) {
+                audioSource.close();
+            }
             await output.finalize();
 
             if (onProgress) onProgress(1.0);
-            console.log('[MediaProcessor] Merge complete!');
 
+            console.log('[MediaProcessor] Merge complete!');
             return new Blob([output.target.buffer], { type: `video/${format}` });
+
+        } catch (error) {
+            console.error('[MediaProcessor] Merge failed:', error);
+            throw new Error(`Video merge failed: ${error.message}`);
         } finally {
             // CRITICAL: Clean up all MediaBunny resources to prevent memory leaks
-            // This is essential for preventing browser hangs during merge operations
+            console.log('[MediaProcessor] Cleaning up resources...');
 
             // Dispose Output
-            if (typeof output !== 'undefined' && output && typeof output.dispose === 'function') {
+            if (output && typeof output.dispose === 'function') {
                 try {
                     output.dispose();
                 } catch (e) {
@@ -529,11 +572,20 @@ export class MediaProcessor {
             }
 
             // Dispose CanvasSource
-            if (typeof canvasSource !== 'undefined' && canvasSource && typeof canvasSource.dispose === 'function') {
+            if (canvasSource && typeof canvasSource.dispose === 'function') {
                 try {
                     canvasSource.dispose();
                 } catch (e) {
                     console.warn('Error disposing canvasSource during merge cleanup:', e);
+                }
+            }
+
+            // Dispose AudioSource
+            if (audioSource && typeof audioSource.dispose === 'function') {
+                try {
+                    audioSource.dispose();
+                } catch (e) {
+                    console.warn('Error disposing audioSource during merge cleanup:', e);
                 }
             }
 
@@ -547,15 +599,22 @@ export class MediaProcessor {
                     }
                 }
             }
-            inputObjects.length = 0; // Clear the array
+            inputObjects.length = 0;
 
-            // Clean up canvas context - helps browser release graphics memory
-            if (typeof canvas !== 'undefined' && canvas) {
+            // Clean up canvas context
+            if (canvas) {
                 const context = canvas.getContext('2d');
                 if (context) {
                     context.clearRect(0, 0, canvas.width, canvas.height);
                 }
             }
+
+            // Nullify references to help garbage collection
+            output = null;
+            canvasSource = null;
+            audioSource = null;
+
+            console.log('[MediaProcessor] Cleanup complete');
         }
     }
 }
