@@ -143,17 +143,81 @@ export class MediaProcessor {
                 }));
             };
 
+            const videoTracksInfo = await formatTrackInfo(videoTracks);
+            const audioTracksInfo = await formatTrackInfo(audioTracks);
+
             return {
-                video: await formatTrackInfo(videoTracks),
-                audio: await formatTrackInfo(audioTracks)
+                video: videoTracksInfo,
+                audio: audioTracksInfo
             };
         } finally {
-            // Cleanup Input to prevent memory leaks
+            // Clean up
+            // MediaBunny handles cleanup internally
+        }
+    }
+
+    /**
+     * Get formatted metadata for caching
+     * Returns videoInfo and audioInfo objects ready to be stored on playlist items
+     * @param {Blob|File} source 
+     * @returns {Promise<{videoInfo: Object|null, audioInfo: Object|null, duration: number}>}
+     */
+    static async getMetadata(source) {
+        const blobSource = new MediaBunny.BlobSource(source);
+        const input = new MediaBunny.Input({
+            source: blobSource,
+            formats: MediaBunny.ALL_FORMATS
+        });
+
+        try {
+            const videoTracks = await input.getVideoTracks();
+            const audioTracks = await input.getAudioTracks();
+
+            let videoInfo = null;
+            let audioInfo = null;
+            let duration = 0;
+
+            // Extract video metadata
+            if (videoTracks && videoTracks.length > 0) {
+                const videoTrack = videoTracks[0]; // Use primary track
+                duration = await videoTrack.computeDuration();
+
+                videoInfo = {
+                    width: videoTrack.width || videoTrack.displayWidth,
+                    height: videoTrack.height || videoTrack.displayHeight,
+                    displayWidth: videoTrack.displayWidth,
+                    displayHeight: videoTrack.displayHeight,
+                    codedWidth: videoTrack.codedWidth,
+                    codedHeight: videoTrack.codedHeight,
+                    codec: videoTrack.codec,
+                    rotation: videoTrack.rotation || 0,
+                    hasHDR: false // Computed on-demand if needed
+                };
+            }
+
+            // Extract audio metadata
+            if (audioTracks && audioTracks.length > 0) {
+                const audioTrack = audioTracks[0]; // Use primary track
+                if (!duration) {
+                    duration = await audioTrack.computeDuration();
+                }
+
+                audioInfo = {
+                    codec: audioTrack.codec,
+                    channels: audioTrack.numberOfChannels,
+                    sampleRate: audioTrack.sampleRate,
+                    languageCode: audioTrack.languageCode
+                };
+            }
+
+            return { videoInfo, audioInfo, duration };
+        } finally {
+            // MediaBunny handles cleanup
             if (input && typeof input.dispose === 'function') {
                 try {
                     input.dispose();
                 } catch (e) {
-                    console.warn('Error disposing input in getTracks:', e);
+                    console.warn('Error disposing input in getMetadata:', e);
                 }
             }
         }

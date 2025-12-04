@@ -579,15 +579,12 @@ export class Playlist {
         for (const item of items) {
             if (item.isLocal && item.file) {
                 try {
-                    // Use MediaBunny to get duration
-                    // We need to create a temporary input
-                    // Note: MediaBunny might not be fully exposed here, 
-                    // but we can try to use a hidden video element as a fallback if MediaBunny is complex to instantiate just for metadata
-                    // Or use the player's method if available.
+                    // Use centralized metadata extraction
+                    const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(item.file);
 
-                    // Simple fallback: use a temporary video element
-                    const duration = await this._getVideoDuration(item.file);
                     item.duration = this._formatDuration(duration);
+                    item.videoInfo = videoInfo;
+                    item.audioInfo = audioInfo;
 
                     // Update UI if this item is rendered
                     this._updateItemUI(item);
@@ -599,6 +596,40 @@ export class Playlist {
                 }
             }
         }
+    }
+
+    /**
+     * Ensure metadata exists on item (fetch if not cached)
+     * @param {Object} item - Playlist item
+     * @returns {Promise<void>}
+     * @private
+     */
+    async _ensureMetadata(item) {
+        // Already cached
+        if (item.videoInfo || item.audioInfo) {
+            return;
+        }
+
+        // Fetch and cache
+        let source;
+        if (item.file) {
+            source = item.file;
+        } else if (item.url) {
+            const response = await fetch(item.url);
+            source = await response.blob();
+        } else {
+            throw new Error('No source available for metadata');
+        }
+
+        const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(source);
+        item.videoInfo = videoInfo;
+        item.audioInfo = audioInfo;
+
+        if (!item.duration || item.duration === '--:--') {
+            item.duration = this._formatDuration(duration);
+        }
+
+        this._saveState();
     }
 
     /**
@@ -2734,20 +2765,12 @@ export class Playlist {
 
         // Load Metadata
         try {
-            let source;
-            if (item.file) {
-                source = item.file;
-            } else {
-                const response = await fetch(item.url);
-                source = await response.blob();
-            }
+            // Ensure metadata is cached
+            await this._ensureMetadata(item);
 
-            const tracks = await MediaProcessor.getTracks(source);
-            const videoTrack = tracks.video[0]; // Assume first video track
-
-            if (videoTrack) {
-                originalWidth = videoTrack.width;
-                originalHeight = videoTrack.height;
+            if (item.videoInfo && item.videoInfo.width && item.videoInfo.height) {
+                originalWidth = item.videoInfo.width;
+                originalHeight = item.videoInfo.height;
                 aspectRatio = originalWidth / originalHeight;
 
                 resolutionDisplay.textContent = `${originalWidth}x${originalHeight}`;
@@ -2756,7 +2779,7 @@ export class Playlist {
                 // Init inputs
                 updateInputs(originalWidth, originalHeight);
             } else {
-                throw new Error('No video track found');
+                throw new Error('No video metadata available');
             }
         } catch (e) {
             console.error('Failed to load video info:', e);
@@ -2961,16 +2984,69 @@ export class Playlist {
 
         // Load Metadata
         try {
-            let source;
+            // Ensure metadata is cached
+            await this._ensureMetadata(item);
+
+            let videoTrack = null;
+
+            // Build metadata from cached data
+            const formatBytes = (bytes, decimals = 1) => {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const dm = decimals < 0 ? 0 : decimals;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            };
+
+            // Get file size
+            let fileSize = '0 Bytes';
             if (item.file) {
-                source = item.file;
-            } else {
-                const response = await fetch(item.url);
-                source = await response.blob();
+                fileSize = formatBytes(item.file.size);
+            } else if (item.url) {
+                try {
+                    const response = await fetch(item.url, { method: 'HEAD' });
+                    const size = response.headers.get('content-length');
+                    if (size) fileSize = formatBytes(parseInt(size));
+                } catch (e) {
+                    fileSize = 'Unknown';
+                }
             }
 
-            // Get full metadata
-            const { metadata, videoTrack } = await this._getFormattedMetadata(source, item.title);
+            const metadata = {
+                filename: item.title,
+                format: item.file ? item.file.type.split('/')[0] : 'Unknown',
+                mimeType: item.file ? item.file.type : 'Unknown',
+                size: fileSize,
+                duration: item.duration || 'Unknown',
+
+                // Video from cached data
+                videoCodec: item.videoInfo ? item.videoInfo.codec.toUpperCase() : 'N/A',
+                videoCodecString: item.videoInfo ? item.videoInfo.codec : 'N/A',
+                resolution: item.videoInfo ? `${item.videoInfo.width}x${item.videoInfo.height}` : 'N/A',
+                codedResolution: item.videoInfo ? `${item.videoInfo.codedWidth}x${item.videoInfo.codedHeight}` : 'N/A',
+                fps: 'Calculating...', // Will be updated with packet stats
+                videoBitrate: 'Calculating...',
+                rotation: item.videoInfo ? `${item.videoInfo.rotation}°` : 'N/A',
+                hdr: item.videoInfo ? (item.videoInfo.hasHDR ? 'Yes' : 'No') : 'N/A',
+
+                // Audio from cached data
+                audioCodec: item.audioInfo ? item.audioInfo.codec.toUpperCase() : 'N/A',
+                audioCodecString: item.audioInfo ? item.audioInfo.codec : 'N/A',
+                channels: item.audioInfo ? (item.audioInfo.channels === 2 ? 'Stereo (2)' : `${item.audioInfo.channels} Channels`) : 'N/A',
+                sampleRate: item.audioInfo ? `${(item.audioInfo.sampleRate / 1000).toFixed(1)} kHz` : 'N/A',
+                language: item.audioInfo ? (item.audioInfo.languageCode === 'und' ? 'Undetermined' : item.audioInfo.languageCode) : 'N/A'
+            };
+
+            // For packet stats, we still need to get the video track
+            if (item.videoInfo && item.file) {
+                try {
+                    const tracks = await MediaProcessor.getTracks(item.file);
+                    videoTrack = tracks.video ? tracks.video[0] : null;
+                } catch (e) {
+                    console.warn('Could not get video track for packet stats:', e);
+                }
+            }
 
             // Hide loading, show content
             loadingEl.classList.add('hidden');
@@ -2988,7 +3064,6 @@ export class Playlist {
             });
 
             // Store raw metadata for "Copy All"
-            // We store it on the modal content wrapper or body to be accessible
             modal.body.dataset.rawInfo = JSON.stringify(metadata);
 
             // Async update for stats
