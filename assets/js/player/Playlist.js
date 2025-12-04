@@ -1694,7 +1694,9 @@ export class Playlist {
                 el.querySelector('.remove-item-btn').remove(); // No remove here
 
                 // Populate Info
-                el.querySelector('.item-title').textContent = item.title;
+                const titleEl = el.querySelector('.item-title');
+                titleEl.textContent = item.title;
+                titleEl.title = item.title; // Tooltip on hover
                 el.querySelector('.item-dur').textContent = item.duration || '--:--';
 
                 // Selection Logic
@@ -1738,7 +1740,9 @@ export class Playlist {
 
                 const el = itemTemplate.content.cloneNode(true).querySelector('.merge-item');
 
-                el.querySelector('.item-title').textContent = item.title;
+                const titleEl = el.querySelector('.item-title');
+                titleEl.textContent = item.title;
+                titleEl.title = item.title; // Tooltip on hover
                 el.querySelector('.item-dur').textContent = item.duration || '--:--';
 
                 // Remove Button
