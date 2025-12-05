@@ -37,11 +37,8 @@ export class ReverseMenu {
         const sourceDuration = modalContent.querySelector('.source-duration');
         const sourceResolution = modalContent.querySelector('.source-resolution');
         const audioCheckbox = modalContent.querySelector('#reverse-include-audio');
-        const audioWarning = modalContent.querySelector('.audio-warning');
-        const audioInfo = modalContent.querySelector('.audio-info');
         const processingInfo = modalContent.querySelector('.processing-info');
         const longVideoWarning = modalContent.querySelector('#long-video-warning');
-        const estimatedTime = modalContent.querySelector('.time-value');
 
         const reverseBtn = modalContent.querySelector('.reverse-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
@@ -91,22 +88,11 @@ export class ReverseMenu {
         if (videoDuration > 60) {
             longVideoWarning.classList.remove('hidden');
             processingInfo.classList.remove('hidden');
-            estimatedTime.textContent = `~${Math.ceil(videoDuration * 2 / 60)} minutes`;
         } else {
-            processingInfo.classList.remove('hidden');
-            estimatedTime.textContent = `~${Math.ceil(videoDuration * 1.5)} seconds`;
+            processingInfo.classList.add('hidden');
         }
 
-        // Event Listeners
-        audioCheckbox.addEventListener('change', () => {
-            if (audioCheckbox.checked) {
-                audioWarning.classList.remove('hidden');
-                audioInfo.classList.add('hidden');
-            } else {
-                audioWarning.classList.add('hidden');
-                audioInfo.classList.remove('hidden');
-            }
-        });
+
 
         const startReversal = async () => {
             const includeAudio = audioCheckbox.checked;

@@ -1382,25 +1382,16 @@
         <div class="options-group mb-lg">
             <div class="text-xs text-secondary font-mono mb-sm">AUDIO OPTIONS</div>
             <label class="checkbox-option mb-sm">
-                <input type="checkbox" name="includeAudio" id="reverse-include-audio">
+                <input type="checkbox" name="includeAudio" id="reverse-include-audio" checked>
                 <span class="checkbox-custom"></span>
                 <span class="checkbox-label">Include reversed audio</span>
             </label>
-            <div class="audio-warning hidden text-xs text-accent ml-lg">
-                ⚠️ Audio reversal is experimental and may take longer.
-            </div>
-            <div class="audio-info text-xs text-muted ml-lg">
-                Audio will be removed by default.
-            </div>
         </div>
 
         <!-- Processing Info -->
         <div class="processing-info mb-lg hidden">
             <div class="warning-message p-sm border-warning text-warning text-sm mb-sm hidden" id="long-video-warning">
                 ⚠️ Long video detected. Processing may take several minutes.
-            </div>
-            <div class="estimated-time text-xs text-secondary">
-                Estimated time: <span class="time-value">Calculating...</span>
             </div>
         </div>
 
@@ -1436,7 +1427,6 @@
             <svg width="16" height="16" fill="currentColor">
                 <use href="assets/icons/sprite.svg#icon-download"></use>
             </svg>
-            <span>Download Reversed Video</span>
         </a>
         <button class="btn jellyjump-btn-secondary hidden try-again-btn" title="Try Again" aria-label="Try Again">
             Try Again
