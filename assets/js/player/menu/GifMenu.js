@@ -2,7 +2,7 @@ import { Modal } from '../Modal.js';
 import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId } from '../../utils/mediaUtils.js';
+import { generateId, formatDuration, formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
 
 /**
  * GIF Menu Handler
@@ -81,7 +81,7 @@ export class GifMenu {
                 videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
             }
         }
-        sourceDuration.textContent = playlist._formatDuration(videoDuration);
+        sourceDuration.textContent = formatDuration(videoDuration);
         sourceResolution.textContent = item.videoInfo
             ? `${item.videoInfo.width}×${item.videoInfo.height} `
             : 'Unknown';
@@ -120,12 +120,12 @@ export class GifMenu {
         const successMessage = modalContent.querySelector('.success-message');
 
         // Initialize end time
-        endInput.value = playlist._formatTime(Math.min(videoDuration, 10));
+        endInput.value = formatTime(Math.min(videoDuration, 10));
 
         // Validation
         const validateAndUpdate = () => {
-            const start = playlist._parseTime(startInput.value);
-            const end = playlist._parseTime(endInput.value);
+            const start = parseTime(startInput.value);
+            const end = parseTime(endInput.value);
             const duration = end - start;
 
             // Update A-B loop points
@@ -183,8 +183,8 @@ export class GifMenu {
         createBtn.addEventListener('click', async () => {
             if (!validateAndUpdate()) return;
 
-            const start = playlist._parseTime(startInput.value);
-            const end = playlist._parseTime(endInput.value);
+            const start = parseTime(startInput.value);
+            const end = parseTime(endInput.value);
             const fps = parseInt(fpsSelect.value);
             const sizePreset = sizeSelect.value;
             const quality = parseInt(qualitySlider.value);
@@ -246,7 +246,7 @@ export class GifMenu {
                 // Show preview
                 const previewUrl = URL.createObjectURL(gifBlob);
                 gifPreviewImage.src = previewUrl;
-                gifFileSize.textContent = playlist._formatFileSize(gifBlob.size);
+                gifFileSize.textContent = formatFileSize(gifBlob.size);
                 gifPreviewSection.classList.remove('hidden');
 
                 // Setup download
@@ -262,7 +262,7 @@ export class GifMenu {
                     const newItem = {
                         title: filename,
                         url: previewUrl,
-                        duration: playlist._formatDuration(end - start),
+                        duration: formatDuration(end - start),
                         thumbnail: previewUrl,
                         isLocal: true,
                         file: new File([gifBlob], filename, { type: 'image/gif' }),
