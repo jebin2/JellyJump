@@ -283,8 +283,16 @@ export class RemoveBackgroundMenu {
         // Background Options
         bgTypeRadios.forEach(radio => {
             radio.onchange = () => {
-                customBgColorInput.disabled = radio.value !== 'custom';
+                const isCustom = radio.value === 'custom';
+                customBgColorInput.disabled = !isCustom;
                 if (!player.isPlaying) player.seek(player.currentTime);
+            };
+
+            radio.onclick = () => {
+                if (radio.value === 'custom') {
+                    customBgColorInput.disabled = false;
+                    setTimeout(() => customBgColorInput.click(), 10);
+                }
             };
         });
 
