@@ -881,7 +881,15 @@ export class MediaProcessor {
             const width = videoTrack.displayWidth || videoTrack.codedWidth;
             const height = videoTrack.displayHeight || videoTrack.codedHeight;
             const duration = await videoTrack.computeDuration();
-            const fps = videoTrack.nominalFrameRate || 30; // Target FPS
+
+            // Compute frame rate from metadata
+            let fps = 30;
+            try {
+                const stats = await videoTrack.computePacketStats();
+                fps = stats.averagePacketRate || 30;
+            } catch (e) {
+                console.warn("[MediaProcessor] Could not compute frame rate, defaulting to 30fps", e);
+            }
 
             console.log(`[MediaProcessor] Source: ${width}x${height}, ${duration}s, ${fps}fps`);
 
@@ -916,7 +924,7 @@ export class MediaProcessor {
                 if (audioTrack) {
                     const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
                     if (supportedCodecs.length > 0) {
-                        audioSource = new MediaBunny.AudioSampleSampleSource({
+                        audioSource = new MediaBunny.AudioSampleSource({
                             codec: supportedCodecs[0],
                             bitrate: 128000
                         });
@@ -993,10 +1001,53 @@ export class MediaProcessor {
 
             // Step 5: Handle Audio (if requested)
             if (includeAudio && audioSource) {
-                // TODO: Implement audio reversal
-                // For now, we'll skip complex audio reversal as it requires decoding all audio, 
-                // reversing the buffer, and re-encoding.
-                console.warn('[MediaProcessor] Audio reversal not fully implemented yet');
+                console.log('[MediaProcessor] Reversing audio...');
+                try {
+                    const audioTrack = await input.getPrimaryAudioTrack();
+                    if (audioTrack) {
+                        const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
+                        const samples = [];
+
+                        // Collect all samples
+                        for await (const sample of audioSink.samples()) {
+                            samples.push(sample);
+                        }
+
+                        console.log(`[MediaProcessor] Collected ${samples.length} audio samples`);
+
+                        // Reverse order
+                        samples.reverse();
+
+                        let currentAudioTime = 0;
+
+                        for (const sample of samples) {
+                            // Convert to AudioBuffer
+                            const buffer = await sample.toAudioBuffer();
+
+                            // Reverse data in each channel
+                            for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                const data = buffer.getChannelData(c);
+                                data.reverse();
+                            }
+
+                            // Create new sample(s)
+                            const reversedSamples = MediaBunny.AudioSample.fromAudioBuffer(buffer, currentAudioTime);
+
+                            const samplesToAdd = Array.isArray(reversedSamples) ? reversedSamples : [reversedSamples];
+
+                            for (const s of samplesToAdd) {
+                                await audioSource.add(s);
+                                currentAudioTime += s.duration;
+                                if (s !== sample) s.close(); // Close new sample after adding
+                            }
+
+                            sample.close(); // Close original sample
+                        }
+                        console.log('[MediaProcessor] Audio reversal complete');
+                    }
+                } catch (e) {
+                    console.warn('[MediaProcessor] Audio reversal failed:', e);
+                }
             }
 
             // Step 6: Finalize
