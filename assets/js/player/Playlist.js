@@ -5,6 +5,7 @@ import { CorePlayer } from '../core/Player.js';
 import { Modal } from './Modal.js';
 import { MenuRouter } from './menu/MenuRouter.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
+import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
 
 /**
@@ -546,33 +547,14 @@ export class Playlist {
 
     /**
      * Process metadata for local files
-     * @param {Array} items 
+     * @param {Array} items
      */
     async _processMetadata(items) {
-        for (const item of items) {
-            if (item.isLocal && item.file) {
-                // Show loading state immediately
-                item.duration = 'Loading...';
-                this._updateItemUI(item);
-
-                try {
-                    // Use centralized metadata extraction
-                    const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(item.file);
-
-                    item.duration = formatDuration(duration);
-                    item.videoInfo = videoInfo;
-                    item.audioInfo = audioInfo;
-
-                    // Update UI with actual data
-                    this._updateItemUI(item);
-                    this._saveState();
-                } catch (e) {
-                    console.warn('Failed to load metadata for', item.title, e);
-                    item.duration = '--:--';
-                    this._updateItemUI(item);
-                }
-            }
-        }
+        await MediaMetadata.processMetadata(
+            items,
+            (item) => this._updateItemUI(item),
+            () => this._saveState()
+        );
     }
 
     /**
@@ -582,32 +564,7 @@ export class Playlist {
      * @private
      */
     async _ensureMetadata(item) {
-        // Already cached
-        if (item.videoInfo || item.audioInfo) {
-            return;
-        }
-
-        // Fetch and cache
-        let source;
-        if (item.file) {
-            source = item.file;
-        } else if (item.url) {
-            const response = await fetch(item.url);
-            source = await response.blob();
-        } else {
-            throw new Error('No source available for metadata');
-        }
-
-        const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(source);
-        item.videoInfo = videoInfo;
-        item.audioInfo = audioInfo;
-
-        // Update duration if missing, placeholder, or loading
-        if (!item.duration || item.duration === '--:--' || item.duration === 'Loading...') {
-            item.duration = formatDuration(duration);
-        }
-
-        this._saveState();
+        await MediaMetadata.ensureMetadata(item, () => this._saveState());
     }
 
     /**
@@ -617,21 +574,7 @@ export class Playlist {
      * @private
      */
     async _getVideoDuration(resource) {
-        try {
-            // Create appropriate source based on resource type
-            const source = resource instanceof File
-                ? new MediaBunny.BlobSource(resource)
-                : new MediaBunny.UrlSource(resource);
-
-            const input = new MediaBunny.Input({
-                source,
-                formats: MediaBunny.ALL_FORMATS
-            });
-
-            const duration = await input.computeDuration();
-            return duration;
-        } catch (error) {
-        }
+        return await MediaMetadata.getVideoDuration(resource);
     }
 
     _updateItemUI(item) {
@@ -1487,76 +1430,13 @@ export class Playlist {
 
     /**
      * Get formatted metadata for a file
-     * @param {Blob} blob 
-     * @param {string} filename 
+     * @param {Blob} blob
+     * @param {string} filename
      * @returns {Promise<Object>}
      * @private
      */
     async _getFormattedMetadata(blob, filename) {
-        const input = new MediaBunny.Input({
-            source: new MediaBunny.BlobSource(blob),
-            formats: MediaBunny.ALL_FORMATS
-        });
-
-        const format = await input.getFormat();
-        const tracks = await input.getTracks();
-        const videoTrack = await input.getPrimaryVideoTrack();
-        const audioTrack = await input.getPrimaryAudioTrack();
-
-        // Helper: Format Bytes
-        const formatBytes = (bytes, decimals = 1) => {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const dm = decimals < 0 ? 0 : decimals;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-        };
-
-        // Helper: Format Duration
-        const formatDuration = (seconds) => {
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = Math.floor(seconds % 60);
-            return [h, m, s]
-                .map(v => v < 10 ? "0" + v : v)
-                .filter((v, i) => v !== "00" || i > 0)
-                .join(":");
-        };
-
-        // Helper: Get Codec Name
-        const getCodecName = (codec) => {
-            if (!codec) return 'N/A';
-            // Map common codec IDs to readable names if needed, or just return the ID
-            return codec.toUpperCase();
-        };
-
-        const metadata = {
-            filename: filename,
-            format: format ? format.name : 'Unknown',
-            mimeType: format ? format.mimeType : blob.type,
-            size: formatBytes(blob.size),
-            duration: formatDuration(videoTrack ? await videoTrack.computeDuration() : (audioTrack ? await audioTrack.computeDuration() : 0)),
-
-            // Video
-            videoCodec: videoTrack ? getCodecName(videoTrack.codec) : 'N/A',
-            videoCodecString: videoTrack ? await videoTrack.getCodecParameterString() : 'N/A',
-            resolution: videoTrack ? `${videoTrack.displayWidth}x${videoTrack.displayHeight}` : 'N/A',
-            codedResolution: videoTrack ? `${videoTrack.codedWidth}x${videoTrack.codedHeight}` : 'N/A',
-            fps: 'Calculating...', // Will be updated with packet stats
-            videoBitrate: 'Calculating...',
-            rotation: videoTrack ? `${videoTrack.rotation}°` : 'N/A',
-            hdr: videoTrack ? (await videoTrack.hasHighDynamicRange() ? 'Yes' : 'No') : 'N/A',
-
-            // Audio
-            audioCodec: audioTrack ? getCodecName(audioTrack.codec) : 'N/A',
-            audioCodecString: audioTrack ? await audioTrack.getCodecParameterString() : 'N/A',
-            channels: audioTrack ? (audioTrack.numberOfChannels === 2 ? 'Stereo (2)' : `${audioTrack.numberOfChannels} Channels`) : 'N/A',
-            sampleRate: audioTrack ? `${(audioTrack.sampleRate / 1000).toFixed(1)} kHz` : 'N/A',
-            language: audioTrack ? (audioTrack.languageCode === 'und' ? 'Undetermined' : audioTrack.languageCode) : 'N/A'
-        };
-
-        return { metadata, videoTrack };
+        return await MediaMetadata.getFormattedMetadata(blob, filename);
     }
 
     /**
