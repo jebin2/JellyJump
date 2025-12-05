@@ -234,6 +234,51 @@ export class MediaProcessor {
     }
 
     /**
+     * Get track details from an input
+     * @param {MediaBunny.Input} input
+     * @returns {Promise<{video: Array, audio: Array}>}
+     * @private
+     */
+    static async _getTrackDetails(input) {
+        const videoTracks = await input.getVideoTracks();
+        const audioTracks = await input.getAudioTracks();
+
+        const formatTrackInfo = async (tracks) => {
+            return Promise.all(tracks.map(async (track) => {
+                const duration = await track.computeDuration();
+                const codecString = await track.getCodecParameterString();
+                return {
+                    id: track.id,
+                    type: track.type,
+                    language: track.languageCode,
+                    codec: track.codec,
+                    codecString: codecString,
+                    duration: duration,
+                    width: track.width || track.displayWidth,
+                    height: track.height || track.displayHeight,
+                    displayWidth: track.displayWidth,
+                    displayHeight: track.displayHeight,
+                    codedWidth: track.codedWidth,
+                    codedHeight: track.codedHeight,
+                    rotation: track.rotation || 0,
+                    channels: track.numberOfChannels,
+                    sampleRate: track.sampleRate,
+                    // Keep reference to track for internal use if needed (e.g. in getMetadata)
+                    _track: track
+                };
+            }));
+        };
+
+        const videoTracksInfo = await formatTrackInfo(videoTracks);
+        const audioTracksInfo = await formatTrackInfo(audioTracks);
+
+        return {
+            video: videoTracksInfo,
+            audio: audioTracksInfo
+        };
+    }
+
+    /**
      * Get tracks from media
      * @param {Blob|File} source
      * @returns {Promise<{video: Array, audio: Array}>}
@@ -246,75 +291,62 @@ export class MediaProcessor {
         });
 
         try {
-            const videoTracks = await input.getVideoTracks();
-            const audioTracks = await input.getAudioTracks();
-
-            const formatTrackInfo = async (tracks) => {
-                return Promise.all(tracks.map(async (track) => {
-                    const duration = await track.computeDuration();
-                    const codecString = await track.getCodecParameterString();
-                    return {
-                        id: track.id,
-                        type: track.type,
-                        language: track.languageCode,
-                        codec: track.codec,
-                        codecString: codecString,
-                        duration: duration,
-                        width: track.displayWidth,
-                        height: track.displayHeight,
-                        channels: track.numberOfChannels,
-                        sampleRate: track.sampleRate,
-                    };
-                }));
-            };
-
-            const videoTracksInfo = await formatTrackInfo(videoTracks);
-            const audioTracksInfo = await formatTrackInfo(audioTracks);
-
-            return {
-                video: videoTracksInfo,
-                audio: audioTracksInfo
-            };
+            const details = await this._getTrackDetails(input);
+            // Remove internal _track reference before returning to public API
+            details.video.forEach(t => delete t._track);
+            details.audio.forEach(t => delete t._track);
+            return details;
         } finally {
-            // Clean up
-            // MediaBunny handles cleanup internally
+            if (input && typeof input.dispose === 'function') {
+                try {
+                    input.dispose();
+                } catch (e) {
+                    console.warn('Error disposing input in getTracks:', e);
+                }
+            }
         }
     }
 
     /**
      * Get formatted metadata for caching
      * Returns videoInfo and audioInfo objects ready to be stored on playlist items
-     * @param {Blob|File} source 
+     * @param {Blob|File|string} source 
      * @returns {Promise<{videoInfo: Object|null, audioInfo: Object|null, duration: number}>}
      */
     static async getMetadata(source) {
-        const blobSource = new MediaBunny.BlobSource(source);
+        let inputSource;
+        if (typeof source === 'string') {
+            inputSource = new MediaBunny.UrlSource(source);
+        } else {
+            inputSource = new MediaBunny.BlobSource(source);
+        }
+
         const input = new MediaBunny.Input({
-            source: blobSource,
+            source: inputSource,
             formats: MediaBunny.ALL_FORMATS
         });
 
         try {
-            const videoTracks = await input.getVideoTracks();
-            const audioTracks = await input.getAudioTracks();
+            const { video, audio } = await this._getTrackDetails(input);
 
             let videoInfo = null;
             let audioInfo = null;
             let duration = 0;
 
             // Extract video metadata
-            if (videoTracks && videoTracks.length > 0) {
-                const videoTrack = videoTracks[0]; // Use primary track
-                duration = await videoTrack.computeDuration();
+            if (video && video.length > 0) {
+                const videoTrackInfo = video[0]; // Use primary track
+                const videoTrack = videoTrackInfo._track;
+                duration = videoTrackInfo.duration;
 
                 videoInfo = {
-                    width: videoTrack.width || videoTrack.displayWidth,
-                    height: videoTrack.height || videoTrack.displayHeight,
+                    width: videoTrackInfo.width,
+                    height: videoTrackInfo.height,
                     displayWidth: videoTrack.displayWidth,
                     displayHeight: videoTrack.displayHeight,
                     codedWidth: videoTrack.codedWidth,
                     codedHeight: videoTrack.codedHeight,
-                    codec: videoTrack.codec,
+                    codec: videoTrackInfo.codec,
                     rotation: videoTrack.rotation || 0,
                     hasHDR: false // Computed on-demand if needed
                 };
@@ -332,17 +364,17 @@ export class MediaProcessor {
             }
 
             // Extract audio metadata
-            if (audioTracks && audioTracks.length > 0) {
-                const audioTrack = audioTracks[0]; // Use primary track
+            if (audio && audio.length > 0) {
+                const audioTrackInfo = audio[0]; // Use primary track
                 if (!duration) {
-                    duration = await audioTrack.computeDuration();
+                    duration = audioTrackInfo.duration;
                 }
 
                 audioInfo = {
-                    codec: audioTrack.codec,
-                    channels: audioTrack.numberOfChannels,
-                    sampleRate: audioTrack.sampleRate,
-                    languageCode: audioTrack.languageCode
+                    codec: audioTrackInfo.codec,
+                    channels: audioTrackInfo.channels,
+                    sampleRate: audioTrackInfo.sampleRate,
+                    languageCode: audioTrackInfo.language
                 };
             }
 

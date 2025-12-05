@@ -22,11 +22,7 @@ export class MediaMetadata {
                 if (onUpdate) onUpdate(item);
 
                 try {
-                    const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(item.file);
-
-                    item.duration = formatDuration(duration);
-                    item.videoInfo = videoInfo;
-                    item.audioInfo = audioInfo;
+                    await this.ensureMetadata(item, onSave);
 
                     // Update UI with actual data
                     if (onUpdate) onUpdate(item);

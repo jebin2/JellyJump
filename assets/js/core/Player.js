@@ -1012,7 +1012,20 @@ export class CorePlayer {
         // Reset state
         this.currentTime = 0;
         this.duration = 0;
+        // Dispose MediaBunny resources
+        if (this.videoSink && typeof this.videoSink.dispose === 'function') {
+            try { this.videoSink.dispose(); } catch (e) { console.warn('Error disposing videoSink:', e); }
+        }
+        if (this.audioSink && typeof this.audioSink.dispose === 'function') {
+            try { this.audioSink.dispose(); } catch (e) { console.warn('Error disposing audioSink:', e); }
+        }
+        if (this.input && typeof this.input.dispose === 'function') {
+            try { this.input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+        }
+
         this.input = null;
+        this.videoSink = null;
+        this.audioSink = null;
         this.videoTrack = null;
         this.audioTrack = null;
         this.videoFrameIterator = null;
@@ -1088,8 +1101,20 @@ export class CorePlayer {
             }
             this._updateTimeDisplay();
 
+            // Dispose previous resources
+            if (this.videoSink && typeof this.videoSink.dispose === 'function') {
+                try { this.videoSink.dispose(); } catch (e) { console.warn('Error disposing videoSink:', e); }
+            }
+            if (this.audioSink && typeof this.audioSink.dispose === 'function') {
+                try { this.audioSink.dispose(); } catch (e) { console.warn('Error disposing audioSink:', e); }
+            }
+            if (this.input && typeof this.input.dispose === 'function') {
+                try { this.input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+            }
+
             this.videoSink = null;
             this.audioSink = null;
+            this.input = null;
 
             this.ui.loader.classList.add('visible');
             console.log(`Loading media: ${url}`);
