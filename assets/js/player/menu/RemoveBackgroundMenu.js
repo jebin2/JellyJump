@@ -443,7 +443,7 @@ export class RemoveBackgroundMenu {
                 const newItem = {
                     title: filename,
                     url: url,
-                    duration: item.duration, // Approx same duration
+                    duration: null, // Let metadata fetcher populate this
                     thumbnail: item.thumbnail, // Use original thumbnail for now
                     isLocal: true,
                     file: new File([processedBlob], filename, { type: `video/${ext}` }),
@@ -457,6 +457,7 @@ export class RemoveBackgroundMenu {
                 } else {
                     playlist.items.push(newItem);
                 }
+                await playlist._ensureMetadata(newItem);
 
                 playlist._saveState();
                 playlist.render();

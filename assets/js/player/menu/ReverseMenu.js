@@ -172,7 +172,7 @@ export class ReverseMenu {
                 const newItem = {
                     title: filename,
                     url: url,
-                    duration: formatDuration(videoDuration),
+                    duration: null, // Let metadata fetcher populate this
                     thumbnail: item.thumbnail, // Use original thumbnail for now
                     isLocal: true,
                     file: new File([reversedBlob], filename, { type: 'video/mp4' }),
@@ -186,6 +186,7 @@ export class ReverseMenu {
                 } else {
                     playlist.items.push(newItem);
                 }
+                await playlist._ensureMetadata(newItem);
 
                 // Mark as new (visual effect)
                 // We'll handle this by re-rendering and highlighting
