@@ -6,6 +6,7 @@ import { Modal } from './Modal.js';
 import { MenuRouter } from './menu/MenuRouter.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
+import { FileDropHandler } from '../utils/FileDropHandler.js';
 import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
 
 /**
@@ -47,8 +48,8 @@ export class Playlist {
         this._createHeader();
         this._createListContainer();
 
-        // Drag and Drop Events
-        this._attachDragEvents();
+        // Setup Drag and Drop
+        this.fileDropHandler = new FileDropHandler(this.container, (files) => this.handleFiles(files));
 
         // Note: Auto-play next would require CorePlayer to emit a custom event
         // when video ends. For now, this is not implemented.
@@ -411,94 +412,6 @@ export class Playlist {
         const activeItem = this.items[this.activeIndex];
         const currentTime = this.player?.currentTime || 0;
         PlaylistStorage.savePlaybackProgress(activeItem, this.activeIndex, currentTime);
-    }
-
-    /**
-     * Attach drag and drop listeners
-     * @private
-     */
-    _attachDragEvents() {
-        const section = this.container.closest('.playlist-section');
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            section.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            }, false);
-        });
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            section.addEventListener(eventName, () => {
-                section.classList.add('drag-over');
-            }, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            section.addEventListener(eventName, () => {
-                section.classList.remove('drag-over');
-            }, false);
-        });
-
-        section.addEventListener('drop', async (e) => {
-            const dt = e.dataTransfer;
-            const items = dt.items;
-
-            if (items) {
-                // Use DataTransferItemList interface to access the file(s)
-                const files = [];
-                const queue = [];
-
-                for (let i = 0; i < items.length; i++) {
-                    const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
-                    if (entry) {
-                        queue.push(this._scanEntry(entry));
-                    } else if (items[i].kind === 'file') {
-                        files.push(items[i].getAsFile());
-                    }
-                }
-
-                const scannedFiles = await Promise.all(queue);
-                const flatScanned = scannedFiles.flat();
-
-                // Combine simple files and scanned entries
-                const allFiles = [...files, ...flatScanned];
-                this.handleFiles(allFiles);
-            } else {
-                // Use DataTransfer interface to access the file(s)
-                this.handleFiles(dt.files);
-            }
-        }, false);
-    }
-
-    /**
-     * Recursively scan a FileSystemEntry
-     * @param {FileSystemEntry} entry 
-     * @returns {Promise<Array<File>>}
-     */
-    _scanEntry(entry) {
-        return new Promise((resolve) => {
-            if (entry.isFile) {
-                entry.file(file => {
-                    // Patch webkitRelativePath if missing (it usually is for dropped files)
-                    if (!file.webkitRelativePath && entry.fullPath) {
-                        // entry.fullPath usually starts with /
-                        Object.defineProperty(file, 'webkitRelativePath', {
-                            value: entry.fullPath.substring(1)
-                        });
-                    }
-                    resolve([file]);
-                });
-            } else if (entry.isDirectory) {
-                const dirReader = entry.createReader();
-                dirReader.readEntries(async (entries) => {
-                    const promises = entries.map(e => this._scanEntry(e));
-                    const results = await Promise.all(promises);
-                    resolve(results.flat());
-                });
-            } else {
-                resolve([]);
-            }
-        });
     }
 
     /**
