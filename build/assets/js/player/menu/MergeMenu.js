@@ -1,0 +1,1 @@
+import{Modal}from"../Modal.js";export class MergeMenu{static async init(e,a){await a._openMergeModal(a.items.indexOf(e))}}
