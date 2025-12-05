@@ -490,6 +490,31 @@ export class Playlist {
         return await MediaMetadata.getVideoDuration(resource);
     }
 
+    /**
+     * Prefetch metadata for a video asynchronously (non-blocking)
+     * This improves UX when user opens Video Info or uses operations
+     * @param {Object} item - Playlist item
+     * @private
+     */
+    async _prefetchMetadata(item) {
+        // Don't prefetch if already cached
+        if (item.videoInfo || item.audioInfo) {
+            console.log('[Playlist] Metadata already cached for:', item.title);
+            return;
+        }
+
+        // Don't block - this runs in background
+        try {
+            console.log('[Playlist] Prefetching metadata for:', item.title);
+            await this._ensureMetadata(item);
+            console.log('[Playlist] Metadata prefetch complete:', item.title);
+        } catch (error) {
+            console.warn('[Playlist] Metadata prefetch failed for:', item.title, error);
+            // Non-critical error - will retry if user opens info/trim
+        }
+    }
+
+
     _updateItemUI(item) {
         // Find the element
         const index = this.items.indexOf(item);
@@ -628,6 +653,9 @@ export class Playlist {
 
         // Auto play if not the first load (optional logic)
         this.player.play();
+
+        // Prefetch metadata asynchronously (non-blocking)
+        this._prefetchMetadata(video);
     }
 
     /**
