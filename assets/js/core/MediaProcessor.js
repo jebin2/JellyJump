@@ -847,4 +847,182 @@ export class MediaProcessor {
             video.load(); // Force release of video resources
         }
     }
+    /**
+     * Reverse video playback
+     * @param {Object} options
+     * @param {Blob|File} options.source
+     * @param {boolean} options.includeAudio
+     * @param {Function} [options.onProgress]
+     * @returns {Promise<Blob>}
+     */
+    static async reverseVideo({ source, includeAudio = false, onProgress }) {
+        console.log('[MediaProcessor] Starting video reversal...');
+
+        const blobSource = new MediaBunny.BlobSource(source);
+        const input = new MediaBunny.Input({
+            source: blobSource,
+            formats: MediaBunny.ALL_FORMATS
+        });
+
+        let output = null;
+        let canvasSource = null;
+        let audioSource = null;
+
+        // Use OffscreenCanvas if available, otherwise regular canvas
+        const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+        let canvas = null;
+        let ctx = null;
+
+        try {
+            // Step 1: Analyze input
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error('No video track found');
+
+            const width = videoTrack.displayWidth || videoTrack.codedWidth;
+            const height = videoTrack.displayHeight || videoTrack.codedHeight;
+            const duration = await videoTrack.computeDuration();
+            const fps = videoTrack.nominalFrameRate || 30; // Target FPS
+
+            console.log(`[MediaProcessor] Source: ${width}x${height}, ${duration}s, ${fps}fps`);
+
+            // Step 2: Setup Output
+            const outputFormat = new MediaBunny.Mp4OutputFormat();
+            output = new MediaBunny.Output({
+                format: outputFormat,
+                target: new MediaBunny.BufferTarget()
+            });
+
+            // Setup Canvas for encoding
+            if (useOffscreen) {
+                canvas = new OffscreenCanvas(width, height);
+            } else {
+                canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+            }
+            ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+            canvasSource = new MediaBunny.CanvasSource(canvas, {
+                codec: 'avc',
+                bitrate: 5000000, // 5 Mbps
+                frameRate: fps
+            });
+
+            output.addVideoTrack(canvasSource, { frameRate: fps });
+
+            // Setup Audio (if requested)
+            if (includeAudio) {
+                const audioTrack = await input.getPrimaryAudioTrack();
+                if (audioTrack) {
+                    const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
+                    if (supportedCodecs.length > 0) {
+                        audioSource = new MediaBunny.AudioSampleSampleSource({
+                            codec: supportedCodecs[0],
+                            bitrate: 128000
+                        });
+                        output.addAudioTrack(audioSource);
+                    }
+                }
+            }
+
+            await output.start();
+
+            // Step 3: Extract Frames
+            console.log('[MediaProcessor] Extracting frames...');
+            const frames = [];
+            const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
+
+            let extractedCount = 0;
+
+            // Temporary canvas for extraction
+            let tempCanvas;
+            let tempCtx;
+            if (useOffscreen) {
+                tempCanvas = new OffscreenCanvas(width, height);
+            } else {
+                tempCanvas = document.createElement('canvas');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+            }
+            tempCtx = tempCanvas.getContext('2d');
+
+            for await (const sample of videoSink.samples()) {
+                // Update progress (0-40%)
+                if (onProgress) onProgress(extractedCount / (duration * fps) * 0.4);
+
+                // Draw to temp canvas
+                sample.draw(tempCtx, 0, 0, width, height);
+
+                // Create bitmap
+                const bitmap = await createImageBitmap(tempCanvas);
+                frames.push({
+                    bitmap: bitmap,
+                    duration: sample.duration || (1 / fps)
+                });
+
+                sample.close();
+                extractedCount++;
+            }
+
+            console.log(`[MediaProcessor] Extracted ${frames.length} frames`);
+
+            // Step 4: Reverse and Encode
+            console.log('[MediaProcessor] Encoding reversed frames...');
+
+            // Reverse frames array
+            frames.reverse();
+
+            let currentTime = 0;
+            for (let i = 0; i < frames.length; i++) {
+                const frame = frames[i];
+
+                // Update progress (40-90%)
+                if (onProgress) onProgress(0.4 + (i / frames.length * 0.5));
+
+                // Draw bitmap to encoding canvas
+                ctx.drawImage(frame.bitmap, 0, 0);
+
+                // Add to output
+                await canvasSource.add(currentTime, frame.duration);
+
+                currentTime += frame.duration;
+
+                // Cleanup bitmap
+                frame.bitmap.close();
+            }
+
+            // Step 5: Handle Audio (if requested)
+            if (includeAudio && audioSource) {
+                // TODO: Implement audio reversal
+                // For now, we'll skip complex audio reversal as it requires decoding all audio, 
+                // reversing the buffer, and re-encoding.
+                console.warn('[MediaProcessor] Audio reversal not fully implemented yet');
+            }
+
+            // Step 6: Finalize
+            console.log('[MediaProcessor] Finalizing...');
+            canvasSource.close();
+            if (audioSource) audioSource.close();
+            await output.finalize();
+
+            if (onProgress) onProgress(1.0);
+
+            return new Blob([output.target.buffer], { type: 'video/mp4' });
+
+        } finally {
+            // Cleanup
+            if (input && typeof input.dispose === 'function') {
+                try { input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+            }
+            if (output && typeof output.dispose === 'function') {
+                try { output.dispose(); } catch (e) { console.warn('Error disposing output:', e); }
+            }
+            if (canvasSource && typeof canvasSource.dispose === 'function') {
+                try { canvasSource.dispose(); } catch (e) { console.warn('Error disposing canvasSource:', e); }
+            }
+            if (audioSource && typeof audioSource.dispose === 'function') {
+                try { audioSource.dispose(); } catch (e) { console.warn('Error disposing audioSource:', e); }
+            }
+        }
+    }
 }

@@ -54,6 +54,10 @@
             <span class="menu-icon">🎞️</span>
             <span class="menu-label">Create GIF...</span>
         </div>
+        <div class="playlist-menu-item" data-action="reverse" role="menuitem">
+            <span class="menu-icon">⏪</span>
+            <span class="menu-label">Reverse Video...</span>
+        </div>
         <div class="menu-divider"></div>
         <div class="playlist-menu-item" data-action="info" role="menuitem">
             <div class="menu-icon">
@@ -1348,6 +1352,97 @@
                 <use href="assets/icons/sprite.svg#icon-copy"></use>
             </svg>
             <span>Copy All</span>
+        </button>
+    </div>
+</template>
+
+<!-- Reverse Content Template -->
+<template id="reverse-content-template">
+    <div class="source-info mb-md">
+        <span class="text-secondary text-sm font-mono">SOURCE:</span>
+        <div class="source-filename text-base font-bold truncate" title=""></div>
+        <div class="source-details text-xs text-muted mt-xs">
+            <span class="source-duration"></span> • <span class="source-resolution"></span>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="reverse-loading flex flex-col items-center justify-center p-xl text-muted">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Loading video info...</span>
+    </div>
+
+    <div class="reverse-content hidden">
+        <div class="info-text mb-lg p-sm bg-tertiary rounded text-sm text-secondary">
+            This will create a new video that plays in reverse.
+        </div>
+
+        <!-- Audio Options -->
+        <div class="options-group mb-lg">
+            <div class="text-xs text-secondary font-mono mb-sm">AUDIO OPTIONS</div>
+            <label class="checkbox-option mb-sm">
+                <input type="checkbox" name="includeAudio" id="reverse-include-audio">
+                <span class="checkbox-custom"></span>
+                <span class="checkbox-label">Include reversed audio</span>
+            </label>
+            <div class="audio-warning hidden text-xs text-accent ml-lg">
+                ⚠️ Audio reversal is experimental and may take longer.
+            </div>
+            <div class="audio-info text-xs text-muted ml-lg">
+                Audio will be removed by default.
+            </div>
+        </div>
+
+        <!-- Processing Info -->
+        <div class="processing-info mb-lg hidden">
+            <div class="warning-message p-sm border-warning text-warning text-sm mb-sm hidden" id="long-video-warning">
+                ⚠️ Long video detected. Processing may take several minutes.
+            </div>
+            <div class="estimated-time text-xs text-secondary">
+                Estimated time: <span class="time-value">Calculating...</span>
+            </div>
+        </div>
+
+        <!-- Progress Section (Hidden by default) -->
+        <div class="progress-section hidden">
+            <div class="flex-between mb-xs">
+                <span class="progress-status text-sm font-mono">Extracting frames...</span>
+                <span class="progress-percentage text-sm font-bold">0%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" style="width: 0%"></div>
+            </div>
+            <div class="text-xs text-secondary mt-xs text-right frame-counter">
+                Frame 0 / 0
+            </div>
+        </div>
+
+        <!-- Error Message (Hidden by default) -->
+        <div class="error-message hidden mt-md p-sm border-danger text-danger text-sm"></div>
+
+        <!-- Success Message (Hidden by default) -->
+        <div class="success-message hidden mt-md p-sm border-success text-success text-sm">
+            Video reversed! Added to playlist.
+        </div>
+    </div>
+</template>
+
+<!-- Reverse Footer Template -->
+<template id="reverse-footer-template">
+    <div class="action-buttons flex gap-sm">
+        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download Reversed Video"
+            aria-label="Download" download>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-download"></use>
+            </svg>
+            <span>Download Reversed Video</span>
+        </a>
+        <button class="btn jellyjump-btn-secondary hidden try-again-btn" title="Try Again" aria-label="Try Again">
+            Try Again
+        </button>
+        <button class="btn jellyjump-btn-primary reverse-btn" title="Start Reversal" aria-label="Start Reversal">
+            Start Reversal
         </button>
     </div>
 </template>

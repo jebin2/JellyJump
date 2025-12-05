@@ -5,6 +5,7 @@ import { GifMenu } from './GifMenu.js';
 import { InfoMenu } from './InfoMenu.js';
 import { MergeMenu } from './MergeMenu.js';
 import { TrackManagerMenu } from './TrackManagerMenu.js';
+import { ReverseMenu } from './ReverseMenu.js';
 
 /**
  * Menu Router
@@ -39,6 +40,9 @@ export class MenuRouter {
                 break;
             case 'create-gif':
                 await GifMenu.init(item, playlist);
+                break;
+            case 'reverse':
+                await ReverseMenu.init(item, playlist);
                 break;
             case 'info':
                 await InfoMenu.init(item, playlist);
