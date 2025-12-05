@@ -120,7 +120,6 @@ export class MergeMenu {
 
             videoItems.forEach((item, idx) => {
                 const el = itemTemplate.content.cloneNode(true).querySelector('.merge-item');
-                el.querySelector('.drag-handle').remove();
                 el.querySelector('.remove-item-btn').remove();
 
                 const titleEl = el.querySelector('.item-title');

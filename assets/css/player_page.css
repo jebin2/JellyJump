@@ -534,10 +534,14 @@
     background-color: var(--bg-tertiary);
     border: 2px solid var(--border-color);
     border-radius: 6px;
-    cursor: pointer;
+    cursor: grab;
     transition: all 0.2s ease;
     user-select: none;
     position: relative;
+}
+
+.merge-item:active {
+    cursor: grabbing;
 }
 
 .merge-item:last-child {
@@ -609,25 +613,6 @@
 
 .selected-list .merge-item:hover {
     background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Drag handle */
-.merge-item__drag-handle {
-    flex-shrink: 0;
-    cursor: grab;
-    color: var(--text-secondary);
-    font-size: 1.2rem;
-    line-height: 1;
-    opacity: 0.5;
-    transition: opacity 0.2s ease;
-}
-
-.merge-item:hover .merge-item__drag-handle {
-    opacity: 1;
-}
-
-.merge-item__drag-handle:active {
-    cursor: grabbing;
 }
 
 /* Thumbnail */
