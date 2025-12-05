@@ -69,8 +69,17 @@
     <!-- Hidden Download Anchor (reusable) -->
     <a id="mb-download-link" style="display: none;"></a>
 
+    <!-- Import Map: Redirect CDN imports to local files -->
+    <script type="importmap">
+    {
+        "imports": {
+            "/npm/mediabunny@1.25.6/+esm": "./assets/js/lib/mediabunny.js"
+        }
+    }
+    </script>
+
     <!-- GIF Encoder Library (local copy for Electron compatibility) -->
-    <script src="assets/js/lib/gif.min.js"></script>
+    <script type="module" src="assets/js/lib/gif.js"></script>
 
     <!-- Scripts -->
     <script type="module">
