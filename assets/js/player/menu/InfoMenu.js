@@ -40,8 +40,6 @@ export class InfoMenu {
             // Ensure metadata is cached
             await playlist._ensureMetadata(item);
 
-            let videoTrack = null;
-
             // Build metadata from cached data
             const formatBytes = (bytes, decimals = 1) => {
                 if (bytes === 0) return '0 Bytes';
@@ -66,6 +64,19 @@ export class InfoMenu {
                 }
             }
 
+            // Format FPS and Bitrate
+            let fps = 'Unknown';
+            let bitrate = 'Unknown';
+
+            if (item.videoInfo) {
+                if (item.videoInfo.fps) {
+                    fps = `${item.videoInfo.fps} fps`;
+                }
+                if (item.videoInfo.bitrate) {
+                    bitrate = `${(item.videoInfo.bitrate / 1000000).toFixed(1)} Mbps`;
+                }
+            }
+
             const metadata = {
                 filename: item.title,
                 format: item.file ? item.file.type.split('/')[0] : 'Unknown',
@@ -78,8 +89,8 @@ export class InfoMenu {
                 videoCodecString: item.videoInfo ? item.videoInfo.codec : 'N/A',
                 resolution: item.videoInfo ? `${item.videoInfo.width}x${item.videoInfo.height}` : 'N/A',
                 codedResolution: item.videoInfo ? `${item.videoInfo.codedWidth}x${item.videoInfo.codedHeight}` : 'N/A',
-                fps: 'Calculating...', // Will be updated with packet stats
-                videoBitrate: 'Calculating...',
+                fps: fps,
+                videoBitrate: bitrate,
                 rotation: item.videoInfo ? `${item.videoInfo.rotation}°` : 'N/A',
                 hdr: item.videoInfo ? (item.videoInfo.hasHDR ? 'Yes' : 'No') : 'N/A',
 
@@ -91,19 +102,9 @@ export class InfoMenu {
                 language: item.audioInfo ? (item.audioInfo.languageCode === 'und' ? 'Undetermined' : item.audioInfo.languageCode) : 'N/A'
             };
 
-            // For packet stats, we still need to get the video track
-            if (item.videoInfo && item.file) {
-                try {
-                    const tracks = await MediaProcessor.getTracks(item.file);
-                    videoTrack = tracks.video ? tracks.video[0] : null;
-                } catch (e) {
-                    console.warn('Could not get video track for packet stats:', e);
-                }
-            }
-
             // Hide loading, show content
-            loadingEl.classList.add('hidden');
-            contentEl.classList.remove('hidden');
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (contentEl) contentEl.classList.remove('hidden');
 
             // Populate UI
             Object.keys(metadata).forEach(key => {
@@ -118,46 +119,6 @@ export class InfoMenu {
 
             // Store raw metadata for "Copy All"
             modal.body.dataset.rawInfo = JSON.stringify(metadata);
-
-            // Async update for stats
-            if (videoTrack) {
-                videoTrack.computePacketStats(50).then(stats => {
-                    // Re-fetch elements as they are in the DOM now
-                    const fpsEl = modalContent.querySelector('.info-value[data-key="fps"]');
-                    const bitrateEl = modalContent.querySelector('.info-value[data-key="videoBitrate"]');
-
-                    // Update metadata object
-                    const currentMetadata = JSON.parse(modal.body.dataset.rawInfo || '{}');
-
-                    if (fpsEl) {
-                        const fps = Math.round(stats.averagePacketRate);
-                        const fpsText = `${fps} fps`;
-                        fpsEl.textContent = fpsText;
-
-                        // Update copy button
-                        const btn = fpsEl.parentElement.querySelector('.copy-btn');
-                        if (btn) btn.dataset.value = fpsText;
-
-                        currentMetadata.fps = fpsText;
-                    }
-
-                    if (bitrateEl) {
-                        const bitrate = (stats.averageBitrate / 1000000).toFixed(1);
-                        const bitrateText = `${bitrate} Mbps`;
-                        bitrateEl.textContent = bitrateText;
-
-                        // Update copy button
-                        const btn = bitrateEl.parentElement.querySelector('.copy-btn');
-                        if (btn) btn.dataset.value = bitrateText;
-
-                        currentMetadata.videoBitrate = bitrateText;
-                    }
-
-                    // Update raw info for copy all
-                    modal.body.dataset.rawInfo = JSON.stringify(currentMetadata);
-
-                }).catch(console.error);
-            }
 
         } catch (e) {
             console.error('Failed to load video info:', e);

@@ -81,43 +81,13 @@ export class RemoveBackgroundMenu {
             if (selectedColors.length === 0) return;
 
             const imageData = ctx.getImageData(0, 0, width, height);
-            const data = imageData.data;
 
             const bgType = Array.from(bgTypeRadios).find(r => r.checked).value;
-            let bgR, bgG, bgB;
+            const bgColor = customBgColorInput.value;
 
-            if (bgType === 'custom') {
-                const hex = customBgColorInput.value;
-                const rgb = hexToRgb(hex);
-                bgR = rgb ? rgb.r : 0;
-                bgG = rgb ? rgb.g : 0;
-                bgB = rgb ? rgb.b : 0;
-            }
+            // Use shared logic for consistent results
+            MediaProcessor.applyChromaKey(imageData, selectedColors, bgType, bgColor);
 
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-
-                for (const color of selectedColors) {
-                    const dist = Math.sqrt(
-                        Math.pow(r - color.r, 2) +
-                        Math.pow(g - color.g, 2) +
-                        Math.pow(b - color.b, 2)
-                    );
-
-                    if (dist <= color.tolerance) {
-                        if (bgType === 'transparent') {
-                            data[i + 3] = 0; // Alpha 0
-                        } else {
-                            data[i] = bgR;
-                            data[i + 1] = bgG;
-                            data[i + 2] = bgB;
-                        }
-                        break;
-                    }
-                }
-            }
             ctx.putImageData(imageData, 0, 0);
         };
 
@@ -344,16 +314,17 @@ export class RemoveBackgroundMenu {
 
             // Pause player
             if (player) player.pause();
-
             try {
                 const bgType = Array.from(bgTypeRadios).find(r => r.checked).value;
                 const bgColor = customBgColorInput.value;
 
-                const processedBlob = await MediaProcessor.removeBackground({
+                const processedBlob = await MediaProcessor.process({
                     source: sourceBlob,
-                    colors: selectedColors,
-                    bgType: bgType,
-                    bgColor: bgColor,
+                    removeBackgroundOptions: {
+                        colors: selectedColors,
+                        bgType: bgType,
+                        bgColor: bgColor
+                    },
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
                         progressBar.style.width = `${pct}%`;

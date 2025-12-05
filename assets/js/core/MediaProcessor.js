@@ -7,70 +7,165 @@ import GIF from '../lib/gif.js';
  */
 export class MediaProcessor {
     /**
+     * Calculate target bitrate based on quality and resolution
+     * @param {number|string} quality - 0-100 or 'high'/'medium'/'low'
+     * @param {number} pixelCount - Width * Height
+     * @returns {number} Bitrate in bits per second
+     */
+    static _getBitrate(quality, pixelCount) {
+        let q = 80;
+        if (typeof quality === 'number') {
+            q = quality;
+        } else if (quality === 'high') {
+            q = 90;
+        } else if (quality === 'medium') {
+            q = 60;
+        } else if (quality === 'low') {
+            q = 30;
+        }
+
+        // Base bitrate for 720p (approx 0.9M pixels)
+        const basePixels = 1280 * 720;
+        const baseBitrate = 2500000; // 2.5 Mbps
+
+        // Scale by pixel count
+        const pixelFactor = pixelCount > 0 ? pixelCount / basePixels : 1;
+
+        // Calculate target
+        let targetBitrate = baseBitrate * pixelFactor * (q / 80);
+
+        // Clamp limits (500 Kbps - 50 Mbps)
+        return Math.floor(Math.max(500000, Math.min(50000000, targetBitrate)));
+    }
+
+    /**
      * Process video (transcode, trim, resize, etc.)
      * @param {Object} options
      * @param {Blob|File} options.source
      * @param {string} options.format - 'mp4', 'webm', 'mov'
      * @param {number} options.quality - 0-100
-     * @param {Object} [options.trim] - { start: number, end: number }
-     * @param {Object} [options.resize] - { width: number, height: number }
+     * @param {Object} [options.trim] - { start, end } in seconds
+     * @param {Object} [options.resolution] - { width, height }
+     * @param {Object} [options.removeBackgroundOptions] - { colors, bgType, bgColor }
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async process({ source, format, quality, trim, resize, onProgress }) {
-        const blobSource = new MediaBunny.BlobSource(source);
-        const input = new MediaBunny.Input({ source: blobSource, formats: MediaBunny.ALL_FORMATS });
-
-        let outputFormat;
-        switch (format) {
-            case 'mp4':
-                outputFormat = new MediaBunny.Mp4OutputFormat();
-                break;
-            case 'webm':
-                outputFormat = new MediaBunny.WebMOutputFormat();
-                break;
-            case 'mov':
-                outputFormat = new MediaBunny.QuickTimeOutputFormat();
-                break;
-            default:
-                throw new Error(`Unsupported format: ${format}`);
-        }
-
-        const output = new MediaBunny.Output({
-            format: outputFormat,
-            target: new MediaBunny.BufferTarget()
-        });
+    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, removeBackgroundOptions = null, onProgress }) {
+        console.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, removeBackgroundOptions });
 
         let conversion = null;
+        let videoUrl = null;
+        let input = null;
+        let output = null;
+
+        // If removing background, we need to handle it via the process callback
+        // and potentially force transcoding to a format that supports alpha (WebM) if transparent
+        if (removeBackgroundOptions && removeBackgroundOptions.bgType === 'transparent') {
+            format = 'webm';
+        }
 
         try {
-            let videoConfig = {};
+            const blobSource = new MediaBunny.BlobSource(source);
+            input = new MediaBunny.Input({
+                source: blobSource,
+                formats: MediaBunny.ALL_FORMATS
+            });
 
-            if (quality < 100) {
-                let bitrate;
-                if (quality >= 80) bitrate = 2500000;
-                else if (quality >= 60) bitrate = 1500000;
-                else bitrate = 800000;
+            // Get video track to determine dimensions if needed
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error('No video track found');
 
-                videoConfig = {
-                    bitrate: bitrate,
-                    forceTranscode: true
-                };
+            const originalWidth = videoTrack.displayWidth || videoTrack.codedWidth;
+            const originalHeight = videoTrack.displayHeight || videoTrack.codedHeight;
+
+            // Configure Output Format
+            let outputFormat;
+            if (format === 'gif') {
+                // ... GIF logic remains separate for now as it uses a different pipeline ...
+                return this.createGif({ source, trim, onProgress });
+            } else if (format === 'webm') {
+                outputFormat = new MediaBunny.WebMOutputFormat();
+            } else {
+                outputFormat = new MediaBunny.Mp4OutputFormat();
             }
 
-            if (resize && resize.width && resize.height) {
-                videoConfig.width = resize.width;
-                videoConfig.height = resize.height;
-                videoConfig.fit = 'fill';
-                videoConfig.forceTranscode = true;
+            output = new MediaBunny.Output({
+                format: outputFormat,
+                target: new MediaBunny.BufferTarget()
+            });
+
+            // Configure Video Options
+            const videoConfig = {
+                codec: format === 'webm' ? 'vp9' : 'avc', // VP9 for WebM (alpha support), AVC for MP4
+                bitrate: this._getBitrate(quality, originalWidth * originalHeight),
+                forceTranscode: true // Ensure quality settings are applied
+            };
+
+            // Resolution
+            if (resolution) {
+                videoConfig.width = resolution.width;
+                videoConfig.height = resolution.height;
+                videoConfig.fit = 'fill'; // Use fill as requested
             }
 
-            conversion = await MediaBunny.Conversion.init({
+            // Process callback for frame manipulation
+            // We define this generically so it can be extended for other features
+            const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+            let canvas = null;
+            let ctx = null;
+
+            videoConfig.process = (sample) => {
+                // If no processing options are active, return sample as-is
+                if (!removeBackgroundOptions) {
+                    return sample;
+                }
+
+                const width = sample.codedWidth;
+                const height = sample.codedHeight;
+
+                if (!canvas || canvas.width !== width || canvas.height !== height) {
+                    if (useOffscreen) {
+                        canvas = new OffscreenCanvas(width, height);
+                    } else {
+                        canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                    }
+                    ctx = canvas.getContext('2d', { willReadFrequently: true });
+                }
+
+                // Draw frame
+                ctx.clearRect(0, 0, width, height);
+                sample.draw(ctx, 0, 0, width, height);
+
+                // Get image data
+                const imageData = ctx.getImageData(0, 0, width, height);
+
+                // Apply Background Removal if requested
+                if (removeBackgroundOptions) {
+                    const { colors, bgType, bgColor } = removeBackgroundOptions;
+                    MediaProcessor.applyChromaKey(imageData, colors, bgType, bgColor);
+                }
+
+                // Put modified data back
+                ctx.putImageData(imageData, 0, 0);
+
+                return canvas;
+            };
+
+            // Initialize Conversion
+            // Initialize Conversion
+            const conversionOptions = {
                 input: input,
                 output: output,
-                video: videoConfig,
-                trim: trim
-            });
+                video: videoConfig
+            };
+
+            if (trim) {
+                conversionOptions.trim = trim;
+            }
+
+            conversion = await MediaBunny.Conversion.init(conversionOptions);
 
             if (onProgress) {
                 conversion.onProgress = onProgress;
@@ -106,6 +201,35 @@ export class MediaProcessor {
             }
 
             conversion = null;
+        }
+    }
+
+    /**
+     * Get video packet statistics
+     * @param {Blob|File} source
+     * @param {number} count - Number of packets to analyze
+     * @returns {Promise<Object>}
+     */
+    static async getVideoStats(source, count = 50) {
+        const blobSource = new MediaBunny.BlobSource(source);
+        const input = new MediaBunny.Input({
+            source: blobSource,
+            formats: MediaBunny.ALL_FORMATS
+        });
+
+        try {
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) return null;
+
+            return await videoTrack.computePacketStats(count);
+        } finally {
+            if (input && typeof input.dispose === 'function') {
+                try {
+                    input.dispose();
+                } catch (e) {
+                    console.warn('Error disposing input in getVideoStats:', e);
+                }
+            }
         }
     }
 
@@ -194,6 +318,17 @@ export class MediaProcessor {
                     rotation: videoTrack.rotation || 0,
                     hasHDR: false // Computed on-demand if needed
                 };
+
+                // Calculate FPS and Bitrate
+                try {
+                    const stats = await videoTrack.computePacketStats(50);
+                    videoInfo.fps = Math.round(stats.averagePacketRate);
+                    videoInfo.bitrate = stats.averageBitrate;
+                } catch (e) {
+                    console.warn('Failed to compute packet stats:', e);
+                    videoInfo.fps = 0;
+                    videoInfo.bitrate = 0;
+                }
             }
 
             // Extract audio metadata
@@ -1076,4 +1211,98 @@ export class MediaProcessor {
             }
         }
     }
+
+    /**
+     * Apply chroma key to image data
+     * @param {ImageData} imageData - The image data to modify in-place
+     * @param {Array} colors - Array of {r, g, b, tolerance} objects
+     * @param {string} bgType - 'transparent' or 'custom'
+     * @param {string} bgColor - Hex color string for custom background
+     */
+    static applyChromaKey(imageData, colors, bgType = 'transparent', bgColor = '#000000') {
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+        const maxDist = 441.67; // Sqrt(255^2 + 255^2 + 255^2)
+
+        // Parse custom background color if needed
+        let bgR = 0, bgG = 0, bgB = 0;
+        if (bgType === 'custom') {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(bgColor);
+            if (result) {
+                bgR = parseInt(result[1], 16);
+                bgG = parseInt(result[2], 16);
+                bgB = parseInt(result[3], 16);
+            }
+        }
+
+        // Optimization: Pre-calculate key color values
+        const keyColors = colors.map(c => ({
+            r: c.r,
+            g: c.g,
+            b: c.b,
+            // Map tolerance (1-100) to similarity (0.0 - 1.0)
+            // Tolerance 10 -> Similarity 0.04 roughly
+            similarity: (c.tolerance / 100) * 0.4,
+            smoothness: 0.08, // Fixed for now
+            spill: 0.1 // Fixed for now
+        }));
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            let finalAlpha = 1.0;
+            let finalR = r;
+            let finalG = g;
+            let finalB = b;
+
+            // Check against all selected colors
+            for (const key of keyColors) {
+                const dist = Math.sqrt((r - key.r) ** 2 + (g - key.g) ** 2 + (b - key.b) ** 2);
+                const normalizedDist = dist / maxDist;
+
+                let alpha = 1.0;
+                if (normalizedDist < key.similarity) {
+                    alpha = 0.0;
+                } else if (normalizedDist < key.similarity + key.smoothness) {
+                    alpha = (normalizedDist - key.similarity) / key.smoothness;
+                }
+
+                // If this color matches better (lower alpha), use its result
+                if (alpha < finalAlpha) {
+                    finalAlpha = alpha;
+
+                    // Spill suppression
+                    if (alpha < 1.0 && key.spill > 0) {
+                        const gray = (r * 0.299 + g * 0.587 + b * 0.114);
+                        const spillFactor = key.spill * (1.0 - normalizedDist); // Simple spill model
+                        if (spillFactor > 0) {
+                            finalR = r * (1 - spillFactor) + gray * spillFactor;
+                            finalG = g * (1 - spillFactor) + gray * spillFactor;
+                            finalB = b * (1 - spillFactor) + gray * spillFactor;
+                        }
+                    }
+                }
+            }
+
+            // Apply result
+            if (bgType === 'transparent') {
+                data[i] = finalR;
+                data[i + 1] = finalG;
+                data[i + 2] = finalB;
+                data[i + 3] = finalAlpha * 255;
+            } else {
+                // Composite with custom background
+                // Result = Foreground * Alpha + Background * (1 - Alpha)
+                data[i] = finalR * finalAlpha + bgR * (1 - finalAlpha);
+                data[i + 1] = finalG * finalAlpha + bgG * (1 - finalAlpha);
+                data[i + 2] = finalB * finalAlpha + bgB * (1 - finalAlpha);
+                data[i + 3] = 255; // Full opacity for custom background
+            }
+        }
+    }
+
+
 }

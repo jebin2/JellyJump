@@ -179,7 +179,7 @@ export class ResizeMenu {
                     source: source,
                     format: 'mp4',
                     quality: 100,
-                    resize: { width: targetW, height: targetH },
+                    resolution: { width: targetW, height: targetH },
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
                         progressBarFill.style.width = `${percent}%`;
