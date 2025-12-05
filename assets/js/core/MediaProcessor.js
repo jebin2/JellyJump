@@ -1,4 +1,5 @@
 import { MediaBunny } from './MediaBunny.js';
+import GIF from '../lib/gif.js';
 
 /**
  * MediaProcessor
