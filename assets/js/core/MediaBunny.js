@@ -4,9 +4,8 @@
  */
 
 import * as MediaBunny from '../lib/mediabunny.js';
+import { registerMp3Encoder } from '../lib/mediabunny-mp3-encoder.js';
 
-// Import and register MP3 encoder extension
-const { registerMp3Encoder } = await import('../lib/mediabunny-mp3-encoder.js');
 registerMp3Encoder();
 
 export default MediaBunny;
