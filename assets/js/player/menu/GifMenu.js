@@ -88,7 +88,8 @@ export class GifMenu {
 
         // Load Video into Player
         if (player) {
-            const videoUrl = item.url || URL.createObjectURL(item.file);
+            // Use cached blob if available, otherwise use URL
+            const videoUrl = item.file ? URL.createObjectURL(item.file) : item.url;
             await player.load(videoUrl, false);
 
             // Enable A-B Loop Mode
