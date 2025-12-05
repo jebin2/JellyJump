@@ -29,7 +29,7 @@ export class CorePlayer {
         this.animationFrameId = null;
 
         // Control bar mode
-        this.controlBarMode = 'overlay'; // 'overlay' or 'fixed'
+        this.controlBarMode = options.controlBarMode || 'overlay'; // 'overlay' or 'fixed'
         this.autoHideTimer = null;
 
         // Controls Configuration
@@ -119,6 +119,9 @@ export class CorePlayer {
         this.asyncId = 0;
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
+
+        // Render Callbacks
+        this.afterFrameRenderCallbacks = [];
 
         // UI Elements
         this.ui = {
@@ -1206,6 +1209,11 @@ export class CorePlayer {
                 // Draw it immediately
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 this.ctx.drawImage(newNextFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+
+                // Execute render callbacks
+                if (this.afterFrameRenderCallbacks.length > 0) {
+                    this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+                }
             } else {
                 // Save it for later
                 this.nextFrame = newNextFrame;
@@ -1400,6 +1408,11 @@ export class CorePlayer {
             // Draw the first frame
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.ctx.drawImage(firstFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+
+            // Execute render callbacks
+            if (this.afterFrameRenderCallbacks.length > 0) {
+                this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+            }
         }
     }
 
@@ -1442,6 +1455,12 @@ export class CorePlayer {
                 if (this.nextFrame && this.nextFrame.timestamp <= playbackTime) {
                     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                     this.ctx.drawImage(this.nextFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+
+                    // Execute render callbacks
+                    if (this.afterFrameRenderCallbacks.length > 0) {
+                        this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+                    }
+
                     this.nextFrame = null;
 
                     // Request the next frame
@@ -2049,6 +2068,11 @@ export class CorePlayer {
         if (frame) {
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.ctx.drawImage(frame.canvas, 0, 0, this.canvas.width, this.canvas.height);
+
+            // Execute render callbacks
+            if (this.afterFrameRenderCallbacks.length > 0) {
+                this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+            }
         }
 
         await iterator.return();
@@ -2077,6 +2101,27 @@ export class CorePlayer {
             return item ? JSON.parse(item) : null;
         } catch (e) {
             return null;
+        }
+    }
+
+    /**
+     * Add a callback to be executed after each frame render
+     * @param {Function} callback 
+     */
+    addRenderCallback(callback) {
+        if (typeof callback === 'function') {
+            this.afterFrameRenderCallbacks.push(callback);
+        }
+    }
+
+    /**
+     * Remove a render callback
+     * @param {Function} callback 
+     */
+    removeRenderCallback(callback) {
+        const index = this.afterFrameRenderCallbacks.indexOf(callback);
+        if (index !== -1) {
+            this.afterFrameRenderCallbacks.splice(index, 1);
         }
     }
 }

@@ -58,6 +58,10 @@
             <span class="menu-icon">⏪</span>
             <span class="menu-label">Reverse Video...</span>
         </div>
+        <div class="playlist-menu-item" data-action="remove-bg" role="menuitem">
+            <span class="menu-icon">🎨</span>
+            <span class="menu-label">Remove Background...</span>
+        </div>
         <div class="menu-divider"></div>
         <div class="playlist-menu-item" data-action="info" role="menuitem">
             <div class="menu-icon">
@@ -1434,5 +1438,137 @@
                 <use href="assets/icons/sprite.svg#icon-play"></use>
             </svg>
         </button>
+    </div>
+</template>
+
+<!-- Remove Background Content Template -->
+<template id="remove-bg-content-template">
+    <div class="remove-bg-container grid grid-cols-2 gap-md h-full">
+        <!-- Left Column: Video Preview -->
+        <div class="preview-column flex flex-col gap-sm">
+            <div class="preview-header flex-between items-center">
+                <div class="text-sm font-bold text-secondary">PREVIEW</div>
+                <label class="checkbox-option flex items-center cursor-pointer select-none">
+                    <input type="checkbox" id="live-preview-toggle" checked>
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-label text-xs text-secondary">Live Preview</span>
+                </label>
+            </div>
+
+            <!-- Reduced size container -->
+            <div class="w-full flex justify-center bg-black rounded overflow-hidden border border-border">
+                <div id="remove-bg-player-container" class="w-full relative" style="height: 300px;">
+                    <!-- CorePlayer will be injected here -->
+                </div>
+            </div>
+
+            <div class="flex justify-center mt-sm">
+                <button id="pick-color-btn" class="btn jellyjump-btn-secondary btn-sm flex items-center gap-xs">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-eyedropper"></use>
+                    </svg>
+                    Pick Color from Video
+                </button>
+            </div>
+            <div class="text-xs text-muted text-center mt-xs">
+                Click "Pick Color" to pause and select a color.
+            </div>
+        </div>
+
+        <!-- Right Column: Controls -->
+        <div class="controls-column flex flex-col gap-md overflow-y-auto pr-xs">
+            <!-- Color Picker Section -->
+            <div class="color-picker-section">
+                <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
+
+                <div class="selected-colors-list flex flex-col gap-xs mb-sm bg-tertiary p-sm rounded border border-border"
+                    style="min-height: 100px; max-height: 200px; overflow-y: auto;">
+                    <!-- Colors injected here -->
+                    <div class="empty-state text-xs text-muted text-center py-md">
+                        No colors selected.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Background Options -->
+            <div class="bg-options-section">
+                <div class="section-title text-sm font-bold text-secondary mb-sm">BACKGROUND</div>
+                <div class="radio-group flex flex-col gap-sm">
+                    <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                        <input type="radio" name="bg-type" value="transparent" checked>
+                        <span class="radio-custom"></span>
+                        <span class="text-sm">Transparent</span>
+                    </label>
+                    <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                        <input type="radio" name="bg-type" value="custom">
+                        <span class="radio-custom"></span>
+                        <span class="text-sm">Custom Color</span>
+                        <div class="flex items-center gap-xs ml-auto">
+                            <input type="color" id="custom-bg-color" value="#ffffff"
+                                class="w-8 h-8 p-0 border-0 rounded cursor-pointer" disabled>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Progress Section -->
+            <div class="progress-section hidden mt-auto">
+                <div class="flex-between mb-xs">
+                    <span class="progress-status text-sm font-mono">Processing...</span>
+                    <span class="progress-percentage text-sm font-bold">0%</span>
+                </div>
+                <div class="progress-bar-container h-2 bg-tertiary rounded overflow-hidden">
+                    <div class="progress-bar-fill h-full bg-primary transition-all duration-300" style="width: 0%">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <div class="error-message hidden mt-sm p-sm border-danger text-danger text-sm bg-danger-soft rounded"></div>
+            <div class="success-message hidden mt-sm p-sm border-success text-success text-sm bg-success-soft rounded">
+                Background removed! Added to playlist.
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Remove Background Footer Template -->
+<template id="remove-bg-footer-template">
+    <div class="action-buttons flex gap-sm w-full justify-end">
+        <button class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download">
+            <svg width="16" height="16" fill="currentColor" class="mr-xs">
+                <use href="assets/icons/sprite.svg#icon-download"></use>
+            </svg>
+            Download
+        </button>
+        <button class="btn jellyjump-btn-primary process-btn w-full md:w-auto" title="Process Video">
+            Process Video
+        </button>
+    </div>
+</template>
+
+<!-- Color Item Template -->
+<template id="color-item-template">
+    <div class="playlist-item color-item">
+        <div class="playlist-thumbnail color-swatch border border-border shadow-sm mr-sm flex-shrink-0">
+        </div>
+        <div class="playlist-info flex-1 min-w-0">
+            <div class="playlist-title color-hex font-mono text-sm font-bold mb-xs">#000000</div>
+            <div class="playlist-duration tolerance-info text-xs text-secondary flex items-center gap-xs">
+                <span>Tol:</span>
+                <span class="tolerance-value font-mono">10</span>
+                <div class="w-20 ml-xs">
+                    <input type="range" class="quality-slider tolerance-slider" min="1" max="100" value="10"
+                        onclick="event.stopPropagation()">
+                </div>
+            </div>
+        </div>
+        <div class="playlist-actions flex items-center gap-xs">
+            <button class="playlist-remove-btn remove-color-btn" title="Remove color">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-trash"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
