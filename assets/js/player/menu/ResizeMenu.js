@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { generateId } from '../../utils/mediaUtils.js';
 
 /**
  * Resize Menu Handler  
@@ -213,7 +214,7 @@ export class ResizeMenu {
                 // Add to Playlist
                 if (addToPlaylistCheckbox.checked) {
                     const newItem = {
-                        id: playlist._generateId(),
+                        id: generateId(),
                         title: filename,
                         url: url,
                         file: new File([blob], filename, { type: `video/${ext}` }),

@@ -1,6 +1,7 @@
 import { Modal } from '../Modal.js';
 import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { generateId } from '../../utils/mediaUtils.js';
 
 /**
  * Trim Menu Handler
@@ -80,7 +81,7 @@ export class TrimMenu {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
             const s = Math.floor(seconds % 60);
-            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} `;
         };
 
         const parseTime = (timeStr) => {
@@ -145,10 +146,10 @@ export class TrimMenu {
             const startPercent = (startTime / duration) * 100;
             const endPercent = (endTime / duration) * 100;
 
-            startHandle.style.left = `${startPercent}%`;
-            endHandle.style.left = `${endPercent}%`;
-            timelineRange.style.left = `${startPercent}%`;
-            timelineRange.style.width = `${endPercent - startPercent}%`;
+            startHandle.style.left = `${startPercent}% `;
+            endHandle.style.left = `${endPercent}% `;
+            timelineRange.style.left = `${startPercent}% `;
+            timelineRange.style.width = `${endPercent - startPercent}% `;
 
             // Update Player Loop Points
             if (player) {
@@ -257,8 +258,8 @@ export class TrimMenu {
                     endTime: endTime,
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
-                        progressBar.style.width = `${percent}%`;
-                        progressPercentage.textContent = `${percent}%`;
+                        progressBar.style.width = `${percent}% `;
+                        progressPercentage.textContent = `${percent}% `;
                     }
                 });
 
@@ -267,7 +268,7 @@ export class TrimMenu {
 
                 // Configure Download
                 const ext = 'mp4';
-                const filename = item.title.replace(/\.[^/.]+$/, "") + `-trimmed-${Math.round(startTime)}-${Math.round(endTime)}.${ext}`;
+                const filename = item.title.replace(/\.[^/.]+$/, "") + `- trimmed - ${Math.round(startTime)} -${Math.round(endTime)}.${ext} `;
                 const url = URL.createObjectURL(blob);
 
                 downloadBtn.href = url;
@@ -277,10 +278,10 @@ export class TrimMenu {
                 // Add to Playlist
                 if (addToPlaylistCheckbox.checked) {
                     const newItem = {
-                        id: playlist._generateId(),
+                        id: generateId(),
                         title: filename,
                         url: url,
-                        file: new File([blob], filename, { type: `video/${ext}` }),
+                        file: new File([blob], filename, { type: `video / ${ext} ` }),
                         duration: formatTime(endTime - startTime),
                         type: 'video',
                         isLocal: true,
@@ -297,7 +298,7 @@ export class TrimMenu {
 
             } catch (e) {
                 console.error('Trimming failed:', e);
-                errorMessage.textContent = `Trimming failed: ${e.message}`;
+                errorMessage.textContent = `Trimming failed: ${e.message} `;
                 errorMessage.classList.remove('hidden');
                 trimBtn.disabled = false;
                 modal.closeBtn.disabled = false;

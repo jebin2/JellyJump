@@ -4,6 +4,7 @@ import { MediaProcessor } from '../core/MediaProcessor.js';
 import { CorePlayer } from '../core/Player.js';
 import { Modal } from './Modal.js';
 import { MenuRouter } from './menu/MenuRouter.js';
+import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
 
 /**
  * Playlist Manager
@@ -557,7 +558,7 @@ export class Playlist {
                 needsReload: false,
                 file: file,
                 path: path,
-                id: this._generateId() // Add unique ID for persistence
+                id: generateId() // Add unique ID for persistence
             };
         });
 
@@ -587,7 +588,7 @@ export class Playlist {
                     // Use centralized metadata extraction
                     const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(item.file);
 
-                    item.duration = this._formatDuration(duration);
+                    item.duration = formatDuration(duration);
                     item.videoInfo = videoInfo;
                     item.audioInfo = audioInfo;
 
@@ -632,7 +633,7 @@ export class Playlist {
 
         // Update duration if missing, placeholder, or loading
         if (!item.duration || item.duration === '--:--' || item.duration === 'Loading...') {
-            item.duration = this._formatDuration(duration);
+            item.duration = formatDuration(duration);
         }
 
         this._saveState();
@@ -659,16 +660,7 @@ export class Playlist {
             const duration = await input.computeDuration();
             return duration;
         } catch (error) {
-            console.error('Error getting video duration:', error);
-            return 0;
         }
-    }
-
-    _formatDuration(seconds) {
-        if (!seconds || isNaN(seconds)) return '--:--';
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
     _updateItemUI(item) {
@@ -688,7 +680,7 @@ export class Playlist {
      * @param {Object} video - Video object { title, url, duration, thumbnail }
      */
     addItem(video) {
-        if (!video.id) video.id = this._generateId();
+        if (!video.id) video.id = generateId();
         this.items.push(video);
         this._saveState();
         this.render();
@@ -700,7 +692,7 @@ export class Playlist {
      * @param {Array} videos 
      */
     addItems(videos) {
-        videos.forEach(v => { if (!v.id) v.id = this._generateId(); });
+        videos.forEach(v => { if (!v.id) v.id = generateId(); });
         const startIndex = this.items.length;
         this.items = [...this.items, ...videos];
         this._saveState();
@@ -1421,18 +1413,6 @@ export class Playlist {
     }
 
     /**
-     * Generate a unique ID
-     * @private
-     * @returns {string}
-     */
-    _generateId() {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            return crypto.randomUUID();
-        }
-        return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    }
-
-    /**
      * Toggle settings menu for an item
      * @param {number} index 
      * @param {HTMLElement} buttonEl 
@@ -1639,52 +1619,5 @@ export class Playlist {
             toast.style.opacity = '0';
             setTimeout(() => document.body.removeChild(toast), 300);
         }, 2000);
-    }
-
-    /**
-     * Parse time string to seconds
-     * @param {string} timeStr - Format: HH:MM:SS or MM:SS or SS
-     * @returns {number}
-     * @private
-     */
-    _parseTime(timeStr) {
-        const parts = timeStr.split(':').map(p => parseFloat(p) || 0);
-        if (parts.length === 3) {
-            return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        } else if (parts.length === 2) {
-            return parts[0] * 60 + parts[1];
-        } else {
-            return parts[0] || 0;
-        }
-    }
-
-    /**
-     * Format seconds to HH:MM:SS string
-     * @param {number} seconds
-     * @returns {string}
-     * @private
-     */
-    _formatTime(seconds) {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = Math.floor(seconds % 60);
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-
-    /**
-     * Format file size in bytes to human readable
-     * @param {number} bytes
-     * @returns {string}
-     * @private
-     */
-    _formatFileSize(bytes) {
-        const units = ['B', 'KB', 'MB', 'GB'];
-        let size = bytes;
-        let unitIndex = 0;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
-        }
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 }

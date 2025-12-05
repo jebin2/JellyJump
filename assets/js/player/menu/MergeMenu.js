@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { generateId } from '../../utils/mediaUtils.js';
 
 /**
  * Merge Menu Handler
@@ -317,7 +318,7 @@ export class MergeMenu {
                         thumbnail: '',
                         isLocal: true,
                         file: new File([mergedBlob], filename, { type: 'video/mp4' }),
-                        id: playlist._generateId()
+                        id: generateId()
                     };
 
                     const lastIndex = playlist.items.indexOf(selectedVideos[selectedVideos.length - 1]);

@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { generateId } from '../../utils/mediaUtils.js';
 
 /**
  * Track Manager Menu Handler
@@ -207,7 +208,7 @@ export class TrackManagerMenu {
 
         if (addToPlaylist) {
             const newItem = {
-                id: playlist._generateId(),
+                id: generateId(),
                 title: newFilename,
                 url: url,
                 file: new File([blob], newFilename, { type: blob.type }),

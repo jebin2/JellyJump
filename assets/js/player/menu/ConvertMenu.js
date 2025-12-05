@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { generateId } from '../../utils/mediaUtils.js';
 
 /**
  * Convert Menu Handler
@@ -232,7 +233,7 @@ export class ConvertMenu {
                 file: new File([blob], newFilename, { type: blob.type }),
                 duration: originalItem.duration, // Approx same duration
                 type: 'video',
-                id: playlist._generateId()
+                id: generateId()
             };
 
             // Insert after original item

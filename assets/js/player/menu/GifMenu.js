@@ -1,6 +1,7 @@
 import { Modal } from '../Modal.js';
 import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { generateId } from '../../utils/mediaUtils.js';
 
 /**
  * GIF Menu Handler
@@ -81,7 +82,7 @@ export class GifMenu {
         }
         sourceDuration.textContent = playlist._formatDuration(videoDuration);
         sourceResolution.textContent = item.videoInfo
-            ? `${item.videoInfo.width}×${item.videoInfo.height}`
+            ? `${item.videoInfo.width}×${item.videoInfo.height} `
             : 'Unknown';
 
         // Load Video into Player
@@ -162,7 +163,7 @@ export class GifMenu {
                 return false;
             }
 
-            durationDisplay.textContent = `${duration.toFixed(1)}s`;
+            durationDisplay.textContent = `${duration.toFixed(1)} s`;
             return true;
         };
 
@@ -234,8 +235,8 @@ export class GifMenu {
                     quality: quality,
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
-                        progressBar.style.width = `${pct}%`;
-                        progressText.textContent = `${pct}%`;
+                        progressBar.style.width = `${pct}% `;
+                        progressText.textContent = `${pct}% `;
                     }
                 });
 
@@ -250,7 +251,7 @@ export class GifMenu {
 
                 // Setup download
                 const timestamp = Math.round(start).toString().padStart(2, '0') + '-' + Math.round(end).toString().padStart(2, '0');
-                const filename = `${item.title.replace(/\.[^.]+$/, '')}-${timestamp}.gif`;
+                const filename = `${item.title.replace(/\.[^.]+$/, '')} -${timestamp}.gif`;
 
                 downloadBtn.href = previewUrl;
                 downloadBtn.download = filename;
@@ -265,7 +266,7 @@ export class GifMenu {
                         thumbnail: previewUrl,
                         isLocal: true,
                         file: new File([gifBlob], filename, { type: 'image/gif' }),
-                        id: playlist._generateId(),
+                        id: generateId(),
                         type: 'image/gif'
                     };
 
@@ -290,7 +291,7 @@ export class GifMenu {
 
             } catch (e) {
                 console.error('GIF creation failed:', e);
-                errorMessage.textContent = `GIF creation failed: ${e.message}`;
+                errorMessage.textContent = `GIF creation failed: ${e.message} `;
                 errorMessage.classList.remove('hidden');
 
                 // Re-enable inputs
