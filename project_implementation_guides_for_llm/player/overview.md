@@ -1,4 +1,4 @@
-## Global Phase Numbers: 15-39
+## Global Phase Numbers: 15-41
 
 ### [Phase 15: Player Layout](phase15-player-layout.md)
 - 80/20 split layout, core player integration
@@ -102,10 +102,21 @@
 - Time selection, settings, download, and playlist options
 - **Done when**: GIF creation works with download and playlist options
 
+### [Phase 40: Reverse Video](phase40-reverse-video.md)
+- Reverse video playback with frame processing
+- Progress tracking during reversal
+- **Done when**: Video reversal works with automatic playlist addition
+
+### [Phase 41: Remove Background](phase41-remove-background.md)
+- Remove background colors using color picker
+- Live preview with multiple color selection
+- Transparent or custom background output
+- **Done when**: Background removal works with live preview and playlist addition
+
 ## Implementation Order
 ```
-Phase 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34 → 35 → 36 → 37 → 38 → 39
-(Layout) (Collapse) (ControlMode) (OptionalControls) (DefaultFrame) (URLUpload) (AutoLoad) (Playlist) (Capture) (Nav) (Download) (Speed) (Loop) (Upload) (Manage) (Save) (Polish) (Settings) (Convert) (Tracks) (Trim) (Resize) (Info) (Merge) (GIF)
+Phase 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34 → 35 → 36 → 37 → 38 → 39 → 40 → 41
+(Layout) (Collapse) (ControlMode) (OptionalControls) (DefaultFrame) (URLUpload) (AutoLoad) (Playlist) (Capture) (Nav) (Download) (Speed) (Loop) (Upload) (Manage) (Save) (Polish) (Settings) (Convert) (Tracks) (Trim) (Resize) (Info) (Merge) (GIF) (Reverse) (RemoveBG)
 ```
 
 ## MediaBunny Integration
@@ -120,4 +131,4 @@ The player page uses MediaBunny for file handling and metadata. **Consult mediab
 - **Playback speed**: MediaBunny playback rate control
 
 **Dependencies**: Phases 01-04 (Theme), 09-14 (Core)  
-**Global Phases**: 15-39 | **Time**: ~13-15 hours
+**Global Phases**: 15-41 | **Time**: ~17-20 hours
