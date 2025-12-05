@@ -4,6 +4,7 @@ import { MediaProcessor } from '../core/MediaProcessor.js';
 import { CorePlayer } from '../core/Player.js';
 import { Modal } from './Modal.js';
 import { MenuRouter } from './menu/MenuRouter.js';
+import { PlaylistStorage } from './PlaylistStorage.js';
 import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
 
 /**
@@ -352,25 +353,23 @@ export class Playlist {
      */
     async _loadSavedPlaylist() {
         try {
-            const savedItems = await this.storage.loadPlaylist();
-            if (savedItems.length > 0) {
-                this.items = savedItems;
+            const { items, playbackState } = await PlaylistStorage.loadPlaylist();
+
+            if (items.length > 0) {
+                this.items = items;
                 this.render();
 
-                // Restore playback state
-                const state = await this.storage.loadPlaybackState();
-
-                if (state) {
+                if (playbackState) {
                     let indexToRestore = -1;
 
                     // Try to restore by ID first (more robust)
-                    if (state.activeId) {
-                        indexToRestore = this.items.findIndex(item => item.id === state.activeId);
+                    if (playbackState.activeId) {
+                        indexToRestore = this.items.findIndex(item => item.id === playbackState.activeId);
                     }
 
                     // Fallback to index if ID not found or not present
-                    if (indexToRestore === -1 && typeof state.index === 'number') {
-                        indexToRestore = state.index;
+                    if (indexToRestore === -1 && typeof playbackState.index === 'number') {
+                        indexToRestore = playbackState.index;
                     }
 
                     if (indexToRestore >= 0 && indexToRestore < this.items.length) {
@@ -379,8 +378,7 @@ export class Playlist {
                         const video = this.items[this.activeIndex];
 
                         if (!video.needsReload) {
-                            await this.player.load(video.url, false, video.id); // Autoplay false for restoration, pass ID
-                            // Seek is now handled internally by player.load -> _handleInitialFrame
+                            await this.player.load(video.url, false, video.id);
                             this._updateUI();
                             this._updatePlayerNavigationState();
                         }
@@ -400,14 +398,8 @@ export class Playlist {
      * @private
      */
     _saveState() {
-        this.storage.savePlaylist(this.items);
-
-        const activeItem = this.items[this.activeIndex];
-        this.storage.savePlaybackState({
-            index: this.activeIndex,
-            activeId: activeItem ? activeItem.id : null,
-            time: this.player.currentTime || 0
-        });
+        const currentTime = this.player?.currentTime || 0;
+        PlaylistStorage.savePlaylist(this.items, this.activeIndex, currentTime);
     }
 
     /**
@@ -416,29 +408,8 @@ export class Playlist {
      */
     _savePlaybackProgress() {
         const activeItem = this.items[this.activeIndex];
-        if (activeItem) {
-            const currentTime = this.player.currentTime || 0;
-
-            // 1. Save to IndexedDB (for playlist restoration)
-            this.storage.savePlaybackState({
-                index: this.activeIndex,
-                activeId: activeItem.id,
-                time: currentTime
-            });
-
-            // 2. Save to localStorage (for Player.js internal restoration)
-            // This ensures Player.js finds the state on reload
-            try {
-                const state = {
-                    videoIdentifier: activeItem.id,
-                    timestamp: currentTime,
-                    savedAt: new Date().toISOString()
-                };
-                localStorage.setItem(`jellyjump-state-${activeItem.id}`, JSON.stringify(state));
-            } catch (e) {
-                console.warn('Failed to sync state to localStorage:', e);
-            }
-        }
+        const currentTime = this.player?.currentTime || 0;
+        PlaylistStorage.savePlaybackProgress(activeItem, this.activeIndex, currentTime);
     }
 
     /**
