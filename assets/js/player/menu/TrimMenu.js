@@ -254,8 +254,10 @@ export class TrimMenu {
                     source: source,
                     format: 'mp4',
                     quality: 100,
-                    startTime: startTime,
-                    endTime: endTime,
+                    trim: {
+                        start: startTime,
+                        end: endTime
+                    },
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
                         progressBar.style.width = `${percent}% `;
