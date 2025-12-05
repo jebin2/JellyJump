@@ -1549,35 +1549,39 @@
 
 <!-- Color Item Template -->
 <template id="color-item-template">
-    <div class="playlist-item color-item flex-col items-start p-sm gap-sm h-auto">
-        <div class="flex items-center w-full gap-sm">
-            <div class="playlist-thumbnail color-swatch border border-border shadow-sm flex-shrink-0"></div>
-            <div class="playlist-title color-hex font-mono text-sm font-bold flex-1">#000000</div>
-            <button class="playlist-remove-btn remove-color-btn" title="Remove color">
-                <svg width="16" height="16" fill="currentColor">
+    <div class="playlist-item color-item flex gap-md p-sm h-auto items-start">
+        <!-- Left: Color Info -->
+        <div class="flex flex-col items-center gap-xs min-w-[60px]">
+            <div class="playlist-thumbnail color-swatch border border-border shadow-sm flex-shrink-0 mb-0"
+                style="width: 32px; height: 32px;"></div>
+            <div class="playlist-title color-hex font-mono text-xs font-bold">#000000</div>
+            <button class="playlist-remove-btn remove-color-btn p-xs hover:text-danger transition-colors"
+                title="Remove color">
+                <svg width="14" height="14" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-trash"></use>
                 </svg>
             </button>
         </div>
 
-        <div class="w-full grid gap-xs">
-            <div class="flex items-center gap-xs text-xs text-secondary">
-                <span class="w-20">Similarity</span>
+        <!-- Right: Sliders -->
+        <div class="flex-1 grid gap-xs w-full pt-xs">
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="w-16 font-mono">Sim</span>
                 <input type="range" class="quality-slider similarity-slider flex-1" min="0" max="100" value="40"
-                    onclick="event.stopPropagation()">
-                <span class="similarity-value font-mono w-8 text-right">0.40</span>
+                    onclick="event.stopPropagation()" style="background: var(--border-dark); height: 4px;">
+                <span class="similarity-value font-mono w-8 text-right text-primary">0.40</span>
             </div>
-            <div class="flex items-center gap-xs text-xs text-secondary">
-                <span class="w-20">Smoothness</span>
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="w-16 font-mono">Smooth</span>
                 <input type="range" class="quality-slider smoothness-slider flex-1" min="0" max="100" value="8"
-                    onclick="event.stopPropagation()">
-                <span class="smoothness-value font-mono w-8 text-right">0.08</span>
+                    onclick="event.stopPropagation()" style="background: var(--border-dark); height: 4px;">
+                <span class="smoothness-value font-mono w-8 text-right text-primary">0.08</span>
             </div>
-            <div class="flex items-center gap-xs text-xs text-secondary">
-                <span class="w-20">Spill</span>
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="w-16 font-mono">Spill</span>
                 <input type="range" class="quality-slider spill-slider flex-1" min="0" max="100" value="10"
-                    onclick="event.stopPropagation()">
-                <span class="spill-value font-mono w-8 text-right">0.10</span>
+                    onclick="event.stopPropagation()" style="background: var(--border-dark); height: 4px;">
+                <span class="spill-value font-mono w-8 text-right text-primary">0.10</span>
             </div>
         </div>
     </div>
