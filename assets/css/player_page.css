@@ -459,7 +459,7 @@
 .selected-section {
     display: flex;
     flex-direction: column;
-    height: 50%;
+    height: 100%;
     min-width: 0;
 }
 
@@ -478,6 +478,7 @@
     margin-top: 0.75rem;
     overflow-x: hidden;
     min-height: 0;
+    max-height: 200px;
 }
 
 /* -----------------------------------------
