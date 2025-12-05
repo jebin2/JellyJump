@@ -93,6 +93,7 @@ export class CorePlayer {
         this.videoSink = null;
         this.audioTrack = null;
         this.audioSink = null;
+        this.audioIteratorCleanupPromise = null; // Track async cleanup of audio iterator
 
         // Subtitles
         this.subtitleManager = new SubtitleManager();
@@ -753,7 +754,9 @@ export class CorePlayer {
                 // Ideally we should destroy the old sink if method exists, 
                 // but JS GC should handle it if we drop reference
             }
-            this.audioSink = new MediaBunny.AudioBufferSink(this.audioTrack);
+            // Use AudioSampleSink instead of AudioBufferSink to avoid MediaBunny bug
+            // where AudioSamples aren't closed properly
+            this.audioSink = new MediaBunny.AudioSampleSink(this.audioTrack);
 
             // Update UI
             this._updateAudioTracks();
@@ -1065,6 +1068,8 @@ export class CorePlayer {
 
             // Reset new state
             if (this.videoFrameIterator) await this.videoFrameIterator.return();
+            // Wait for any pending audio iterator cleanup from pause()
+            if (this.audioIteratorCleanupPromise) await this.audioIteratorCleanupPromise;
             if (this.audioBufferIterator) await this.audioBufferIterator.return();
             this.videoFrameIterator = null;
             this.audioBufferIterator = null;
@@ -1136,7 +1141,9 @@ export class CorePlayer {
             }
 
             if (this.audioTrack) {
-                this.audioSink = new MediaBunny.AudioBufferSink(this.audioTrack);
+                // Use AudioSampleSink instead of AudioBufferSink to avoid MediaBunny bug
+                // where AudioSamples aren't closed properly
+                this.audioSink = new MediaBunny.AudioSampleSink(this.audioTrack);
             }
 
             this._updateAudioTracks();
@@ -1297,7 +1304,8 @@ export class CorePlayer {
         if (this.audioSink) {
             // Start the audio iterator
             if (this.audioBufferIterator) await this.audioBufferIterator.return();
-            this.audioBufferIterator = this.audioSink.buffers(this._getPlaybackTime());
+            // Use samples() instead of buffers() since we're using AudioSampleSink
+            this.audioBufferIterator = this.audioSink.samples(this._getPlaybackTime());
             this._runAudioIterator();
         }
 
@@ -1327,8 +1335,16 @@ export class CorePlayer {
         this._updatePlayPauseUI();
 
         if (this.audioBufferIterator) {
-            this.audioBufferIterator.return(); // This stops any for-loops that are iterating the iterator
+            // Properly await the iterator cleanup to ensure AudioSample objects are closed
+            // Using .then() since pause() must be synchronous for event handlers
+            const iterator = this.audioBufferIterator;
             this.audioBufferIterator = null;
+            this.audioIteratorCleanupPromise = iterator.return().catch(e => {
+                // Iterator might already be closed or in error state, ignore
+                console.debug("Error closing audio iterator:", e);
+            }).finally(() => {
+                this.audioIteratorCleanupPromise = null;
+            });
         }
 
         if (this.animationFrameId) {
@@ -1453,39 +1469,36 @@ export class CorePlayer {
         if (!this.audioSink) return;
 
         try {
-            // To play back audio, we loop over all audio chunks (typically very short) of the file and play them at the correct
-            // timestamp. The result is a continuous, uninterrupted audio signal.
-            for await (const { buffer, timestamp } of this.audioBufferIterator) {
-                if (!this.isPlaying) break;
-
-                const node = this.audioContext.createBufferSource();
-                node.buffer = buffer;
-                node.playbackRate.value = this.playbackRate;
-                node.connect(this.gainNode);
-
-                // Calculate when this chunk should play in AudioContext time
-                // Formula: startTimestamp = audioContextStartTime + (mediaTimestamp - playbackTimeAtStart) / playbackRate
-                const startTimestamp = this.audioContextStartTime + (timestamp - this.playbackTimeAtStart) / this.playbackRate;
-
-                // Two cases: Either, the audio starts in the future or in the past
-                if (startTimestamp >= this.audioContext.currentTime) {
-                    // If the audio starts in the future, easy, we just schedule it
-                    node.start(startTimestamp);
-                } else {
-                    // If it starts in the past, then let's only play the audible section that remains from here on out
-                    // We need to offset into the buffer by how much time has passed * playbackRate
-                    const timePassed = this.audioContext.currentTime - startTimestamp;
-                    const offset = timePassed * this.playbackRate;
-
-                    if (offset < buffer.duration) {
-                        node.start(this.audioContext.currentTime, offset);
-                    }
+            // Now iterating over AudioSamples instead of buffers
+            for await (const audioSample of this.audioBufferIterator) {
+                if (!this.isPlaying) {
+                    // Close the AudioSample before breaking
+                    audioSample.close();
+                    break;
                 }
 
-                this.queuedAudioNodes.add(node);
-                node.onended = () => {
-                    this.queuedAudioNodes.delete(node);
-                };
+                // Convert AudioSample to AudioBuffer and CLOSE the sample
+                const buffer = audioSample.toAudioBuffer();
+                const timestamp = audioSample.timestamp;
+                audioSample.close(); // Critical: Close AudioSample after converting
+
+                // Create AudioBufferSourceNode
+                const audioSource = this.audioContext.createBufferSource();
+                audioSource.buffer = buffer;
+                audioSource.playbackRate.value = this.playbackRate; // Apply playback rate
+                audioSource.connect(this.gainNode); // Connect to gain node
+
+                // Calculate when this buffer should start playing
+                const now = this.audioContext.currentTime;
+                const delay = timestamp - this._getPlaybackTime();
+                const startTime = now + Math.max(0, delay);
+
+                // Queue the buffer
+                audioSource.start(startTime);
+
+                // Track source for cleanup
+                this.queuedAudioNodes.add(audioSource);
+                audioSource.onended = () => this.queuedAudioNodes.delete(audioSource);
 
                 // If we're more than a second ahead of the current playback time, let's slow down the loop until time has
                 // passed.
@@ -1502,6 +1515,16 @@ export class CorePlayer {
             }
         } catch (error) {
             console.error("Error in audio iterator:", error);
+        } finally {
+            // Ensure the iterator is properly closed to clean up any AudioSample objects
+            // This is critical to prevent memory leaks as per MediaBunny's resource management requirements
+            if (this.audioBufferIterator) {
+                try {
+                    await this.audioBufferIterator.return();
+                } catch (e) {
+                    // Iterator might already be closed, ignore errors
+                }
+            }
         }
     }
 
