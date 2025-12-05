@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 
 /**
@@ -171,13 +172,8 @@ export class ResizeMenu {
             statusText.textContent = `Resizing to ${targetW}x${targetH}...`;
 
             try {
-                let source;
-                if (item.file) {
-                    source = item.file;
-                } else {
-                    const response = await fetch(item.url);
-                    source = await response.blob();
-                }
+                // Get source with caching
+                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
                 const blob = await MediaProcessor.process({
                     source: source,

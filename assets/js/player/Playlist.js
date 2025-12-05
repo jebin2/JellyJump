@@ -1000,7 +1000,7 @@ export class Playlist {
             const isBlobUrl = item.url.startsWith('blob:');
 
             if (!isBlobUrl) {
-                // For remote URLs, fetch as blob to enable proper download
+                // For remote URLs, use cached blob or fetch
                 // Show loading state
                 if (downloadBtn) {
                     const loadingTemplate = document.getElementById('loading-spinner-template');
@@ -1010,17 +1010,15 @@ export class Playlist {
                     downloadBtn.style.opacity = '1';
                 }
 
-                console.log(`Fetching remote file: ${item.url}`);
+                console.log(`Getting source for download: ${item.title}`);
 
-                const response = await fetch(item.url);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch file: ${response.statusText}`);
-                }
-
-                const blob = await response.blob();
+                const blob = await MediaMetadata.getSourceBlob(item, () => this._saveState());
                 blobUrl = URL.createObjectURL(blob);
                 downloadUrl = blobUrl;
-                downloadBtn.style.opacity = "";
+
+                if (downloadBtn) {
+                    downloadBtn.style.opacity = "";
+                }
             }
 
             // Use reusable download anchor from HTML

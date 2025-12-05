@@ -40,6 +40,58 @@ export class MediaMetadata {
         }
     }
 
+
+    /**
+     * Get source blob for an item (with caching for remote URLs)
+     * Fetches remote videos once and caches them on the item to avoid redundant downloads
+     * @param {Object} item - Playlist item  
+     * @param {Function} [onSave] - Optional callback to save state after caching
+     * @returns {Promise<Blob>} Source blob
+     */
+    static async getSourceBlob(item, onSave) {
+        // Local file - return directly
+        if (item.file) {
+            return item.file;
+        }
+
+        // Remote URL - fetch and cache
+        if (item.url) {
+            console.log('[Cache] Fetching remote video for caching:', item.title);
+
+            const response = await fetch(item.url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch video: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+            const sizeMB = blob.size / 1024 / 1024;
+
+            console.log(`[Cache] Downloaded ${sizeMB.toFixed(2)} MB`);
+
+            // Size limit check (500MB default)
+            const MAX_CACHE_SIZE_MB = 500;
+            if (sizeMB > MAX_CACHE_SIZE_MB) {
+                console.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB > ${MAX_CACHE_SIZE_MB} MB)`);
+                console.warn('[Cache] Returning blob without caching (will re-fetch on next operation)');
+                return blob; // Return without caching
+            }
+
+            // Cache the blob
+            item.file = blob;
+            item.isLocal = true; // Mark as locally available
+
+            // Save to persistence
+            if (onSave) {
+                onSave();
+            }
+
+            console.log('[Cache] Blob cached on item:', item.title);
+            return blob;
+        }
+
+        throw new Error('No source available for item');
+    }
+
     /**
      * Ensure metadata exists on item (lazy load if missing)
      * @param {Object} item - Playlist item
@@ -52,16 +104,8 @@ export class MediaMetadata {
             return;
         }
 
-        // Fetch and cache
-        let source;
-        if (item.file) {
-            source = item.file;
-        } else if (item.url) {
-            const response = await fetch(item.url);
-            source = await response.blob();
-        } else {
-            throw new Error('No source available for metadata');
-        }
+        // Use helper to get source (with caching for remote URLs)
+        const source = await MediaMetadata.getSourceBlob(item, onSave);
 
         const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(source);
         item.videoInfo = videoInfo;

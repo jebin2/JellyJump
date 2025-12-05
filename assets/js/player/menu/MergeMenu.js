@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 
 /**
@@ -268,18 +269,11 @@ export class MergeMenu {
             successMsg.classList.add('hidden');
 
             try {
-                // Prepare Inputs
+                // Prepare Inputs (with caching)
                 const inputs = [];
                 for (const item of selectedVideos) {
-                    if (item.file) {
-                        inputs.push(item.file);
-                    } else if (item.url) {
-                        const response = await fetch(item.url);
-                        const blob = await response.blob();
-                        inputs.push(blob);
-                    } else {
-                        throw new Error(`Cannot access content for video: ${item.title}`);
-                    }
+                    const blob = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    inputs.push(blob);
                 }
 
                 // Merge

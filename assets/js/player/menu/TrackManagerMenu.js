@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 
 /**
@@ -30,13 +31,8 @@ export class TrackManagerMenu {
 
         // Fetch Tracks
         try {
-            let source;
-            if (item.file) {
-                source = item.file;
-            } else {
-                const response = await fetch(item.url);
-                source = await response.blob();
-            }
+            // Get source with caching
+            const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
             const tracks = await MediaProcessor.getTracks(source);
 
@@ -161,13 +157,8 @@ export class TrackManagerMenu {
         progressContainer.classList.remove('hidden');
 
         try {
-            let source;
-            if (item.file) {
-                source = item.file;
-            } else {
-                const response = await fetch(item.url);
-                source = await response.blob();
-            }
+            // Get source with caching
+            const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
             const blob = await MediaProcessor.extractTrack({
                 source,

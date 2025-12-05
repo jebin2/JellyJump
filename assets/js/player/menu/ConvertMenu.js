@@ -1,5 +1,6 @@
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 
 /**
@@ -167,15 +168,8 @@ export class ConvertMenu {
      * @private
      */
     static async _startConversion(item, format, quality, addToPlaylist, playlist, onProgress, downloadBtn) {
-        // Ensure we have the file blob
-        let source;
-        if (item.file) {
-            source = item.file;
-        } else {
-            // Fetch from URL
-            const response = await fetch(item.url);
-            source = await response.blob();
-        }
+        // Get source with caching
+        const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
         // Determine Target Format
         let targetFormat = format;
