@@ -444,67 +444,255 @@
 }
 
 /* -----------------------------------------
-   Merge Modal Grid Layout
+   Merge Modal Grid Layout - Revamped
    ----------------------------------------- */
 .merge-grid-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    max-height: 200px;
+    gap: 1rem;
+    max-height: 300px;
     margin-bottom: 1.5rem;
-    overflow: hidden;
 }
 
 .available-section,
 .selected-section {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 250px;
     min-width: 0;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
 }
 
 .available-section {
-    padding-right: 1rem;
-    border-right: 2px solid var(--color-border);
+    border-color: rgba(var(--accent-primary-rgb), 0.3);
+}
+
+.selected-section {
+    border-color: var(--accent-primary);
+    background-color: rgba(var(--accent-primary-rgb), 0.05);
 }
 
 .section-header {
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--color-border-subtle);
+    margin-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
     flex-shrink: 0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.available-section .section-header {
+    border-bottom-color: rgba(var(--accent-primary-rgb), 0.4);
+}
+
+.selected-section .section-header {
+    border-bottom-color: var(--accent-primary);
+    color: var(--accent-primary);
 }
 
 .scroll-list {
-    margin-top: 0.75rem;
+    margin-top: 0;
+    overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
-    max-height: 200px;
+    flex: 1;
+    padding: 4px;
+}
+
+/* Custom scrollbar for lists */
+.scroll-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scroll-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.scroll-list::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 3px;
+}
+
+.scroll-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--accent-primary-rgb), 0.8);
 }
 
 /* -----------------------------------------
-   Merge Item Template
+   Merge Item Template - Card Style
    ----------------------------------------- */
 .merge-item {
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    position: relative;
 }
 
+.merge-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Hover effect for all items */
+.merge-item:hover {
+    background-color: rgba(var(--accent-primary-rgb), 0.08);
+    border-color: var(--accent-primary);
+    transform: translateX(2px);
+    box-shadow: -3px 0 0 0 var(--accent-primary);
+}
+
+/* Selected state in available list */
+.available-list .merge-item.bg-primary {
+    background-color: rgba(var(--accent-primary-rgb), 0.15);
+    border-color: var(--accent-primary);
+    border-width: 2px;
+}
+
+.available-list .merge-item.bg-primary::before {
+    content: '✓';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    background-color: var(--accent-primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.available-list .merge-item.bg-primary:hover {
+    background-color: rgba(var(--accent-primary-rgb), 0.2);
+    transform: translateX(2px);
+}
+
+/* Items in selected list with order numbers */
+.selected-list .merge-item {
+    padding-left: 2.5rem;
+}
+
+.selected-list .merge-item::before {
+    content: attr(data-order);
+    position: absolute;
+    left: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    background-color: var(--accent-primary);
+    color: white;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.selected-list .merge-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Drag handle */
 .merge-item__drag-handle {
     flex-shrink: 0;
+    cursor: grab;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    line-height: 1;
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
 }
 
+.merge-item:hover .merge-item__drag-handle {
+    opacity: 1;
+}
+
+.merge-item__drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Thumbnail */
+.item-thumb {
+    flex-shrink: 0;
+    border: 1px solid var(--border-color);
+}
+
+/* Info */
 .merge-item__info {
     min-width: 0;
     overflow: hidden;
+    flex: 1;
 }
 
 .merge-item__title {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 500;
+    margin-bottom: 2px;
 }
 
+.item-meta {
+    font-size: 0.7rem;
+}
+
+/* Remove button */
 .merge-item__remove {
     flex-shrink: 0;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 1.3rem;
+    line-height: 1;
+    padding: 0 4px;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.merge-item:hover .merge-item__remove {
+    opacity: 1;
+}
+
+.merge-item__remove:hover {
+    color: var(--error-color, #ff4444);
+    transform: scale(1.2);
+}
+
+/* Empty states */
+.empty-state,
+.empty-selection-state {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Dragging states */
+.merge-item.opacity-50 {
+    opacity: 0.4;
+}
+
+.merge-item.border-primary {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.3);
 }
 
 /* -----------------------------------------
