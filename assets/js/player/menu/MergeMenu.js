@@ -134,11 +134,8 @@ export class MergeMenu {
                 }
 
                 el.addEventListener('click', () => {
-                    if (isSelected) {
-                        selectedVideos = selectedVideos.filter(v => v !== item);
-                    } else {
-                        selectedVideos.push(item);
-                    }
+                    // Always add to merge list (allowing duplicates)
+                    selectedVideos.push(item);
                     renderAvailable();
                     renderSelected();
                     updateUI();
@@ -172,7 +169,7 @@ export class MergeMenu {
                 // Remove Button
                 el.querySelector('.remove-item-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    selectedVideos = selectedVideos.filter(v => v !== item);
+                    selectedVideos.splice(idx, 1); // Remove only this specific instance
                     renderAvailable();
                     renderSelected();
                     updateUI();
