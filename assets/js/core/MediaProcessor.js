@@ -278,40 +278,13 @@ export class MediaProcessor {
         };
     }
 
-    /**
-     * Get tracks from media
-     * @param {Blob|File} source
-     * @returns {Promise<{video: Array, audio: Array}>}
-     */
-    static async getTracks(source) {
-        const blobSource = new MediaBunny.BlobSource(source);
-        const input = new MediaBunny.Input({
-            source: blobSource,
-            formats: MediaBunny.ALL_FORMATS
-        });
 
-        try {
-            const details = await this._getTrackDetails(input);
-            // Remove internal _track reference before returning to public API
-            details.video.forEach(t => delete t._track);
-            details.audio.forEach(t => delete t._track);
-            return details;
-        } finally {
-            if (input && typeof input.dispose === 'function') {
-                try {
-                    input.dispose();
-                } catch (e) {
-                    console.warn('Error disposing input in getTracks:', e);
-                }
-            }
-        }
-    }
 
     /**
      * Get formatted metadata for caching
      * Returns videoInfo and audioInfo objects ready to be stored on playlist items
      * @param {Blob|File|string} source 
-     * @returns {Promise<{videoInfo: Object|null, audioInfo: Object|null, duration: number}>}
+     * @returns {Promise<{videoInfo: Object|null, audioInfo: Object|null, duration: number, videoTracks: Array, audioTracks: Array}>}
      */
     static async getMetadata(source) {
         let inputSource;
@@ -378,7 +351,17 @@ export class MediaProcessor {
                 };
             }
 
-            return { videoInfo, audioInfo, duration };
+            // Prepare full track lists for return (removing internal references)
+            const videoTracks = video.map(t => {
+                const { _track, ...rest } = t;
+                return rest;
+            });
+            const audioTracks = audio.map(t => {
+                const { _track, ...rest } = t;
+                return rest;
+            });
+
+            return { videoInfo, audioInfo, duration, videoTracks, audioTracks };
         } finally {
             // MediaBunny handles cleanup
             if (input && typeof input.dispose === 'function') {

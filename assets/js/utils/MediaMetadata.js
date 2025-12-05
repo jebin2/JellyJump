@@ -103,9 +103,11 @@ export class MediaMetadata {
         // Use helper to get source (with caching for remote URLs)
         const source = await MediaMetadata.getSourceBlob(item, onSave);
 
-        const { videoInfo, audioInfo, duration } = await MediaProcessor.getMetadata(source);
+        const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(source);
         item.videoInfo = videoInfo;
         item.audioInfo = audioInfo;
+        item.videoTracks = videoTracks;
+        item.audioTracks = audioTracks;
 
         // Update duration if missing, placeholder, or loading
         if (!item.duration || item.duration === '--:--' || item.duration === 'Loading...') {

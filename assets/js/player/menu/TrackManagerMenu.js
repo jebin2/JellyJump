@@ -31,14 +31,18 @@ export class TrackManagerMenu {
 
         // Fetch Tracks
         try {
-            // Get source with caching
-            const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-            const tracks = await MediaProcessor.getTracks(source);
+            // Ensure metadata (including tracks) is loaded/cached
+            await playlist._ensureMetadata(item);
 
             // Hide loading, show content
             modalContent.querySelector('.tracks-loading').classList.add('hidden');
             modalContent.querySelector('.tracks-content').classList.remove('hidden');
+
+            // Use cached tracks
+            const tracks = {
+                video: item.videoTracks || [],
+                audio: item.audioTracks || []
+            };
 
             this.renderTracks(tracks, item, modalContent, playlist);
         } catch (e) {
