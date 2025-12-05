@@ -99,8 +99,11 @@ export class ReverseMenu {
 
             // UI Updates
             reverseBtn.disabled = true;
-            reverseBtn.classList.add('hidden');
             tryAgainBtn.classList.add('hidden');
+
+            // Disable download button
+            downloadBtn.disabled = true;
+
             audioCheckbox.disabled = true;
 
             progressSection.classList.remove('hidden');
@@ -150,9 +153,22 @@ export class ReverseMenu {
                 const filename = `${item.title.replace(/\.[^.]+$/, '')}-reversed.mp4`;
                 const url = URL.createObjectURL(reversedBlob);
 
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
+                // Configure download button
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+
+                downloadBtn.disabled = false;
                 downloadBtn.classList.remove('hidden');
+
+                // Re-enable controls for another run
+                audioCheckbox.disabled = false;
+                reverseBtn.disabled = false;
 
                 // Add to playlist
                 const newItem = {
