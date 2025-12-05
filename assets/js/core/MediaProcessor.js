@@ -1241,7 +1241,7 @@ export class MediaProcessor {
             r: c.r,
             g: c.g,
             b: c.b,
-            similarity: c.similarity !== undefined ? c.similarity : 0.4,
+            similarity: c.similarity !== undefined ? c.similarity : 0.0, // 0.4
             smoothness: c.smoothness !== undefined ? c.smoothness : 0.08,
             spill: c.spill !== undefined ? c.spill : 0.1
         }));

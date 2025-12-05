@@ -102,6 +102,59 @@ export class RemoveBackgroundMenu {
 
             await player.load(videoUrl, false);
 
+            // Auto-detect background color
+            if (player.canvas) {
+                // Wait a moment for the frame to render
+                setTimeout(() => {
+                    try {
+                        const ctx = player.canvas.getContext('2d', { willReadFrequently: true });
+                        const width = player.canvas.width;
+                        const height = player.canvas.height;
+                        const imageData = ctx.getImageData(0, 0, width, height).data;
+
+                        // Helper to detect background color from frame edges
+                        const detectBackgroundColor = (data, width, height) => {
+                            // We will sample 4 points: Top-Left, Top-Right, Bottom-Left, Bottom-Right
+                            const positions = [
+                                0,                              // Top-Left
+                                (width - 1) * 4,                // Top-Right
+                                (width * (height - 1)) * 4,     // Bottom-Left
+                                (width * height - 1) * 4        // Bottom-Right
+                            ];
+
+                            let r = 0, g = 0, b = 0;
+                            let count = 0;
+
+                            positions.forEach(pos => {
+                                if (pos < data.length) {
+                                    r += data[pos];
+                                    g += data[pos + 1];
+                                    b += data[pos + 2];
+                                    count++;
+                                }
+                            });
+
+                            if (count === 0) return null;
+
+                            // Return the average RGB values
+                            return {
+                                r: Math.round(r / count),
+                                g: Math.round(g / count),
+                                b: Math.round(b / count)
+                            };
+                        };
+
+                        const detectedColor = detectBackgroundColor(imageData, width, height);
+                        if (detectedColor) {
+                            console.log('[RemoveBackground] Auto-detected color:', detectedColor);
+                            addColor(detectedColor);
+                        }
+                    } catch (e) {
+                        console.warn('[RemoveBackground] Auto-detection failed:', e);
+                    }
+                }, 100);
+            }
+
             // Handle Color Picking
             if (player.canvas) {
                 player.canvas.addEventListener('click', (e) => {
@@ -194,7 +247,7 @@ export class RemoveBackgroundMenu {
             // Add with default values
             selectedColors.push({
                 ...color,
-                similarity: 0.4,
+                similarity: 0.0,
                 smoothness: 0.08,
                 spill: 0.1
             });
