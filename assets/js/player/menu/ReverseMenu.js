@@ -42,7 +42,6 @@ export class ReverseMenu {
 
         const reverseBtn = modalContent.querySelector('.reverse-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
-        const tryAgainBtn = modalContent.querySelector('.try-again-btn');
         const progressSection = modalContent.querySelector('.progress-section');
         const progressBar = modalContent.querySelector('.progress-bar-fill');
         const progressText = modalContent.querySelector('.progress-percentage');
@@ -99,7 +98,6 @@ export class ReverseMenu {
 
             // UI Updates
             reverseBtn.disabled = true;
-            tryAgainBtn.classList.add('hidden');
 
             // Disable download button
             downloadBtn.disabled = true;
@@ -202,7 +200,10 @@ export class ReverseMenu {
                 errorMessage.textContent = `Reversal failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
-                tryAgainBtn.classList.remove('hidden');
+
+                // Re-enable controls on error
+                audioCheckbox.disabled = false;
+                reverseBtn.disabled = false;
             } finally {
                 // Restore close functionality
                 modal.close = originalClose;
@@ -211,6 +212,5 @@ export class ReverseMenu {
         };
 
         reverseBtn.addEventListener('click', startReversal);
-        tryAgainBtn.addEventListener('click', startReversal);
     }
 }
