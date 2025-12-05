@@ -1558,7 +1558,12 @@ export class CorePlayer {
                 }
             }
         } catch (error) {
-            console.error("Error in audio iterator:", error);
+            // Ignore InputDisposedError as it happens during reset/unload
+            if (error.name === 'InputDisposedError' || error.message.includes('Input has been disposed')) {
+                // console.debug('Audio iterator stopped due to input disposal');
+            } else {
+                console.error("Error in audio iterator:", error);
+            }
         } finally {
             // Ensure the iterator is properly closed to clean up any AudioSample objects
             // This is critical to prevent memory leaks as per MediaBunny's resource management requirements
