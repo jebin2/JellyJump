@@ -207,6 +207,7 @@ export class TrackManagerMenu {
 
         if (addToPlaylist) {
             const newItem = {
+                id: playlist._generateId(),
                 title: newFilename,
                 url: url,
                 file: new File([blob], newFilename, { type: blob.type }),
