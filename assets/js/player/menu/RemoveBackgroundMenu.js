@@ -127,8 +127,7 @@ export class RemoveBackgroundMenu {
                     addColor({
                         r: pixel[0],
                         g: pixel[1],
-                        b: pixel[2],
-                        tolerance: 10
+                        b: pixel[2]
                     });
 
                     // Turn off picking mode after selection
@@ -192,7 +191,13 @@ export class RemoveBackgroundMenu {
 
             if (exists) return;
 
-            selectedColors.push(color);
+            // Add with default values
+            selectedColors.push({
+                ...color,
+                similarity: 0.4,
+                smoothness: 0.08,
+                spill: 0.1
+            });
             renderColorsList();
 
             // Force redraw if paused
@@ -225,23 +230,50 @@ export class RemoveBackgroundMenu {
                 const swatch = clone.querySelector('.color-swatch');
                 const hex = clone.querySelector('.color-hex');
                 const removeBtn = clone.querySelector('.remove-color-btn');
-                const slider = clone.querySelector('.tolerance-slider');
-                const toleranceValue = clone.querySelector('.tolerance-value');
+
+                // Sliders
+                const similaritySlider = clone.querySelector('.similarity-slider');
+                const similarityValue = clone.querySelector('.similarity-value');
+                const smoothnessSlider = clone.querySelector('.smoothness-slider');
+                const smoothnessValue = clone.querySelector('.smoothness-value');
+                const spillSlider = clone.querySelector('.spill-slider');
+                const spillValue = clone.querySelector('.spill-value');
 
                 const rgbString = `rgb(${color.r}, ${color.g}, ${color.b})`;
                 swatch.style.backgroundColor = rgbString;
                 hex.textContent = rgbToHex(color.r, color.g, color.b);
 
-                slider.value = color.tolerance;
-                toleranceValue.textContent = `Tol: ${color.tolerance}`;
+                // Initialize values
+                similaritySlider.value = color.similarity * 100;
+                similarityValue.textContent = color.similarity.toFixed(2);
 
-                slider.oninput = () => {
-                    color.tolerance = parseInt(slider.value);
-                    toleranceValue.textContent = `Tol: ${color.tolerance}`;
+                smoothnessSlider.value = color.smoothness * 100;
+                smoothnessValue.textContent = color.smoothness.toFixed(2);
+
+                spillSlider.value = color.spill * 100;
+                spillValue.textContent = color.spill.toFixed(2);
+
+                // Event Handlers
+                const updatePreview = () => {
+                    if (!player.isPlaying) player.seek(player.currentTime);
                 };
 
-                slider.onchange = () => {
-                    if (!player.isPlaying) player.seek(player.currentTime);
+                similaritySlider.oninput = () => {
+                    color.similarity = parseInt(similaritySlider.value) / 100;
+                    similarityValue.textContent = color.similarity.toFixed(2);
+                    updatePreview();
+                };
+
+                smoothnessSlider.oninput = () => {
+                    color.smoothness = parseInt(smoothnessSlider.value) / 100;
+                    smoothnessValue.textContent = color.smoothness.toFixed(2);
+                    updatePreview();
+                };
+
+                spillSlider.oninput = () => {
+                    color.spill = parseInt(spillSlider.value) / 100;
+                    spillValue.textContent = color.spill.toFixed(2);
+                    updatePreview();
                 };
 
                 removeBtn.onclick = () => removeColor(index);

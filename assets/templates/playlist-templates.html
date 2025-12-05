@@ -1549,26 +1549,36 @@
 
 <!-- Color Item Template -->
 <template id="color-item-template">
-    <div class="playlist-item color-item">
-        <div class="playlist-thumbnail color-swatch border border-border shadow-sm mr-sm flex-shrink-0">
-        </div>
-        <div class="playlist-info flex-1 min-w-0">
-            <div class="playlist-title color-hex font-mono text-sm font-bold mb-xs">#000000</div>
-            <div class="playlist-duration tolerance-info text-xs text-secondary flex items-center gap-xs">
-                <span>Tol:</span>
-                <span class="tolerance-value font-mono">10</span>
-                <div class="w-20 ml-xs">
-                    <input type="range" class="quality-slider tolerance-slider" min="1" max="100" value="10"
-                        onclick="event.stopPropagation()">
-                </div>
-            </div>
-        </div>
-        <div class="playlist-actions flex items-center gap-xs">
+    <div class="playlist-item color-item flex-col items-start p-sm gap-sm h-auto">
+        <div class="flex items-center w-full gap-sm">
+            <div class="playlist-thumbnail color-swatch border border-border shadow-sm flex-shrink-0"></div>
+            <div class="playlist-title color-hex font-mono text-sm font-bold flex-1">#000000</div>
             <button class="playlist-remove-btn remove-color-btn" title="Remove color">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-trash"></use>
                 </svg>
             </button>
+        </div>
+
+        <div class="w-full grid gap-xs">
+            <div class="flex items-center gap-xs text-xs text-secondary">
+                <span class="w-20">Similarity</span>
+                <input type="range" class="quality-slider similarity-slider flex-1" min="0" max="100" value="40"
+                    onclick="event.stopPropagation()">
+                <span class="similarity-value font-mono w-8 text-right">0.40</span>
+            </div>
+            <div class="flex items-center gap-xs text-xs text-secondary">
+                <span class="w-20">Smoothness</span>
+                <input type="range" class="quality-slider smoothness-slider flex-1" min="0" max="100" value="8"
+                    onclick="event.stopPropagation()">
+                <span class="smoothness-value font-mono w-8 text-right">0.08</span>
+            </div>
+            <div class="flex items-center gap-xs text-xs text-secondary">
+                <span class="w-20">Spill</span>
+                <input type="range" class="quality-slider spill-slider flex-1" min="0" max="100" value="10"
+                    onclick="event.stopPropagation()">
+                <span class="spill-value font-mono w-8 text-right">0.10</span>
+            </div>
         </div>
     </div>
 </template>

@@ -1241,11 +1241,9 @@ export class MediaProcessor {
             r: c.r,
             g: c.g,
             b: c.b,
-            // Map tolerance (1-100) to similarity (0.0 - 1.0)
-            // Tolerance 10 -> Similarity 0.04 roughly
-            similarity: (c.tolerance / 100) * 0.4,
-            smoothness: 0.08, // Fixed for now
-            spill: 0.1 // Fixed for now
+            similarity: c.similarity !== undefined ? c.similarity : 0.4,
+            smoothness: c.smoothness !== undefined ? c.smoothness : 0.08,
+            spill: c.spill !== undefined ? c.spill : 0.1
         }));
 
         for (let i = 0; i < data.length; i += 4) {
