@@ -94,11 +94,16 @@ export class IndexedDBService {
 
             // Clear existing playlist first (simplest approach for now)
             // Ideally we'd diff, but clearing is safer to ensure sync
+            // Clear existing playlist first (simplest approach for now)
+            // Ideally we'd diff, but clearing is safer to ensure sync
             playlistStore.clear();
-            // We don't clear files immediately to avoid deleting files that are still needed
-            // But for simplicity in this phase, we'll clear and rewrite. 
-            // Optimization: Only delete files that are no longer in the playlist.
-            fileStore.clear();
+
+            // CRITICAL: Do NOT clear fileStore here. 
+            // Since we unload files from memory to save RAM, clearing the store would delete 
+            // the persisted files for items that are currently unloaded (item.file is null).
+            // We only want to ADD/UPDATE files that are present in memory.
+            // Garbage collection of unused files should be a separate process if needed.
+            // fileStore.clear();
 
             items.forEach(item => {
                 // 1. Prepare item for storage
@@ -137,62 +142,59 @@ export class IndexedDBService {
      * Load playlist and restore files
      * @returns {Promise<Array>}
      */
+    /**
+     * Load playlist (metadata only, no files)
+     * @returns {Promise<Array>}
+     */
     async loadPlaylist() {
         await this.ready();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.STORES.PLAYLIST, this.STORES.FILES], 'readonly');
+            const transaction = this.db.transaction([this.STORES.PLAYLIST], 'readonly');
             const playlistStore = transaction.objectStore(this.STORES.PLAYLIST);
-            const fileStore = transaction.objectStore(this.STORES.FILES);
-
             const itemsRequest = playlistStore.getAll();
 
-            itemsRequest.onsuccess = async () => {
+            itemsRequest.onsuccess = () => {
                 const storedItems = itemsRequest.result;
-                const restoredItems = [];
-
-                // We need to fetch files for local items
-                // Since we can't await inside the transaction easily for all, 
-                // we'll collect promises or do it in a way that keeps transaction active?
-                // Actually, 'getAll' on files might be heavy. Let's get individual files.
-
-                // Better approach: Get all items, then for each local item, get its file.
-                // Note: Transaction might commit if we await. 
-                // So let's fetch all files if possible or open a new transaction if needed.
-                // For safety, let's just fetch all files now (assuming playlist isn't huge).
-
-                const filesRequest = fileStore.getAll();
-
-                filesRequest.onsuccess = () => {
-                    const files = filesRequest.result;
-                    const fileMap = new Map(files.map(f => [f.id, f]));
-
-                    storedItems.forEach(item => {
-                        const restored = { ...item };
-
-                        if (restored.isLocal) {
-                            const fileData = fileMap.get(item.id);
-                            if (fileData) {
-                                // Reconstruct File object
-                                restored.file = new File([fileData.blob], fileData.name, { type: fileData.type });
-                                restored.url = URL.createObjectURL(restored.file);
-                                restored.needsReload = false;
-                            } else {
-                                restored.needsReload = true; // File missing or too large
-                            }
-                        }
-
-                        restoredItems.push(restored);
-                    });
-
-                    // Sort by original index if needed, or rely on array order
-                    resolve(restoredItems);
-                };
-
-                filesRequest.onerror = () => reject(filesRequest.error);
+                const restoredItems = storedItems.map(item => {
+                    const restored = { ...item };
+                    if (restored.isLocal) {
+                        // Don't load file yet. Set as null.
+                        restored.file = null;
+                        restored.url = null;
+                        restored.needsReload = false; // We assume it exists, will fail on load if not
+                    }
+                    return restored;
+                });
+                resolve(restoredItems);
             };
 
             itemsRequest.onerror = () => reject(itemsRequest.error);
+        });
+    }
+
+    /**
+     * Load a single file by ID
+     * @param {string} id 
+     * @returns {Promise<File|null>}
+     */
+    async loadFile(id) {
+        await this.ready();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.STORES.FILES], 'readonly');
+            const fileStore = transaction.objectStore(this.STORES.FILES);
+            const request = fileStore.get(id);
+
+            request.onsuccess = () => {
+                const result = request.result;
+                if (result) {
+                    const file = new File([result.blob], result.name, { type: result.type });
+                    resolve(file);
+                } else {
+                    resolve(null);
+                }
+            };
+            request.onerror = () => reject(request.error);
         });
     }
 

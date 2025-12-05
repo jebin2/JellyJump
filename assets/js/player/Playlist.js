@@ -376,14 +376,8 @@ export class Playlist {
 
                     if (indexToRestore >= 0 && indexToRestore < this.items.length) {
                         // Don't auto-play on restore, just load
-                        this.activeIndex = indexToRestore;
-                        const video = this.items[this.activeIndex];
-
-                        if (!video.needsReload) {
-                            await this.player.load(video.url, false, video.id);
-                            this._updateUI();
-                            this._updatePlayerNavigationState();
-                        }
+                        // Use selectItem to handle on-demand loading
+                        await this.selectItem(indexToRestore, false);
                     }
                 }
             } else {
@@ -630,9 +624,21 @@ export class Playlist {
     /**
      * Select and play a video by index
      * @param {number} index 
+     * @param {boolean} autoplay - Whether to start playing immediately
      */
-    async selectItem(index) {
+    async selectItem(index, autoplay = true) {
         if (index < 0 || index >= this.items.length) return;
+
+        // Cleanup previous item's resources if it was local
+        if (this.activeIndex !== -1 && this.activeIndex !== index) {
+            const prevItem = this.items[this.activeIndex];
+            if (prevItem && prevItem.isLocal && prevItem.url) {
+                console.log(`Releasing memory for: ${prevItem.title}`);
+                URL.revokeObjectURL(prevItem.url);
+                prevItem.url = null;
+                prevItem.file = null; // Release Blob
+            }
+        }
 
         const video = this.items[index];
 
@@ -643,16 +649,46 @@ export class Playlist {
 
         this.activeIndex = index;
 
+        // On-Demand Loading: Fetch file from DB if missing
+        if (video.isLocal && !video.file) {
+            try {
+                if (this.player.ui && this.player.ui.loader) {
+                    this.player.ui.loader.classList.add('visible');
+                }
+                console.log(`Loading file from storage: ${video.title}`);
+                const file = await this.storage.loadFile(video.id);
+                if (file) {
+                    video.file = file;
+                    video.url = URL.createObjectURL(file);
+                } else {
+                    console.error('File not found in storage');
+                    alert('File not found in storage. Please re-add it.');
+                    if (this.player.ui && this.player.ui.loader) {
+                        this.player.ui.loader.classList.remove('visible');
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error('Error loading file from storage:', e);
+                if (this.player.ui && this.player.ui.loader) {
+                    this.player.ui.loader.classList.remove('visible');
+                }
+                return;
+            }
+        }
+
         // Load video into player
-        await this.player.load(video.url, true, video.id);
+        await this.player.load(video.url, autoplay, video.id);
 
         // Update UI
         this._updateUI();
         this._saveState();
         this._updatePlayerNavigationState();
 
-        // Auto play if not the first load (optional logic)
-        this.player.play();
+        // Auto play if requested
+        if (autoplay) {
+            this.player.play();
+        }
 
         // Prefetch metadata asynchronously (non-blocking)
         this._prefetchMetadata(video);
