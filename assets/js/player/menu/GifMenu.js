@@ -92,8 +92,8 @@ export class GifMenu {
         // Load Video into Player
         if (player) {
             // Get source blob - handles memory vs IndexedDB vs URL
-            const videoUrl = await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-            await player.load(videoUrl, false);
+            await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
+            await player.load(item.blob_url, false);
 
             // Enable A-B Loop Mode
             player.loopMode = 'ab';

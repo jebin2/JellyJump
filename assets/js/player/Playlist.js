@@ -405,48 +405,6 @@ export class Playlist {
                             localPath: itemToRestore.localPath
                         });
 
-                        // Electron: Check if localPath file still exists on disk
-                        if (ElectronHelper.isElectron() && itemToRestore.localPath) {
-                            const fileExists = await ElectronHelper.fileExists(itemToRestore.localPath);
-                            if (fileExists) {
-                                console.log('[Electron] File exists on disk, proceeding to load:', itemToRestore.localPath);
-                                await this.selectItem(indexToRestore, false);
-                                return;
-                            }
-                            console.warn('[Electron] File no longer exists:', itemToRestore.localPath);
-                            // Fall through to show modal
-                        }
-
-                        // Pre-check: If it's a local item with no usable source, don't try to load
-                        // This includes: no file AND (no url OR stale blob url) AND (no localPath or Electron not available)
-                        const hasElectronPath = ElectronHelper.isElectron() && itemToRestore.localPath;
-                        const hasNoSource = itemToRestore.isLocal && !itemToRestore.file &&
-                            (!itemToRestore.url || itemToRestore.url.startsWith('blob:')) && !hasElectronPath;
-
-                        if (hasNoSource) {
-                            console.log('[Playlist] Item has no source, showing modal');
-                            // Wait for UI to settle, then show modal
-                            setTimeout(async () => {
-                                const shouldRemove = await ConfirmModal.confirm({
-                                    title: 'File Not Found',
-                                    message: `"${itemToRestore.title}" could not be loaded.\n\nThis file was likely too large to save in browser storage (>500MB) and needs to be re-added to the playlist.`,
-                                    confirmText: 'Remove',
-                                    cancelText: 'Keep',
-                                    confirmStyle: 'danger',
-                                    icon: '⚠️'
-                                });
-
-                                if (shouldRemove) {
-                                    this.items.splice(indexToRestore, 1);
-                                    this.activeIndex = -1;
-                                    this._saveState();
-                                    this.render();
-                                    this._updatePlayerNavigationState();
-                                }
-                            }, 300); // Longer delay to ensure page is fully loaded
-                            return; // Don't try to select this item
-                        }
-
                         // Don't auto-play on restore, just load
                         // Use selectItem to handle on-demand loading
                         await this.selectItem(indexToRestore, false);
@@ -815,13 +773,14 @@ export class Playlist {
             this.activeIndex = index;
 
             // On-Demand Loading: Fetch file from DB if missing OR if URL was revoked
-            if (video.isLocal && (!video.file || !video.url)) {
+            // Also handles remote URL items that need to load from cache
+            if (!video.blob_url) {
                 try {
                     if (this.player.ui && this.player.ui.loader) {
                         this.player.ui.loader.classList.add('visible');
                     }
                     console.log(`Loading file from storage: ${video.title}`);
-                    await MediaMetadata.getProcessedSourceURL(video)
+                    await MediaMetadata.getProcessedSourceURL(video);
                 } catch (e) {
                     console.error('Error loading file from storage:', e);
                     if (this.player.ui && this.player.ui.loader) {
@@ -858,14 +817,14 @@ export class Playlist {
             }
 
             // Final safety check: Ensure we have a valid URL before loading
-            if (!video.url) {
+            if (!video.blob_url) {
                 console.error('Video URL is null, cannot load:', video.title);
                 return;
             }
 
             // Load video into player (autoplay based on whether we WERE playing)
             const shouldAutoplay = autoplay && wasPlaying;
-            await this.player.load(video.url, shouldAutoplay, video.id);
+            await this.player.load(video.blob_url, shouldAutoplay, video.id);
 
             // Update UI
             this._updateUI();
@@ -1219,14 +1178,7 @@ export class Playlist {
             // Sanitize filename
             filename = this._sanitizeFilename(filename);
 
-            let downloadUrl = item.url;
-            let blobUrl = null;
-
-            // Check if URL is a blob URL or a remote URL
-            const isBlobUrl = item.url.startsWith('blob:');
-
-            if (!isBlobUrl) {
-                // For remote URLs, use cached blob or fetch
+            if (!item.blob_url) {
                 // Show loading state
                 if (downloadBtn) {
                     const loadingTemplate = document.getElementById('loading-spinner-template');
@@ -1238,7 +1190,7 @@ export class Playlist {
 
                 console.log(`Getting source for download: ${item.title}`);
 
-                blobUrl = await MediaMetadata.getProcessedSourceURL(item, () => this._saveState());
+                await MediaMetadata.getProcessedSourceURL(item, () => this._saveState());
 
                 if (downloadBtn) {
                     downloadBtn.style.opacity = "";
@@ -1247,13 +1199,13 @@ export class Playlist {
 
             // Use reusable download anchor from HTML
             const downloadLink = document.getElementById('mb-download-link');
-            downloadLink.href = blobUrl;
+            downloadLink.href = item.blob_url;
             downloadLink.download = filename;
             downloadLink.click();
 
             // Clean up blob URL if we created one
-            if (blobUrl) {
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+            if (item.blob_url) {
+                setTimeout(() => URL.revokeObjectURL(item.blob_url), 100);
             }
 
             console.log(`Downloading: ${filename}`);

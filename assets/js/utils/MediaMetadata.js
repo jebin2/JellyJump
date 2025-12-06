@@ -72,7 +72,7 @@ export class MediaMetadata {
         }
 
         // 3. If isLocal (previously cached), try loading from IndexedDB
-        if (item.isLocal && item.id) {
+        if (item.id) {
             console.log('[Cache] Loading cached file from IndexedDB:', item.title);
             const file = await _dbService.loadFile(item.id);
             if (file) {
@@ -109,11 +109,6 @@ export class MediaMetadata {
                 const filename = item.title || 'video';
                 const saved = await _dbService.saveFile(item.id, blob, filename, blob.type);
                 if (saved) {
-                    // Mark as locally cached (but don't keep in memory!)
-                    item.isLocal = true;
-                    // Keep original URL for reference, but file will load from DB
-                    // item.file stays null - on-demand loading will get it from DB
-
                     if (onSave) {
                         onSave();
                     }
@@ -130,35 +125,14 @@ export class MediaMetadata {
     }
 
     static async getProcessedSourceURL(item, onSave) {
-        // If already has a usable URL (not a stale blob), return it
-        if (item.url && !item.url.startsWith('blob:')) {
-            return item.url;
-        }
-        // If it's a local file that already has a valid blob URL in memory, return it
-        if (item.isLocal && item.url && item.url.startsWith('blob:')) {
-            return item.url;
+        if (item.blob_url && item.blob_url.startsWith('blob:')) {
+            return item.blob_url;
         }
 
         const file = await this.getSourceBlob(item, onSave);
 
-        // Only mark as local if it's not a remote URL item
-        if (!item.isRemoteUrl) {
-            item.isLocal = true;
-        }
-
-        // Create blob URL for playback (but preserve original URL for remote items)
-        const blobUrl = URL.createObjectURL(file);
-
-        // For remote URL items, don't overwrite the original URL
-        // Store blob URL separately or just return it for this session
-        if (item.isRemoteUrl) {
-            // Store playback URL separately, keep original for persistence
-            item._playbackUrl = blobUrl;
-            return blobUrl;
-        }
-
-        item.url = blobUrl;
-        return item.url;
+        item.blob_url = URL.createObjectURL(file);
+        return item.blob_url;
     }
 
     /**
@@ -174,9 +148,9 @@ export class MediaMetadata {
         }
 
         // Use helper to get source (with caching for remote URLs)
-        const sourceUrl = await MediaMetadata.getProcessedSourceURL(item, onSave);
+        const blobUrl = await MediaMetadata.getProcessedSourceURL(item, onSave);
 
-        const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(sourceUrl);
+        const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(blobUrl);
         item.videoInfo = videoInfo;
         item.audioInfo = audioInfo;
         item.videoTracks = videoTracks;
