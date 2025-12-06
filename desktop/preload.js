@@ -27,5 +27,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @param {string} filePath - Absolute path to the file
      * @returns {Promise<{success: boolean, stats?: {size: number, mtime: number}, error?: string}>}
      */
-    getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath)
+    getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
+
+    /**
+     * Open native file dialog and return selected file paths with metadata
+     * @param {Object} options - Optional dialog options
+     * @returns {Promise<{success: boolean, files?: Array<{path: string, name: string, size: number}>, canceled?: boolean}>}
+     */
+    openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options)
 });

@@ -25,10 +25,8 @@ cp -r build desktop/build
 cd desktop
 
 # Ensure dependencies are installed
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing desktop dependencies..."
-    npm install
-fi
+echo "📦 Installing desktop dependencies..."
+npm install
 
 # Build Electron App
 echo "🔨 Running Electron Build..."

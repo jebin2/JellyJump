@@ -24,8 +24,12 @@
     "icon": "build/assets/icons/jelly_jump_logo.png",
     "files": [
       "main.js",
+      "preload.js",
       "package.json",
       "build/**/*"
+    ],
+    "asarUnpack": [
+      "preload.js"
     ],
     "publish": {
       "provider": "github",

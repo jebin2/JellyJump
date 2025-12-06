@@ -2,6 +2,23 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Debug: Log the preload path
+// In packaged apps, unpacked files are in app.asar.unpacked
+let preloadPath = path.join(__dirname, 'preload.js');
+
+// Check if we're in a packaged app and preload is unpacked
+if (app.isPackaged) {
+    const unpackedPath = preloadPath.replace('app.asar', 'app.asar.unpacked');
+    if (fs.existsSync(unpackedPath)) {
+        preloadPath = unpackedPath;
+    }
+}
+
+console.log('[Electron] Preload path:', preloadPath);
+console.log('[Electron] Preload exists:', fs.existsSync(preloadPath));
+console.log('[Electron] __dirname:', __dirname);
+console.log('[Electron] app.isPackaged:', app.isPackaged);
+
 // ============================================
 // IPC Handlers for File System Access
 // ============================================
@@ -54,6 +71,45 @@ ipcMain.handle('get-file-stats', async (event, filePath) => {
     }
 });
 
+/**
+ * Open file dialog and return file paths with metadata
+ */
+ipcMain.handle('open-file-dialog', async (event, options = {}) => {
+    const { dialog } = require('electron');
+
+    try {
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+                { name: 'Videos', extensions: ['mp4', 'mkv', 'avi', 'webm', 'mov', 'm4v', 'wmv', 'flv'] },
+                { name: 'All Files', extensions: ['*'] }
+            ],
+            ...options
+        });
+
+        if (result.canceled) {
+            return { success: false, canceled: true };
+        }
+
+        // Get file stats for each selected file
+        const files = await Promise.all(result.filePaths.map(async (filePath) => {
+            const stats = await fs.promises.stat(filePath);
+            const name = path.basename(filePath);
+            return {
+                path: filePath,
+                name: name,
+                size: stats.size,
+                lastModified: stats.mtimeMs
+            };
+        }));
+
+        return { success: true, files };
+    } catch (error) {
+        console.error('[Electron] Error opening file dialog:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // ============================================
 // Window Creation
 // ============================================
@@ -66,7 +122,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: true, // Important for loading local resources properly
-            preload: path.join(__dirname, 'preload.js') // Load preload script
+            preload: preloadPath // Load preload script (handles ASAR unpacking)
         },
         autoHideMenuBar: true,
         title: "JellyJump Player",
