@@ -199,6 +199,43 @@ export class IndexedDBService {
     }
 
     /**
+     * Save a single file to IndexedDB
+     * @param {string} id - Item ID
+     * @param {Blob} blob - File blob to save
+     * @param {string} name - Filename
+     * @param {string} type - MIME type
+     * @returns {Promise<boolean>} True if saved, false if too large
+     */
+    async saveFile(id, blob, name, type) {
+        await this.ready();
+
+        // Size limit (500MB)
+        const MAX_SIZE = 500 * 1024 * 1024;
+        if (blob.size > MAX_SIZE) {
+            console.warn(`[IndexedDB] File too large to save: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+            return false;
+        }
+
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.STORES.FILES], 'readwrite');
+            const fileStore = transaction.objectStore(this.STORES.FILES);
+
+            fileStore.put({
+                id: id,
+                blob: blob,
+                name: name,
+                type: type
+            });
+
+            transaction.oncomplete = () => {
+                console.log(`[IndexedDB] File saved: ${name} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+                resolve(true);
+            };
+            transaction.onerror = () => reject(transaction.error);
+        });
+    }
+
+    /**
      * Save playback state
      * @param {Object} state 
      */

@@ -1,6 +1,10 @@
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
+import { IndexedDBService } from '../player/IndexedDBService.js';
 import { formatDuration } from './mediaUtils.js';
+
+// Shared IndexedDB instance for caching remote blobs
+const _dbService = new IndexedDBService();
 
 /**
  * Media Metadata Service
@@ -39,18 +43,30 @@ export class MediaMetadata {
 
     /**
      * Get source blob for an item (with caching for remote URLs)
-     * Fetches remote videos once and caches them on the item to avoid redundant downloads
+     * For remote URLs: downloads, saves to IndexedDB, then releases from memory
+     * For local files: loads from IndexedDB on-demand if not in memory
      * @param {Object} item - Playlist item  
      * @param {Function} [onSave] - Optional callback to save state after caching
      * @returns {Promise<Blob>} Source blob
      */
     static async getSourceBlob(item, onSave) {
-        // Local file - return directly
+        // 1. If file is already in memory, return it
         if (item.file) {
             return item.file;
         }
 
-        // Remote URL - fetch and cache
+        // 2. If isLocal (previously cached), try loading from IndexedDB
+        if (item.isLocal && item.id) {
+            console.log('[Cache] Loading cached file from IndexedDB:', item.title);
+            const file = await _dbService.loadFile(item.id);
+            if (file) {
+                console.log('[Cache] File loaded from IndexedDB:', item.title);
+                return file;  // Return without keeping in memory
+            }
+            console.warn('[Cache] File not found in IndexedDB, falling back to URL:', item.title);
+        }
+
+        // 3. Remote URL - fetch and persist to IndexedDB
         if (item.url) {
             console.log('[Cache] Fetching remote video for caching:', item.title);
 
@@ -72,16 +88,25 @@ export class MediaMetadata {
                 return blob; // Return without caching
             }
 
-            // Cache the blob
-            item.file = blob;
-            item.isLocal = true; // Mark as locally available
+            // Save to IndexedDB for persistence
+            if (item.id) {
+                const filename = item.title || 'video';
+                const saved = await _dbService.saveFile(item.id, blob, filename, blob.type);
+                if (saved) {
+                    // Mark as locally cached (but don't keep in memory!)
+                    item.isLocal = true;
+                    // Keep original URL for reference, but file will load from DB
+                    // item.file stays null - on-demand loading will get it from DB
 
-            // Save to persistence
-            if (onSave) {
-                onSave();
+                    if (onSave) {
+                        onSave();
+                    }
+
+                    console.log('[Cache] Blob persisted to IndexedDB, releasing from memory:', item.title);
+                }
             }
 
-            console.log('[Cache] Blob cached on item:', item.title);
+            // Return the blob for immediate use
             return blob;
         }
 
