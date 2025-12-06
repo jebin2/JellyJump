@@ -9,9 +9,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2000;
+    z-index: 10000;
     backdrop-filter: blur(2px);
-    animation: fadeIn 0.2s ease-out;
+    animation: fadeIn 0.2s ease-out forwards;
+}
+
+.modal-overlay.closing {
+    animation: fadeOut 0.2s ease-out forwards;
+}
+
+.modal-overlay.closing .modal {
+    animation: scaleOut 0.2s ease-out forwards;
 }
 
 .modal {
@@ -37,9 +45,9 @@
     gap: var(--space-sm);
 }
 
-.modal__title::before {
-    content: '⚠️';
+.modal__icon {
     font-size: 24px;
+    line-height: 1;
 }
 
 .modal__message {
@@ -47,6 +55,7 @@
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.5;
+    white-space: pre-line;
 }
 
 .modal__actions {
@@ -78,6 +87,11 @@
     box-shadow: none;
 }
 
+.modal-btn:focus {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
 /* Button Types */
 .modal-btn--primary {
     background-color: var(--accent-primary);
@@ -107,6 +121,16 @@
     }
 }
 
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
 @keyframes scaleIn {
     from {
         transform: scale(0.9);
@@ -116,5 +140,17 @@
     to {
         transform: scale(1);
         opacity: 1;
+    }
+}
+
+@keyframes scaleOut {
+    from {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    to {
+        transform: scale(0.9);
+        opacity: 0;
     }
 }

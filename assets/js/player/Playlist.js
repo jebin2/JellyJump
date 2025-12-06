@@ -2,7 +2,7 @@ import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
 import { CorePlayer } from '../core/Player.js';
-import { Modal } from './Modal.js';
+import { Modal } from '../utils/Modal.js';
 import { MenuRouter } from './menu/MenuRouter.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
@@ -385,6 +385,43 @@ export class Playlist {
                     }
 
                     if (indexToRestore >= 0 && indexToRestore < this.items.length) {
+                        const itemToRestore = this.items[indexToRestore];
+
+                        console.log('[Playlist] Restoring item:', itemToRestore.title, {
+                            isLocal: itemToRestore.isLocal,
+                            hasFile: !!itemToRestore.file,
+                            url: itemToRestore.url
+                        });
+
+                        // Pre-check: If it's a local item with no usable source, don't try to load
+                        // This includes: no file AND (no url OR stale blob url)
+                        const hasNoSource = itemToRestore.isLocal && !itemToRestore.file &&
+                            (!itemToRestore.url || itemToRestore.url.startsWith('blob:'));
+
+                        if (hasNoSource) {
+                            console.log('[Playlist] Item has no source, showing modal');
+                            // Wait for UI to settle, then show modal
+                            setTimeout(async () => {
+                                const shouldRemove = await Modal.confirm({
+                                    title: 'File Not Found',
+                                    message: `"${itemToRestore.title}" could not be loaded.\n\nThis file was likely too large to save in browser storage (>500MB) and needs to be re-added to the playlist.`,
+                                    confirmText: 'Remove',
+                                    cancelText: 'Keep',
+                                    confirmStyle: 'danger',
+                                    icon: '⚠️'
+                                });
+
+                                if (shouldRemove) {
+                                    this.items.splice(indexToRestore, 1);
+                                    this.activeIndex = -1;
+                                    this._saveState();
+                                    this.render();
+                                    this._updatePlayerNavigationState();
+                                }
+                            }, 300); // Longer delay to ensure page is fully loaded
+                            return; // Don't try to select this item
+                        }
+
                         // Don't auto-play on restore, just load
                         // Use selectItem to handle on-demand loading
                         await this.selectItem(indexToRestore, false);
@@ -692,6 +729,32 @@ export class Playlist {
                     console.error('Error loading file from storage:', e);
                     if (this.player.ui && this.player.ui.loader) {
                         this.player.ui.loader.classList.remove('visible');
+                    }
+
+                    // Show user-friendly popup for missing file
+                    try {
+                        console.log('Showing modal for file not found...');
+                        const shouldRemove = await Modal.confirm({
+                            title: 'File Not Found',
+                            message: `"${video.title}" could not be loaded.\n\nThis file was likely too large to save in browser storage (>500MB) and needs to be re-added to the playlist.`,
+                            confirmText: 'Remove',
+                            cancelText: 'Keep',
+                            confirmStyle: 'danger',
+                            icon: '⚠️'
+                        });
+
+                        if (shouldRemove) {
+                            // Remove the corrupted/missing item
+                            this.items.splice(index, 1);
+                            if (this.activeIndex >= index) {
+                                this.activeIndex = Math.max(-1, this.activeIndex - 1);
+                            }
+                            this._saveState();
+                            this.render();
+                            this._updatePlayerNavigationState();
+                        }
+                    } catch (modalError) {
+                        console.error('Error showing modal:', modalError);
                     }
                     return;
                 }

@@ -1144,7 +1144,7 @@ body.fullscreen-active {
 /* -----------------------------------------
    Conversion Modal (Phase 33)
    ----------------------------------------- */
-.modal-overlay {
+.conversion-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -1161,7 +1161,7 @@ body.fullscreen-active {
     transition: opacity 0.2s ease;
 }
 
-.modal-overlay.visible {
+.conversion-modal-overlay.visible {
     opacity: 1;
     pointer-events: auto;
 }

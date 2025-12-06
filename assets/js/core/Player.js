@@ -101,6 +101,9 @@ export class CorePlayer {
         // Subtitles - only initialize if captions control is enabled
         this.subtitleManager = null;
         this.isSubtitlesEnabled = false;
+        this.subtitleTracks = []; // Array of {id, name, cues}
+        this.activeSubtitleTrackId = null;
+        this.subtitleTrackCounter = 0;
 
         // Screenshot Manager - initialized lazily if needed
         this.screenshotManager = null;
@@ -822,17 +825,67 @@ export class CorePlayer {
         // Skip if captions control is disabled
         if (!this.ui.ccMenu || !this.ui.ccBtn) return;
 
-        const items = this.ui.ccMenu.querySelectorAll('.jellyjump-menu-item');
-        items.forEach(item => item.classList.remove('active'));
+        // Remove old custom track items (keep Off and Upload)
+        const oldCustomItems = this.ui.ccMenu.querySelectorAll('[data-value^="custom-"]');
+        oldCustomItems.forEach(item => item.remove());
 
+        // Clear active states
+        this.ui.ccMenu.querySelectorAll('.jellyjump-menu-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        // Add menu items for each subtitle track
+        const uploadItem = this.ui.ccMenu.querySelector('#mb-upload-cc');
+        this.subtitleTracks.forEach(track => {
+            const trackItem = document.createElement('div');
+            trackItem.className = 'jellyjump-menu-item';
+            trackItem.setAttribute('data-value', track.id);
+            trackItem.setAttribute('role', 'menuitem');
+            trackItem.setAttribute('tabindex', '0');
+            trackItem.textContent = track.name;
+
+            // Insert before upload button
+            if (uploadItem) {
+                this.ui.ccMenu.insertBefore(trackItem, uploadItem);
+            } else {
+                this.ui.ccMenu.appendChild(trackItem);
+            }
+
+            // Add click handler
+            trackItem.addEventListener('click', () => {
+                this._switchSubtitleTrack(track.id);
+                this.ui.ccMenu.classList.remove('visible');
+            });
+        });
+
+        // Update active states
         if (!this.isSubtitlesEnabled) {
             this.ui.ccMenu.querySelector('[data-value="off"]').classList.add('active');
             this.ui.ccBtn.classList.remove('active');
         } else {
-            // For now, just activate upload item or custom track if we had one
-            // Since we only support one external track at a time via upload/loadSubtitle:
+            const activeItem = this.ui.ccMenu.querySelector(`[data-value="${this.activeSubtitleTrackId}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+            }
             this.ui.ccBtn.classList.add('active');
         }
+    }
+
+    /**
+     * Switch to a different subtitle track
+     * @param {string} trackId 
+     * @private
+     */
+    _switchSubtitleTrack(trackId) {
+        const track = this.subtitleTracks.find(t => t.id === trackId);
+        if (!track) return;
+
+        // Load the cues into the subtitle manager
+        this.subtitleManager.cues = [...track.cues];
+        this.activeSubtitleTrackId = trackId;
+        this.isSubtitlesEnabled = true;
+        this._updateSubtitleMenu();
+        console.log(`Switched to subtitle track: ${track.name}`);
     }
 
     async _switchAudioTrack(trackId) {
@@ -1287,8 +1340,8 @@ export class CorePlayer {
     }
 
     /**
-     * Load a subtitle file
-     * @param {string} url - URL of the subtitle file (VTT or SRT)
+     * Load a subtitle file (VTT, SRT, or JSON transcript)
+     * @param {string} url - URL of the subtitle file
      */
     async loadSubtitle(url) {
         if (!this.subtitleManager) {
@@ -1299,10 +1352,39 @@ export class CorePlayer {
             console.log(`Loading subtitles: ${url}`);
             const response = await fetch(url);
             const content = await response.text();
-            this.subtitleManager.parse(content);
+
+            // Detect if content is JSON (transcript format)
+            let vttContent = content;
+            if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+                try {
+                    const { parseTranscriptJSON, jsonToVTT } = await import('./SubtitleConverter.js');
+                    const words = parseTranscriptJSON(content);
+                    vttContent = jsonToVTT(words);
+                    console.log('Converted JSON transcript to VTT format');
+                } catch (jsonError) {
+                    console.warn('Failed to parse as JSON transcript, treating as VTT:', jsonError);
+                }
+            }
+
+            // Parse the subtitle content
+            this.subtitleManager.parse(vttContent);
+
+            // Store as a new track with incrementing name
+            this.subtitleTrackCounter++;
+            const trackId = `custom-${this.subtitleTrackCounter}`;
+            const trackName = `Custom ${this.subtitleTrackCounter}`;
+
+            this.subtitleTracks.push({
+                id: trackId,
+                name: trackName,
+                cues: [...this.subtitleManager.cues] // Copy cues
+            });
+
+            // Set this track as active
+            this.activeSubtitleTrackId = trackId;
             this.isSubtitlesEnabled = true;
             this._updateSubtitleMenu();
-            console.log('Subtitles loaded successfully');
+            console.log(`Subtitles loaded successfully as "${trackName}"`);
         } catch (error) {
             console.error('Error loading subtitles:', error);
         }
@@ -1362,27 +1444,46 @@ export class CorePlayer {
         const activeCues = this.subtitleManager.getActiveCues(timestamp);
         if (activeCues.length === 0) return;
 
-        const fontSize = this.canvas.height * 0.05; // Responsive font size
-        this.ctx.font = `${fontSize}px Arial`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillStyle = 'white';
-        this.ctx.strokeStyle = 'black';
-        this.ctx.lineWidth = fontSize * 0.1;
-
-        const bottomMargin = this.canvas.height * 0.1;
+        const fontSize = Math.max(22, this.canvas.height * 0.055);
+        const lineHeight = fontSize * 1.35;
+        const bottomMargin = this.canvas.height * 0.08;
         const x = this.canvas.width / 2;
+
+        // Collect all lines from all active cues
+        const allLines = [];
+        activeCues.forEach(cue => {
+            cue.text.split('\n').forEach(line => {
+                if (line.trim()) allLines.push(line.trim());
+            });
+        });
+
+        if (allLines.length === 0) return;
+
+        // Calculate starting Y position (draw from bottom up)
         let y = this.canvas.height - bottomMargin;
 
-        activeCues.forEach(cue => {
-            const lines = cue.text.split('\n');
-            // Draw from bottom up
-            for (let i = lines.length - 1; i >= 0; i--) {
-                this.ctx.strokeText(lines[i], x, y);
-                this.ctx.fillText(lines[i], x, y);
-                y -= fontSize * 1.2;
-            }
-        });
+        // Setup text styling - Netflix/YouTube style with thick outline
+        this.ctx.font = `bold ${fontSize}px "Segoe UI", Roboto, Arial, sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.lineJoin = 'round';
+        this.ctx.miterLimit = 2;
+
+        // Draw lines from bottom to top
+        for (let i = allLines.length - 1; i >= 0; i--) {
+            const line = allLines[i];
+
+            // Draw thick black outline
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = fontSize * 0.15;
+            this.ctx.strokeText(line, x, y);
+
+            // Draw white fill
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillText(line, x, y);
+
+            y -= lineHeight;
+        }
     }
 
     /**
