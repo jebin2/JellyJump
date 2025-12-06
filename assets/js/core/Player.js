@@ -191,7 +191,7 @@ export class CorePlayer {
         const canvasTemplate = document.getElementById('player-canvas-template');
         const canvasClone = canvasTemplate.content.cloneNode(true);
         this.canvas = canvasClone.querySelector('canvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
         this.container.appendChild(canvasClone);
 
         // Initialize Subtitle Manager only if captions control is enabled
@@ -1240,8 +1240,11 @@ export class CorePlayer {
                     this.frameRate = 30;
                 }
 
-                // Setup Canvas Sink
-                this.videoSink = new MediaBunny.CanvasSink(this.videoTrack);
+                // Setup Canvas Sink with pool size for memory efficiency
+                this.videoSink = new MediaBunny.CanvasSink(this.videoTrack, {
+                    poolSize: 2, // Only keep 2 canvases - current and next frame
+                    fit: 'contain' // Handle videos that may change dimensions
+                });
 
                 // Set canvas size
                 this.canvas.width = this.videoTrack.displayWidth;
