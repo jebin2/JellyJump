@@ -437,6 +437,8 @@ export class Playlist {
                 isLocal: true,
                 needsReload: false,
                 file: file,
+                fileSize: file.size,      // Cache size for InfoMenu (file will be released after IndexedDB save)
+                fileType: file.type,      // Cache type for InfoMenu
                 path: path,
                 id: generateId() // Add unique ID for persistence
             };
@@ -678,8 +680,12 @@ export class Playlist {
                     console.log(`Loading file from storage: ${video.title}`);
                     const file = await this.storage.loadFile(video.id);
                     if (file) {
-                        video.file = file;
+                        // Create blob URL for playback (this keeps the blob alive)
                         video.url = URL.createObjectURL(file);
+                        // DON'T store the file reference - the URL keeps the blob alive
+                        // and the file is persisted in IndexedDB for re-loading
+                        video.file = null;
+                        console.log(`Created blob URL for: ${video.title}, file NOT kept in memory`);
                     } else {
                         console.error('File not found in storage');
                         alert('File not found in storage. Please re-add it.');
@@ -1078,9 +1084,7 @@ export class Playlist {
 
                 console.log(`Getting source for download: ${item.title}`);
 
-                const blob = await MediaMetadata.getSourceBlob(item, () => this._saveState());
-                blobUrl = URL.createObjectURL(blob);
-                downloadUrl = blobUrl;
+                blobUrl = await MediaMetadata.getProcessedSourceURL(item, () => this._saveState());
 
                 if (downloadBtn) {
                     downloadBtn.style.opacity = "";
@@ -1089,7 +1093,7 @@ export class Playlist {
 
             // Use reusable download anchor from HTML
             const downloadLink = document.getElementById('mb-download-link');
-            downloadLink.href = downloadUrl;
+            downloadLink.href = blobUrl;
             downloadLink.download = filename;
             downloadLink.click();
 

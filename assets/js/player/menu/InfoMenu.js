@@ -50,9 +50,13 @@ export class InfoMenu {
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
             };
 
-            // Get file size
-            let fileSize = '0 Bytes';
-            if (item.file) {
+            // Get file size from cached metadata or fetch from URL
+            let fileSize = 'Unknown';
+            if (item.fileSize) {
+                // Use cached file size (works even after item.file is released from memory)
+                fileSize = formatBytes(item.fileSize);
+            } else if (item.file) {
+                // Fallback to file object if available
                 fileSize = formatBytes(item.file.size);
             } else if (item.url) {
                 try {
@@ -77,10 +81,14 @@ export class InfoMenu {
                 }
             }
 
+            // Get file type from cached metadata or file object
+            const mimeType = item.fileType || (item.file ? item.file.type : 'Unknown');
+            const format = mimeType !== 'Unknown' ? mimeType.split('/')[0] : 'Unknown';
+
             const metadata = {
                 filename: item.title,
-                format: item.file ? item.file.type.split('/')[0] : 'Unknown',
-                mimeType: item.file ? item.file.type : 'Unknown',
+                format: format,
+                mimeType: mimeType,
                 size: fileSize,
                 duration: item.duration || 'Unknown',
 

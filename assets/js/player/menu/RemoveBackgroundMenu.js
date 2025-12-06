@@ -97,9 +97,7 @@ export class RemoveBackgroundMenu {
 
         // Initialize Video
         try {
-            sourceBlob = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-            const videoUrl = URL.createObjectURL(sourceBlob);
-
+            const videoUrl = await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
             await player.load(videoUrl, false);
 
             // Auto-detect background color

@@ -124,8 +124,8 @@ export class TrimMenu {
 
         // Load Video into Player
         if (player) {
-            // Use cached blob if available, otherwise use URL
-            const videoUrl = item.file ? URL.createObjectURL(item.file) : item.url;
+            // Get source blob - handles memory vs IndexedDB vs URL
+            const videoUrl = await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
             await player.load(videoUrl, false);
 
             // Enable A-B Loop Mode

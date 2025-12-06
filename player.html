@@ -142,13 +142,7 @@
                     }
                 ]);
 
-                // Auto-load the first video (without autoplay) so the player isn't empty
-                if (playlist.items.length > 0) {
-                    const firstItem = playlist.items[0];
-                    playlist.activeIndex = 0;
-                    playlist.render(); // Update UI to show active state
-                    player.load(firstItem.url, false, firstItem.id);
-                }
+                playlist.selectItem(0, false);
             }
         }
 

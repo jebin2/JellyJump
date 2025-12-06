@@ -85,6 +85,17 @@ export class IndexedDBService {
                 } else {
                     localStorage.removeItem(this.DB_NAME + '-playlist');
                 }
+
+                // Release file blobs from memory after successful persistence.
+                // Files are now safely stored in IndexedDB and can be reloaded on-demand.
+                // We keep the URL alive (browser holds blob reference) for current playback.
+                for (const item of items) {
+                    if (item.isLocal && item.file) {
+                        console.log(`[IndexedDB] Releasing memory for persisted file: ${item.title}`);
+                        item.file = null;
+                    }
+                }
+
                 resolve();
             };
             transaction.onerror = (event) => reject(event.target.error);
@@ -115,7 +126,9 @@ export class IndexedDBService {
                     isLocal: item.isLocal,
                     path: item.path,
                     url: item.isLocal ? '' : item.url, // Remote URLs kept, local cleared
-                    originalIndex: item.originalIndex
+                    originalIndex: item.originalIndex,
+                    fileSize: item.fileSize,  // Persist for InfoMenu
+                    fileType: item.fileType   // Persist for InfoMenu
                 };
 
                 playlistStore.put(storedItem);

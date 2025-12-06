@@ -113,6 +113,16 @@ export class MediaMetadata {
         throw new Error('No source available for item');
     }
 
+    static async getProcessedSourceURL(item, onSave) {
+        if (item.isLocal && item.url) {
+            return item.url;
+        }
+        const file = await this.getSourceBlob(item, onSave);
+        item.isLocal = true;
+        item.url = URL.createObjectURL(file);
+        return item.url;
+    }
+
     /**
      * Ensure metadata exists on item (lazy load if missing)
      * @param {Object} item - Playlist item
@@ -126,9 +136,9 @@ export class MediaMetadata {
         }
 
         // Use helper to get source (with caching for remote URLs)
-        const source = await MediaMetadata.getSourceBlob(item, onSave);
+        const sourceUrl = await MediaMetadata.getProcessedSourceURL(item, onSave);
 
-        const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(source);
+        const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(sourceUrl);
         item.videoInfo = videoInfo;
         item.audioInfo = audioInfo;
         item.videoTracks = videoTracks;
