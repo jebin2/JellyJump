@@ -116,90 +116,81 @@ export class IndexedDBService {
      * @param {Array} items 
      */
     async savePlaylist(items) {
-        await this.ready();
-
-        // Check if database connection is still open
-        if (!this.db || this.db.statechanged) {
-            console.warn('IndexedDB connection not available, skipping savePlaylist');
-            return Promise.resolve();
-        }
-
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.STORES.PLAYLIST, this.STORES.FILES], 'readwrite');
-
-            transaction.oncomplete = () => {
-                if (items.length > 0) {
-                    localStorage.setItem(this.DB_NAME + '-playlist', 'true');
-                } else {
-                    localStorage.removeItem(this.DB_NAME + '-playlist');
-                }
-
-                // Release file blobs from memory after successful persistence.
-                // Files are now safely stored in IndexedDB and can be reloaded on-demand.
-                // We keep the URL alive (browser holds blob reference) for current playback.
-                for (const item of items) {
-                    if (item.isLocal && item.file) {
-                        console.log(`[IndexedDB] Releasing memory for persisted file: ${item.title}`);
-                        item.file = null;
-                    }
-                }
-
-                resolve();
-            };
-            transaction.onerror = (event) => reject(event.target.error);
-
-            const playlistStore = transaction.objectStore(this.STORES.PLAYLIST);
-            const fileStore = transaction.objectStore(this.STORES.FILES);
-
-            // Clear existing playlist first (simplest approach for now)
-            // Ideally we'd diff, but clearing is safer to ensure sync
-            // Clear existing playlist first (simplest approach for now)
-            // Ideally we'd diff, but clearing is safer to ensure sync
-            playlistStore.clear();
-
-            // CRITICAL: Do NOT clear fileStore here. 
-            // Since we unload files from memory to save RAM, clearing the store would delete 
-            // the persisted files for items that are currently unloaded (item.file is null).
-            // We only want to ADD/UPDATE files that are present in memory.
-            // Garbage collection of unused files should be a separate process if needed.
-            // fileStore.clear();
-
-            items.forEach(item => {
-                // 1. Prepare item for storage
-                const storedItem = {
-                    id: item.id,
-                    title: item.title,
-                    duration: item.duration,
-                    thumbnail: item.thumbnail,
-                    isLocal: item.isLocal,
-                    path: item.path,
-                    url: item.isLocal ? '' : item.url, // Remote URLs kept, local cleared
-                    originalIndex: item.originalIndex,
-                    fileSize: item.fileSize,  // Persist for InfoMenu
-                    fileType: item.fileType   // Persist for InfoMenu
-                };
-
-                playlistStore.put(storedItem);
-
-                // 2. If local and has file in memory, save it to files store
-                // Note: Most files are already in DB via saveFile() from MediaMetadata
-                // This handles files that were added via file input (not downloaded)
-                if (item.isLocal && item.file) {
-                    // Check size limit (500MB)
-                    const MAX_SIZE = 500 * 1024 * 1024;
-                    if (item.file.size < MAX_SIZE) {
-                        fileStore.put({
-                            id: item.id,
-                            blob: item.file,
-                            name: item.file.name || item.title,
-                            type: item.file.type
-                        });
+        return this._withTransaction(
+            [this.STORES.PLAYLIST, this.STORES.FILES],
+            'readwrite',
+            (transaction, resolve, reject) => {
+                transaction.oncomplete = () => {
+                    if (items.length > 0) {
+                        localStorage.setItem(this.DB_NAME + '-playlist', 'true');
                     } else {
-                        console.warn(`[IndexedDB] File ${item.title} too large to persist (${(item.file.size / 1024 / 1024).toFixed(2)} MB)`);
+                        localStorage.removeItem(this.DB_NAME + '-playlist');
                     }
-                }
-            });
-        });
+
+                    // Release file blobs from memory after successful persistence.
+                    // Files are now safely stored in IndexedDB and can be reloaded on-demand.
+                    // We keep the URL alive (browser holds blob reference) for current playback.
+                    for (const item of items) {
+                        if (item.isLocal && item.file) {
+                            console.log(`[IndexedDB] Releasing memory for persisted file: ${item.title}`);
+                            item.file = null;
+                        }
+                    }
+
+                    resolve();
+                };
+                transaction.onerror = (event) => reject(event.target.error);
+
+                const playlistStore = transaction.objectStore(this.STORES.PLAYLIST);
+                const fileStore = transaction.objectStore(this.STORES.FILES);
+
+                // Clear existing playlist first (simplest approach for now)
+                // Ideally we'd diff, but clearing is safer to ensure sync
+                playlistStore.clear();
+
+                // CRITICAL: Do NOT clear fileStore here. 
+                // Since we unload files from memory to save RAM, clearing the store would delete 
+                // the persisted files for items that are currently unloaded (item.file is null).
+                // We only want to ADD/UPDATE files that are present in memory.
+                // Garbage collection of unused files should be a separate process if needed.
+
+                items.forEach(item => {
+                    // 1. Prepare item for storage
+                    const storedItem = {
+                        id: item.id,
+                        title: item.title,
+                        duration: item.duration,
+                        thumbnail: item.thumbnail,
+                        isLocal: item.isLocal,
+                        path: item.path,
+                        url: item.isLocal ? '' : item.url, // Remote URLs kept, local cleared
+                        originalIndex: item.originalIndex,
+                        fileSize: item.fileSize,  // Persist for InfoMenu
+                        fileType: item.fileType   // Persist for InfoMenu
+                    };
+
+                    playlistStore.put(storedItem);
+
+                    // 2. If local and has file in memory, save it to files store
+                    // Note: Most files are already in DB via saveFile() from MediaMetadata
+                    // This handles files that were added via file input (not downloaded)
+                    if (item.isLocal && item.file) {
+                        // Check size limit (500MB)
+                        const MAX_SIZE = 500 * 1024 * 1024;
+                        if (item.file.size < MAX_SIZE) {
+                            fileStore.put({
+                                id: item.id,
+                                blob: item.file,
+                                name: item.file.name || item.title,
+                                type: item.file.type
+                            });
+                        } else {
+                            console.warn(`[IndexedDB] File ${item.title} too large to persist (${(item.file.size / 1024 / 1024).toFixed(2)} MB)`);
+                        }
+                    }
+                });
+            }
+        );
     }
 
     /**
