@@ -166,6 +166,10 @@
                 loader.classList.add('hidden');
             }
         });
+
+        // CRITICAL: Disable bfcache to prevent memory accumulation on refresh
+        // Without this, browser keeps ALL previous page states in memory
+        window.addEventListener('unload', function () { });
     </script>
 
 </body>
