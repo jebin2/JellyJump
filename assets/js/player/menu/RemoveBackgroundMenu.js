@@ -60,6 +60,7 @@ export class RemoveBackgroundMenu {
                 controlBarMode: 'fixed', // Fixed control bar as requested
                 controls: {
                     playPause: true,
+                    navigation: false,  // No prev/next buttons
                     volume: false,
                     time: true,
                     progress: true,
@@ -68,7 +69,8 @@ export class RemoveBackgroundMenu {
                     fullscreen: false,
                     loop: true,
                     speed: false,
-                    modeToggle: false
+                    modeToggle: false,
+                    keyboard: false  // Disable keyboard shortcuts for modal player
                 },
                 autoplay: false
             });

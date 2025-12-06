@@ -37,8 +37,10 @@ export class TrimMenu {
         if (playerContainer) {
             player = new CorePlayer('trim-player-container', {
                 mode: 'player',
+                controlBarMode: 'fixed',  // Always show control bar
                 controls: {
                     playPause: true,
+                    navigation: false,  // No prev/next buttons
                     volume: false,
                     time: true,
                     progress: true,
@@ -47,7 +49,8 @@ export class TrimMenu {
                     fullscreen: false,
                     loop: false,
                     speed: false,
-                    modeToggle: false
+                    modeToggle: false,
+                    keyboard: false  // Disable keyboard shortcuts for modal player
                 },
                 autoplay: false
             });

@@ -34,7 +34,9 @@ export class CorePlayer {
 
         // Controls Configuration
         this.config.controls = {
+            controlBar: true,  // Show/hide the entire control bar
             playPause: true,
+            navigation: true,  // Enable/disable prev/next buttons
             volume: true,
             time: true,
             progress: true,
@@ -44,6 +46,7 @@ export class CorePlayer {
             loop: true,
             speed: true,
             modeToggle: true,
+            keyboard: true,  // Enable/disable keyboard shortcuts
             ...this.config.controls
         };
 
@@ -162,12 +165,17 @@ export class CorePlayer {
         // Current loaded video ID (url)
         this.currentVideoId = null;
 
-        // Global Event Handlers
+        // Global Event Handlers (created conditionally based on which controls are enabled)
         this._handlers = {
-            fullscreen: this._updateFullscreenUI.bind(this),
-            keydown: (e) => this._handleKeyboard(e),
             click: (e) => this._handleDocumentClick(e)
         };
+        // Only create handlers that will be used
+        if (this.config.controls.fullscreen) {
+            this._handlers.fullscreen = this._updateFullscreenUI.bind(this);
+        }
+        if (this.config.controls.keyboard) {
+            this._handlers.keydown = (e) => this._handleKeyboard(e);
+        }
 
         this._init();
     }
@@ -198,16 +206,24 @@ export class CorePlayer {
 
         // Create UI
         this._createControls();
-        this._createHelpOverlay();
+
+        // Only create help overlay if keyboard shortcuts are enabled (since help shows shortcuts)
+        if (this.config.controls.keyboard) {
+            this._createHelpOverlay();
+        }
 
         // Attach Events
         this._attachEvents();
 
-        // Load control bar mode preference
-        this._loadControlBarMode();
+        // Control bar mode initialization (only if control bar is visible)
+        if (this.config.controls.controlBar) {
+            this._applyControlBarMode();
+        }
 
-        // Initialize ResizeObserver for responsive controls
-        this._initResizeObserver();
+        // Initialize ResizeObserver only if fullscreen is enabled (responsive controls needed)
+        if (this.config.controls.fullscreen) {
+            this._initResizeObserver();
+        }
     }
 
     /**
@@ -279,51 +295,88 @@ export class CorePlayer {
         const controlsTemplate = document.getElementById('player-controls-template');
         this.container.appendChild(controlsTemplate.content.cloneNode(true));
 
-        // Loop Panel
-        const loopPanelTemplate = document.getElementById('player-loop-panel-template');
-        this.container.appendChild(loopPanelTemplate.content.cloneNode(true));
+        // Loop Panel (only if loop control is enabled)
+        if (this.config.controls.loop) {
+            const loopPanelTemplate = document.getElementById('player-loop-panel-template');
+            this.container.appendChild(loopPanelTemplate.content.cloneNode(true));
+        }
 
         // Initialize Screenshot Manager UI (must be after controls, before caching)
         if (this.screenshotManager) {
             this.screenshotManager.init();
         }
 
-        // Cache elements
+        // Cache elements - only query for controls that are enabled
         this.ui.controls = this.container.querySelector('.jellyjump-controls');
         this.ui.playOverlay = this.container.querySelector('.jellyjump-play-overlay');
-        this.ui.playBtn = this.container.querySelector('#mb-play-btn');
-        this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');
-        this.ui.nextBtn = this.container.querySelector('#mb-next-btn');
-        this.ui.progressContainer = this.container.querySelector('.jellyjump-progress-container');
-        this.ui.progressBar = this.container.querySelector('.jellyjump-progress-bar');
-        this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
-        this.ui.muteBtn = this.container.querySelector('#mb-mute-btn');
-        this.ui.volumeSlider = this.container.querySelector('#mb-volume-slider');
-        this.ui.fullscreenBtn = this.container.querySelector('#mb-fullscreen-btn');
-        this.ui.modeToggleBtn = this.container.querySelector('#mb-mode-toggle-btn');
-        this.ui.ccBtn = this.container.querySelector('#mb-cc-btn');
-        this.ui.ccMenu = this.container.querySelector('#mb-cc-menu');
-        this.ui.ccInput = this.container.querySelector('#mb-cc-input');
-        this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
-        this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
-        this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
-        this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
-        this.ui.speedMenu = this.container.querySelector('#mb-speed-menu');
-        this.ui.loopBtn = this.container.querySelector('#mb-loop-btn');
-        this.ui.loopMarkerA = this.container.querySelector('.jellyjump-marker.marker-a');
-        this.ui.loopMarkerB = this.container.querySelector('.jellyjump-marker.marker-b');
-        this.ui.loopRegion = this.container.querySelector('.jellyjump-loop-region');
 
-        this.ui.loopPanel = this.container.querySelector('.jellyjump-loop-panel');
-        this.ui.loopStartInput = this.container.querySelector('#mb-loop-start');
-        this.ui.loopEndInput = this.container.querySelector('#mb-loop-end');
-        this.ui.loopStatus = this.container.querySelector('#mb-loop-status');
-        this.ui.setABtn = this.container.querySelector('#mb-set-a-btn');
-        this.ui.setBBtn = this.container.querySelector('#mb-set-b-btn');
-        this.ui.clearLoopBtn = this.container.querySelector('#mb-clear-loop-btn');
-        this.ui.closeLoopPanelBtn = this.container.querySelector('.jellyjump-loop-panel .jellyjump-close-btn');
+        // Always needed for play/pause
+        if (this.config.controls.playPause) {
+            this.ui.playBtn = this.container.querySelector('#mb-play-btn');
+        }
 
-        this._updateSpeedMenu();
+        // Navigation buttons (only if navigation enabled - not needed for modal players)\n        if (this.config.controls.navigation) {\n            this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');\n            this.ui.nextBtn = this.container.querySelector('#mb-next-btn');\n        }
+
+        // Progress (always needed for seeking)
+        if (this.config.controls.progress) {
+            this.ui.progressContainer = this.container.querySelector('.jellyjump-progress-container');
+            this.ui.progressBar = this.container.querySelector('.jellyjump-progress-bar');
+        }
+
+        // Time display
+        if (this.config.controls.time) {
+            this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
+        }
+
+        // Volume controls
+        if (this.config.controls.volume) {
+            this.ui.muteBtn = this.container.querySelector('#mb-mute-btn');
+            this.ui.volumeSlider = this.container.querySelector('#mb-volume-slider');
+        }
+
+        // Fullscreen
+        if (this.config.controls.fullscreen) {
+            this.ui.fullscreenBtn = this.container.querySelector('#mb-fullscreen-btn');
+            this.ui.modeToggleBtn = this.container.querySelector('#mb-mode-toggle-btn');
+        }
+
+        // Captions
+        if (this.config.controls.captions) {
+            this.ui.ccBtn = this.container.querySelector('#mb-cc-btn');
+            this.ui.ccMenu = this.container.querySelector('#mb-cc-menu');
+            this.ui.ccInput = this.container.querySelector('#mb-cc-input');
+            this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
+            this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
+            this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
+        }
+
+        // Speed controls
+        if (this.config.controls.speed) {
+            this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
+            this.ui.speedMenu = this.container.querySelector('#mb-speed-menu');
+        }
+
+        // Loop button
+        if (this.config.controls.loop) {
+            this.ui.loopBtn = this.container.querySelector('#mb-loop-btn');
+            this.ui.loopMarkerA = this.container.querySelector('.jellyjump-marker.marker-a');
+            this.ui.loopMarkerB = this.container.querySelector('.jellyjump-marker.marker-b');
+            this.ui.loopRegion = this.container.querySelector('.jellyjump-loop-region');
+
+            this.ui.loopPanel = this.container.querySelector('.jellyjump-loop-panel');
+            this.ui.loopStartInput = this.container.querySelector('#mb-loop-start');
+            this.ui.loopEndInput = this.container.querySelector('#mb-loop-end');
+            this.ui.loopStatus = this.container.querySelector('#mb-loop-status');
+            this.ui.setABtn = this.container.querySelector('#mb-set-a-btn');
+            this.ui.setBBtn = this.container.querySelector('#mb-set-b-btn');
+            this.ui.clearLoopBtn = this.container.querySelector('#mb-clear-loop-btn');
+            this.ui.closeLoopPanelBtn = this.container.querySelector('.jellyjump-loop-panel .jellyjump-close-btn');
+        }
+
+        // Only update speed menu if speed is enabled
+        if (this.config.controls.speed) {
+            this._updateSpeedMenu();
+        }
         this._applyControlVisibility();
     }
 
@@ -340,6 +393,8 @@ export class CorePlayer {
         };
 
         toggle(this.ui.playBtn, c.playPause);
+        toggle(this.ui.prevBtn, c.navigation);
+        toggle(this.ui.nextBtn, c.navigation);
         toggle(this.ui.muteBtn, c.volume);
         toggle(this.ui.volumeSlider, c.volume);
         toggle(this.ui.timeDisplay, c.time);
@@ -363,206 +418,236 @@ export class CorePlayer {
      * @private
      */
     _attachEvents() {
-        // Play/Pause
-        this.ui.playBtn.addEventListener('click', () => this.togglePlay());
+        // Play/Pause (only if enabled)
+        if (this.config.controls.playPause && this.ui.playBtn) {
+            this.ui.playBtn.addEventListener('click', () => this.togglePlay());
+        }
         this.canvas.addEventListener('click', () => this.togglePlay());
         if (this.ui.playOverlay) {
             this.ui.playOverlay.addEventListener('click', () => this.play());
         }
 
-        // Navigation
-        this.ui.prevBtn.addEventListener('click', () => {
-            if (!this.ui.prevBtn.disabled && this.onPrevious) {
-                this.onPrevious();
-            }
-        });
-        this.ui.nextBtn.addEventListener('click', () => {
-            if (!this.ui.nextBtn.disabled && this.onNext) {
-                this.onNext();
-            }
-        });
-
-        // Seek
-        this.ui.progressContainer.addEventListener('click', (e) => this._seek(e));
-
-        // Volume
-        this.ui.volumeSlider.addEventListener('input', (e) => {
-            this.config.volume = parseFloat(e.target.value);
-            this.config.muted = false;
-
-            if (this.gainNode) {
-                this.gainNode.gain.value = this.config.volume;
-            }
-            this._updateVolumeIcon();
-        });
-
-        this.ui.muteBtn.addEventListener('click', () => {
-            this.config.muted = !this.config.muted;
-
-            if (this.gainNode) {
-                this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
-            }
-            this._updateVolumeIcon();
-        });
-
-        // Fullscreen
-        this.ui.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
-
-        // Control Bar Mode Toggle
-        this.ui.modeToggleBtn.addEventListener('click', () => this.toggleControlBarMode());
-
-        // Auto-hide for overlay mode
-        this.container.addEventListener('mousemove', (e) => this._handleMouseMove(e));
-
-        // Rule 2: On cursor enter canvas/video the control bar should appear immediately
-        this.container.addEventListener('mouseenter', () => {
-            if (this.controlBarMode === 'overlay') {
-                this.ui.controls.classList.add('visible');
-                this._clearAutoHideTimer();
-                if (this.isPlaying) this._startAutoHideTimer();
-            }
-        });
-
-        // Rule 4: When the cursor move out of the canvas /video the control bar should hide immediately
-        this.container.addEventListener('mouseleave', () => {
-            if (this.controlBarMode === 'overlay' && this.isPlaying) {
-                this._clearAutoHideTimer();
-                this.ui.controls.classList.remove('visible');
-                this.container.classList.add('hide-cursor');
-            }
-        });
-
-        // Keep controls visible when hovering over them (Rule 3)
-        this.ui.controls.addEventListener('mouseenter', () => this._clearAutoHideTimer());
-        this.ui.controls.addEventListener('mouseleave', () => {
-            if (this.isPlaying && this.controlBarMode === 'overlay') {
-                this._startAutoHideTimer();
-            }
-        });
-
-        // Subtitles
-        this.ui.ccBtn.addEventListener('click', () => {
-            this.ui.ccMenu.classList.toggle('visible');
-            this.ui.ccBtn.setAttribute('aria-expanded', this.ui.ccMenu.classList.contains('visible'));
-        });
-
-        this.ui.ccMenu.addEventListener('click', (e) => {
-            const item = e.target.closest('.jellyjump-menu-item');
-            if (!item) return;
-
-            if (item.id === 'mb-upload-cc') {
-                this.ui.ccInput.click();
-            } else {
-                const value = item.dataset.value;
-                if (value === 'off') {
-                    this.isSubtitlesEnabled = false;
-                } else {
-                    // Handle track selection if multiple tracks supported
+        // Navigation (only if buttons exist - not needed for modal players)
+        if (this.ui.prevBtn) {
+            this.ui.prevBtn.addEventListener('click', () => {
+                if (!this.ui.prevBtn.disabled && this.onPrevious) {
+                    this.onPrevious();
                 }
-                this._updateSubtitleMenu();
-                this.ui.ccMenu.classList.remove('visible');
-            }
-        });
+            });
+        }
+        if (this.ui.nextBtn) {
+            this.ui.nextBtn.addEventListener('click', () => {
+                if (!this.ui.nextBtn.disabled && this.onNext) {
+                    this.onNext();
+                }
+            });
+        }
 
-        this.ui.ccInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const url = URL.createObjectURL(file);
-                this.loadSubtitle(url);
-                this.ui.ccMenu.classList.remove('visible');
-            }
-        });
+        // Seek (only if progress enabled)
+        if (this.config.controls.progress && this.ui.progressContainer) {
+            this.ui.progressContainer.addEventListener('click', (e) => this._seek(e));
+        }
 
-        // Audio Tracks
-        this.ui.audioBtn.addEventListener('click', () => {
-            this.ui.audioMenu.classList.toggle('visible');
-            this.ui.audioBtn.setAttribute('aria-expanded', this.ui.audioMenu.classList.contains('visible'));
-        });
+        // Volume (only if enabled)
+        if (this.config.controls.volume && this.ui.volumeSlider) {
+            this.ui.volumeSlider.addEventListener('input', (e) => {
+                this.config.volume = parseFloat(e.target.value);
+                this.config.muted = false;
 
-        this.ui.audioMenu.addEventListener('click', (e) => {
-            const item = e.target.closest('.jellyjump-menu-item');
-            if (!item) return;
+                if (this.gainNode) {
+                    this.gainNode.gain.value = this.config.volume;
+                }
+                this._updateVolumeIcon();
+            });
+        }
 
-            const trackId = parseInt(item.dataset.value);
-            this._switchAudioTrack(trackId);
-            this.ui.audioMenu.classList.remove('visible');
-        });
+        if (this.config.controls.volume && this.ui.muteBtn) {
+            this.ui.muteBtn.addEventListener('click', () => {
+                this.config.muted = !this.config.muted;
 
-        // Speed Control
-        this.ui.speedBtn.addEventListener('click', () => {
-            this.ui.speedMenu.classList.toggle('visible');
-            this.ui.speedBtn.setAttribute('aria-expanded', this.ui.speedMenu.classList.contains('visible'));
-        });
+                if (this.gainNode) {
+                    this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
+                }
+                this._updateVolumeIcon();
+            });
+        }
 
-        this.ui.speedMenu.addEventListener('click', (e) => {
-            const item = e.target.closest('.jellyjump-menu-item');
-            if (!item) return;
+        // Fullscreen (only if enabled)
+        if (this.config.controls.fullscreen && this.ui.fullscreenBtn) {
+            this.ui.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        }
 
-            const speed = parseFloat(item.dataset.value);
-            this.setPlaybackRate(speed);
-            this.ui.speedMenu.classList.remove('visible');
-        });
+        // Control Bar Mode Toggle (only if fullscreen enabled, since it's for main player)
+        if (this.config.controls.fullscreen && this.ui.modeToggleBtn) {
+            this.ui.modeToggleBtn.addEventListener('click', () => this.toggleControlBarMode());
+        }
 
-        // Fullscreen Change Events
-        document.addEventListener('fullscreenchange', this._handlers.fullscreen);
-        document.addEventListener('webkitfullscreenchange', this._handlers.fullscreen);
-        document.addEventListener('mozfullscreenchange', this._handlers.fullscreen);
-        document.addEventListener('MSFullscreenChange', this._handlers.fullscreen);
+        // Auto-hide for overlay mode (only if fullscreen enabled - modal players don't need this)
+        if (this.config.controls.fullscreen) {
+            this.container.addEventListener('mousemove', (e) => this._handleMouseMove(e));
 
-        // Loop Control
-        this.ui.loopBtn.addEventListener('click', () => this.toggleLoopMode());
-        // Long press or right click to open panel? Or just a separate button?
-        // Let's make right click open panel for now, or maybe just double click?
-        // Actually, let's add a context menu listener to the loop button
-        this.ui.loopBtn.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            this.toggleLoopPanel();
-        });
+            // Rule 2: On cursor enter canvas/video the control bar should appear immediately
+            this.container.addEventListener('mouseenter', () => {
+                if (this.controlBarMode === 'overlay') {
+                    this.ui.controls.classList.add('visible');
+                    this._clearAutoHideTimer();
+                    if (this.isPlaying) this._startAutoHideTimer();
+                }
+            });
 
-        // Loop Panel Events
-        this.ui.closeLoopPanelBtn.addEventListener('click', () => this.toggleLoopPanel());
-        this.ui.setABtn.addEventListener('click', () => this.setLoopStart());
-        this.ui.setBBtn.addEventListener('click', () => this.setLoopEnd());
-        this.ui.clearLoopBtn.addEventListener('click', () => this.clearLoopMarkers());
+            // Rule 4: When the cursor move out of the canvas /video the control bar should hide immediately
+            this.container.addEventListener('mouseleave', () => {
+                if (this.controlBarMode === 'overlay' && this.isPlaying) {
+                    this._clearAutoHideTimer();
+                    this.ui.controls.classList.remove('visible');
+                    this.container.classList.add('hide-cursor');
+                }
+            });
 
-        this.ui.loopStartInput.addEventListener('change', (e) => {
-            const time = this._parseTime(e.target.value);
-            if (time !== null) {
-                this.loopStart = time;
-                this.loopMode = 'ab';
-                this._updateLoopUI();
-            }
-        });
+            // Keep controls visible when hovering over them (Rule 3)
+            this.ui.controls.addEventListener('mouseenter', () => this._clearAutoHideTimer());
+            this.ui.controls.addEventListener('mouseleave', () => {
+                if (this.isPlaying && this.controlBarMode === 'overlay') {
+                    this._startAutoHideTimer();
+                }
+            });
+        }
 
-        this.ui.loopEndInput.addEventListener('change', (e) => {
-            const time = this._parseTime(e.target.value);
-            if (time !== null) {
-                this.loopEnd = time;
-                this.loopMode = 'ab';
-                this._updateLoopUI();
-            }
-        });
+        // Subtitles (only if captions enabled)
+        if (this.config.controls.captions && this.ui.ccBtn) {
+            this.ui.ccBtn.addEventListener('click', () => {
+                this.ui.ccMenu.classList.toggle('visible');
+                this.ui.ccBtn.setAttribute('aria-expanded', this.ui.ccMenu.classList.contains('visible'));
+            });
+
+            this.ui.ccMenu.addEventListener('click', (e) => {
+                const item = e.target.closest('.jellyjump-menu-item');
+                if (!item) return;
+
+                if (item.id === 'mb-upload-cc') {
+                    this.ui.ccInput.click();
+                } else {
+                    const value = item.dataset.value;
+                    if (value === 'off') {
+                        this.isSubtitlesEnabled = false;
+                    } else {
+                        // Handle track selection if multiple tracks supported
+                    }
+                    this._updateSubtitleMenu();
+                    this.ui.ccMenu.classList.remove('visible');
+                }
+            });
+
+            this.ui.ccInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const url = URL.createObjectURL(file);
+                    this.loadSubtitle(url);
+                    this.ui.ccMenu.classList.remove('visible');
+                }
+            });
+
+            // Audio Tracks
+            this.ui.audioBtn.addEventListener('click', () => {
+                this.ui.audioMenu.classList.toggle('visible');
+                this.ui.audioBtn.setAttribute('aria-expanded', this.ui.audioMenu.classList.contains('visible'));
+            });
+
+            this.ui.audioMenu.addEventListener('click', (e) => {
+                const item = e.target.closest('.jellyjump-menu-item');
+                if (!item) return;
+
+                const trackId = parseInt(item.dataset.value);
+                this._switchAudioTrack(trackId);
+                this.ui.audioMenu.classList.remove('visible');
+            });
+        }
+
+        // Speed (only if enabled)
+        if (this.config.controls.speed && this.ui.speedBtn) {
+            this.ui.speedBtn.addEventListener('click', () => {
+                this.ui.speedMenu.classList.toggle('visible');
+                this.ui.speedBtn.setAttribute('aria-expanded', this.ui.speedMenu.classList.contains('visible'));
+            });
+
+            this.ui.speedMenu.addEventListener('click', (e) => {
+                const item = e.target.closest('.jellyjump-menu-item');
+                if (!item) return;
+
+                const speed = parseFloat(item.dataset.value);
+                this.setPlaybackRate(speed);
+                this.ui.speedMenu.classList.remove('visible');
+            });
+        }
+
+        // Fullscreen Change Events (only if fullscreen enabled)
+        if (this.config.controls.fullscreen) {
+            document.addEventListener('fullscreenchange', this._handlers.fullscreen);
+            document.addEventListener('webkitfullscreenchange', this._handlers.fullscreen);
+            document.addEventListener('mozfullscreenchange', this._handlers.fullscreen);
+            document.addEventListener('MSFullscreenChange', this._handlers.fullscreen);
+        }
+
+        // Loop Control (only if loop enabled)
+        if (this.config.controls.loop) {
+            this.ui.loopBtn.addEventListener('click', () => this.toggleLoopMode());
+            // Context menu to open loop panel
+            this.ui.loopBtn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.toggleLoopPanel();
+            });
+
+            // Loop Panel Events
+            this.ui.closeLoopPanelBtn.addEventListener('click', () => this.toggleLoopPanel());
+            this.ui.setABtn.addEventListener('click', () => this.setLoopStart());
+            this.ui.setBBtn.addEventListener('click', () => this.setLoopEnd());
+            this.ui.clearLoopBtn.addEventListener('click', () => this.clearLoopMarkers());
+
+            this.ui.loopStartInput.addEventListener('change', (e) => {
+                const time = this._parseTime(e.target.value);
+                if (time !== null) {
+                    this.loopStart = time;
+                    this.loopMode = 'ab';
+                    this._updateLoopUI();
+                }
+            });
+
+            this.ui.loopEndInput.addEventListener('change', (e) => {
+                const time = this._parseTime(e.target.value);
+                if (time !== null) {
+                    this.loopEnd = time;
+                    this.loopMode = 'ab';
+                    this._updateLoopUI();
+                }
+            });
+        }
 
         // Close menus when clicking outside
         document.addEventListener('click', this._handlers.click);
 
-        // Keyboard Shortcuts
-        document.addEventListener('keydown', this._handlers.keydown);
+        // Keyboard Shortcuts (only if enabled in config)
+        if (this.config.controls.keyboard) {
+            document.addEventListener('keydown', this._handlers.keydown);
+        }
     }
 
     _handleDocumentClick(e) {
-        if (!this.ui.ccBtn.contains(e.target) && !this.ui.ccMenu.contains(e.target)) {
+        // Only check elements that exist
+        if (this.ui.ccBtn && this.ui.ccMenu && !this.ui.ccBtn.contains(e.target) && !this.ui.ccMenu.contains(e.target)) {
             this.ui.ccMenu.classList.remove('visible');
         }
-        if (!this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
+        if (this.ui.audioBtn && this.ui.audioMenu && !this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
             this.ui.audioMenu.classList.remove('visible');
         }
-        if (!this.ui.speedBtn.contains(e.target) && !this.ui.speedMenu.contains(e.target)) {
+        if (this.ui.speedBtn && this.ui.speedMenu && !this.ui.speedBtn.contains(e.target) && !this.ui.speedMenu.contains(e.target)) {
             this.ui.speedMenu.classList.remove('visible');
         }
     }
 
     _updateSpeedMenu() {
+        // Skip if speed control is disabled
+        if (!this.ui.speedMenu || !this.ui.speedBtn) return;
+
         const items = this.ui.speedMenu.querySelectorAll('.jellyjump-menu-item');
         items.forEach(item => {
             const speed = parseFloat(item.dataset.value);
@@ -745,6 +830,9 @@ export class CorePlayer {
     }
 
     _updateSubtitleMenu() {
+        // Skip if captions control is disabled
+        if (!this.ui.ccMenu || !this.ui.ccBtn) return;
+
         const items = this.ui.ccMenu.querySelectorAll('.jellyjump-menu-item');
         items.forEach(item => item.classList.remove('active'));
 
@@ -783,7 +871,8 @@ export class CorePlayer {
     }
 
     async _updateAudioTracks() {
-        if (!this.ui.audioMenu) return;
+        // Skip if captions control is disabled (audio tracks are under captions)
+        if (!this.ui.audioMenu || !this.ui.audioContainer) return;
 
         this.ui.audioMenu.textContent = '';
         const tracks = this.input ? await this.input.getAudioTracks() : [];
@@ -1068,13 +1157,17 @@ export class CorePlayer {
     destroy() {
         this.reset();
 
-        // Remove global listeners
-        document.removeEventListener('fullscreenchange', this._handlers.fullscreen);
-        document.removeEventListener('webkitfullscreenchange', this._handlers.fullscreen);
-        document.removeEventListener('mozfullscreenchange', this._handlers.fullscreen);
-        document.removeEventListener('MSFullscreenChange', this._handlers.fullscreen);
+        // Remove global listeners (only those that were added)
+        if (this.config.controls.fullscreen) {
+            document.removeEventListener('fullscreenchange', this._handlers.fullscreen);
+            document.removeEventListener('webkitfullscreenchange', this._handlers.fullscreen);
+            document.removeEventListener('mozfullscreenchange', this._handlers.fullscreen);
+            document.removeEventListener('MSFullscreenChange', this._handlers.fullscreen);
+        }
         document.removeEventListener('click', this._handlers.click);
-        document.removeEventListener('keydown', this._handlers.keydown);
+        if (this.config.controls.keyboard) {
+            document.removeEventListener('keydown', this._handlers.keydown);
+        }
 
         // Remove ResizeObserver
         if (this.resizeObserver) {
@@ -1886,11 +1979,13 @@ export class CorePlayer {
         // Add current mode class
         this.container.classList.add(`mode-${this.controlBarMode}`);
 
-        // Update button aria-label and aria-pressed
-        const isFixed = this.controlBarMode === 'fixed';
-        this.ui.modeToggleBtn.setAttribute('aria-label', isFixed ? 'Unpin controls' : 'Pin controls');
-        this.ui.modeToggleBtn.setAttribute('aria-pressed', isFixed.toString());
-        this.ui.modeToggleBtn.setAttribute('title', isFixed ? 'Unpin controls' : 'Pin controls');
+        // Update button aria-label and aria-pressed (only if button exists)
+        if (this.ui.modeToggleBtn) {
+            const isFixed = this.controlBarMode === 'fixed';
+            this.ui.modeToggleBtn.setAttribute('aria-label', isFixed ? 'Unpin controls' : 'Pin controls');
+            this.ui.modeToggleBtn.setAttribute('aria-pressed', isFixed.toString());
+            this.ui.modeToggleBtn.setAttribute('title', isFixed ? 'Unpin controls' : 'Pin controls');
+        }
 
         // Handle auto-hide
         if (this.controlBarMode === 'overlay') {
