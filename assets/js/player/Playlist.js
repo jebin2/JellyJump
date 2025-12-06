@@ -2,12 +2,13 @@ import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
 import { CorePlayer } from '../core/Player.js';
-import { Modal as ConfirmModal } from '../utils/Modal.js';
-import { Modal } from './Modal.js';
+import { Modal as ConfirmModal } from '../utils/Modal.js'; // Static confirm/alert dialogs
+import { Modal as DialogModal } from './Modal.js';         // Instance-based custom dialogs
 import { MenuRouter } from './menu/MenuRouter.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { FileDropHandler } from '../utils/FileDropHandler.js';
+import { ElectronHelper } from '../utils/ElectronHelper.js';
 import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
 
 /**
@@ -201,8 +202,8 @@ export class Playlist {
         if (addFilesBtn) {
             addFilesBtn.addEventListener('click', async () => {
                 // Electron: Use native file dialog to get file paths
-                if (window.electronAPI?.isElectron && window.electronAPI.openFileDialog) {
-                    const result = await window.electronAPI.openFileDialog();
+                if (ElectronHelper.isElectron()) {
+                    const result = await ElectronHelper.openFileDialog();
                     if (result.success && result.files) {
                         this.handleElectronFiles(result.files);
                     }
@@ -404,9 +405,9 @@ export class Playlist {
                             localPath: itemToRestore.localPath
                         });
 
-                        // Electron: Check if localPath exists on disk
-                        if (window.electronAPI?.isElectron && itemToRestore.localPath) {
-                            const fileExists = await window.electronAPI.fileExists(itemToRestore.localPath);
+                        // Electron: Check if localPath file still exists on disk
+                        if (ElectronHelper.isElectron() && itemToRestore.localPath) {
+                            const fileExists = await ElectronHelper.fileExists(itemToRestore.localPath);
                             if (fileExists) {
                                 console.log('[Electron] File exists on disk, proceeding to load:', itemToRestore.localPath);
                                 await this.selectItem(indexToRestore, false);
@@ -418,7 +419,7 @@ export class Playlist {
 
                         // Pre-check: If it's a local item with no usable source, don't try to load
                         // This includes: no file AND (no url OR stale blob url) AND (no localPath or Electron not available)
-                        const hasElectronPath = window.electronAPI?.isElectron && itemToRestore.localPath;
+                        const hasElectronPath = ElectronHelper.isElectron() && itemToRestore.localPath;
                         const hasNoSource = itemToRestore.isLocal && !itemToRestore.file &&
                             (!itemToRestore.url || itemToRestore.url.startsWith('blob:')) && !hasElectronPath;
 
@@ -540,7 +541,6 @@ export class Playlist {
      * @param {Array<{path: string, name: string, size: number, lastModified: number}>} files 
      */
     async handleElectronFiles(files) {
-        console.log('[Electron] Processing files from native dialog:', files);
 
         const videoExtensions = ['mp4', 'mkv', 'avi', 'webm', 'mov', 'm4v', 'wmv', 'flv'];
         const videoFiles = files.filter(file => {
@@ -585,7 +585,7 @@ export class Playlist {
             };
         });
 
-        console.log('[Electron] Created items with localPath:', newItems.map(i => ({ title: i.title, localPath: i.localPath })));
+
 
         this.addItems(newItems);
 
@@ -1358,7 +1358,7 @@ export class Playlist {
         const footerTemplate = document.getElementById('url-upload-footer-template');
         if (!contentTemplate || !footerTemplate) return;
 
-        const modal = new Modal({ maxWidth: '500px' });
+        const modal = new DialogModal({ maxWidth: '500px' });
         modal.setTitle('Add Video from URL');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
@@ -1483,7 +1483,7 @@ export class Playlist {
                 id: generateId()
             };
 
-            console.log('[URL Upload] Created item with remote URL:', newItem.title, url);
+
 
             this.addItem(newItem);
 

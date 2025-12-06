@@ -2,6 +2,7 @@ import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
 import { IndexedDBService } from '../player/IndexedDBService.js';
 import { formatDuration } from './mediaUtils.js';
+import { ElectronHelper } from './ElectronHelper.js';
 
 // Shared IndexedDB instance for caching remote blobs
 const _dbService = new IndexedDBService();
@@ -57,25 +58,16 @@ export class MediaMetadata {
         }
 
         // 2. Electron: If we have a localPath, read directly from disk
-        if (window.electronAPI?.isElectron && item.localPath) {
-            console.log('[Electron] Loading file from disk:', item.localPath);
-
-            // First check if file still exists
-            const exists = await window.electronAPI.fileExists(item.localPath);
+        if (ElectronHelper.isElectron() && item.localPath) {
+            const exists = await ElectronHelper.fileExists(item.localPath);
             if (!exists) {
-                console.warn('[Electron] File no longer exists:', item.localPath);
                 throw new Error('File no longer exists at path: ' + item.localPath);
             }
 
-            // Read file from disk
-            const result = await window.electronAPI.readFile(item.localPath);
-            if (!result.success) {
-                throw new Error('Failed to read file: ' + result.error);
+            const blob = await ElectronHelper.readFileAsBlob(item.localPath, item.mimeType);
+            if (!blob) {
+                throw new Error('Failed to read file from disk');
             }
-
-            // Convert ArrayBuffer to Blob
-            const blob = new Blob([result.buffer], { type: item.mimeType || 'video/mp4' });
-            console.log('[Electron] File loaded from disk:', item.title, `(${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
             return blob;
         }
 

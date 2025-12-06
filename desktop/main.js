@@ -2,22 +2,15 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Debug: Log the preload path
+// Resolve preload script path
 // In packaged apps, unpacked files are in app.asar.unpacked
 let preloadPath = path.join(__dirname, 'preload.js');
-
-// Check if we're in a packaged app and preload is unpacked
 if (app.isPackaged) {
     const unpackedPath = preloadPath.replace('app.asar', 'app.asar.unpacked');
     if (fs.existsSync(unpackedPath)) {
         preloadPath = unpackedPath;
     }
 }
-
-console.log('[Electron] Preload path:', preloadPath);
-console.log('[Electron] Preload exists:', fs.existsSync(preloadPath));
-console.log('[Electron] __dirname:', __dirname);
-console.log('[Electron] app.isPackaged:', app.isPackaged);
 
 // ============================================
 // IPC Handlers for File System Access

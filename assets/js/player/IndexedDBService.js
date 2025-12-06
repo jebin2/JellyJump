@@ -2,6 +2,22 @@
  * IndexedDB Service
  * Handles persistence of playlist, files, and player state using IndexedDB.
  * Allows storing large binary data (Blobs) which localStorage cannot handle.
+ * 
+ * Playlist Item Schema:
+ * @typedef {Object} PlaylistItem
+ * @property {string} id - Unique identifier (UUID)
+ * @property {string} title - Display title (filename)
+ * @property {string} duration - Formatted duration ("mm:ss" or "hh:mm:ss")
+ * @property {string} thumbnail - Thumbnail URL or empty string
+ * @property {boolean} isLocal - True if item is a local file (not remote stream)
+ * @property {boolean} [isRemoteUrl] - True if item is a URL-uploaded video (persists original URL)
+ * @property {string} [path] - Filename/relative path
+ * @property {string} [url] - Remote URL for streaming, or empty for local files
+ * @property {string} [localPath] - Absolute filesystem path (Electron only, for disk access)
+ * @property {string} [mimeType] - MIME type (e.g., "video/mp4")
+ * @property {string} [fileType] - Same as mimeType (for compatibility)
+ * @property {number} [fileSize] - File size in bytes
+ * @property {number} [originalIndex] - Original position in playlist (for shuffle)
  */
 export class IndexedDBService {
     constructor() {
