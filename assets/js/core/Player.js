@@ -95,11 +95,11 @@ export class CorePlayer {
         this.audioSink = null;
         this.audioIteratorCleanupPromise = null; // Track async cleanup of audio iterator
 
-        // Subtitles
-        this.subtitleManager = new SubtitleManager();
+        // Subtitles - only initialize if captions control is enabled
+        this.subtitleManager = null;
         this.isSubtitlesEnabled = false;
 
-        // Screenshot Manager
+        // Screenshot Manager - initialized lazily if needed
         this.screenshotManager = null;
 
         // Web Audio API
@@ -186,8 +186,15 @@ export class CorePlayer {
         this.ctx = this.canvas.getContext('2d');
         this.container.appendChild(canvasClone);
 
-        // Initialize Screenshot Manager (before creating controls)
-        this.screenshotManager = new ScreenshotManager(this);
+        // Initialize Subtitle Manager only if captions control is enabled
+        if (this.config.controls.captions) {
+            this.subtitleManager = new SubtitleManager();
+        }
+
+        // Initialize Screenshot Manager only if settings control is enabled (screenshot is in settings)
+        if (this.config.controls.settings) {
+            this.screenshotManager = new ScreenshotManager(this);
+        }
 
         // Create UI
         this._createControls();
@@ -1199,6 +1206,10 @@ export class CorePlayer {
      * @param {string} url - URL of the subtitle file (VTT or SRT)
      */
     async loadSubtitle(url) {
+        if (!this.subtitleManager) {
+            console.warn('Subtitle manager not initialized (captions disabled)');
+            return;
+        }
         try {
             console.log(`Loading subtitles: ${url}`);
             const response = await fetch(url);
@@ -1261,6 +1272,8 @@ export class CorePlayer {
      * @private
      */
     _renderSubtitles(timestamp) {
+        if (!this.subtitleManager) return;
+
         const activeCues = this.subtitleManager.getActiveCues(timestamp);
         if (activeCues.length === 0) return;
 
