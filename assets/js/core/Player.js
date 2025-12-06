@@ -716,8 +716,14 @@ export class CorePlayer {
         if (rate < 0.25 || rate > 2) return;
 
         const wasPlaying = this.isPlaying;
+        const currentPosition = this._getPlaybackTime();
+
         if (wasPlaying) {
             this.pause();
+            // Wait for audio iterator cleanup to complete before changing rate
+            if (this.audioIteratorCleanupPromise) {
+                await this.audioIteratorCleanupPromise;
+            }
         }
 
         this.playbackRate = rate;
@@ -725,6 +731,8 @@ export class CorePlayer {
         this._updateSpeedMenu();
 
         if (wasPlaying) {
+            // Seek to current position to reset all iterators with new rate
+            await this._seekTo(currentPosition);
             await this.play();
         }
     }
@@ -1281,12 +1289,15 @@ export class CorePlayer {
 
     /**
      * Returns the current playback time in the media file.
-     * To ensure perfect audio-video sync, we always use the audio context's clock to determine playback time, even
-     * when there is no audio track.
+     * To ensure perfect audio-video sync, we always use the audio context's clock to determine playback time.
+     * Note: We don't multiply by playbackRate here because audioContext.currentTime advances at real-time,
+     * but audio sources play at playbackRate speed, effectively advancing media time faster.
      */
     _getPlaybackTime() {
         if (this.isPlaying && this.audioContext) {
-            return (this.audioContext.currentTime - this.audioContextStartTime) * this.playbackRate + this.playbackTimeAtStart;
+            const elapsedRealTime = this.audioContext.currentTime - this.audioContextStartTime;
+            // Media time advances at playbackRate speed
+            return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
         } else {
             return this.playbackTimeAtStart;
         }
@@ -1385,7 +1396,8 @@ export class CorePlayer {
             this.animationFrameId = null;
         }
 
-        if (this.audioContext) {
+        // Suspend audioContext to stop its clock - keeps audio/video time in sync
+        if (this.audioContext && this.audioContext.state === 'running') {
             this.audioContext.suspend();
         }
 
@@ -1513,7 +1525,7 @@ export class CorePlayer {
         if (!this.audioSink) return;
 
         try {
-            // Now iterating over AudioSamples instead of buffers
+            // Iterating over AudioSamples
             for await (const audioSample of this.audioBufferIterator) {
                 if (!this.isPlaying) {
                     // Close the AudioSample before breaking
@@ -1533,12 +1545,26 @@ export class CorePlayer {
                 audioSource.connect(this.gainNode); // Connect to gain node
 
                 // Calculate when this buffer should start playing
+                // 'timestamp' is in media time, but audioContext.currentTime is real time
+                // At faster playback rates, real-time delay is shorter than media-time delay
                 const now = this.audioContext.currentTime;
-                const delay = timestamp - this._getPlaybackTime();
-                const startTime = now + Math.max(0, delay);
+                const mediaTimeDelay = timestamp - this._getPlaybackTime();
+                const realTimeDelay = mediaTimeDelay / this.playbackRate;
+                const startTime = now + Math.max(0, realTimeDelay);
 
-                // Queue the buffer
-                audioSource.start(startTime);
+                // Queue the buffer with proper timing
+                if (realTimeDelay >= 0) {
+                    // Sample is in the future - schedule it
+                    audioSource.start(startTime);
+                } else {
+                    // Sample is in the past - play only the remaining audible portion
+                    const offset = -realTimeDelay;  // How far into the buffer to start
+                    if (offset < buffer.duration / this.playbackRate) {
+                        // There's still some audio left to play
+                        audioSource.start(now, offset * this.playbackRate);
+                    }
+                    // If offset >= buffer duration, skip this sample entirely
+                }
 
                 // Track source for cleanup
                 this.queuedAudioNodes.add(audioSource);
