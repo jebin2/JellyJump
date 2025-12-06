@@ -1373,6 +1373,7 @@ export class Playlist {
                 const action = menuItem.dataset.action;
                 MenuRouter.init(action, index, this);
                 this._closeAllMenus();
+                this.player.pause();
             });
         });
 

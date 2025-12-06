@@ -47,6 +47,25 @@ export class TrackManagerMenu {
             this.renderTracks(tracks, item, modalContent, playlist);
         } catch (e) {
             console.error('Failed to load tracks:', e);
+
+            // Check if this is a "no source" error (file missing from IndexedDB and no URL)
+            if (e.message && e.message.includes('No source available')) {
+                modal.close();
+
+                // Show user-friendly popup
+                alert(`The file "${item.title}" is no longer available and will be removed from the playlist.\n\nThis can happen when the browser cache is cleared or the file was not properly saved.`);
+
+                // Remove the item from playlist
+                const itemIndex = playlist.items.indexOf(item);
+                if (itemIndex !== -1) {
+                    playlist.items.splice(itemIndex, 1);
+                    playlist.render();
+                    playlist._saveState();
+                    console.log(`[TrackManagerMenu] Removed unavailable item: ${item.title}`);
+                }
+                return;
+            }
+
             modalContent.querySelector('.tracks-loading').classList.add('hidden');
             modalContent.querySelector('.mb-modal-body').insertAdjacentHTML('beforeend', `<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`);
         }
