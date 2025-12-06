@@ -104,6 +104,7 @@ export class CorePlayer {
         this.subtitleTracks = []; // Array of {id, name, cues}
         this.activeSubtitleTrackId = null;
         this.subtitleTrackCounter = 0;
+        this.onSubtitleChange = null; // Callback for when subtitles are added/changed
 
         // Screenshot Manager - initialized lazily if needed
         this.screenshotManager = null;
@@ -1226,7 +1227,7 @@ export class CorePlayer {
      * @param {string} url - URL of the media file
      * @param {boolean} autoplay - Whether to start playing automatically
      */
-    async load(url, autoplay = false, videoId = null) {
+    async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
         try {
             // Stop any current playback
             this.pause(false);
@@ -1265,6 +1266,15 @@ export class CorePlayer {
             this.videoSink = null;
             this.audioSink = null;
             this.input = null;
+
+            // Reset subtitle state for new video
+            this.subtitleTracks = [];
+            this.subtitleTrackCounter = 0;
+            this.activeSubtitleTrackId = null;
+            this.isSubtitlesEnabled = false;
+            if (this.subtitleManager) {
+                this.subtitleManager.cues = [];
+            }
 
             this.ui.loader.classList.add('visible');
             console.log(`Loading media: ${url}`);
@@ -1328,6 +1338,22 @@ export class CorePlayer {
             }
 
             this._updateAudioTracks();
+
+            // Restore saved subtitles for this video
+            if (savedSubtitles && savedSubtitles.length > 0) {
+                this.subtitleTracks = savedSubtitles.map(track => ({
+                    id: track.id,
+                    name: track.name,
+                    cues: [...track.cues]
+                }));
+                // Find max counter from restored tracks
+                this.subtitleTrackCounter = savedSubtitles.reduce((max, track) => {
+                    const match = track.id.match(/custom-(\d+)/);
+                    return match ? Math.max(max, parseInt(match[1])) : max;
+                }, 0);
+                console.log(`Restored ${savedSubtitles.length} subtitle track(s) for video`);
+            }
+
             this._updateSubtitleMenu();
 
             this.ui.loader.classList.remove('visible');
@@ -1385,6 +1411,11 @@ export class CorePlayer {
             this.isSubtitlesEnabled = true;
             this._updateSubtitleMenu();
             console.log(`Subtitles loaded successfully as "${trackName}"`);
+
+            // Notify callback (for playlist to persist subtitles)
+            if (this.onSubtitleChange) {
+                this.onSubtitleChange(this.subtitleTracks);
+            }
         } catch (error) {
             console.error('Error loading subtitles:', error);
         }

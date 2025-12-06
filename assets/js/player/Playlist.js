@@ -824,7 +824,20 @@ export class Playlist {
 
             // Load video into player (autoplay based on whether we WERE playing)
             const shouldAutoplay = autoplay && wasPlaying;
-            await this.player.load(video.blob_url, shouldAutoplay, video.id);
+
+            // Set up callback to save subtitles when user uploads them
+            this.player.onSubtitleChange = (subtitleTracks) => {
+                video.subtitleTracks = subtitleTracks.map(track => ({
+                    id: track.id,
+                    name: track.name,
+                    cues: [...track.cues]
+                }));
+                this._saveState();
+                console.log(`Saved ${subtitleTracks.length} subtitle track(s) for: ${video.title}`);
+            };
+
+            // Load video with saved subtitles (if any)
+            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null);
 
             // Update UI
             this._updateUI();
