@@ -65,9 +65,14 @@ export class MediaProcessor {
         }
 
         try {
-            const blobSource = new MediaBunny.BlobSource(source);
+            let inputSource;
+            if (typeof source === 'string') {
+                inputSource = new MediaBunny.UrlSource(source);
+            } else {
+                inputSource = new MediaBunny.BlobSource(source);
+            }
             input = new MediaBunny.Input({
-                source: blobSource,
+                source: inputSource,
                 formats: MediaBunny.ALL_FORMATS
             });
 

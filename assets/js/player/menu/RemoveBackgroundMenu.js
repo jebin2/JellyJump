@@ -433,7 +433,7 @@ export class RemoveBackgroundMenu {
                 const bgColor = customBgColorInput.value;
 
                 const processedBlob = await MediaProcessor.process({
-                    source: sourceBlob,
+                    source: await MediaMetadata.getProcessedSourceURL(item),
                     removeBackgroundOptions: {
                         colors: selectedColors,
                         bgType: bgType,
