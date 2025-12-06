@@ -196,21 +196,44 @@ export class IndexedDBService {
      */
     async loadFile(id) {
         await this.ready();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.STORES.FILES], 'readonly');
-            const fileStore = transaction.objectStore(this.STORES.FILES);
-            const request = fileStore.get(id);
 
-            request.onsuccess = () => {
-                const result = request.result;
-                if (result) {
-                    const file = new File([result.blob], result.name, { type: result.type });
-                    resolve(file);
+        // Check if database connection is still open
+        if (!this.db) {
+            console.warn('IndexedDB connection not available, reinitializing...');
+            this.initPromise = this._init();
+            await this.initPromise;
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = this.db.transaction([this.STORES.FILES], 'readonly');
+                const fileStore = transaction.objectStore(this.STORES.FILES);
+                const request = fileStore.get(id);
+
+                request.onsuccess = () => {
+                    const result = request.result;
+                    if (result) {
+                        const file = new File([result.blob], result.name, { type: result.type });
+                        resolve(file);
+                    } else {
+                        resolve(null);
+                    }
+                };
+                request.onerror = () => reject(request.error);
+            } catch (e) {
+                // Handle InvalidStateError when connection is closing
+                if (e.name === 'InvalidStateError') {
+                    console.warn('IndexedDB connection was closing, reinitializing...');
+                    this.db = null;
+                    this.initPromise = this._init();
+                    this.initPromise.then(() => {
+                        // Retry the operation
+                        this.loadFile(id).then(resolve).catch(reject);
+                    }).catch(reject);
                 } else {
-                    resolve(null);
+                    reject(e);
                 }
-            };
-            request.onerror = () => reject(request.error);
+            }
         });
     }
 
