@@ -56,9 +56,18 @@ export class Playlist {
         // when video ends. For now, this is not implemented.
         // TODO: Add player.on('ended', () => this.playNext()) if CorePlayer supports events
 
-        // Save state on pause or unload
+        // Save state on beforeunload (works for most cases)
         window.addEventListener('beforeunload', () => {
+            console.log('[Playlist] beforeunload - saving state');
             this._saveState();
+            console.log('[Playlist] beforeunload - revoking blob URLs');
+            // Revoke all blob URLs to help browser release memory
+            for (const item of this.items) {
+                if (item.url && item.url.startsWith('blob:')) {
+                    URL.revokeObjectURL(item.url);
+                    item.url = null;
+                }
+            }
         });
 
         // Keyboard Shortcuts

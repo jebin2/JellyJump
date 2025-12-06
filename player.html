@@ -106,8 +106,8 @@
             const { CorePlayer } = await import('./assets/js/core/Player.js');
             const { Playlist } = await import('./assets/js/player/Playlist.js');
 
-            // Initialize Player
-            const player = new CorePlayer('player-container', {
+            // Initialize Player (attach to window for cleanup on unload)
+            const player = window.player = new CorePlayer('player-container', {
                 autoplay: false,
                 muted: false,
                 mode: 'player'
@@ -161,8 +161,18 @@
             }
         });
 
-        // CRITICAL: Disable bfcache to prevent memory accumulation on refresh
-        // Without this, browser keeps ALL previous page states in memory
+        // CRITICAL: Cleanup on page unload to prevent memory accumulation
+        // pagehide is more reliable than unload/beforeunload
+        window.addEventListener('beforeunload', function () {
+            console.log('[Player] beforeunload - destroying player');
+            // Destroy player if it exists (closes MediaBunny resources, audio context, etc.)
+            if (window.player && typeof window.player.destroy === 'function') {
+                window.player.destroy();
+                window.player = null;
+            }
+        });
+
+        // Also keep unload to disable bfcache (back-forward cache)
         window.addEventListener('unload', function () { });
     </script>
 
