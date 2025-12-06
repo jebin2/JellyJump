@@ -10,7 +10,6 @@
  * @property {string} duration - Formatted duration ("mm:ss" or "hh:mm:ss")
  * @property {string} thumbnail - Thumbnail URL or empty string
  * @property {boolean} isLocal - True if item is a local file (not remote stream)
- * @property {boolean} [isRemoteUrl] - True if item is a URL-uploaded video (persists original URL)
  * @property {string} [path] - Filename/relative path
  * @property {string} [url] - Remote URL for streaming, or empty for local files
  * @property {string} [localPath] - Absolute filesystem path (Electron only, for disk access)
@@ -178,10 +177,9 @@ export class IndexedDBService {
                         duration: item.duration,
                         thumbnail: item.thumbnail,
                         isLocal: item.isLocal,
-                        isRemoteUrl: item.isRemoteUrl, // Flag for URL-uploaded videos
                         path: item.path,
                         // Keep URL for remote items, clear for local
-                        url: (item.isRemoteUrl || !item.isLocal) ? item.url : '',
+                        url: item.isLocal ? '' : item.url,
                         originalIndex: item.originalIndex,
                         fileSize: item.fileSize,  // Persist for InfoMenu
                         fileType: item.fileType,  // Persist for InfoMenu
@@ -226,7 +224,7 @@ export class IndexedDBService {
                 const storedItems = itemsRequest.result;
                 const restoredItems = storedItems.map(item => {
                     const restored = { ...item };
-                    if (restored.isLocal && !restored.isRemoteUrl) {
+                    if (restored.isLocal) {
                         // Local file: Don't load file yet. Set as null.
                         restored.file = null;
                         restored.url = null;

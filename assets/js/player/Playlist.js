@@ -1424,11 +1424,10 @@ export class Playlist {
             // Create item with original URL for re-fetching
             const newItem = {
                 title: filename,
-                url: url, // Keep original URL for re-fetching
+                url: url,
                 duration: 'Loading...',
                 thumbnail: '',
-                isLocal: false, // NOT a local file - it's a remote URL
-                isRemoteUrl: true, // Flag to indicate this is a saved remote URL
+                isLocal: false,
                 file: null,
                 fileType: contentType,
                 mimeType: contentType,
