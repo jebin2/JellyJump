@@ -66,3 +66,7 @@
     padding-top: var(--space-3xl);
     padding-bottom: var(--space-3xl);
 }
+
+.h300pximpl {
+    height: 300px !important;
+}
