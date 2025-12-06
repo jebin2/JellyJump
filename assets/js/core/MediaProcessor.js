@@ -1171,8 +1171,8 @@ export class MediaProcessor {
                         let currentAudioTime = 0;
 
                         for (const sample of samples) {
-                            // Convert to AudioBuffer
-                            const buffer = await sample.toAudioBuffer();
+                            // Convert to AudioBuffer (synchronous operation)
+                            const buffer = sample.toAudioBuffer();
 
                             // Reverse data in each channel
                             for (let c = 0; c < buffer.numberOfChannels; c++) {
@@ -1180,18 +1180,17 @@ export class MediaProcessor {
                                 data.reverse();
                             }
 
-                            // Create new sample(s)
+                            // Create new sample(s) from reversed buffer
                             const reversedSamples = MediaBunny.AudioSample.fromAudioBuffer(buffer, currentAudioTime);
-
                             const samplesToAdd = Array.isArray(reversedSamples) ? reversedSamples : [reversedSamples];
 
                             for (const s of samplesToAdd) {
                                 await audioSource.add(s);
                                 currentAudioTime += s.duration;
-                                if (s !== sample) s.close(); // Close new sample after adding
+                                s.close(); // Close newly created sample after adding
                             }
 
-                            sample.close(); // Close original sample
+                            sample.close(); // Close original input sample
                         }
                         console.log('[MediaProcessor] Audio reversal complete');
                     }
