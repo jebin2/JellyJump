@@ -70,3 +70,7 @@
 .h300pximpl {
     height: 300px !important;
 }
+
+.comingsoon {
+    display: none !important;
+}
