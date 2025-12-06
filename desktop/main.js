@@ -1,5 +1,62 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// ============================================
+// IPC Handlers for File System Access
+// ============================================
+
+/**
+ * Read a file from disk and return as ArrayBuffer
+ */
+ipcMain.handle('read-file', async (event, filePath) => {
+    try {
+        console.log('[Electron] Reading file:', filePath);
+        const buffer = await fs.promises.readFile(filePath);
+        // Convert Node Buffer to ArrayBuffer for transfer
+        return {
+            success: true,
+            buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+        };
+    } catch (error) {
+        console.error('[Electron] Error reading file:', error.message);
+        return { success: false, error: error.message };
+    }
+});
+
+/**
+ * Check if a file exists at the given path
+ */
+ipcMain.handle('file-exists', async (event, filePath) => {
+    try {
+        await fs.promises.access(filePath, fs.constants.R_OK);
+        return true;
+    } catch {
+        return false;
+    }
+});
+
+/**
+ * Get file stats (size, modified time)
+ */
+ipcMain.handle('get-file-stats', async (event, filePath) => {
+    try {
+        const stats = await fs.promises.stat(filePath);
+        return {
+            success: true,
+            stats: {
+                size: stats.size,
+                mtime: stats.mtimeMs
+            }
+        };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// ============================================
+// Window Creation
+// ============================================
 
 function createWindow() {
     const win = new BrowserWindow({
@@ -8,7 +65,8 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            webSecurity: true // Important for loading local resources properly
+            webSecurity: true, // Important for loading local resources properly
+            preload: path.join(__dirname, 'preload.js') // Load preload script
         },
         autoHideMenuBar: true,
         title: "JellyJump Player",

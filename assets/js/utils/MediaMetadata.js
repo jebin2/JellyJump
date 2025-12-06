@@ -45,6 +45,7 @@ export class MediaMetadata {
      * Get source blob for an item (with caching for remote URLs)
      * For remote URLs: downloads, saves to IndexedDB, then releases from memory
      * For local files: loads from IndexedDB on-demand if not in memory
+     * For Electron: reads directly from disk using localPath
      * @param {Object} item - Playlist item  
      * @param {Function} [onSave] - Optional callback to save state after caching
      * @returns {Promise<Blob>} Source blob
@@ -55,7 +56,30 @@ export class MediaMetadata {
             return item.file;
         }
 
-        // 2. If isLocal (previously cached), try loading from IndexedDB
+        // 2. Electron: If we have a localPath, read directly from disk
+        if (window.electronAPI?.isElectron && item.localPath) {
+            console.log('[Electron] Loading file from disk:', item.localPath);
+
+            // First check if file still exists
+            const exists = await window.electronAPI.fileExists(item.localPath);
+            if (!exists) {
+                console.warn('[Electron] File no longer exists:', item.localPath);
+                throw new Error('File no longer exists at path: ' + item.localPath);
+            }
+
+            // Read file from disk
+            const result = await window.electronAPI.readFile(item.localPath);
+            if (!result.success) {
+                throw new Error('Failed to read file: ' + result.error);
+            }
+
+            // Convert ArrayBuffer to Blob
+            const blob = new Blob([result.buffer], { type: item.mimeType || 'video/mp4' });
+            console.log('[Electron] File loaded from disk:', item.title, `(${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+            return blob;
+        }
+
+        // 3. If isLocal (previously cached), try loading from IndexedDB
         if (item.isLocal && item.id) {
             console.log('[Cache] Loading cached file from IndexedDB:', item.title);
             const file = await _dbService.loadFile(item.id);

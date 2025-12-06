@@ -390,13 +390,27 @@ export class Playlist {
                         console.log('[Playlist] Restoring item:', itemToRestore.title, {
                             isLocal: itemToRestore.isLocal,
                             hasFile: !!itemToRestore.file,
-                            url: itemToRestore.url
+                            url: itemToRestore.url,
+                            localPath: itemToRestore.localPath
                         });
 
+                        // Electron: Check if localPath exists on disk
+                        if (window.electronAPI?.isElectron && itemToRestore.localPath) {
+                            const fileExists = await window.electronAPI.fileExists(itemToRestore.localPath);
+                            if (fileExists) {
+                                console.log('[Electron] File exists on disk, proceeding to load:', itemToRestore.localPath);
+                                await this.selectItem(indexToRestore, false);
+                                return;
+                            }
+                            console.warn('[Electron] File no longer exists:', itemToRestore.localPath);
+                            // Fall through to show modal
+                        }
+
                         // Pre-check: If it's a local item with no usable source, don't try to load
-                        // This includes: no file AND (no url OR stale blob url)
+                        // This includes: no file AND (no url OR stale blob url) AND (no localPath or Electron not available)
+                        const hasElectronPath = window.electronAPI?.isElectron && itemToRestore.localPath;
                         const hasNoSource = itemToRestore.isLocal && !itemToRestore.file &&
-                            (!itemToRestore.url || itemToRestore.url.startsWith('blob:'));
+                            (!itemToRestore.url || itemToRestore.url.startsWith('blob:')) && !hasElectronPath;
 
                         if (hasNoSource) {
                             console.log('[Playlist] Item has no source, showing modal');
@@ -475,7 +489,7 @@ export class Playlist {
                 path = file.name;
             }
 
-            return {
+            const item = {
                 title: file.name,
                 url: URL.createObjectURL(file),
                 duration: 'Loading...',
@@ -485,9 +499,19 @@ export class Playlist {
                 file: file,
                 fileSize: file.size,      // Cache size for InfoMenu (file will be released after IndexedDB save)
                 fileType: file.type,      // Cache type for InfoMenu
+                mimeType: file.type,      // Store MIME type for blob creation
                 path: path,
                 id: generateId() // Add unique ID for persistence
             };
+
+            // Electron: Store absolute file path for direct disk access
+            // file.path is only available in Electron, not in browsers
+            if (file.path) {
+                item.localPath = file.path;
+                console.log('[Electron] Storing localPath for:', file.name, '->', file.path);
+            }
+
+            return item;
         });
 
         this.addItems(newItems);
