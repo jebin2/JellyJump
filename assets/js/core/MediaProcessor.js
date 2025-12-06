@@ -1003,9 +1003,9 @@ export class MediaProcessor {
         }
     }
     /**
-     * Reverse video playback using seek-based approach for memory efficiency.
-     * Instead of extracting all frames into memory, we seek backwards through
-     * the video one frame at a time, keeping memory usage constant.
+     * Reverse video playback using MediaBunny's samplesAtTimestamps for efficiency.
+     * Uses VideoSampleSink to efficiently retrieve frames in reverse order,
+     * letting MediaBunny handle the seeking/decoding optimizations internally.
      * 
      * @param {Object} options
      * @param {Blob|File} options.source
@@ -1014,45 +1014,42 @@ export class MediaProcessor {
      * @returns {Promise<Blob>}
      */
     static async reverseVideo({ source, includeAudio = false, onProgress }) {
-        console.log('[MediaProcessor] Starting seek-based video reversal...');
+        console.log('[MediaProcessor] Starting video reversal with samplesAtTimestamps...');
 
-        let videoUrl = null;
-        let video = null;
+        const blobSource = new MediaBunny.BlobSource(source);
+        const input = new MediaBunny.Input({
+            source: blobSource,
+            formats: MediaBunny.ALL_FORMATS
+        });
+
         let output = null;
         let canvasSource = null;
         let audioSource = null;
         let canvas = null;
 
         try {
-            // Step 1: Create video element for seeking
-            video = document.createElement('video');
-            video.muted = true;
-            video.playsInline = true;
-            video.preload = 'auto';
+            // Step 1: Analyze input
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error('No video track found');
 
-            videoUrl = URL.createObjectURL(source);
-            video.src = videoUrl;
+            const width = videoTrack.displayWidth || videoTrack.codedWidth;
+            const height = videoTrack.displayHeight || videoTrack.codedHeight;
+            const duration = await videoTrack.computeDuration();
+            const firstTimestamp = await videoTrack.getFirstTimestamp();
 
-            // Wait for video to be fully loaded
-            await new Promise((resolve, reject) => {
-                video.onloadedmetadata = () => {
-                    // Also wait for enough data to seek
-                    video.oncanplaythrough = resolve;
-                };
-                video.onerror = () => reject(new Error('Failed to load video'));
-            });
+            // Compute frame rate from metadata
+            let fps = 30;
+            try {
+                const stats = await videoTrack.computePacketStats();
+                fps = stats.averagePacketRate || 30;
+            } catch (e) {
+                console.warn("[MediaProcessor] Could not compute frame rate, defaulting to 30fps", e);
+            }
 
-            const width = video.videoWidth;
-            const height = video.videoHeight;
-            const duration = video.duration;
-
-            // Estimate FPS (default to 30 if we can't determine)
-            // For seek-based approach, we'll use a target FPS for output
-            const fps = 30;
             const frameDuration = 1 / fps;
             const totalFrames = Math.ceil(duration * fps);
 
-            console.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, targeting ${fps}fps (${totalFrames} frames)`);
+            console.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, ${fps.toFixed(1)}fps (${totalFrames} frames)`);
 
             // Step 2: Setup Output
             const outputFormat = new MediaBunny.Mp4OutputFormat();
@@ -1077,57 +1074,67 @@ export class MediaProcessor {
 
             // Setup Audio (if requested)
             if (includeAudio) {
-                const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
-                if (supportedCodecs.length > 0) {
-                    audioSource = new MediaBunny.AudioSampleSource({
-                        codec: supportedCodecs[0],
-                        bitrate: 128000
-                    });
-                    output.addAudioTrack(audioSource);
+                const audioTrack = await input.getPrimaryAudioTrack();
+                if (audioTrack) {
+                    const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
+                    if (supportedCodecs.length > 0) {
+                        audioSource = new MediaBunny.AudioSampleSource({
+                            codec: supportedCodecs[0],
+                            bitrate: 128000
+                        });
+                        output.addAudioTrack(audioSource);
+                    }
                 }
             }
 
             await output.start();
 
-            // Step 3: Seek-based frame extraction (REVERSE ORDER)
-            // Instead of storing all frames, we seek backwards through the video
-            console.log('[MediaProcessor] Extracting and encoding frames in reverse order...');
+            // Step 3: Use samplesAtTimestamps with reverse timestamp generator
+            console.log('[MediaProcessor] Extracting frames in reverse order using samplesAtTimestamps...');
+
+            const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
+
+            // Generate timestamps in REVERSE order (from end to start)
+            const reverseTimestampGenerator = (async function* () {
+                for (let i = totalFrames - 1; i >= 0; i--) {
+                    yield firstTimestamp + (i * frameDuration);
+                }
+            })();
 
             let outputTimestamp = 0;
+            let frameCount = 0;
 
-            for (let i = 0; i < totalFrames; i++) {
-                // Calculate source time (seeking backwards from end)
-                // For output frame 0, we want the last frame of the source
-                // For output frame N, we want frame (totalFrames - N - 1) from source
-                const sourceTime = Math.max(0, duration - (i * frameDuration) - frameDuration);
+            // samplesAtTimestamps efficiently handles seeking and decoding
+            for await (const sample of videoSink.samplesAtTimestamps(reverseTimestampGenerator)) {
+                if (sample) {
+                    // Draw the sample to canvas
+                    sample.draw(ctx, 0, 0, width, height);
 
-                // Seek to the source time
-                video.currentTime = sourceTime;
-                await new Promise(resolve => {
-                    video.onseeked = resolve;
-                });
+                    // Encode the frame
+                    await canvasSource.add(outputTimestamp, frameDuration);
+                    outputTimestamp += frameDuration;
 
-                // Draw the frame to canvas
-                ctx.drawImage(video, 0, 0, width, height);
+                    sample.close();
+                    frameCount++;
 
-                // Encode the frame
-                await canvasSource.add(outputTimestamp, frameDuration);
-                outputTimestamp += frameDuration;
-
-                // Update progress (0-80% for video)
-                if (onProgress) {
-                    onProgress((i + 1) / totalFrames * 0.8);
+                    // Update progress (0-80% for video)
+                    if (onProgress) {
+                        onProgress(frameCount / totalFrames * 0.8);
+                    }
                 }
             }
 
-            console.log(`[MediaProcessor] Encoded ${totalFrames} frames`);
+            console.log(`[MediaProcessor] Encoded ${frameCount} frames`);
 
-            // Step 4: Handle Audio (if requested) - Process in chunks for memory efficiency
+            // Step 4: Handle Audio (if requested)
             if (includeAudio && audioSource) {
-                console.log('[MediaProcessor] Reversing audio in chunks...');
+                console.log('[MediaProcessor] Reversing audio...');
                 try {
-                    await MediaProcessor._reverseAudioInChunks(source, audioSource, duration, onProgress);
-                    console.log('[MediaProcessor] Audio reversal complete');
+                    const audioTrack = await input.getPrimaryAudioTrack();
+                    if (audioTrack) {
+                        await MediaProcessor._reverseAudioWithSink(audioTrack, audioSource, duration, onProgress);
+                        console.log('[MediaProcessor] Audio reversal complete');
+                    }
                 } catch (e) {
                     console.warn('[MediaProcessor] Audio reversal failed:', e);
                 }
@@ -1146,12 +1153,8 @@ export class MediaProcessor {
 
         } finally {
             // Cleanup
-            if (videoUrl) {
-                URL.revokeObjectURL(videoUrl);
-            }
-            if (video) {
-                video.src = '';
-                video.load(); // Force release of video resources
+            if (input && typeof input.dispose === 'function') {
+                try { input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
             }
             if (output && typeof output.dispose === 'function') {
                 try { output.dispose(); } catch (e) { console.warn('Error disposing output:', e); }
@@ -1161,6 +1164,64 @@ export class MediaProcessor {
             }
             if (audioSource && typeof audioSource.dispose === 'function') {
                 try { audioSource.dispose(); } catch (e) { console.warn('Error disposing audioSource:', e); }
+            }
+        }
+    }
+
+    /**
+     * Reverse audio using AudioSampleSink with chunked encoding.
+     * Collects samples, reverses them, then encodes in chunks to limit memory.
+     * 
+     * @param {Object} audioTrack - MediaBunny audio track
+     * @param {Object} audioSource - MediaBunny AudioSampleSource to write to
+     * @param {number} duration - Total duration in seconds
+     * @param {Function} [onProgress] - Progress callback
+     * @private
+     */
+    static async _reverseAudioWithSink(audioTrack, audioSource, duration, onProgress) {
+        const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
+
+        // Collect all audio samples (audio is much smaller than video)
+        const samples = [];
+        for await (const sample of audioSink.samples()) {
+            samples.push(sample);
+        }
+
+        console.log(`[MediaProcessor] Collected ${samples.length} audio samples`);
+
+        // Reverse order
+        samples.reverse();
+
+        let outputTimestamp = 0;
+        const totalSamples = samples.length;
+
+        for (let i = 0; i < samples.length; i++) {
+            const sample = samples[i];
+
+            // Convert to AudioBuffer
+            const buffer = sample.toAudioBuffer();
+
+            // Reverse data in each channel
+            for (let c = 0; c < buffer.numberOfChannels; c++) {
+                const data = buffer.getChannelData(c);
+                data.reverse();
+            }
+
+            // Create new sample(s) from reversed buffer
+            const reversedSamples = MediaBunny.AudioSample.fromAudioBuffer(buffer, outputTimestamp);
+            const samplesToAdd = Array.isArray(reversedSamples) ? reversedSamples : [reversedSamples];
+
+            for (const s of samplesToAdd) {
+                await audioSource.add(s);
+                outputTimestamp += s.duration;
+                s.close();
+            }
+
+            sample.close();
+
+            // Update progress (80-100% for audio)
+            if (onProgress && i % 100 === 0) {
+                onProgress(0.8 + (i / totalSamples) * 0.2);
             }
         }
     }
