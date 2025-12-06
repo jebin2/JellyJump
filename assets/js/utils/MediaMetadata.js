@@ -138,12 +138,34 @@ export class MediaMetadata {
     }
 
     static async getProcessedSourceURL(item, onSave) {
-        if (item.isLocal && item.url) {
+        // If already has a usable URL (not a stale blob), return it
+        if (item.url && !item.url.startsWith('blob:')) {
             return item.url;
         }
+        // If it's a local file that already has a valid blob URL in memory, return it
+        if (item.isLocal && item.url && item.url.startsWith('blob:')) {
+            return item.url;
+        }
+
         const file = await this.getSourceBlob(item, onSave);
-        item.isLocal = true;
-        item.url = URL.createObjectURL(file);
+
+        // Only mark as local if it's not a remote URL item
+        if (!item.isRemoteUrl) {
+            item.isLocal = true;
+        }
+
+        // Create blob URL for playback (but preserve original URL for remote items)
+        const blobUrl = URL.createObjectURL(file);
+
+        // For remote URL items, don't overwrite the original URL
+        // Store blob URL separately or just return it for this session
+        if (item.isRemoteUrl) {
+            // Store playback URL separately, keep original for persistence
+            item._playbackUrl = blobUrl;
+            return blobUrl;
+        }
+
+        item.url = blobUrl;
         return item.url;
     }
 

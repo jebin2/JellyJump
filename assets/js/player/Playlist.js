@@ -2,7 +2,8 @@ import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
 import { CorePlayer } from '../core/Player.js';
-import { Modal } from '../utils/Modal.js';
+import { Modal as ConfirmModal } from '../utils/Modal.js';
+import { Modal } from './Modal.js';
 import { MenuRouter } from './menu/MenuRouter.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
@@ -198,8 +199,17 @@ export class Playlist {
         const clearBtn = header.querySelector('#mb-clear-playlist');
 
         if (addFilesBtn) {
-            addFilesBtn.addEventListener('click', () => {
-                document.getElementById('mb-file-input').click();
+            addFilesBtn.addEventListener('click', async () => {
+                // Electron: Use native file dialog to get file paths
+                if (window.electronAPI?.isElectron && window.electronAPI.openFileDialog) {
+                    const result = await window.electronAPI.openFileDialog();
+                    if (result.success && result.files) {
+                        this.handleElectronFiles(result.files);
+                    }
+                } else {
+                    // Web: Use HTML file input
+                    document.getElementById('mb-file-input').click();
+                }
             });
         }
 
@@ -416,7 +426,7 @@ export class Playlist {
                             console.log('[Playlist] Item has no source, showing modal');
                             // Wait for UI to settle, then show modal
                             setTimeout(async () => {
-                                const shouldRemove = await Modal.confirm({
+                                const shouldRemove = await ConfirmModal.confirm({
                                     title: 'File Not Found',
                                     message: `"${itemToRestore.title}" could not be loaded.\n\nThis file was likely too large to save in browser storage (>500MB) and needs to be re-added to the playlist.`,
                                     confirmText: 'Remove',
@@ -513,6 +523,69 @@ export class Playlist {
 
             return item;
         });
+
+        this.addItems(newItems);
+
+        // Process metadata for new items
+        this._processMetadata(newItems);
+
+        // If playlist was empty, play the first new file
+        if (this.items.length === newItems.length) {
+            this.selectItem(0);
+        }
+    }
+
+    /**
+     * Handle files from Electron's native file dialog (has paths)
+     * @param {Array<{path: string, name: string, size: number, lastModified: number}>} files 
+     */
+    async handleElectronFiles(files) {
+        console.log('[Electron] Processing files from native dialog:', files);
+
+        const videoExtensions = ['mp4', 'mkv', 'avi', 'webm', 'mov', 'm4v', 'wmv', 'flv'];
+        const videoFiles = files.filter(file => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            return videoExtensions.includes(ext);
+        });
+
+        if (videoFiles.length === 0) {
+            alert('Please select valid video files.');
+            return;
+        }
+
+        const newItems = videoFiles.map(file => {
+            // Determine MIME type from extension
+            const ext = file.name.split('.').pop().toLowerCase();
+            const mimeTypes = {
+                'mp4': 'video/mp4',
+                'mkv': 'video/x-matroska',
+                'avi': 'video/x-msvideo',
+                'webm': 'video/webm',
+                'mov': 'video/quicktime',
+                'm4v': 'video/x-m4v',
+                'wmv': 'video/x-ms-wmv',
+                'flv': 'video/x-flv'
+            };
+            const mimeType = mimeTypes[ext] || 'video/mp4';
+
+            return {
+                title: file.name,
+                url: '', // Will be created on-demand from localPath
+                duration: 'Loading...',
+                thumbnail: '',
+                isLocal: true,
+                needsReload: false,
+                file: null, // File will be loaded from disk on-demand
+                fileSize: file.size,
+                fileType: mimeType,
+                mimeType: mimeType,
+                path: file.name,
+                localPath: file.path, // The absolute path for disk access
+                id: generateId()
+            };
+        });
+
+        console.log('[Electron] Created items with localPath:', newItems.map(i => ({ title: i.title, localPath: i.localPath })));
 
         this.addItems(newItems);
 
@@ -758,7 +831,7 @@ export class Playlist {
                     // Show user-friendly popup for missing file
                     try {
                         console.log('Showing modal for file not found...');
-                        const shouldRemove = await Modal.confirm({
+                        const shouldRemove = await ConfirmModal.confirm({
                             title: 'File Not Found',
                             message: `"${video.title}" could not be loaded.\n\nThis file was likely too large to save in browser storage (>500MB) and needs to be re-added to the playlist.`,
                             confirmText: 'Remove',
@@ -1375,41 +1448,55 @@ export class Playlist {
      */
     async _handleUrlUpload(url) {
         try {
-            // Fetch the video to verify access and get blob
-            const response = await fetch(url);
+            // Fetch the video to verify access and get metadata
+            const response = await fetch(url, { method: 'HEAD' });
 
             if (!response.ok) {
-                throw new Error(`Failed to fetch video: ${response.statusText}`);
+                // Try GET if HEAD fails (some servers don't support HEAD)
+                const getResponse = await fetch(url);
+                if (!getResponse.ok) {
+                    throw new Error(`Failed to fetch video: ${getResponse.statusText}`);
+                }
             }
 
-            const blob = await response.blob();
-
-            // Basic validation
-            if (!blob.type.startsWith('video/')) {
+            // Get content type from headers
+            const contentType = response.headers.get('content-type') || 'video/mp4';
+            if (!contentType.startsWith('video/')) {
                 throw new Error('The URL does not point to a valid video file.');
             }
 
-            // Create MediaBunny Input to extract metadata
-            // Note: For remote URLs, we might want to use UrlSource, but fetching as Blob ensures we have access
-            // and avoids some CORS issues during playback if we store the blob.
-            // However, storing large blobs in IndexedDB might be heavy.
-            // For Phase 20, let's store the URL and re-fetch, OR store the blob if small enough.
-            // The requirement says "Add to playlist with URL as identifier".
+            // Extract filename from URL
+            const urlPath = new URL(url).pathname;
+            const filename = urlPath.split('/').pop() || 'remote-video.mp4';
 
-            // Let's use the Blob for metadata extraction, but store the URL if possible?
-            // Actually, if we fetched it as a blob, we have it. Let's use it.
-            // But wait, if we refresh, the blob is gone.
-            // So we should probably treat it like a local file (store in IndexedDB) OR just store the URL.
-            // If we store the URL, we need to handle CORS again on reload.
-            // Let's try to store the Blob in IndexedDB (IndexedDBService handles size limits).
+            // Create item with original URL for re-fetching
+            const newItem = {
+                title: filename,
+                url: url, // Keep original URL for re-fetching
+                duration: 'Loading...',
+                thumbnail: '',
+                isLocal: false, // NOT a local file - it's a remote URL
+                isRemoteUrl: true, // Flag to indicate this is a saved remote URL
+                file: null,
+                fileType: contentType,
+                mimeType: contentType,
+                id: generateId()
+            };
 
-            const file = new File([blob], url.split('/').pop() || 'remote-video.mp4', { type: blob.type });
+            console.log('[URL Upload] Created item with remote URL:', newItem.title, url);
 
-            // Use handleFiles to process the file and create the item object correctly
-            this.handleFiles([file]);
+            this.addItem(newItem);
+
+            // Process metadata
+            this._processMetadata([newItem]);
+
+            // Select the new item
+            if (this.items.length === 1) {
+                this.selectItem(0);
+            }
 
         } catch (error) {
-            if (error.message.includes('Failed to fetch')) {
+            if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
                 throw new Error('CORS Error: Cannot access this URL. The server must allow cross-origin requests.');
             }
             throw error;

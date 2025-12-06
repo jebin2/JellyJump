@@ -162,11 +162,15 @@ export class IndexedDBService {
                         duration: item.duration,
                         thumbnail: item.thumbnail,
                         isLocal: item.isLocal,
+                        isRemoteUrl: item.isRemoteUrl, // Flag for URL-uploaded videos
                         path: item.path,
-                        url: item.isLocal ? '' : item.url, // Remote URLs kept, local cleared
+                        // Keep URL for remote items, clear for local
+                        url: (item.isRemoteUrl || !item.isLocal) ? item.url : '',
                         originalIndex: item.originalIndex,
                         fileSize: item.fileSize,  // Persist for InfoMenu
-                        fileType: item.fileType   // Persist for InfoMenu
+                        fileType: item.fileType,  // Persist for InfoMenu
+                        mimeType: item.mimeType,  // Persist for Electron blob creation
+                        localPath: item.localPath // Persist for Electron disk access
                     };
 
                     playlistStore.put(storedItem);
@@ -206,12 +210,13 @@ export class IndexedDBService {
                 const storedItems = itemsRequest.result;
                 const restoredItems = storedItems.map(item => {
                     const restored = { ...item };
-                    if (restored.isLocal) {
-                        // Don't load file yet. Set as null.
+                    if (restored.isLocal && !restored.isRemoteUrl) {
+                        // Local file: Don't load file yet. Set as null.
                         restored.file = null;
                         restored.url = null;
                         restored.needsReload = false; // We assume it exists, will fail on load if not
                     }
+                    // Remote URL items keep their URL for re-fetching
                     return restored;
                 });
                 resolve(restoredItems);
