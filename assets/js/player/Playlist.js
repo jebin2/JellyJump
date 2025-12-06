@@ -678,22 +678,7 @@ export class Playlist {
                         this.player.ui.loader.classList.add('visible');
                     }
                     console.log(`Loading file from storage: ${video.title}`);
-                    const file = await this.storage.loadFile(video.id);
-                    if (file) {
-                        // Create blob URL for playback (this keeps the blob alive)
-                        video.url = URL.createObjectURL(file);
-                        // DON'T store the file reference - the URL keeps the blob alive
-                        // and the file is persisted in IndexedDB for re-loading
-                        video.file = null;
-                        console.log(`Created blob URL for: ${video.title}, file NOT kept in memory`);
-                    } else {
-                        console.error('File not found in storage');
-                        alert('File not found in storage. Please re-add it.');
-                        if (this.player.ui && this.player.ui.loader) {
-                            this.player.ui.loader.classList.remove('visible');
-                        }
-                        return;
-                    }
+                    await MediaMetadata.getProcessedSourceURL(video)
                 } catch (e) {
                     console.error('Error loading file from storage:', e);
                     if (this.player.ui && this.player.ui.loader) {
