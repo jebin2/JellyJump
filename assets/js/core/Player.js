@@ -78,9 +78,9 @@ export class CorePlayer {
             },
             minimal: {
                 playPause: true,
-                volume: false,
                 time: true,
                 progress: true,
+                volume: false,
                 captions: false,
                 settings: false,
                 fullscreen: false,
@@ -306,41 +306,43 @@ export class CorePlayer {
             this.screenshotManager.init();
         }
 
-        // Cache elements - only query for controls that are enabled
+        // Cache control container and play overlay (always needed)
         this.ui.controls = this.container.querySelector('.jellyjump-controls');
         this.ui.playOverlay = this.container.querySelector('.jellyjump-play-overlay');
 
-        // Always needed for play/pause
+        // Cache elements only if their control is enabled
+        // Visibility is handled by data-control attributes (hidden by default in HTML)
         if (this.config.controls.playPause) {
             this.ui.playBtn = this.container.querySelector('#mb-play-btn');
         }
 
-        // Navigation buttons (only if navigation enabled - not needed for modal players)\n        if (this.config.controls.navigation) {\n            this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');\n            this.ui.nextBtn = this.container.querySelector('#mb-next-btn');\n        }
+        if (this.config.controls.navigation) {
+            this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');
+            this.ui.nextBtn = this.container.querySelector('#mb-next-btn');
+        }
 
-        // Progress (always needed for seeking)
         if (this.config.controls.progress) {
             this.ui.progressContainer = this.container.querySelector('.jellyjump-progress-container');
             this.ui.progressBar = this.container.querySelector('.jellyjump-progress-bar');
         }
 
-        // Time display
         if (this.config.controls.time) {
             this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
         }
 
-        // Volume controls
         if (this.config.controls.volume) {
             this.ui.muteBtn = this.container.querySelector('#mb-mute-btn');
             this.ui.volumeSlider = this.container.querySelector('#mb-volume-slider');
         }
 
-        // Fullscreen
         if (this.config.controls.fullscreen) {
             this.ui.fullscreenBtn = this.container.querySelector('#mb-fullscreen-btn');
+        }
+
+        if (this.config.controls.modeToggle) {
             this.ui.modeToggleBtn = this.container.querySelector('#mb-mode-toggle-btn');
         }
 
-        // Captions
         if (this.config.controls.captions) {
             this.ui.ccBtn = this.container.querySelector('#mb-cc-btn');
             this.ui.ccMenu = this.container.querySelector('#mb-cc-menu');
@@ -350,19 +352,16 @@ export class CorePlayer {
             this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
         }
 
-        // Speed controls
         if (this.config.controls.speed) {
             this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
             this.ui.speedMenu = this.container.querySelector('#mb-speed-menu');
         }
 
-        // Loop button
         if (this.config.controls.loop) {
             this.ui.loopBtn = this.container.querySelector('#mb-loop-btn');
             this.ui.loopMarkerA = this.container.querySelector('.jellyjump-marker.marker-a');
             this.ui.loopMarkerB = this.container.querySelector('.jellyjump-marker.marker-b');
             this.ui.loopRegion = this.container.querySelector('.jellyjump-loop-region');
-
             this.ui.loopPanel = this.container.querySelector('.jellyjump-loop-panel');
             this.ui.loopStartInput = this.container.querySelector('#mb-loop-start');
             this.ui.loopEndInput = this.container.querySelector('#mb-loop-end');
@@ -373,44 +372,34 @@ export class CorePlayer {
             this.ui.closeLoopPanelBtn = this.container.querySelector('.jellyjump-loop-panel .jellyjump-close-btn');
         }
 
+        // Apply visibility based on config (removes control--hidden class for enabled controls)
+        this._applyControlVisibility();
+
         // Only update speed menu if speed is enabled
         if (this.config.controls.speed) {
             this._updateSpeedMenu();
         }
-        this._applyControlVisibility();
     }
 
     /**
      * Apply visibility based on config
+     * Controls are hidden by default in HTML (control--hidden class)
+     * This method removes the class for enabled controls
      * @private
      */
     _applyControlVisibility() {
+        if (!this.ui.controls) return;
+
         const c = this.config.controls;
 
-        // Helper to toggle visibility
-        const toggle = (el, visible) => {
-            if (el) el.style.display = visible ? '' : 'none';
-        };
-
-        toggle(this.ui.playBtn, c.playPause);
-        toggle(this.ui.prevBtn, c.navigation);
-        toggle(this.ui.nextBtn, c.navigation);
-        toggle(this.ui.muteBtn, c.volume);
-        toggle(this.ui.volumeSlider, c.volume);
-        toggle(this.ui.timeDisplay, c.time);
-        toggle(this.ui.progressContainer, c.progress);
-        toggle(this.ui.ccBtn, c.captions);
-        toggle(this.ui.fullscreenBtn, c.fullscreen);
-        toggle(this.ui.loopBtn, c.loop);
-        toggle(this.ui.speedBtn, c.speed);
-        toggle(this.ui.modeToggleBtn, c.modeToggle);
-
-        // Special case for audio menu (container)
-        // It's handled dynamically by _updateAudioTracks, but we should respect config
-        if (!c.settings) {
-            // If settings are off, maybe hide audio/speed/cc? 
-            // The config has specific flags for them, so we use those.
-        }
+        // Find all elements with data-control attribute and toggle visibility
+        this.ui.controls.querySelectorAll('[data-control]').forEach(el => {
+            const controlName = el.dataset.control;
+            if (c[controlName]) {
+                el.classList.remove('control--hidden');
+            }
+            // Elements without matching config stay hidden (default from HTML)
+        });
     }
 
     /**
@@ -2096,25 +2085,6 @@ export class CorePlayer {
         } else {
             console.warn(`Preset '${presetName}' not found.`);
         }
-    }
-
-    /**
-     * Apply control visibility based on configuration
-     * @private
-     */
-    _applyControlVisibility() {
-        if (!this.ui.controls) return;
-
-        Object.entries(this.config.controls).forEach(([name, visible]) => {
-            const element = this.ui.controls.querySelector(`[data-control="${name}"]`);
-            if (element) {
-                if (visible) {
-                    element.classList.remove('control--hidden');
-                } else {
-                    element.classList.add('control--hidden');
-                }
-            }
-        });
     }
 
     /**
