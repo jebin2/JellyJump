@@ -64,6 +64,54 @@ export class IndexedDBService {
     }
 
     /**
+     * Ensure database connection is open and valid
+     * Reinitializes if connection is null or closed
+     * @private
+     */
+    async _ensureConnection() {
+        await this.ready();
+        if (!this.db) {
+            console.warn('[IndexedDB] Connection not available, reinitializing...');
+            this.initPromise = this._init();
+            await this.initPromise;
+        }
+    }
+
+    /**
+     * Execute a transaction with automatic retry on InvalidStateError
+     * @param {string[]} stores - Store names for transaction
+     * @param {string} mode - 'readonly' or 'readwrite'
+     * @param {Function} executor - Function receiving (transaction) to execute operations
+     * @returns {Promise} Result from executor
+     * @private
+     */
+    async _withTransaction(stores, mode, executor) {
+        await this._ensureConnection();
+
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = this.db.transaction(stores, mode);
+                executor(transaction, resolve, reject);
+            } catch (e) {
+                // Handle InvalidStateError when connection is closing
+                if (e.name === 'InvalidStateError') {
+                    console.warn('[IndexedDB] Connection was closing, reinitializing and retrying...');
+                    this.db = null;
+                    this.initPromise = this._init();
+                    this.initPromise.then(() => {
+                        // Retry the transaction
+                        this._withTransaction(stores, mode, executor)
+                            .then(resolve)
+                            .catch(reject);
+                    }).catch(reject);
+                } else {
+                    reject(e);
+                }
+            }
+        });
+    }
+
+    /**
      * Save playlist items and their files
      * @param {Array} items 
      */
@@ -163,10 +211,7 @@ export class IndexedDBService {
      * @returns {Promise<Array>}
      */
     async loadPlaylist() {
-        await this.ready();
-
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.STORES.PLAYLIST], 'readonly');
+        return this._withTransaction([this.STORES.PLAYLIST], 'readonly', (transaction, resolve, reject) => {
             const playlistStore = transaction.objectStore(this.STORES.PLAYLIST);
             const itemsRequest = playlistStore.getAll();
 
@@ -195,45 +240,20 @@ export class IndexedDBService {
      * @returns {Promise<File|null>}
      */
     async loadFile(id) {
-        await this.ready();
+        return this._withTransaction([this.STORES.FILES], 'readonly', (transaction, resolve, reject) => {
+            const fileStore = transaction.objectStore(this.STORES.FILES);
+            const request = fileStore.get(id);
 
-        // Check if database connection is still open
-        if (!this.db) {
-            console.warn('IndexedDB connection not available, reinitializing...');
-            this.initPromise = this._init();
-            await this.initPromise;
-        }
-
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = this.db.transaction([this.STORES.FILES], 'readonly');
-                const fileStore = transaction.objectStore(this.STORES.FILES);
-                const request = fileStore.get(id);
-
-                request.onsuccess = () => {
-                    const result = request.result;
-                    if (result) {
-                        const file = new File([result.blob], result.name, { type: result.type });
-                        resolve(file);
-                    } else {
-                        resolve(null);
-                    }
-                };
-                request.onerror = () => reject(request.error);
-            } catch (e) {
-                // Handle InvalidStateError when connection is closing
-                if (e.name === 'InvalidStateError') {
-                    console.warn('IndexedDB connection was closing, reinitializing...');
-                    this.db = null;
-                    this.initPromise = this._init();
-                    this.initPromise.then(() => {
-                        // Retry the operation
-                        this.loadFile(id).then(resolve).catch(reject);
-                    }).catch(reject);
+            request.onsuccess = () => {
+                const result = request.result;
+                if (result) {
+                    const file = new File([result.blob], result.name, { type: result.type });
+                    resolve(file);
                 } else {
-                    reject(e);
+                    resolve(null);
                 }
-            }
+            };
+            request.onerror = () => reject(request.error);
         });
     }
 
@@ -246,8 +266,6 @@ export class IndexedDBService {
      * @returns {Promise<boolean>} True if saved, false if too large
      */
     async saveFile(id, blob, name, type) {
-        await this.ready();
-
         // Size limit (500MB)
         const MAX_SIZE = 500 * 1024 * 1024;
         if (blob.size > MAX_SIZE) {
@@ -255,8 +273,7 @@ export class IndexedDBService {
             return false;
         }
 
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.STORES.FILES], 'readwrite');
+        return this._withTransaction([this.STORES.FILES], 'readwrite', (transaction, resolve, reject) => {
             const fileStore = transaction.objectStore(this.STORES.FILES);
 
             fileStore.put({
@@ -279,16 +296,7 @@ export class IndexedDBService {
      * @param {Object} state 
      */
     async savePlaybackState(state) {
-        await this.ready();
-
-        // Check if database connection is still open
-        if (!this.db || this.db.statechanged) {
-            console.warn('IndexedDB connection not available, skipping savePlaybackState');
-            return Promise.resolve();
-        }
-
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.STORES.STATE], 'readwrite');
+        return this._withTransaction([this.STORES.STATE], 'readwrite', (transaction, resolve, reject) => {
             const store = transaction.objectStore(this.STORES.STATE);
             store.put({ key: 'playback', ...state });
             transaction.oncomplete = () => resolve();
@@ -300,9 +308,7 @@ export class IndexedDBService {
      * Load playback state
      */
     async loadPlaybackState() {
-        await this.ready();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([this.STORES.STATE], 'readonly');
+        return this._withTransaction([this.STORES.STATE], 'readonly', (transaction, resolve, reject) => {
             const store = transaction.objectStore(this.STORES.STATE);
             const request = store.get('playback');
             request.onsuccess = () => resolve(request.result);
@@ -310,17 +316,22 @@ export class IndexedDBService {
         });
     }
 
+    /**
+     * Clear all data
+     */
     async clear() {
-        await this.ready();
-        const transaction = this.db.transaction([this.STORES.PLAYLIST, this.STORES.FILES, this.STORES.STATE], 'readwrite');
-        transaction.objectStore(this.STORES.PLAYLIST).clear();
-        transaction.objectStore(this.STORES.FILES).clear();
-        transaction.objectStore(this.STORES.STATE).clear();
-        return new Promise((resolve) => {
-            transaction.oncomplete = () => {
-                localStorage.removeItem(this.DB_NAME + '-playlist');
-                resolve();
-            };
-        });
+        return this._withTransaction(
+            [this.STORES.PLAYLIST, this.STORES.FILES, this.STORES.STATE],
+            'readwrite',
+            (transaction, resolve) => {
+                transaction.objectStore(this.STORES.PLAYLIST).clear();
+                transaction.objectStore(this.STORES.FILES).clear();
+                transaction.objectStore(this.STORES.STATE).clear();
+                transaction.oncomplete = () => {
+                    localStorage.removeItem(this.DB_NAME + '-playlist');
+                    resolve();
+                };
+            }
+        );
     }
 }
