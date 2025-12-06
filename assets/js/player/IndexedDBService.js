@@ -120,18 +120,21 @@ export class IndexedDBService {
 
                 playlistStore.put(storedItem);
 
-                // 2. If local and has file, save the file blob
+                // 2. If local and has file in memory, save it to files store
+                // Note: Most files are already in DB via saveFile() from MediaMetadata
+                // This handles files that were added via file input (not downloaded)
                 if (item.isLocal && item.file) {
-                    // Check size limit (e.g., 500MB)
-                    if (item.file.size < 500 * 1024 * 1024) {
+                    // Check size limit (500MB)
+                    const MAX_SIZE = 500 * 1024 * 1024;
+                    if (item.file.size < MAX_SIZE) {
                         fileStore.put({
                             id: item.id,
                             blob: item.file,
-                            name: item.file.name,
+                            name: item.file.name || item.title,
                             type: item.file.type
                         });
                     } else {
-                        console.warn(`File ${item.title} too large to persist (${(item.file.size / 1024 / 1024).toFixed(2)} MB)`);
+                        console.warn(`[IndexedDB] File ${item.title} too large to persist (${(item.file.size / 1024 / 1024).toFixed(2)} MB)`);
                     }
                 }
             });
