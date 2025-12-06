@@ -52,6 +52,7 @@ export class RemoveBackgroundMenu {
         let sourceBlob = null;
         let player = null;
         let isPickingColor = false;
+        let frameOverlay = null; // Overlay image for color picking
 
         // Initialize Player
         if (playerContainer) {
@@ -155,44 +156,63 @@ export class RemoveBackgroundMenu {
                 }, 100);
             }
 
-            // Handle Color Picking
-            if (player.canvas) {
-                player.canvas.addEventListener('click', (e) => {
-                    if (!isPickingColor) return;
+            // Handle Color Picking with Frame Overlay
+            // Create a frame overlay for stable color picking
+            const createFrameOverlay = () => {
+                // Create overlay image if not exists
+                if (!frameOverlay) {
+                    frameOverlay = document.createElement('img');
+                    frameOverlay.className = 'color-picker-overlay';
+                    frameOverlay.style.cssText = `
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        object-fit: contain;
+                        z-index: 100;
+                        cursor: crosshair;
+                        display: none;
+                        background: #000;
+                    `;
+                    playerContainer.appendChild(frameOverlay);
 
-                    // Stop propagation to prevent play/pause toggle
-                    e.stopImmediatePropagation();
-                    e.preventDefault();
+                    // Click handler for picking color from overlay
+                    frameOverlay.addEventListener('click', (e) => {
+                        if (!isPickingColor) return;
 
-                    const rect = player.canvas.getBoundingClientRect();
-                    const scaleX = player.canvas.width / rect.width;
-                    const scaleY = player.canvas.height / rect.height;
+                        // Create a temp canvas to read pixel from the overlay image
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = player.canvas.width;
+                        tempCanvas.height = player.canvas.height;
+                        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+                        tempCtx.drawImage(frameOverlay, 0, 0, tempCanvas.width, tempCanvas.height);
 
-                    const x = (e.clientX - rect.left) * scaleX;
-                    const y = (e.clientY - rect.top) * scaleY;
+                        // Calculate click position relative to image
+                        const rect = frameOverlay.getBoundingClientRect();
+                        const scaleX = tempCanvas.width / rect.width;
+                        const scaleY = tempCanvas.height / rect.height;
+                        const x = Math.floor((e.clientX - rect.left) * scaleX);
+                        const y = Math.floor((e.clientY - rect.top) * scaleY);
 
-                    const ctx = player.canvas.getContext('2d', { willReadFrequently: true });
-                    const pixel = ctx.getImageData(x, y, 1, 1).data;
+                        const pixel = tempCtx.getImageData(x, y, 1, 1).data;
 
-                    // Don't add if transparent
-                    if (pixel[3] === 0) return;
+                        // Don't add if transparent
+                        if (pixel[3] === 0) return;
 
-                    addColor({
-                        r: pixel[0],
-                        g: pixel[1],
-                        b: pixel[2]
+                        addColor({
+                            r: pixel[0],
+                            g: pixel[1],
+                            b: pixel[2]
+                        });
+                        // Don't close - allow picking more colors
                     });
+                }
+                return frameOverlay;
+            };
 
-                    // Turn off picking mode after selection
-                    togglePickingMode(false);
-
-                }, true); // Capture phase
-
-                // Change cursor when hovering canvas in picking mode
-                player.canvas.addEventListener('mousemove', () => {
-                    player.canvas.style.cursor = isPickingColor ? 'crosshair' : 'pointer';
-                });
-            }
+            // Create the overlay
+            createFrameOverlay();
 
         } catch (e) {
             console.error('Failed to load video:', e);
@@ -208,13 +228,18 @@ export class RemoveBackgroundMenu {
             if (isPickingColor) {
                 pickColorBtn.classList.add('active');
                 pickColorBtn.innerHTML = `
-                    <svg width="16" height="16" fill="currentColor" class="animate-pulse">
-                        <use href="assets/icons/sprite.svg#icon-eyedropper"></use>
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-check"></use>
                     </svg>
-                    Picking... (Click Video)
+                    Done
                 `;
                 player.pause(); // Pause video when picking starts
-                player.canvas.style.cursor = 'crosshair';
+
+                // Capture current frame and show overlay
+                if (player.canvas && frameOverlay) {
+                    frameOverlay.src = player.canvas.toDataURL('image/png');
+                    frameOverlay.style.display = 'block';
+                }
             } else {
                 pickColorBtn.classList.remove('active');
                 pickColorBtn.innerHTML = `
@@ -223,7 +248,11 @@ export class RemoveBackgroundMenu {
                     </svg>
                     Pick Color from Video
                 `;
-                player.canvas.style.cursor = 'pointer';
+
+                // Hide overlay
+                if (frameOverlay) {
+                    frameOverlay.style.display = 'none';
+                }
             }
         }
 
