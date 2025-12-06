@@ -194,10 +194,6 @@ export class IndexedDBService {
     }
 
     /**
-     * Load playlist and restore files
-     * @returns {Promise<Array>}
-     */
-    /**
      * Load playlist (metadata only, no files)
      * @returns {Promise<Array>}
      */
