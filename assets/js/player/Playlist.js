@@ -27,7 +27,6 @@ export class Playlist {
         this.activeIndex = -1;
         this.storage = new IndexedDBService();
         this.expandedFolders = new Set(); // Track expanded folders
-        this._isSelectingItem = false; // Guard against rapid selection
 
         // Storage
         this.storage = new IndexedDBService();
@@ -733,13 +732,6 @@ export class Playlist {
     async selectItem(index, autoplay = true) {
         if (index < 0 || index >= this.items.length) return;
 
-        // Prevent concurrent selection operations
-        if (this._isSelectingItem) {
-            console.log('Selection in progress, skipping rapid click');
-            return;
-        }
-        this._isSelectingItem = true;
-
         try {
             // Capture if we were playing before switching
             const wasPlaying = this.player.isPlaying;
@@ -780,7 +772,17 @@ export class Playlist {
                         this.player.ui.loader.classList.add('visible');
                     }
                     console.log(`Loading file from storage: ${video.title}`);
+                    this.player.already_fetching = true;
                     await MediaMetadata.getProcessedSourceURL(video);
+                    if (!this.player.already_fetching) {
+                        setTimeout(() => {
+                            URL.revokeObjectURL(video.blob_url);
+                            video.blob_url = null;
+                        }, 100);
+                        this.player.already_fetching = false;
+                        return;
+                    }
+                    this.player.already_fetching = false;
                 } catch (e) {
                     console.error('Error loading file from storage:', e);
                     if (this.player.ui && this.player.ui.loader) {
