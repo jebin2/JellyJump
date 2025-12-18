@@ -1543,10 +1543,22 @@ export class Playlist {
         let top = rect.bottom + 5;
         let left = rect.right - menuRect.width; // Align right edge by default
 
-        // Check vertical overflow
+        // Check vertical overflow (bottom)
         if (top + menuRect.height > viewportHeight - 10) {
             // Position above
             top = rect.top - menuRect.height - 5;
+        }
+
+        // Check vertical overflow (top) - ensure menu doesn't go above viewport
+        if (top < 10) {
+            top = 10;
+        }
+
+        // Calculate max-height to ensure menu fits in viewport with scrolling
+        const maxHeight = viewportHeight - top - 10; // 10px margin from bottom
+        if (menuRect.height > maxHeight) {
+            menu.style.maxHeight = `${maxHeight}px`;
+            menu.style.overflowY = 'auto';
         }
 
         // Check horizontal overflow (left side)
