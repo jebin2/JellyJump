@@ -386,10 +386,27 @@ export class MediaProcessor {
      * @param {number} options.trackIndex - Index of the track in its type list (0-based)
      * @param {string} options.trackType - 'video' or 'audio'
      * @param {string} options.format - 'mp4' (video) or 'm4a'/'mp3' (audio)
+     * @param {number} [options.speed=1] - Playback speed multiplier (0.25 to 2)
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async extractTrack({ source, trackIndex, trackType, format, onProgress }) {
+    static async extractTrack({ source, trackIndex, trackType, format, speed = 1, onProgress }) {
+        // Clamp speed to valid range
+        const clampedSpeed = Math.max(0.25, Math.min(2, speed));
+
+        // If speed is 1, use fast stream copy; otherwise re-encode with time-stretch
+        if (clampedSpeed === 1) {
+            return this._extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress });
+        } else {
+            return this._extractTrackWithSpeed({ source, trackIndex, trackType, format, speed: clampedSpeed, onProgress });
+        }
+    }
+
+    /**
+     * Extract track using stream copy (fast, no re-encoding)
+     * @private
+     */
+    static async _extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress }) {
         const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);
         const input = new MediaBunny.Input({
             source: blobSource,
@@ -478,6 +495,228 @@ export class MediaProcessor {
                 } catch (e) {
                     console.warn('Error disposing input in extractTrack:', e);
                 }
+            }
+        }
+    }
+
+    /**
+     * Extract track with speed adjustment (requires re-encoding)
+     * @private
+     */
+    static async _extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress }) {
+        console.log(`[MediaProcessor] Extracting ${trackType} track ${trackIndex} with speed ${speed}x`);
+
+        const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);
+        const input = new MediaBunny.Input({
+            source: blobSource,
+            formats: MediaBunny.ALL_FORMATS
+        });
+
+        let output = null;
+        let canvasSource = null;
+        let audioSource = null;
+        let canvas = null;
+
+        try {
+            if (trackType === 'video') {
+                // Extract and speed-adjust video track
+                const videoTracks = await input.getVideoTracks();
+                if (trackIndex >= videoTracks.length) {
+                    throw new Error(`Video track ${trackIndex} not found`);
+                }
+                const videoTrack = videoTracks[trackIndex];
+
+                const width = videoTrack.displayWidth || videoTrack.codedWidth;
+                const height = videoTrack.displayHeight || videoTrack.codedHeight;
+                const duration = await videoTrack.computeDuration();
+                const firstTimestamp = await videoTrack.getFirstTimestamp();
+
+                let sourceFps = 30;
+                try {
+                    const stats = await videoTrack.computePacketStats();
+                    sourceFps = stats.averagePacketRate || 30;
+                } catch (e) {
+                    console.warn('[MediaProcessor] Could not compute frame rate, defaulting to 30fps');
+                }
+
+                const outputDuration = duration / speed;
+                const outputFps = sourceFps;
+                const frameDuration = 1 / outputFps;
+                const totalOutputFrames = Math.ceil(outputDuration * outputFps);
+
+                console.log(`[MediaProcessor] Video: ${width}x${height}, ${duration.toFixed(2)}s -> ${outputDuration.toFixed(2)}s at ${speed}x`);
+
+                // Setup output
+                const outputFormat = format === 'webm' ? new MediaBunny.WebMOutputFormat() : new MediaBunny.Mp4OutputFormat();
+                output = new MediaBunny.Output({
+                    format: outputFormat,
+                    target: new MediaBunny.BufferTarget()
+                });
+
+                canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+                canvasSource = new MediaBunny.CanvasSource(canvas, {
+                    codec: format === 'webm' ? 'vp9' : 'avc',
+                    bitrate: 5000000,
+                    frameRate: outputFps
+                });
+
+                output.addVideoTrack(canvasSource, { frameRate: outputFps });
+                await output.start();
+
+                // Sample frames with speed adjustment
+                const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
+                const timestampGenerator = (async function* () {
+                    for (let outputFrame = 0; outputFrame < totalOutputFrames; outputFrame++) {
+                        const outputProgress = outputFrame / totalOutputFrames;
+                        const sourceTime = duration * outputProgress;
+                        yield firstTimestamp + sourceTime;
+                    }
+                })();
+
+                let outputTimestamp = 0;
+                let frameCount = 0;
+
+                for await (const sample of videoSink.samplesAtTimestamps(timestampGenerator)) {
+                    if (sample) {
+                        sample.draw(ctx, 0, 0, width, height);
+                        await canvasSource.add(outputTimestamp, frameDuration);
+                        outputTimestamp += frameDuration;
+                        sample.close();
+                        frameCount++;
+
+                        if (onProgress) {
+                            onProgress(frameCount / totalOutputFrames);
+                        }
+                    }
+                }
+
+                console.log(`[MediaProcessor] Encoded ${frameCount} video frames`);
+                canvasSource.close();
+                await output.finalize();
+
+                return new Blob([output.target.buffer], { type: `video/${format}` });
+
+            } else {
+                // Extract and speed-adjust audio track
+                const audioTracks = await input.getAudioTracks();
+                if (trackIndex >= audioTracks.length) {
+                    throw new Error(`Audio track ${trackIndex} not found`);
+                }
+                const audioTrack = audioTracks[trackIndex];
+
+                // Collect all audio samples
+                const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
+                const samples = [];
+                for await (const sample of audioSink.samples()) {
+                    samples.push(sample);
+                }
+
+                console.log(`[MediaProcessor] Collected ${samples.length} audio samples for speed adjustment`);
+
+                // Setup output
+                let outputFormat;
+                switch (format) {
+                    case 'm4a':
+                        outputFormat = new MediaBunny.Mp4OutputFormat();
+                        break;
+                    case 'mp3':
+                        outputFormat = new MediaBunny.Mp3OutputFormat();
+                        break;
+                    case 'wav':
+                        outputFormat = new MediaBunny.WavOutputFormat();
+                        break;
+                    default:
+                        outputFormat = new MediaBunny.Mp4OutputFormat();
+                }
+
+                output = new MediaBunny.Output({
+                    format: outputFormat,
+                    target: new MediaBunny.BufferTarget()
+                });
+
+                const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
+                if (supportedCodecs.length === 0) {
+                    throw new Error('No supported audio codecs found');
+                }
+
+                audioSource = new MediaBunny.AudioSampleSource({
+                    codec: supportedCodecs[0],
+                    bitrate: 128000
+                });
+                output.addAudioTrack(audioSource);
+                await output.start();
+
+                let outputTimestamp = 0;
+                const totalSamples = samples.length;
+
+                for (let i = 0; i < samples.length; i++) {
+                    const sample = samples[i];
+                    const buffer = sample.toAudioBuffer();
+
+                    // Time-stretch using OfflineAudioContext
+                    let finalBuffer = buffer;
+                    try {
+                        const targetDuration = buffer.duration / speed;
+                        const targetFrames = Math.ceil(targetDuration * buffer.sampleRate);
+
+                        const offlineCtx = new OfflineAudioContext(
+                            buffer.numberOfChannels,
+                            targetFrames,
+                            buffer.sampleRate
+                        );
+
+                        const source = offlineCtx.createBufferSource();
+                        source.buffer = buffer;
+                        source.playbackRate.value = speed;
+                        source.connect(offlineCtx.destination);
+                        source.start(0);
+
+                        finalBuffer = await offlineCtx.startRendering();
+                    } catch (e) {
+                        console.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
+                    }
+
+                    const processedSamples = MediaBunny.AudioSample.fromAudioBuffer(finalBuffer, outputTimestamp);
+                    const samplesToAdd = Array.isArray(processedSamples) ? processedSamples : [processedSamples];
+
+                    for (const s of samplesToAdd) {
+                        await audioSource.add(s);
+                        outputTimestamp += s.duration;
+                        s.close();
+                    }
+
+                    sample.close();
+
+                    if (onProgress && i % 100 === 0) {
+                        onProgress(i / totalSamples);
+                    }
+                }
+
+                console.log('[MediaProcessor] Audio speed adjustment complete');
+                audioSource.close();
+                await output.finalize();
+
+                if (onProgress) onProgress(1.0);
+
+                return new Blob([output.target.buffer], { type: `audio/${format}` });
+            }
+        } finally {
+            // Cleanup
+            if (input && typeof input.dispose === 'function') {
+                try { input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+            }
+            if (output && typeof output.dispose === 'function') {
+                try { output.dispose(); } catch (e) { console.warn('Error disposing output:', e); }
+            }
+            if (canvasSource && typeof canvasSource.dispose === 'function') {
+                try { canvasSource.dispose(); } catch (e) { console.warn('Error disposing canvasSource:', e); }
+            }
+            if (audioSource && typeof audioSource.dispose === 'function') {
+                try { audioSource.dispose(); } catch (e) { console.warn('Error disposing audioSource:', e); }
             }
         }
     }

@@ -116,6 +116,7 @@ export class TrackManagerMenu {
                 const downloadBtn = el.querySelector('.download-track-btn');
                 const addToPlaylistBtn = el.querySelector('.add-to-playlist-btn');
                 const progressContainer = el.querySelector('.progress-container');
+                const speedSelect = el.querySelector('.track-speed-select');
 
                 // Determine format based on codec
                 let format = 'mp4';
@@ -133,7 +134,8 @@ export class TrackManagerMenu {
                 }
 
                 downloadBtn.addEventListener('click', () => {
-                    this.extractTrack(playlist.items.indexOf(item), i, type, format, false, progressContainer, downloadBtn, addToPlaylistBtn, playlist);
+                    const speed = parseFloat(speedSelect.value) || 1;
+                    this.extractTrack(playlist.items.indexOf(item), i, type, format, false, speed, progressContainer, downloadBtn, addToPlaylistBtn, speedSelect, playlist);
                 });
 
                 addToPlaylistBtn.addEventListener('click', () => {
@@ -147,7 +149,9 @@ export class TrackManagerMenu {
                         return;
                     }
 
-                    this.extractTrack(playlist.items.indexOf(item), i, type, format, true, progressContainer, downloadBtn, addToPlaylistBtn, playlist);
+                    const speed = parseFloat(speedSelect.value) || 1;
+
+                    this.extractTrack(playlist.items.indexOf(item), i, type, format, true, speed, progressContainer, downloadBtn, addToPlaylistBtn, speedSelect, playlist);
                 });
 
                 trackList.appendChild(el);
@@ -165,19 +169,22 @@ export class TrackManagerMenu {
      * @param {string} trackType 
      * @param {string} format
      * @param {boolean} addToPlaylist 
+     * @param {number} speed - Playback speed multiplier (0.25 to 2)
      * @param {HTMLElement} progressContainer 
      * @param {HTMLElement} downloadBtn 
      * @param {HTMLElement} addToPlaylistBtn
+     * @param {HTMLElement} speedSelect
      * @param {Playlist} playlist
      * @private
      */
-    static async extractTrack(index, trackIndex, trackType, format, addToPlaylist, progressContainer, downloadBtn, addToPlaylistBtn, playlist) {
+    static async extractTrack(index, trackIndex, trackType, format, addToPlaylist, speed, progressContainer, downloadBtn, addToPlaylistBtn, speedSelect, playlist) {
         const item = playlist.items[index];
 
         // UI State
         downloadBtn.classList.add('hidden');
         addToPlaylistBtn.classList.add('hidden');
         progressContainer.classList.remove('hidden');
+        speedSelect.disabled = true;
 
         try {
             // Get source with caching
@@ -188,6 +195,7 @@ export class TrackManagerMenu {
                 trackIndex,
                 trackType,
                 format,
+                speed,
                 onProgress: (p) => {
                     // Optional: Update progress text
                 }
@@ -201,6 +209,7 @@ export class TrackManagerMenu {
             downloadBtn.classList.remove('hidden');
             addToPlaylistBtn.classList.remove('hidden');
             progressContainer.classList.add('hidden');
+            speedSelect.disabled = false;
         }
     }
 
