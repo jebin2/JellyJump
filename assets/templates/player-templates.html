@@ -49,13 +49,7 @@
             </div>
 
             <div class="jellyjump-volume-container control--hidden" data-control="volume">
-                <button class="jellyjump-btn" id="mb-mute-btn" aria-label="Mute" aria-pressed="false">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-volume-high"></use>
-                    </svg>
-                </button>
-                <input type="range" class="jellyjump-volume-slider" id="mb-volume-slider" min="0" max="1" step="0.05"
-                    value="1" aria-label="Volume">
+
 
                 <!-- Audio Track Menu -->
                 <div class="jellyjump-menu-btn" id="mb-audio-container" style="display: none;">
@@ -111,10 +105,10 @@
                     </svg>
                 </button>
 
-                <button class="jellyjump-btn control--hidden" id="mb-eq-btn" aria-label="Audio Equalizer"
-                    data-control="equalizer" title="Audio Equalizer">
+                <button class="jellyjump-btn control--hidden" id="mb-audio-settings-btn" aria-label="Audio Settings"
+                    data-control="equalizer" title="Audio Settings">
                     <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-equalizer"></use>
+                        <use href="assets/icons/sprite.svg#icon-volume-high"></use>
                     </svg>
                 </button>
 
@@ -223,14 +217,30 @@
     </div>
 </template>
 
-<!-- EQ Panel Template -->
-<template id="player-eq-panel-template">
+<!-- Audio/EQ Panel Template -->
+<template id="player-audio-panel-template">
     <div class="jellyjump-eq-panel" style="display: none;">
         <div class="eq-panel-header">
-            <span>Audio Equalizer</span>
-            <button class="jellyjump-close-btn" aria-label="Close EQ Panel">×</button>
+            <span>Audio Settings</span>
+            <button class="jellyjump-close-btn" aria-label="Close Audio Panel">×</button>
         </div>
         <div class="eq-panel-content">
+            <!-- Volume Control Section -->
+            <div class="audio-volume-section">
+                <div class="volume-row">
+                    <button class="jellyjump-btn-text" id="mb-panel-mute-btn" aria-label="Mute">
+                        <svg width="20" height="20" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-volume-high"></use>
+                        </svg>
+                    </button>
+                    <input type="range" id="mb-panel-volume-slider" min="0" max="1" step="0.05" value="1"
+                        class="panel-volume-slider">
+                    <span class="volume-value" id="mb-panel-volume-value">100%</span>
+                </div>
+            </div>
+
+            <div class="eq-section-divider"></div>
+
             <div class="eq-sliders">
                 <div class="eq-slider-group">
                     <input type="range" id="mb-eq-bass" min="-12" max="12" value="0" class="eq-slider"

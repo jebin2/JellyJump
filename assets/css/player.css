@@ -958,6 +958,49 @@ button:focus-visible {
     gap: 15px;
 }
 
+/* Audio Volume Section */
+.audio-volume-section {
+    padding: 0 5px;
+}
+
+.volume-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.panel-volume-slider {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.panel-volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-value {
+    font-size: 12px;
+    color: var(--text-primary);
+    min-width: 35px;
+    text-align: right;
+}
+
+.eq-section-divider {
+    height: 1px;
+    background: var(--border-dark);
+    margin: 0 5px;
+}
+
 .eq-sliders {
     display: flex;
     justify-content: space-around;

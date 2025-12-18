@@ -375,10 +375,7 @@ export class CorePlayer {
             this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
         }
 
-        if (this.config.controls.volume) {
-            this.ui.muteBtn = this.container.querySelector('#mb-mute-btn');
-            this.ui.volumeSlider = this.container.querySelector('#mb-volume-slider');
-        }
+
 
         if (this.config.controls.fullscreen) {
             this.ui.fullscreenBtn = this.container.querySelector('#mb-fullscreen-btn');
@@ -441,13 +438,20 @@ export class CorePlayer {
 
         // Equalizer Panel (only if equalizer control is enabled)
         if (this.config.controls.equalizer) {
-            const eqPanelTemplate = document.getElementById('player-eq-panel-template');
-            if (eqPanelTemplate) {
-                this.container.appendChild(eqPanelTemplate.content.cloneNode(true));
+            const audioPanelTemplate = document.getElementById('player-audio-panel-template');
+            if (audioPanelTemplate) {
+                this.container.appendChild(audioPanelTemplate.content.cloneNode(true));
             }
 
-            this.ui.eqBtn = this.container.querySelector('#mb-eq-btn');
-            this.ui.eqPanel = this.container.querySelector('.jellyjump-eq-panel');
+            this.ui.audioSettingsBtn = this.container.querySelector('#mb-audio-settings-btn');
+            this.ui.audioPanel = this.container.querySelector('.jellyjump-eq-panel');
+
+            // Panel Volume Controls
+            this.ui.panelMuteBtn = this.container.querySelector('#mb-panel-mute-btn');
+            this.ui.panelVolumeSlider = this.container.querySelector('#mb-panel-volume-slider');
+            this.ui.panelVolumeValue = this.container.querySelector('#mb-panel-volume-value');
+
+            // EQ Controls
             this.ui.eqBassSlider = this.container.querySelector('#mb-eq-bass');
             this.ui.eqMidSlider = this.container.querySelector('#mb-eq-mid');
             this.ui.eqTrebleSlider = this.container.querySelector('#mb-eq-treble');
@@ -455,7 +459,7 @@ export class CorePlayer {
             this.ui.eqMidValue = this.container.querySelector('#mb-mid-value');
             this.ui.eqTrebleValue = this.container.querySelector('#mb-treble-value');
             this.ui.resetEqBtn = this.container.querySelector('#mb-reset-eq-btn');
-            this.ui.closeEqPanelBtn = this.container.querySelector('.jellyjump-eq-panel .jellyjump-close-btn');
+            this.ui.closeAudioPanelBtn = this.container.querySelector('.jellyjump-eq-panel .jellyjump-close-btn');
         }
 
         // Apply visibility based on config (removes control--hidden class for enabled controls)
@@ -758,13 +762,27 @@ export class CorePlayer {
         }
 
         // Equalizer Control (only if enabled)
-        if (this.config.controls.equalizer && this.ui.eqBtn) {
-            // Toggle EQ panel
-            this.ui.eqBtn.addEventListener('click', () => this.toggleEqPanel());
+        // Audio/Equalizer Control (only if enabled)
+        if (this.config.controls.equalizer && this.ui.audioSettingsBtn) {
+            // Toggle Audio panel
+            this.ui.audioSettingsBtn.addEventListener('click', () => this.toggleAudioPanel());
 
             // Close button
-            if (this.ui.closeEqPanelBtn) {
-                this.ui.closeEqPanelBtn.addEventListener('click', () => this.toggleEqPanel());
+            if (this.ui.closeAudioPanelBtn) {
+                this.ui.closeAudioPanelBtn.addEventListener('click', () => this.toggleAudioPanel());
+            }
+
+            // Panel Mute Button
+            if (this.ui.panelMuteBtn) {
+                this.ui.panelMuteBtn.addEventListener('click', () => this.toggleMute());
+            }
+
+            // Panel Volume Slider
+            if (this.ui.panelVolumeSlider) {
+                this.ui.panelVolumeSlider.addEventListener('input', (e) => {
+                    const volume = parseFloat(e.target.value);
+                    this.setVolume(volume);
+                });
             }
 
             // Bass slider
@@ -773,7 +791,6 @@ export class CorePlayer {
                     const value = parseInt(e.target.value);
                     this.audioEqualizer.setBass(value);
                     this.ui.eqBassValue.textContent = value;
-                    this._updateEqButtonState();
                 });
             }
 
@@ -783,7 +800,6 @@ export class CorePlayer {
                     const value = parseInt(e.target.value);
                     this.audioEqualizer.setMid(value);
                     this.ui.eqMidValue.textContent = value;
-                    this._updateEqButtonState();
                 });
             }
 
@@ -793,7 +809,6 @@ export class CorePlayer {
                     const value = parseInt(e.target.value);
                     this.audioEqualizer.setTreble(value);
                     this.ui.eqTrebleValue.textContent = value;
-                    this._updateEqButtonState();
                 });
             }
 
@@ -803,7 +818,6 @@ export class CorePlayer {
                     const preset = btn.dataset.preset;
                     this.audioEqualizer.applyPreset(preset);
                     this._syncEqSliders();
-                    this._updateEqButtonState();
                 });
             });
 
@@ -812,7 +826,6 @@ export class CorePlayer {
                 this.ui.resetEqBtn.addEventListener('click', () => {
                     this.audioEqualizer.reset();
                     this._syncEqSliders();
-                    this._updateEqButtonState();
                 });
             }
         }
@@ -842,10 +855,10 @@ export class CorePlayer {
             !this.ui.filtersBtn.contains(e.target) && !this.ui.filterPanel.contains(e.target)) {
             this.ui.filterPanel.style.display = 'none';
         }
-        // Hide EQ panel when clicking outside
-        if (this.ui.eqPanel && this.ui.eqBtn &&
-            !this.ui.eqBtn.contains(e.target) && !this.ui.eqPanel.contains(e.target)) {
-            this.ui.eqPanel.style.display = 'none';
+        // Hide Audio panel when clicking outside
+        if (this.ui.audioPanel && this.ui.audioSettingsBtn &&
+            !this.ui.audioSettingsBtn.contains(e.target) && !this.ui.audioPanel.contains(e.target)) {
+            this.ui.audioPanel.style.display = 'none';
         }
     }
 
@@ -952,14 +965,15 @@ export class CorePlayer {
     }
 
     /**
-     * Toggle audio equalizer panel visibility
+     * Toggle audio settings panel visibility
      */
-    toggleEqPanel() {
-        if (!this.ui.eqPanel) return;
-        const isVisible = this.ui.eqPanel.style.display !== 'none';
-        this.ui.eqPanel.style.display = isVisible ? 'none' : 'block';
+    toggleAudioPanel() {
+        if (!this.ui.audioPanel) return;
+        const isVisible = this.ui.audioPanel.style.display !== 'none';
+        this.ui.audioPanel.style.display = isVisible ? 'none' : 'block';
         if (!isVisible) {
             this._syncEqSliders(); // Ensure sliders match current state
+            this._updateVolumeUI(); // Ensure volume UI is synced
         }
     }
 
@@ -986,18 +1000,33 @@ export class CorePlayer {
     }
 
     /**
-     * Update EQ button to show active state when EQ is applied
+     * Update Audio button to show active state (mute/volume)
      * @private
      */
-    _updateEqButtonState() {
-        if (!this.ui.eqBtn || !this.audioEqualizer) return;
+    _updateAudioButtonState() {
+        if (!this.ui.audioSettingsBtn) return;
 
-        if (this.audioEqualizer.isActive()) {
-            this.ui.eqBtn.style.color = 'var(--accent-primary)';
-            this.ui.eqBtn.setAttribute('aria-label', 'Audio Equalizer (Active)');
+        const iconUse = this.ui.audioSettingsBtn.querySelector('use');
+        if (!iconUse) return;
+
+        if (this.isMuted || this.volume === 0) {
+            iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
+            this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings (Muted)');
+            this.ui.audioSettingsBtn.style.color = 'var(--accent-warning)'; // Optional: highlight muted state
         } else {
-            this.ui.eqBtn.style.color = '';
-            this.ui.eqBtn.setAttribute('aria-label', 'Audio Equalizer');
+            if (this.volume < 0.5) {
+                iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-low');
+            } else {
+                iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
+            }
+            this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings');
+
+            // Highlight if EQ is active
+            if (this.audioEqualizer && this.audioEqualizer.isActive()) {
+                this.ui.audioSettingsBtn.style.color = 'var(--accent-primary)';
+            } else {
+                this.ui.audioSettingsBtn.style.color = '';
+            }
         }
     }
 
@@ -1312,24 +1341,15 @@ export class CorePlayer {
             // Audio Controls
             case 'arrowup':
                 e.preventDefault();
-                this.config.volume = Math.min(1, this.config.volume + 0.1);
-                this.config.muted = false;
-                this.ui.volumeSlider.value = this.config.volume;
-                if (this.gainNode) this.gainNode.gain.value = this.config.volume;
-                this._updateVolumeIcon();
+                this.setVolume(this.config.volume + 0.1);
                 break;
             case 'arrowdown':
                 e.preventDefault();
-                this.config.volume = Math.max(0, this.config.volume - 0.1);
-                this.ui.volumeSlider.value = this.config.volume;
-                if (this.gainNode) this.gainNode.gain.value = this.config.volume;
-                this._updateVolumeIcon();
+                this.setVolume(this.config.volume - 0.1);
                 break;
             case 'm':
                 e.preventDefault();
-                this.config.muted = !this.config.muted;
-                if (this.gainNode) this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
-                this._updateVolumeIcon();
+                this.toggleMute();
                 break;
 
             // Display Controls
@@ -2278,14 +2298,106 @@ export class CorePlayer {
         }
     }
 
-    _updateVolumeIcon() {
-        // Visual update only for now
-        const use = this.ui.muteBtn.querySelector('use');
-        if (this.config.muted || this.config.volume === 0) {
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
-        } else {
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
+    /**
+     * Set volume (0.0 to 1.0)
+     * @param {number} value 
+     */
+    setVolume(value) {
+        this.config.volume = Math.max(0, Math.min(1, value));
+        if (this.config.volume > 0) {
+            this.config.muted = false;
         }
+
+        if (this.gainNode) {
+            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
+        }
+
+        this._updateVolumeUI();
+    }
+
+    /**
+     * Toggle mute state
+     */
+    toggleMute() {
+        this.config.muted = !this.config.muted;
+
+        if (this.gainNode) {
+            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
+        }
+
+        this._updateVolumeUI();
+    }
+
+    get volume() {
+        return this.config.volume;
+    }
+
+    get isMuted() {
+        return this.config.muted;
+    }
+
+    /**
+     * Set volume (0.0 to 1.0)
+     * @param {number} value 
+     */
+    setVolume(value) {
+        this.config.volume = Math.max(0, Math.min(1, value));
+        if (this.config.volume > 0) {
+            this.config.muted = false;
+        }
+
+        if (this.gainNode) {
+            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
+        }
+
+        this._updateVolumeUI();
+    }
+
+    /**
+     * Toggle mute state
+     */
+    toggleMute() {
+        this.config.muted = !this.config.muted;
+
+        if (this.gainNode) {
+            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
+        }
+
+        this._updateVolumeUI();
+    }
+
+    get volume() {
+        return this.config.volume;
+    }
+
+    get isMuted() {
+        return this.config.muted;
+    }
+
+    _updateVolumeUI() {
+        // Update panel slider and value
+        if (this.ui.panelVolumeSlider) {
+            this.ui.panelVolumeSlider.value = this.volume;
+            // Update background size for slider fill effect if needed, or just value
+        }
+        if (this.ui.panelVolumeValue) {
+            this.ui.panelVolumeValue.textContent = `${Math.round(this.volume * 100)}%`;
+        }
+
+        // Update panel mute button icon
+        if (this.ui.panelMuteBtn) {
+            const use = this.ui.panelMuteBtn.querySelector('use');
+            if (this.isMuted || this.volume === 0) {
+                use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
+                this.ui.panelMuteBtn.setAttribute('aria-label', 'Unmute');
+            } else {
+                use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
+                this.ui.panelMuteBtn.setAttribute('aria-label', 'Mute');
+            }
+        }
+
+        // Update main audio button state
+        this._updateAudioButtonState();
     }
 
     /**
