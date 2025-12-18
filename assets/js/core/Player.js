@@ -720,6 +720,11 @@ export class CorePlayer {
         if (this.ui.speedBtn && this.ui.speedMenu && !this.ui.speedBtn.contains(e.target) && !this.ui.speedMenu.contains(e.target)) {
             this.ui.speedMenu.classList.remove('visible');
         }
+        // Hide filter panel when clicking outside
+        if (this.ui.filterPanel && this.ui.filtersBtn &&
+            !this.ui.filtersBtn.contains(e.target) && !this.ui.filterPanel.contains(e.target)) {
+            this.ui.filterPanel.style.display = 'none';
+        }
     }
 
     _updateSpeedMenu() {
