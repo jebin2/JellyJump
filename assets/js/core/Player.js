@@ -7,6 +7,7 @@ import { MediaBunny } from './MediaBunny.js';
 import { PLAYER_CONFIG } from './config.js';
 import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
+import { VideoFilters } from '../player/VideoFilters.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -45,6 +46,7 @@ export class CorePlayer {
             fullscreen: true,
             loop: true,
             speed: true,
+            filters: true,
             modeToggle: true,
             keyboard: true,  // Enable/disable keyboard shortcuts
             ...this.config.controls
@@ -62,6 +64,7 @@ export class CorePlayer {
                 fullscreen: true,
                 loop: true,
                 speed: true,
+                filters: true,
                 modeToggle: true
             },
             editor: {
@@ -376,6 +379,28 @@ export class CorePlayer {
             this.ui.closeLoopPanelBtn = this.container.querySelector('.jellyjump-loop-panel .jellyjump-close-btn');
         }
 
+        // Filter Panel (only if filters control is enabled)
+        if (this.config.controls.filters) {
+            const filterPanelTemplate = document.getElementById('player-filter-panel-template');
+            if (filterPanelTemplate) {
+                this.container.appendChild(filterPanelTemplate.content.cloneNode(true));
+            }
+
+            this.ui.filtersBtn = this.container.querySelector('#mb-filters-btn');
+            this.ui.filterPanel = this.container.querySelector('.jellyjump-filter-panel');
+            this.ui.brightnessSlider = this.container.querySelector('#mb-filter-brightness');
+            this.ui.contrastSlider = this.container.querySelector('#mb-filter-contrast');
+            this.ui.saturationSlider = this.container.querySelector('#mb-filter-saturation');
+            this.ui.brightnessValue = this.container.querySelector('#mb-brightness-value');
+            this.ui.contrastValue = this.container.querySelector('#mb-contrast-value');
+            this.ui.saturationValue = this.container.querySelector('#mb-saturation-value');
+            this.ui.resetFiltersBtn = this.container.querySelector('#mb-reset-filters-btn');
+            this.ui.closeFilterPanelBtn = this.container.querySelector('.jellyjump-filter-panel .jellyjump-close-btn');
+
+            // Initialize VideoFilters
+            this.videoFilters = new VideoFilters(this.canvas);
+        }
+
         // Apply visibility based on config (removes control--hidden class for enabled controls)
         this._applyControlVisibility();
 
@@ -615,6 +640,66 @@ export class CorePlayer {
             });
         }
 
+        // Filter Control (only if enabled)
+        if (this.config.controls.filters && this.ui.filtersBtn) {
+            // Toggle filter panel
+            this.ui.filtersBtn.addEventListener('click', () => this.toggleFilterPanel());
+
+            // Close button
+            if (this.ui.closeFilterPanelBtn) {
+                this.ui.closeFilterPanelBtn.addEventListener('click', () => this.toggleFilterPanel());
+            }
+
+            // Brightness slider
+            if (this.ui.brightnessSlider) {
+                this.ui.brightnessSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.videoFilters.setBrightness(value);
+                    this.ui.brightnessValue.textContent = `${value}%`;
+                    this._updateFiltersButtonState();
+                });
+            }
+
+            // Contrast slider
+            if (this.ui.contrastSlider) {
+                this.ui.contrastSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.videoFilters.setContrast(value);
+                    this.ui.contrastValue.textContent = `${value}%`;
+                    this._updateFiltersButtonState();
+                });
+            }
+
+            // Saturation slider
+            if (this.ui.saturationSlider) {
+                this.ui.saturationSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.videoFilters.setSaturation(value);
+                    this.ui.saturationValue.textContent = `${value}%`;
+                    this._updateFiltersButtonState();
+                });
+            }
+
+            // Preset buttons
+            this.container.querySelectorAll('.filter-preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const preset = btn.dataset.preset;
+                    this.videoFilters.applyPreset(preset);
+                    this._syncFilterSliders();
+                    this._updateFiltersButtonState();
+                });
+            });
+
+            // Reset button
+            if (this.ui.resetFiltersBtn) {
+                this.ui.resetFiltersBtn.addEventListener('click', () => {
+                    this.videoFilters.reset();
+                    this._syncFilterSliders();
+                    this._updateFiltersButtonState();
+                });
+            }
+        }
+
         // Close menus when clicking outside
         document.addEventListener('click', this._handlers.click);
 
@@ -686,6 +771,56 @@ export class CorePlayer {
         this.ui.loopPanel.style.display = isVisible ? 'none' : 'block';
         if (!isVisible) {
             this._updateLoopUI(); // Ensure inputs are synced
+        }
+    }
+
+    /**
+     * Toggle video filters panel visibility
+     */
+    toggleFilterPanel() {
+        if (!this.ui.filterPanel) return;
+        const isVisible = this.ui.filterPanel.style.display !== 'none';
+        this.ui.filterPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            this._syncFilterSliders(); // Ensure sliders match current state
+        }
+    }
+
+    /**
+     * Sync filter sliders with current VideoFilters state
+     * @private
+     */
+    _syncFilterSliders() {
+        if (!this.videoFilters) return;
+        const state = this.videoFilters.getState();
+
+        if (this.ui.brightnessSlider) {
+            this.ui.brightnessSlider.value = state.brightness;
+            this.ui.brightnessValue.textContent = `${state.brightness}%`;
+        }
+        if (this.ui.contrastSlider) {
+            this.ui.contrastSlider.value = state.contrast;
+            this.ui.contrastValue.textContent = `${state.contrast}%`;
+        }
+        if (this.ui.saturationSlider) {
+            this.ui.saturationSlider.value = state.saturation;
+            this.ui.saturationValue.textContent = `${state.saturation}%`;
+        }
+    }
+
+    /**
+     * Update filter button to show active state when filters are applied
+     * @private
+     */
+    _updateFiltersButtonState() {
+        if (!this.ui.filtersBtn || !this.videoFilters) return;
+
+        if (this.videoFilters.isActive()) {
+            this.ui.filtersBtn.style.color = 'var(--accent-primary)';
+            this.ui.filtersBtn.setAttribute('aria-label', 'Video Filters (Active)');
+        } else {
+            this.ui.filtersBtn.style.color = '';
+            this.ui.filtersBtn.setAttribute('aria-label', 'Video Filters');
         }
     }
 

@@ -104,6 +104,13 @@
                     </div>
                 </div>
 
+                <button class="jellyjump-btn control--hidden" id="mb-filters-btn" aria-label="Video Filters"
+                    data-control="filters" title="Video Filters">
+                    <svg width="24" height="24" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-sliders"></use>
+                    </svg>
+                </button>
+
                 <button class="jellyjump-btn control--hidden" id="mb-loop-btn" aria-label="Loop Mode: Off"
                     data-control="loop" title="Right Click">
                     <svg width="24" height="24" fill="currentColor">
@@ -155,6 +162,55 @@
             </div>
             <div class="loop-actions">
                 <button class="jellyjump-btn-text" id="mb-clear-loop-btn">Clear Markers</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Filter Panel Template -->
+<template id="player-filter-panel-template">
+    <div class="jellyjump-filter-panel" style="display: none;">
+        <div class="filter-panel-header">
+            <span>Video Filters</span>
+            <button class="jellyjump-close-btn" aria-label="Close Filter Panel">×</button>
+        </div>
+        <div class="filter-panel-content">
+            <div class="filter-sliders">
+                <div class="filter-slider-group">
+                    <label for="mb-filter-brightness">
+                        <span>Brightness</span>
+                        <span class="filter-value" id="mb-brightness-value">100%</span>
+                    </label>
+                    <input type="range" id="mb-filter-brightness" min="0" max="200" value="100" class="filter-slider">
+                </div>
+                <div class="filter-slider-group">
+                    <label for="mb-filter-contrast">
+                        <span>Contrast</span>
+                        <span class="filter-value" id="mb-contrast-value">100%</span>
+                    </label>
+                    <input type="range" id="mb-filter-contrast" min="0" max="200" value="100" class="filter-slider">
+                </div>
+                <div class="filter-slider-group">
+                    <label for="mb-filter-saturation">
+                        <span>Saturation</span>
+                        <span class="filter-value" id="mb-saturation-value">100%</span>
+                    </label>
+                    <input type="range" id="mb-filter-saturation" min="0" max="200" value="100" class="filter-slider">
+                </div>
+            </div>
+            <div class="filter-presets">
+                <span class="filter-presets-label">Presets</span>
+                <div class="filter-preset-grid">
+                    <button class="filter-preset-btn" data-preset="night">🌙 Night</button>
+                    <button class="filter-preset-btn" data-preset="vivid">🌈 Vivid</button>
+                    <button class="filter-preset-btn" data-preset="warm">🔥 Warm</button>
+                    <button class="filter-preset-btn" data-preset="cool">❄️ Cool</button>
+                    <button class="filter-preset-btn" data-preset="grayscale">⬜ B&W</button>
+                    <button class="filter-preset-btn" data-preset="sepia">📜 Sepia</button>
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button class="jellyjump-btn-text" id="mb-reset-filters-btn">Reset All</button>
             </div>
         </div>
     </div>

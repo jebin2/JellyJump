@@ -769,6 +769,147 @@ button:focus-visible {
     text-align: center;
 }
 
+/* -----------------------------------------
+   Filter Panel
+   ----------------------------------------- */
+.jellyjump-filter-panel {
+    position: absolute;
+    bottom: 70px;
+    right: 10px;
+    width: 280px;
+    background-color: rgba(10, 10, 10, 0.95);
+    border: 2px solid var(--accent-primary);
+    padding: 15px;
+    z-index: 20;
+    box-shadow: var(--shadow-md) var(--accent-primary);
+    font-family: var(--font-mono);
+    border-radius: 8px;
+}
+
+.filter-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 8px;
+    color: var(--accent-primary);
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.filter-panel-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.filter-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.filter-slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.filter-slider-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.filter-slider-group .filter-value {
+    color: var(--text-primary);
+    font-weight: bold;
+}
+
+.filter-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.filter-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    transition: transform 0.15s;
+}
+
+.filter-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.filter-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+}
+
+.filter-presets {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-presets-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.filter-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.filter-preset-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-dark);
+    color: var(--text-primary);
+    padding: 6px 4px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.filter-preset-btn:hover {
+    background: var(--accent-primary);
+    color: #000;
+    border-color: var(--accent-primary);
+}
+
+.filter-preset-btn.active {
+    background: var(--accent-primary);
+    color: #000;
+    border-color: var(--accent-primary);
+}
+
+.filter-actions {
+    text-align: center;
+    padding-top: 5px;
+    border-top: 1px solid var(--border-dark);
+}
+
 .jellyjump-btn-text {
     background: none;
     border: none;
