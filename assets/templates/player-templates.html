@@ -111,6 +111,13 @@
                     </svg>
                 </button>
 
+                <button class="jellyjump-btn control--hidden" id="mb-eq-btn" aria-label="Audio Equalizer"
+                    data-control="equalizer" title="Audio Equalizer">
+                    <svg width="24" height="24" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-equalizer"></use>
+                    </svg>
+                </button>
+
                 <button class="jellyjump-btn control--hidden" id="mb-loop-btn" aria-label="Loop Mode: Off"
                     data-control="loop" title="Right Click">
                     <svg width="24" height="24" fill="currentColor">
@@ -211,6 +218,51 @@
             </div>
             <div class="filter-actions">
                 <button class="jellyjump-btn-text" id="mb-reset-filters-btn">Reset All</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- EQ Panel Template -->
+<template id="player-eq-panel-template">
+    <div class="jellyjump-eq-panel" style="display: none;">
+        <div class="eq-panel-header">
+            <span>Audio Equalizer</span>
+            <button class="jellyjump-close-btn" aria-label="Close EQ Panel">×</button>
+        </div>
+        <div class="eq-panel-content">
+            <div class="eq-sliders">
+                <div class="eq-slider-group">
+                    <input type="range" id="mb-eq-bass" min="-12" max="12" value="0" class="eq-slider"
+                        orient="vertical">
+                    <span class="eq-value" id="mb-bass-value">0</span>
+                    <label>Bass</label>
+                </div>
+                <div class="eq-slider-group">
+                    <input type="range" id="mb-eq-mid" min="-12" max="12" value="0" class="eq-slider" orient="vertical">
+                    <span class="eq-value" id="mb-mid-value">0</span>
+                    <label>Mid</label>
+                </div>
+                <div class="eq-slider-group">
+                    <input type="range" id="mb-eq-treble" min="-12" max="12" value="0" class="eq-slider"
+                        orient="vertical">
+                    <span class="eq-value" id="mb-treble-value">0</span>
+                    <label>Treble</label>
+                </div>
+            </div>
+            <div class="eq-presets">
+                <span class="eq-presets-label">Presets</span>
+                <div class="eq-preset-grid">
+                    <button class="eq-preset-btn" data-preset="flat">Flat</button>
+                    <button class="eq-preset-btn" data-preset="bass-boost">🔊 Bass</button>
+                    <button class="eq-preset-btn" data-preset="treble-boost">🔔 Treble</button>
+                    <button class="eq-preset-btn" data-preset="voice">🎤 Voice</button>
+                    <button class="eq-preset-btn" data-preset="rock">🎸 Rock</button>
+                    <button class="eq-preset-btn" data-preset="electronic">🎹 Electronic</button>
+                </div>
+            </div>
+            <div class="eq-actions">
+                <button class="jellyjump-btn-text" id="mb-reset-eq-btn">Reset EQ</button>
             </div>
         </div>
     </div>

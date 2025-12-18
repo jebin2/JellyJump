@@ -924,6 +924,148 @@ button:focus-visible {
 }
 
 /* -----------------------------------------
+   EQ Panel
+   ----------------------------------------- */
+.jellyjump-eq-panel {
+    position: absolute;
+    bottom: 70px;
+    right: 10px;
+    width: 300px;
+    background-color: rgba(10, 10, 10, 0.95);
+    border: 2px solid var(--accent-primary);
+    padding: 15px;
+    z-index: 20;
+    box-shadow: var(--shadow-md) var(--accent-primary);
+    font-family: var(--font-mono);
+    border-radius: 8px;
+}
+
+.eq-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 8px;
+    color: var(--accent-primary);
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.eq-panel-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.eq-sliders {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 10px 0;
+}
+
+.eq-slider-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.eq-slider-group label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.eq-slider-group .eq-value {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: bold;
+    min-width: 30px;
+    text-align: center;
+}
+
+/* Vertical slider */
+.eq-slider {
+    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 20px;
+    height: 80px;
+    background: var(--bg-tertiary);
+    cursor: pointer;
+}
+
+.eq-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+}
+
+.eq-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+}
+
+.eq-presets {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.eq-presets-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.eq-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.eq-preset-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-dark);
+    color: var(--text-primary);
+    padding: 6px 4px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.eq-preset-btn:hover {
+    background: var(--accent-primary);
+    color: #000;
+    border-color: var(--accent-primary);
+}
+
+.eq-preset-btn.active {
+    background: var(--accent-primary);
+    color: #000;
+    border-color: var(--accent-primary);
+}
+
+.eq-actions {
+    text-align: center;
+    padding-top: 5px;
+    border-top: 1px solid var(--border-dark);
+}
+
+/* -----------------------------------------
    Help Overlay
    ----------------------------------------- */
 .jellyjump-help-overlay {

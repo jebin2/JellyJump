@@ -8,6 +8,7 @@ import { PLAYER_CONFIG } from './config.js';
 import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
+import { AudioEqualizer } from '../player/AudioEqualizer.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -47,6 +48,7 @@ export class CorePlayer {
             loop: true,
             speed: true,
             filters: true,
+            equalizer: true,
             modeToggle: true,
             keyboard: true,  // Enable/disable keyboard shortcuts
             ...this.config.controls
@@ -65,6 +67,7 @@ export class CorePlayer {
                 loop: true,
                 speed: true,
                 filters: true,
+                equalizer: true,
                 modeToggle: true
             },
             editor: {
@@ -279,14 +282,49 @@ export class CorePlayer {
 
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         this.audioContext = new AudioContext();
+
+        // Create Gain Node (Volume)
         this.gainNode = this.audioContext.createGain();
+
+        // Initialize Equalizer if enabled
+        if (this.config.controls.equalizer) {
+            this.audioEqualizer = new AudioEqualizer(this.audioContext);
+            const eqInput = this.audioEqualizer.init();
+            const eqOutput = this.audioEqualizer.getOutputNode();
+
+            // Chain: EQ Output -> Gain Node -> Destination
+            // Note: Source connection happens in _setupAudioNodes
+            eqOutput.connect(this.gainNode);
+        }
+
         this.gainNode.connect(this.audioContext.destination);
 
         // Set initial volume
         this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
 
+        this.isInitialized = true; // Fix: Use isAudioInitialized? No, existing code used isAudioInitialized
         this.isAudioInitialized = true;
     }
+
+    /**
+     * Create custom controls UI
+     * @private
+     */
+    _createControls() {
+        // ... (existing code)
+    }
+
+    // ... inside _createControls or similar where UI is cached ...
+    // Wait, I need to find where UI caching happens. It's in the constructor usually or _createControls.
+    // Let's look at the previous view of Player.js.
+    // UI caching is in the constructor after _createControls.
+
+    // I will split this into two edits if needed, but I can probably do it in one if I target the right lines.
+    // The previous view showed _initAudio at line 280.
+    // The UI caching was around line 316.
+
+    // Let's stick to _initAudio first.
+
 
     /**
      * Create custom controls UI
@@ -399,6 +437,25 @@ export class CorePlayer {
 
             // Initialize VideoFilters
             this.videoFilters = new VideoFilters(this.canvas);
+        }
+
+        // Equalizer Panel (only if equalizer control is enabled)
+        if (this.config.controls.equalizer) {
+            const eqPanelTemplate = document.getElementById('player-eq-panel-template');
+            if (eqPanelTemplate) {
+                this.container.appendChild(eqPanelTemplate.content.cloneNode(true));
+            }
+
+            this.ui.eqBtn = this.container.querySelector('#mb-eq-btn');
+            this.ui.eqPanel = this.container.querySelector('.jellyjump-eq-panel');
+            this.ui.eqBassSlider = this.container.querySelector('#mb-eq-bass');
+            this.ui.eqMidSlider = this.container.querySelector('#mb-eq-mid');
+            this.ui.eqTrebleSlider = this.container.querySelector('#mb-eq-treble');
+            this.ui.eqBassValue = this.container.querySelector('#mb-bass-value');
+            this.ui.eqMidValue = this.container.querySelector('#mb-mid-value');
+            this.ui.eqTrebleValue = this.container.querySelector('#mb-treble-value');
+            this.ui.resetEqBtn = this.container.querySelector('#mb-reset-eq-btn');
+            this.ui.closeEqPanelBtn = this.container.querySelector('.jellyjump-eq-panel .jellyjump-close-btn');
         }
 
         // Apply visibility based on config (removes control--hidden class for enabled controls)
@@ -700,6 +757,66 @@ export class CorePlayer {
             }
         }
 
+        // Equalizer Control (only if enabled)
+        if (this.config.controls.equalizer && this.ui.eqBtn) {
+            // Toggle EQ panel
+            this.ui.eqBtn.addEventListener('click', () => this.toggleEqPanel());
+
+            // Close button
+            if (this.ui.closeEqPanelBtn) {
+                this.ui.closeEqPanelBtn.addEventListener('click', () => this.toggleEqPanel());
+            }
+
+            // Bass slider
+            if (this.ui.eqBassSlider) {
+                this.ui.eqBassSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.audioEqualizer.setBass(value);
+                    this.ui.eqBassValue.textContent = value;
+                    this._updateEqButtonState();
+                });
+            }
+
+            // Mid slider
+            if (this.ui.eqMidSlider) {
+                this.ui.eqMidSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.audioEqualizer.setMid(value);
+                    this.ui.eqMidValue.textContent = value;
+                    this._updateEqButtonState();
+                });
+            }
+
+            // Treble slider
+            if (this.ui.eqTrebleSlider) {
+                this.ui.eqTrebleSlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.audioEqualizer.setTreble(value);
+                    this.ui.eqTrebleValue.textContent = value;
+                    this._updateEqButtonState();
+                });
+            }
+
+            // Preset buttons
+            this.container.querySelectorAll('.eq-preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const preset = btn.dataset.preset;
+                    this.audioEqualizer.applyPreset(preset);
+                    this._syncEqSliders();
+                    this._updateEqButtonState();
+                });
+            });
+
+            // Reset button
+            if (this.ui.resetEqBtn) {
+                this.ui.resetEqBtn.addEventListener('click', () => {
+                    this.audioEqualizer.reset();
+                    this._syncEqSliders();
+                    this._updateEqButtonState();
+                });
+            }
+        }
+
         // Close menus when clicking outside
         document.addEventListener('click', this._handlers.click);
 
@@ -724,6 +841,11 @@ export class CorePlayer {
         if (this.ui.filterPanel && this.ui.filtersBtn &&
             !this.ui.filtersBtn.contains(e.target) && !this.ui.filterPanel.contains(e.target)) {
             this.ui.filterPanel.style.display = 'none';
+        }
+        // Hide EQ panel when clicking outside
+        if (this.ui.eqPanel && this.ui.eqBtn &&
+            !this.ui.eqBtn.contains(e.target) && !this.ui.eqPanel.contains(e.target)) {
+            this.ui.eqPanel.style.display = 'none';
         }
     }
 
@@ -826,6 +948,56 @@ export class CorePlayer {
         } else {
             this.ui.filtersBtn.style.color = '';
             this.ui.filtersBtn.setAttribute('aria-label', 'Video Filters');
+        }
+    }
+
+    /**
+     * Toggle audio equalizer panel visibility
+     */
+    toggleEqPanel() {
+        if (!this.ui.eqPanel) return;
+        const isVisible = this.ui.eqPanel.style.display !== 'none';
+        this.ui.eqPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            this._syncEqSliders(); // Ensure sliders match current state
+        }
+    }
+
+    /**
+     * Sync EQ sliders with current AudioEqualizer state
+     * @private
+     */
+    _syncEqSliders() {
+        if (!this.audioEqualizer) return;
+        const state = this.audioEqualizer.getState();
+
+        if (this.ui.eqBassSlider) {
+            this.ui.eqBassSlider.value = state.bass;
+            this.ui.eqBassValue.textContent = state.bass;
+        }
+        if (this.ui.eqMidSlider) {
+            this.ui.eqMidSlider.value = state.mid;
+            this.ui.eqMidValue.textContent = state.mid;
+        }
+        if (this.ui.eqTrebleSlider) {
+            this.ui.eqTrebleSlider.value = state.treble;
+            this.ui.eqTrebleValue.textContent = state.treble;
+        }
+    }
+
+    /**
+     * Update EQ button to show active state when EQ is applied
+     * @private
+     */
+    _updateEqButtonState() {
+        if (!this.ui.eqBtn || !this.audioEqualizer) return;
+
+        if (this.audioEqualizer.isActive()) {
+            this.ui.eqBtn.style.color = 'var(--accent-primary)';
+            this.ui.eqBtn.setAttribute('aria-label', 'Audio Equalizer (Active)');
+        } else {
+            this.ui.eqBtn.style.color = '';
+            this.ui.eqBtn.setAttribute('aria-label', 'Audio Equalizer');
         }
     }
 
@@ -1912,7 +2084,13 @@ export class CorePlayer {
                 const audioSource = this.audioContext.createBufferSource();
                 audioSource.buffer = buffer;
                 audioSource.playbackRate.value = this.playbackRate; // Apply playback rate
-                audioSource.connect(this.gainNode); // Connect to gain node
+
+                // Connect to EQ input if available, otherwise gain node
+                if (this.audioEqualizer && this.audioEqualizer.isInitialized) {
+                    audioSource.connect(this.audioEqualizer.getInputNode());
+                } else {
+                    audioSource.connect(this.gainNode);
+                }
 
                 // Calculate when this buffer should start playing
                 // 'timestamp' is in media time, but audioContext.currentTime is real time
