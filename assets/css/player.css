@@ -1055,23 +1055,35 @@ button:focus-visible {
 }
 
 .mb-select-xs {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-light);
-    color: var(--text-primary);
-    padding: 4px 6px;
-    border-radius: 3px;
-    font-size: 0.75em;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--accent-primary);
+    color: var(--accent-primary);
+    padding: 4px 8px;
+    border-radius: 0;
+    font-size: 12px;
     cursor: pointer;
     font-family: var(--font-mono);
+    font-weight: bold;
 }
 
 .mb-select-xs:focus {
-    outline: 1px solid var(--accent-primary);
-    border-color: var(--accent-primary);
+    outline: none;
+    box-shadow: 0 0 0 1px var(--accent-primary);
 }
 
 .mb-select-xs:hover {
-    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.mb-select-xs option {
+    background: var(--bg-tertiary);
+    color: var(--accent-primary);
+}
+
+.mb-select-xs option:hover,
+.mb-select-xs option:checked {
+    background: var(--accent-primary);
+    color: #000;
 }
 
 .mb-modal-error {
