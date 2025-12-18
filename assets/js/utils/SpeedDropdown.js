@@ -22,12 +22,8 @@ export class SpeedDropdown {
 
             // Position the fixed menu below the button
             const rect = button.getBoundingClientRect();
-            const menuTop = rect.bottom + 4;
-            const availableHeight = window.innerHeight - menuTop - 20;
-
-            menu.style.top = `${menuTop}px`;
+            menu.style.top = `${rect.bottom + 4}px`;
             menu.style.left = `${rect.left}px`;
-            menu.style.maxHeight = `${Math.max(availableHeight, 100)}px`;
 
             menu.classList.toggle('visible');
         });
