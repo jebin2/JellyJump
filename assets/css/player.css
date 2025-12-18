@@ -1086,6 +1086,21 @@ button:focus-visible {
     color: #000;
 }
 
+/* Track Speed Menu */
+.track-speed-container {
+    position: relative;
+}
+
+.track-speed-menu {
+    position: fixed;
+    z-index: 9999;
+    height: auto;
+    bottom: auto;
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid var(--accent-primary);
+}
+
 .mb-modal-error {
     margin-top: 10px;
     color: var(--error-color);
