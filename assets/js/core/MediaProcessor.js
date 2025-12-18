@@ -1010,10 +1010,11 @@ export class MediaProcessor {
      * @param {Object} options
      * @param {Blob|File} options.source
      * @param {boolean} options.includeAudio
+     * @param {number} [options.speed=1] - Playback speed multiplier (0.25 to 2)
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async reverseVideo({ source, includeAudio = false, onProgress }) {
+    static async reverseVideo({ source, includeAudio = false, speed = 1, onProgress }) {
         console.log('[MediaProcessor] Starting video reversal with samplesAtTimestamps...');
 
         const blobSource = new MediaBunny.BlobSource(source);
@@ -1038,18 +1039,30 @@ export class MediaProcessor {
             const firstTimestamp = await videoTrack.getFirstTimestamp();
 
             // Compute frame rate from metadata
-            let fps = 30;
+            let sourceFps = 30;
             try {
                 const stats = await videoTrack.computePacketStats();
-                fps = stats.averagePacketRate || 30;
+                sourceFps = stats.averagePacketRate || 30;
             } catch (e) {
                 console.warn("[MediaProcessor] Could not compute frame rate, defaulting to 30fps", e);
             }
 
-            const frameDuration = 1 / fps;
-            const totalFrames = Math.ceil(duration * fps);
+            // Clamp speed to valid range
+            const clampedSpeed = Math.max(0.25, Math.min(2, speed));
 
-            console.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, ${fps.toFixed(1)}fps (${totalFrames} frames)`);
+            // Output FPS stays the same, but we adjust frame sampling based on speed
+            // At 2x speed: output half the duration (skip frames)
+            // At 0.5x speed: output double the duration (duplicate frames or interpolate)
+            const outputFps = sourceFps;
+            const sourceDuration = duration;
+            const outputDuration = sourceDuration / clampedSpeed;
+
+            // Frame parameters
+            const frameDuration = 1 / outputFps;
+            const totalOutputFrames = Math.ceil(outputDuration * outputFps);
+
+            console.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, ${sourceFps.toFixed(1)}fps`);
+            console.log(`[MediaProcessor] Speed: ${clampedSpeed}x, Output: ${outputDuration.toFixed(2)}s, ${totalOutputFrames} frames`);
 
             // Step 2: Setup Output
             const outputFormat = new MediaBunny.Mp4OutputFormat();
@@ -1067,10 +1080,10 @@ export class MediaProcessor {
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: 'avc',
                 bitrate: 5000000, // 5 Mbps
-                frameRate: fps
+                frameRate: outputFps
             });
 
-            output.addVideoTrack(canvasSource, { frameRate: fps });
+            output.addVideoTrack(canvasSource, { frameRate: outputFps });
 
             // Setup Audio (if requested)
             if (includeAudio) {
@@ -1095,9 +1108,18 @@ export class MediaProcessor {
             const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
 
             // Generate timestamps in REVERSE order (from end to start)
+            // Speed affects which frames we sample from source:
+            // - At speed 1x: sample all frames in reverse
+            // - At speed 2x: sample every other frame (faster playback)
+            // - At speed 0.5x: sample frames with smaller steps (slower playback)
             const reverseTimestampGenerator = (async function* () {
-                for (let i = totalFrames - 1; i >= 0; i--) {
-                    yield firstTimestamp + (i * frameDuration);
+                for (let outputFrame = 0; outputFrame < totalOutputFrames; outputFrame++) {
+                    // Map output frame to source time (reversed)
+                    // outputFrame 0 -> end of source video
+                    // outputFrame N -> start of source video  
+                    const outputProgress = outputFrame / totalOutputFrames;
+                    const sourceTime = sourceDuration * (1 - outputProgress);
+                    yield firstTimestamp + sourceTime;
                 }
             })();
 
@@ -1119,7 +1141,7 @@ export class MediaProcessor {
 
                     // Update progress (0-80% for video)
                     if (onProgress) {
-                        onProgress(frameCount / totalFrames * 0.8);
+                        onProgress(frameCount / totalOutputFrames * 0.8);
                     }
                 }
             }
@@ -1132,7 +1154,7 @@ export class MediaProcessor {
                 try {
                     const audioTrack = await input.getPrimaryAudioTrack();
                     if (audioTrack) {
-                        await MediaProcessor._reverseAudioWithSink(audioTrack, audioSource, duration, onProgress);
+                        await MediaProcessor._reverseAudioWithSink(audioTrack, audioSource, duration, clampedSpeed, onProgress);
                         console.log('[MediaProcessor] Audio reversal complete');
                     }
                 } catch (e) {
@@ -1175,10 +1197,11 @@ export class MediaProcessor {
      * @param {Object} audioTrack - MediaBunny audio track
      * @param {Object} audioSource - MediaBunny AudioSampleSource to write to
      * @param {number} duration - Total duration in seconds
+     * @param {number} [speed=1] - Speed multiplier (affects audio playback speed)
      * @param {Function} [onProgress] - Progress callback
      * @private
      */
-    static async _reverseAudioWithSink(audioTrack, audioSource, duration, onProgress) {
+    static async _reverseAudioWithSink(audioTrack, audioSource, duration, speed = 1, onProgress) {
         const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
 
         // Collect all audio samples (audio is much smaller than video)
@@ -1207,8 +1230,37 @@ export class MediaProcessor {
                 data.reverse();
             }
 
-            // Create new sample(s) from reversed buffer
-            const reversedSamples = MediaBunny.AudioSample.fromAudioBuffer(buffer, outputTimestamp);
+            // Time-stretch audio if speed != 1
+            // At 2x speed, audio duration is halved
+            // At 0.5x speed, audio duration is doubled
+            let finalBuffer = buffer;
+            if (speed !== 1) {
+                try {
+                    const originalDuration = buffer.duration;
+                    const targetDuration = originalDuration / speed;
+                    const targetFrames = Math.ceil(targetDuration * buffer.sampleRate);
+
+                    // Use OfflineAudioContext for resampling
+                    const offlineCtx = new OfflineAudioContext(
+                        buffer.numberOfChannels,
+                        targetFrames,
+                        buffer.sampleRate
+                    );
+
+                    const source = offlineCtx.createBufferSource();
+                    source.buffer = buffer;
+                    source.playbackRate.value = speed;
+                    source.connect(offlineCtx.destination);
+                    source.start(0);
+
+                    finalBuffer = await offlineCtx.startRendering();
+                } catch (e) {
+                    console.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
+                }
+            }
+
+            // Create new sample(s) from processed buffer
+            const reversedSamples = MediaBunny.AudioSample.fromAudioBuffer(finalBuffer, outputTimestamp);
             const samplesToAdd = Array.isArray(reversedSamples) ? reversedSamples : [reversedSamples];
 
             for (const s of samplesToAdd) {

@@ -37,6 +37,7 @@ export class ReverseMenu {
         const sourceDuration = modalContent.querySelector('.source-duration');
         const sourceResolution = modalContent.querySelector('.source-resolution');
         const audioCheckbox = modalContent.querySelector('#reverse-include-audio');
+        const speedSelect = modalContent.querySelector('#reverse-speed');
         const processingInfo = modalContent.querySelector('.processing-info');
         const longVideoWarning = modalContent.querySelector('#long-video-warning');
 
@@ -95,6 +96,7 @@ export class ReverseMenu {
 
         const startReversal = async () => {
             const includeAudio = audioCheckbox.checked;
+            const speed = parseFloat(speedSelect.value) || 1;
 
             // UI Updates
             reverseBtn.disabled = true;
@@ -103,6 +105,7 @@ export class ReverseMenu {
             downloadBtn.disabled = true;
 
             audioCheckbox.disabled = true;
+            speedSelect.disabled = true;
 
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
@@ -127,6 +130,7 @@ export class ReverseMenu {
                 const reversedBlob = await MediaProcessor.reverseVideo({
                     source: sourceFile,
                     includeAudio: includeAudio,
+                    speed: speed,
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
                         progressBar.style.width = `${pct}%`;
@@ -166,6 +170,7 @@ export class ReverseMenu {
 
                 // Re-enable controls for another run
                 audioCheckbox.disabled = false;
+                speedSelect.disabled = false;
                 reverseBtn.disabled = false;
 
                 // Add to playlist
@@ -204,6 +209,7 @@ export class ReverseMenu {
 
                 // Re-enable controls on error
                 audioCheckbox.disabled = false;
+                speedSelect.disabled = false;
                 reverseBtn.disabled = false;
             } finally {
                 // Restore close functionality
