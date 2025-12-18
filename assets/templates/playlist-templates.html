@@ -712,12 +712,12 @@
             </div>
             <div class="track-actions flex flex-col gap-sm items-end shrink-0">
                 <!-- Speed Menu -->
-                <div class="jellyjump-menu-btn track-speed-container">
-                    <button class="btn jellyjump-btn-small track-speed-btn" aria-label="Speed" aria-haspopup="true"
-                        aria-expanded="false" title="Playback Speed">
+                <div class="jellyjump-menu-btn mb-speed-dropdown-container">
+                    <button class="btn jellyjump-btn-small mb-speed-dropdown-btn" data-speed-btn aria-label="Speed"
+                        aria-haspopup="true" aria-expanded="false" title="Playback Speed">
                         1x
                     </button>
-                    <div class="jellyjump-menu track-speed-menu" role="menu">
+                    <div class="jellyjump-menu mb-speed-dropdown" data-speed-menu role="menu">
                         <div class="jellyjump-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x</div>
                         <div class="jellyjump-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x</div>
                         <div class="jellyjump-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
@@ -1413,12 +1413,12 @@
         <!-- Speed Options -->
         <div class="options-group mb-lg">
             <div class="text-xs text-secondary font-mono mb-sm">PLAYBACK SPEED</div>
-            <div class="jellyjump-menu-btn reverse-speed-container">
-                <button class="btn jellyjump-btn-small reverse-speed-btn" id="reverse-speed-btn" aria-label="Speed"
+            <div class="jellyjump-menu-btn mb-speed-dropdown-container">
+                <button class="btn jellyjump-btn-small mb-speed-dropdown-btn" data-speed-btn aria-label="Speed"
                     aria-haspopup="true" aria-expanded="false" title="Playback Speed">
                     1x (Normal)
                 </button>
-                <div class="jellyjump-menu reverse-speed-menu" id="reverse-speed-menu" role="menu">
+                <div class="jellyjump-menu mb-speed-dropdown" data-speed-menu role="menu">
                     <div class="jellyjump-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x (Very Slow)
                     </div>
                     <div class="jellyjump-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x (Slow)</div>

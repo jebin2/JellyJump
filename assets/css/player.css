@@ -1086,27 +1086,12 @@ button:focus-visible {
     color: #000;
 }
 
-/* Track Speed Menu */
-.track-speed-container {
+/* Speed Dropdown Menu (Common) */
+.mb-speed-dropdown-container {
     position: relative;
 }
 
-.track-speed-menu {
-    position: fixed;
-    z-index: 9999;
-    height: auto;
-    bottom: auto;
-    max-height: 50vh;
-    overflow-y: auto;
-    border: 1px solid var(--accent-primary);
-}
-
-/* Reverse Speed Menu */
-.reverse-speed-container {
-    position: relative;
-}
-
-.reverse-speed-menu {
+.mb-speed-dropdown {
     position: fixed;
     z-index: 9999;
     height: auto;

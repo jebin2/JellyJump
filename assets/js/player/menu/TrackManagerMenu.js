@@ -2,6 +2,7 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
+import { SpeedDropdown } from '../../utils/SpeedDropdown.js';
 
 /**
  * Track Manager Menu Handler
@@ -117,50 +118,12 @@ export class TrackManagerMenu {
                 const addToPlaylistBtn = el.querySelector('.add-to-playlist-btn');
                 const progressContainer = el.querySelector('.progress-container');
 
-                // Speed menu elements (div-based like control bar)
-                const speedBtn = el.querySelector('.track-speed-btn');
-                const speedMenu = el.querySelector('.track-speed-menu');
-                const speedItems = speedMenu.querySelectorAll('.jellyjump-menu-item');
-                let currentSpeed = 1;
-
-                // Speed button click - toggle menu and position it
-                speedBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-
-                    // Position the fixed menu below the button
-                    const rect = speedBtn.getBoundingClientRect();
-                    const menuTop = rect.bottom + 4;
-                    const availableHeight = window.innerHeight - menuTop - 20; // 20px padding from bottom
-
-                    speedMenu.style.top = `${menuTop}px`;
-                    speedMenu.style.right = `${window.innerWidth - rect.right}px`;
-                    speedMenu.style.maxHeight = `${Math.max(availableHeight, 100)}px`; // Min 100px
-
-                    speedMenu.classList.toggle('visible');
-                });
-
-                // Speed menu item selection
-                speedItems.forEach(menuItem => {
-                    menuItem.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const value = parseFloat(menuItem.dataset.value);
-                        currentSpeed = value;
-
-                        // Update button text
-                        speedBtn.textContent = value === 1 ? '1x' : `${value}x`;
-
-                        // Update active state
-                        speedItems.forEach(item => item.classList.remove('active'));
-                        menuItem.classList.add('active');
-
-                        // Hide menu
-                        speedMenu.classList.remove('visible');
-                    });
-                });
-
-                // Close menu when clicking outside
-                document.addEventListener('click', () => {
-                    speedMenu.classList.remove('visible');
+                // Speed dropdown (using common utility)
+                const speedBtn = el.querySelector('[data-speed-btn]');
+                const speedMenu = el.querySelector('[data-speed-menu]');
+                const speedDropdown = SpeedDropdown.init({
+                    button: speedBtn,
+                    menu: speedMenu
                 });
 
                 // Determine format based on codec
@@ -179,7 +142,7 @@ export class TrackManagerMenu {
                 }
 
                 downloadBtn.addEventListener('click', () => {
-                    this.extractTrack(playlist.items.indexOf(item), i, type, format, false, currentSpeed, progressContainer, downloadBtn, addToPlaylistBtn, speedBtn, playlist);
+                    this.extractTrack(playlist.items.indexOf(item), i, type, format, false, speedDropdown.getCurrentSpeed(), progressContainer, downloadBtn, addToPlaylistBtn, speedDropdown, playlist);
                 });
 
                 addToPlaylistBtn.addEventListener('click', () => {
@@ -193,7 +156,7 @@ export class TrackManagerMenu {
                         return;
                     }
 
-                    this.extractTrack(playlist.items.indexOf(item), i, type, format, true, currentSpeed, progressContainer, downloadBtn, addToPlaylistBtn, speedBtn, playlist);
+                    this.extractTrack(playlist.items.indexOf(item), i, type, format, true, speedDropdown.getCurrentSpeed(), progressContainer, downloadBtn, addToPlaylistBtn, speedDropdown, playlist);
                 });
 
                 trackList.appendChild(el);
@@ -215,18 +178,18 @@ export class TrackManagerMenu {
      * @param {HTMLElement} progressContainer 
      * @param {HTMLElement} downloadBtn 
      * @param {HTMLElement} addToPlaylistBtn
-     * @param {HTMLElement} speedBtn
+     * @param {Object} speedDropdown - SpeedDropdown controller
      * @param {Playlist} playlist
      * @private
      */
-    static async extractTrack(index, trackIndex, trackType, format, addToPlaylist, speed, progressContainer, downloadBtn, addToPlaylistBtn, speedBtn, playlist) {
+    static async extractTrack(index, trackIndex, trackType, format, addToPlaylist, speed, progressContainer, downloadBtn, addToPlaylistBtn, speedDropdown, playlist) {
         const item = playlist.items[index];
 
         // UI State
         downloadBtn.classList.add('hidden');
         addToPlaylistBtn.classList.add('hidden');
         progressContainer.classList.remove('hidden');
-        speedBtn.disabled = true;
+        speedDropdown.setDisabled(true);
 
         try {
             // Get source with caching
@@ -251,7 +214,7 @@ export class TrackManagerMenu {
             downloadBtn.classList.remove('hidden');
             addToPlaylistBtn.classList.remove('hidden');
             progressContainer.classList.add('hidden');
-            speedBtn.disabled = false;
+            speedDropdown.setDisabled(false);
         }
     }
 

@@ -2,6 +2,7 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatDuration, formatFileSize } from '../../utils/mediaUtils.js';
+import { SpeedDropdown } from '../../utils/SpeedDropdown.js';
 
 /**
  * Reverse Menu Handler
@@ -38,50 +39,12 @@ export class ReverseMenu {
         const sourceResolution = modalContent.querySelector('.source-resolution');
         const audioCheckbox = modalContent.querySelector('#reverse-include-audio');
 
-        // Speed menu elements (div-based like control bar)
-        const speedBtn = modalContent.querySelector('#reverse-speed-btn');
-        const speedMenu = modalContent.querySelector('#reverse-speed-menu');
-        const speedItems = speedMenu.querySelectorAll('.jellyjump-menu-item');
-        let currentSpeed = 1;
-
-        // Speed button click - toggle menu and position it
-        speedBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-
-            // Position the fixed menu below the button
-            const rect = speedBtn.getBoundingClientRect();
-            const menuTop = rect.bottom + 4;
-            const availableHeight = window.innerHeight - menuTop - 20;
-
-            speedMenu.style.top = `${menuTop}px`;
-            speedMenu.style.left = `${rect.left}px`;
-            speedMenu.style.maxHeight = `${Math.max(availableHeight, 100)}px`;
-
-            speedMenu.classList.toggle('visible');
-        });
-
-        // Speed menu item selection
-        speedItems.forEach(menuItem => {
-            menuItem.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const value = parseFloat(menuItem.dataset.value);
-                currentSpeed = value;
-
-                // Update button text
-                speedBtn.textContent = menuItem.textContent;
-
-                // Update active state
-                speedItems.forEach(item => item.classList.remove('active'));
-                menuItem.classList.add('active');
-
-                // Hide menu
-                speedMenu.classList.remove('visible');
-            });
-        });
-
-        // Close menu when clicking outside
-        document.addEventListener('click', () => {
-            speedMenu.classList.remove('visible');
+        // Speed dropdown (using common utility)
+        const speedBtn = modalContent.querySelector('[data-speed-btn]');
+        const speedMenu = modalContent.querySelector('[data-speed-menu]');
+        const speedDropdown = SpeedDropdown.init({
+            button: speedBtn,
+            menu: speedMenu
         });
 
         const processingInfo = modalContent.querySelector('.processing-info');
@@ -142,7 +105,7 @@ export class ReverseMenu {
 
         const startReversal = async () => {
             const includeAudio = audioCheckbox.checked;
-            const speed = currentSpeed;
+            const speed = speedDropdown.getCurrentSpeed();
 
             // UI Updates
             reverseBtn.disabled = true;
@@ -151,7 +114,7 @@ export class ReverseMenu {
             downloadBtn.disabled = true;
 
             audioCheckbox.disabled = true;
-            speedBtn.disabled = true;
+            speedDropdown.setDisabled(true);
 
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
@@ -216,7 +179,7 @@ export class ReverseMenu {
 
                 // Re-enable controls for another run
                 audioCheckbox.disabled = false;
-                speedBtn.disabled = false;
+                speedDropdown.setDisabled(false);
                 reverseBtn.disabled = false;
 
                 // Add to playlist
@@ -255,7 +218,7 @@ export class ReverseMenu {
 
                 // Re-enable controls on error
                 audioCheckbox.disabled = false;
-                speedBtn.disabled = false;
+                speedDropdown.setDisabled(false);
                 reverseBtn.disabled = false;
             } finally {
                 // Restore close functionality
