@@ -1413,16 +1413,24 @@
         <!-- Speed Options -->
         <div class="options-group mb-lg">
             <div class="text-xs text-secondary font-mono mb-sm">PLAYBACK SPEED</div>
-            <select id="reverse-speed" class="mb-select w-full">
-                <option value="0.25">0.25x (Very Slow)</option>
-                <option value="0.5">0.5x (Slow)</option>
-                <option value="0.75">0.75x</option>
-                <option value="1" selected>1x (Normal)</option>
-                <option value="1.25">1.25x</option>
-                <option value="1.5">1.5x (Fast)</option>
-                <option value="1.75">1.75x</option>
-                <option value="2">2x (Very Fast)</option>
-            </select>
+            <div class="jellyjump-menu-btn reverse-speed-container">
+                <button class="btn jellyjump-btn-small reverse-speed-btn" id="reverse-speed-btn" aria-label="Speed"
+                    aria-haspopup="true" aria-expanded="false" title="Playback Speed">
+                    1x (Normal)
+                </button>
+                <div class="jellyjump-menu reverse-speed-menu" id="reverse-speed-menu" role="menu">
+                    <div class="jellyjump-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x (Very Slow)
+                    </div>
+                    <div class="jellyjump-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x (Slow)</div>
+                    <div class="jellyjump-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
+                    <div class="jellyjump-menu-item active" data-value="1" role="menuitem" tabindex="0">1x (Normal)
+                    </div>
+                    <div class="jellyjump-menu-item" data-value="1.25" role="menuitem" tabindex="0">1.25x</div>
+                    <div class="jellyjump-menu-item" data-value="1.5" role="menuitem" tabindex="0">1.5x (Fast)</div>
+                    <div class="jellyjump-menu-item" data-value="1.75" role="menuitem" tabindex="0">1.75x</div>
+                    <div class="jellyjump-menu-item" data-value="2" role="menuitem" tabindex="0">2x (Very Fast)</div>
+                </div>
+            </div>
             <div class="text-xs text-muted mt-xs">Affects final video speed</div>
         </div>
 
