@@ -1012,7 +1012,7 @@ export class CorePlayer {
         if (this.isMuted || this.volume === 0) {
             iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
             this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings (Muted)');
-            this.ui.audioSettingsBtn.style.color = 'var(--accent-warning)'; // Optional: highlight muted state
+            // this.ui.audioSettingsBtn.style.color = 'var(--accent-warning)'; // Removed to use default/theme color
         } else {
             if (this.volume < 0.5) {
                 iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-low');

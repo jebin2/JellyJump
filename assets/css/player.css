@@ -977,6 +977,7 @@ button:focus-visible {
     -webkit-appearance: none;
     appearance: none;
     cursor: pointer;
+    accent-color: var(--accent-primary);
 }
 
 .panel-volume-slider::-webkit-slider-thumb {
@@ -1040,6 +1041,7 @@ button:focus-visible {
     height: 80px;
     background: var(--bg-tertiary);
     cursor: pointer;
+    accent-color: var(--accent-primary);
 }
 
 .eq-slider::-webkit-slider-thumb {
