@@ -2167,6 +2167,28 @@ body.fullscreen-active {
     }
 }
 
+/* LIVE Badge - Not at live edge (behind live) */
+.jellyjump-live-badge.not-live {
+    background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+    animation: none;
+    box-shadow: 0 0 8px rgba(84, 110, 122, 0.4);
+}
+
+.jellyjump-live-badge.not-live::before {
+    background: #90a4ae;
+    animation: none;
+}
+
+.jellyjump-live-badge.not-live:hover {
+    background: linear-gradient(135deg, #607d8b 0%, #455a64 100%);
+    box-shadow: 0 0 12px rgba(96, 125, 139, 0.6);
+}
+
+/* Stream mode - hide unsupported controls */
+.stream-mode-hidden {
+    display: none !important;
+}
+
 /* Quality Selector Button */
 .jellyjump-quality-btn {
     background: none;

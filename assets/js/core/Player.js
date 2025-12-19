@@ -1774,8 +1774,19 @@ export class CorePlayer {
             // Setup stream video events
             this._setupStreamVideoEvents();
 
+            // Sync volume with config
+            if (this.streamVideo) {
+                this.streamVideo.volume = this.config.volume;
+                this.streamVideo.muted = this.config.muted;
+            }
+
             this.ui.loader.classList.remove('visible');
             console.log('[Stream] HLS stream loaded successfully. Live:', this.isLive);
+
+            // For live streams, seek to live edge on first load
+            if (this.isLive) {
+                this.hlsPlayer.seekToLive();
+            }
 
             if (autoplay) {
                 this.play();
@@ -1783,6 +1794,10 @@ export class CorePlayer {
                 // Show play overlay
                 if (this.ui.playOverlay) {
                     this.ui.playOverlay.style.display = 'flex';
+                }
+                // Show as not-live when paused initially
+                if (this.isLive && this.ui.liveBadge) {
+                    this.ui.liveBadge.classList.add('not-live');
                 }
             }
 
@@ -1835,6 +1850,8 @@ export class CorePlayer {
         if (this.canvas) {
             this.canvas.style.display = 'block';
         }
+        // Restore controls that were hidden in stream mode
+        this._setStreamModeControls(false);
     }
 
     /**
@@ -1851,6 +1868,15 @@ export class CorePlayer {
                 this.duration = this.streamVideo.duration || 0;
                 this._updateTimeDisplay();
                 this._updateProgress();
+
+                // Update LIVE badge based on whether we're at live edge
+                if (this.isLive && this.ui.liveBadge) {
+                    const latency = this.hlsPlayer?.getLiveLatency() || 0;
+                    // HLS streams typically have 20-30 second latency for buffering
+                    // Consider "at live" if within 30 seconds of live edge
+                    const isAtLive = latency < 30;
+                    this.ui.liveBadge.classList.toggle('not-live', !isAtLive);
+                }
             }
         };
 
@@ -1868,12 +1894,28 @@ export class CorePlayer {
             if (this.ui.playOverlay) {
                 this.ui.playOverlay.style.display = 'none';
             }
+            // Start auto-hide timer for overlay mode
+            if (this.controlBarMode === 'overlay') {
+                setTimeout(() => {
+                    if (this.isPlaying && this.controlBarMode === 'overlay') {
+                        this._startAutoHideTimer();
+                    }
+                }, 500);
+            }
         };
 
         this.streamVideo.onpause = () => {
             this.isPlaying = false;
+            this._clearAutoHideTimer();
             this._updatePlayPauseUI();
+            // Show as not-live when paused
+            if (this.isLive && this.ui.liveBadge) {
+                this.ui.liveBadge.classList.add('not-live');
+            }
         };
+
+        // Click on stream video to toggle play/pause
+        this.streamVideo.addEventListener('click', () => this.togglePlay());
     }
 
     /**
@@ -1887,6 +1929,13 @@ export class CorePlayer {
                 this.ui.liveBadge = document.createElement('span');
                 this.ui.liveBadge.className = 'jellyjump-live-badge';
                 this.ui.liveBadge.textContent = 'LIVE';
+                this.ui.liveBadge.style.cursor = 'pointer';
+                this.ui.liveBadge.title = 'Click to jump to live';
+
+                // Click to seek to live edge
+                this.ui.liveBadge.addEventListener('click', () => {
+                    this._seekToLive();
+                });
 
                 // Insert near time display
                 const timeContainer = this.ui.timeDisplay?.parentNode;
@@ -1916,8 +1965,38 @@ export class CorePlayer {
             }
         }
 
+        // Hide controls that don't work in stream mode
+        this._setStreamModeControls(true);
+
         // Create quality selector button if we have multiple levels
         this._createQualitySelector();
+    }
+
+    /**
+     * Hide/show controls that don't work in stream mode
+     * @param {boolean} isStreamMode - Whether stream mode is active
+     * @private
+     */
+    _setStreamModeControls(isStreamMode) {
+        const unsupportedControls = [
+            this.ui.ccBtn,           // Subtitles
+            this.ui.speedBtn,        // Speed control
+            this.ui.filtersBtn,      // Video filters
+            this.ui.audioSettingsBtn, // Audio equalizer (but keep mute/volume in panel)
+            this.ui.loopBtn          // Loop controls
+        ];
+
+        // Also hide screenshot button if it exists
+        const screenshotBtn = this.container.querySelector('#mb-screenshot-btn');
+        if (screenshotBtn) {
+            unsupportedControls.push(screenshotBtn);
+        }
+
+        unsupportedControls.forEach(control => {
+            if (control) {
+                control.classList.toggle('stream-mode-hidden', isStreamMode);
+            }
+        });
     }
 
     /**
@@ -2036,6 +2115,27 @@ export class CorePlayer {
         this.videoTrack = null;
         this.audioTrack = null;
         this.nextFrame = null;
+    }
+
+    /**
+     * Seek to live edge for live streams
+     * @private
+     */
+    _seekToLive() {
+        if (this.isStreamMode && this.isLive && this.hlsPlayer) {
+            this.hlsPlayer.seekToLive();
+
+            // Update LIVE badge to show we're at live edge
+            if (this.ui.liveBadge) {
+                this.ui.liveBadge.classList.remove('not-live');
+            }
+
+            // Auto-play after seeking to live
+            if (!this.isPlaying) {
+                this.play();
+            }
+            console.log('[Stream] Seeked to live edge');
+        }
     }
 
     /**
@@ -2713,42 +2813,10 @@ export class CorePlayer {
             this.config.muted = false;
         }
 
-        if (this.gainNode) {
-            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
-        }
-
-        this._updateVolumeUI();
-    }
-
-    /**
-     * Toggle mute state
-     */
-    toggleMute() {
-        this.config.muted = !this.config.muted;
-
-        if (this.gainNode) {
-            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
-        }
-
-        this._updateVolumeUI();
-    }
-
-    get volume() {
-        return this.config.volume;
-    }
-
-    get isMuted() {
-        return this.config.muted;
-    }
-
-    /**
-     * Set volume (0.0 to 1.0)
-     * @param {number} value 
-     */
-    setVolume(value) {
-        this.config.volume = Math.max(0, Math.min(1, value));
-        if (this.config.volume > 0) {
-            this.config.muted = false;
+        // Handle stream mode volume
+        if (this.isStreamMode && this.streamVideo) {
+            this.streamVideo.volume = this.config.volume;
+            this.streamVideo.muted = this.config.muted;
         }
 
         if (this.gainNode) {
@@ -2763,6 +2831,11 @@ export class CorePlayer {
      */
     toggleMute() {
         this.config.muted = !this.config.muted;
+
+        // Handle stream mode mute
+        if (this.isStreamMode && this.streamVideo) {
+            this.streamVideo.muted = this.config.muted;
+        }
 
         if (this.gainNode) {
             this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
