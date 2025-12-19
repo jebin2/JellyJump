@@ -631,7 +631,133 @@ export class Playlist {
         if (el) {
             const durationEl = el.querySelector('.playlist-duration');
             if (durationEl) durationEl.textContent = item.duration;
+
+            // Update thumbnail if available
+            const thumbEl = el.querySelector('.playlist-thumbnail img');
+            if (thumbEl && item.thumbnail) {
+                thumbEl.src = item.thumbnail;
+            }
         }
+    }
+
+    /**
+     * Update stream item metadata after loading (duration and thumbnail)
+     * @param {Object} video - Video item
+     * @param {number} index - Item index
+     * @private
+     */
+    _updateStreamItemMetadata(video, index) {
+        // Determine if it's live or VOD based on player state
+        const isLive = this.player.isLive;
+
+        // Update duration display
+        if (isLive) {
+            video.duration = 'LIVE';
+            video.isLive = true;
+        } else {
+            // VOD stream - get actual duration when available
+            const checkDuration = () => {
+                if (this.player.duration && this.player.duration > 0) {
+                    video.duration = formatDuration(this.player.duration);
+                    this._updateItemUI(video);
+                    this._saveState();
+                }
+            };
+            // Check after a short delay for metadata to load
+            setTimeout(checkDuration, 500);
+            setTimeout(checkDuration, 2000); // Retry if first didn't work
+        }
+
+        // Capture thumbnail after video starts playing
+        this._captureStreamThumbnail(video, index);
+
+        // Update UI immediately for live badge
+        this._updateItemUI(video);
+    }
+
+    /**
+     * Capture thumbnail from stream video
+     * @param {Object} video - Video item
+     * @param {number} index - Item index
+     * @private
+     */
+    _captureStreamThumbnail(video, index) {
+        // Wait for video to have some frames
+        setTimeout(() => {
+            try {
+                const canvas = this.player.canvas;
+                if (canvas && canvas.width > 0 && canvas.height > 0) {
+                    // Create small thumbnail
+                    const thumbCanvas = document.createElement('canvas');
+                    thumbCanvas.width = 160;
+                    thumbCanvas.height = 90;
+                    const ctx = thumbCanvas.getContext('2d');
+                    ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+                    // Convert to data URL
+                    const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.7);
+                    video.thumbnail = thumbnail;
+
+                    // Update UI
+                    this._updateItemUI(video);
+                    this._saveState();
+
+                    console.log(`[Playlist] Captured thumbnail for: ${video.title}`);
+                }
+            } catch (e) {
+                console.warn('[Playlist] Failed to capture thumbnail:', e);
+            }
+        }, 2000); // Wait 2 seconds for video to start
+    }
+
+    /**
+     * Update local video item metadata after loading (duration and thumbnail)
+     * @param {Object} video - Video item
+     * @param {number} index - Item index
+     * @private
+     */
+    _updateLocalItemMetadata(video, index) {
+        // Update duration when metadata is available
+        const updateDuration = () => {
+            if (this.player.duration && this.player.duration > 0) {
+                const newDuration = formatDuration(this.player.duration);
+                if (video.duration !== newDuration) {
+                    video.duration = newDuration;
+                    this._updateItemUI(video);
+                    this._saveState();
+                }
+            }
+        };
+
+        // Check duration after metadata loads
+        setTimeout(updateDuration, 300);
+        setTimeout(updateDuration, 1000); // Retry if first didn't work
+
+        // Capture thumbnail after first frame renders
+        setTimeout(() => {
+            try {
+                const canvas = this.player.canvas;
+                if (canvas && canvas.width > 0 && canvas.height > 0) {
+                    // Create small thumbnail
+                    const thumbCanvas = document.createElement('canvas');
+                    thumbCanvas.width = 160;
+                    thumbCanvas.height = 90;
+                    const ctx = thumbCanvas.getContext('2d');
+                    ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+                    // Convert to data URL
+                    const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.7);
+                    if (video.thumbnail !== thumbnail) {
+                        video.thumbnail = thumbnail;
+                        this._updateItemUI(video);
+                        this._saveState();
+                        console.log(`[Playlist] Captured thumbnail for local file: ${video.title}`);
+                    }
+                }
+            } catch (e) {
+                console.warn('[Playlist] Failed to capture local file thumbnail:', e);
+            }
+        }, 500); // Wait 500ms for first frame
     }
 
     /**
@@ -779,6 +905,10 @@ export class Playlist {
                 video.isStream = true; // Mark for metadata prefetch skip
                 const shouldAutoplay = autoplay && this.player.isPlaying;
                 await this.player.load(video.url, shouldAutoplay, video.id, null);
+
+                // Update item metadata after stream loads
+                this._updateStreamItemMetadata(video, index);
+
                 this._updateUI();
                 this._saveState();
                 this._updatePlayerNavigationState();
@@ -864,6 +994,9 @@ export class Playlist {
 
             // Load video with saved subtitles (if any)
             await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null);
+
+            // Update item metadata (duration and thumbnail) after video loads
+            this._updateLocalItemMetadata(video, index);
 
             // Update UI
             this._updateUI();
