@@ -22,7 +22,13 @@ export class StreamDetector {
         if (lowerUrl.includes('.m3u8') ||
             lowerUrl.includes('/hls/') ||
             lowerUrl.includes('/live/') ||
-            lowerUrl.includes('playlist.m3u8')) {
+            lowerUrl.includes('playlist.m3u8') ||
+            lowerUrl.includes('/manifest/') ||
+            lowerUrl.includes('/stream/') ||
+            lowerUrl.includes('playouts') ||      // Common in Amagi/streaming CDNs
+            lowerUrl.includes('.now.') ||         // now.amagi.tv pattern
+            lowerUrl.includes('/master.') ||
+            lowerUrl.includes('/index.') && lowerUrl.includes('m3u')) {
             return this.TYPE_HLS;
         }
 

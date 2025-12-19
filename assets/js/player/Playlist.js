@@ -770,6 +770,20 @@ export class Playlist {
 
             this.activeIndex = index;
 
+            // Handle streams (HLS/Live) - load directly without MediaMetadata processing
+            if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {
+                video.isStream = true; // Mark for metadata prefetch skip
+                const shouldAutoplay = autoplay && this.player.isPlaying;
+                await this.player.load(video.url, shouldAutoplay, video.id, null);
+                this._updateUI();
+                this._saveState();
+                this._updatePlayerNavigationState();
+                if (shouldAutoplay) {
+                    this.player.play();
+                }
+                return;
+            }
+
             // On-Demand Loading: Fetch file from DB if missing OR if URL was revoked
             // Also handles remote URL items that need to load from cache
             if (!video.blob_url) {
