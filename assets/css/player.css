@@ -2127,7 +2127,10 @@ body.fullscreen-active {
     letter-spacing: 1px;
     margin-right: 10px;
     align-items: center;
+    justify-content: center;
+    text-align: center;
     gap: 5px;
+    min-width: 70px;
     animation: live-pulse 2s ease-in-out infinite;
     box-shadow: 0 0 10px rgba(229, 57, 53, 0.5);
     border: none;
