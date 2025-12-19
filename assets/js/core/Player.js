@@ -1739,6 +1739,25 @@ export class CorePlayer {
     }
 
     /**
+     * Reset UI elements (canvas, time, progress)
+     */
+    resetUI() {
+        // Clear canvas
+        if (this.ctx && this.canvas) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        // Reset time and duration
+        this.currentTime = 0;
+        this.duration = 0;
+        this._updateTimeDisplay();
+        this._updateProgress();
+
+        // Hide loader if visible (optional, but good for full reset)
+        // this.ui.loader.classList.remove('visible'); 
+    }
+
+    /**
      * Load an HLS stream
      * @param {string} url - HLS manifest URL (m3u8)
      * @param {boolean} autoplay - Whether to start playing automatically
@@ -1758,6 +1777,9 @@ export class CorePlayer {
             this.currentVideoId = videoId || url;
             this.ui.loader.classList.add('visible');
             this._hideStreamError(); // Hide any previous errors
+
+            // Reset UI (clear canvas, reset time/progress)
+            this.resetUI();
 
             // Create stream video element if needed
             this._createStreamVideo();
@@ -3219,7 +3241,9 @@ export class CorePlayer {
     }
 
     _updateProgress() {
-        const percent = (this.currentTime / this.duration) * 100;
+        let percent = (this.currentTime / this.duration) * 100;
+        if (!isFinite(percent)) percent = 0;
+
         this.ui.progressBar.style.width = `${percent}%`;
         this.ui.progressContainer.setAttribute('aria-valuenow', Math.round(percent));
         this._updateTimeDisplay();

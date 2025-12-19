@@ -929,6 +929,11 @@ export class Playlist {
     async selectItem(index, autoplay = true) {
         if (index < 0 || index >= this.items.length) return;
 
+        // Reset UI immediately for instant feedback
+        if (this.player && typeof this.player.resetUI === 'function') {
+            this.player.resetUI();
+        }
+
         try {
             // Capture if we were playing before switching
             const wasPlaying = this.player.isPlaying;
