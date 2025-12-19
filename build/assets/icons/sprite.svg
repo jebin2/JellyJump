@@ -141,4 +141,18 @@
     <symbol id="icon-equalizer" viewBox="0 0 24 24">
         <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03V16c1.48-.74 2.5-2.26 2.5-4.03zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
     </symbol>
+    <!-- Target/Crosshair Icon -->
+    <symbol id="icon-target" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="12" cy="12" r="2" fill="currentColor"/>
+        <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2"/>
+        <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2"/>
+        <line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2"/>
+        <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/>
+    </symbol>
+    <!-- Search Icon -->
+    <symbol id="icon-search" viewBox="0 0 24 24">
+        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+    </symbol>
 </svg>
