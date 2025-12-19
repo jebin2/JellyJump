@@ -629,8 +629,15 @@ export class Playlist {
 
         const el = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
         if (el) {
-            const durationEl = el.querySelector('.playlist-duration');
-            if (durationEl) durationEl.textContent = item.duration;
+            // Update overlay
+            let overlay = el.querySelector('.playlist-thumbnail-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'playlist-thumbnail-overlay';
+                const thumbEl = el.querySelector('.playlist-thumbnail');
+                if (thumbEl) thumbEl.appendChild(overlay);
+            }
+            if (overlay) overlay.textContent = item.duration;
 
             // Update thumbnail if available - use background-image on div
             const thumbEl = el.querySelector('.playlist-thumbnail');
@@ -638,6 +645,13 @@ export class Playlist {
                 thumbEl.style.backgroundImage = `url(${item.thumbnail})`;
                 thumbEl.style.backgroundSize = 'cover';
                 thumbEl.style.backgroundPosition = 'center';
+
+                // Hide placeholder/img, keep overlay
+                Array.from(thumbEl.children).forEach(child => {
+                    if (!child.classList.contains('playlist-thumbnail-overlay')) {
+                        child.style.display = 'none';
+                    }
+                });
             }
         }
     }
@@ -698,7 +712,7 @@ export class Playlist {
         }
 
         let attempts = 0;
-        const maxAttempts = 15; // Try for up to 15 seconds (streams take longer)
+        const maxAttempts = 60; // Try for up to 60 seconds (streams take longer)
 
         // Poll until we can capture
         const tryCapture = () => {
@@ -727,19 +741,21 @@ export class Playlist {
                 // HAVE_METADATA = 1, HAVE_CURRENT_DATA = 2
                 if (this.player.streamVideo.readyState < 2) {
                     // Stream video not ready yet, wait for it
-                    setTimeout(tryCapture, 500);
+                    console.log(`[Playlist] Stream not ready (readyState: ${this.player.streamVideo.readyState}), waiting...`);
+                    setTimeout(tryCapture, 1000);
                     return;
                 }
 
                 // Extra check: make sure video dimensions are set
                 if (this.player.streamVideo.videoWidth === 0) {
-                    setTimeout(tryCapture, 500);
+                    setTimeout(tryCapture, 1000);
                     return;
                 }
             }
 
-            // Check if player is playing and has canvas content
-            if (!this.player.isPlaying || !this.player.canvas) {
+            // Check if player has canvas content
+            // REMOVED !this.player.isPlaying check to allow capture during buffering
+            if (!this.player.canvas) {
                 // Retry in 1 second
                 setTimeout(tryCapture, 1000);
                 return;
@@ -761,12 +777,28 @@ export class Playlist {
                 ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
 
                 // Check if canvas has actual content (not just black)
-                const imageData = ctx.getImageData(0, 0, 10, 10);
-                const hasContent = imageData.data.some((v, i) => i % 4 !== 3 && v > 10);
+                // Check more pixels to be sure (center and corners)
+                const imageData = ctx.getImageData(0, 0, thumbCanvas.width, thumbCanvas.height);
+                const data = imageData.data;
+                let nonBlackPixels = 0;
+                const threshold = 10; // Dark threshold
 
-                if (!hasContent) {
-                    // Canvas is still black, retry
-                    setTimeout(tryCapture, 500);
+                // Sample every 4th pixel to save perf
+                for (let i = 0; i < data.length; i += 16) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    if (r > threshold || g > threshold || b > threshold) {
+                        nonBlackPixels++;
+                    }
+                }
+
+                // Require at least 5% of pixels to be non-black
+                const totalPixels = (thumbCanvas.width * thumbCanvas.height) / 4;
+                if (nonBlackPixels < totalPixels * 0.05) {
+                    // Canvas is still mostly black, retry
+                    // console.log('[Playlist] Canvas mostly black, retrying...');
+                    setTimeout(tryCapture, 1000);
                     return;
                 }
 
@@ -787,6 +819,7 @@ export class Playlist {
                 console.log(`[Playlist] Captured thumbnail for: ${video.title}`);
             } catch (e) {
                 console.warn('[Playlist] Failed to capture thumbnail:', e);
+                setTimeout(tryCapture, 1000);
             }
         };
 
@@ -1578,15 +1611,30 @@ export class Playlist {
 
         // Thumbnail
         if (item.thumbnail) {
-            thumbnail.innerHTML = `<img src="${item.thumbnail}" alt="${item.title}" loading="lazy">`;
+            thumbnail.style.backgroundImage = `url(${item.thumbnail})`;
+            thumbnail.style.backgroundSize = 'cover';
+            thumbnail.style.backgroundPosition = 'center';
         } else {
             const placeholderTemplate = document.getElementById('video-placeholder-template');
             const placeholderClone = placeholderTemplate.content.cloneNode(true);
             thumbnail.appendChild(placeholderClone);
         }
 
-        // Title
-        const titleText = item.title || 'Unknown Video';
+        // Add Duration Overlay
+        const durationOverlay = document.createElement('div');
+        durationOverlay.className = 'playlist-thumbnail-overlay';
+        durationOverlay.textContent = item.duration || '--:--';
+        thumbnail.appendChild(durationOverlay);
+
+        // Title Sanitization
+        let titleText = item.title || 'Unknown Video';
+        // Remove extension
+        titleText = titleText.replace(/\.[^/.]+$/, "");
+        // Replace underscores/hyphens with spaces
+        titleText = titleText.replace(/[_-]/g, " ");
+        // Capitalize words
+        titleText = titleText.replace(/\b\w/g, l => l.toUpperCase());
+
         title.textContent = titleText;
         title.setAttribute('title', titleText);
 
@@ -1597,8 +1645,8 @@ export class Playlist {
             title.appendChild(statusSpan);
         }
 
-        // Duration
-        duration.textContent = item.duration || '--:--';
+        // Duration (hidden by CSS)
+        if (duration) duration.style.display = 'none';
 
         return clone;
     }
