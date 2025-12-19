@@ -116,7 +116,7 @@ export class RecordMenu {
                     window.URL.revokeObjectURL(url);
                 }, 100);
 
-                playlist._showToast('Recording saved to Downloads', 'success');
+                playlist._showToast('Recording saved', 'success');
                 this.chunks = [];
                 this.isRecording = false;
                 this.mediaRecorder = null;
