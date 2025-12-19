@@ -12,6 +12,9 @@ import { ElectronHelper } from '../utils/ElectronHelper.js';
 import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
 
+// Performance config for large playlists (e.g., 10K+ IPTV channels)
+const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
+
 /**
  * Playlist Manager
  * Handles rendering and interaction for the video playlist.
@@ -964,6 +967,7 @@ export class Playlist {
 
     /**
      * Create folder element with header and children
+     * Uses LAZY RENDERING for large folders to improve performance
      * @param {Object} folder
      * @returns {HTMLElement}
      * @private
@@ -974,17 +978,31 @@ export class Playlist {
 
         const isExpanded = this.expandedFolders.has(folder.path);
 
-        // Create header
-        const header = this._createFolderHeader(folder, isExpanded);
+        // Calculate total children (items + nested folder items)
+        const totalChildren = this._countFolderChildren(folder);
+        const useLazyRendering = totalChildren > LAZY_FOLDER_THRESHOLD && !isExpanded;
+
+        // Create header with item count badge
+        const header = this._createFolderHeader(folder, isExpanded, totalChildren);
 
         // Create children container
         const childrenContainer = document.createElement('div');
         childrenContainer.className = `playlist-children ${isExpanded ? '' : 'hidden'}`;
 
-        // Recursively render children
-        childrenContainer.appendChild(this._renderTreeLevel(folder));
+        // LAZY RENDERING: Only render children if expanded OR small folder
+        if (useLazyRendering) {
+            // Mark for lazy loading - will render on first expand
+            childrenContainer.dataset.lazyFolder = folder.path;
+            childrenContainer.dataset.needsRender = 'true';
+            // Store folder data for later rendering
+            this._lazyFolderData = this._lazyFolderData || new Map();
+            this._lazyFolderData.set(folder.path, folder);
+        } else {
+            // Render immediately (small folder or already expanded)
+            childrenContainer.appendChild(this._renderTreeLevel(folder));
+        }
 
-        // Attach events
+        // Attach events (handles lazy rendering on expand)
         this._attachFolderEvents(header, childrenContainer, folder);
 
         folderEl.appendChild(header);
@@ -993,13 +1011,30 @@ export class Playlist {
     }
 
     /**
+     * Count total items in a folder (recursively)
+     * @param {Object} folder
+     * @returns {number}
+     * @private
+     */
+    _countFolderChildren(folder) {
+        let count = folder.items?.length || 0;
+        if (folder.children) {
+            for (const child of Object.values(folder.children)) {
+                count += this._countFolderChildren(child);
+            }
+        }
+        return count;
+    }
+
+    /**
      * Create folder header HTML
      * @param {Object} folder
      * @param {boolean} isExpanded
+     * @param {number} itemCount - Total items in folder
      * @returns {HTMLElement}
      * @private
      */
-    _createFolderHeader(folder, isExpanded) {
+    _createFolderHeader(folder, isExpanded, itemCount = 0) {
         const template = document.getElementById('playlist-folder-header-template');
         const clone = template.content.cloneNode(true);
 
@@ -1011,7 +1046,9 @@ export class Playlist {
         if (isExpanded) {
             toggle.classList.add('expanded');
         }
-        folderName.textContent = folder.name;
+
+        // Show folder name with item count
+        folderName.textContent = itemCount > 0 ? `${folder.name} (${itemCount})` : folder.name;
         removeBtn.setAttribute('aria-label', `Remove folder ${folder.name}`);
 
         return clone.firstElementChild;
@@ -1019,18 +1056,24 @@ export class Playlist {
 
     /**
      * Attach event listeners to folder elements
+     * Handles LAZY RENDERING: children are rendered on first expand
      * @param {HTMLElement} header
      * @param {HTMLElement} childrenContainer
      * @param {Object} folder
      * @private
      */
     _attachFolderEvents(header, childrenContainer, folder) {
-        // Toggle Event
+        // Toggle Event - handles lazy rendering
         header.querySelector('.playlist-folder-info').addEventListener('click', (e) => {
             e.stopPropagation();
             const isHidden = childrenContainer.classList.contains('hidden');
 
             if (isHidden) {
+                // LAZY RENDERING: Render children on first expand
+                if (childrenContainer.dataset.needsRender === 'true') {
+                    this._renderLazyFolderContent(childrenContainer, folder);
+                }
+
                 childrenContainer.classList.remove('hidden');
                 header.querySelector('.playlist-toggle').classList.add('expanded');
                 this.expandedFolders.add(folder.path);
@@ -1048,6 +1091,24 @@ export class Playlist {
                 this.removeFolder(folder.path);
             }
         });
+    }
+
+    /**
+     * Render lazy folder content on first expand
+     * Simply defers rendering until needed - no virtual scrolling needed
+     * for folders since tree rendering is already efficient after first load
+     * @param {HTMLElement} container
+     * @param {Object} folder
+     * @private
+     */
+    _renderLazyFolderContent(container, folder) {
+        // Mark as rendered
+        delete container.dataset.needsRender;
+        delete container.dataset.lazyFolder;
+
+        // Simply render the tree level normally - the lazy loading already
+        // provides the main performance benefit by deferring this work
+        container.appendChild(this._renderTreeLevel(folder));
     }
 
     /**
