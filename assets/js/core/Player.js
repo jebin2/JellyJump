@@ -13,6 +13,7 @@ import { AudioEqualizer } from '../player/AudioEqualizer.js';
 import { StreamBuffer } from '../utils/StreamBuffer.js';
 import { HLSPlayer } from './HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
+import { AudioVisualizer } from '../player/AudioVisualizer.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -187,6 +188,11 @@ export class CorePlayer {
         this.liveMode = 'buffer'; // 'live' or 'buffer' - default to 30s buffer for stability
         this.streamRenderLoopId = null;
         this.streamBuffer = null; // DVR-style segment capture (experimental)
+
+        // Audio-only playback
+        this.audioVisualizer = null;
+        this.isAudioMode = false;
+        this.audioElement = null;
 
         // Global Event Handlers (created conditionally based on which controls are enabled)
         this._handlers = {
@@ -1584,8 +1590,9 @@ export class CorePlayer {
      * @param {boolean} autoplay - Whether to start playing automatically
      * @param {string} videoId - Optional unique identifier for the video
      * @param {Array} savedSubtitles - Optional saved subtitle tracks
+     * @param {Object} options - Additional options { isAudio: boolean }
      */
-    async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
+    async load(url, autoplay = false, videoId = null, savedSubtitles = null, options = {}) {
         try {
             // Detect stream type
             const streamType = StreamDetector.detect(url);
@@ -1593,6 +1600,19 @@ export class CorePlayer {
             if (streamType === StreamDetector.TYPE_HLS) {
                 return this._loadHLSStream(url, autoplay, videoId);
             }
+
+            // Detect audio-only files by extension OR by isAudio flag
+            const urlLower = url.toLowerCase();
+            const audioExtensions = ['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma'];
+            const isAudioByExtension = audioExtensions.some(ext => urlLower.endsWith(ext));
+            const isAudioFile = options.isAudio || isAudioByExtension;
+
+            if (isAudioFile) {
+                return this._loadAudioFile(url, autoplay, videoId);
+            }
+
+            // Reset audio mode if loading a video
+            this._cleanupAudio();
 
             // Reset stream mode if loading a file
             if (this.hlsPlayer) {
@@ -1735,6 +1755,131 @@ export class CorePlayer {
         } catch (error) {
             console.error('Error loading media:', error);
             this.ui.loader.classList.remove('visible');
+        }
+    }
+
+    /**
+     * Load an audio file and display visualizer
+     * @param {string} url - Audio file URL
+     * @param {boolean} autoplay - Whether to start playing automatically
+     * @param {string} videoId - Optional unique identifier
+     * @private
+     */
+    async _loadAudioFile(url, autoplay, videoId) {
+        try {
+            console.log('[Audio] Loading audio file:', url);
+
+            // Cleanup previous playback
+            this._cleanupAudio();
+            this._cleanupMediaBunny();
+            if (this.hlsPlayer) this._cleanupHLS();
+
+            this.isAudioMode = true;
+            this.isStreamMode = false;
+            this.isLive = false;
+            this.currentVideoId = videoId || url;
+            this.ui.loader.classList.add('visible');
+
+            // Create audio element
+            this.audioElement = new Audio();
+            this.audioElement.crossOrigin = 'anonymous';
+            this.audioElement.src = url;
+            this.audioElement.preload = 'metadata';
+
+            // Wait for metadata
+            await new Promise((resolve, reject) => {
+                this.audioElement.onloadedmetadata = () => {
+                    this.duration = this.audioElement.duration;
+                    this._updateTimeDisplay();
+                    resolve();
+                };
+                this.audioElement.onerror = (e) => {
+                    reject(new Error('Failed to load audio: ' + (e.target?.error?.message || 'Unknown error')));
+                };
+            });
+
+            // Setup audio context and visualizer
+            await this._initAudioVisualizerForAudioFile();
+
+            // Setup event listeners
+            this.audioElement.ontimeupdate = () => {
+                this.currentTime = this.audioElement.currentTime;
+                this._updateTimeDisplay();
+                this._updateProgress();
+            };
+
+            this.audioElement.onended = () => {
+                this.isPlaying = false;
+                this._updatePlayPauseUI();
+                if (this.onEnded) this.onEnded();
+            };
+
+            // Draw static background
+            if (this.audioVisualizer) {
+                this.audioVisualizer.drawStaticBackground();
+            }
+
+            // Hide loader and show play overlay
+            this.ui.loader.classList.remove('visible');
+            if (this.ui.playOverlay) {
+                this.ui.playOverlay.style.display = 'flex';
+            }
+
+            if (autoplay) {
+                await this.play();
+            }
+
+            console.log('[Audio] Audio file loaded successfully');
+
+        } catch (error) {
+            console.error('[Audio] Error loading audio:', error);
+            this.ui.loader.classList.remove('visible');
+            this.isAudioMode = false;
+        }
+    }
+
+    /**
+     * Initialize audio visualizer for audio file playback
+     * @private
+     */
+    async _initAudioVisualizerForAudioFile() {
+        // Initialize audio context if needed
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // Resume if suspended
+        if (this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
+
+        // Create audio source from audio element
+        const source = this.audioContext.createMediaElementSource(this.audioElement);
+
+        // Create and connect visualizer
+        this.audioVisualizer = new AudioVisualizer(this.canvas);
+        this.audioVisualizer.connect(this.audioContext, source);
+    }
+
+    /**
+     * Cleanup audio-only playback
+     * @private
+     */
+    _cleanupAudio() {
+        this.isAudioMode = false;
+
+        if (this.audioVisualizer) {
+            this.audioVisualizer.disconnect();
+            this.audioVisualizer = null;
+        }
+
+        if (this.audioElement) {
+            // Remove event listeners before cleanup
+            this.audioElement.ontimeupdate = null;
+            this.audioElement.onended = null;
+            this.audioElement.pause();
+            this.audioElement.src = '';
+            this.audioElement = null;
         }
     }
 
@@ -2867,6 +3012,41 @@ export class CorePlayer {
             return;
         }
 
+        // Handle audio-only mode
+        if (this.isAudioMode && this.audioElement) {
+            try {
+                // Resume audio context if suspended
+                if (this.audioContext && this.audioContext.state === 'suspended') {
+                    await this.audioContext.resume();
+                }
+
+                await this.audioElement.play();
+                this.isPlaying = true;
+                this._updatePlayPauseUI();
+
+                // Start visualizer
+                if (this.audioVisualizer) {
+                    this.audioVisualizer.start();
+                }
+
+                if (this.ui.playOverlay) {
+                    this.ui.playOverlay.style.display = 'none';
+                }
+
+                // Start auto-hide timer for overlay mode
+                if (this.controlBarMode === 'overlay') {
+                    setTimeout(() => {
+                        if (this.isPlaying && this.controlBarMode === 'overlay') {
+                            this._startAutoHideTimer();
+                        }
+                    }, 500);
+                }
+            } catch (e) {
+                console.warn('[Audio] Play failed:', e.message);
+            }
+            return;
+        }
+
         // File-based playback (MediaBunny)
         if (!this.videoTrack && !this.audioTrack) return;
 
@@ -2925,6 +3105,24 @@ export class CorePlayer {
             this.isPlaying = false;
             this._clearAutoHideTimer();
             this._updatePlayPauseUI();
+            if (this.ui.playOverlay) {
+                this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
+            }
+            return;
+        }
+
+        // Handle audio-only mode
+        if (this.isAudioMode && this.audioElement) {
+            this.audioElement.pause();
+            this.isPlaying = false;
+            this._clearAutoHideTimer();
+            this._updatePlayPauseUI();
+
+            // Stop visualizer
+            if (this.audioVisualizer) {
+                this.audioVisualizer.stop();
+            }
+
             if (this.ui.playOverlay) {
                 this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
             }
@@ -3170,6 +3368,18 @@ export class CorePlayer {
 
     async _seekTo(time) {
         console.log(`_seekTo called with time: ${time}`);
+
+        // Handle audio-only mode
+        if (this.isAudioMode && this.audioElement) {
+            const wasPlaying = this.isPlaying;
+            this.audioElement.currentTime = Math.max(0, Math.min(this.duration, time));
+            this.currentTime = this.audioElement.currentTime;
+            this._updateProgress();
+            if (wasPlaying) {
+                await this.play();
+            }
+            return;
+        }
 
         // Show loader during seek
         this.ui.loader.classList.add('visible');

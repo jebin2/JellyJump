@@ -553,14 +553,17 @@ export class Playlist {
      * @param {FileList} files 
      */
     handleFiles(files) {
-        const videoFiles = Array.from(files).filter(file => file.type.startsWith('video/'));
+        // Accept both video and audio files
+        const mediaFiles = Array.from(files).filter(file =>
+            file.type.startsWith('video/') || file.type.startsWith('audio/')
+        );
 
-        if (videoFiles.length === 0) {
-            alert('Please select valid video files.');
+        if (mediaFiles.length === 0) {
+            alert('Please select valid video or audio files.');
             return;
         }
 
-        const newItems = videoFiles.map(file => {
+        const newItems = mediaFiles.map(file => {
             // Determine path
             let path = file.webkitRelativePath || file.name;
             // If path doesn't contain separators, it's at root
@@ -568,12 +571,15 @@ export class Playlist {
                 path = file.name;
             }
 
+            const isAudio = file.type.startsWith('audio/');
+
             const item = {
                 title: file.name,
                 url: URL.createObjectURL(file),
                 duration: 'Loading...',
                 thumbnail: '',
                 isLocal: true,
+                isAudio: isAudio,
                 needsReload: false,
                 file: file,
                 fileSize: file.size,      // Cache size for InfoMenu (file will be released after IndexedDB save)
@@ -611,17 +617,20 @@ export class Playlist {
     async handleElectronFiles(files) {
 
         const videoExtensions = ['mp4', 'mkv', 'avi', 'webm', 'mov', 'm4v', 'wmv', 'flv'];
-        const videoFiles = files.filter(file => {
+        const audioExtensions = ['mp3', 'flac', 'aac', 'ogg', 'wav', 'm4a', 'opus', 'wma'];
+        const allExtensions = [...videoExtensions, ...audioExtensions];
+
+        const mediaFiles = files.filter(file => {
             const ext = file.name.split('.').pop().toLowerCase();
-            return videoExtensions.includes(ext);
+            return allExtensions.includes(ext);
         });
 
-        if (videoFiles.length === 0) {
-            alert('Please select valid video files.');
+        if (mediaFiles.length === 0) {
+            alert('Please select valid video or audio files.');
             return;
         }
 
-        const newItems = videoFiles.map(file => {
+        const newItems = mediaFiles.map(file => {
             // Determine MIME type from extension
             const ext = file.name.split('.').pop().toLowerCase();
             const mimeTypes = {
@@ -632,9 +641,19 @@ export class Playlist {
                 'mov': 'video/quicktime',
                 'm4v': 'video/x-m4v',
                 'wmv': 'video/x-ms-wmv',
-                'flv': 'video/x-flv'
+                'flv': 'video/x-flv',
+                // Audio types
+                'mp3': 'audio/mpeg',
+                'flac': 'audio/flac',
+                'aac': 'audio/aac',
+                'ogg': 'audio/ogg',
+                'wav': 'audio/wav',
+                'm4a': 'audio/mp4',
+                'opus': 'audio/opus',
+                'wma': 'audio/x-ms-wma'
             };
             const mimeType = mimeTypes[ext] || 'video/mp4';
+            const isAudio = ext && audioExtensions.includes(ext);
 
             return {
                 title: file.name,
@@ -642,6 +661,7 @@ export class Playlist {
                 duration: 'Loading...',
                 thumbnail: '',
                 isLocal: true,
+                isAudio: isAudio,
                 needsReload: false,
                 file: null, // File will be loaded from disk on-demand
                 fileSize: file.size,
@@ -1226,8 +1246,8 @@ export class Playlist {
                 console.log(`Saved ${subtitleTracks.length} subtitle track(s) for: ${video.title}`);
             };
 
-            // Load video with saved subtitles (if any)
-            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null);
+            // Load video with saved subtitles (if any) - pass isAudio for audio files
+            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null, { isAudio: video.isAudio });
 
             // Update item metadata (duration and thumbnail) after video loads
             this._updateLocalItemMetadata(video, index);
@@ -1968,6 +1988,42 @@ export class Playlist {
                 return;
             }
 
+            // Check if it's an audio file
+            const audioExtensions = ['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma'];
+            const isAudioFile = audioExtensions.some(ext => urlLower.endsWith(ext));
+
+            if (isAudioFile) {
+                const urlPath = new URL(url).pathname;
+                let filename = urlPath.split('/').pop() || 'audio';
+                filename = filename.split('?')[0];
+
+                // Remove extension for display
+                const displayTitle = filename.replace(/\.[^/.]+$/, '') || 'Audio Track';
+
+                const newItem = {
+                    title: displayTitle,
+                    url: url,
+                    blob_url: url,
+                    duration: 'Loading...',
+                    thumbnail: '',
+                    isLocal: false,
+                    isAudio: true,
+                    file: null,
+                    fileType: this._getAudioMimeType(urlLower),
+                    mimeType: this._getAudioMimeType(urlLower),
+                    id: generateId()
+                };
+
+                this.addItem(newItem);
+
+                // Select the new item if playlist was empty
+                if (this.items.length === 1) {
+                    this.selectItem(0);
+                }
+
+                return;
+            }
+
             // For regular video files, verify access
             const response = await fetch(url, { method: 'HEAD' });
 
@@ -2100,6 +2156,30 @@ export class Playlist {
             }
             throw error;
         }
+    }
+
+    /**
+     * Get MIME type for audio file extension
+     * @param {string} url - URL in lowercase
+     * @returns {string} MIME type
+     * @private
+     */
+    _getAudioMimeType(url) {
+        const mimeTypes = {
+            '.mp3': 'audio/mpeg',
+            '.flac': 'audio/flac',
+            '.aac': 'audio/aac',
+            '.ogg': 'audio/ogg',
+            '.wav': 'audio/wav',
+            '.m4a': 'audio/mp4',
+            '.opus': 'audio/opus',
+            '.wma': 'audio/x-ms-wma'
+        };
+
+        for (const [ext, mime] of Object.entries(mimeTypes)) {
+            if (url.endsWith(ext)) return mime;
+        }
+        return 'audio/mpeg'; // Default
     }
 
     /**
