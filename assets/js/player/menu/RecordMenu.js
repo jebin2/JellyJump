@@ -7,8 +7,6 @@ import { Modal } from '../Modal.js';
 export class RecordMenu {
     static isRecording = false;
     static mediaRecorder = null;
-    static writable = null;
-    static fileHandle = null;
     static chunks = [];
 
     /**
@@ -26,8 +24,6 @@ export class RecordMenu {
         // Check if item is active
         if (!this.checkActiveItem(item, playlist)) {
             playlist._showToast('Please play this video to record it', 'warning');
-            // Optionally play it for them?
-            // playlist.selectItem(playlist.items.indexOf(item));
             return;
         }
 
@@ -42,50 +38,23 @@ export class RecordMenu {
             playlist._showToast('Recording started. Play video to capture.', 'info');
         }
 
-        // Check if File System Access API is supported
-        const supportsFileSystem = 'showSaveFilePicker' in window;
-
-        if (!supportsFileSystem) {
-            this._startRecordingFallback(playlist);
-            return;
-        }
-
-        try {
-            // 1. Ask user where to save FIRST
-            const handle = await window.showSaveFilePicker({
-                suggestedName: `recording_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`,
-                types: [{
-                    description: 'WebM Video',
-                    accept: { 'video/webm': ['.webm'] },
-                }],
-            });
-
-            this.writable = await handle.createWritable();
-            this.fileHandle = handle;
-            this._startRecording(playlist, true);
-
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.error('RecordMenu: Error', err);
-                playlist._showToast('Failed to start recording: ' + err.message, 'error');
-            }
-        }
+        // Start Recording (Standard Download Mode)
+        this._startRecording(playlist);
     }
 
     /**
-     * Start Recording (Internal)
+     * Start Recording
      * @param {Playlist} playlist 
-     * @param {boolean} useFileSystem 
      */
-    static _startRecording(playlist, useFileSystem) {
+    static _startRecording(playlist) {
         try {
+            this.chunks = []; // Reset chunks
+
             // Capture Video from Canvas
             const videoStream = playlist.player.canvas.captureStream(30); // 30 FPS
 
             // Capture Audio from Video Element
             let audioStream;
-            // Try to find the video element. HLSPlayer attaches it to this.video, 
-            // and Player.js usually has it as this.video or this.hlsPlayer.video
             const videoEl = playlist.player.video || (playlist.player.hlsPlayer && playlist.player.hlsPlayer.video);
 
             if (videoEl) {
@@ -117,66 +86,47 @@ export class RecordMenu {
                 mimeType: 'video/webm;codecs=vp9,opus' // Try VP9 + Opus
             });
 
-            this.mediaRecorder.ondataavailable = async (event) => {
+            this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
-                    if (useFileSystem && this.writable) {
-                        await this.writable.write(event.data);
-                    } else if (!useFileSystem) {
-                        // Fallback: Store in memory
-                        if (!this.chunks) this.chunks = [];
-                        this.chunks.push(event.data);
-                    }
+                    this.chunks.push(event.data);
                 }
             };
 
-            this.mediaRecorder.onstop = async () => {
-                if (useFileSystem && this.writable) {
-                    await this.writable.close();
-                    playlist._showToast('Recording saved successfully!', 'success');
+            this.mediaRecorder.onstop = () => {
+                // Create Blob and File
+                const filename = `recording_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+                const blob = new Blob(this.chunks, { type: 'video/webm' });
 
-                    // Add to playlist
-                    if (this.fileHandle) {
-                        try {
-                            const file = await this.fileHandle.getFile();
-                            playlist.handleFiles([file]);
-                        } catch (e) {
-                            console.error('RecordMenu: Failed to add to playlist', e);
-                        }
-                    }
-                } else if (!useFileSystem) {
-                    // Fallback Download
-                    const filename = `recording_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
-                    const blob = new Blob(this.chunks, { type: 'video/webm' });
+                // Add to Playlist
+                const file = new File([blob], filename, { type: 'video/webm' });
+                playlist.handleFiles([file]);
 
-                    // Create File object for playlist
-                    const file = new File([blob], filename, { type: 'video/webm' });
-                    playlist.handleFiles([file]);
+                // Trigger Download
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
 
-                    // Trigger Download
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                    }, 100);
-                    playlist._showToast('Recording saved to Downloads', 'success');
-                    this.chunks = [];
-                }
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
 
+                playlist._showToast('Recording saved to Downloads', 'success');
+                this.chunks = [];
                 this.isRecording = false;
                 this.mediaRecorder = null;
-                this.writable = null;
-                this.fileHandle = null;
             };
 
             this.mediaRecorder.start(1000); // Write chunks every second
             this.isRecording = true;
-            playlist._showToast('Recording started. Play video to capture.', 'info');
+            if (!playlist.player.paused) {
+                playlist._showToast('Recording started. Play video to capture.', 'info');
+            }
 
         } catch (err) {
             console.error('RecordMenu: Start Error', err);
@@ -194,15 +144,6 @@ export class RecordMenu {
             this.mediaRecorder.stop();
             playlist._showToast('Stopping recording...', 'info');
         }
-    }
-
-    /**
-     * Fallback recording for browsers without File System Access API
-     * @private
-     */
-    static _startRecordingFallback(playlist) {
-        this.chunks = [];
-        this._startRecording(playlist, false);
     }
 
     /**
