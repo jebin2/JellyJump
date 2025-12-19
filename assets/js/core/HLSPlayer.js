@@ -271,20 +271,16 @@ export class HLSPlayer {
     seekToLive() {
         if (!this.isLive) return;
 
-        if (this.hls) {
-            // hls.js - use liveSyncPosition
-            const liveEdge = this.hls.liveSyncPosition;
-            if (liveEdge) {
-                this.video.currentTime = liveEdge;
-                console.log('[HLS] Seeked to live edge:', liveEdge);
-            }
-        } else {
-            // Native HLS (Safari) - seek to end of seekable range
-            const seekable = this.video.seekable;
-            if (seekable.length > 0) {
-                this.video.currentTime = seekable.end(seekable.length - 1);
-                console.log('[HLS] Seeked to live edge (native):', this.video.currentTime);
-            }
+        // Always use the end of seekable range for the true live edge
+        const seekable = this.video.seekable;
+        if (seekable.length > 0) {
+            const liveEdge = seekable.end(seekable.length - 1);
+            this.video.currentTime = liveEdge;
+            console.log('[HLS] Seeked to live edge:', liveEdge);
+        } else if (this.hls?.liveSyncPosition) {
+            // Fallback to liveSyncPosition if seekable not available yet
+            this.video.currentTime = this.hls.liveSyncPosition;
+            console.log('[HLS] Seeked to live sync position:', this.hls.liveSyncPosition);
         }
     }
 

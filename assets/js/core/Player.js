@@ -1783,9 +1783,9 @@ export class CorePlayer {
             this.ui.loader.classList.remove('visible');
             console.log('[Stream] HLS stream loaded successfully. Live:', this.isLive);
 
-            // For live streams, seek to live edge on first load
+            // Mark that we need to seek to live on first play
             if (this.isLive) {
-                this.hlsPlayer.seekToLive();
+                this._needsSeekToLive = true;
             }
 
             if (autoplay) {
@@ -1894,6 +1894,16 @@ export class CorePlayer {
             if (this.ui.playOverlay) {
                 this.ui.playOverlay.style.display = 'none';
             }
+
+            // Seek to live edge on first play for live streams
+            if (this._needsSeekToLive && this.hlsPlayer) {
+                this._needsSeekToLive = false;
+                // Small delay to ensure seekable range is populated
+                setTimeout(() => {
+                    this.hlsPlayer.seekToLive();
+                }, 300);
+            }
+
             // Start auto-hide timer for overlay mode
             if (this.controlBarMode === 'overlay') {
                 setTimeout(() => {
