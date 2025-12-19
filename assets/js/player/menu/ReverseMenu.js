@@ -191,7 +191,8 @@ export class ReverseMenu {
                     isLocal: true,
                     file: new File([reversedBlob], filename, { type: 'video/mp4' }),
                     id: generateId(),
-                    type: 'video/mp4'
+                    type: 'video/mp4',
+                    path: (item.path || item.title) + '/' + filename
                 };
 
                 const sourceIndex = playlist.items.indexOf(item);

@@ -283,11 +283,12 @@ export class TrimMenu {
                         id: generateId(),
                         title: filename,
                         url: url,
-                        file: new File([blob], filename, { type: `video / ${ext} ` }),
+                        file: new File([blob], filename, { type: `video/${ext}` }),
                         duration: formatTime(endTime - startTime),
                         type: 'video',
                         isLocal: true,
-                        isNew: true
+                        isNew: true,
+                        path: (item.path || item.title) + '/' + filename
                     };
 
                     const insertIndex = playlist.items.indexOf(item) + 1;

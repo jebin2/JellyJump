@@ -477,7 +477,8 @@ export class RemoveBackgroundMenu {
                     isLocal: true,
                     file: new File([processedBlob], filename, { type: `video/${ext}` }),
                     id: generateId(),
-                    type: `video/${ext}`
+                    type: `video/${ext}`,
+                    path: (item.path || item.title) + '/' + filename
                 };
 
                 const sourceIndex = playlist.items.indexOf(item);

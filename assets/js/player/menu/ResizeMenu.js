@@ -217,7 +217,8 @@ export class ResizeMenu {
                         duration: item.duration,
                         type: 'video',
                         isLocal: true,
-                        isNew: true
+                        isNew: true,
+                        path: (item.path || item.title) + '/' + filename
                     };
 
                     const insertIndex = playlist.items.indexOf(item) + 1;

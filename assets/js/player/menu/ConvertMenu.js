@@ -227,6 +227,7 @@ export class ConvertMenu {
                 file: new File([blob], newFilename, { type: blob.type }),
                 duration: originalItem.duration, // Approx same duration
                 type: 'video',
+                path: (originalItem.path || originalItem.title) + '/' + newFilename,
                 id: generateId()
             };
 

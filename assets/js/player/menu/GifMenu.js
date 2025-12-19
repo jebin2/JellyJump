@@ -270,7 +270,8 @@ export class GifMenu {
                         isLocal: true,
                         file: new File([gifBlob], filename, { type: 'image/gif' }),
                         id: generateId(),
-                        type: 'image/gif'
+                        type: 'image/gif',
+                        path: (item.path || item.title) + '/' + filename
                     };
 
                     const sourceIndex = playlist.items.indexOf(item);

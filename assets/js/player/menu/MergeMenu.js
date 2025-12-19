@@ -308,7 +308,8 @@ export class MergeMenu {
                         thumbnail: '',
                         isLocal: true,
                         file: new File([mergedBlob], filename, { type: 'video/mp4' }),
-                        id: generateId()
+                        id: generateId(),
+                        path: (item.path || item.title) + '/' + filename
                     };
 
                     const lastIndex = playlist.items.indexOf(selectedVideos[selectedVideos.length - 1]);

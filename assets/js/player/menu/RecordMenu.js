@@ -98,8 +98,20 @@ export class RecordMenu {
                 const blob = new Blob(this.chunks, { type: 'video/webm' });
 
                 // Add to Playlist
+                const itemPath = playlist.items[playlist.activeIndex].path || playlist.items[playlist.activeIndex].title;
                 const file = new File([blob], filename, { type: 'video/webm' });
-                playlist.handleFiles([file]);
+                const newItem = {
+                    title: filename,
+                    url: URL.createObjectURL(blob),
+                    file: file,
+                    duration: 'Loading...',
+                    type: 'video',
+                    isLocal: true,
+                    path: `${itemPath}/${filename}`,
+                    id: Date.now().toString() // Simple ID generation
+                };
+
+                playlist.addItems([newItem]);
 
                 // Trigger Download
                 const url = URL.createObjectURL(blob);
