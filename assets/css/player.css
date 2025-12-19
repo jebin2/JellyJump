@@ -2130,6 +2130,9 @@ body.fullscreen-active {
     gap: 5px;
     animation: live-pulse 2s ease-in-out infinite;
     box-shadow: 0 0 10px rgba(229, 57, 53, 0.5);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
 }
 
 .jellyjump-live-badge::before {

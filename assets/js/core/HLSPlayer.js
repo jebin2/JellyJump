@@ -383,6 +383,27 @@ export class HLSPlayer {
     }
 
     /**
+     * Seek to a specific latency from the live edge
+     * @param {number} latency - Seconds from live edge
+     */
+    seekToLatency(latency) {
+        if (!this.isLive) return;
+
+        const seekable = this.video.seekable;
+        if (seekable.length > 0) {
+            const liveEdge = seekable.end(seekable.length - 1);
+            let targetTime = liveEdge - latency;
+
+            // Ensure we don't seek before the start
+            const start = seekable.start(0);
+            targetTime = Math.max(start, targetTime);
+
+            this.video.currentTime = targetTime;
+            console.log(`[HLS] Seeked to latency ${latency}s (time: ${targetTime})`);
+        }
+    }
+
+    /**
      * Get latency from live edge
      * @returns {number} Seconds behind live
      */

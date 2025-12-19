@@ -183,6 +183,7 @@ export class CorePlayer {
         this.streamVideo = null;
         this.isStreamMode = false;
         this.isLive = false;
+        this.liveMode = 'live'; // 'live' or 'buffer'
 
         // Global Event Handlers (created conditionally based on which controls are enabled)
         this._handlers = {
@@ -1895,9 +1896,18 @@ export class CorePlayer {
                 // Update LIVE badge based on whether we're at live edge
                 if (this.isLive && this.ui.liveBadge) {
                     const latency = this.hlsPlayer?.getLiveLatency() || 0;
-                    // Only consider "at live" if within 5 seconds of live edge
-                    // This ensures badge is gray even after short pauses
-                    const isAtLive = latency < 10;
+                    let isAtLive = false;
+
+                    if (this.liveMode === 'buffer') {
+                        // In buffer mode, we want to be around 30s behind
+                        // Allow +/- 5s drift
+                        isAtLive = Math.abs(latency - 30) < 5;
+                    } else {
+                        // In live mode, we want to be close to 0
+                        // Only consider "at live" if within 10 seconds of live edge
+                        isAtLive = latency < 10;
+                    }
+
                     this.ui.liveBadge.classList.toggle('not-live', !isAtLive);
                 }
             }
@@ -1967,25 +1977,74 @@ export class CorePlayer {
     _updateStreamUI() {
         // Create or update live badge
         if (this.isLive) {
-            if (!this.ui.liveBadge) {
-                this.ui.liveBadge = document.createElement('span');
+            if (!this.ui.liveControl) {
+                // Container
+                this.ui.liveControl = document.createElement('div');
+                this.ui.liveControl.className = 'jellyjump-menu-btn jellyjump-live-control';
+                this.ui.liveControl.style.display = 'inline-flex';
+                this.ui.liveControl.style.marginRight = '10px';
+                this.ui.liveControl.style.position = 'relative'; // For menu positioning
+
+                // Badge/Button
+                this.ui.liveBadge = document.createElement('button');
                 this.ui.liveBadge.className = 'jellyjump-live-badge';
                 this.ui.liveBadge.textContent = 'LIVE';
-                this.ui.liveBadge.style.cursor = 'pointer';
-                this.ui.liveBadge.title = 'Click to jump to live';
+                this.ui.liveBadge.title = 'Click to change mode';
+                this.ui.liveBadge.style.display = 'inline-flex'; // Override CSS display: none
+                this.ui.liveBadge.style.marginRight = '0'; // Remove margin as container handles it
 
-                // Click to seek to live edge
-                this.ui.liveBadge.addEventListener('click', () => {
+                // Menu
+                this.ui.liveMenu = document.createElement('div');
+                this.ui.liveMenu.className = 'jellyjump-menu';
+                this.ui.liveMenu.style.minWidth = '150px';
+                this.ui.liveMenu.innerHTML = `
+                    <div class="jellyjump-menu-item active" data-value="live">Live (Low Latency)</div>
+                    <div class="jellyjump-menu-item" data-value="buffer">30s Buffer (Stable)</div>
+                `;
+
+                this.ui.liveControl.appendChild(this.ui.liveBadge);
+                this.ui.liveControl.appendChild(this.ui.liveMenu);
+
+                // Events
+                this.ui.liveBadge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.ui.liveMenu.classList.toggle('visible');
+                });
+
+                // Close menu when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!this.ui.liveControl.contains(e.target)) {
+                        this.ui.liveMenu.classList.remove('visible');
+                    }
+                });
+
+                this.ui.liveMenu.addEventListener('click', (e) => {
+                    const item = e.target.closest('.jellyjump-menu-item');
+                    if (!item) return;
+
+                    const mode = item.dataset.value;
+                    this.liveMode = mode;
+
+                    // Update menu active state
+                    this.ui.liveMenu.querySelectorAll('.jellyjump-menu-item').forEach(el => el.classList.remove('active'));
+                    item.classList.add('active');
+
+                    // Update badge text
+                    this.ui.liveBadge.textContent = mode === 'live' ? 'LIVE' : 'BUFFER';
+
+                    // Seek immediately
                     this._seekToLive();
+
+                    this.ui.liveMenu.classList.remove('visible');
                 });
 
                 // Insert near time display
                 const timeContainer = this.ui.timeDisplay?.parentNode;
                 if (timeContainer) {
-                    timeContainer.insertBefore(this.ui.liveBadge, this.ui.timeDisplay);
+                    timeContainer.insertBefore(this.ui.liveControl, this.ui.timeDisplay);
                 }
             }
-            this.ui.liveBadge.style.display = 'inline-flex';
+            this.ui.liveControl.style.display = 'inline-flex';
 
             // Hide progress bar for live streams (no seeking)
             if (this.ui.progressContainer) {
@@ -1996,8 +2055,8 @@ export class CorePlayer {
             }
         } else {
             // VOD stream - show normal controls
-            if (this.ui.liveBadge) {
-                this.ui.liveBadge.style.display = 'none';
+            if (this.ui.liveControl) {
+                this.ui.liveControl.style.display = 'none';
             }
             if (this.ui.progressContainer) {
                 this.ui.progressContainer.classList.remove('live-mode-hidden');
@@ -2168,7 +2227,13 @@ export class CorePlayer {
             // Show loader during seek
             this.ui.loader.classList.add('visible');
 
-            this.hlsPlayer.seekToLive();
+            if (this.liveMode === 'buffer') {
+                this.hlsPlayer.seekToLatency(30);
+                console.log('[Stream] Seeked to 30s buffer');
+            } else {
+                this.hlsPlayer.seekToLive();
+                console.log('[Stream] Seeked to live edge');
+            }
 
             // Update LIVE badge to show we're at live edge
             if (this.ui.liveBadge) {
@@ -2179,7 +2244,6 @@ export class CorePlayer {
             if (!this.isPlaying) {
                 this.play();
             }
-            console.log('[Stream] Seeked to live edge');
         }
     }
 
@@ -2195,6 +2259,14 @@ export class CorePlayer {
         this.isStreamMode = false;
         this.isLive = false;
 
+        // Remove live control
+        if (this.ui.liveControl) {
+            this.ui.liveControl.remove();
+            this.ui.liveControl = null;
+            this.ui.liveBadge = null;
+            this.ui.liveMenu = null;
+        }
+
         // Remove quality UI
         if (this.ui.qualityBtn) {
             this.ui.qualityBtn.remove();
@@ -2203,9 +2275,6 @@ export class CorePlayer {
         if (this.ui.qualityMenu) {
             this.ui.qualityMenu.remove();
             this.ui.qualityMenu = null;
-        }
-        if (this.ui.liveBadge) {
-            this.ui.liveBadge.style.display = 'none';
         }
 
         // Reset Live Mode UI (Progress bar and time display)
