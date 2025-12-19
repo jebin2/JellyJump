@@ -1887,6 +1887,13 @@ export class CorePlayer {
             }
         };
 
+        // Seek completed - hide loader
+        this.streamVideo.onseeked = () => {
+            if (this.isStreamMode) {
+                this.ui.loader.classList.remove('visible');
+            }
+        };
+
         // Playing state sync
         this.streamVideo.onplay = () => {
             this.isPlaying = true;
@@ -1898,6 +1905,8 @@ export class CorePlayer {
             // Seek to live edge on first play for live streams
             if (this._needsSeekToLive && this.hlsPlayer) {
                 this._needsSeekToLive = false;
+                // Show loader during seek
+                this.ui.loader.classList.add('visible');
                 // Small delay to ensure seekable range is populated
                 setTimeout(() => {
                     this.hlsPlayer.seekToLive();
@@ -2133,6 +2142,9 @@ export class CorePlayer {
      */
     _seekToLive() {
         if (this.isStreamMode && this.isLive && this.hlsPlayer) {
+            // Show loader during seek
+            this.ui.loader.classList.add('visible');
+
             this.hlsPlayer.seekToLive();
 
             // Update LIVE badge to show we're at live edge
