@@ -805,7 +805,9 @@ export class CorePlayer {
             if (this.ui.eqBassSlider) {
                 this.ui.eqBassSlider.addEventListener('input', (e) => {
                     const value = parseInt(e.target.value);
-                    this.audioEqualizer.setBass(value);
+                    if (this.audioEqualizer) {
+                        this.audioEqualizer.setBass(value);
+                    }
                     this.ui.eqBassValue.textContent = value;
                 });
             }
@@ -814,7 +816,9 @@ export class CorePlayer {
             if (this.ui.eqMidSlider) {
                 this.ui.eqMidSlider.addEventListener('input', (e) => {
                     const value = parseInt(e.target.value);
-                    this.audioEqualizer.setMid(value);
+                    if (this.audioEqualizer) {
+                        this.audioEqualizer.setMid(value);
+                    }
                     this.ui.eqMidValue.textContent = value;
                 });
             }
@@ -823,7 +827,9 @@ export class CorePlayer {
             if (this.ui.eqTrebleSlider) {
                 this.ui.eqTrebleSlider.addEventListener('input', (e) => {
                     const value = parseInt(e.target.value);
-                    this.audioEqualizer.setTreble(value);
+                    if (this.audioEqualizer) {
+                        this.audioEqualizer.setTreble(value);
+                    }
                     this.ui.eqTrebleValue.textContent = value;
                 });
             }
@@ -831,6 +837,7 @@ export class CorePlayer {
             // Preset buttons
             this.container.querySelectorAll('.eq-preset-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
+                    if (!this.audioEqualizer) return;
                     const preset = btn.dataset.preset;
                     this.audioEqualizer.applyPreset(preset);
                     this._syncEqSliders();
@@ -840,6 +847,7 @@ export class CorePlayer {
             // Reset button
             if (this.ui.resetEqBtn) {
                 this.ui.resetEqBtn.addEventListener('click', () => {
+                    if (!this.audioEqualizer) return;
                     this.audioEqualizer.reset();
                     this._syncEqSliders();
                 });
