@@ -1957,14 +1957,21 @@ export class CorePlayer {
             // Start canvas render loop for stream (copies video frames to canvas)
             this._startStreamRenderLoop();
 
-            // Seek to live edge on first play for live streams
+            // Seek to appropriate position on first play for live streams
             if (this._needsSeekToLive && this.hlsPlayer) {
                 this._needsSeekToLive = false;
                 // Show loader during seek
                 this.ui.loader.classList.add('visible');
                 // Small delay to ensure seekable range is populated
                 setTimeout(() => {
-                    this.hlsPlayer.seekToLive();
+                    // Respect liveMode setting - buffer mode seeks to 30s behind
+                    if (this.liveMode === 'buffer') {
+                        this.hlsPlayer.seekToLatency(30);
+                        console.log('[Stream] First play - seeked to 30s buffer');
+                    } else {
+                        this.hlsPlayer.seekToLive();
+                        console.log('[Stream] First play - seeked to live edge');
+                    }
                 }, 300);
             }
 
@@ -2081,23 +2088,23 @@ export class CorePlayer {
                 this.ui.liveControl.style.marginRight = '10px';
                 this.ui.liveControl.style.position = 'relative'; // For menu positioning
 
-                // Badge/Button
+                // Badge/Button - show BUFFER since that's the default liveMode
                 this.ui.liveBadge = document.createElement('button');
                 this.ui.liveBadge.className = 'jellyjump-live-badge';
-                this.ui.liveBadge.textContent = 'LIVE';
+                this.ui.liveBadge.textContent = this.liveMode === 'live' ? 'LIVE' : 'BUFFER';
                 this.ui.liveBadge.title = 'Click to change mode';
                 this.ui.liveBadge.style.display = 'inline-flex'; // Override CSS display: none
                 this.ui.liveBadge.style.marginRight = '0'; // Remove margin as container handles it
 
-                // Menu
+                // Menu - mark buffer as active by default (matches liveMode = 'buffer')
                 this.ui.liveMenu = document.createElement('div');
                 this.ui.liveMenu.className = 'jellyjump-menu';
                 this.ui.liveMenu.style.minWidth = '150px';
                 this.ui.liveMenu.style.left = '0'; // Align to left since it's on the left side
                 this.ui.liveMenu.style.right = 'auto'; // Override default right: 0
                 this.ui.liveMenu.innerHTML = `
-                    <div class="jellyjump-menu-item active" data-value="live">Live (Low Latency)</div>
-                    <div class="jellyjump-menu-item" data-value="buffer">30s Buffer (Stable)</div>
+                    <div class="jellyjump-menu-item ${this.liveMode === 'live' ? 'active' : ''}" data-value="live">Live (Low Latency)</div>
+                    <div class="jellyjump-menu-item ${this.liveMode === 'buffer' ? 'active' : ''}" data-value="buffer">30s Buffer (Stable)</div>
                 `;
 
                 this.ui.liveControl.appendChild(this.ui.liveBadge);
