@@ -8,6 +8,7 @@
 import { dbHelper } from './indexeddb-helper.js';
 import { thumbnailGenerator } from './thumbnail-generator.js';
 import { previewPlayerManager } from './preview-player.js';
+import { modalDialog } from './modal-dialog.js';
 
 // Notification system
 const NOTIFICATION_DURATION = 4000; // 4 seconds
@@ -371,6 +372,96 @@ function uploadImages() {
     fileInput.click();
 }
 
+/**
+ * Handle URL Import
+ * @param {string} url 
+ */
+async function handleUrlImport(url) {
+    showNotification('⏳ Importing from URL...', 'info');
+
+    try {
+        // Basic validation
+        const urlLower = url.toLowerCase();
+        const isHLS = urlLower.includes('.m3u8') || urlLower.includes('/hls/') || urlLower.includes('/live/');
+        const isM3U = urlLower.endsWith('.m3u') || (urlLower.includes('.m3u') && !urlLower.includes('.m3u8'));
+
+        // Extract filename
+        const urlPath = new URL(url).pathname;
+        let filename = urlPath.split('/').pop() || 'remote-video';
+        if (isHLS) filename = filename.replace('.m3u8', '') || 'Live Stream';
+        if (isM3U) filename = filename.replace('.m3u', '') || 'Playlist';
+
+        // Create media object
+        const mediaItem = {
+            id: crypto.randomUUID(),
+            name: filename,
+            type: 'video', // Treat as video for now
+            url: url,
+            blob: null, // No blob for remote
+            size: 0,
+            duration: isHLS ? 0 : 0, // Unknown duration
+            width: 0,
+            height: 0,
+            dateAdded: Date.now(),
+            category: 'videos',
+            thumbnailGenerated: false,
+            thumbnail: null,
+            isRemote: true,
+            isStream: isHLS,
+            isPlaylist: isM3U
+        };
+
+        // Save to IndexedDB
+        await dbHelper.addMedia(mediaItem);
+
+        showNotification(`✅ Added ${filename} to library`, 'success');
+        await updateMediaLibraryCounts();
+
+    } catch (error) {
+        console.error('Failed to import URL:', error);
+        showNotification(`❌ Failed to import URL: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Show URL Upload Modal
+ */
+function uploadUrl() {
+    const content = `
+        <div class="mb-input-group">
+            <label for="url-input-modal" style="display:block; margin-bottom:5px; font-weight:bold;">Video URL</label>
+            <input type="url" id="url-input-modal" placeholder="https://example.com/video.mp4" class="mb-input" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-secondary); color:var(--text-primary);">
+            <div class="text-xs text-secondary mt-xs" style="margin-top:5px; font-size:0.8em; color:var(--text-secondary);">
+                Supported: HLS (.m3u8), MP4, WebM, MOV, M3U Playlists
+            </div>
+        </div>
+    `;
+
+    modalDialog.show('Import from URL', content, [
+        {
+            text: 'Cancel',
+            type: 'secondary',
+            callback: () => { }
+        },
+        {
+            text: 'Import',
+            type: 'primary',
+            callback: () => {
+                const input = document.getElementById('url-input-modal');
+                if (input && input.value.trim()) {
+                    handleUrlImport(input.value.trim());
+                }
+            }
+        }
+    ]);
+
+    // Focus input
+    setTimeout(() => {
+        const input = document.getElementById('url-input-modal');
+        if (input) input.focus();
+    }, 100);
+}
+
 // Search state
 let searchQuery = '';
 let searchTimeout = null;
@@ -488,6 +579,11 @@ function getThumbnailUrl(item) {
         return URL.createObjectURL(item.thumbnail);
     }
 
+    // For remote URLs without thumbnail, return null (will show placeholder)
+    if (item.url && !item.thumbnail) {
+        return null;
+    }
+
     return null;
 }
 
@@ -538,7 +634,8 @@ function createTile(item) {
         thumbnail.textContent = icon;
 
         // For videos without thumbnails, generate asynchronously
-        if (item.type === 'video' && !item.thumbnailGenerated) {
+        // Only if we have a blob (local file)
+        if (item.type === 'video' && !item.thumbnailGenerated && item.blob) {
             tile.setAttribute('data-thumbnail-status', 'loading');
             loadThumbnailForTile(tile, item).catch(err => {
                 console.error(`Failed to generate thumbnail for ${item.name}:`, err);
@@ -579,7 +676,9 @@ function createTile(item) {
     if (item.type === 'video') {
         tile.addEventListener('dblclick', async () => {
             try {
-                await previewPlayerManager.loadVideo(item.blob, item.id, item.name);
+                // Pass URL if available, otherwise blob
+                const source = item.url || item.blob;
+                await previewPlayerManager.loadVideo(source, item.id, item.name);
             } catch (error) {
                 console.error('Failed to load video in preview:', error);
             }
@@ -755,6 +854,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const uploadBtn = document.querySelector('[data-upload="videos"]');
         if (uploadBtn) {
             uploadBtn.addEventListener('click', uploadVideos);
+        }
+
+        // Attach URL upload button handler
+        const urlUploadBtn = document.querySelector('[data-upload="url"]');
+        if (urlUploadBtn) {
+            urlUploadBtn.addEventListener('click', uploadUrl);
         }
 
         // Attach file input handler

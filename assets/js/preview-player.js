@@ -113,12 +113,12 @@ class PreviewPlayerManager {
     }
 
     /**
-     * Load video from blob
-     * @param {Blob} videoBlob - Video blob from IndexedDB
+     * Load video from blob or URL
+     * @param {Blob|string} videoSource - Video blob or URL string
      * @param {string} videoId - Video ID for tracking
      * @param {string} videoName - Video filename
      */
-    async loadVideo(videoBlob, videoId, videoName) {
+    async loadVideo(videoSource, videoId, videoName) {
         if (!this.player) {
             console.error('Player not initialized');
             return;
@@ -128,13 +128,21 @@ class PreviewPlayerManager {
             // Revoke previous blob URL to free memory
             if (this.currentBlobUrl) {
                 URL.revokeObjectURL(this.currentBlobUrl);
+                this.currentBlobUrl = null;
             }
 
-            // Create blob URL
-            this.currentBlobUrl = URL.createObjectURL(videoBlob);
+            let sourceUrl;
+            if (typeof videoSource === 'string') {
+                // It's a remote URL
+                sourceUrl = videoSource;
+            } else {
+                // It's a Blob
+                this.currentBlobUrl = URL.createObjectURL(videoSource);
+                sourceUrl = this.currentBlobUrl;
+            }
 
             // Load video into CorePlayer
-            await this.player.load(this.currentBlobUrl);
+            await this.player.load(sourceUrl);
 
             // Update metadata display
             this._updateMetadataDisplay();
