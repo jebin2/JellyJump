@@ -43,6 +43,68 @@ export class MediaMetadata {
 
 
     /**
+     * Check if item is already cached in IndexedDB
+     * @param {Object} item 
+     * @returns {Promise<Blob|null>}
+     */
+    static async checkCache(item) {
+        if (!item.id) return null;
+
+        try {
+            const file = await _dbService.loadFile(item.id);
+            if (file) {
+                console.log('[Cache] Found in cache:', item.title);
+                return file;
+            }
+        } catch (e) {
+            console.warn('[Cache] Error checking cache:', e);
+        }
+        return null;
+    }
+
+    /**
+     * Cache a remote URL in the background
+     * @param {Object} item 
+     * @param {Function} [onSave] 
+     */
+    static async cacheInBackground(item, onSave) {
+        if (!item.url || !item.id) return;
+
+        console.log('[Cache] Starting background cache for:', item.title);
+
+        try {
+            // Check if already cached first to avoid redundant download
+            const existing = await this.checkCache(item);
+            if (existing) {
+                console.log('[Cache] Item already cached, skipping download:', item.title);
+                return;
+            }
+
+            const response = await fetch(item.url);
+            if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
+
+            const blob = await response.blob();
+            const sizeMB = blob.size / 1024 / 1024;
+            const MAX_CACHE_SIZE_MB = 500;
+
+            if (sizeMB > MAX_CACHE_SIZE_MB) {
+                console.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB)`);
+                return;
+            }
+
+            const filename = item.title || 'video';
+            const saved = await _dbService.saveFile(item.id, blob, filename, blob.type);
+
+            if (saved) {
+                console.log('[Cache] Successfully cached in background:', item.title);
+                if (onSave) onSave();
+            }
+        } catch (error) {
+            console.warn('[Cache] Background caching failed:', error);
+        }
+    }
+
+    /**
      * Get source blob for an item (with caching for remote URLs)
      * For remote URLs: downloads, saves to IndexedDB, then releases from memory
      * For local files: loads from IndexedDB on-demand if not in memory
@@ -71,20 +133,16 @@ export class MediaMetadata {
             return blob;
         }
 
-        // 3. If isLocal (previously cached), try loading from IndexedDB
-        if (item.id) {
-            console.log('[Cache] Loading cached file from IndexedDB:', item.title);
-            const file = await _dbService.loadFile(item.id);
-            if (file) {
-                console.log('[Cache] File loaded from IndexedDB:', item.title);
-                return file;  // Return without keeping in memory
-            }
-            console.warn('[Cache] File not found in IndexedDB, falling back to URL:', item.title);
+        // 3. Check IndexedDB Cache
+        const cachedFile = await this.checkCache(item);
+        if (cachedFile) {
+            return cachedFile;
         }
 
-        // 3. Remote URL - fetch and persist to IndexedDB
+        // 4. Remote URL - fetch and persist to IndexedDB (Blocking Legacy Mode)
+        // Note: For better UX, use cacheInBackground() in the UI layer instead of this blocking call
         if (item.url) {
-            console.log('[Cache] Fetching remote video for caching:', item.title);
+            console.log('[Cache] Fetching remote video (blocking):', item.title);
 
             const response = await fetch(item.url);
             if (!response.ok) {
@@ -94,13 +152,10 @@ export class MediaMetadata {
             const blob = await response.blob();
             const sizeMB = blob.size / 1024 / 1024;
 
-            console.log(`[Cache] Downloaded ${sizeMB.toFixed(2)} MB`);
-
             // Size limit check (500MB default)
             const MAX_CACHE_SIZE_MB = 500;
             if (sizeMB > MAX_CACHE_SIZE_MB) {
-                console.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB > ${MAX_CACHE_SIZE_MB} MB)`);
-                console.warn('[Cache] Returning blob without caching (will re-fetch on next operation)');
+                console.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB)`);
                 return blob; // Return without caching
             }
 
@@ -109,15 +164,11 @@ export class MediaMetadata {
                 const filename = item.title || 'video';
                 const saved = await _dbService.saveFile(item.id, blob, filename, blob.type);
                 if (saved) {
-                    if (onSave) {
-                        onSave();
-                    }
-
-                    console.log('[Cache] Blob persisted to IndexedDB, releasing from memory:', item.title);
+                    if (onSave) onSave();
+                    console.log('[Cache] Blob persisted to IndexedDB:', item.title);
                 }
             }
 
-            // Return the blob for immediate use
             return blob;
         }
 

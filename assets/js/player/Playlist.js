@@ -988,21 +988,45 @@ export class Playlist {
             // Also handles remote URL items that need to load from cache
             if (!video.blob_url) {
                 try {
-                    if (this.player.ui && this.player.ui.loader) {
-                        this.player.ui.loader.classList.add('visible');
+                    // OPTIMIZATION: For remote URLs, check cache first.
+                    // If not in cache, play directly from URL and cache in background.
+                    if (!video.isLocal && video.url && !video.isStream) {
+                        const cachedBlob = await MediaMetadata.checkCache(video);
+
+                        if (cachedBlob) {
+                            console.log(`[Playlist] Playing from cache: ${video.title}`);
+                            video.blob_url = URL.createObjectURL(cachedBlob);
+                            // Mark as having file so we don't try to download again
+                            video.file = cachedBlob;
+                        } else {
+                            console.log(`[Playlist] Playing directly from URL (background caching): ${video.title}`);
+                            // Direct playback
+                            video.blob_url = video.url;
+
+                            // Trigger background cache
+                            MediaMetadata.cacheInBackground(video, () => {
+                                console.log(`[Playlist] Background cache complete for: ${video.title}`);
+                                this._saveState();
+                            });
+                        }
+                    } else {
+                        // Local files or legacy behavior
+                        if (this.player.ui && this.player.ui.loader) {
+                            this.player.ui.loader.classList.add('visible');
+                        }
+                        console.log(`Loading file from storage: ${video.title}`);
+                        this.player.already_fetching = true;
+                        await MediaMetadata.getProcessedSourceURL(video);
                     }
-                    console.log(`Loading file from storage: ${video.title}`);
-                    this.player.already_fetching = true;
-                    await MediaMetadata.getProcessedSourceURL(video);
-                    if (!this.player.already_fetching) {
-                        setTimeout(() => {
-                            URL.revokeObjectURL(video.blob_url);
-                            video.blob_url = null;
-                        }, 100);
+
+                    if (this.player.already_fetching) {
+                        // If we were fetching (local file), clean up after a bit
+                        // But for remote URLs we might want to keep the blob_url if it's a blob
+                        if (video.blob_url.startsWith('blob:')) {
+                            // Keep it for a bit or let the player handle revocation
+                        }
                         this.player.already_fetching = false;
-                        return;
                     }
-                    this.player.already_fetching = false;
                 } catch (e) {
                     console.error('Error loading file from storage:', e);
                     if (this.player.ui && this.player.ui.loader) {
