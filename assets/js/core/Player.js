@@ -1583,6 +1583,9 @@ export class CorePlayer {
             }
 
             // Reset stream mode if loading a file
+            if (this.hlsPlayer) {
+                this._cleanupHLS();
+            }
             this.isStreamMode = false;
             this.isLive = false;
             this._hideStreamVideo();
@@ -2187,6 +2190,7 @@ export class CorePlayer {
     _cleanupHLS() {
         if (this.hlsPlayer) {
             this.hlsPlayer.destroy();
+            this.hlsPlayer = null;
         }
         this.isStreamMode = false;
         this.isLive = false;
@@ -2202,6 +2206,14 @@ export class CorePlayer {
         }
         if (this.ui.liveBadge) {
             this.ui.liveBadge.style.display = 'none';
+        }
+
+        // Reset Live Mode UI (Progress bar and time display)
+        if (this.ui.progressContainer) {
+            this.ui.progressContainer.classList.remove('live-mode-hidden');
+        }
+        if (this.ui.timeDisplay) {
+            this.ui.timeDisplay.classList.remove('live-mode-hidden');
         }
 
         // Hide any error overlay
