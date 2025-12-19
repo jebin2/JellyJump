@@ -632,10 +632,12 @@ export class Playlist {
             const durationEl = el.querySelector('.playlist-duration');
             if (durationEl) durationEl.textContent = item.duration;
 
-            // Update thumbnail if available
-            const thumbEl = el.querySelector('.playlist-thumbnail img');
+            // Update thumbnail if available - use background-image on div
+            const thumbEl = el.querySelector('.playlist-thumbnail');
             if (thumbEl && item.thumbnail) {
-                thumbEl.src = item.thumbnail;
+                thumbEl.style.backgroundImage = `url(${item.thumbnail})`;
+                thumbEl.style.backgroundSize = 'cover';
+                thumbEl.style.backgroundPosition = 'center';
             }
         }
     }
@@ -682,32 +684,116 @@ export class Playlist {
      * @private
      */
     _captureStreamThumbnail(video, index) {
-        // Wait for video to have some frames
-        setTimeout(() => {
-            try {
-                const canvas = this.player.canvas;
-                if (canvas && canvas.width > 0 && canvas.height > 0) {
-                    // Create small thumbnail
-                    const thumbCanvas = document.createElement('canvas');
-                    thumbCanvas.width = 160;
-                    thumbCanvas.height = 90;
-                    const ctx = thumbCanvas.getContext('2d');
-                    ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+        // Generate a unique capture ID to handle video switches
+        const captureId = ++this._thumbnailCaptureId || 1;
+        this._thumbnailCaptureId = captureId;
 
-                    // Convert to data URL
-                    const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.7);
-                    video.thumbnail = thumbnail;
+        // Clear any existing stale thumbnail from previous video
+        // This prevents showing the wrong thumbnail during loading
+        if (video.thumbnail) {
+            // If this video already had a thumbnail before, keep it
+            // (it was captured from THIS video previously)
+            console.log(`[Playlist] Keeping existing thumbnail for: ${video.title}`);
+            return;
+        }
 
-                    // Update UI
-                    this._updateItemUI(video);
-                    this._saveState();
+        let attempts = 0;
+        const maxAttempts = 15; // Try for up to 15 seconds (streams take longer)
 
-                    console.log(`[Playlist] Captured thumbnail for: ${video.title}`);
+        // Poll until we can capture
+        const tryCapture = () => {
+            attempts++;
+
+            // Check if capture was invalidated (user switched videos)
+            if (this._thumbnailCaptureId !== captureId) {
+                console.log(`[Playlist] Thumbnail capture invalidated for: ${video.title}`);
+                return;
+            }
+
+            // Stop trying after max attempts
+            if (attempts > maxAttempts) {
+                console.log(`[Playlist] Gave up capturing thumbnail for: ${video.title}`);
+                return;
+            }
+
+            // Skip if thumbnail was added
+            if (video.thumbnail) return;
+
+            // Skip if we switched to a different video
+            if (this.activeIndex !== index) return;
+
+            // For streams, verify the stream video has loaded metadata
+            if (this.player.isStreamMode && this.player.streamVideo) {
+                // HAVE_METADATA = 1, HAVE_CURRENT_DATA = 2
+                if (this.player.streamVideo.readyState < 2) {
+                    // Stream video not ready yet, wait for it
+                    setTimeout(tryCapture, 500);
+                    return;
                 }
+
+                // Extra check: make sure video dimensions are set
+                if (this.player.streamVideo.videoWidth === 0) {
+                    setTimeout(tryCapture, 500);
+                    return;
+                }
+            }
+
+            // Check if player is playing and has canvas content
+            if (!this.player.isPlaying || !this.player.canvas) {
+                // Retry in 1 second
+                setTimeout(tryCapture, 1000);
+                return;
+            }
+
+            const canvas = this.player.canvas;
+            if (canvas.width === 0 || canvas.height === 0) {
+                // Canvas not ready, retry
+                setTimeout(tryCapture, 1000);
+                return;
+            }
+
+            try {
+                // Create small thumbnail - optimized for memory
+                const thumbCanvas = document.createElement('canvas');
+                thumbCanvas.width = 80;
+                thumbCanvas.height = 45;
+                const ctx = thumbCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+                // Check if canvas has actual content (not just black)
+                const imageData = ctx.getImageData(0, 0, 10, 10);
+                const hasContent = imageData.data.some((v, i) => i % 4 !== 3 && v > 10);
+
+                if (!hasContent) {
+                    // Canvas is still black, retry
+                    setTimeout(tryCapture, 500);
+                    return;
+                }
+
+                // Final check: ensure we're still on the same video
+                if (this.activeIndex !== index || this._thumbnailCaptureId !== captureId) {
+                    console.log(`[Playlist] Thumbnail capture aborted (video switched): ${video.title}`);
+                    return;
+                }
+
+                // Convert to data URL with low quality for smaller size
+                const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
+                video.thumbnail = thumbnail;
+
+                // Update UI
+                this._updateItemUI(video);
+                this._saveState();
+
+                console.log(`[Playlist] Captured thumbnail for: ${video.title}`);
             } catch (e) {
                 console.warn('[Playlist] Failed to capture thumbnail:', e);
             }
-        }, 2000); // Wait 2 seconds for video to start
+        };
+
+        // Start polling after the stream has time to load
+        // Use a longer initial delay for streams since they need to buffer
+        const initialDelay = this.player.isStreamMode ? 3000 : 2000;
+        setTimeout(tryCapture, initialDelay);
     }
 
     /**
@@ -733,31 +819,34 @@ export class Playlist {
         setTimeout(updateDuration, 300);
         setTimeout(updateDuration, 1000); // Retry if first didn't work
 
-        // Capture thumbnail after first frame renders
-        setTimeout(() => {
-            try {
-                const canvas = this.player.canvas;
-                if (canvas && canvas.width > 0 && canvas.height > 0) {
-                    // Create small thumbnail
-                    const thumbCanvas = document.createElement('canvas');
-                    thumbCanvas.width = 160;
-                    thumbCanvas.height = 90;
-                    const ctx = thumbCanvas.getContext('2d');
-                    ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+        // Capture thumbnail after first frame renders (only if no thumbnail exists)
+        if (!video.thumbnail) {
+            setTimeout(() => {
+                try {
+                    // Skip if thumbnail was added while waiting
+                    if (video.thumbnail) return;
 
-                    // Convert to data URL
-                    const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.7);
-                    if (video.thumbnail !== thumbnail) {
+                    const canvas = this.player.canvas;
+                    if (canvas && canvas.width > 0 && canvas.height > 0) {
+                        // Create small thumbnail - optimized for memory
+                        const thumbCanvas = document.createElement('canvas');
+                        thumbCanvas.width = 80;  // Small for memory efficiency
+                        thumbCanvas.height = 45;
+                        const ctx = thumbCanvas.getContext('2d');
+                        ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+
+                        // Convert to data URL with low quality for smaller size
+                        const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
                         video.thumbnail = thumbnail;
                         this._updateItemUI(video);
                         this._saveState();
                         console.log(`[Playlist] Captured thumbnail for local file: ${video.title}`);
                     }
+                } catch (e) {
+                    console.warn('[Playlist] Failed to capture local file thumbnail:', e);
                 }
-            } catch (e) {
-                console.warn('[Playlist] Failed to capture local file thumbnail:', e);
-            }
-        }, 500); // Wait 500ms for first frame
+            }, 500); // Wait 500ms for first frame
+        }
     }
 
     /**

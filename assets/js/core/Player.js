@@ -2118,6 +2118,8 @@ export class CorePlayer {
 
                 // Close menu when clicking outside
                 document.addEventListener('click', (e) => {
+                    // Guard - liveControl may be null after cleanup
+                    if (!this.ui.liveControl || !this.ui.liveMenu) return;
                     if (!this.ui.liveControl.contains(e.target)) {
                         this.ui.liveMenu.classList.remove('visible');
                     }
