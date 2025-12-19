@@ -1997,6 +1997,8 @@ export class CorePlayer {
                 this.ui.liveMenu = document.createElement('div');
                 this.ui.liveMenu.className = 'jellyjump-menu';
                 this.ui.liveMenu.style.minWidth = '150px';
+                this.ui.liveMenu.style.left = '0'; // Align to left since it's on the left side
+                this.ui.liveMenu.style.right = 'auto'; // Override default right: 0
                 this.ui.liveMenu.innerHTML = `
                     <div class="jellyjump-menu-item active" data-value="live">Live (Low Latency)</div>
                     <div class="jellyjump-menu-item" data-value="buffer">30s Buffer (Stable)</div>
