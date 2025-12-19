@@ -207,7 +207,20 @@ export class Playlist {
         const searchClearBtn = header.querySelector('#mb-playlist-search-clear');
 
         if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
+            // Debounce function
+            const debounce = (func, wait) => {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            };
+
+            const handleSearch = debounce((e) => {
                 this.searchQuery = e.target.value.trim().toLowerCase();
 
                 // Toggle clear button
@@ -218,7 +231,9 @@ export class Playlist {
                 }
 
                 this.render();
-            });
+            }, 300); // 300ms delay
+
+            searchInput.addEventListener('input', handleSearch);
 
             searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
@@ -1172,8 +1187,11 @@ export class Playlist {
                 emptyDiv.textContent = 'No matches found';
                 this.container.appendChild(emptyDiv);
             } else {
-                // Render flat list for search results
-                filteredItems.forEach(item => {
+                // Render flat list for search results (limited to 50)
+                const MAX_RESULTS = 50;
+                const itemsToShow = filteredItems.slice(0, MAX_RESULTS);
+
+                itemsToShow.forEach(item => {
                     // Find original index for correct selection
                     const originalIndex = this.items.indexOf(item);
                     this.container.appendChild(this._createPlaylistItemElement({
@@ -1181,6 +1199,17 @@ export class Playlist {
                         originalIndex: originalIndex
                     }));
                 });
+
+                // Show message if there are more results
+                if (filteredItems.length > MAX_RESULTS) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.style.padding = '10px';
+                    moreDiv.style.textAlign = 'center';
+                    moreDiv.style.color = 'var(--text-secondary)';
+                    moreDiv.style.fontSize = '12px';
+                    moreDiv.textContent = `Showing top ${MAX_RESULTS} of ${filteredItems.length} matches. Refine search to see more.`;
+                    this.container.appendChild(moreDiv);
+                }
             }
         } else {
             // Normal Tree View
