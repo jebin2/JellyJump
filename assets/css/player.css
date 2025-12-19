@@ -2189,6 +2189,23 @@ body.fullscreen-active {
     box-shadow: 0 0 12px rgba(96, 125, 139, 0.6);
 }
 
+/* BUFFER Mode Badge - Gray color to differentiate from live (red) */
+.jellyjump-live-badge.buffer-mode {
+    background: linear-gradient(135deg, #546e7a 0%, #37474f 100%);
+    animation: none;
+    box-shadow: 0 0 8px rgba(84, 110, 122, 0.4);
+}
+
+.jellyjump-live-badge.buffer-mode::before {
+    background: #90a4ae;
+    animation: none;
+}
+
+.jellyjump-live-badge.buffer-mode:hover {
+    background: linear-gradient(135deg, #607d8b 0%, #455a64 100%);
+    box-shadow: 0 0 12px rgba(96, 125, 139, 0.6);
+}
+
 /* Stream mode - hide unsupported controls */
 .stream-mode-hidden {
     display: none !important;

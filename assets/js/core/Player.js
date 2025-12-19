@@ -2090,7 +2090,7 @@ export class CorePlayer {
 
                 // Badge/Button - show BUFFER since that's the default liveMode
                 this.ui.liveBadge = document.createElement('button');
-                this.ui.liveBadge.className = 'jellyjump-live-badge';
+                this.ui.liveBadge.className = 'jellyjump-live-badge' + (this.liveMode === 'buffer' ? ' buffer-mode' : '');
                 this.ui.liveBadge.textContent = this.liveMode === 'live' ? 'LIVE' : 'BUFFER';
                 this.ui.liveBadge.title = 'Click to change mode';
                 this.ui.liveBadge.style.display = 'inline-flex'; // Override CSS display: none
@@ -2134,8 +2134,9 @@ export class CorePlayer {
                     this.ui.liveMenu.querySelectorAll('.jellyjump-menu-item').forEach(el => el.classList.remove('active'));
                     item.classList.add('active');
 
-                    // Update badge text
+                    // Update badge text and color
                     this.ui.liveBadge.textContent = mode === 'live' ? 'LIVE' : 'BUFFER';
+                    this.ui.liveBadge.classList.toggle('buffer-mode', mode === 'buffer');
 
                     // Seek immediately
                     this._seekToLive();
