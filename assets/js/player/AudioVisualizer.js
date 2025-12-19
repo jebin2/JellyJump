@@ -52,35 +52,55 @@ export class AudioVisualizer {
         const bufferLength = this.analyser.frequencyBinCount;
         this.dataArray = new Uint8Array(bufferLength);
 
-        // Initialize raindrops
+        // Initialize raindrops in layers
         this._initRaindrops();
 
-        console.log('[AudioVisualizer] Connected - Rain mode');
+        // Initialize ripple array
+        this.ripples = [];
+
+        console.log('[AudioVisualizer] Connected - Rain mode with depth layers');
     }
 
     /**
-     * Initialize raindrop particles
+     * Initialize raindrop particles in 3 depth layers
      * @private
      */
     _initRaindrops() {
         this.raindrops = [];
-        for (let i = 0; i < this.maxRaindrops; i++) {
-            this.raindrops.push(this._createRaindrop());
-        }
+
+        // Create 3 layers: background (slow/faint), middle, foreground (fast/bright)
+        const layers = [
+            { count: 60, speedMult: 0.5, opacityMult: 0.4, thicknessMult: 0.6 },  // Background
+            { count: 80, speedMult: 1.0, opacityMult: 0.7, thicknessMult: 1.0 },  // Middle
+            { count: 60, speedMult: 1.5, opacityMult: 1.0, thicknessMult: 1.3 }   // Foreground
+        ];
+
+        layers.forEach((layer, layerIndex) => {
+            for (let i = 0; i < layer.count; i++) {
+                this.raindrops.push(this._createRaindrop(layer, layerIndex));
+            }
+        });
     }
 
     /**
-     * Create a single raindrop
+     * Create a single raindrop with layer properties
+     * @param {Object} layer - Layer multipliers
+     * @param {number} layerIndex - Layer index (0=back, 2=front)
      * @private
      */
-    _createRaindrop() {
+    _createRaindrop(layer = {}, layerIndex = 1) {
+        const speedMult = layer.speedMult || 1;
+        const opacityMult = layer.opacityMult || 1;
+        const thicknessMult = layer.thicknessMult || 1;
+
         return {
             x: Math.random() * this.canvas.width,
             y: Math.random() * this.canvas.height - this.canvas.height,
-            speed: 2 + Math.random() * 3,
-            length: 10 + Math.random() * 20,
-            opacity: 0.2 + Math.random() * 0.5,
-            thickness: 1 + Math.random() * 2
+            speed: (2 + Math.random() * 3) * speedMult,
+            length: (10 + Math.random() * 20) * (0.7 + layerIndex * 0.15),
+            opacity: (0.2 + Math.random() * 0.5) * opacityMult,
+            thickness: (1 + Math.random() * 2) * thicknessMult,
+            layer: layerIndex
         };
     }
 
@@ -199,20 +219,31 @@ export class AudioVisualizer {
 
         // Rain intensity based on overall volume
         const overallLevel = (this.bassLevel + this.midLevel + this.highLevel) / 3;
-        const activeDrops = Math.floor(this.maxRaindrops * (0.3 + overallLevel * 0.7));
+        const activeDrops = this.raindrops.length;
 
-        // Update and draw raindrops
-        for (let i = 0; i < Math.min(activeDrops, this.raindrops.length); i++) {
+        // Update and draw raindrops by layer (back to front)
+        for (let i = 0; i < activeDrops; i++) {
             const drop = this.raindrops[i];
 
-            // Move raindrop down
+            // Move raindrop down (layer affects speed)
             drop.y += drop.speed * speedMultiplier;
 
             // Add slight horizontal movement based on mid frequencies
-            drop.x += (this.midLevel - 0.5) * 2;
+            drop.x += (this.midLevel - 0.5) * 2 * (drop.layer === 2 ? 1.5 : 1);
 
-            // Reset raindrop if it goes off screen
+            // Reset raindrop if it goes off screen - create ripple
             if (drop.y > height) {
+                // Create ripple at impact point (only for middle and foreground)
+                if (drop.layer >= 1 && Math.random() > 0.5) {
+                    this.ripples.push({
+                        x: drop.x,
+                        y: height - 5,
+                        radius: 2,
+                        maxRadius: 15 + Math.random() * 10,
+                        opacity: 0.6 + overallLevel * 0.3
+                    });
+                }
+
                 drop.y = -drop.length;
                 drop.x = Math.random() * width;
             }
@@ -224,6 +255,9 @@ export class AudioVisualizer {
             // Draw raindrop
             this._drawRaindrop(drop, overallLevel);
         }
+
+        // Update and draw ripples
+        this._updateAndDrawRipples();
 
         // Draw subtle ground reflection/splash
         this._drawGroundEffect(overallLevel);
@@ -253,6 +287,47 @@ export class AudioVisualizer {
         this.ctx.moveTo(drop.x, drop.y);
         this.ctx.lineTo(drop.x, drop.y + drop.length);
         this.ctx.stroke();
+    }
+
+    /**
+     * Update and draw puddle ripples
+     * @private
+     */
+    _updateAndDrawRipples() {
+        const height = this.canvas.height;
+
+        // Process ripples
+        for (let i = this.ripples.length - 1; i >= 0; i--) {
+            const ripple = this.ripples[i];
+
+            // Expand ripple
+            ripple.radius += 0.8;
+            ripple.opacity *= 0.92;
+
+            // Remove if too faded or too large
+            if (ripple.opacity < 0.05 || ripple.radius > ripple.maxRadius) {
+                this.ripples.splice(i, 1);
+                continue;
+            }
+
+            // Draw ripple as ellipse (perspective effect)
+            this.ctx.beginPath();
+            this.ctx.ellipse(
+                ripple.x,
+                ripple.y,
+                ripple.radius,
+                ripple.radius * 0.3, // Flatten for perspective
+                0, 0, Math.PI * 2
+            );
+            this.ctx.strokeStyle = `rgba(150, 200, 255, ${ripple.opacity})`;
+            this.ctx.lineWidth = 1.5;
+            this.ctx.stroke();
+        }
+
+        // Limit max ripples for performance
+        if (this.ripples.length > 50) {
+            this.ripples = this.ripples.slice(-50);
+        }
     }
 
     /**
