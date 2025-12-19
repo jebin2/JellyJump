@@ -434,34 +434,50 @@
 
 <!-- Playlist Header Controls Template -->
 <template id="playlist-header-controls-template">
-    <div class="playlist-header-top">
-        <div class="playlist-title-text">Playlist</div>
-        <button class="sidebar-collapse-btn" id="sidebar-toggle-btn" aria-label="Collapse sidebar" aria-expanded="true"
-            title="Collapse sidebar (Ctrl+B)">
-            ▶
-        </button>
+    <div class="playlist-header-main">
+        <div class="playlist-header-top">
+            <div class="playlist-title-text">Playlist</div>
+            <button class="sidebar-collapse-btn" id="sidebar-toggle-btn" aria-label="Collapse sidebar"
+                aria-expanded="true" title="Collapse sidebar (Ctrl+B)">
+                ▶
+            </button>
+        </div>
+        <div class="playlist-controls">
+            <button class="jellyjump-btn-small" id="mb-add-files" title="Add Files">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-plus"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-folder" title="Add Folder">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-folder"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-url" title="Add from URL">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-link"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-clear-playlist" title="Clear Playlist">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-trash"></use>
+                </svg>
+            </button>
+        </div>
     </div>
-    <div class="playlist-controls">
-        <button class="jellyjump-btn-small" id="mb-add-files" title="Add Files">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-plus"></use>
+    <div class="playlist-search-bar">
+        <div class="playlist-search-wrapper">
+            <svg width="14" height="14" fill="currentColor" class="search-icon">
+                <use href="assets/icons/sprite.svg#icon-search"></use>
             </svg>
-        </button>
-        <button class="jellyjump-btn-small" id="mb-add-folder" title="Add Folder">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-folder"></use>
-            </svg>
-        </button>
-        <button class="jellyjump-btn-small" id="mb-add-url" title="Add from URL">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-link"></use>
-            </svg>
-        </button>
-        <button class="jellyjump-btn-small" id="mb-clear-playlist" title="Clear Playlist">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-trash"></use>
-            </svg>
-        </button>
+            <input type="text" id="mb-playlist-search-input" placeholder="Search playlist..."
+                class="playlist-search-input">
+            <button class="search-clear-btn hidden" id="mb-playlist-search-clear" title="Clear Search">
+                <svg width="12" height="12" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-close"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 

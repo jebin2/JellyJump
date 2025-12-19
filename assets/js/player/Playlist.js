@@ -32,6 +32,7 @@ export class Playlist {
         this.activeIndex = -1;
         this.storage = new IndexedDBService();
         this.expandedFolders = new Set(); // Track expanded folders
+        this.searchQuery = ''; // Search query state
 
         // Storage
         this.storage = new IndexedDBService();
@@ -202,6 +203,43 @@ export class Playlist {
         const addFilesBtn = header.querySelector('#mb-add-files');
         const addFolderBtn = header.querySelector('#mb-add-folder');
         const clearBtn = header.querySelector('#mb-clear-playlist');
+        const searchInput = header.querySelector('#mb-playlist-search-input');
+        const searchClearBtn = header.querySelector('#mb-playlist-search-clear');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.searchQuery = e.target.value.trim().toLowerCase();
+
+                // Toggle clear button
+                if (this.searchQuery) {
+                    searchClearBtn?.classList.remove('hidden');
+                } else {
+                    searchClearBtn?.classList.add('hidden');
+                }
+
+                this.render();
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    searchInput.value = '';
+                    this.searchQuery = '';
+                    searchClearBtn?.classList.add('hidden');
+                    this.render();
+                    searchInput.blur();
+                }
+            });
+        }
+
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                this.searchQuery = '';
+                searchClearBtn.classList.add('hidden');
+                this.render();
+                searchInput.focus();
+            });
+        }
 
         if (addFilesBtn) {
             addFilesBtn.addEventListener('click', async () => {
@@ -1122,11 +1160,33 @@ export class Playlist {
             return;
         }
 
-        // Build Tree
-        const tree = this._buildTree(this.items);
+        // Handle Search
+        if (this.searchQuery) {
+            const filteredItems = this.items.filter(item =>
+                item.title.toLowerCase().includes(this.searchQuery)
+            );
 
-        // Render Tree
-        this.container.appendChild(this._renderTreeLevel(tree));
+            if (filteredItems.length === 0) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'playlist-placeholder';
+                emptyDiv.textContent = 'No matches found';
+                this.container.appendChild(emptyDiv);
+            } else {
+                // Render flat list for search results
+                filteredItems.forEach(item => {
+                    // Find original index for correct selection
+                    const originalIndex = this.items.indexOf(item);
+                    this.container.appendChild(this._createPlaylistItemElement({
+                        ...item,
+                        originalIndex: originalIndex
+                    }));
+                });
+            }
+        } else {
+            // Normal Tree View
+            const tree = this._buildTree(this.items);
+            this.container.appendChild(this._renderTreeLevel(tree));
+        }
 
         // Update Active State
         this._updateUI();

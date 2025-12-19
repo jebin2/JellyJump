@@ -33,15 +33,22 @@
 
 /* Playlist Header & Controls */
 .playlist-header {
-    padding: 15px;
+    padding: 10px 15px;
     border-bottom: 1px solid var(--border-light);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     background: var(--bg-secondary);
     position: sticky;
     top: 0;
     z-index: 10;
+    gap: 10px;
+}
+
+.playlist-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 }
 
 .playlist-title-text {
@@ -999,6 +1006,72 @@ button:focus-visible {
     background: var(--border-dark);
     margin: 0 5px;
 }
+
+/* Playlist Search Bar */
+.playlist-search-bar {
+    width: 100%;
+}
+
+.playlist-search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-dark);
+    border-radius: 4px;
+    padding: 0 8px;
+    height: 30px;
+    transition: border-color 0.2s;
+}
+
+.playlist-search-wrapper:focus-within {
+    border-color: var(--accent-primary);
+}
+
+.playlist-search-wrapper .search-icon {
+    color: var(--text-secondary);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.playlist-search-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    min-width: 0;
+    font-family: inherit;
+}
+
+.playlist-search-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.search-clear-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    margin-left: 4px;
+}
+
+.search-clear-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.search-clear-btn.hidden {
+    display: none;
+}
+
 
 .eq-sliders {
     display: flex;
