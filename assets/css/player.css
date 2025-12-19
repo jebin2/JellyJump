@@ -412,12 +412,6 @@ button:focus-visible {
     margin-left: 10px;
 }
 
-.jellyjump-volume-container {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
 .jellyjump-volume-slider {
     width: 80px;
     height: 4px;
@@ -655,9 +649,6 @@ button:focus-visible {
 }
 
 @media (max-width: 640px) {
-    .jellyjump-volume-container {
-        gap: 5px;
-    }
 
     .jellyjump-volume-slider {
         display: none;
@@ -1220,7 +1211,7 @@ button:focus-visible {
 }
 
 /* Minimal Mode (< 400px) */
-.jellyjump-controls.size-minimal .jellyjump-volume-container {
+.jellyjump-controls.size-minimal {
     display: flex;
     /* Keep container visible */
 }
