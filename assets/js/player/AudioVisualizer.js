@@ -30,6 +30,11 @@ export class AudioVisualizer {
         this.lastBassLevel = 0;
         this.lightningThreshold = 0.7; // Bass level to trigger lightning
 
+        // Clouds and trees
+        this.clouds = [];
+        this.trees = [];
+        this.cloudsInitialized = false;
+
         console.log('[AudioVisualizer] Created for canvas:', canvas.width, 'x', canvas.height);
     }
 
@@ -207,12 +212,24 @@ export class AudioVisualizer {
             this.lightningAlpha = 0.8 + Math.random() * 0.2;
         }
 
-        // Dark gradient background
+        // Dark gradient background (stormy sky)
         const bgGradient = this.ctx.createLinearGradient(0, 0, 0, height);
-        bgGradient.addColorStop(0, '#0a0a12');
-        bgGradient.addColorStop(1, '#1a1a2e');
+        bgGradient.addColorStop(0, '#050510');
+        bgGradient.addColorStop(0.4, '#0a0a1a');
+        bgGradient.addColorStop(1, '#151525');
         this.ctx.fillStyle = bgGradient;
         this.ctx.fillRect(0, 0, width, height);
+
+        // Initialize clouds and trees if not done
+        if (!this.cloudsInitialized || this.clouds.length === 0) {
+            this._initCloudsAndTrees(width, height);
+        }
+
+        // Draw and update clouds (behind rain)
+        this._drawClouds(width, height);
+
+        // Draw trees silhouette (behind rain but in front of ground)
+        this._drawTrees(width, height);
 
         // Speed multiplier based on bass
         const speedMultiplier = 1 + this.bassLevel * 4;
@@ -327,6 +344,114 @@ export class AudioVisualizer {
         // Limit max ripples for performance
         if (this.ripples.length > 50) {
             this.ripples = this.ripples.slice(-50);
+        }
+    }
+
+    /**
+     * Initialize clouds and trees
+     * @private
+     */
+    _initCloudsAndTrees(width, height) {
+        // Create clouds
+        this.clouds = [];
+        const cloudCount = 8 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < cloudCount; i++) {
+            this.clouds.push({
+                x: Math.random() * width * 1.5 - width * 0.25,
+                y: Math.random() * height * 0.25,
+                width: 100 + Math.random() * 150,
+                height: 30 + Math.random() * 40,
+                speed: 0.2 + Math.random() * 0.3,
+                opacity: 0.3 + Math.random() * 0.3
+            });
+        }
+
+        // Create tree silhouettes
+        this.trees = [];
+        const treeCount = 12 + Math.floor(Math.random() * 8);
+        for (let i = 0; i < treeCount; i++) {
+            this.trees.push({
+                x: (i / treeCount) * width + (Math.random() - 0.5) * 80,
+                height: 60 + Math.random() * 100,
+                width: 20 + Math.random() * 30,
+                type: Math.random() > 0.5 ? 'pine' : 'round'
+            });
+        }
+
+        this.cloudsInitialized = true;
+    }
+
+    /**
+     * Draw and update clouds
+     * @private
+     */
+    _drawClouds(width, height) {
+        for (const cloud of this.clouds) {
+            // Move cloud slowly
+            cloud.x += cloud.speed * (1 + this.midLevel * 0.5);
+
+            // Wrap around
+            if (cloud.x > width + cloud.width) {
+                cloud.x = -cloud.width;
+            }
+
+            // Draw cloud as layered ellipses
+            this.ctx.fillStyle = `rgba(30, 35, 50, ${cloud.opacity})`;
+
+            // Main body
+            this.ctx.beginPath();
+            this.ctx.ellipse(cloud.x, cloud.y, cloud.width / 2, cloud.height / 2, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Left bump
+            this.ctx.beginPath();
+            this.ctx.ellipse(cloud.x - cloud.width * 0.3, cloud.y + 5, cloud.width * 0.3, cloud.height * 0.4, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Right bump
+            this.ctx.beginPath();
+            this.ctx.ellipse(cloud.x + cloud.width * 0.25, cloud.y + 8, cloud.width * 0.35, cloud.height * 0.35, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+    }
+
+    /**
+     * Draw tree silhouettes
+     * @private
+     */
+    _drawTrees(width, height) {
+        const groundY = height - 5;
+
+        for (const tree of this.trees) {
+            this.ctx.fillStyle = 'rgba(10, 12, 20, 0.9)';
+
+            if (tree.type === 'pine') {
+                // Pine tree (triangle shape)
+                this.ctx.beginPath();
+                this.ctx.moveTo(tree.x, groundY - tree.height);
+                this.ctx.lineTo(tree.x - tree.width / 2, groundY);
+                this.ctx.lineTo(tree.x + tree.width / 2, groundY);
+                this.ctx.closePath();
+                this.ctx.fill();
+
+                // Second layer (smaller)
+                this.ctx.beginPath();
+                this.ctx.moveTo(tree.x, groundY - tree.height * 1.1);
+                this.ctx.lineTo(tree.x - tree.width * 0.35, groundY - tree.height * 0.4);
+                this.ctx.lineTo(tree.x + tree.width * 0.35, groundY - tree.height * 0.4);
+                this.ctx.closePath();
+                this.ctx.fill();
+            } else {
+                // Round tree (trunk + circle canopy)
+                // Trunk
+                const trunkWidth = tree.width * 0.2;
+                this.ctx.fillRect(tree.x - trunkWidth / 2, groundY - tree.height * 0.4, trunkWidth, tree.height * 0.4);
+
+                // Canopy
+                this.ctx.beginPath();
+                this.ctx.arc(tree.x, groundY - tree.height * 0.6, tree.width * 0.4, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
         }
     }
 
