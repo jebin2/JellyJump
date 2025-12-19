@@ -8,6 +8,7 @@ export class RecordMenu {
     static isRecording = false;
     static mediaRecorder = null;
     static writable = null;
+    static fileHandle = null;
     static chunks = [];
 
     /**
@@ -53,6 +54,7 @@ export class RecordMenu {
             });
 
             this.writable = await handle.createWritable();
+            this.fileHandle = handle;
             this._startRecording(playlist, true);
 
         } catch (err) {
@@ -124,14 +126,31 @@ export class RecordMenu {
                 if (useFileSystem && this.writable) {
                     await this.writable.close();
                     playlist._showToast('Recording saved successfully!', 'success');
+
+                    // Add to playlist
+                    if (this.fileHandle) {
+                        try {
+                            const file = await this.fileHandle.getFile();
+                            playlist.handleFiles([file]);
+                        } catch (e) {
+                            console.error('RecordMenu: Failed to add to playlist', e);
+                        }
+                    }
                 } else if (!useFileSystem) {
                     // Fallback Download
+                    const filename = `recording_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
                     const blob = new Blob(this.chunks, { type: 'video/webm' });
+
+                    // Create File object for playlist
+                    const file = new File([blob], filename, { type: 'video/webm' });
+                    playlist.handleFiles([file]);
+
+                    // Trigger Download
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = `recording_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+                    a.download = filename;
                     document.body.appendChild(a);
                     a.click();
                     setTimeout(() => {
@@ -145,6 +164,7 @@ export class RecordMenu {
                 this.isRecording = false;
                 this.mediaRecorder = null;
                 this.writable = null;
+                this.fileHandle = null;
             };
 
             this.mediaRecorder.start(1000); // Write chunks every second
