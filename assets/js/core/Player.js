@@ -1780,6 +1780,11 @@ export class CorePlayer {
             this.currentVideoId = videoId || url;
             this.ui.loader.classList.add('visible');
 
+            // Resize canvas to fill the container for fullscreen visualizer
+            const containerRect = this.container.getBoundingClientRect();
+            this.canvas.width = containerRect.width || 1280;
+            this.canvas.height = containerRect.height || 720;
+
             // Create audio element
             this.audioElement = new Audio();
             this.audioElement.crossOrigin = 'anonymous';
