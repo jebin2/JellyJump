@@ -25,6 +25,11 @@ export class AudioVisualizer {
         this.simulatedMode = false;
         this.simulatedTime = 0;
 
+        // Lightning flash effect
+        this.lightningAlpha = 0;
+        this.lastBassLevel = 0;
+        this.lightningThreshold = 0.7; // Bass level to trigger lightning
+
         console.log('[AudioVisualizer] Created for canvas:', canvas.width, 'x', canvas.height);
     }
 
@@ -172,6 +177,16 @@ export class AudioVisualizer {
         const width = this.canvas.width;
         const height = this.canvas.height;
 
+        // Detect bass hit (sudden increase in bass)
+        const bassHit = this.bassLevel > this.lightningThreshold &&
+            this.bassLevel > this.lastBassLevel + 0.2;
+        this.lastBassLevel = this.bassLevel;
+
+        // Trigger lightning on bass hit
+        if (bassHit) {
+            this.lightningAlpha = 0.8 + Math.random() * 0.2;
+        }
+
         // Dark gradient background
         const bgGradient = this.ctx.createLinearGradient(0, 0, 0, height);
         bgGradient.addColorStop(0, '#0a0a12');
@@ -212,6 +227,13 @@ export class AudioVisualizer {
 
         // Draw subtle ground reflection/splash
         this._drawGroundEffect(overallLevel);
+
+        // Draw lightning flash overlay
+        if (this.lightningAlpha > 0) {
+            this._drawLightning(width, height);
+            this.lightningAlpha *= 0.85; // Fade out quickly
+            if (this.lightningAlpha < 0.05) this.lightningAlpha = 0;
+        }
     }
 
     /**
@@ -264,6 +286,75 @@ export class AudioVisualizer {
                 this.ctx.fill();
             }
         }
+    }
+
+    /**
+     * Draw lightning flash effect
+     * @private
+     */
+    _drawLightning(width, height) {
+        // Full screen flash with gradient
+        const flashGradient = this.ctx.createRadialGradient(
+            width / 2, height / 3, 0,
+            width / 2, height / 3, Math.max(width, height)
+        );
+        flashGradient.addColorStop(0, `rgba(255, 255, 255, ${this.lightningAlpha})`);
+        flashGradient.addColorStop(0.3, `rgba(200, 220, 255, ${this.lightningAlpha * 0.7})`);
+        flashGradient.addColorStop(1, `rgba(100, 150, 255, ${this.lightningAlpha * 0.2})`);
+
+        this.ctx.fillStyle = flashGradient;
+        this.ctx.fillRect(0, 0, width, height);
+
+        // Draw lightning bolt (optional, adds visual interest)
+        if (this.lightningAlpha > 0.5) {
+            this._drawLightningBolt(width, height);
+        }
+    }
+
+    /**
+     * Draw a jagged lightning bolt
+     * @private
+     */
+    _drawLightningBolt(width, height) {
+        const startX = width * (0.3 + Math.random() * 0.4);
+        const startY = 0;
+        const endY = height * 0.6;
+
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = `rgba(255, 255, 255, ${this.lightningAlpha})`;
+        this.ctx.lineWidth = 2 + Math.random() * 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        let x = startX;
+        let y = startY;
+        this.ctx.moveTo(x, y);
+
+        const segments = 8 + Math.floor(Math.random() * 5);
+        const segmentHeight = endY / segments;
+
+        for (let i = 0; i < segments; i++) {
+            x += (Math.random() - 0.5) * 60;
+            y += segmentHeight;
+            this.ctx.lineTo(x, y);
+
+            // Occasional branch
+            if (Math.random() > 0.7) {
+                const branchX = x + (Math.random() - 0.5) * 80;
+                const branchY = y + segmentHeight * 0.5;
+                this.ctx.moveTo(x, y);
+                this.ctx.lineTo(branchX, branchY);
+                this.ctx.moveTo(x, y);
+            }
+        }
+
+        this.ctx.stroke();
+
+        // Glow effect
+        this.ctx.shadowColor = 'rgba(150, 200, 255, 0.8)';
+        this.ctx.shadowBlur = 20;
+        this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
     }
 
     /**
