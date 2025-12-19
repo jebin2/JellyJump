@@ -594,6 +594,12 @@ export class Playlist {
      * @private
      */
     async _prefetchMetadata(item) {
+        // Don't prefetch for streams (HLS/M3U8) - MediaBunny doesn't understand them
+        if (item.isStream) {
+            console.log('[Playlist] Skipping metadata prefetch for stream:', item.title);
+            return;
+        }
+
         // Don't prefetch if already cached
         if (item.videoInfo || item.audioInfo) {
             console.log('[Playlist] Metadata already cached for:', item.title);
@@ -1415,7 +1421,49 @@ export class Playlist {
      */
     async _handleUrlUpload(url) {
         try {
-            // Fetch the video to verify access and get metadata
+            // Check if it's an HLS stream (m3u8)
+            const urlLower = url.toLowerCase();
+            const isHLSStream = urlLower.includes('.m3u8') ||
+                urlLower.includes('/hls/') ||
+                urlLower.includes('/live/');
+
+            if (isHLSStream) {
+                // For HLS streams, skip HEAD request validation
+                // since many stream servers return different content-types
+                const urlPath = new URL(url).pathname;
+                let filename = urlPath.split('/').pop() || 'stream';
+
+                // Remove query string from filename
+                filename = filename.split('?')[0];
+
+                // Create a display title
+                const displayTitle = filename.replace('.m3u8', '') || 'Live Stream';
+
+                const newItem = {
+                    title: displayTitle,
+                    url: url,
+                    blob_url: url, // For streams, blob_url IS the stream URL
+                    duration: 'LIVE',
+                    thumbnail: '',
+                    isLocal: false,
+                    isStream: true,
+                    file: null,
+                    fileType: 'application/vnd.apple.mpegurl',
+                    mimeType: 'application/vnd.apple.mpegurl',
+                    id: generateId()
+                };
+
+                this.addItem(newItem);
+
+                // Select the new item if playlist was empty
+                if (this.items.length === 1) {
+                    this.selectItem(0);
+                }
+
+                return;
+            }
+
+            // For regular video files, verify access
             const response = await fetch(url, { method: 'HEAD' });
 
             if (!response.ok) {
@@ -1428,8 +1476,13 @@ export class Playlist {
 
             // Get content type from headers
             const contentType = response.headers.get('content-type') || 'video/mp4';
-            if (!contentType.startsWith('video/')) {
-                throw new Error('The URL does not point to a valid video file.');
+
+            // Allow video types and HLS types
+            const validTypes = ['video/', 'application/vnd.apple.mpegurl', 'application/x-mpegurl'];
+            const isValidType = validTypes.some(type => contentType.toLowerCase().includes(type.toLowerCase()));
+
+            if (!isValidType) {
+                throw new Error('The URL does not point to a valid video file or stream.');
             }
 
             // Extract filename from URL
@@ -1448,8 +1501,6 @@ export class Playlist {
                 mimeType: contentType,
                 id: generateId()
             };
-
-
 
             this.addItem(newItem);
 

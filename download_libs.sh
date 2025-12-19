@@ -22,4 +22,8 @@ echo "Downloading gif.worker.js..."
 curl -L "https://cdn.jsdelivr.net/npm/gif.js@latest/dist/gif.worker.js" \
      -o "$OUT/gif.worker.js"
 
+echo "Downloading hls.js..."
+curl -L "https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.mjs" \
+     -o "$OUT/hls.js"
+
 echo "All files downloaded into $OUT/"

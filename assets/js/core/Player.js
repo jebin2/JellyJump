@@ -1,6 +1,7 @@
 /**
  * Core Player Class
  * The main controller for video playback using MediaBunny.
+ * Supports both file-based playback (MediaBunny) and HLS streaming (hls.js).
  */
 
 import { MediaBunny } from './MediaBunny.js';
@@ -9,6 +10,8 @@ import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
+import { HLSPlayer } from './HLSPlayer.js';
+import { StreamDetector } from '../utils/StreamDetector.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -174,6 +177,12 @@ export class CorePlayer {
 
         // Current loaded video ID (url)
         this.currentVideoId = null;
+
+        // HLS/Stream playback
+        this.hlsPlayer = null;
+        this.streamVideo = null;
+        this.isStreamMode = false;
+        this.isLive = false;
 
         // Global Event Handlers (created conditionally based on which controls are enabled)
         this._handlers = {
@@ -1556,11 +1565,25 @@ export class CorePlayer {
 
     /**
      * Load a media source
-     * @param {string} url - URL of the media file
+     * @param {string} url - URL of the media file or HLS stream
      * @param {boolean} autoplay - Whether to start playing automatically
+     * @param {string} videoId - Optional unique identifier for the video
+     * @param {Array} savedSubtitles - Optional saved subtitle tracks
      */
     async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
         try {
+            // Detect stream type
+            const streamType = StreamDetector.detect(url);
+
+            if (streamType === StreamDetector.TYPE_HLS) {
+                return this._loadHLSStream(url, autoplay, videoId);
+            }
+
+            // Reset stream mode if loading a file
+            this.isStreamMode = false;
+            this.isLive = false;
+            this._hideStreamVideo();
+
             // Stop any current playback
             this.pause(false);
             this.currentTime = 0;
@@ -1696,6 +1719,350 @@ export class CorePlayer {
             this.ui.loader.classList.remove('visible');
         }
     }
+
+    /**
+     * Load an HLS stream
+     * @param {string} url - HLS manifest URL (m3u8)
+     * @param {boolean} autoplay - Whether to start playing automatically
+     * @param {string} videoId - Optional unique identifier
+     * @private
+     */
+    async _loadHLSStream(url, autoplay, videoId) {
+        try {
+            console.log('[Stream] Loading HLS stream:', url);
+
+            // Stop any current playback and clean up MediaBunny resources
+            this.pause(false);
+            this._cleanupMediaBunny();
+
+            this.isStreamMode = true;
+            this.currentVideoId = videoId || url;
+            this.ui.loader.classList.add('visible');
+
+            // Create stream video element if needed
+            this._createStreamVideo();
+
+            // Show stream video, hide canvas
+            this._showStreamVideo();
+
+            // Initialize HLS player
+            if (!this.hlsPlayer) {
+                this.hlsPlayer = new HLSPlayer(this.streamVideo);
+
+                // Setup event handlers
+                this.hlsPlayer.onManifestParsed = (data) => {
+                    console.log('[Stream] Manifest parsed:', data.levels?.length, 'quality levels');
+                    this._updateQualityMenu();
+                };
+
+                this.hlsPlayer.onQualityChange = (level) => {
+                    this._updateQualityMenu();
+                };
+
+                this.hlsPlayer.onError = (error) => {
+                    console.warn('[Stream] HLS error:', error);
+                };
+            }
+
+            // Load the stream
+            await this.hlsPlayer.load(url);
+            this.isLive = this.hlsPlayer.isLive;
+
+            // Update UI for stream mode
+            this._updateStreamUI();
+
+            // Setup stream video events
+            this._setupStreamVideoEvents();
+
+            this.ui.loader.classList.remove('visible');
+            console.log('[Stream] HLS stream loaded successfully. Live:', this.isLive);
+
+            if (autoplay) {
+                this.play();
+            } else {
+                // Show play overlay
+                if (this.ui.playOverlay) {
+                    this.ui.playOverlay.style.display = 'flex';
+                }
+            }
+
+        } catch (error) {
+            console.error('[Stream] Error loading HLS stream:', error);
+            this.ui.loader.classList.remove('visible');
+            this.isStreamMode = false;
+            throw error;
+        }
+    }
+
+    /**
+     * Create the stream video element
+     * @private
+     */
+    _createStreamVideo() {
+        if (this.streamVideo) return;
+
+        this.streamVideo = document.createElement('video');
+        this.streamVideo.className = 'jellyjump-stream-video jellyjump-video';
+        this.streamVideo.playsInline = true;
+        this.streamVideo.crossOrigin = 'anonymous';
+
+        // Insert after canvas
+        const wrapper = this.container.querySelector('.jellyjump-video-wrapper') || this.container;
+        wrapper.appendChild(this.streamVideo);
+    }
+
+    /**
+     * Show stream video, hide canvas
+     * @private
+     */
+    _showStreamVideo() {
+        if (this.streamVideo) {
+            this.streamVideo.style.display = 'block';
+        }
+        if (this.canvas) {
+            this.canvas.style.display = 'none';
+        }
+    }
+
+    /**
+     * Hide stream video, show canvas
+     * @private
+     */
+    _hideStreamVideo() {
+        if (this.streamVideo) {
+            this.streamVideo.style.display = 'none';
+        }
+        if (this.canvas) {
+            this.canvas.style.display = 'block';
+        }
+    }
+
+    /**
+     * Setup event listeners for stream video
+     * @private
+     */
+    _setupStreamVideoEvents() {
+        if (!this.streamVideo) return;
+
+        // Time update
+        this.streamVideo.ontimeupdate = () => {
+            if (this.isStreamMode) {
+                this.currentTime = this.streamVideo.currentTime;
+                this.duration = this.streamVideo.duration || 0;
+                this._updateTimeDisplay();
+                this._updateProgress();
+            }
+        };
+
+        // Ended
+        this.streamVideo.onended = () => {
+            if (this.isStreamMode && this.onEnded) {
+                this.onEnded();
+            }
+        };
+
+        // Playing state sync
+        this.streamVideo.onplay = () => {
+            this.isPlaying = true;
+            this._updatePlayPauseUI();
+            if (this.ui.playOverlay) {
+                this.ui.playOverlay.style.display = 'none';
+            }
+        };
+
+        this.streamVideo.onpause = () => {
+            this.isPlaying = false;
+            this._updatePlayPauseUI();
+        };
+    }
+
+    /**
+     * Update UI for stream mode (live badge, hide/show controls)
+     * @private
+     */
+    _updateStreamUI() {
+        // Create or update live badge
+        if (this.isLive) {
+            if (!this.ui.liveBadge) {
+                this.ui.liveBadge = document.createElement('span');
+                this.ui.liveBadge.className = 'jellyjump-live-badge';
+                this.ui.liveBadge.textContent = 'LIVE';
+
+                // Insert near time display
+                const timeContainer = this.ui.timeDisplay?.parentNode;
+                if (timeContainer) {
+                    timeContainer.insertBefore(this.ui.liveBadge, this.ui.timeDisplay);
+                }
+            }
+            this.ui.liveBadge.style.display = 'inline-flex';
+
+            // Hide progress bar for live streams (no seeking)
+            if (this.ui.progressContainer) {
+                this.ui.progressContainer.classList.add('live-mode-hidden');
+            }
+            if (this.ui.timeDisplay) {
+                this.ui.timeDisplay.classList.add('live-mode-hidden');
+            }
+        } else {
+            // VOD stream - show normal controls
+            if (this.ui.liveBadge) {
+                this.ui.liveBadge.style.display = 'none';
+            }
+            if (this.ui.progressContainer) {
+                this.ui.progressContainer.classList.remove('live-mode-hidden');
+            }
+            if (this.ui.timeDisplay) {
+                this.ui.timeDisplay.classList.remove('live-mode-hidden');
+            }
+        }
+
+        // Create quality selector button if we have multiple levels
+        this._createQualitySelector();
+    }
+
+    /**
+     * Create quality selector UI
+     * @private
+     */
+    _createQualitySelector() {
+        if (!this.hlsPlayer || this.ui.qualityBtn) return;
+
+        const levels = this.hlsPlayer.getLevels();
+        if (levels.length <= 1) return;
+
+        // Create quality button
+        this.ui.qualityBtn = document.createElement('button');
+        this.ui.qualityBtn.className = 'jellyjump-control-btn jellyjump-quality-btn';
+        this.ui.qualityBtn.setAttribute('aria-label', 'Quality');
+        this.ui.qualityBtn.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
+            </svg>
+        `;
+
+        // Create quality menu
+        this.ui.qualityMenu = document.createElement('div');
+        this.ui.qualityMenu.className = 'jellyjump-dropdown jellyjump-quality-menu';
+
+        // Insert into controls
+        const controlsRight = this.container.querySelector('.jellyjump-controls-right');
+        if (controlsRight) {
+            controlsRight.insertBefore(this.ui.qualityMenu, controlsRight.firstChild);
+            controlsRight.insertBefore(this.ui.qualityBtn, controlsRight.firstChild);
+        }
+
+        // Event handlers
+        this.ui.qualityBtn.addEventListener('click', () => {
+            this.ui.qualityMenu.classList.toggle('visible');
+        });
+
+        this.ui.qualityMenu.addEventListener('click', (e) => {
+            const item = e.target.closest('.jellyjump-menu-item');
+            if (item) {
+                const level = parseInt(item.dataset.value);
+                this.hlsPlayer.setLevel(level);
+                this.ui.qualityMenu.classList.remove('visible');
+                this._updateQualityMenu();
+            }
+        });
+
+        this._updateQualityMenu();
+    }
+
+    /**
+     * Update quality menu items
+     * @private
+     */
+    _updateQualityMenu() {
+        if (!this.ui.qualityMenu || !this.hlsPlayer) return;
+
+        const levels = this.hlsPlayer.getLevels();
+        const currentLevel = this.hlsPlayer.getCurrentLevel();
+        const isAuto = this.hlsPlayer.isAutoLevel();
+
+        let html = `
+            <div class="jellyjump-menu-item ${isAuto ? 'active' : ''}" data-value="-1">
+                Auto
+            </div>
+        `;
+
+        levels.forEach(level => {
+            html += `
+                <div class="jellyjump-menu-item ${!isAuto && currentLevel === level.index ? 'active' : ''}" 
+                     data-value="${level.index}">
+                    ${level.label}
+                </div>
+            `;
+        });
+
+        this.ui.qualityMenu.innerHTML = html;
+
+        // Update button text
+        if (this.ui.qualityBtn) {
+            const currentLabel = isAuto ? 'Auto' : levels[currentLevel]?.label || 'Auto';
+            this.ui.qualityBtn.title = `Quality: ${currentLabel}`;
+        }
+    }
+
+    /**
+     * Clean up MediaBunny resources when switching to stream mode
+     * @private
+     */
+    _cleanupMediaBunny() {
+        // Reset iterators
+        if (this.videoFrameIterator) {
+            this.videoFrameIterator.return().catch(() => { });
+            this.videoFrameIterator = null;
+        }
+        if (this.audioBufferIterator) {
+            this.audioBufferIterator.return().catch(() => { });
+            this.audioBufferIterator = null;
+        }
+
+        // Dispose sinks
+        if (this.videoSink && typeof this.videoSink.dispose === 'function') {
+            try { this.videoSink.dispose(); } catch (e) { }
+        }
+        if (this.audioSink && typeof this.audioSink.dispose === 'function') {
+            try { this.audioSink.dispose(); } catch (e) { }
+        }
+        if (this.input && typeof this.input.dispose === 'function') {
+            try { this.input.dispose(); } catch (e) { }
+        }
+
+        this.videoSink = null;
+        this.audioSink = null;
+        this.input = null;
+        this.videoTrack = null;
+        this.audioTrack = null;
+        this.nextFrame = null;
+    }
+
+    /**
+     * Clean up HLS player resources
+     * @private
+     */
+    _cleanupHLS() {
+        if (this.hlsPlayer) {
+            this.hlsPlayer.destroy();
+        }
+        this.isStreamMode = false;
+        this.isLive = false;
+
+        // Remove quality UI
+        if (this.ui.qualityBtn) {
+            this.ui.qualityBtn.remove();
+            this.ui.qualityBtn = null;
+        }
+        if (this.ui.qualityMenu) {
+            this.ui.qualityMenu.remove();
+            this.ui.qualityMenu = null;
+        }
+        if (this.ui.liveBadge) {
+            this.ui.liveBadge.style.display = 'none';
+        }
+    }
+
 
     /**
      * Load a subtitle file (VTT, SRT, or JSON transcript)
@@ -1869,8 +2236,8 @@ export class CorePlayer {
      * Toggle play/pause
      */
     togglePlay() {
-        // If no video loaded, try to request play from playlist
-        if (!this.videoTrack && !this.audioTrack && !this.currentVideoId) {
+        // If no video loaded (neither file nor stream), try to request play from playlist
+        if (!this.videoTrack && !this.audioTrack && !this.isStreamMode && !this.currentVideoId) {
             if (this.onPlayRequest) {
                 this.onPlayRequest();
             }
@@ -1885,6 +2252,30 @@ export class CorePlayer {
     }
 
     async play() {
+        // Handle stream mode
+        if (this.isStreamMode && this.streamVideo) {
+            try {
+                await this.streamVideo.play();
+                this.isPlaying = true;
+                this._updatePlayPauseUI();
+                if (this.ui.playOverlay) {
+                    this.ui.playOverlay.style.display = 'none';
+                }
+                // Start auto-hide timer for overlay mode
+                if (this.controlBarMode === 'overlay') {
+                    setTimeout(() => {
+                        if (this.isPlaying && this.controlBarMode === 'overlay') {
+                            this._startAutoHideTimer();
+                        }
+                    }, 500);
+                }
+            } catch (e) {
+                console.warn('[Stream] Play failed:', e.message);
+            }
+            return;
+        }
+
+        // File-based playback (MediaBunny)
         if (!this.videoTrack && !this.audioTrack) return;
 
         // Initialize Audio Context on first user interaction
@@ -1935,6 +2326,20 @@ export class CorePlayer {
 
     pause(showOverlay = true) {
         console.log("Player.pause() called");
+
+        // Handle stream mode
+        if (this.isStreamMode && this.streamVideo) {
+            this.streamVideo.pause();
+            this.isPlaying = false;
+            this._clearAutoHideTimer();
+            this._updatePlayPauseUI();
+            if (this.ui.playOverlay) {
+                this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
+            }
+            return;
+        }
+
+        // File-based playback (MediaBunny)
         this.playbackTimeAtStart = this._getPlaybackTime();
         this.isPlaying = false;
         this._clearAutoHideTimer();
