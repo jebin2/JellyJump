@@ -3737,6 +3737,18 @@ export class CorePlayer {
             this._clearAutoHideTimer();
             this.ui.controls.classList.add('visible');
         }
+
+        // Resize canvas to fill container in audio mode when pin changes
+        if (this.isAudioMode) {
+            const containerRect = this.container.getBoundingClientRect();
+            this.canvas.width = containerRect.width || 1280;
+            this.canvas.height = containerRect.height || 720;
+
+            // Redraw static background if not playing
+            if (!this.isPlaying && this.audioVisualizer) {
+                this.audioVisualizer.drawStaticBackground();
+            }
+        }
     }
 
     /**
