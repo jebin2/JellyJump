@@ -1872,9 +1872,9 @@ export class CorePlayer {
                 // Update LIVE badge based on whether we're at live edge
                 if (this.isLive && this.ui.liveBadge) {
                     const latency = this.hlsPlayer?.getLiveLatency() || 0;
-                    // HLS streams typically have 20-30 second latency for buffering
-                    // Consider "at live" if within 30 seconds of live edge
-                    const isAtLive = latency < 30;
+                    // Only consider "at live" if within 5 seconds of live edge
+                    // This ensures badge is gray even after short pauses
+                    const isAtLive = latency < 10;
                     this.ui.liveBadge.classList.toggle('not-live', !isAtLive);
                 }
             }
