@@ -703,130 +703,69 @@ export class Playlist {
         this._thumbnailCaptureId = captureId;
 
         // Clear any existing stale thumbnail from previous video
-        // This prevents showing the wrong thumbnail during loading
         if (video.thumbnail) {
-            // If this video already had a thumbnail before, keep it
-            // (it was captured from THIS video previously)
             console.log(`[Playlist] Keeping existing thumbnail for: ${video.title}`);
             return;
         }
 
-        let attempts = 0;
-        const maxAttempts = 60; // Try for up to 60 seconds (streams take longer)
-
-        // Poll until we can capture
-        const tryCapture = () => {
-            attempts++;
-
+        // Define the capture callback
+        const captureCallback = (ctx, width, height) => {
             // Check if capture was invalidated (user switched videos)
-            if (this._thumbnailCaptureId !== captureId) {
-                console.log(`[Playlist] Thumbnail capture invalidated for: ${video.title}`);
-                return;
-            }
-
-            // Stop trying after max attempts
-            if (attempts > maxAttempts) {
-                console.log(`[Playlist] Gave up capturing thumbnail for: ${video.title}`);
-                return;
-            }
-
-            // Skip if thumbnail was added
-            if (video.thumbnail) return;
-
-            // Skip if we switched to a different video
-            if (this.activeIndex !== index) return;
-
-            // For streams, verify the stream video has loaded metadata
-            if (this.player.isStreamMode && this.player.streamVideo) {
-                // HAVE_METADATA = 1, HAVE_CURRENT_DATA = 2
-                if (this.player.streamVideo.readyState < 2) {
-                    // Stream video not ready yet, wait for it
-                    console.log(`[Playlist] Stream not ready (readyState: ${this.player.streamVideo.readyState}), waiting...`);
-                    setTimeout(tryCapture, 1000);
-                    return;
-                }
-
-                // Extra check: make sure video dimensions are set
-                if (this.player.streamVideo.videoWidth === 0) {
-                    setTimeout(tryCapture, 1000);
-                    return;
-                }
-            }
-
-            // Check if player has canvas content
-            // REMOVED !this.player.isPlaying check to allow capture during buffering
-            if (!this.player.canvas) {
-                // Retry in 1 second
-                setTimeout(tryCapture, 1000);
-                return;
-            }
-
-            const canvas = this.player.canvas;
-            if (canvas.width === 0 || canvas.height === 0) {
-                // Canvas not ready, retry
-                setTimeout(tryCapture, 1000);
+            if (this._thumbnailCaptureId !== captureId || this.activeIndex !== index) {
+                // Remove this callback as it's no longer valid
+                this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
                 return;
             }
 
             try {
-                // Create small thumbnail - optimized for memory
+                // Create small thumbnail
                 const thumbCanvas = document.createElement('canvas');
                 thumbCanvas.width = 80;
                 thumbCanvas.height = 45;
-                const ctx = thumbCanvas.getContext('2d');
-                ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                const thumbCtx = thumbCanvas.getContext('2d');
+                thumbCtx.drawImage(this.player.canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
 
-                // Check if canvas has actual content (not just black)
-                // Check more pixels to be sure (center and corners)
-                const imageData = ctx.getImageData(0, 0, thumbCanvas.width, thumbCanvas.height);
+                // Check content (non-black pixels)
+                const imageData = thumbCtx.getImageData(0, 0, thumbCanvas.width, thumbCanvas.height);
                 const data = imageData.data;
                 let nonBlackPixels = 0;
-                const threshold = 10; // Dark threshold
+                const threshold = 10;
 
-                // Sample every 4th pixel to save perf
                 for (let i = 0; i < data.length; i += 16) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-                    if (r > threshold || g > threshold || b > threshold) {
+                    if (data[i] > threshold || data[i + 1] > threshold || data[i + 2] > threshold) {
                         nonBlackPixels++;
                     }
                 }
 
-                // Require at least 5% of pixels to be non-black
                 const totalPixels = (thumbCanvas.width * thumbCanvas.height) / 4;
                 if (nonBlackPixels < totalPixels * 0.05) {
-                    // Canvas is still mostly black, retry
-                    // console.log('[Playlist] Canvas mostly black, retrying...');
-                    setTimeout(tryCapture, 1000);
+                    // Still black, keep waiting (don't remove callback yet)
                     return;
                 }
 
-                // Final check: ensure we're still on the same video
-                if (this.activeIndex !== index || this._thumbnailCaptureId !== captureId) {
-                    console.log(`[Playlist] Thumbnail capture aborted (video switched): ${video.title}`);
-                    return;
-                }
-
-                // Convert to data URL with low quality for smaller size
-                const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
-                video.thumbnail = thumbnail;
-
-                // Update UI
+                // Success!
+                video.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
                 this._updateItemUI(video);
                 this._saveState();
+                console.log(`[Playlist] Captured thumbnail via render loop for: ${video.title}`);
 
-                console.log(`[Playlist] Captured thumbnail for: ${video.title}`);
+                // Remove the callback since we're done
+                this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
+
             } catch (e) {
-                console.warn('[Playlist] Failed to capture thumbnail:', e);
-                setTimeout(tryCapture, 1000);
+                console.warn('[Playlist] Failed to capture thumbnail in render loop:', e);
+                // Remove callback on error to prevent endless errors
+                this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
             }
         };
 
-        // Start polling after the stream has time to load
-        // Use a longer initial delay for streams since they need to buffer
-        const initialDelay = this.player.isStreamMode ? 3000 : 2000;
-        setTimeout(tryCapture, initialDelay);
+        // Register the callback
+        this.player.afterFrameRenderCallbacks.push(captureCallback);
+
+        // Safety timeout: remove callback if it never fires (e.g. stream fails)
+        setTimeout(() => {
+            this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
+        }, 60000);
     }
 
     /**
