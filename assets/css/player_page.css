@@ -72,7 +72,10 @@
     max-width: 30vw;
     min-width: 350px;
     flex-shrink: 0;
+    /* Isolate layout to prevent folder expansion from affecting video */
+    contain: layout style;
 }
+
 
 /* Collapsed State - Hide sidebar completely, show only overlay button */
 .playlist-section.collapsed {
@@ -178,7 +181,10 @@
     padding: var(--space-md);
     position: relative;
     /* For drag overlay if needed */
+    /* Prevent content expansion from affecting video layout */
+    contain: strict;
 }
+
 
 .playlist-section.drag-over {
     border: 2px dashed var(--accent-primary);

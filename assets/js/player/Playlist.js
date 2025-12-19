@@ -10,6 +10,7 @@ import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { FileDropHandler } from '../utils/FileDropHandler.js';
 import { ElectronHelper } from '../utils/ElectronHelper.js';
 import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
+import { M3UParser } from '../utils/M3UParser.js';
 
 /**
  * Playlist Manager
@@ -1435,8 +1436,19 @@ export class Playlist {
      */
     async _handleUrlUpload(url) {
         try {
-            // Check if it's an HLS stream (m3u8)
             const urlLower = url.toLowerCase();
+
+            // Check if it's an M3U playlist (not HLS stream)
+            // M3U playlists end with .m3u (not .m3u8)
+            const isM3UPlaylist = urlLower.endsWith('.m3u') ||
+                (urlLower.includes('.m3u') && !urlLower.includes('.m3u8'));
+
+            if (isM3UPlaylist) {
+                await this._handleM3UPlaylist(url);
+                return;
+            }
+
+            // Check if it's an HLS stream (m3u8)
             const isHLSStream = urlLower.includes('.m3u8') ||
                 urlLower.includes('/hls/') ||
                 urlLower.includes('/live/');
@@ -1529,6 +1541,83 @@ export class Playlist {
         } catch (error) {
             if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
                 throw new Error('CORS Error: Cannot access this URL. The server must allow cross-origin requests.');
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Handle M3U/IPTV Playlist Import
+     * Parses the M3U file and adds channels grouped by category as folders
+     * @param {string} url - URL to the M3U playlist
+     * @private
+     */
+    async _handleM3UPlaylist(url) {
+        try {
+            // Fetch and parse the M3U playlist
+            const channels = await M3UParser.fetchAndParse(url);
+
+            if (!channels || channels.length === 0) {
+                throw new Error('No channels found in this playlist.');
+            }
+
+            // Extract playlist name from URL for root folder
+            const urlPath = new URL(url).pathname;
+            let playlistName = urlPath.split('/').pop() || 'IPTV Playlist';
+            playlistName = playlistName.replace('.m3u', '').replace(/_/g, ' ');
+            // Capitalize first letter
+            playlistName = playlistName.charAt(0).toUpperCase() + playlistName.slice(1);
+
+            // Convert channels to playlist items with folder hierarchy
+            const newItems = channels.map(channel => {
+                // Build path: PlaylistName/Group/ChannelName
+                const group = channel.group || 'Uncategorized';
+                const channelName = channel.name || 'Unknown Channel';
+                const path = `${playlistName}/${group}/${channelName}`;
+
+                return {
+                    title: channelName,
+                    url: channel.url,
+                    blob_url: channel.url, // For streams, blob_url IS the stream URL
+                    duration: 'LIVE',
+                    thumbnail: channel.logo || '',
+                    isLocal: false,
+                    isStream: true,
+                    isLive: true,
+                    file: null,
+                    fileType: 'application/vnd.apple.mpegurl',
+                    mimeType: 'application/vnd.apple.mpegurl',
+                    path: path,
+                    id: channel.id || generateId(),
+                    // Store M3U metadata for potential future use
+                    m3uData: {
+                        tvgId: channel.tvgId,
+                        tvgName: channel.tvgName,
+                        language: channel.language,
+                        country: channel.country,
+                        group: channel.group
+                    }
+                };
+            });
+
+            // Add all items at once
+            newItems.forEach(item => {
+                if (!item.id) item.id = generateId();
+            });
+            this.items = [...this.items, ...newItems];
+            this._saveState();
+            this.render();
+            this._updatePlayerNavigationState();
+
+            // Show success message
+            this._showToast(`Added ${channels.length} channels from ${playlistName}`);
+
+            console.log(`[M3U] Imported ${channels.length} channels from: ${url}`);
+
+        } catch (error) {
+            console.error('[M3U] Failed to import playlist:', error);
+            if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+                throw new Error('CORS Error: Cannot access this M3U playlist. The server must allow cross-origin requests.');
             }
             throw error;
         }
