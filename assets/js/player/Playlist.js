@@ -944,17 +944,51 @@ export class Playlist {
      * Add multiple videos
      * @param {Array} videos 
      */
-    addItems(videos) {
-        videos.forEach(v => { if (!v.id) v.id = generateId(); });
-        const startIndex = this.items.length;
-        this.items = [...this.items, ...videos];
-        this._saveState();
-        this.render();
-        this._updatePlayerNavigationState();
+    async addItems(videos) {
+        // Separate M3U playlist URLs from regular items
+        const m3uItems = [];
+        const regularItems = [];
 
-        // Auto-load if single file added (Phase 21)
-        if (videos.length === 1) {
-            this.selectItem(startIndex);
+        for (const v of videos) {
+            const url = v.url?.toLowerCase() || '';
+            const isM3UPlaylist = url.endsWith('.m3u') ||
+                (url.includes('.m3u') && !url.includes('.m3u8'));
+
+            if (isM3UPlaylist) {
+                m3uItems.push(v);
+            } else {
+                if (!v.id) v.id = generateId();
+                regularItems.push(v);
+            }
+        }
+
+        // Add regular items immediately
+        if (regularItems.length > 0) {
+            const startIndex = this.items.length;
+            this.items = [...this.items, ...regularItems];
+            this._saveState();
+            this.render();
+            this._updatePlayerNavigationState();
+
+            // Auto-load if single file added (Phase 21)
+            if (regularItems.length === 1 && m3uItems.length === 0) {
+                this.selectItem(startIndex);
+            }
+        }
+
+        // Process M3U playlists asynchronously
+        for (const m3u of m3uItems) {
+            try {
+                console.log(`[Playlist] Expanding M3U playlist: ${m3u.title || m3u.url}`);
+                await this._handleM3UPlaylist(m3u.url);
+            } catch (error) {
+                console.error(`[Playlist] Failed to expand M3U: ${m3u.url}`, error);
+                // Add as a regular item if expansion fails
+                if (!m3u.id) m3u.id = generateId();
+                this.items.push(m3u);
+                this._saveState();
+                this.render();
+            }
         }
     }
 
