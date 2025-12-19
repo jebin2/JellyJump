@@ -112,6 +112,104 @@ export class HLSPlayer {
     }
 
     /**
+     * Get user-friendly error details from HLS error data
+     * @param {Object} data - HLS error data
+     * @returns {Object} Structured error with type, title, message, recoverable, suggestion
+     */
+    static getErrorDetails(data) {
+        const url = data.url || '';
+        const details = data.details || '';
+
+        // Detect CORS errors - usually manifest with specific patterns
+        const isCORS = (
+            details === 'manifestLoadError' &&
+            data.response?.code === 0
+        ) || (
+                data.error?.message?.includes('CORS') ||
+                data.error?.name === 'TypeError'
+            );
+
+        // Detect DNS/network resolution errors
+        const isDNS = details.includes('manifestLoadError') &&
+            (data.error?.message?.includes('ERR_NAME_NOT_RESOLVED') ||
+                data.error?.message?.includes('getaddrinfo'));
+
+        // Detect timeout errors
+        const isTimeout = details.includes('timeout') ||
+            data.error?.message?.includes('timeout');
+
+        // Detect media errors (codec, format issues)
+        const isMediaError = data.type === 'mediaError';
+
+        // Build error response based on type
+        if (isCORS) {
+            return {
+                type: 'cors',
+                title: 'Access Blocked',
+                message: 'This stream is blocked by the server\'s security policy (CORS).',
+                suggestion: 'The stream server doesn\'t allow playback from this site. Try a different stream.',
+                recoverable: false,
+                icon: '🚫'
+            };
+        }
+
+        if (isDNS) {
+            return {
+                type: 'dns',
+                title: 'Server Not Found',
+                message: 'Could not connect to the stream server.',
+                suggestion: 'Check your internet connection or the stream URL may be invalid.',
+                recoverable: true,
+                icon: '🌐'
+            };
+        }
+
+        if (isTimeout) {
+            return {
+                type: 'timeout',
+                title: 'Connection Timeout',
+                message: 'The stream server took too long to respond.',
+                suggestion: 'Try again or check your internet connection.',
+                recoverable: true,
+                icon: '⏱️'
+            };
+        }
+
+        if (isMediaError) {
+            return {
+                type: 'media',
+                title: 'Playback Error',
+                message: 'Unable to play this stream format.',
+                suggestion: 'The stream format may not be supported by your browser.',
+                recoverable: false,
+                icon: '🎬'
+            };
+        }
+
+        // Default network error
+        if (data.type === 'networkError') {
+            return {
+                type: 'network',
+                title: 'Network Error',
+                message: 'Failed to load the stream.',
+                suggestion: 'Check your internet connection and try again.',
+                recoverable: true,
+                icon: '📡'
+            };
+        }
+
+        // Unknown error
+        return {
+            type: 'unknown',
+            title: 'Stream Error',
+            message: `Failed to load stream: ${details || 'Unknown error'}`,
+            suggestion: 'Try a different stream or refresh the page.',
+            recoverable: true,
+            icon: '⚠️'
+        };
+    }
+
+    /**
      * Wait for video metadata (native HLS in Safari)
      * @returns {Promise<void>}
      * @private

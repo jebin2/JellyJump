@@ -471,6 +471,9 @@ export class CorePlayer {
             this.ui.closeAudioPanelBtn = this.container.querySelector('.jellyjump-eq-panel .jellyjump-close-btn');
         }
 
+        // Create Stream Error Overlay
+        this._createErrorOverlay();
+
         // Apply visibility based on config (removes control--hidden class for enabled controls)
         this._applyControlVisibility();
 
@@ -1730,6 +1733,7 @@ export class CorePlayer {
     async _loadHLSStream(url, autoplay, videoId) {
         try {
             console.log('[Stream] Loading HLS stream:', url);
+            this._lastStreamUrl = url; // Save for retry
 
             // Stop any current playback and clean up MediaBunny resources
             this.pause(false);
@@ -1738,6 +1742,7 @@ export class CorePlayer {
             this.isStreamMode = true;
             this.currentVideoId = videoId || url;
             this.ui.loader.classList.add('visible');
+            this._hideStreamError(); // Hide any previous errors
 
             // Create stream video element if needed
             this._createStreamVideo();
@@ -1761,6 +1766,11 @@ export class CorePlayer {
 
                 this.hlsPlayer.onError = (error) => {
                     console.warn('[Stream] HLS error:', error);
+                    // Only show fatal errors or specific network errors
+                    if (error.fatal || error.type === 'networkError') {
+                        const errorDetails = HLSPlayer.getErrorDetails(error);
+                        this._showStreamError(errorDetails);
+                    }
                 };
             }
 
@@ -1804,8 +1814,18 @@ export class CorePlayer {
         } catch (error) {
             console.error('[Stream] Error loading HLS stream:', error);
             this.ui.loader.classList.remove('visible');
-            this.isStreamMode = false;
-            throw error;
+
+            // Show error overlay for load failures
+            const errorDetails = HLSPlayer.getErrorDetails({
+                type: 'networkError',
+                details: error.message || 'manifestLoadError',
+                error: error,
+                url: url
+            });
+            this._showStreamError(errorDetails);
+
+            // Don't throw, just handle it in UI
+            // this.isStreamMode = false; // Keep stream mode so retry works
         }
     }
 
@@ -2183,8 +2203,84 @@ export class CorePlayer {
         if (this.ui.liveBadge) {
             this.ui.liveBadge.style.display = 'none';
         }
+
+        // Hide any error overlay
+        this._hideStreamError();
     }
 
+    /**
+     * Create the error overlay element
+     * @private
+     */
+    _createErrorOverlay() {
+        const overlay = document.createElement('div');
+        overlay.className = 'jellyjump-error-overlay';
+        overlay.style.display = 'none';
+        overlay.innerHTML = `
+            <div class="jellyjump-error-content">
+                <span class="jellyjump-error-icon">⚠️</span>
+                <h3 class="jellyjump-error-title">Stream Error</h3>
+                <p class="jellyjump-error-message">Failed to load stream.</p>
+                <p class="jellyjump-error-suggestion"></p>
+                <div class="jellyjump-error-actions">
+                    <button class="jellyjump-btn-secondary jellyjump-error-retry">Retry</button>
+                    <button class="jellyjump-btn-secondary jellyjump-error-dismiss">Dismiss</button>
+                </div>
+            </div>
+        `;
+
+        // Insert in the video wrapper
+        const wrapper = this.container.querySelector('.jellyjump-video-wrapper') || this.container;
+        wrapper.appendChild(overlay);
+
+        this.ui.errorOverlay = overlay;
+
+        // Event handlers
+        overlay.querySelector('.jellyjump-error-retry').addEventListener('click', () => {
+            this._hideStreamError();
+            // Retry loading the current stream
+            if (this._lastStreamUrl) {
+                this._loadHLSStream(this._lastStreamUrl, false, this.currentVideoId);
+            }
+        });
+
+        overlay.querySelector('.jellyjump-error-dismiss').addEventListener('click', () => {
+            this._hideStreamError();
+        });
+    }
+
+    /**
+     * Show stream error overlay with user-friendly message
+     * @param {Object} errorDetails - Structured error from HLSPlayer.getErrorDetails
+     * @private
+     */
+    _showStreamError(errorDetails) {
+        if (!this.ui.errorOverlay) return;
+
+        const overlay = this.ui.errorOverlay;
+        overlay.querySelector('.jellyjump-error-icon').textContent = errorDetails.icon || '⚠️';
+        overlay.querySelector('.jellyjump-error-title').textContent = errorDetails.title || 'Stream Error';
+        overlay.querySelector('.jellyjump-error-message').textContent = errorDetails.message || 'Failed to load stream.';
+        overlay.querySelector('.jellyjump-error-suggestion').textContent = errorDetails.suggestion || '';
+
+        // Show/hide retry button based on recoverability
+        const retryBtn = overlay.querySelector('.jellyjump-error-retry');
+        retryBtn.style.display = errorDetails.recoverable ? 'inline-block' : 'none';
+
+        // Hide loader, show error
+        this.ui.loader.classList.remove('visible');
+        overlay.style.display = 'flex';
+    }
+
+    /**
+     * Hide stream error overlay
+     * @private
+     */
+    _hideStreamError() {
+        if (this.ui.errorOverlay) {
+            this.ui.errorOverlay.style.display = 'none';
+        }
+    }
 
     /**
      * Load a subtitle file (VTT, SRT, or JSON transcript)
