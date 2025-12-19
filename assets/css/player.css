@@ -1072,6 +1072,20 @@ button:focus-visible {
     display: none;
 }
 
+/* Scroll to playing highlight animation */
+@keyframes playlist-item-highlight {
+    0% {
+        background-color: var(--accent-primary);
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+.playlist-item--highlight {
+    animation: playlist-item-highlight 1.5s ease-out;
+}
 
 .eq-sliders {
     display: flex;

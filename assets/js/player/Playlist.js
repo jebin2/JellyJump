@@ -283,6 +283,14 @@ export class Playlist {
             });
         }
 
+        // Scroll to playing button
+        const scrollToPlayingBtn = header.querySelector('#mb-scroll-to-playing');
+        if (scrollToPlayingBtn) {
+            scrollToPlayingBtn.addEventListener('click', () => {
+                this.scrollToPlaying();
+            });
+        }
+
         // File input events
         const fileInput = document.getElementById('mb-file-input');
         const folderInput = document.getElementById('mb-folder-input');
@@ -415,6 +423,51 @@ export class Playlist {
     _updatePlayerNavigationState() {
         if (this.player && typeof this.player.updateNavigationButtons === 'function') {
             this.player.updateNavigationButtons(this._canGoPrevious(), this._canGoNext());
+        }
+    }
+
+    /**
+     * Scroll to the currently playing item and highlight it
+     */
+    scrollToPlaying() {
+        if (this.activeIndex < 0 || this.activeIndex >= this.items.length) {
+            console.log('[Playlist] No active item to scroll to');
+            return;
+        }
+
+        // Clear any active search first (to show tree view)
+        const searchInput = document.querySelector('#mb-playlist-search-input');
+        if (searchInput && searchInput.value) {
+            searchInput.value = '';
+            this.searchQuery = '';
+            const searchClearBtn = document.querySelector('#mb-playlist-search-clear');
+            searchClearBtn?.classList.add('hidden');
+            this.render();
+        }
+
+        // Find the item's parent folders and expand them
+        const item = this.items[this.activeIndex];
+        if (item.path && item.path.includes('/')) {
+            const pathParts = item.path.split('/');
+            let currentPath = '';
+            for (let i = 0; i < pathParts.length - 1; i++) {
+                currentPath = currentPath ? `${currentPath}/${pathParts[i]}` : pathParts[i];
+                this.expandedFolders.add(currentPath);
+            }
+            this.render();
+        }
+
+        // Find the DOM element for the active item
+        const itemEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+        if (itemEl) {
+            // Scroll into view
+            itemEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Add highlight animation
+            itemEl.classList.add('playlist-item--highlight');
+            setTimeout(() => {
+                itemEl.classList.remove('playlist-item--highlight');
+            }, 1500);
         }
     }
 
