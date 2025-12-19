@@ -2101,12 +2101,15 @@ body.fullscreen-active {
    HLS/IPTV Live Streaming Mode
    ----------------------------------------- */
 
-/* Stream video element (native <video> for HLS) */
+/* Stream video element - HIDDEN, used only for HLS audio
+   Video frames are copied to canvas via requestAnimationFrame */
 .jellyjump-stream-video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: none;
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
 }
 
 /* Live mode - hide progress and time */

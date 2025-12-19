@@ -118,9 +118,15 @@ export class ScreenshotManager {
 
     /**
      * Capture current video frame as screenshot
+     * Works in both MediaBunny mode and stream mode (canvas-based)
      */
     async capture() {
-        if (!this.player.videoSink || !this.player.videoTrack) {
+        // Check if we have something to capture
+        const isStreamMode = this.player.isStreamMode;
+        const hasMediaBunny = this.player.videoSink && this.player.videoTrack;
+        const hasCanvas = this.player.canvas && this.player.ctx;
+
+        if (!hasMediaBunny && !hasCanvas) {
             console.warn('No video loaded');
             return;
         }
@@ -134,19 +140,32 @@ export class ScreenshotManager {
                 this.player.pause();
             }
 
-            // Get current frame from MediaBunny
-            const frame = await this.player.videoSink.getCanvas(this.player.currentTime);
+            let dataUrl;
+            let timestamp;
 
-            if (!frame || !frame.canvas) {
-                console.error('Failed to capture frame');
+            if (isStreamMode && hasCanvas) {
+                // Stream mode: capture directly from canvas
+                dataUrl = this.player.canvas.toDataURL('image/png');
+                timestamp = this.player.currentTime || 0;
+                console.log('[Screenshot] Captured from stream canvas');
+            } else if (hasMediaBunny) {
+                // MediaBunny mode: use videoSink
+                const frame = await this.player.videoSink.getCanvas(this.player.currentTime);
+
+                if (!frame || !frame.canvas) {
+                    console.error('Failed to capture frame');
+                    return;
+                }
+
+                dataUrl = frame.canvas.toDataURL('image/png');
+                timestamp = frame.timestamp;
+            } else {
+                console.error('No capture method available');
                 return;
             }
 
-            // Convert canvas to data URL
-            const dataUrl = frame.canvas.toDataURL('image/png');
-
             // Show modal with preview
-            this.showModal(dataUrl, frame.timestamp);
+            this.showModal(dataUrl, timestamp);
         } catch (error) {
             console.error('Error capturing frame:', error);
         }

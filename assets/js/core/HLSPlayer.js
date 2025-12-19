@@ -30,11 +30,14 @@ export class HLSPlayer {
     /**
      * Load an HLS stream
      * @param {string} url - M3U8 manifest URL
+     * @param {Object} options - Optional config
+     * @param {StreamBuffer} options.streamBuffer - Optional StreamBuffer for DVR capture
      * @returns {Promise<void>}
      */
-    async load(url) {
+    async load(url, options = {}) {
         this.destroy(); // Clean up previous instance
         this.currentUrl = url;
+        this.streamBuffer = options.streamBuffer || null;
 
         // Check native HLS support (Safari)
         if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -49,20 +52,33 @@ export class HLSPlayer {
         }
 
         console.log('[HLS] Using hls.js');
-        this.hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true,
-            backBufferLength: 90,
-            maxBufferLength: 30,
-            maxMaxBufferLength: 60,
-            startLevel: -1, // Auto
-        });
+
+        // Use StreamBuffer's config if available (for segment capture)
+        const hlsConfig = this.streamBuffer
+            ? this.streamBuffer.getHLSConfig()
+            : {
+                enableWorker: true,
+                lowLatencyMode: true,
+                backBufferLength: 90,
+                maxBufferLength: 30,
+                maxMaxBufferLength: 60,
+                startLevel: -1,
+            };
+
+        this.hls = new Hls(hlsConfig);
 
         return new Promise((resolve, reject) => {
             this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
                 console.log('[HLS] Manifest parsed:', data.levels.length, 'quality levels');
                 this.isLive = !data.levels[0]?.details?.endSN;
                 this.onManifestParsed?.(data);
+
+                // Auto-start capture if buffer attached
+                if (this.streamBuffer) {
+                    this.streamBuffer.startCapture();
+                    console.log('[HLS] StreamBuffer capture started');
+                }
+
                 resolve();
             });
 
@@ -430,6 +446,12 @@ export class HLSPlayer {
      * Clean up resources
      */
     destroy() {
+        // Stop StreamBuffer capture
+        if (this.streamBuffer) {
+            this.streamBuffer.stopCapture();
+            this.streamBuffer = null;
+        }
+
         if (this.hls) {
             this.hls.destroy();
             this.hls = null;
@@ -439,5 +461,13 @@ export class HLSPlayer {
         this.currentUrl = null;
         this.isLive = false;
         this.currentLevel = -1;
+    }
+
+    /**
+     * Get the StreamBuffer if attached
+     * @returns {StreamBuffer|null}
+     */
+    getStreamBuffer() {
+        return this.streamBuffer;
     }
 }

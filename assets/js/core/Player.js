@@ -10,6 +10,7 @@ import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
+import { StreamBuffer } from '../utils/StreamBuffer.js';
 import { HLSPlayer } from './HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 
@@ -183,7 +184,8 @@ export class CorePlayer {
         this.streamVideo = null;
         this.isStreamMode = false;
         this.isLive = false;
-        this.liveMode = 'live'; // 'live' or 'buffer'
+        this.streamRenderLoopId = null;
+        this.streamBuffer = null; // DVR-style segment capture
 
         // Global Event Handlers (created conditionally based on which controls are enabled)
         this._handlers = {
@@ -1778,8 +1780,17 @@ export class CorePlayer {
                 };
             }
 
-            // Load the stream
-            await this.hlsPlayer.load(url);
+            // Create StreamBuffer for DVR-style segment capture
+            this.streamBuffer = new StreamBuffer();
+            this.streamBuffer.onSegmentAdded = (segment, count, totalBytes) => {
+                // Log capture progress
+                if (count % 5 === 0) {
+                    console.log(`[DVR] Captured ${count} segments, ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
+                }
+            };
+
+            // Load the stream with StreamBuffer attached
+            await this.hlsPlayer.load(url, { streamBuffer: this.streamBuffer });
             this.isLive = this.hlsPlayer.isLive;
 
             // Update UI for stream mode
@@ -1834,7 +1845,7 @@ export class CorePlayer {
     }
 
     /**
-     * Create the stream video element
+     * Create the stream video element (hidden - frames copied to canvas)
      * @private
      */
     _createStreamVideo() {
@@ -1845,21 +1856,28 @@ export class CorePlayer {
         this.streamVideo.playsInline = true;
         this.streamVideo.crossOrigin = 'anonymous';
 
-        // Insert after canvas
+        // Keep video hidden - we render frames to canvas
+        this.streamVideo.style.position = 'absolute';
+        this.streamVideo.style.visibility = 'hidden';
+        this.streamVideo.style.pointerEvents = 'none';
+        this.streamVideo.style.width = '1px';
+        this.streamVideo.style.height = '1px';
+        this.streamVideo.style.opacity = '0';
+
+        // Insert into container (hidden)
         const wrapper = this.container.querySelector('.jellyjump-video-wrapper') || this.container;
         wrapper.appendChild(this.streamVideo);
     }
 
     /**
-     * Show stream video, hide canvas
+     * Show canvas for stream rendering (video stays hidden)
      * @private
      */
     _showStreamVideo() {
-        if (this.streamVideo) {
-            this.streamVideo.style.display = 'block';
-        }
+        // For canvas-based stream rendering, show canvas (not video)
+        // Video stays hidden - frames are copied via render loop
         if (this.canvas) {
-            this.canvas.style.display = 'none';
+            this.canvas.style.display = 'block';
         }
     }
 
@@ -1935,6 +1953,9 @@ export class CorePlayer {
                 this.ui.playOverlay.style.display = 'none';
             }
 
+            // Start canvas render loop for stream (copies video frames to canvas)
+            this._startStreamRenderLoop();
+
             // Seek to live edge on first play for live streams
             if (this._needsSeekToLive && this.hlsPlayer) {
                 this._needsSeekToLive = false;
@@ -1960,14 +1981,88 @@ export class CorePlayer {
             this.isPlaying = false;
             this._clearAutoHideTimer();
             this._updatePlayPauseUI();
+            // Stop render loop
+            this._stopStreamRenderLoop();
             // Show as not-live when paused
             if (this.isLive && this.ui.liveBadge) {
                 this.ui.liveBadge.classList.add('not-live');
             }
         };
 
+        // Set canvas size when video dimensions are known
+        this.streamVideo.onloadedmetadata = () => {
+            if (this.streamVideo.videoWidth && this.streamVideo.videoHeight) {
+                this.canvas.width = this.streamVideo.videoWidth;
+                this.canvas.height = this.streamVideo.videoHeight;
+                console.log('[Stream] Canvas size set to:', this.canvas.width, 'x', this.canvas.height);
+                // Render first frame
+                this._renderStreamFrame();
+            }
+        };
+
         // Click on stream video to toggle play/pause
         this.streamVideo.addEventListener('click', () => this.togglePlay());
+    }
+
+    /**
+     * Start the stream render loop (copies video frames to canvas)
+     * @private
+     */
+    _startStreamRenderLoop() {
+        if (this.streamRenderLoopId) return; // Already running
+
+        console.log('[Stream] Starting canvas render loop');
+
+        const renderFrame = () => {
+            if (!this.isStreamMode || !this.isPlaying) {
+                this.streamRenderLoopId = null;
+                return;
+            }
+
+            this._renderStreamFrame();
+            this.streamRenderLoopId = requestAnimationFrame(renderFrame);
+        };
+
+        this.streamRenderLoopId = requestAnimationFrame(renderFrame);
+    }
+
+    /**
+     * Stop the stream render loop
+     * @private
+     */
+    _stopStreamRenderLoop() {
+        if (this.streamRenderLoopId) {
+            cancelAnimationFrame(this.streamRenderLoopId);
+            this.streamRenderLoopId = null;
+            console.log('[Stream] Stopped canvas render loop');
+        }
+    }
+
+    /**
+     * Render a single frame from stream video to canvas
+     * @private
+     */
+    _renderStreamFrame() {
+        if (!this.streamVideo || !this.ctx || !this.canvas) return;
+        if (this.streamVideo.readyState < 2) return; // Not enough data
+
+        // Draw video frame to canvas
+        // Note: VideoFilters applies CSS filters to canvas element, so they auto-apply
+        this.ctx.drawImage(
+            this.streamVideo,
+            0, 0,
+            this.canvas.width,
+            this.canvas.height
+        );
+
+        // Run after-frame callbacks (for subtitles, overlays, etc.)
+        for (const callback of this.afterFrameRenderCallbacks) {
+            try {
+                callback(this.canvas, this.ctx);
+            } catch (e) {
+                console.warn('After-frame callback error:', e);
+            }
+        }
     }
 
     /**
@@ -2077,23 +2172,26 @@ export class CorePlayer {
 
     /**
      * Hide/show controls that don't work in stream mode
+     * Note: Filters DO work in stream mode now (canvas-based rendering)
      * @param {boolean} isStreamMode - Whether stream mode is active
      * @private
      */
     _setStreamModeControls(isStreamMode) {
+        // These controls don't work with HLS streams
+        // Note: Filters ARE supported now because we render to canvas!
         const unsupportedControls = [
-            this.ui.ccBtn,           // Subtitles
-            this.ui.speedBtn,        // Speed control
-            this.ui.filtersBtn,      // Video filters
-            this.ui.audioSettingsBtn, // Audio equalizer (but keep mute/volume in panel)
-            this.ui.loopBtn          // Loop controls
+            this.ui.ccBtn,           // Subtitles (not supported for streams)
+            this.ui.speedBtn,        // Speed control (not reliable for live)
+            this.ui.loopBtn          // Loop controls (doesn't make sense for live)
+            // filtersBtn REMOVED - filters now work with canvas rendering!
+            // audioSettingsBtn REMOVED - let user adjust audio
         ];
 
-        // Also hide screenshot button if it exists
-        const screenshotBtn = this.container.querySelector('#mb-screenshot-btn');
-        if (screenshotBtn) {
-            unsupportedControls.push(screenshotBtn);
-        }
+        // Also hide screenshot button if it exists (actually, screenshots work too!)
+        // const screenshotBtn = this.container.querySelector('#mb-screenshot-btn');
+        // if (screenshotBtn) {
+        //     unsupportedControls.push(screenshotBtn);
+        // }
 
         unsupportedControls.forEach(control => {
             if (control) {
@@ -2254,6 +2352,16 @@ export class CorePlayer {
      * @private
      */
     _cleanupHLS() {
+        // Stop render loop
+        this._stopStreamRenderLoop();
+
+        // Clear StreamBuffer
+        if (this.streamBuffer) {
+            this.streamBuffer.stopCapture();
+            this.streamBuffer.clear();
+            this.streamBuffer = null;
+        }
+
         if (this.hlsPlayer) {
             this.hlsPlayer.destroy();
             this.hlsPlayer = null;
@@ -2289,6 +2397,110 @@ export class CorePlayer {
 
         // Hide any error overlay
         this._hideStreamError();
+    }
+
+    // ==========================================
+    // DVR / Buffer Playback (Experimental)
+    // ==========================================
+
+    /**
+     * Get DVR buffer stats (for debugging)
+     * @returns {Object|null}
+     */
+    getDVRStats() {
+        if (!this.streamBuffer) return null;
+        return this.streamBuffer.getStats();
+    }
+
+    /**
+     * Attempt to play captured stream buffer through MediaBunny
+     * This is experimental - TS segments may or may not work!
+     * @returns {Promise<boolean>} Whether playback was successful
+     */
+    async tryDVRPlayback() {
+        if (!this.streamBuffer || !this.streamBuffer.hasEnoughData()) {
+            console.warn('[DVR] Not enough data captured. Need at least 3 segments.');
+            return false;
+        }
+
+        console.log('[DVR] Attempting MediaBunny playback from buffer...');
+        const stats = this.streamBuffer.getStats();
+        console.log(`[DVR] Buffer: ${stats.segmentCount} segments, ${stats.totalMB}MB`);
+
+        try {
+            // Stop live stream
+            this.pause(false);
+            this._stopStreamRenderLoop();
+
+            // Get blob URL from buffer
+            const blobUrl = this.streamBuffer.toBlobURL();
+            if (!blobUrl) {
+                console.error('[DVR] Failed to create blob URL');
+                return false;
+            }
+
+            // Clean up HLS (this also clears streamBuffer, so save blobUrl first)
+            const savedBuffer = {
+                url: blobUrl,
+                stats: stats
+            };
+
+            // Switch to file mode
+            this.isStreamMode = false;
+            this.isLive = false;
+            this._hideStreamVideo();
+
+            // Hide live badge
+            if (this.ui.liveBadge) {
+                this.ui.liveBadge.style.display = 'none';
+            }
+
+            // Try loading through MediaBunny
+            this.ui.loader.classList.add('visible');
+            console.log('[DVR] Loading blob through MediaBunny...');
+
+            // Create MediaBunny Input with BlobSource
+            this.input = new MediaBunny.Input({
+                source: new MediaBunny.UrlSource(savedBuffer.url),
+                formats: MediaBunny.ALL_FORMATS
+            });
+
+            // Get Duration (this will fail if format isn't supported)
+            this.duration = await this.input.computeDuration();
+            console.log('[DVR] Duration computed:', this.duration);
+
+            // Get Video Track
+            this.videoTrack = await this.input.getPrimaryVideoTrack();
+            if (!this.videoTrack) {
+                throw new Error('No video track found in buffered content');
+            }
+
+            // Setup Canvas Sink
+            this.videoSink = new MediaBunny.CanvasSink(this.videoTrack, {
+                poolSize: 2,
+                fit: 'contain'
+            });
+
+            // Set canvas size
+            this.canvas.width = this.videoTrack.displayWidth;
+            this.canvas.height = this.videoTrack.displayHeight;
+
+            // Get first frame
+            await this._handleInitialFrame(false);
+
+            this.ui.loader.classList.remove('visible');
+            console.log('[DVR] ✅ MediaBunny playback initialized! Try player.play()');
+
+            return true;
+
+        } catch (error) {
+            console.error('[DVR] ❌ MediaBunny playback failed:', error.message);
+            console.log('[DVR] The TS segment format may not be supported by MediaBunny.');
+            console.log('[DVR] Consider using canvas-copy mode (Option 1) instead.');
+
+            this.ui.loader.classList.remove('visible');
+            return false;
+        }
     }
 
     /**
