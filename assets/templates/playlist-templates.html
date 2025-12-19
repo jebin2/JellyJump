@@ -1151,6 +1151,17 @@
         <div class="info-section">
             <h3 class="text-accent text-sm font-bold uppercase mb-sm border-b border-dark pb-xs">File Properties</h3>
             <div class="info-grid grid grid-cols-2 gap-x-md gap-y-sm text-sm">
+                <div class="text-secondary">Source</div>
+                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
+                    <span class="info-value truncate max-w-[200px]" data-key="source" title="">Local File</span>
+                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Copy" data-copy="source">
+                        <svg width="12" height="12" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-copy"></use>
+                        </svg>
+                    </button>
+                </div>
+
                 <div class="text-secondary">Filename</div>
                 <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
                     <span class="info-value" data-key="filename">video.mp4</span>

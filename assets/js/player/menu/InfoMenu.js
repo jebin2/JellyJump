@@ -37,6 +37,73 @@ export class InfoMenu {
 
         // Load Metadata
         try {
+            // For streams, we can't use MediaBunny to extract metadata from a file
+            // So we skip ensureMetadata and populate what we know
+            if (item.isStream || item.isLive) {
+                const isPlaying = playlist.player && playlist.player.src === item.url;
+                let resolution = 'N/A';
+                let videoCodec = 'N/A';
+
+                // If currently playing, try to get info from video element
+                if (isPlaying && playlist.player.videoElement) {
+                    const v = playlist.player.videoElement;
+                    if (v.videoWidth) {
+                        resolution = `${v.videoWidth}x${v.videoHeight}`;
+                    }
+                }
+
+                const metadata = {
+                    source: item.url || 'Unknown',
+                    filename: item.title,
+                    format: 'Stream (HLS/M3U8)',
+                    mimeType: item.mimeType || 'application/vnd.apple.mpegurl',
+                    size: 'N/A',
+                    duration: 'LIVE',
+
+                    // Video
+                    videoCodec: videoCodec,
+                    videoCodecString: 'N/A',
+                    resolution: resolution,
+                    codedResolution: 'N/A',
+                    fps: 'N/A',
+                    videoBitrate: 'N/A',
+                    rotation: 'N/A',
+                    hdr: 'N/A',
+
+                    // Audio
+                    audioCodec: 'N/A',
+                    audioCodecString: 'N/A',
+                    channels: 'N/A',
+                    sampleRate: 'N/A',
+                    language: 'N/A'
+                };
+
+                // Hide loading, show content
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (contentEl) contentEl.classList.remove('hidden');
+
+                // Populate UI
+                Object.keys(metadata).forEach(key => {
+                    const el = modalContent.querySelector(`[data-key="${key}"]`);
+                    if (el) {
+                        el.textContent = metadata[key];
+                        // Update copy button data
+                        const btn = el.parentElement.querySelector('.copy-btn');
+                        if (btn) btn.dataset.value = metadata[key];
+
+                        // Special handling for source URL title
+                        if (key === 'source') {
+                            el.title = metadata[key];
+                        }
+                    }
+                });
+
+                // Store raw metadata for "Copy All"
+                modal.body.dataset.rawInfo = JSON.stringify(metadata);
+
+                return; // Done for stream
+            }
+
             // Ensure metadata is cached
             await playlist._ensureMetadata(item);
 
@@ -85,7 +152,11 @@ export class InfoMenu {
             const mimeType = item.fileType || (item.file ? item.file.type : 'Unknown');
             const format = mimeType !== 'Unknown' ? mimeType.split('/')[0] : 'Unknown';
 
+            // Determine source text
+            const sourceText = item.isLocal ? 'Local File' : (item.url || 'Unknown');
+
             const metadata = {
+                source: sourceText,
                 filename: item.title,
                 format: format,
                 mimeType: mimeType,
@@ -122,6 +193,11 @@ export class InfoMenu {
                     // Update copy button data
                     const btn = el.parentElement.querySelector('.copy-btn');
                     if (btn) btn.dataset.value = metadata[key];
+
+                    // Special handling for source URL title
+                    if (key === 'source') {
+                        el.title = metadata[key];
+                    }
                 }
             });
 

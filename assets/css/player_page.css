@@ -700,6 +700,10 @@
     box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.3);
 }
 
+.info-value {
+    word-break: break-all;
+}
+
 /* -----------------------------------------
    Accessibility: Reduced Motion
    ----------------------------------------- */

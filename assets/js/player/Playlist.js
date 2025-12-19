@@ -1956,6 +1956,22 @@ export class Playlist {
 
         // Conditional Logic
         const item = this.items[index];
+        const isLive = item.isLive || item.isStream;
+
+        // If live/stream, hide all options except "Video Info"
+        if (isLive) {
+            menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
+                const action = menuItem.dataset.action;
+                if (action !== 'info') {
+                    menuItem.style.display = 'none';
+                }
+            });
+
+            // Also hide dividers
+            menu.querySelectorAll('.menu-divider').forEach(divider => {
+                divider.style.display = 'none';
+            });
+        }
 
         // Attach Event Listeners
         menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
