@@ -184,8 +184,9 @@ export class CorePlayer {
         this.streamVideo = null;
         this.isStreamMode = false;
         this.isLive = false;
+        this.liveMode = 'live'; // 'live' or 'buffer' - controls live edge vs buffered playback
         this.streamRenderLoopId = null;
-        this.streamBuffer = null; // DVR-style segment capture
+        this.streamBuffer = null; // DVR-style segment capture (experimental)
 
         // Global Event Handlers (created conditionally based on which controls are enabled)
         this._handlers = {
@@ -1780,17 +1781,9 @@ export class CorePlayer {
                 };
             }
 
-            // Create StreamBuffer for DVR-style segment capture
-            this.streamBuffer = new StreamBuffer();
-            this.streamBuffer.onSegmentAdded = (segment, count, totalBytes) => {
-                // Log capture progress
-                if (count % 5 === 0) {
-                    console.log(`[DVR] Captured ${count} segments, ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
-                }
-            };
-
-            // Load the stream with StreamBuffer attached
-            await this.hlsPlayer.load(url, { streamBuffer: this.streamBuffer });
+            // Note: DVR segment capture available via player.enableDVRCapture()
+            // Load the stream
+            await this.hlsPlayer.load(url);
             this.isLive = this.hlsPlayer.isLive;
 
             // Update UI for stream mode
@@ -2402,6 +2395,33 @@ export class CorePlayer {
     // ==========================================
     // DVR / Buffer Playback (Experimental)
     // ==========================================
+
+    /**
+     * Enable DVR segment capture (experimental)
+     * Call this BEFORE loading a stream if you want to capture segments
+     * Warning: May cause buffering issues with some streams
+     */
+    enableDVRCapture() {
+        this.streamBuffer = new StreamBuffer();
+        this.streamBuffer.onSegmentAdded = (segment, count, totalBytes) => {
+            if (count % 5 === 0) {
+                console.log(`[DVR] Captured ${count} segments, ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
+            }
+        };
+        console.log('[DVR] Segment capture enabled. Load a stream to start capturing.');
+    }
+
+    /**
+     * Disable DVR segment capture
+     */
+    disableDVRCapture() {
+        if (this.streamBuffer) {
+            this.streamBuffer.stopCapture();
+            this.streamBuffer.clear();
+            this.streamBuffer = null;
+            console.log('[DVR] Segment capture disabled.');
+        }
+    }
 
     /**
      * Get DVR buffer stats (for debugging)
