@@ -7,6 +7,7 @@ import { MergeMenu } from './MergeMenu.js';
 import { TrackManagerMenu } from './TrackManagerMenu.js';
 import { ReverseMenu } from './ReverseMenu.js';
 import { RemoveBackgroundMenu } from './RemoveBackgroundMenu.js';
+import { RecordMenu } from './RecordMenu.js';
 
 /**
  * Menu Router
@@ -47,6 +48,9 @@ export class MenuRouter {
                 break;
             case 'remove-bg':
                 await RemoveBackgroundMenu.init(item, playlist);
+                break;
+            case 'record':
+                await RecordMenu.init(item, playlist);
                 break;
             case 'info':
                 await InfoMenu.init(item, playlist);

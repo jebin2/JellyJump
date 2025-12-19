@@ -5,6 +5,7 @@ import { CorePlayer } from '../core/Player.js';
 import { Modal as ConfirmModal } from '../utils/Modal.js'; // Static confirm/alert dialogs
 import { Modal as DialogModal } from './Modal.js';         // Instance-based custom dialogs
 import { MenuRouter } from './menu/MenuRouter.js';
+import { RecordMenu } from './menu/RecordMenu.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { FileDropHandler } from '../utils/FileDropHandler.js';
@@ -1956,20 +1957,50 @@ export class Playlist {
 
         // Conditional Logic
         const item = this.items[index];
-        const isLive = item.isLive || item.isStream;
+        const isLive = item.isLive; // Only true for actual live streams
 
-        // If live/stream, hide all options except "Video Info"
-        if (isLive) {
-            menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
-                const action = menuItem.dataset.action;
-                if (action !== 'info') {
+        menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
+            const action = menuItem.dataset.action;
+
+            if (isLive) {
+                // Live Stream: Show ONLY Record and Info
+                if (action === 'info' || action === 'record') {
+                    menuItem.style.display = 'flex'; // Ensure it's visible
+
+                    // Update Record Item UI based on state
+                    if (action === 'record') {
+                        if (RecordMenu.isRecording) {
+                            menuItem.querySelector('.menu-label').textContent = 'Stop Recording';
+                            menuItem.querySelector('.menu-icon').textContent = '⏹️';
+                            menuItem.classList.add('text-red-500');
+                        } else {
+                            menuItem.querySelector('.menu-label').textContent = 'Record Stream...';
+                            menuItem.querySelector('.menu-icon').textContent = '🔴';
+                            menuItem.classList.remove('text-red-500');
+                        }
+                    }
+                } else {
                     menuItem.style.display = 'none';
                 }
-            });
+            } else {
+                // Local File or Remote VOD: Show ALL except Record
+                if (action === 'record') {
+                    menuItem.style.display = 'none';
+                } else {
+                    menuItem.style.display = 'flex'; // Ensure it's visible
+                }
+            }
+        });
 
-            // Also hide dividers
+        // Hide dividers for Live since we only have 2 items
+        if (isLive) {
             menu.querySelectorAll('.menu-divider').forEach(divider => {
                 divider.style.display = 'none';
+            });
+        } else {
+            // Ensure dividers are visible for VOD
+            menu.querySelectorAll('.menu-divider').forEach(divider => {
+                divider.style.display = 'block';
             });
         }
 
