@@ -381,6 +381,12 @@ button:focus-visible {
     gap: 15px;
 }
 
+.jellyjump-controls-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
 .jellyjump-btn {
     background: none;
     border: none;
@@ -464,7 +470,8 @@ button:focus-visible {
     cursor: pointer;
     transition: background 0.2s;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 10px;
     align-items: center;
 }
 

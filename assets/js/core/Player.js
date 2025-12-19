@@ -2241,7 +2241,11 @@ export class CorePlayer {
         if (!this.hlsPlayer || this.ui.qualityBtn) return;
 
         const levels = this.hlsPlayer.getLevels();
-        if (levels.length <= 1) return;
+        if (levels.length < 1) return;
+
+        // Create wrapper for positioning
+        const wrapper = document.createElement('div');
+        wrapper.className = 'jellyjump-menu-btn';
 
         // Create quality button
         this.ui.qualityBtn = document.createElement('button');
@@ -2257,11 +2261,13 @@ export class CorePlayer {
         this.ui.qualityMenu = document.createElement('div');
         this.ui.qualityMenu.className = 'jellyjump-dropdown jellyjump-quality-menu';
 
+        wrapper.appendChild(this.ui.qualityBtn);
+        wrapper.appendChild(this.ui.qualityMenu);
+
         // Insert into controls
         const controlsRight = this.container.querySelector('.jellyjump-controls-right');
         if (controlsRight) {
-            controlsRight.insertBefore(this.ui.qualityMenu, controlsRight.firstChild);
-            controlsRight.insertBefore(this.ui.qualityBtn, controlsRight.firstChild);
+            controlsRight.insertBefore(wrapper, controlsRight.firstChild);
         }
 
         // Event handlers
@@ -2275,7 +2281,8 @@ export class CorePlayer {
                 const level = parseInt(item.dataset.value);
                 this.hlsPlayer.setLevel(level);
                 this.ui.qualityMenu.classList.remove('visible');
-                this._updateQualityMenu();
+                // Optimistic update: show selected level immediately
+                this._updateQualityMenu(level);
             }
         });
 
@@ -2284,14 +2291,26 @@ export class CorePlayer {
 
     /**
      * Update quality menu items
+     * @param {number} [optimisticLevel] - Optional level to show as selected immediately
      * @private
      */
-    _updateQualityMenu() {
+    _updateQualityMenu(optimisticLevel) {
         if (!this.ui.qualityMenu || !this.hlsPlayer) return;
 
         const levels = this.hlsPlayer.getLevels();
-        const currentLevel = this.hlsPlayer.getCurrentLevel();
-        const isAuto = this.hlsPlayer.isAutoLevel();
+        let currentLevel = this.hlsPlayer.getCurrentLevel();
+        let isAuto = this.hlsPlayer.isAutoLevel();
+
+        // Use optimistic level if provided
+        if (optimisticLevel !== undefined) {
+            if (optimisticLevel === -1) {
+                isAuto = true;
+                // Keep currentLevel as is (or could set to -1, but HLS might still be on a specific level)
+            } else {
+                isAuto = false;
+                currentLevel = optimisticLevel;
+            }
+        }
 
         let html = `
             <div class="jellyjump-menu-item ${isAuto ? 'active' : ''}" data-value="-1">
