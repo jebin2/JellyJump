@@ -23,6 +23,14 @@ export class RecordMenu {
             return;
         }
 
+        // Check if item is active
+        if (!this.checkActiveItem(item, playlist)) {
+            playlist._showToast('Please play this video to record it', 'warning');
+            // Optionally play it for them?
+            // playlist.selectItem(playlist.items.indexOf(item));
+            return;
+        }
+
         // Toggle logic
         if (this.isRecording) {
             this.stopRecording(playlist);
@@ -31,8 +39,7 @@ export class RecordMenu {
 
         // Check playback state
         if (playlist.player.paused) {
-            playlist._showToast('Please play the video to start recording', 'warning');
-            return;
+            playlist._showToast('Recording started. Play video to capture.', 'info');
         }
 
         // Check if File System Access API is supported
@@ -169,7 +176,7 @@ export class RecordMenu {
 
             this.mediaRecorder.start(1000); // Write chunks every second
             this.isRecording = true;
-            playlist._showToast('Recording started...', 'info');
+            playlist._showToast('Recording started. Play video to capture.', 'info');
 
         } catch (err) {
             console.error('RecordMenu: Start Error', err);
@@ -196,5 +203,29 @@ export class RecordMenu {
     static _startRecordingFallback(playlist) {
         this.chunks = [];
         this._startRecording(playlist, false);
+    }
+
+    /**
+     * Handle Playlist Item Change
+     * Stops recording if active
+     * @param {Playlist} playlist 
+     */
+    static handleItemChange(playlist) {
+        if (this.isRecording) {
+            console.log('RecordMenu: Item changed, stopping recording...');
+            this.stopRecording(playlist);
+        }
+    }
+
+    /**
+     * Check if the item is currently active/playing
+     * @param {Object} item 
+     * @param {Playlist} playlist 
+     * @returns {boolean}
+     */
+    static checkActiveItem(item, playlist) {
+        if (!playlist || playlist.activeIndex === -1) return false;
+        const activeItem = playlist.items[playlist.activeIndex];
+        return activeItem === item;
     }
 }

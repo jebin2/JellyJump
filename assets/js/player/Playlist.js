@@ -967,6 +967,9 @@ export class Playlist {
 
             this.activeIndex = index;
 
+            // Handle Recording State (Stop if active)
+            RecordMenu.handleItemChange(this);
+
             // Handle streams (HLS/Live) - load directly without MediaMetadata processing
             if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {
                 video.isStream = true; // Mark for metadata prefetch skip
