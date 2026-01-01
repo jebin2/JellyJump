@@ -96,6 +96,7 @@
             const controlsParam = params.get('controls');
             const autoplay = params.get('autoplay') !== '0';
             const muted = params.get('muted') === '1';
+            const withCredentials = params.get('credentials') === 'true';
 
             // Validate video_url
             if (!videoUrl) {
@@ -152,6 +153,7 @@
                     muted: muted,
                     mode: 'embed',
                     controlBarMode: 'overlay',
+                    withCredentials: withCredentials,
                     controls: controlsConfig
                 });
 

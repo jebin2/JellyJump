@@ -1801,7 +1801,7 @@ export class CorePlayer {
 
             // Create audio element
             this.audioElement = new Audio();
-            this.audioElement.crossOrigin = 'anonymous';
+            this.audioElement.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
             this.audioElement.src = url;
             this.audioElement.preload = 'metadata';
 
@@ -1953,7 +1953,7 @@ export class CorePlayer {
 
             // Initialize HLS player
             if (!this.hlsPlayer) {
-                this.hlsPlayer = new HLSPlayer(this.streamVideo);
+                this.hlsPlayer = new HLSPlayer(this.streamVideo, { withCredentials: this.config.withCredentials });
 
                 // Setup event handlers
                 this.hlsPlayer.onManifestParsed = (data) => {
@@ -2041,7 +2041,7 @@ export class CorePlayer {
         this.streamVideo = document.createElement('video');
         this.streamVideo.className = 'jellyjump-stream-video jellyjump-video';
         this.streamVideo.playsInline = true;
-        this.streamVideo.crossOrigin = 'anonymous';
+        this.streamVideo.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
 
         // Keep video hidden - we render frames to canvas
         this.streamVideo.style.position = 'absolute';

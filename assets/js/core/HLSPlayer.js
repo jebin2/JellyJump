@@ -5,8 +5,9 @@
 import Hls from '../lib/hls.js';
 
 export class HLSPlayer {
-    constructor(videoElement) {
+    constructor(videoElement, config = {}) {
         this.video = videoElement;
+        this.config = config;
         this.hls = null;
         this.isLive = false;
         this.currentUrl = null;
@@ -63,6 +64,9 @@ export class HLSPlayer {
                 maxBufferLength: 30,
                 maxMaxBufferLength: 60,
                 startLevel: -1,
+                xhrSetup: this.config.withCredentials ? function (xhr, url) {
+                    xhr.withCredentials = true;
+                } : undefined
             };
 
         this.hls = new Hls(hlsConfig);
