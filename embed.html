@@ -65,6 +65,9 @@
         <!-- CorePlayer will be injected here -->
     </div>
 
+    <!-- Hidden Download Anchor (for screenshot) -->
+    <a id="mb-download-link" style="display: none;"></a>
+
     <!-- Import Map -->
     <script type="importmap">
     {
@@ -121,7 +124,7 @@
                 captions: false,
                 loop: false,
                 filters: false,
-                equalizer: false,
+                equalizer: allowedControls.includes('volume'),  // Enable equalizer for volume panel
                 modeToggle: false,
                 keyboard: true  // Keep shortcuts
             };
