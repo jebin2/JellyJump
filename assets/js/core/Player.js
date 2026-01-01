@@ -54,6 +54,7 @@ export class CorePlayer {
             speed: true,
             filters: true,
             equalizer: true,
+            volumeOnly: false,  // When true, Audio Settings panel shows only volume (no EQ)
             modeToggle: true,
             keyboard: true,  // Enable/disable keyboard shortcuts
             ...this.config.controls
@@ -479,6 +480,19 @@ export class CorePlayer {
             this.ui.eqTrebleValue = this.container.querySelector('#mb-treble-value');
             this.ui.resetEqBtn = this.container.querySelector('#mb-reset-eq-btn');
             this.ui.closeAudioPanelBtn = this.container.querySelector('.jellyjump-eq-panel .jellyjump-close-btn');
+
+            // Hide EQ sections if volumeOnly mode is enabled (show only volume slider)
+            if (this.config.controls.volumeOnly) {
+                const divider = this.ui.audioPanel.querySelector('.eq-section-divider');
+                const eqSliders = this.ui.audioPanel.querySelector('.eq-sliders');
+                const eqPresets = this.ui.audioPanel.querySelector('.eq-presets');
+                const eqActions = this.ui.audioPanel.querySelector('.eq-actions');
+
+                if (divider) divider.style.display = 'none';
+                if (eqSliders) eqSliders.style.display = 'none';
+                if (eqPresets) eqPresets.style.display = 'none';
+                if (eqActions) eqActions.style.display = 'none';
+            }
         }
 
         // Create Stream Error Overlay
