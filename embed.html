@@ -14,7 +14,8 @@
 
     <style>
         /* Embed-specific overrides */
-        html, body {
+        html,
+        body {
             margin: 0;
             padding: 0;
             width: 100%;
@@ -22,17 +23,17 @@
             overflow: hidden;
             background: #000;
         }
-        
+
         .embed-container {
             width: 100%;
             height: 100%;
         }
-        
+
         /* Hide elements not needed in embed */
         .jellyjump-help-overlay {
             display: none !important;
         }
-        
+
         /* Error state */
         .embed-error {
             display: flex;
@@ -44,12 +45,12 @@
             text-align: center;
             padding: 20px;
         }
-        
+
         .embed-error h2 {
             margin: 0 0 10px;
             font-size: 1.2rem;
         }
-        
+
         .embed-error p {
             margin: 0;
             opacity: 0.7;
@@ -100,7 +101,7 @@
 
             // Parse allowed controls
             const DEFAULT_CONTROLS = ['play', 'pause', 'fullscreen', 'progress', 'time', 'volume'];
-            const allowedControls = controlsParam 
+            const allowedControls = controlsParam
                 ? controlsParam.split(',').map(c => c.trim().toLowerCase())
                 : DEFAULT_CONTROLS;
 
@@ -145,9 +146,9 @@
                     controls: controlsConfig
                 });
 
-                // Load the video
+                // Load the video (use load() method with autoplay param)
                 const decodedUrl = decodeURIComponent(videoUrl);
-                await player.loadMedia(decodedUrl);
+                await player.load(decodedUrl, autoplay);
 
             } catch (err) {
                 console.error('[Embed] Init error:', err);
