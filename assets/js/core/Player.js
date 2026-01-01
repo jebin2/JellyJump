@@ -3072,22 +3072,9 @@ export class CorePlayer {
         // Initialize Audio Context on first user interaction
         this._initAudio();
 
-        // Resume AudioContext if suspended (required due to browser autoplay policy)
+        // Resume AudioContext if suspended (e.g., after pause suspends it)
         if (this.audioContext && this.audioContext.state === 'suspended') {
             await this.audioContext.resume();
-            // Wait for context to actually be running
-            if (this.audioContext.state !== 'running') {
-                await new Promise(resolve => {
-                    const checkState = () => {
-                        if (this.audioContext.state === 'running') {
-                            resolve();
-                        } else {
-                            setTimeout(checkState, 10);
-                        }
-                    };
-                    checkState();
-                });
-            }
         }
 
         if (this._getPlaybackTime() >= this.duration) {
@@ -3098,9 +3085,6 @@ export class CorePlayer {
             // If iterator wasn't started (e.g. default frame mode), start it now
             await this._startVideoIterator();
         }
-
-        // Small delay to let AudioContext clock stabilize after resume
-        await new Promise(resolve => setTimeout(resolve, 50));
 
         this.audioContextStartTime = this.audioContext.currentTime;
         this.isPlaying = true;
