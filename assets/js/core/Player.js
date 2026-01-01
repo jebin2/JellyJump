@@ -3074,6 +3074,7 @@ export class CorePlayer {
 
         // Resume AudioContext if suspended (required due to browser autoplay policy)
         if (this.audioContext && this.audioContext.state === 'suspended') {
+            console.log('[Audio Debug] AudioContext suspended, resuming...');
             await this.audioContext.resume();
             // Wait for context to actually be running
             if (this.audioContext.state !== 'running') {
@@ -3088,6 +3089,7 @@ export class CorePlayer {
                     checkState();
                 });
             }
+            console.log('[Audio Debug] AudioContext now:', this.audioContext.state);
         }
 
         if (this._getPlaybackTime() >= this.duration) {
@@ -3105,10 +3107,13 @@ export class CorePlayer {
 
         if (this.audioSink) {
             // Start the audio iterator
+            console.log('[Audio Debug] Starting audio iterator, playbackTime:', this._getPlaybackTime(), 'contextTime:', this.audioContext?.currentTime);
             if (this.audioBufferIterator) await this.audioBufferIterator.return();
             // Use samples() instead of buffers() since we're using AudioSampleSink
             this.audioBufferIterator = this.audioSink.samples(this._getPlaybackTime());
             this._runAudioIterator();
+        } else {
+            console.log('[Audio Debug] No audioSink available!');
         }
 
         this._startRenderLoop();
