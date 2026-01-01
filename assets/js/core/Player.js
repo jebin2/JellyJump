@@ -3072,8 +3072,22 @@ export class CorePlayer {
         // Initialize Audio Context on first user interaction
         this._initAudio();
 
+        // Resume AudioContext if suspended (required due to browser autoplay policy)
         if (this.audioContext && this.audioContext.state === 'suspended') {
             await this.audioContext.resume();
+            // Wait for context to actually be running
+            if (this.audioContext.state !== 'running') {
+                await new Promise(resolve => {
+                    const checkState = () => {
+                        if (this.audioContext.state === 'running') {
+                            resolve();
+                        } else {
+                            setTimeout(checkState, 10);
+                        }
+                    };
+                    checkState();
+                });
+            }
         }
 
         if (this._getPlaybackTime() >= this.duration) {
