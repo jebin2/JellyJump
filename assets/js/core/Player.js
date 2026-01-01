@@ -3969,6 +3969,21 @@ export class CorePlayer {
                 this.isPlaying = false;
                 this._updatePlayPauseUI();
 
+                // Clean up audio state to ensure next play() works correctly
+                if (this.audioBufferIterator) {
+                    this.audioBufferIterator.return().catch(() => { });
+                    this.audioBufferIterator = null;
+                }
+                // Suspend AudioContext if it was started
+                if (this.audioContext && this.audioContext.state === 'running') {
+                    this.audioContext.suspend();
+                }
+                // Clear any queued audio nodes
+                for (const node of this.queuedAudioNodes) {
+                    try { node.stop(); } catch (e) { }
+                }
+                this.queuedAudioNodes.clear();
+
                 // Fallback: Draw frame and show overlay
                 await this._startVideoIterator();
                 if (this.ui.playOverlay) this.ui.playOverlay.style.display = 'flex';
