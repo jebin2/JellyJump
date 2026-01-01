@@ -394,11 +394,7 @@ export class CorePlayer {
             this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
         }
 
-        // Volume control (inline slider + mute button)
-        if (this.config.controls.volume) {
-            this.ui.volumeSlider = this.container.querySelector('#mb-volume-slider');
-            this.ui.muteBtn = this.container.querySelector('#mb-mute-btn');
-        }
+
 
         if (this.config.controls.fullscreen) {
             this.ui.fullscreenBtn = this.container.querySelector('#mb-fullscreen-btn');
@@ -1061,28 +1057,6 @@ export class CorePlayer {
             } else {
                 this.ui.audioSettingsBtn.style.color = '';
             }
-        }
-    }
-
-    /**
-     * Update inline volume button icon based on mute/volume state
-     * @private
-     */
-    _updateVolumeIcon() {
-        if (!this.ui.muteBtn) return;
-
-        const iconUse = this.ui.muteBtn.querySelector('use');
-        if (!iconUse) return;
-
-        if (this.config.muted || this.config.volume === 0) {
-            iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
-            this.ui.muteBtn.setAttribute('aria-label', 'Unmute');
-        } else if (this.config.volume < 0.5) {
-            iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-low');
-            this.ui.muteBtn.setAttribute('aria-label', 'Mute');
-        } else {
-            iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
-            this.ui.muteBtn.setAttribute('aria-label', 'Mute');
         }
     }
 

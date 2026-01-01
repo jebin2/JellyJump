@@ -419,14 +419,6 @@ button:focus-visible {
     margin-left: 10px;
 }
 
-/* Inline Volume Control */
-.jellyjump-volume {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-left: 10px;
-}
-
 .jellyjump-volume-slider {
     width: 80px;
     height: 4px;
