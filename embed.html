@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="assets/css/theme.css">
     <link rel="stylesheet" href="assets/css/common.css">
     <link rel="stylesheet" href="assets/css/player.css">
+    <link rel="stylesheet" href="assets/css/screenshot.css">
 
     <style>
         /* Embed-specific overrides */
@@ -100,7 +101,7 @@
             }
 
             // Parse allowed controls
-            const DEFAULT_CONTROLS = ['play', 'pause', 'fullscreen', 'progress', 'time', 'volume'];
+            const DEFAULT_CONTROLS = ['play', 'pause', 'fullscreen', 'progress', 'time', 'volume', 'screenshot'];
             const allowedControls = controlsParam
                 ? controlsParam.split(',').map(c => c.trim().toLowerCase())
                 : DEFAULT_CONTROLS;
@@ -115,9 +116,9 @@
                 progress: allowedControls.includes('progress'),
                 fullscreen: allowedControls.includes('fullscreen'),
                 speed: allowedControls.includes('speed'),
+                settings: allowedControls.includes('screenshot'),  // Enable settings for screenshot
                 // Disabled in embed mode
                 captions: false,
-                settings: false,
                 loop: false,
                 filters: false,
                 equalizer: false,
@@ -126,13 +127,17 @@
             };
 
             try {
-                // Load player template (minimal - just player controls)
-                const playerResponse = await fetch('assets/templates/player-templates.html');
+                // Load player and screenshot templates
+                const [playerResponse, screenshotResponse] = await Promise.all([
+                    fetch('assets/templates/player-templates.html'),
+                    fetch('assets/templates/screenshot-templates.html')
+                ]);
                 const playerHtml = await playerResponse.text();
+                const screenshotHtml = await screenshotResponse.text();
 
                 const tempDiv = document.createElement('div');
                 tempDiv.style.display = 'none';
-                tempDiv.innerHTML = playerHtml;
+                tempDiv.innerHTML = playerHtml + screenshotHtml;
                 document.body.appendChild(tempDiv);
 
                 // Import and initialize CorePlayer
