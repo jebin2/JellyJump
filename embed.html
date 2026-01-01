@@ -97,6 +97,7 @@
             const autoplay = params.get('autoplay') !== '0';
             const muted = params.get('muted') === '1';
             const withCredentials = params.get('credentials') === 'true';
+            const controlBarMode = params.get('controlBarMode') || 'fixed';
 
             // Validate video_url
             if (!videoUrl) {
@@ -152,7 +153,7 @@
                     autoplay: autoplay,
                     muted: muted,
                     mode: 'embed',
-                    controlBarMode: 'overlay',
+                    controlBarMode: controlBarMode,
                     withCredentials: withCredentials,
                     controls: controlsConfig
                 });
