@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JellyJump - Embed</title>
+    <link rel="icon" href="assets/icons/jelly_jump_logo.png">
+
+    <!-- CSS (reuse existing) -->
+    <link rel="stylesheet" href="assets/css/theme.css">
+    <link rel="stylesheet" href="assets/css/common.css">
+    <link rel="stylesheet" href="assets/css/player.css">
+
+    <style>
+        /* Embed-specific overrides */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        .embed-container {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Hide elements not needed in embed */
+        .jellyjump-help-overlay {
+            display: none !important;
+        }
+        
+        /* Error state */
+        .embed-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #fff;
+            font-family: system-ui, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .embed-error h2 {
+            margin: 0 0 10px;
+            font-size: 1.2rem;
+        }
+        
+        .embed-error p {
+            margin: 0;
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="embed-container" id="player-container">
+        <!-- CorePlayer will be injected here -->
+    </div>
+
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "/npm/mediabunny@1.27.0/+esm": "./assets/js/lib/mediabunny.js"
+        }
+    }
+    </script>
+
+    <script type="module">
+        /**
+         * JellyJump Embed Mode
+         * Minimal player for iframe embedding.
+         * 
+         * Query params:
+         *   - video_url: URL of video to play (required)
+         *   - controls: Comma-separated controls (default: play,pause,fullscreen,progress,time,volume)
+         *   - autoplay: 1 to autoplay (default: 1)
+         *   - muted: 1 to start muted (default: 0)
+         */
+
+        async function initEmbed() {
+            // Parse query params
+            const params = new URLSearchParams(window.location.search);
+            const videoUrl = params.get('video_url');
+            const controlsParam = params.get('controls');
+            const autoplay = params.get('autoplay') !== '0';
+            const muted = params.get('muted') === '1';
+
+            // Validate video_url
+            if (!videoUrl) {
+                showError('Missing video_url', 'Add ?video_url=YOUR_VIDEO_URL to the embed URL.');
+                return;
+            }
+
+            // Parse allowed controls
+            const DEFAULT_CONTROLS = ['play', 'pause', 'fullscreen', 'progress', 'time', 'volume'];
+            const allowedControls = controlsParam 
+                ? controlsParam.split(',').map(c => c.trim().toLowerCase())
+                : DEFAULT_CONTROLS;
+
+            // Build controls config
+            const controlsConfig = {
+                controlBar: true,
+                playPause: allowedControls.includes('play') || allowedControls.includes('pause'),
+                navigation: false,  // No prev/next in embed
+                volume: allowedControls.includes('volume'),
+                time: allowedControls.includes('time'),
+                progress: allowedControls.includes('progress'),
+                fullscreen: allowedControls.includes('fullscreen'),
+                speed: allowedControls.includes('speed'),
+                // Disabled in embed mode
+                captions: false,
+                settings: false,
+                loop: false,
+                filters: false,
+                equalizer: false,
+                modeToggle: false,
+                keyboard: true  // Keep shortcuts
+            };
+
+            try {
+                // Load player template (minimal - just player controls)
+                const playerResponse = await fetch('assets/templates/player-templates.html');
+                const playerHtml = await playerResponse.text();
+
+                const tempDiv = document.createElement('div');
+                tempDiv.style.display = 'none';
+                tempDiv.innerHTML = playerHtml;
+                document.body.appendChild(tempDiv);
+
+                // Import and initialize CorePlayer
+                const { CorePlayer } = await import('./assets/js/core/Player.js');
+
+                const player = window.player = new CorePlayer('player-container', {
+                    autoplay: autoplay,
+                    muted: muted,
+                    mode: 'embed',
+                    controlBarMode: 'overlay',
+                    controls: controlsConfig
+                });
+
+                // Load the video
+                const decodedUrl = decodeURIComponent(videoUrl);
+                await player.loadMedia(decodedUrl);
+
+            } catch (err) {
+                console.error('[Embed] Init error:', err);
+                showError('Failed to load player', err.message);
+            }
+        }
+
+        function showError(title, message) {
+            const container = document.getElementById('player-container');
+            container.innerHTML = `
+                <div class="embed-error">
+                    <div>
+                        <h2>${title}</h2>
+                        <p>${message}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize when DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initEmbed);
+        } else {
+            initEmbed();
+        }
+
+        // Cleanup on unload
+        window.addEventListener('beforeunload', () => {
+            if (window.player && typeof window.player.destroy === 'function') {
+                window.player.destroy();
+                window.player = null;
+            }
+        });
+    </script>
+
+</body>
+
+</html>
