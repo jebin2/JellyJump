@@ -107,27 +107,43 @@
 
             // Parse allowed controls
             const DEFAULT_CONTROLS = ['play', 'pause', 'fullscreen', 'progress', 'time', 'volume', 'screenshot'];
-            const allowedControls = controlsParam
-                ? controlsParam.split(',').map(c => c.trim().toLowerCase())
-                : DEFAULT_CONTROLS;
+
+            // Handle "none" case specifically
+            let allowedControls = [];
+            let isNone = false;
+
+            if (controlsParam === 'none') {
+                isNone = true;
+                // For "none", we keep 'play' in allowed list internally so logic works,
+                // but we will hide the control bar via controlsConfig.controlBar = false
+                allowedControls = ['play', 'pause'];
+            } else {
+                allowedControls = controlsParam
+                    ? controlsParam.split(',').map(c => c.trim().toLowerCase())
+                    : DEFAULT_CONTROLS;
+            }
 
             // Build controls config
             const controlsConfig = {
-                controlBar: true,
+                // If explicit 'none' or no controls requested, hide bar.
+                // Otherwise default to showing bar unless controlBarMode says otherwise
+                controlBar: !isNone,
+
                 playPause: allowedControls.includes('play') || allowedControls.includes('pause'),
                 navigation: false,  // No prev/next in embed
-                volume: allowedControls.includes('volume'),
-                time: allowedControls.includes('time'),
-                progress: allowedControls.includes('progress'),
-                fullscreen: allowedControls.includes('fullscreen'),
-                speed: allowedControls.includes('speed'),
-                settings: allowedControls.includes('screenshot'),  // Enable settings for screenshot
+                volume: !isNone && allowedControls.includes('volume'),
+                time: !isNone && allowedControls.includes('time'),
+                progress: !isNone && allowedControls.includes('progress'),
+                fullscreen: !isNone && allowedControls.includes('fullscreen'),
+                speed: !isNone && allowedControls.includes('speed'),
+                settings: !isNone && allowedControls.includes('screenshot'),
+
                 // Disabled in embed mode
                 captions: false,
                 loop: false,
                 filters: false,
-                equalizer: allowedControls.includes('volume'),  // Enable equalizer for volume panel
-                volumeOnly: true,  // Hide EQ, show only volume slider
+                equalizer: !isNone && allowedControls.includes('volume'),
+                volumeOnly: true,
                 modeToggle: false,
                 keyboard: true  // Keep shortcuts
             };

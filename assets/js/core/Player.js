@@ -3477,15 +3477,17 @@ export class CorePlayer {
     }
 
     _updatePlayPauseUI() {
+        if (!this.ui.playBtn) return;
+
         const use = this.ui.playBtn.querySelector('use');
         if (this.isPlaying) {
             this.ui.playBtn.setAttribute('aria-label', 'Pause');
             this.ui.playBtn.setAttribute('aria-pressed', 'true');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-pause');
+            if (use) use.setAttribute('href', 'assets/icons/sprite.svg#icon-pause');
         } else {
             this.ui.playBtn.setAttribute('aria-label', 'Play');
             this.ui.playBtn.setAttribute('aria-pressed', 'false');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-play');
+            if (use) use.setAttribute('href', 'assets/icons/sprite.svg#icon-play');
         }
     }
 
