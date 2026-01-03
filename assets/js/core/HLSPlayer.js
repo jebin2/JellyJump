@@ -140,6 +140,18 @@ export class HLSPlayer {
         const url = data.url || '';
         const details = data.details || '';
 
+        // Detect Server Errors (500+)
+        if (data.response && data.response.code >= 500) {
+            return {
+                type: 'server_error',
+                title: 'Server Error',
+                message: `The stream server reported an internal error (${data.response.code}).`,
+                suggestion: 'The camera service might be crashing or overloaded. Check server logs.',
+                recoverable: true,
+                icon: '🔥'
+            };
+        }
+
         // Detect CORS errors - usually manifest with specific patterns
         const isCORS = (
             details === 'manifestLoadError' &&
@@ -149,25 +161,15 @@ export class HLSPlayer {
                 data.error?.name === 'TypeError'
             );
 
-        // Detect DNS/network resolution errors
-        const isDNS = details.includes('manifestLoadError') &&
-            (data.error?.message?.includes('ERR_NAME_NOT_RESOLVED') ||
-                data.error?.message?.includes('getaddrinfo'));
-
-        // Detect timeout errors
-        const isTimeout = details.includes('timeout') ||
-            data.error?.message?.includes('timeout');
-
-        // Detect media errors (codec, format issues)
-        const isMediaError = data.type === 'mediaError';
+        // ... checks for other errors ...
 
         // Build error response based on type
         if (isCORS) {
             return {
                 type: 'cors',
                 title: 'Access Blocked',
-                message: 'This stream is blocked by the server\'s security policy (CORS).',
-                suggestion: 'The stream server doesn\'t allow playback from this site. Try a different stream.',
+                message: 'Stream could not be loaded. This might be a CORS policy issue OR the server is down.',
+                suggestion: 'Check if the stream server is running and accessible. If it is, check CORS headers.',
                 recoverable: false,
                 icon: '🚫'
             };
