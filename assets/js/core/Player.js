@@ -1975,6 +1975,9 @@ export class CorePlayer {
                 };
             }
 
+            // Setup stream video events (before loading to catch metadata events)
+            this._setupStreamVideoEvents();
+
             // Note: DVR segment capture available via player.enableDVRCapture()
             // Load the stream
             await this.hlsPlayer.load(url);
@@ -1982,9 +1985,6 @@ export class CorePlayer {
 
             // Update UI for stream mode
             this._updateStreamUI();
-
-            // Setup stream video events
-            this._setupStreamVideoEvents();
 
             // Sync volume with config
             if (this.streamVideo) {
@@ -2048,8 +2048,8 @@ export class CorePlayer {
         this.streamVideo.style.position = 'absolute';
         this.streamVideo.style.visibility = 'hidden';
         this.streamVideo.style.pointerEvents = 'none';
-        this.streamVideo.style.width = '100%';
-        this.streamVideo.style.height = '100%';
+        this.streamVideo.style.width = '1px';
+        this.streamVideo.style.height = '1px';
         this.streamVideo.style.opacity = '0';
 
         // Insert into container (hidden)
