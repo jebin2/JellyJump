@@ -2043,12 +2043,13 @@ export class CorePlayer {
         this.streamVideo.playsInline = true;
         this.streamVideo.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
 
-        // Keep video hidden - we render frames to canvas
+        // Keep video hidden but full size - we render frames to canvas
+        // Avoiding 1px size to prevent browser decoding optimizations that might lower quality
         this.streamVideo.style.position = 'absolute';
         this.streamVideo.style.visibility = 'hidden';
         this.streamVideo.style.pointerEvents = 'none';
-        this.streamVideo.style.width = '1px';
-        this.streamVideo.style.height = '1px';
+        this.streamVideo.style.width = '100%';
+        this.streamVideo.style.height = '100%';
         this.streamVideo.style.opacity = '0';
 
         // Insert into container (hidden)
@@ -2094,6 +2095,15 @@ export class CorePlayer {
         this.streamVideo.ontimeupdate = () => {
             if (this.isStreamMode) {
                 this.currentTime = this.streamVideo.currentTime;
+
+                // Send time update to parent (Mini-NVR)
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'timeupdate',
+                        currentTime: this.currentTime
+                    }, '*');
+                }
+
                 this.duration = this.streamVideo.duration || 0;
                 this._updateTimeDisplay();
                 this._updateProgress();
