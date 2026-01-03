@@ -3492,6 +3492,8 @@ export class CorePlayer {
     }
 
     _updateProgress() {
+        if (!this.ui.progressBar || !this.ui.progressContainer) return;
+
         let percent = (this.currentTime / this.duration) * 100;
         if (!isFinite(percent)) percent = 0;
 
@@ -3501,6 +3503,8 @@ export class CorePlayer {
     }
 
     _updateTimeDisplay() {
+        if (!this.ui.timeDisplay) return;
+
         const current = this._formatTime(this.currentTime);
         const duration = this._formatTime(this.duration);
         this.ui.timeDisplay.textContent = `${current} / ${duration}`;
@@ -3513,6 +3517,8 @@ export class CorePlayer {
     }
 
     _updateFullscreenUI() {
+        if (!this.ui.fullscreenBtn) return;
+
         const use = this.ui.fullscreenBtn.querySelector('use');
         const isFullscreen = document.fullscreenElement ||
             document.webkitFullscreenElement ||
@@ -3522,10 +3528,10 @@ export class CorePlayer {
 
         if (isFullscreen) {
             this.ui.fullscreenBtn.setAttribute('aria-label', 'Exit Fullscreen');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-fullscreen-exit');
+            if (use) use.setAttribute('href', 'assets/icons/sprite.svg#icon-fullscreen-exit');
         } else {
             this.ui.fullscreenBtn.setAttribute('aria-label', 'Fullscreen');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-fullscreen');
+            if (use) use.setAttribute('href', 'assets/icons/sprite.svg#icon-fullscreen');
         }
     }
 
