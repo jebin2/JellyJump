@@ -2044,16 +2044,26 @@ export class CorePlayer {
         this.streamVideo.setAttribute('webkit-playsinline', '');
         this.streamVideo.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
 
-        // Keep video hidden but full size - we render frames to canvas
-        // IMPORTANT: Using 100% size instead of 1px to ensure HLS adaptive bitrate
-        // correctly selects high-quality streams. Mobile browsers use element dimensions
-        // to determine optimal quality level - 1px causes low quality selection.
+        // Keep video hidden but accessible
         this.streamVideo.style.position = 'absolute';
         this.streamVideo.style.top = '0';
         this.streamVideo.style.left = '0';
-        this.streamVideo.style.width = '100%';
-        this.streamVideo.style.height = '100%';
-        this.streamVideo.style.visibility = 'visible'; // Must be visible for mobile autoplay
+
+        // Check for mobile device
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            // Mobile: 100% size for HLS quality selection and visible for autoplay
+            this.streamVideo.style.width = '100%';
+            this.streamVideo.style.height = '100%';
+            this.streamVideo.style.visibility = 'visible';
+        } else {
+            // Desktop: 1px/hidden is more performant and prevents rendering issues
+            this.streamVideo.style.width = '1px';
+            this.streamVideo.style.height = '1px';
+            this.streamVideo.style.visibility = 'hidden';
+        }
+
         this.streamVideo.style.pointerEvents = 'none';
         this.streamVideo.style.opacity = '0';
         this.streamVideo.style.zIndex = '-1';
