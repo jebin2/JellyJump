@@ -163,6 +163,9 @@ export class HLSPlayer {
             );
 
         // ... checks for other errors ...
+        const isTimeout = data.type === 'networkError' && data.response?.timeout;
+        const isDNS = data.type === 'networkError' && (data.response?.code === 0 || (data.error && (data.error.code === 0 || data.error.message?.includes('DNS') || data.error.message?.includes('ERR_NAME_NOT_RESOLVED'))));
+        const isMediaError = data.type === 'mediaError';
 
         // Build error response based on type
         if (isCORS) {
