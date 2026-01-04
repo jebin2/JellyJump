@@ -40,7 +40,67 @@ export class HLSPlayer {
         this.currentUrl = url;
         this.streamBuffer = options.streamBuffer || null;
 
-        // Check native HLS support (Safari)
+        // Use hls.js if supported (Preferred for stability/latency)
+        if (Hls.isSupported()) {
+            console.log('[HLS] Using hls.js');
+
+            // Use StreamBuffer's config if available (for segment capture)
+            const hlsConfig = this.streamBuffer
+                ? this.streamBuffer.getHLSConfig()
+                : {
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    backBufferLength: 90,
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60,
+                    startLevel: -1,
+                    xhrSetup: this.config.withCredentials ? function (xhr, url) {
+                        xhr.withCredentials = true;
+                    } : undefined
+                };
+
+            this.hls = new Hls(hlsConfig);
+
+            return new Promise((resolve, reject) => {
+                this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+                    console.log('[HLS] Manifest parsed:', data.levels.length, 'quality levels');
+                    this.isLive = !data.levels[0]?.details?.endSN;
+                    this.onManifestParsed?.(data);
+
+                    // Auto-start capture if buffer attached
+                    if (this.streamBuffer) {
+                        this.streamBuffer.startCapture();
+                        console.log('[HLS] StreamBuffer capture started');
+                    }
+
+                    resolve();
+                });
+
+                this.hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+                    this.isLive = data.details.live;
+                    this.onLevelLoaded?.(data);
+                });
+
+                this.hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+                    this.currentLevel = data.level;
+                    this.onQualityChange?.(data.level);
+                });
+
+                this.hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.warn('[HLS] Error:', data.type, data.details);
+                    if (data.fatal) {
+                        this._handleFatalError(data);
+                        reject(new Error(data.details));
+                    }
+                    this.onError?.(data);
+                });
+
+                this.hls.loadSource(url);
+                this.hls.attachMedia(this.video);
+            });
+        }
+
+        // Fallback to Native HLS (Safari)
         if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
             console.log('[HLS] Using native HLS support');
             const metadataPromise = this._waitForMetadata();
@@ -48,67 +108,8 @@ export class HLSPlayer {
             return metadataPromise;
         }
 
-        // Use hls.js for other browsers
-        if (!Hls.isSupported()) {
-            throw new Error('HLS is not supported in this browser');
-        }
-
-        console.log('[HLS] Using hls.js');
-
-        // Use StreamBuffer's config if available (for segment capture)
-        const hlsConfig = this.streamBuffer
-            ? this.streamBuffer.getHLSConfig()
-            : {
-                enableWorker: true,
-                lowLatencyMode: true,
-                backBufferLength: 90,
-                maxBufferLength: 30,
-                maxMaxBufferLength: 60,
-                startLevel: -1,
-                xhrSetup: this.config.withCredentials ? function (xhr, url) {
-                    xhr.withCredentials = true;
-                } : undefined
-            };
-
-        this.hls = new Hls(hlsConfig);
-
-        return new Promise((resolve, reject) => {
-            this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-                console.log('[HLS] Manifest parsed:', data.levels.length, 'quality levels');
-                this.isLive = !data.levels[0]?.details?.endSN;
-                this.onManifestParsed?.(data);
-
-                // Auto-start capture if buffer attached
-                if (this.streamBuffer) {
-                    this.streamBuffer.startCapture();
-                    console.log('[HLS] StreamBuffer capture started');
-                }
-
-                resolve();
-            });
-
-            this.hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
-                this.isLive = data.details.live;
-                this.onLevelLoaded?.(data);
-            });
-
-            this.hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
-                this.currentLevel = data.level;
-                this.onQualityChange?.(data.level);
-            });
-
-            this.hls.on(Hls.Events.ERROR, (event, data) => {
-                console.warn('[HLS] Error:', data.type, data.details);
-                if (data.fatal) {
-                    this._handleFatalError(data);
-                    reject(new Error(data.details));
-                }
-                this.onError?.(data);
-            });
-
-            this.hls.loadSource(url);
-            this.hls.attachMedia(this.video);
-        });
+        // If neither supported
+        throw new Error('HLS is not supported in this browser');
     }
 
     /**
