@@ -41,7 +41,10 @@ export class HLSPlayer {
         this.streamBuffer = options.streamBuffer || null;
 
         // Use hls.js if supported (Preferred for stability/latency)
-        if (Hls.isSupported()) {
+        // BUT skip on iOS (iPhone/iPad) where Native HLS is required/better
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+        if (Hls.isSupported() && !isIOS) {
             console.log('[HLS] Using hls.js');
 
             // Use StreamBuffer's config if available (for segment capture)
