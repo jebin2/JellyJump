@@ -1608,6 +1608,13 @@ export class CorePlayer {
      */
     async load(url, autoplay = false, videoId = null, savedSubtitles = null, options = {}) {
         try {
+            // Force mute on mobile for autoplay (browser policy requirement)
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (autoplay && isMobile) {
+                console.log('[Player] Mobile Autoplay requested - enforcing muted playback');
+                this.config.muted = true;
+            }
+
             // Detect stream type
             const streamType = StreamDetector.detect(url);
 
@@ -2043,6 +2050,11 @@ export class CorePlayer {
         this.streamVideo.setAttribute('playsinline', '');
         this.streamVideo.setAttribute('webkit-playsinline', '');
         this.streamVideo.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
+
+        if (this.config.muted) {
+            this.streamVideo.muted = true;
+            this.streamVideo.setAttribute('muted', '');
+        }
 
         // Keep video hidden but accessible
         this.streamVideo.style.position = 'absolute';
