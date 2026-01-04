@@ -186,7 +186,7 @@ export class CorePlayer {
         this.streamVideo = null;
         this.isStreamMode = false;
         this.isLive = false;
-        this.liveMode = 'buffer'; // 'live' or 'buffer' - default to 30s buffer for stability
+        this.liveMode = options.liveMode || 'buffer'; // 'live' or 'buffer' - default to 30s buffer for stability
         this.streamRenderLoopId = null;
         this.streamBuffer = null; // DVR-style segment capture (experimental)
 
