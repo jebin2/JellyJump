@@ -2040,7 +2040,8 @@ export class CorePlayer {
 
         this.streamVideo = document.createElement('video');
         this.streamVideo.className = 'jellyjump-stream-video jellyjump-video';
-        this.streamVideo.playsInline = true;
+        this.streamVideo.setAttribute('playsinline', '');
+        this.streamVideo.setAttribute('webkit-playsinline', '');
         this.streamVideo.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
 
         // Keep video hidden but full size - we render frames to canvas
@@ -2052,9 +2053,10 @@ export class CorePlayer {
         this.streamVideo.style.left = '0';
         this.streamVideo.style.width = '100%';
         this.streamVideo.style.height = '100%';
-        this.streamVideo.style.visibility = 'hidden';
+        this.streamVideo.style.visibility = 'visible'; // Must be visible for mobile autoplay
         this.streamVideo.style.pointerEvents = 'none';
         this.streamVideo.style.opacity = '0';
+        this.streamVideo.style.zIndex = '-1';
 
         // Insert into container (hidden)
         const wrapper = this.container.querySelector('.jellyjump-video-wrapper') || this.container;
@@ -3041,9 +3043,9 @@ export class CorePlayer {
                 }
             } catch (e) {
                 console.warn('[Stream] Play failed:', e.message);
-                // Handle autoplay policy - try muted on mobile
-                if (e.name === 'NotAllowedError') {
-                    console.log('[Stream] Autoplay blocked, trying muted...');
+                // Handle autoplay policy - try muted on mobile/any failure
+                if (true) {
+                    console.log('[Stream] Autoplay/Play failed (' + e.name + '), trying muted...');
                     try {
                         this.streamVideo.muted = true;
                         await this.streamVideo.play();
