@@ -43,8 +43,9 @@ export class HLSPlayer {
         // Check native HLS support (Safari)
         if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
             console.log('[HLS] Using native HLS support');
+            const metadataPromise = this._waitForMetadata();
             this.video.src = url;
-            return this._waitForMetadata();
+            return metadataPromise;
         }
 
         // Use hls.js for other browsers
