@@ -106,9 +106,31 @@ export class HLSPlayer {
         // Fallback to Native HLS (Safari)
         if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
             console.log('[HLS] Using native HLS support');
-            const metadataPromise = this._waitForMetadata();
-            this.video.src = url;
-            return metadataPromise;
+
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts) {
+                try {
+                    const metadataPromise = this._waitForMetadata();
+                    this.video.src = url;
+                    return await metadataPromise;
+                } catch (e) {
+                    attempts++;
+                    console.warn(`[HLS] Native load error (attempt ${attempts}/${maxAttempts}):`, e);
+
+                    if (attempts >= maxAttempts) {
+                        throw e; // Give up after max retries
+                    }
+
+                    // Wait before retrying (1s)
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // Reset video element state
+                    this.video.removeAttribute('src');
+                    this.video.load();
+                }
+            }
         }
 
         // If neither supported
