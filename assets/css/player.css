@@ -2183,12 +2183,16 @@ body.fullscreen-active {
    HLS/IPTV Live Streaming Mode
    ----------------------------------------- */
 
-/* Stream video element - HIDDEN, used only for HLS audio
+/* Stream video element - HIDDEN but full-size for proper HLS quality selection
+   IMPORTANT: Using 100% dimensions ensures HLS adaptive bitrate correctly selects
+   high-quality streams. Mobile browsers use element dimensions to determine quality.
    Video frames are copied to canvas via requestAnimationFrame */
 .jellyjump-stream-video {
     position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     visibility: hidden !important;
     pointer-events: none !important;
     opacity: 0 !important;
