@@ -2044,12 +2044,16 @@ export class CorePlayer {
         this.streamVideo.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
 
         // Keep video hidden but full size - we render frames to canvas
-        // Avoiding 1px size to prevent browser decoding optimizations that might lower quality
+        // IMPORTANT: Using 100% size instead of 1px to ensure HLS adaptive bitrate
+        // correctly selects high-quality streams. Mobile browsers use element dimensions
+        // to determine optimal quality level - 1px causes low quality selection.
         this.streamVideo.style.position = 'absolute';
+        this.streamVideo.style.top = '0';
+        this.streamVideo.style.left = '0';
+        this.streamVideo.style.width = '100%';
+        this.streamVideo.style.height = '100%';
         this.streamVideo.style.visibility = 'hidden';
         this.streamVideo.style.pointerEvents = 'none';
-        this.streamVideo.style.width = '1px';
-        this.streamVideo.style.height = '1px';
         this.streamVideo.style.opacity = '0';
 
         // Insert into container (hidden)
