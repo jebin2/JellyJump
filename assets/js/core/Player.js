@@ -3051,20 +3051,20 @@ export class CorePlayer {
                         await this.streamVideo.play();
                         this.isPlaying = true;
                         this._updatePlayPauseUI();
-                        if (this.ui.playOverlay) {
-                            this.ui.playOverlay.style.display = 'none';
-                        }
+                        // if (this.ui.playOverlay) {
+                        //     this.ui.playOverlay.style.display = 'none';
+                        // }
                         // Set up one-time click handler to unmute
-                        const unmuteHandler = () => {
-                            if (this.streamVideo && this.isPlaying) {
-                                this.streamVideo.muted = this.config.muted || false;
-                                console.log('[Stream] Unmuted after user interaction');
-                            }
-                            document.removeEventListener('click', unmuteHandler);
-                            document.removeEventListener('touchstart', unmuteHandler);
-                        };
-                        document.addEventListener('click', unmuteHandler, { once: true });
-                        document.addEventListener('touchstart', unmuteHandler, { once: true });
+                        // const unmuteHandler = () => {
+                        //     if (this.streamVideo && this.isPlaying) {
+                        //         this.streamVideo.muted = this.config.muted || false;
+                        //         console.log('[Stream] Unmuted after user interaction');
+                        //     }
+                        //     document.removeEventListener('click', unmuteHandler);
+                        //     document.removeEventListener('touchstart', unmuteHandler);
+                        // };
+                        // document.addEventListener('click', unmuteHandler, { once: true });
+                        // document.addEventListener('touchstart', unmuteHandler, { once: true });
                         console.log('[Stream] Playing muted (touch/click to unmute)');
                     } catch (mutedError) {
                         console.error('[Stream] Even muted play failed:', mutedError);
