@@ -2191,10 +2191,7 @@ body.fullscreen-active {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    /* meaningful change: visibility must be visible for mobile autoplay */
-    visibility: visible !important;
+    /* Width, Height, and Visibility are handled by Player.js (device specific) */
     pointer-events: none !important;
     opacity: 0 !important;
     z-index: -1 !important;
