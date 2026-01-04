@@ -1975,10 +1975,14 @@ export class CorePlayer {
 
                 this.hlsPlayer.onError = (error) => {
                     console.warn('[Stream] HLS error:', error);
-                    // Only show fatal errors or specific network errors
+                    // Only show fatal/network errors if NOT recoverable
                     if (error.fatal || error.type === 'networkError') {
                         const errorDetails = HLSPlayer.getErrorDetails(error);
-                        this._showStreamError(errorDetails);
+                        if (!errorDetails.recoverable) {
+                            this._showStreamError(errorDetails);
+                        } else {
+                            console.log('[Stream] Suppressed recoverable error:', errorDetails.message);
+                        }
                     }
                 };
             }
