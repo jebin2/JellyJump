@@ -1613,6 +1613,7 @@ export class CorePlayer {
             if (autoplay && isMobile) {
                 console.log('[Player] Mobile Autoplay requested - enforcing muted playback');
                 this.config.muted = true;
+                this._updateVolumeUI();
             }
 
             // Detect stream type
@@ -3621,6 +3622,11 @@ export class CorePlayer {
         if (this.isStreamMode && this.streamVideo) {
             this.streamVideo.volume = this.config.volume;
             this.streamVideo.muted = this.config.muted;
+            if (this.config.muted) {
+                this.streamVideo.setAttribute('muted', '');
+            } else {
+                this.streamVideo.removeAttribute('muted');
+            }
         }
 
         if (this.gainNode) {
@@ -3639,6 +3645,11 @@ export class CorePlayer {
         // Handle stream mode mute
         if (this.isStreamMode && this.streamVideo) {
             this.streamVideo.muted = this.config.muted;
+            if (this.config.muted) {
+                this.streamVideo.setAttribute('muted', '');
+            } else {
+                this.streamVideo.removeAttribute('muted');
+            }
         }
 
         if (this.gainNode) {
