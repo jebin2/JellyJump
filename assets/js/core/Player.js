@@ -2161,6 +2161,21 @@ export class CorePlayer {
             }
         };
 
+        // Handle Stalling/Waiting (Show Loader)
+        this.streamVideo.onwaiting = () => {
+            if (this.isStreamMode && !this.paused) {
+                this.ui.loader.classList.add('visible');
+            }
+        };
+
+        // Handle Playing (Hide Loader & Clear Errors)
+        this.streamVideo.onplaying = () => {
+            if (this.isStreamMode) {
+                this.ui.loader.classList.remove('visible');
+                this._hideStreamError(); // Recovery successful!
+            }
+        };
+
         // Ended
         this.streamVideo.onended = () => {
             if (this.isStreamMode && this.onEnded) {
