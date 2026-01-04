@@ -98,6 +98,7 @@
             const muted = params.get('muted') === '1';
             const withCredentials = params.get('credentials') === 'true';
             const controlBarMode = params.get('controlBarMode') || 'fixed';
+            const liveMode = params.get('liveMode') || 'buffer';
 
             // Validate video_url
             if (!videoUrl) {
@@ -170,6 +171,7 @@
                     muted: muted,
                     mode: 'embed',
                     controlBarMode: controlBarMode,
+                    liveMode: liveMode,
                     withCredentials: withCredentials,
                     controls: controlsConfig
                 });
