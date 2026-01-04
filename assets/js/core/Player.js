@@ -3505,6 +3505,13 @@ export class CorePlayer {
     }
 
     toggleFullscreen() {
+        // iOS requires native video fullscreen
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isIOS && this.isStreamMode && this.streamVideo && this.streamVideo.webkitEnterFullscreen) {
+            this.streamVideo.webkitEnterFullscreen();
+            return;
+        }
+
         if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
             if (this.container.requestFullscreen) {
                 this.container.requestFullscreen().catch(err => {
