@@ -230,10 +230,10 @@ export class HLSPlayer {
         if (isMediaError) {
             return {
                 type: 'media',
-                title: 'Playback Error',
-                message: 'Unable to play this stream format.',
-                suggestion: 'The stream format may not be supported by your browser.',
-                recoverable: false,
+                title: 'Playback Glitch',
+                message: 'Stream stuttered, attempting recovery...',
+                suggestion: 'Please wait while we restore playback.',
+                recoverable: true,
                 icon: '🎬'
             };
         }
