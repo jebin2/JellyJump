@@ -2165,6 +2165,43 @@ export class CorePlayer {
         this.streamVideo.onwaiting = () => {
             if (this.isStreamMode && !this.paused) {
                 this.ui.loader.classList.add('visible');
+
+                // Start stall recovery timer for live streams (native HLS on iOS/Android)
+                // If stalled for more than 5 seconds, seek to live edge
+                if (this.isLive && !this._stallRecoveryTimer) {
+                    this._stallRecoveryTimer = setTimeout(() => {
+                        if (this.isStreamMode && this.isLive && !this.paused) {
+                            console.log('[Stream] Stall detected, attempting recovery...');
+                            this._recoverFromStall();
+                        }
+                    }, 5000);
+                }
+            }
+        };
+
+        // Handle stalled event (network issues)
+        this.streamVideo.onstalled = () => {
+            if (this.isStreamMode && this.isLive && !this.paused) {
+                console.log('[Stream] Video stalled, starting recovery timer...');
+                if (!this._stallRecoveryTimer) {
+                    this._stallRecoveryTimer = setTimeout(() => {
+                        this._recoverFromStall();
+                    }, 3000);
+                }
+            }
+        };
+
+        // Handle error event (critical for native HLS recovery)
+        this.streamVideo.onerror = (e) => {
+            console.warn('[Stream] Video error:', e);
+            if (this.isStreamMode && this.isLive) {
+                // For live streams, attempt recovery by reloading
+                setTimeout(() => {
+                    if (this._lastStreamUrl) {
+                        console.log('[Stream] Attempting to reload stream after error...');
+                        this._loadHLSStream(this._lastStreamUrl, true);
+                    }
+                }, 2000);
             }
         };
 
@@ -2173,6 +2210,11 @@ export class CorePlayer {
             if (this.isStreamMode) {
                 this.ui.loader.classList.remove('visible');
                 this._hideStreamError(); // Recovery successful!
+                // Clear stall recovery timer
+                if (this._stallRecoveryTimer) {
+                    clearTimeout(this._stallRecoveryTimer);
+                    this._stallRecoveryTimer = null;
+                }
             }
         };
 
@@ -2235,6 +2277,11 @@ export class CorePlayer {
             this._updatePlayPauseUI();
             // Stop render loop
             this._stopStreamRenderLoop();
+            // Clear stall recovery timer (intentional pause)
+            if (this._stallRecoveryTimer) {
+                clearTimeout(this._stallRecoveryTimer);
+                this._stallRecoveryTimer = null;
+            }
             // Show as not-live when paused
             if (this.isLive && this.ui.liveBadge) {
                 this.ui.liveBadge.classList.add('not-live');
@@ -2617,6 +2664,50 @@ export class CorePlayer {
             // Auto-play after seeking to live
             if (!this.isPlaying) {
                 this.play();
+            }
+        }
+    }
+
+    /**
+     * Recover from stall (for native HLS on iOS/Android)
+     * Seeks to live edge and resumes playback
+     * @private
+     */
+    _recoverFromStall() {
+        if (!this.isStreamMode || !this.isLive || !this.streamVideo) return;
+
+        console.log('[Stream] Attempting stall recovery...');
+
+        // Clear recovery timer
+        if (this._stallRecoveryTimer) {
+            clearTimeout(this._stallRecoveryTimer);
+            this._stallRecoveryTimer = null;
+        }
+
+        // For native HLS (no hlsPlayer), seek using video.seekable
+        const seekable = this.streamVideo.seekable;
+        if (seekable.length > 0) {
+            const liveEdge = seekable.end(seekable.length - 1);
+            // Seek to a few seconds behind live edge for buffer room
+            const targetTime = Math.max(seekable.start(0), liveEdge - 5);
+
+            console.log(`[Stream] Seeking to ${targetTime}s (live edge: ${liveEdge}s)`);
+            this.streamVideo.currentTime = targetTime;
+
+            // Try to resume playback
+            this.streamVideo.play().then(() => {
+                console.log('[Stream] Stall recovery successful');
+            }).catch(e => {
+                console.warn('[Stream] Stall recovery play failed:', e);
+            });
+        } else if (this.hlsPlayer) {
+            // Use hlsPlayer if available
+            this._seekToLive();
+        } else {
+            // Last resort: reload the stream
+            console.log('[Stream] No seekable range, reloading stream...');
+            if (this._lastStreamUrl) {
+                this._loadHLSStream(this._lastStreamUrl, true);
             }
         }
     }
