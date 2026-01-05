@@ -42,9 +42,11 @@ export class HLSPlayer {
 
         // Use hls.js if supported (Preferred for stability/latency)
         // BUT skip on iOS (iPhone/iPad) where Native HLS is required/better
+        // AND skip on Android where hls.js has loading issues in Chrome
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isAndroid = /Android/i.test(navigator.userAgent);
 
-        if (Hls.isSupported() && !isIOS) {
+        if (Hls.isSupported() && !isIOS && !isAndroid) {
             console.log('[HLS] Using hls.js');
 
             // Use StreamBuffer's config if available (for segment capture)
@@ -103,9 +105,9 @@ export class HLSPlayer {
             });
         }
 
-        // Fallback to Native HLS (Safari)
+        // Fallback to Native HLS (Safari, iOS, Android)
         if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
-            console.log('[HLS] Using native HLS support');
+            console.log('[HLS] Using native HLS support (iOS/Android/Safari)');
 
             let attempts = 0;
             const maxAttempts = 3;
