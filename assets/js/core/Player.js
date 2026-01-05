@@ -2957,6 +2957,19 @@ export class CorePlayer {
         // Hide loader, show error
         this.ui.loader.classList.remove('visible');
         overlay.style.display = 'flex';
+
+        // Send error notification to parent (Mini-NVR) so it can show Live button for retry
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'streamError',
+                error: {
+                    type: errorDetails.type,
+                    title: errorDetails.title,
+                    message: errorDetails.message,
+                    recoverable: errorDetails.recoverable
+                }
+            }, '*');
+        }
     }
 
     /**
