@@ -53,12 +53,12 @@ find . -name "*.html" \
     "$file"
 done
 
-echo "🖼 Copying image and font assets..."
+echo "🖼 Copying image, font, and manifest assets..."
 find . \
   \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
      -o -name "*.gif" -o -name "*.svg" -o -name "*.ico" \
      -o -name "*.woff" -o -name "*.woff2" -o -name "*.ttf" \
-     -o -name "*.eot" \) \
+     -o -name "*.eot" -o -name "*.json" \) \
   -not -path "./node_modules/*" \
   -not -path "./build/*" \
   -not -path "./desktop/*" \
