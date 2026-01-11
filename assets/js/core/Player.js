@@ -539,7 +539,7 @@ export class CorePlayer {
         }
         this.canvas.addEventListener('click', () => this.togglePlay());
         if (this.ui.playOverlay) {
-            this.ui.playOverlay.addEventListener('click', () => this.play());
+            this.ui.playOverlay.addEventListener('click', () => this.togglePlay());
         }
 
         // Navigation (only if buttons exist - not needed for modal players)
@@ -1527,6 +1527,16 @@ export class CorePlayer {
     reset() {
         this.pause();
 
+        // Clean up HLS streams
+        if (this.hlsPlayer) {
+            this._cleanupHLS();
+        }
+
+        // Clean up audio-only mode
+        if (this.isAudioMode) {
+            this._cleanupAudio();
+        }
+
         // Clear canvas
         if (this.ctx && this.canvas) {
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -1568,6 +1578,8 @@ export class CorePlayer {
             });
             this.activeSources = [];
         }
+
+        console.log('[Player] Reset complete - select a video to play');
     }
 
     /**

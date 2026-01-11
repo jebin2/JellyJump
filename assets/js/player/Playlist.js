@@ -119,10 +119,24 @@ export class Playlist {
             () => this.playNext()
         );
 
-        // Auto-play first item if play button clicked with no video loaded
+        // Handle play request when no video is loaded
         this.player.setPlayCallback(() => {
-            if (this.items.length > 0) {
-                this.selectItem(0);
+            if (this.items.length > 0 && this.activeIndex === -1) {
+                // Playlist has items but none selected - show message
+                ConfirmModal.alert({
+                    title: 'No Video Selected',
+                    message: 'Please select a video from the playlist to play.',
+                    confirmText: 'OK',
+                    icon: '📺'
+                });
+            } else if (this.items.length === 0) {
+                // Playlist is empty - show message
+                ConfirmModal.alert({
+                    title: 'Playlist Empty',
+                    message: 'Add videos to the playlist using the upload button or paste a URL.',
+                    confirmText: 'OK',
+                    icon: '📂'
+                });
             }
         });
     }
@@ -358,47 +372,19 @@ export class Playlist {
         }
     }
 
-    /**
-     * Initialize keyboard shortcuts
-     * @private
-     */
-    _initKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Ignore if typing in input
-            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
 
-            if (e.shiftKey && e.key.toLowerCase() === 'n') {
-                e.preventDefault();
-                this.playNext();
-            } else if (e.shiftKey && e.key.toLowerCase() === 'p') {
-                e.preventDefault();
-                this.playPrevious();
-            } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                // Remove active item if focused or just active? 
-                // Let's say if we have a selection concept separate from playing, 
-                // but for now let's just remove the currently playing one for simplicity 
-                // OR maybe better: remove the one hovered? No, keyboard.
-                // Let's skip delete for now to avoid accidental deletion of playing video.
-            }
-        });
-    }
 
     /**
-     * Setup player navigation callbacks
+     * Stop playback and show 'Select video to play' message
+     * Called when active video/folder is deleted
      * @private
      */
-    _setupPlayerNavigation() {
-        if (this.player && typeof this.player.setNavigationCallbacks === 'function') {
-            this.player.setNavigationCallbacks(
-                () => this.playPrevious(),
-                () => this.playNext()
-            );
-
-            // Hook up onEnded for auto-advance
-            this.player.onEnded = () => this.playNext();
-
-            this._updatePlayerNavigationState();
-        }
+    _stopPlayback() {
+        this.activeIndex = -1;
+        this.player.reset();
+        this._updateUI();
+        this._updatePlayerNavigationState();
+        console.log('[Playlist] Playback stopped - select a video to play');
     }
 
     /**
@@ -435,26 +421,104 @@ export class Playlist {
         const item = this.items[this.activeIndex];
         if (!item) return;
 
-        // Ensure path expansion (Iterative lazy load)
+        // 1. Recursive Expansion
+        let targetFolderWrapper = this.container;
+
         if (item.path && item.path.includes('/')) {
             const parts = item.path.split('/');
+            // Expand all parents
             for (let i = 0; i < parts.length - 1; i++) {
                 const folderPath = parts.slice(0, i + 1).join('/');
                 await this._ensureFolderExpanded(folderPath);
             }
+
+            // Find target wrapper
+            const parentPath = parts.slice(0, parts.length - 1).join('/');
+            const folderEl = this.container.querySelector(`.playlist-folder[data-path="${parentPath}"]`);
+            if (folderEl) {
+                targetFolderWrapper = folderEl.querySelector('.playlist-children');
+            }
         }
 
-        // Wait for DOM paint after expansion
+        // Wait for render
         await new Promise(r => setTimeout(r, 50));
 
-        const itemEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+        // 2. Try Standard Scroll
+        let itemEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+
+        // 3. Virtual Scroll Fallback
+        if (!itemEl && targetFolderWrapper) {
+            const index = this._calculateVirtualIndex(item);
+            if (index !== -1) {
+                // Estimate height: 40px item + 1px border
+                targetFolderWrapper.scrollTop = index * 41;
+
+                // Wait for scroll listener to trigger render
+                await new Promise(r => setTimeout(r, 200)); // Generous wait for large lists
+                itemEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+            }
+        }
+
         if (itemEl) {
             itemEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             itemEl.classList.add('playlist-item--highlight');
-            setTimeout(() => {
-                itemEl.classList.remove('playlist-item--highlight');
-            }, 1500);
+            setTimeout(() => itemEl.classList.remove('playlist-item--highlight'), 1500);
         }
+    }
+
+    /**
+     * Calculate virtual index of an item within its folder (Drawer)
+     * Used to scroll virtual lists to the correct position
+     */
+    _calculateVirtualIndex(targetItem) {
+        // Determine parent path
+        let parentPath = '';
+        if (targetItem.path && targetItem.path.includes('/')) {
+            parentPath = targetItem.path.substring(0, targetItem.path.lastIndexOf('/'));
+        }
+        const prefix = parentPath ? parentPath + '/' : '';
+
+        // 1. Count Sibling Folders (Folders come first in Drawer)
+        const siblingFolders = new Set();
+        this.items.forEach(i => {
+            const p = i.path || '';
+            // Check if derivative path
+            if (p.startsWith(prefix) && p !== prefix) {
+                const relative = p.substring(prefix.length);
+                const slashIndex = relative.indexOf('/');
+                if (slashIndex !== -1) {
+                    siblingFolders.add(relative.substring(0, slashIndex));
+                }
+            }
+        });
+
+        const folderCount = siblingFolders.size;
+
+        // 2. Count Sibling Items (items equal to or before target)
+        let itemCountBefore = 0;
+        let found = false;
+
+        for (const i of this.items) {
+            const p = i.path || '';
+            let isDirectSibling = false;
+            if (prefix === '') {
+                isDirectSibling = !p.includes('/');
+            } else {
+                isDirectSibling = p.startsWith(prefix) && !p.substring(prefix.length).includes('/');
+            }
+
+            if (isDirectSibling) {
+                if (i === targetItem) {
+                    found = true;
+                    break;
+                }
+                itemCountBefore++;
+            }
+        }
+
+        if (!found) return -1;
+
+        return folderCount + itemCountBefore;
     }
 
     /**
@@ -1031,21 +1095,15 @@ export class Playlist {
     removeItem(index) {
         if (index < 0 || index >= this.items.length) return;
 
-        // Player Logic (Update Active Index)
-        if (index === this.activeIndex) {
-            if (this.items.length > 1) {
-                if (index < this.items.length - 1) {
-                    this.selectItem(index + 1);
-                    this.activeIndex--;
-                } else {
-                    this.selectItem(index - 1);
-                }
-            } else {
-                this.clear(false);
-                return; // Clear handles everything
-            }
-        } else if (index < this.activeIndex) {
+        // If removing the currently playing item, stop playback (KISS)
+        const wasActive = index === this.activeIndex;
+
+        // Adjust activeIndex if removing item before it
+        if (index < this.activeIndex) {
             this.activeIndex--;
+        } else if (wasActive) {
+            // Will stop playback after removal
+            this.activeIndex = -1;
         }
 
         // 1. Data Removal
@@ -1081,6 +1139,11 @@ export class Playlist {
                 el.dataset.index = curr - 1;
             }
         }
+
+        // 4. Stop playback if active item was removed (KISS)
+        if (wasActive) {
+            this._stopPlayback();
+        }
     }
 
     /**
@@ -1109,26 +1172,14 @@ export class Playlist {
             this.items.splice(idx, 1);
         });
 
-        // 2. Update Active Index (Play Next Logic)
+        // 2. Update Active Index - KISS approach: stop if active was removed
+        let wasActiveRemoved = false;
         if (originalActive) {
             const newIndex = this.items.indexOf(originalActive);
             if (newIndex === -1) {
-                // Active item was removed. Play Next.
-                // Smallest removed index points to the "hole" now filled by next item
-                // (or end of list)
-                const nextIndexCandidate = indicesToRemove[indicesToRemove.length - 1];
-
-                let targetIndex = nextIndexCandidate;
-                if (targetIndex >= this.items.length) {
-                    targetIndex = this.items.length - 1;
-                }
-
-                if (targetIndex >= 0 && this.items.length > 0) {
-                    this.selectItem(targetIndex);
-                } else {
-                    this.activeIndex = -1;
-                    this.clear(false);
-                }
+                // Active item was removed - stop playback
+                wasActiveRemoved = true;
+                this.activeIndex = -1;
             } else {
                 this.activeIndex = newIndex;
             }
@@ -1161,6 +1212,11 @@ export class Playlist {
             if (shift > 0) {
                 el.dataset.index = oldIdx - shift;
             }
+        }
+
+        // 5. Stop playback if active was removed (KISS)
+        if (wasActiveRemoved) {
+            this._stopPlayback();
         }
     }
 
@@ -1432,9 +1488,10 @@ export class Playlist {
     }
 
     _renderSearchResults(query) {
-        const filtered = this.items.filter(item =>
-            item.title.toLowerCase().includes(query)
-        );
+        // Filter items and include their original index for proper selection
+        const filtered = this.items
+            .map((item, index) => ({ ...item, originalIndex: index }))
+            .filter(item => item.title.toLowerCase().includes(query));
 
         if (filtered.length === 0) {
             const emptyDiv = document.createElement('div');
@@ -1991,13 +2048,22 @@ export class Playlist {
 
         if (this.activeIndex === -1) return;
 
-        // Simple highlight logic
-        // We rely on surgical DOM updates to keep data-index correct
-        const activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+        // Try to find and highlight the active element
+        let activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+
         if (activeEl) {
             activeEl.classList.add('active');
+        } else {
+            // Element not in DOM - likely in collapsed folder or not yet virtualized
+            // Use scrollToPlaying() to expand parents and render the item
+            this.scrollToPlaying().then(() => {
+                // Re-query after scroll/expansion and highlight
+                activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+                if (activeEl) {
+                    activeEl.classList.add('active');
+                }
+            });
         }
-        // Note: Auto-expansion/scrolling de-prioritized to prevent aggressive re-renders
     }
 
     /**
