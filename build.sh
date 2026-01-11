@@ -117,67 +117,26 @@ log_success "Processed ${HTML_COUNT} HTML files"
 log_info "Optimizing player.html for production..."
 
 # Create optimized player.html that uses bundles
-cat > build/player.html << 'PLAYER_HTML'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JellyJump - Player</title>
-    <script>
-        // Set base URL for subdirectory deployments (e.g., /JellyJump/)
-        (function() {
-            var path = window.location.pathname;
-            var base = path.substring(0, path.lastIndexOf('/') + 1);
-            var tag = document.createElement('base');
-            tag.href = base;
-            document.head.appendChild(tag);
-        })();
-    </script>
-    <link rel="icon" href="assets/icons/jelly_jump_logo.png">
-    <meta name="description" content="JellyJump - A modern, feature-rich video player and editor. Play local files, stream HLS, trim, convert, and create GIFs - all in your browser with complete privacy.">
-    <link rel="preload" href="assets/icons/jelly_jump_logo.gif" as="image">
-    <link rel="preload" href="assets/icons/jelly_play.webp" as="image">
-    <meta name="theme-color" content="#00d9a5">
-    <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="assets/icons/jelly_jump_logo.png">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="JellyJump">
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('[PWA] Service Worker registered'))
-                    .catch(err => console.log('[PWA] Service Worker failed', err));
-            });
-        }
-    </script>
-    <!-- BUNDLED CSS - Single file instead of 6 -->
-    <link rel="stylesheet" href="assets/css/player.bundle.css">
-</head>
-<body>
-    <div class="page-loader" id="page-loader">
-        <div class="page-loader-logo"></div>
-    </div>
-    <div style="display: none;">
-        <svg xmlns="http://www.w3.org/2000/svg"><defs></defs></svg>
-    </div>
-    <div class="player-layout">
-        <main class="video-section" id="player-container"></main>
-        <aside class="playlist-section hidden">
-            <header class="playlist-header" style="display: none;"></header>
-            <div class="playlist-content">
-                <div class="playlist-placeholder"></div>
-            </div>
-        </aside>
-        <button id="mobile-expand-btn" class="mobile-expand-button" aria-label="Expand playlist" title="Expand playlist" style="display: none;">▲</button>
-    </div>
-    <input type="file" id="mb-file-input" multiple accept="video/*,audio/*" style="display: none;">
-    <input type="file" id="mb-folder-input" webkitdirectory directory style="display: none;">
-    <a id="mb-download-link" style="display: none;"></a>
+# Copy source player.html to build
+cp player.html build/player.html
 
-    <!-- Import Map for external libraries (bundle uses relative paths) -->
+# 1. Add Base URL Script (for subdirectory deployment)
+# Insert after <title>
+sed -i 's|<title>JellyJump - Player</title>|<title>JellyJump - Player</title><script>(function(){var p=window.location.pathname;var b=p.substring(0,p.lastIndexOf("/")+1);var t=document.createElement("base");t.href=b;document.head.appendChild(t);})();</script>|' build/player.html
+
+# 2. Replace CSS with Bundle
+# Replace the block of CSS files with the single bundle
+sed -i '/assets\/css\/theme.css/c\    <link rel="stylesheet" href="assets/css/player.bundle.css">' build/player.html
+# Remove the other CSS lines that follow (common, player, etc are now in bundle)
+sed -i '/assets\/css\/common.css/d' build/player.html
+sed -i '/assets\/css\/player.css/d' build/player.html
+sed -i '/assets\/css\/screenshot.css/d' build/player.html
+sed -i '/assets\/css\/modal.css/d' build/player.html
+sed -i '/assets\/css\/player_page.css/d' build/player.html
+
+# 3. Update Import Map for Production (fix path resolution)
+# We will replace the entire simple import map with the comprehensive one
+cat > build/temp_importmap.html << 'EOF'
     <script type="importmap">
     {
         "imports": {
@@ -189,72 +148,16 @@ cat > build/player.html << 'PLAYER_HTML'
         }
     }
     </script>
+EOF
 
-    <!-- GIF Library -->
-    <script type="module" src="assets/js/lib/gif.js"></script>
+# Use perl to replace the multi-line import map block
+perl -0777 -i -pe 'BEGIN{local $/; open(F, "<", "build/temp_importmap.html"); $c = <F>; close(F)} s/<script type="importmap">.*?<\/script>/$c/gs' build/player.html
+rm build/temp_importmap.html
 
-    <!-- BUNDLED JS - Single import instead of many -->
-    <script type="module">
-        async function initializeApp() {
-            // Load templates
-            const [playlistHtml, screenshotHtml, playerHtml] = await Promise.all([
-                fetch('assets/templates/playlist-templates.html').then(r => r.text()),
-                fetch('assets/templates/screenshot-templates.html').then(r => r.text()),
-                fetch('assets/templates/player-templates.html').then(r => r.text())
-            ]);
-            
-            const tempDiv = document.createElement('div');
-            tempDiv.style.display = 'none';
-            tempDiv.innerHTML = playlistHtml + screenshotHtml + playerHtml;
-            document.body.appendChild(tempDiv);
-
-            // Import from bundle
-            const { CorePlayer, Playlist } = await import('./assets/js/bundles/player.bundle.js');
-
-            const player = window.player = new CorePlayer('player-container', {
-                autoplay: false,
-                muted: false,
-                mode: 'player'
-            });
-
-            const playlist = new Playlist(
-                document.querySelector('.playlist-content'),
-                player
-            );
-
-            if (!localStorage.getItem('JellyJumpDB-playlist') && 
-                (window.location.href.includes('//localhost:') || 
-                 window.location.href.includes('//jebin2.github.io/JellyJump/') || 
-                 window.location.href.includes('//www.voidall.com/JellyJump/'))) {
-                playlist.addItems([
-                    { title: 'Big Buck Bunny', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', isLocal: false },
-                    { title: 'Big Buck Bunny Audio', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/CastVideos/dash/BigBuckBunnyAudio.mp4', isLocal: false, isAudio: true },
-                    { url: "https://30a-tv.com/feeds/720p/63.m3u8", title: "30A Ridiculous TV", isStream: true }
-                ], false);
-            }
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeApp);
-        } else {
-            initializeApp();
-        }
-
-        window.addEventListener('load', () => {
-            const loader = document.getElementById('page-loader');
-            if (loader) loader.classList.add('hidden');
-        });
-
-        window.addEventListener('beforeunload', () => {
-            if (window.player && typeof window.player.destroy === 'function') {
-                window.player.destroy();
-                window.player = null;
-            }
-        });
-    </script>
-</body>
-</html>
-PLAYER_HTML
+# 4. Replace JS Imports with Bundle
+# Replace the individual imports with the bundle import
+sed -i "s|const { CorePlayer } = await import('\./assets/js/core/Player.js');|const { CorePlayer, Playlist } = await import('./assets/js/bundles/player.bundle.js');|g" build/player.html
+sed -i "/const { Playlist } = await import('\.\/assets\/js\/player\/Playlist\.js');/d" build/player.html
 
 log_success "Created optimized player.html with bundles"
 
