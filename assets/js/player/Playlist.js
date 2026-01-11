@@ -1019,32 +1019,132 @@ export class Playlist {
      * Remove a video from the playlist
      * @param {number} index 
      */
+    /**
+     * Remove item (Surgical DOM Update)
+     * @param {number} index 
+     */
     removeItem(index) {
         if (index < 0 || index >= this.items.length) return;
 
-        // If removing the currently playing item
+        // Player Logic (Update Active Index)
         if (index === this.activeIndex) {
-            // Try to play next, or stop if it was the last one
             if (this.items.length > 1) {
                 if (index < this.items.length - 1) {
                     this.selectItem(index + 1);
-                    this.activeIndex--; // Adjust because we're about to splice
+                    this.activeIndex--;
                 } else {
                     this.selectItem(index - 1);
                 }
             } else {
                 this.clear(false);
+                return; // Clear handles everything
             }
         } else if (index < this.activeIndex) {
-            // If removing an item before current, adjust active index
             this.activeIndex--;
         }
 
+        // 1. Data Removal
         this.items.splice(index, 1);
         this._saveState();
-        this.render();
         this._updatePlayerNavigationState();
+
+        // 2. Surgical DOM Removal
+        const itemEl = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
+        if (itemEl) {
+            // Update Parent Folder Count
+            const folder = itemEl.closest('.playlist-folder');
+            if (folder) {
+                const header = folder.querySelector('.playlist-folder-header');
+                const countSpan = header.querySelector('span:last-child'); // Assumption: Count is last span
+                // Better lookup: count is the one with opacity 0.7
+                if (countSpan && countSpan.textContent.startsWith('(')) {
+                    const currentCount = parseInt(countSpan.textContent.replace(/\D/g, ''));
+                    const newCount = Math.max(0, currentCount - 1);
+                    countSpan.textContent = `(${newCount})`;
+                    if (newCount === 0) folder.remove(); // Optional: remove empty folder
+                }
+            }
+            itemEl.remove();
+        }
+
+        // 3. Patch Indices (Crucial for correct subsequent clicks)
+        // Find all items with index > removed index
+        const allItems = this.container.querySelectorAll('.playlist-item');
+        for (const el of allItems) {
+            const curr = parseInt(el.dataset.index);
+            if (curr > index) {
+                el.dataset.index = curr - 1;
+            }
+        }
     }
+
+    /**
+     * Remove a folder (Surgical)
+     */
+    removeFolder(folderPath) {
+        // Find items to remove
+        const indicesToRemove = [];
+        this.items.forEach((item, idx) => {
+            const itemPath = item.path || '';
+            if (itemPath === folderPath || itemPath.startsWith(folderPath + '/')) {
+                indicesToRemove.push(idx);
+            }
+        });
+
+        if (indicesToRemove.length === 0) return;
+
+        // Sort desc to splice correctly from end
+        indicesToRemove.sort((a, b) => b - a);
+
+        // Active Item Logic
+        const originalActive = this.activeIndex >= 0 ? this.items[this.activeIndex] : null;
+
+        // 1. Remove Data
+        indicesToRemove.forEach(idx => {
+            this.items.splice(idx, 1);
+        });
+
+        // 2. Update Active Index
+        if (originalActive) {
+            const newIndex = this.items.indexOf(originalActive);
+            if (newIndex === -1) {
+                this.activeIndex = -1;
+                if (this.player) this.player.reset();
+            } else {
+                this.activeIndex = newIndex;
+            }
+        } else {
+            this.activeIndex = -1;
+        }
+
+        this._saveState();
+        this._updatePlayerNavigationState();
+
+        // 3. Surgical DOM Removal
+        const folderEl = this.container.querySelector(`.playlist-folder[data-path="${folderPath}"]`);
+        if (folderEl) {
+            folderEl.remove();
+        }
+
+        // 4. Robust Index Patching
+        // Iterate all remaining DOM items and shift their indices
+        const allItems = this.container.querySelectorAll('.playlist-item');
+
+        for (const el of allItems) {
+            const oldIdx = parseInt(el.dataset.index);
+            // Count how many removed items were BEFORE this item's old index
+            let shift = 0;
+            for (const removedIdx of indicesToRemove) {
+                if (removedIdx < oldIdx) {
+                    shift++;
+                }
+            }
+            if (shift > 0) {
+                el.dataset.index = oldIdx - shift;
+            }
+        }
+    }
+
 
     /**
      * Clear the playlist
@@ -1273,76 +1373,116 @@ export class Playlist {
     }
 
     /**
-     * Render the playlist
+     * Render the playlist using Lazy Drawers (Nested Infinite Scroll)
      */
     render() {
-        this.container.innerHTML = '';
         const sidebar = this.container.closest('.playlist-section');
 
         if (this.isLoading) {
-            // Ensure sidebar is hidden while loading
             if (sidebar) sidebar.classList.add('hidden');
             return;
         } else {
-            // Show sidebar when data is ready
             if (sidebar) sidebar.classList.remove('hidden');
         }
 
         if (this.items.length === 0) {
+            this.container.innerHTML = '';
             const template = document.getElementById('playlist-empty-template');
             const clone = template.content.cloneNode(true);
             this.container.appendChild(clone);
             return;
         }
 
-        // Handle Search
+        // 1. Build Tree
+        const tree = this._buildTree(this.items);
+
+        // 2. Setup Root Container
+        this.container.innerHTML = '';
+        this.container.scrollTop = 0;
+        this.container.style.overflowY = 'auto';
+        this.container.style.overflowX = 'hidden';
+
+        // 3. Render Root Level (Lazy)
         if (this.searchQuery) {
-            const filteredItems = this.items.filter(item =>
-                item.title.toLowerCase().includes(this.searchQuery)
-            );
-
-            if (filteredItems.length === 0) {
-                const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'playlist-placeholder';
-                emptyDiv.textContent = 'No matches found';
-                this.container.appendChild(emptyDiv);
-            } else {
-                // Render flat list for search results (limited to 50)
-                const MAX_RESULTS = 50;
-                const itemsToShow = filteredItems.slice(0, MAX_RESULTS);
-
-                itemsToShow.forEach(item => {
-                    // Find original index for correct selection
-                    const originalIndex = this.items.indexOf(item);
-                    this.container.appendChild(this._createPlaylistItemElement({
-                        ...item,
-                        originalIndex: originalIndex
-                    }));
-                });
-
-                // Show message if there are more results
-                if (filteredItems.length > MAX_RESULTS) {
-                    const moreDiv = document.createElement('div');
-                    moreDiv.style.padding = '10px';
-                    moreDiv.style.textAlign = 'center';
-                    moreDiv.style.color = 'var(--text-secondary)';
-                    moreDiv.style.fontSize = '12px';
-                    moreDiv.textContent = `Showing top ${MAX_RESULTS} of ${filteredItems.length} matches. Refine search to see more.`;
-                    this.container.appendChild(moreDiv);
-                }
-            }
+            this._renderSearchResults(this.searchQuery);
         } else {
-            // Normal Tree View
-            const tree = this._buildTree(this.items);
-            this.container.appendChild(this._renderTreeLevel(tree));
+            this._setupInfiniteScroll(this.container, tree);
         }
 
-        // Update Active State
         this._updateUI();
     }
 
+    _renderSearchResults(query) {
+        const filtered = this.items.filter(item =>
+            item.title.toLowerCase().includes(query)
+        );
+
+        if (filtered.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'playlist-placeholder';
+            emptyDiv.textContent = 'No matches found';
+            this.container.appendChild(emptyDiv);
+            return;
+        }
+
+        // Treat as a flat list node
+        const resultsNode = { allContent: filtered.map(item => ({ type: 'item', data: item })) };
+        this._setupInfiniteScroll(this.container, resultsNode);
+    }
+
     /**
-     * Build hierarchical tree from items
+     * Setup Infinite Scroll for a container (Root or Folder)
+     * @param {HTMLElement} container 
+     * @param {Object} node (Must have .allContent prepared)
+     */
+    _setupInfiniteScroll(container, node) {
+        container.dataset.renderedCount = '0';
+        // Cleanup old listener if any? (DOM replacement handles it)
+
+        // Scroll Listener
+        container.addEventListener('scroll', () => {
+            const scrollTop = container.scrollTop;
+            const scrollHeight = container.scrollHeight;
+            const clientHeight = container.clientHeight;
+
+            if (scrollTop + clientHeight >= scrollHeight - 100) { // Threshold
+                this._renderBatch(container, node);
+            }
+        }, { passive: true });
+
+        // Initial Render
+        this._renderBatch(container, node);
+    }
+
+    /**
+     * Render next batch of items into container
+     */
+    _renderBatch(container, node) {
+        if (!node.allContent) return;
+
+        const BATCH_SIZE = 50;
+        const currentCount = parseInt(container.dataset.renderedCount || '0');
+        const total = node.allContent.length;
+
+        if (currentCount >= total) return;
+
+        const nextBatch = node.allContent.slice(currentCount, currentCount + BATCH_SIZE);
+
+        const fragment = document.createDocumentFragment();
+        nextBatch.forEach(entry => {
+            if (entry.type === 'folder') {
+                fragment.appendChild(this._createFolderElement(entry.data));
+            } else {
+                fragment.appendChild(this._createPlaylistItemElement(entry.data));
+            }
+        });
+
+        container.appendChild(fragment);
+        container.dataset.renderedCount = (currentCount + nextBatch.length).toString();
+    }
+
+    /**
+     * Build hierarchical tree from items and prepare allContent for infinite scroll
      * @param {Array} items 
      */
     _buildTree(items) {
@@ -1351,13 +1491,12 @@ export class Playlist {
         items.forEach((item, index) => {
             const path = item.path || item.title || 'Unknown';
             const parts = path.split('/');
-            // If path is just filename, it goes to root items
+
             if (parts.length === 1) {
                 root.items.push({ ...item, originalIndex: index });
                 return;
             }
 
-            // Navigate/Create folders
             let current = root;
             for (let i = 0; i < parts.length - 1; i++) {
                 const folderName = parts[i];
@@ -1371,14 +1510,27 @@ export class Playlist {
                 }
                 current = current.children[folderName];
             }
-
-            // Add item to last folder
             current.items.push({ ...item, originalIndex: index });
         });
 
-        // Tag folders that are purely from an M3U source
+        // Tag M3U
         this._tagM3UFolders(root);
 
+        // Finalize: Prepare 'allContent' array for every node
+        const finalizeNode = (node) => {
+            const childrenFolders = Object.values(node.children)
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            // Recurse first
+            childrenFolders.forEach(finalizeNode);
+
+            const folderEntries = childrenFolders.map(f => ({ type: 'folder', data: f }));
+            const itemEntries = node.items.map(i => ({ type: 'item', data: i }));
+
+            node.allContent = [...folderEntries, ...itemEntries];
+        };
+
+        finalizeNode(root);
         return root;
     }
 
@@ -1410,10 +1562,6 @@ export class Playlist {
                 const childSource = this._tagM3UFolders(child);
                 if (childSource === null) {
                     commonSource = null;
-                    // We must continue traversing other children to tag THEM correctly
-                    // But for THIS node, it's null. 
-                    // However, we shouldn't break early because siblings depend on recursion.
-                    // Wait, we can't break early from the loop if we want to process all children.
                 } else {
                     if (commonSource === undefined) {
                         commonSource = childSource;
@@ -1438,70 +1586,201 @@ export class Playlist {
     }
 
     /**
-     * Render a level of the tree
-     * @param {Object} node 
-     * @returns {HTMLElement}
+     * Simplified Folder Element for Virtual List
+     * No recursive children rendering needed
      */
-    _renderTreeLevel(node) {
-        const container = document.createElement('div');
-        container.className = 'playlist-tree-level';
+    /**
+     * Create Folder Element (Lazy Drawer)
+     */
+    _createFolderElement(folderData) {
+        const template = document.getElementById('playlist-folder-header-template');
+        // Handle template missing case if needed
+        const clone = template.content.cloneNode(true);
+        const header = clone.querySelector('.playlist-folder-header');
 
-        // Render Folders
-        Object.values(node.children).forEach(folder => {
-            container.appendChild(this._createFolderElement(folder));
-        });
+        // Setup Header
+        const toggle = header.querySelector('.playlist-toggle');
+        const folderName = header.querySelector('.folder-name');
+        const removeBtn = header.querySelector('.folder-remove-btn');
 
-        // Render Items
-        node.items.forEach(item => {
-            container.appendChild(this._createPlaylistItemElement(item));
-        });
+        // M3U Sync
+        if (folderData.m3uSource) {
+            const syncBtn = document.createElement('button');
+            syncBtn.className = 'playlist-action-btn folder-sync-btn';
+            syncBtn.title = 'Sync M3U Playlist';
+            syncBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-loop"></use></svg>';
+            syncBtn.onclick = (e) => {
+                e.stopPropagation();
+                this._syncM3UPlaylist(folderData.path, folderData.m3uSource);
+            };
+            // Insert before remove btn
+            header.insertBefore(syncBtn, removeBtn);
+            removeBtn.style.marginLeft = '5px';
+        }
 
-        return container;
+        // Expanded State
+        const isExpanded = this.expandedFolders.has(folderData.path);
+        if (isExpanded) {
+            toggle.classList.add('expanded');
+        }
+
+        // Folder Title Layout (Name + Count)
+        const count = folderData.totalCount !== undefined ? folderData.totalCount : (folderData.allContent ? folderData.allContent.length : 0);
+
+        // Clear existing content
+        folderName.innerHTML = '';
+
+        // 1. Name Span (Flexible, Truncates)
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = folderData.name;
+        nameSpan.style.overflow = 'hidden';
+        nameSpan.style.textOverflow = 'ellipsis';
+        nameSpan.style.whiteSpace = 'nowrap';
+        // nameSpan.style.flex = '1'; handled by parent flex? No, need to set here if parent is flex.
+        // But folderName is the container now? No, folderName IS the element from template.
+        // We should treat folderName as the container.
+        folderName.style.display = 'flex';
+        folderName.style.flex = '1';
+        folderName.style.minWidth = '0';
+        folderName.style.alignItems = 'center';
+        folderName.appendChild(nameSpan);
+
+        // 2. Count Span (Fixed)
+        if (count > 0) {
+            const countSpan = document.createElement('span');
+            countSpan.textContent = `(${count})`;
+            countSpan.style.opacity = '0.7';
+            countSpan.style.fontSize = '0.9em';
+            countSpan.style.marginLeft = '6px';
+            countSpan.style.whiteSpace = 'nowrap';
+            countSpan.style.flexShrink = '0'; // Don't shrink
+            folderName.appendChild(countSpan);
+        }
+
+        const info = header.querySelector('.playlist-folder-info');
+        info.style.flex = '1';
+        info.style.display = 'flex';
+        info.style.alignItems = 'center';
+        info.style.minWidth = '0';
+        info.style.gap = '8px';
+
+        removeBtn.setAttribute('aria-label', `Remove folder ${folderData.name}`);
+
+        // Create Children Drawer
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'playlist-children custom-scroll';
+        if (!isExpanded) {
+            childrenContainer.classList.add('hidden');
+        }
+
+        // Wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'playlist-folder';
+        wrapper.dataset.path = folderData.path; // For lookup
+        wrapper.appendChild(header);
+        wrapper.appendChild(childrenContainer);
+
+        // Toggle Logic
+        const toggleDrawer = () => {
+            const hidden = childrenContainer.classList.contains('hidden');
+            if (hidden) {
+                childrenContainer.classList.remove('hidden');
+                toggle.classList.add('expanded');
+                this.expandedFolders.add(folderData.path);
+
+                // Trigger Lazy Load
+                if (!childrenContainer.dataset.renderedCount) {
+                    this._setupInfiniteScroll(childrenContainer, folderData);
+                }
+            } else {
+                childrenContainer.classList.add('hidden');
+                toggle.classList.remove('expanded');
+                this.expandedFolders.delete(folderData.path);
+            }
+        };
+
+        header.onclick = (e) => {
+            e.stopPropagation();
+            toggleDrawer();
+        };
+
+        info.onclick = (e) => {
+            e.stopPropagation();
+            toggleDrawer(); // Override template default
+        };
+
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete folder "${folderData.name}"?`)) {
+                this.removeFolder(folderData.path);
+            }
+        };
+
+        // Initialize children if already expanded
+        if (isExpanded) {
+            setTimeout(() => {
+                if (!childrenContainer.dataset.renderedCount && childrenContainer.isConnected) {
+                    this._setupInfiniteScroll(childrenContainer, folderData);
+                }
+            }, 0);
+        }
+
+        return wrapper;
     }
 
     /**
-     * Create folder element with header and children
-     * Uses LAZY RENDERING for large folders to improve performance
-     * @param {Object} folder
-     * @returns {HTMLElement}
-     * @private
+     * Proxy to toggle folder via DOM lookup
+     * Maintains compatibility with external calls
      */
-    _createFolderElement(folder) {
-        const folderEl = document.createElement('div');
-        folderEl.className = 'playlist-folder';
-
-        const isExpanded = this.expandedFolders.has(folder.path);
-
-        // Calculate total children (items + nested folder items)
-        const totalChildren = this._countFolderChildren(folder);
-        const useLazyRendering = totalChildren > LAZY_FOLDER_THRESHOLD && !isExpanded;
-
-        // Create header with item count badge
-        const header = this._createFolderHeader(folder, isExpanded, totalChildren);
-
-        // Create children container
-        const childrenContainer = document.createElement('div');
-        childrenContainer.className = `playlist-children ${isExpanded ? '' : 'hidden'}`;
-
-        // LAZY RENDERING: Only render children if expanded OR small folder
-        if (useLazyRendering) {
-            // Mark for lazy loading - will render on first expand
-            childrenContainer.dataset.lazyFolder = folder.path;
-            childrenContainer.dataset.needsRender = 'true';
-            // Store folder data for later rendering
-            this._lazyFolderData = this._lazyFolderData || new Map();
-            this._lazyFolderData.set(folder.path, folder);
-        } else {
-            // Render immediately (small folder or already expanded)
-            childrenContainer.appendChild(this._renderTreeLevel(folder));
+    _toggleFolder(path) {
+        // Find wrapper
+        const wrappers = this.container.querySelectorAll('.playlist-folder');
+        for (const wrapper of wrappers) {
+            if (wrapper.dataset.path === path) {
+                // Click the header to trigger toggleDrawer
+                const header = wrapper.querySelector('.playlist-folder-header');
+                if (header) header.click();
+                return;
+            }
         }
+        // If not found in DOM (e.g. collapsed parent), just update state
+        if (this.expandedFolders.has(path)) {
+            this.expandedFolders.delete(path);
+        } else {
+            this.expandedFolders.add(path);
+        }
+        // No render needed if it's hidden
+    }
 
-        // Attach events (handles lazy rendering on expand)
-        this._attachFolderEvents(header, childrenContainer, folder);
+    _removeFolder(folderData) {
+        // Find items that start with folder path
+        const prefix = folderData.path + '/';
+        // And exact path matches? Folders are virtual.
+        // Actually filtering strategy:
+        // Remove all items where item.path startsWith prefix OR item.path == folderData.path?
+        // Items inside: `Playlist/Group/Item`.
+        // Folder: `Playlist/Group`.
+        // Check if item.path includes the folder segments.
 
-        folderEl.appendChild(header);
-        folderEl.appendChild(childrenContainer);
-        return folderEl;
+        if (confirm(`Delete folder "${folderData.name}" and all contents?`)) {
+            // Deletion logic
+            // We need to implement _deleteItemsByPathPrefix
+            // For now simple approach:
+            const countBefore = this.items.length;
+            this.items = this.items.filter(item => {
+                // Check if item belongs to folder. 
+                // Item path: "Root/Folder/Item"
+                // Folder path: "Root/Folder"
+                // So item.path starts with folder.path + '/' ?
+                // Wait, path separator logic.
+                return !item.path.startsWith(folderData.path + '/');
+            });
+
+            if (this.items.length < countBefore) {
+                this._saveState();
+                this.render();
+            }
+        }
     }
 
     /**
@@ -1564,69 +1843,48 @@ export class Playlist {
             toggle.classList.add('expanded');
         }
 
-        // Show folder name with item count
-        folderName.textContent = itemCount > 0 ? `${folder.name} (${itemCount})` : folder.name;
-        removeBtn.setAttribute('aria-label', `Remove folder ${folder.name}`);
+        folderName.innerHTML = folderData.totalCount > 0 ? `${folderData.name} <span style="opacity:0.7; font-size:0.9em">(${folderData.totalCount})</span>` : folderData.name;
 
-        return clone.firstElementChild;
-    }
+        // Add ellipsis style
+        folderName.style.whiteSpace = 'nowrap';
+        folderName.style.overflow = 'hidden';
+        folderName.style.textOverflow = 'ellipsis';
+        folderName.style.flex = '1'; /* Take remaining width */
+        folderName.style.minWidth = '0';
+        folderName.style.display = 'block';
 
-    /**
-     * Attach event listeners to folder elements
-     * Handles LAZY RENDERING: children are rendered on first expand
-     * @param {HTMLElement} header
-     * @param {HTMLElement} childrenContainer
-     * @param {Object} folder
-     * @private
-     */
-    _attachFolderEvents(header, childrenContainer, folder) {
-        // Toggle Event - handles lazy rendering
-        header.querySelector('.playlist-folder-info').addEventListener('click', (e) => {
+        removeBtn.setAttribute('aria-label', `Remove folder ${folderData.name}`);
+
+        // Click to Toggle
+        const info = header.querySelector('.playlist-folder-info');
+
+        // Fix Flexbox for Ellipsis
+        info.style.flex = '1';
+        info.style.display = 'flex';
+        info.style.alignItems = 'center';
+        info.style.minWidth = '0'; // Crucial for truncation
+        info.style.gap = '8px';
+
+        info.onclick = (e) => {
             e.stopPropagation();
-            const isHidden = childrenContainer.classList.contains('hidden');
+            this._toggleFolder(folderData.path);
+        };
 
-            if (isHidden) {
-                // LAZY RENDERING: Render children on first expand
-                if (childrenContainer.dataset.needsRender === 'true') {
-                    this._renderLazyFolderContent(childrenContainer, folder);
-                }
+        // Wrap in div (virtual item)
+        const wrapper = document.createElement('div');
+        wrapper.className = 'playlist-folder';
+        wrapper.appendChild(header);
 
-                childrenContainer.classList.remove('hidden');
-                header.querySelector('.playlist-toggle').classList.add('expanded');
-                this.expandedFolders.add(folder.path);
-            } else {
-                childrenContainer.classList.add('hidden');
-                header.querySelector('.playlist-toggle').classList.remove('expanded');
-                this.expandedFolders.delete(folder.path);
-            }
-        });
+        // Indentation
+        // Use 30px per depth level for VERY clear hierarchy
+        if (folderData.depth > 0) {
+            header.style.paddingLeft = `${(folderData.depth * 30) + 10}px`;
+        }
 
-        // Remove Folder Event
-        header.querySelector('.folder-remove-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (confirm(`Delete folder "${folder.name}" and all its contents?`)) {
-                this.removeFolder(folder.path);
-            }
-        });
+        return wrapper;
     }
 
-    /**
-     * Render lazy folder content on first expand
-     * Simply defers rendering until needed - no virtual scrolling needed
-     * for folders since tree rendering is already efficient after first load
-     * @param {HTMLElement} container
-     * @param {Object} folder
-     * @private
-     */
-    _renderLazyFolderContent(container, folder) {
-        // Mark as rendered
-        delete container.dataset.needsRender;
-        delete container.dataset.lazyFolder;
-
-        // Simply render the tree level normally - the lazy loading already
-        // provides the main performance benefit by deferring this work
-        container.appendChild(this._renderTreeLevel(folder));
-    }
+    // Methods _attachFolderEvents and _renderLazyFolderContent removed (superseded by Virtual Scrolling)
 
     /**
      * Create playlist item element with events
@@ -1637,6 +1895,24 @@ export class Playlist {
     _createPlaylistItemElement(item) {
         const fragment = this._createItemHTML(item, item.originalIndex);
         const itemEl = fragment.querySelector('.playlist-item');
+
+        // Removed manual indentation logic (handled by CSS .playlist-children padding)
+
+        // Force Ellipsis on Title
+        const titleEl = itemEl.querySelector('.playlist-title');
+        if (titleEl) {
+            titleEl.style.whiteSpace = 'nowrap';
+            titleEl.style.overflow = 'hidden';
+            titleEl.style.textOverflow = 'ellipsis';
+            titleEl.style.display = 'block';
+            titleEl.style.maxWidth = '100%';
+        }
+
+        // Ensure flex container handles min-width for truncation
+        const infoEl = itemEl.querySelector('.playlist-info');
+        if (infoEl) {
+            infoEl.style.minWidth = '0'; // HTML5 Flexbox hack for truncation
+        }
 
         this._attachItemEvents(itemEl);
         return itemEl;
@@ -1691,63 +1967,19 @@ export class Playlist {
      * @private
      */
     _updateUI() {
-        // Remove active class from all
-        const allItems = this.container.querySelectorAll('.playlist-item');
-        allItems.forEach(el => el.classList.remove('active'));
+        // Clear previous active
+        const prevActive = this.container.querySelector('.playlist-item.active');
+        if (prevActive) prevActive.classList.remove('active');
 
-        // Add active class to current index
-        if (this.activeIndex >= 0) {
-            const activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
-            if (activeEl) {
-                activeEl.classList.add('active');
-                activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
+        if (this.activeIndex === -1) return;
+
+        // Simple highlight logic
+        // We rely on surgical DOM updates to keep data-index correct
+        const activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
+        if (activeEl) {
+            activeEl.classList.add('active');
         }
-    }
-
-    /**
-     * Remove a folder and its contents
-     * @param {string} folderPath 
-     */
-    removeFolder(folderPath) {
-        // Capture the currently active item before modification
-        const activeItem = (this.activeIndex >= 0 && this.activeIndex < this.items.length)
-            ? this.items[this.activeIndex]
-            : null;
-
-        const originalLength = this.items.length;
-
-        // Filter items
-        this.items = this.items.filter(item => {
-            const itemPath = item.path || '';
-            if (itemPath === folderPath || itemPath.startsWith(folderPath + '/')) {
-                return false; // Remove
-            }
-            return true; // Keep
-        });
-
-        if (this.items.length !== originalLength) {
-            // Check if active item still exists
-            if (activeItem) {
-                const newIndex = this.items.indexOf(activeItem);
-                if (newIndex === -1) {
-                    // Active item was removed
-                    this.activeIndex = -1;
-                    // Stop playback and reset player
-                    if (this.player) {
-                        this.player.reset();
-                    }
-                } else {
-                    // Active item still exists, update index
-                    this.activeIndex = newIndex;
-                }
-            } else {
-                this.activeIndex = -1;
-            }
-
-            this._saveState();
-            this.render();
-        }
+        // Note: Auto-expansion/scrolling de-prioritized to prevent aggressive re-renders
     }
 
     /**

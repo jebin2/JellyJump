@@ -412,6 +412,17 @@
     margin-bottom: 2px;
     max-width: 100%;
     display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.playlist-folder-header .folder-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: block;
 }
 
 .playlist-remove-btn {
@@ -440,6 +451,37 @@
     display: flex;
     gap: 4px;
     align-items: center;
+}
+
+/* Nested Playlist Children (Drawer) */
+.playlist-children {
+    padding-left: 10px;
+    margin-left: 12px;
+    max-height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* Vertical Indent Line - Green Theme */
+    border-left: 1px solid var(--accent-primary);
+    background: transparent;
+}
+
+/* Custom Scrollbar for Drawers (Themed) */
+.playlist-children::-webkit-scrollbar {
+    width: 8px;
+}
+
+.playlist-children::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-dark);
+}
+
+.playlist-children::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border: 2px solid var(--bg-secondary);
+}
+
+.playlist-children::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-secondary);
 }
 
 .playlist-download-btn {
