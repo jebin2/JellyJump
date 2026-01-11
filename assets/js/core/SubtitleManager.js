@@ -35,6 +35,9 @@ export class SubtitleManager {
 
             if (!line || line === 'WEBVTT') continue;
 
+            // Skip SRT cue numbers (lines that are just digits, e.g., "1185")
+            if (/^\d+$/.test(line)) continue;
+
             // Check for timestamp line
             const timeMatch = line.match(/(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})\s-->\s(\d{2}:\d{2}:\d{2}\.\d{3}|\d{2}:\d{2}\.\d{3})/);
 
