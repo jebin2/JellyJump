@@ -2923,7 +2923,7 @@ export class CorePlayer {
                 <p class="jellyjump-error-suggestion"></p>
                 <div class="jellyjump-error-actions">
                     <button class="jellyjump-btn-secondary jellyjump-error-retry">Retry</button>
-                    <button class="jellyjump-btn-secondary jellyjump-error-dismiss">Dismiss</button>
+                    <button class="hidden jellyjump-btn-secondary jellyjump-error-dismiss">Dismiss</button>
                 </div>
             </div>
         `;

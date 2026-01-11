@@ -2357,10 +2357,39 @@ export class Playlist {
                 return;
             }
 
-            // Check if it's an HLS stream (m3u8)
-            const isHLSStream = urlLower.includes('.m3u8') ||
-                urlLower.includes('/hls/') ||
-                urlLower.includes('/live/');
+            // Check if it's potentially an M3U8 file (could be HLS or IPTV playlist)
+            const hasM3u8Extension = urlLower.includes('.m3u8');
+            const looksLikeStream = urlLower.includes('/hls/') || urlLower.includes('/live/');
+
+            // For .m3u8 URLs, we need to inspect content to differentiate IPTV playlists from HLS streams
+            // IPTV playlists contain #EXTINF channel entries; HLS manifests contain #EXT-X-* tags
+            if (hasM3u8Extension && !looksLikeStream) {
+                try {
+                    console.log('[Playlist] Fetching .m3u8 to determine if IPTV or HLS:', url);
+                    const response = await fetch(url);
+                    const content = await response.text();
+
+                    // Check for IPTV playlist indicators (#EXTINF with channel info)
+                    // vs HLS manifest indicators (#EXT-X-STREAM-INF, #EXT-X-MEDIA-SEQUENCE, .ts segments)
+                    const isIPTVPlaylist = content.includes('#EXTINF') &&
+                        (content.includes('group-title=') || content.includes('tvg-logo=') || content.includes('tvg-id=')) &&
+                        !content.includes('#EXT-X-STREAM-INF') &&
+                        !content.includes('#EXT-X-MEDIA-SEQUENCE') &&
+                        !content.includes('#EXT-X-TARGETDURATION');
+
+                    if (isIPTVPlaylist) {
+                        console.log('[Playlist] Detected IPTV playlist in .m3u8 format, parsing as M3U');
+                        await this._handleM3UPlaylist(url);
+                        return;
+                    }
+                    console.log('[Playlist] Detected HLS stream manifest');
+                } catch (fetchError) {
+                    console.warn('[Playlist] Could not fetch .m3u8 for inspection, treating as HLS stream:', fetchError);
+                }
+            }
+
+            // Check if it's an HLS stream (m3u8 or /hls/ or /live/ paths)
+            const isHLSStream = hasM3u8Extension || looksLikeStream;
 
             if (isHLSStream) {
                 // For HLS streams, skip HEAD request validation
