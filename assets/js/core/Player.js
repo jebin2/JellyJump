@@ -3600,6 +3600,22 @@ export class CorePlayer {
                     // Iterator might already be closed, ignore errors
                 }
             }
+
+            // Auto-restart audio iterator if still playing and not at end of media
+            // This prevents random audio dropouts caused by iterator exiting unexpectedly
+            const currentTime = this._getPlaybackTime();
+            const isNearEnd = this.duration > 0 && currentTime >= this.duration - 0.5;
+
+            if (this.isPlaying && this.audioSink && !isNearEnd) {
+                console.warn('[Audio] Iterator exited unexpectedly, restarting...');
+                // Small delay to prevent rapid restart loops
+                setTimeout(() => {
+                    if (this.isPlaying && this.audioSink) {
+                        this.audioBufferIterator = this.audioSink.samples(this._getPlaybackTime());
+                        this._runAudioIterator();
+                    }
+                }, 100);
+            }
         }
     }
 
