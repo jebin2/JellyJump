@@ -1513,6 +1513,35 @@ export class CorePlayer {
     }
 
     /**
+     * Clear the canvas
+     * @private
+     */
+    _clearCanvas() {
+        if (this.ctx && this.canvas) {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+    }
+
+    /**
+     * Dispose MediaBunny resources (sinks and input)
+     * @private
+     */
+    _disposeMediaBunnyResources() {
+        if (this.videoSink?.dispose) {
+            try { this.videoSink.dispose(); } catch (e) { }
+        }
+        if (this.audioSink?.dispose) {
+            try { this.audioSink.dispose(); } catch (e) { }
+        }
+        if (this.input?.dispose) {
+            try { this.input.dispose(); } catch (e) { }
+        }
+        this.videoSink = null;
+        this.audioSink = null;
+        this.input = null;
+    }
+
+    /**
      * Reset the player state and unload media
      */
     reset() {
@@ -1529,33 +1558,21 @@ export class CorePlayer {
         }
 
         // Clear canvas
-        if (this.ctx && this.canvas) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        }
+        this._clearCanvas();
 
         // Reset state
         this.currentTime = 0;
         this.duration = 0;
-        // Dispose MediaBunny resources
-        if (this.videoSink && typeof this.videoSink.dispose === 'function') {
-            try { this.videoSink.dispose(); } catch (e) { Logger.warn('Error disposing videoSink:', e); }
-        }
-        if (this.audioSink && typeof this.audioSink.dispose === 'function') {
-            try { this.audioSink.dispose(); } catch (e) { Logger.warn('Error disposing audioSink:', e); }
-        }
-        if (this.input && typeof this.input.dispose === 'function') {
-            try { this.input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
-        }
 
-        this.input = null;
-        this.videoSink = null;
-        this.audioSink = null;
+        // Dispose MediaBunny resources
+        this._disposeMediaBunnyResources();
+
         this.videoTrack = null;
         this.audioTrack = null;
         this.videoFrameIterator = null;
         this.audioBufferIterator = null;
         this.nextFrame = null;
-        this.currentVideoId = null; // Clear current video ID
+        this.currentVideoId = null;
 
         // Update UI
         this._updateTimeDisplay();
@@ -1571,34 +1588,6 @@ export class CorePlayer {
         }
 
         Logger.log('[Player] Reset complete - select a video to play');
-    }
-
-    /**
-     * Destroy the player and clean up listeners
-     */
-    destroy() {
-        this.reset();
-
-        // Remove global listeners (only those that were added)
-        if (this.config.controls.fullscreen) {
-            document.removeEventListener('fullscreenchange', this._handlers.fullscreen);
-            document.removeEventListener('webkitfullscreenchange', this._handlers.fullscreen);
-            document.removeEventListener('mozfullscreenchange', this._handlers.fullscreen);
-            document.removeEventListener('MSFullscreenChange', this._handlers.fullscreen);
-        }
-        document.removeEventListener('click', this._handlers.click);
-        if (this.config.controls.keyboard) {
-            document.removeEventListener('keydown', this._handlers.keydown);
-        }
-
-        // Remove ResizeObserver
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
-        }
-
-        // Remove elements if needed (optional, but good for cleanup)
-        this.container.innerHTML = '';
     }
 
     /**
@@ -1655,25 +1644,11 @@ export class CorePlayer {
             this.queuedAudioNodes.clear();
 
             // Clear canvas and reset UI immediately
-            if (this.ctx && this.canvas) {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            }
+            this._clearCanvas();
             this._updateTimeDisplay();
 
             // Dispose previous resources
-            if (this.videoSink && typeof this.videoSink.dispose === 'function') {
-                try { this.videoSink.dispose(); } catch (e) { Logger.warn('Error disposing videoSink:', e); }
-            }
-            if (this.audioSink && typeof this.audioSink.dispose === 'function') {
-                try { this.audioSink.dispose(); } catch (e) { Logger.warn('Error disposing audioSink:', e); }
-            }
-            if (this.input && typeof this.input.dispose === 'function') {
-                try { this.input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
-            }
-
-            this.videoSink = null;
-            this.audioSink = null;
-            this.input = null;
+            this._disposeMediaBunnyResources();
 
             // Reset subtitle state for new video
             this.subtitleTracks = [];
@@ -1804,10 +1779,7 @@ export class CorePlayer {
      * Reset UI elements (canvas, time, progress)
      */
     resetUI() {
-        // Clear canvas
-        if (this.ctx && this.canvas) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        }
+        this._clearCanvas();
 
         // Reset time and duration
         this.currentTime = 0;
@@ -1815,7 +1787,7 @@ export class CorePlayer {
         this._updateTimeDisplay();
         this._updateProgress();
 
-        // Hide loader if visible (optional, but good for full reset)
+        // Hide loader if visible
         this._setLoading(false);
     }
 
@@ -1884,7 +1856,7 @@ export class CorePlayer {
             // Setup stream video events (before loading to catch metadata events)
             this._setupStreamVideoEvents();
 
-            // Note: DVR segment capture available via player.enableDVRCapture()
+
             // Load the stream
             await this.hlsPlayer.load(url);
             this.isLive = this.hlsPlayer.isLive;
@@ -2520,20 +2492,9 @@ export class CorePlayer {
             this.audioBufferIterator = null;
         }
 
-        // Dispose sinks
-        if (this.videoSink && typeof this.videoSink.dispose === 'function') {
-            try { this.videoSink.dispose(); } catch (e) { }
-        }
-        if (this.audioSink && typeof this.audioSink.dispose === 'function') {
-            try { this.audioSink.dispose(); } catch (e) { }
-        }
-        if (this.input && typeof this.input.dispose === 'function') {
-            try { this.input.dispose(); } catch (e) { }
-        }
+        // Dispose sinks and input
+        this._disposeMediaBunnyResources();
 
-        this.videoSink = null;
-        this.audioSink = null;
-        this.input = null;
         this.videoTrack = null;
         this.audioTrack = null;
         this.nextFrame = null;
@@ -2667,133 +2628,6 @@ export class CorePlayer {
     // ==========================================
     // DVR / Buffer Playback (Experimental)
     // ==========================================
-
-    /**
-     * Enable DVR segment capture (experimental)
-     * Call this BEFORE loading a stream if you want to capture segments
-     * Warning: May cause buffering issues with some streams
-     */
-    enableDVRCapture() {
-        this.streamBuffer = new StreamBuffer();
-        this.streamBuffer.onSegmentAdded = (segment, count, totalBytes) => {
-            if (count % 5 === 0) {
-                Logger.log(`[DVR] Captured ${count} segments, ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
-            }
-        };
-        Logger.log('[DVR] Segment capture enabled. Load a stream to start capturing.');
-    }
-
-    /**
-     * Disable DVR segment capture
-     */
-    disableDVRCapture() {
-        if (this.streamBuffer) {
-            this.streamBuffer.stopCapture();
-            this.streamBuffer.clear();
-            this.streamBuffer = null;
-            Logger.log('[DVR] Segment capture disabled.');
-        }
-    }
-
-    /**
-     * Get DVR buffer stats (for debugging)
-     * @returns {Object|null}
-     */
-    getDVRStats() {
-        if (!this.streamBuffer) return null;
-        return this.streamBuffer.getStats();
-    }
-
-    /**
-     * Attempt to play captured stream buffer through MediaBunny
-     * This is experimental - TS segments may or may not work!
-     * @returns {Promise<boolean>} Whether playback was successful
-     */
-    async tryDVRPlayback() {
-        if (!this.streamBuffer || !this.streamBuffer.hasEnoughData()) {
-            Logger.warn('[DVR] Not enough data captured. Need at least 3 segments.');
-            return false;
-        }
-
-        Logger.log('[DVR] Attempting MediaBunny playback from buffer...');
-        const stats = this.streamBuffer.getStats();
-        Logger.log(`[DVR] Buffer: ${stats.segmentCount} segments, ${stats.totalMB}MB`);
-
-        try {
-            // Stop live stream
-            this.pause(false);
-            this._stopStreamRenderLoop();
-
-            // Get blob URL from buffer
-            const blobUrl = this.streamBuffer.toBlobURL();
-            if (!blobUrl) {
-                Logger.error('[DVR] Failed to create blob URL');
-                return false;
-            }
-
-            // Clean up HLS (this also clears streamBuffer, so save blobUrl first)
-            const savedBuffer = {
-                url: blobUrl,
-                stats: stats
-            };
-
-            // Switch to file mode
-            this.isStreamMode = false;
-            this.isLive = false;
-            this._hideStreamVideo();
-
-            // Hide live badge
-            if (this.ui.liveBadge) {
-                this.ui.liveBadge.style.display = 'none';
-            }
-
-            // Try loading through MediaBunny
-            this._setLoading(true);
-            Logger.log('[DVR] Loading blob through MediaBunny...');
-
-            // Create MediaBunny Input with BlobSource
-            this.input = new MediaBunny.Input({
-                source: new MediaBunny.UrlSource(savedBuffer.url),
-                formats: MediaBunny.ALL_FORMATS
-            });
-
-            // Get Duration (this will fail if format isn't supported)
-            this.duration = await this.input.computeDuration();
-            Logger.log('[DVR] Duration computed:', this.duration);
-
-            // Get Video Track
-            this.videoTrack = await this.input.getPrimaryVideoTrack();
-            if (!this.videoTrack) {
-                throw new Error('No video track found in buffered content');
-            }
-
-            // Setup Canvas Sink
-            this.videoSink = new MediaBunny.CanvasSink(this.videoTrack, {
-                poolSize: 2,
-                fit: 'contain'
-            });
-
-            // Set canvas size
-            this.canvas.width = this.videoTrack.displayWidth;
-            this.canvas.height = this.videoTrack.displayHeight;
-
-            // Get first frame
-            await this._handleInitialFrame(false);
-
-            this._setLoading(false);
-            Logger.log('[DVR] ✅ MediaBunny playback initialized! Try player.play()');
-
-            return true;
-
-        } catch (error) {
-            Logger.error('[DVR] ❌ MediaBunny playback failed:', error.message);
-            Logger.log('[DVR] The TS segment format may not be supported by MediaBunny.');
-            Logger.log('[DVR] Consider using canvas-copy mode (Option 1) instead.');
-
-            this._setLoading(false);
-            return false;
-        }
-    }
 
     /**
      * Create the error overlay element
@@ -3835,10 +3669,12 @@ export class CorePlayer {
             this.ui.nextBtn.style.cursor = canGoNext ? 'pointer' : 'not-allowed';
         }
     }
-
+    /**
+     * Destroy the player and clean up all resources
+     */
     destroy() {
-        // Stop playback
-        this.pause();
+        // Full reset (stops playback, disposes MediaBunny resources)
+        this.reset();
 
         // Clean up audio context
         if (this.audioContext) {
@@ -3846,15 +3682,22 @@ export class CorePlayer {
             this.audioContext = null;
         }
 
-        // Clean up MediaBunny resources
-        if (this.videoSink) {
-            this.videoSink = null; // Let GC handle cleanup
+        // Remove global event listeners
+        if (this.config.controls.fullscreen) {
+            document.removeEventListener('fullscreenchange', this._handlers.fullscreen);
+            document.removeEventListener('webkitfullscreenchange', this._handlers.fullscreen);
+            document.removeEventListener('mozfullscreenchange', this._handlers.fullscreen);
+            document.removeEventListener('MSFullscreenChange', this._handlers.fullscreen);
         }
-        if (this.audioSink) {
-            this.audioSink = null;
+        document.removeEventListener('click', this._handlers.click);
+        if (this.config.controls.keyboard) {
+            document.removeEventListener('keydown', this._handlers.keydown);
         }
-        if (this.input) {
-            this.input = null;
+
+        // Remove ResizeObserver
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
         }
 
         // Clean up DOM elements
@@ -3874,11 +3717,6 @@ export class CorePlayer {
 
         this.container.classList.remove('jellyjump-container');
         this.container = null;
-
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
-        }
     }
 
     // ========================================
