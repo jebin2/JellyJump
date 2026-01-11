@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 /**
  * Reusable Modal Component
  * Uses the 'modal-shell-template' to create consistent modals.
@@ -24,7 +25,7 @@ export class Modal {
     _init() {
         const template = document.getElementById('modal-shell-template');
         if (!template) {
-            console.error('Modal shell template not found');
+            Logger.error('Modal shell template not found');
             return;
         }
 

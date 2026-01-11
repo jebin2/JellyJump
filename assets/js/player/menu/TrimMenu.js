@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
@@ -300,7 +301,7 @@ export class TrimMenu {
                 modal.closeBtn.disabled = false;
 
             } catch (e) {
-                console.error('Trimming failed:', e);
+                Logger.error('Trimming failed:', e);
                 errorMessage.textContent = `Trimming failed: ${e.message} `;
                 errorMessage.classList.remove('hidden');
                 trimBtn.disabled = false;

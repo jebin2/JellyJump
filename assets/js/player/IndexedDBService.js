@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 /**
  * IndexedDB Service
  * Handles persistence of playlist, files, and player state using IndexedDB.
@@ -40,7 +41,7 @@ export class IndexedDBService {
             const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
 
             request.onerror = (event) => {
-                console.error('IndexedDB error:', event.target.error);
+                Logger.error('IndexedDB error:', event.target.error);
                 reject(event.target.error);
             };
 
@@ -86,7 +87,7 @@ export class IndexedDBService {
     async _ensureConnection() {
         await this.ready();
         if (!this.db) {
-            console.warn('[IndexedDB] Connection not available, reinitializing...');
+            Logger.warn('[IndexedDB] Connection not available, reinitializing...');
             this.initPromise = this._init();
             await this.initPromise;
         }
@@ -110,7 +111,7 @@ export class IndexedDBService {
             } catch (e) {
                 // Handle InvalidStateError when connection is closing
                 if (e.name === 'InvalidStateError') {
-                    console.warn('[IndexedDB] Connection was closing, reinitializing and retrying...');
+                    Logger.warn('[IndexedDB] Connection was closing, reinitializing and retrying...');
                     this.db = null;
                     this.initPromise = this._init();
                     this.initPromise.then(() => {
@@ -147,7 +148,7 @@ export class IndexedDBService {
                     // We keep the URL alive (browser holds blob reference) for current playback.
                     for (const item of items) {
                         if (item.isLocal && item.file) {
-                            console.log(`[IndexedDB] Releasing memory for persisted file: ${item.title}`);
+                            Logger.log(`[IndexedDB] Releasing memory for persisted file: ${item.title}`);
                             item.file = null;
                         }
                     }
@@ -203,7 +204,7 @@ export class IndexedDBService {
                                 type: item.file.type
                             });
                         } else {
-                            console.warn(`[IndexedDB] File ${item.title} too large to persist (${(item.file.size / 1024 / 1024).toFixed(2)} MB)`);
+                            Logger.warn(`[IndexedDB] File ${item.title} too large to persist (${(item.file.size / 1024 / 1024).toFixed(2)} MB)`);
                         }
                     }
                 });
@@ -275,7 +276,7 @@ export class IndexedDBService {
         // Size limit (500MB)
         const MAX_SIZE = 500 * 1024 * 1024;
         if (blob.size > MAX_SIZE) {
-            console.warn(`[IndexedDB] File too large to save: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+            Logger.warn(`[IndexedDB] File too large to save: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
             return false;
         }
 
@@ -290,7 +291,7 @@ export class IndexedDBService {
             });
 
             transaction.oncomplete = () => {
-                console.log(`[IndexedDB] File saved: ${name} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+                Logger.log(`[IndexedDB] File saved: ${name} (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
                 resolve(true);
             };
             transaction.onerror = () => reject(transaction.error);

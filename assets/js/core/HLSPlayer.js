@@ -2,6 +2,7 @@
  * HLS Player Wrapper
  * Handles HLS/IPTV stream playback using hls.js
  */
+import { Logger } from "../utils/Logger.js";
 import Hls from '../lib/hls.js';
 
 export class HLSPlayer {
@@ -93,7 +94,7 @@ export class HLSPlayer {
         const isAndroid = /Android/i.test(navigator.userAgent);
 
         if (Hls.isSupported() && !isIOS && !isAndroid) {
-            console.log('[HLS] Using hls.js');
+            Logger.log('[HLS] Using hls.js');
 
             // Use StreamBuffer's config if available (for segment capture)
             const hlsConfig = this.streamBuffer
@@ -114,14 +115,14 @@ export class HLSPlayer {
 
             return new Promise((resolve, reject) => {
                 this.hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-                    console.log('[HLS] Manifest parsed:', data.levels.length, 'quality levels');
+                    Logger.log('[HLS] Manifest parsed:', data.levels.length, 'quality levels');
                     this.isLive = !data.levels[0]?.details?.endSN;
                     this.onManifestParsed?.(data);
 
                     // Auto-start capture if buffer attached
                     if (this.streamBuffer) {
                         this.streamBuffer.startCapture();
-                        console.log('[HLS] StreamBuffer capture started');
+                        Logger.log('[HLS] StreamBuffer capture started');
                     }
 
                     resolve();
@@ -138,7 +139,7 @@ export class HLSPlayer {
                 });
 
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
-                    console.warn('[HLS] Error:', data.type, data.details);
+                    Logger.warn('[HLS] Error:', data.type, data.details);
                     if (data.fatal) {
                         this._handleFatalError(data);
                         reject(new Error(data.details));
@@ -153,7 +154,7 @@ export class HLSPlayer {
 
         // Fallback to Native HLS (Safari, iOS, Android)
         if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
-            console.log('[HLS] Using native HLS support (iOS/Android/Safari)');
+            Logger.log('[HLS] Using native HLS support (iOS/Android/Safari)');
 
             let attempts = 0;
             const maxAttempts = 3;
@@ -165,7 +166,7 @@ export class HLSPlayer {
                     return await metadataPromise;
                 } catch (e) {
                     attempts++;
-                    console.warn(`[HLS] Native load error (attempt ${attempts}/${maxAttempts}):`, e);
+                    Logger.warn(`[HLS] Native load error (attempt ${attempts}/${maxAttempts}):`, e);
 
                     if (attempts >= maxAttempts) {
                         throw e; // Give up after max retries
@@ -193,15 +194,15 @@ export class HLSPlayer {
     _handleFatalError(data) {
         switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-                console.warn('[HLS] Network error, attempting recovery...');
+                Logger.warn('[HLS] Network error, attempting recovery...');
                 this.hls.startLoad();
                 break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-                console.warn('[HLS] Media error, attempting recovery...');
+                Logger.warn('[HLS] Media error, attempting recovery...');
                 this.hls.recoverMediaError();
                 break;
             default:
-                console.error('[HLS] Unrecoverable error:', data);
+                Logger.error('[HLS] Unrecoverable error:', data);
                 this.destroy();
         }
     }
@@ -366,7 +367,7 @@ export class HLSPlayer {
     setLevel(levelIndex) {
         if (this.hls) {
             this.hls.currentLevel = levelIndex;
-            console.log('[HLS] Quality level set to:', levelIndex === -1 ? 'Auto' : this.getLevels()[levelIndex]?.label);
+            Logger.log('[HLS] Quality level set to:', levelIndex === -1 ? 'Auto' : this.getLevels()[levelIndex]?.label);
         }
     }
 
@@ -387,7 +388,7 @@ export class HLSPlayer {
         try {
             await this.video.play();
         } catch (e) {
-            console.warn('[HLS] Play failed:', e.message);
+            Logger.warn('[HLS] Play failed:', e.message);
             throw e;
         }
     }
@@ -474,11 +475,11 @@ export class HLSPlayer {
         if (seekable.length > 0) {
             const liveEdge = seekable.end(seekable.length - 1);
             this.video.currentTime = liveEdge;
-            console.log('[HLS] Seeked to live edge:', liveEdge);
+            Logger.log('[HLS] Seeked to live edge:', liveEdge);
         } else if (this.hls?.liveSyncPosition) {
             // Fallback to liveSyncPosition if seekable not available yet
             this.video.currentTime = this.hls.liveSyncPosition;
-            console.log('[HLS] Seeked to live sync position:', this.hls.liveSyncPosition);
+            Logger.log('[HLS] Seeked to live sync position:', this.hls.liveSyncPosition);
         }
     }
 
@@ -499,7 +500,7 @@ export class HLSPlayer {
             targetTime = Math.max(start, targetTime);
 
             this.video.currentTime = targetTime;
-            console.log(`[HLS] Seeked to latency ${latency}s (time: ${targetTime})`);
+            Logger.log(`[HLS] Seeked to latency ${latency}s (time: ${targetTime})`);
         }
     }
 

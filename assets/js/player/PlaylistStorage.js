@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 import { IndexedDBService } from './IndexedDBService.js';
 
 /**
@@ -21,7 +22,7 @@ export class PlaylistStorage {
                 playbackState: playbackState || null
             };
         } catch (e) {
-            console.error('Error loading playlist:', e);
+            Logger.error('Error loading playlist:', e);
             return {
                 items: [],
                 playbackState: null
@@ -80,7 +81,7 @@ export class PlaylistStorage {
             };
             localStorage.setItem(`jellyjump-state-${activeItem.id}`, JSON.stringify(state));
         } catch (e) {
-            console.warn('Failed to sync state to localStorage:', e);
+            Logger.warn('Failed to sync state to localStorage:', e);
         }
     }
 

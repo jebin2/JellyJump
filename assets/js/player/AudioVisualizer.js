@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 /**
  * Audio Visualizer Component
  * Renders rain effect visualization that responds to audio
@@ -35,7 +36,7 @@ export class AudioVisualizer {
         this.trees = [];
         this.cloudsInitialized = false;
 
-        console.log('[AudioVisualizer] Created for canvas:', canvas.width, 'x', canvas.height);
+        Logger.log('[AudioVisualizer] Created for canvas:', canvas.width, 'x', canvas.height);
     }
 
     /**
@@ -63,7 +64,7 @@ export class AudioVisualizer {
         // Initialize ripple array
         this.ripples = [];
 
-        console.log('[AudioVisualizer] Connected - Rain mode with depth layers');
+        Logger.log('[AudioVisualizer] Connected - Rain mode with depth layers');
     }
 
     /**
@@ -118,13 +119,13 @@ export class AudioVisualizer {
         // If no analyser, use simulated mode
         if (!this.analyser) {
             this.simulatedMode = true;
-            console.log('[AudioVisualizer] Starting in simulated mode');
+            Logger.log('[AudioVisualizer] Starting in simulated mode');
         }
 
         this.isRunning = true;
         this._initRaindrops();
         this._animate();
-        console.log('[AudioVisualizer] Started');
+        Logger.log('[AudioVisualizer] Started');
     }
 
     /**
@@ -136,7 +137,7 @@ export class AudioVisualizer {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
-        console.log('[AudioVisualizer] Stopped');
+        Logger.log('[AudioVisualizer] Stopped');
     }
 
     /**
@@ -568,7 +569,7 @@ export class AudioVisualizer {
         }
         this.dataArray = null;
         this.raindrops = [];
-        console.log('[AudioVisualizer] Disconnected');
+        Logger.log('[AudioVisualizer] Disconnected');
     }
 
     /**

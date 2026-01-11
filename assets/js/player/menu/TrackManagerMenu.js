@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
@@ -47,7 +48,7 @@ export class TrackManagerMenu {
 
             this.renderTracks(tracks, item, modalContent, playlist);
         } catch (e) {
-            console.error('Failed to load tracks:', e);
+            Logger.error('Failed to load tracks:', e);
 
             // Check if this is a "no source" error (file missing from IndexedDB and no URL)
             if (e.message && e.message.includes('No source available')) {
@@ -62,7 +63,7 @@ export class TrackManagerMenu {
                     playlist.items.splice(itemIndex, 1);
                     playlist.render();
                     playlist._saveState();
-                    console.log(`[TrackManagerMenu] Removed unavailable item: ${item.title}`);
+                    Logger.log(`[TrackManagerMenu] Removed unavailable item: ${item.title}`);
                 }
                 return;
             }
@@ -208,7 +209,7 @@ export class TrackManagerMenu {
 
             this.handleExtractionSuccess(blob, item, trackType, trackIndex, format, addToPlaylist, playlist);
         } catch (e) {
-            console.error('Extraction failed:', e);
+            Logger.error('Extraction failed:', e);
             alert(`Extraction failed: ${e.message}`);
         } finally {
             downloadBtn.classList.remove('hidden');

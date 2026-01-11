@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 import { modalDialog } from './modal-dialog.js';
 import { StorageHelper } from './storage-helper.js';
 
@@ -56,7 +57,7 @@ export class TabManager {
             } else {
                 this.switchTab(this.tabs[0].id, false);
             }
-            console.log(`Restored ${this.tabs.length} tabs`);
+            Logger.log(`Restored ${this.tabs.length} tabs`);
         } else {
             // First time load
             this.createTab();
@@ -78,7 +79,7 @@ export class TabManager {
             }
 
             StorageHelper.save('last_save', Date.now());
-            // console.log('Tabs saved to storage');
+            // Logger.log('Tabs saved to storage');
         }, 500);
     }
 
@@ -142,7 +143,7 @@ export class TabManager {
                     text: 'Save',
                     type: 'primary',
                     callback: () => {
-                        console.log(`Saving project: ${tab.id}`);
+                        Logger.log(`Saving project: ${tab.id}`);
                         // Simulate save (update flag and persist)
                         tab.hasUnsavedChanges = false;
                         this.saveTabs();
@@ -153,7 +154,7 @@ export class TabManager {
                     text: "Don't Save",
                     type: 'danger',
                     callback: () => {
-                        console.log(`Tab closed without saving: ${tab.id}`);
+                        Logger.log(`Tab closed without saving: ${tab.id}`);
                         this.performCloseTab(tab.id);
                     }
                 },
@@ -161,7 +162,7 @@ export class TabManager {
                     text: 'Cancel',
                     type: 'secondary',
                     callback: () => {
-                        console.log(`Close canceled for tab: ${tab.id}`);
+                        Logger.log(`Close canceled for tab: ${tab.id}`);
                     }
                 }
             ]
@@ -195,7 +196,7 @@ export class TabManager {
         this.renderTabs();
         this.saveTabs(); // Save after closing
 
-        console.log(`Closed tab: ${tabId}`);
+        Logger.log(`Closed tab: ${tabId}`);
     }
 
     /**
@@ -274,8 +275,8 @@ export class TabManager {
         this.updateUIState();
 
         // Load project data (placeholder)
-        console.log(`Switched to tab: ${tab.name} (${tabId})`);
-        console.log('Loading project data...');
+        Logger.log(`Switched to tab: ${tab.name} (${tabId})`);
+        Logger.log('Loading project data...');
 
         if (save) this.saveTabs();
     }

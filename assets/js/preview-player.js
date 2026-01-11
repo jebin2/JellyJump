@@ -5,6 +5,7 @@
  * Manages the CorePlayer instance in the editor preview panel
  */
 
+import { Logger } from "./utils/Logger.js";
 import { CorePlayer } from './core/Player.js';
 
 class PreviewPlayerManager {
@@ -37,9 +38,9 @@ class PreviewPlayerManager {
             document.body.append(...tempDiv.children);
 
             this.templatesLoaded = true;
-            console.log('Player and screenshot templates loaded');
+            Logger.log('Player and screenshot templates loaded');
         } catch (error) {
-            console.error('Failed to load templates:', error);
+            Logger.error('Failed to load templates:', error);
             throw error;
         }
     }
@@ -68,7 +69,7 @@ class PreviewPlayerManager {
         // Setup sync with timeline
         this._setupTimelineSync();
 
-        console.log('CorePlayer initialized in preview panel');
+        Logger.log('CorePlayer initialized in preview panel');
     }
 
     /**
@@ -120,7 +121,7 @@ class PreviewPlayerManager {
      */
     async loadVideo(videoSource, videoId, videoName) {
         if (!this.player) {
-            console.error('Player not initialized');
+            Logger.error('Player not initialized');
             return;
         }
 
@@ -148,9 +149,9 @@ class PreviewPlayerManager {
             this._updateMetadataDisplay();
 
             this.currentVideoId = videoId;
-            console.log(`Loaded video: ${videoName}`);
+            Logger.log(`Loaded video: ${videoName}`);
         } catch (error) {
-            console.error('Failed to load video:', error);
+            Logger.error('Failed to load video:', error);
             throw error;
         }
     }
@@ -225,6 +226,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await previewPlayerManager.init();
     } catch (error) {
-        console.error('Failed to initialize preview player:', error);
+        Logger.error('Failed to initialize preview player:', error);
     }
 });

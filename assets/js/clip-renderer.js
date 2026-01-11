@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * ClipRenderer
  * Handles visual rendering of clips on the timeline.
@@ -30,7 +31,7 @@ class ClipRenderer {
     renderClip(clip) {
         const track = document.querySelector(`.timeline-track[data-track-id="${clip.trackId}"]`);
         if (!track) {
-            console.warn(`Track not found for clip: ${clip.id}`);
+            Logger.warn(`Track not found for clip: ${clip.id}`);
             return;
         }
 
@@ -80,9 +81,9 @@ class ClipRenderer {
 
         if (targetTrackContent) {
             targetTrackContent.appendChild(el);
-            console.log(`Rendered clip ${clip.id} to track ${clip.trackId}`);
+            Logger.log(`Rendered clip ${clip.id} to track ${clip.trackId}`);
         } else {
-            console.error(`Track content not found for track ${clip.trackId} when rendering clip ${clip.id}`);
+            Logger.error(`Track content not found for track ${clip.trackId} when rendering clip ${clip.id}`);
         }
     }
 

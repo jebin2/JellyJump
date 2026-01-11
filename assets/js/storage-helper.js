@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * JellyJump Editor - Storage Helper
  * Utilities for managing localStorage with error handling and quota checks.
@@ -20,10 +21,10 @@ export class StorageHelper {
             return true;
         } catch (e) {
             if (e.name === 'QuotaExceededError') {
-                console.error('Storage quota exceeded. Cannot save data.');
+                Logger.error('Storage quota exceeded. Cannot save data.');
                 // In a real app, we might try to clear old data here
             } else {
-                console.error('Error saving to localStorage:', e);
+                Logger.error('Error saving to localStorage:', e);
             }
             return false;
         }
@@ -39,7 +40,7 @@ export class StorageHelper {
             const serialized = localStorage.getItem(this.PREFIX + key);
             return serialized ? JSON.parse(serialized) : null;
         } catch (e) {
-            console.error('Error loading from localStorage:', e);
+            Logger.error('Error loading from localStorage:', e);
             return null;
         }
     }
@@ -52,7 +53,7 @@ export class StorageHelper {
         try {
             localStorage.removeItem(this.PREFIX + key);
         } catch (e) {
-            console.error('Error removing from localStorage:', e);
+            Logger.error('Error removing from localStorage:', e);
         }
     }
 
@@ -65,7 +66,7 @@ export class StorageHelper {
                 localStorage.removeItem(key);
             });
         } catch (e) {
-            console.error('Error clearing localStorage:', e);
+            Logger.error('Error clearing localStorage:', e);
         }
     }
 

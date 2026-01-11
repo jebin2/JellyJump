@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 /**
  * Subtitle Manager
  * Handles parsing and management of WebVTT subtitles.
@@ -61,7 +62,7 @@ export class SubtitleManager {
             this.cues.push(currentCue);
         }
 
-        console.log(`Parsed ${this.cues.length} subtitle cues.`);
+        Logger.log(`Parsed ${this.cues.length} subtitle cues.`);
     }
 
     /**

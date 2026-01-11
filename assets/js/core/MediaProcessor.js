@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 import { MediaBunny } from './MediaBunny.js';
 import GIF from '../lib/gif.js';
 
@@ -51,7 +52,7 @@ export class MediaProcessor {
      * @returns {Promise<Blob>}
      */
     static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, removeBackgroundOptions = null, onProgress }) {
-        console.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, removeBackgroundOptions });
+        Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, removeBackgroundOptions });
 
         let conversion = null;
         let videoUrl = null;
@@ -185,7 +186,7 @@ export class MediaProcessor {
                 try {
                     conversion.dispose();
                 } catch (e) {
-                    console.warn('Error disposing conversion:', e);
+                    Logger.warn('Error disposing conversion:', e);
                 }
             }
 
@@ -193,7 +194,7 @@ export class MediaProcessor {
                 try {
                     output.dispose();
                 } catch (e) {
-                    console.warn('Error disposing output:', e);
+                    Logger.warn('Error disposing output:', e);
                 }
             }
 
@@ -201,7 +202,7 @@ export class MediaProcessor {
                 try {
                     input.dispose();
                 } catch (e) {
-                    console.warn('Error disposing input:', e);
+                    Logger.warn('Error disposing input:', e);
                 }
             }
 
@@ -232,7 +233,7 @@ export class MediaProcessor {
                 try {
                     input.dispose();
                 } catch (e) {
-                    console.warn('Error disposing input in getVideoStats:', e);
+                    Logger.warn('Error disposing input in getVideoStats:', e);
                 }
             }
         }
@@ -335,7 +336,7 @@ export class MediaProcessor {
                     videoInfo.fps = Math.round(stats.averagePacketRate);
                     videoInfo.bitrate = stats.averageBitrate;
                 } catch (e) {
-                    console.warn('Failed to compute packet stats:', e);
+                    Logger.warn('Failed to compute packet stats:', e);
                     videoInfo.fps = 0;
                     videoInfo.bitrate = 0;
                 }
@@ -373,7 +374,7 @@ export class MediaProcessor {
                 try {
                     input.dispose();
                 } catch (e) {
-                    console.warn('Error disposing input in getMetadata:', e);
+                    Logger.warn('Error disposing input in getMetadata:', e);
                 }
             }
         }
@@ -445,12 +446,12 @@ export class MediaProcessor {
                 output: output,
                 video: (t, i) => {
                     const keep = trackType === 'video' && (i - 1) === trackIndex;
-                    console.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
+                    Logger.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
                     return keep ? {} : { discard: true };
                 },
                 audio: (t, i) => {
                     const keep = trackType === 'audio' && (i - 1) === trackIndex;
-                    console.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
+                    Logger.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
                     return keep ? {} : { discard: true };
                 }
             };
@@ -458,7 +459,7 @@ export class MediaProcessor {
             conversion = await MediaBunny.Conversion.init(config);
 
             if (!conversion.isValid) {
-                console.error('Conversion invalid:', conversion.discardedTracks);
+                Logger.error('Conversion invalid:', conversion.discardedTracks);
                 const reasons = conversion.discardedTracks.map(d => `${d.track.type}: ${d.reason}`).join(', ');
                 throw new Error(`Cannot execute conversion: ${reasons}`);
             }
@@ -477,7 +478,7 @@ export class MediaProcessor {
                 try {
                     conversion.dispose();
                 } catch (e) {
-                    console.warn('Error disposing conversion in extractTrack:', e);
+                    Logger.warn('Error disposing conversion in extractTrack:', e);
                 }
             }
 
@@ -485,7 +486,7 @@ export class MediaProcessor {
                 try {
                     output.dispose();
                 } catch (e) {
-                    console.warn('Error disposing output in extractTrack:', e);
+                    Logger.warn('Error disposing output in extractTrack:', e);
                 }
             }
 
@@ -493,7 +494,7 @@ export class MediaProcessor {
                 try {
                     input.dispose();
                 } catch (e) {
-                    console.warn('Error disposing input in extractTrack:', e);
+                    Logger.warn('Error disposing input in extractTrack:', e);
                 }
             }
         }
@@ -504,7 +505,7 @@ export class MediaProcessor {
      * @private
      */
     static async _extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress }) {
-        console.log(`[MediaProcessor] Extracting ${trackType} track ${trackIndex} with speed ${speed}x`);
+        Logger.log(`[MediaProcessor] Extracting ${trackType} track ${trackIndex} with speed ${speed}x`);
 
         const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);
         const input = new MediaBunny.Input({
@@ -536,7 +537,7 @@ export class MediaProcessor {
                     const stats = await videoTrack.computePacketStats();
                     sourceFps = stats.averagePacketRate || 30;
                 } catch (e) {
-                    console.warn('[MediaProcessor] Could not compute frame rate, defaulting to 30fps');
+                    Logger.warn('[MediaProcessor] Could not compute frame rate, defaulting to 30fps');
                 }
 
                 const outputDuration = duration / speed;
@@ -544,7 +545,7 @@ export class MediaProcessor {
                 const frameDuration = 1 / outputFps;
                 const totalOutputFrames = Math.ceil(outputDuration * outputFps);
 
-                console.log(`[MediaProcessor] Video: ${width}x${height}, ${duration.toFixed(2)}s -> ${outputDuration.toFixed(2)}s at ${speed}x`);
+                Logger.log(`[MediaProcessor] Video: ${width}x${height}, ${duration.toFixed(2)}s -> ${outputDuration.toFixed(2)}s at ${speed}x`);
 
                 // Setup output
                 const outputFormat = format === 'webm' ? new MediaBunny.WebMOutputFormat() : new MediaBunny.Mp4OutputFormat();
@@ -594,7 +595,7 @@ export class MediaProcessor {
                     }
                 }
 
-                console.log(`[MediaProcessor] Encoded ${frameCount} video frames`);
+                Logger.log(`[MediaProcessor] Encoded ${frameCount} video frames`);
                 canvasSource.close();
                 await output.finalize();
 
@@ -615,7 +616,7 @@ export class MediaProcessor {
                     samples.push(sample);
                 }
 
-                console.log(`[MediaProcessor] Collected ${samples.length} audio samples for speed adjustment`);
+                Logger.log(`[MediaProcessor] Collected ${samples.length} audio samples for speed adjustment`);
 
                 // Setup output
                 let outputFormat;
@@ -677,7 +678,7 @@ export class MediaProcessor {
 
                         finalBuffer = await offlineCtx.startRendering();
                     } catch (e) {
-                        console.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
+                        Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
                     }
 
                     const processedSamples = MediaBunny.AudioSample.fromAudioBuffer(finalBuffer, outputTimestamp);
@@ -696,7 +697,7 @@ export class MediaProcessor {
                     }
                 }
 
-                console.log('[MediaProcessor] Audio speed adjustment complete');
+                Logger.log('[MediaProcessor] Audio speed adjustment complete');
                 audioSource.close();
                 await output.finalize();
 
@@ -707,16 +708,16 @@ export class MediaProcessor {
         } finally {
             // Cleanup
             if (input && typeof input.dispose === 'function') {
-                try { input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+                try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
             }
             if (output && typeof output.dispose === 'function') {
-                try { output.dispose(); } catch (e) { console.warn('Error disposing output:', e); }
+                try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
             }
             if (canvasSource && typeof canvasSource.dispose === 'function') {
-                try { canvasSource.dispose(); } catch (e) { console.warn('Error disposing canvasSource:', e); }
+                try { canvasSource.dispose(); } catch (e) { Logger.warn('Error disposing canvasSource:', e); }
             }
             if (audioSource && typeof audioSource.dispose === 'function') {
-                try { audioSource.dispose(); } catch (e) { console.warn('Error disposing audioSource:', e); }
+                try { audioSource.dispose(); } catch (e) { Logger.warn('Error disposing audioSource:', e); }
             }
         }
     }
@@ -780,7 +781,7 @@ export class MediaProcessor {
             throw new Error('At least 2 videos are required for merging.');
         }
 
-        console.log('[MediaProcessor] Starting merge of', inputs.length, 'videos');
+        Logger.log('[MediaProcessor] Starting merge of', inputs.length, 'videos');
 
         // Track all objects for cleanup
         const inputObjects = [];
@@ -791,7 +792,7 @@ export class MediaProcessor {
 
         try {
             // Step 1: Analyze all input videos
-            console.log('[MediaProcessor] Step 1: Analyzing input videos...');
+            Logger.log('[MediaProcessor] Step 1: Analyzing input videos...');
             const videoInfos = [];
             let maxWidth = 0;
             let maxHeight = 0;
@@ -812,7 +813,7 @@ export class MediaProcessor {
                 const width = videoTrack.displayWidth || videoTrack.codedWidth;
                 const height = videoTrack.displayHeight || videoTrack.codedHeight;
 
-                console.log(`[MediaProcessor] Video ${i + 1}: ${width}x${height}, ${duration}s, codec: ${videoTrack.codec}`);
+                Logger.log(`[MediaProcessor] Video ${i + 1}: ${width}x${height}, ${duration}s, codec: ${videoTrack.codec}`);
 
                 maxWidth = Math.max(maxWidth, width);
                 maxHeight = Math.max(maxHeight, height);
@@ -835,10 +836,10 @@ export class MediaProcessor {
             const targetHeight = resolution?.height || maxHeight;
             const targetFps = 30;
 
-            console.log(`[MediaProcessor] Target specs: ${targetWidth}x${targetHeight} @ ${targetFps}fps`);
+            Logger.log(`[MediaProcessor] Target specs: ${targetWidth}x${targetHeight} @ ${targetFps}fps`);
 
             // Step 2: Create output
-            console.log('[MediaProcessor] Step 2: Setting up output...');
+            Logger.log('[MediaProcessor] Step 2: Setting up output...');
 
             let outputFormat;
             switch (format) {
@@ -885,11 +886,11 @@ export class MediaProcessor {
                 const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
 
                 if (supportedCodecs.length === 0) {
-                    console.warn('[MediaProcessor] No supported audio codecs found, merge will be video-only');
+                    Logger.warn('[MediaProcessor] No supported audio codecs found, merge will be video-only');
                     audioCodec = null;
                 } else {
                     audioCodec = supportedCodecs[0];
-                    console.log(`[MediaProcessor] Using audio codec: ${audioCodec}`);
+                    Logger.log(`[MediaProcessor] Using audio codec: ${audioCodec}`);
                 }
             }
 
@@ -899,7 +900,7 @@ export class MediaProcessor {
                     bitrate: audioBitrate
                 });
                 output.addAudioTrack(audioSource);
-                console.log(`[MediaProcessor] Audio output: ${targetChannels} channels @ ${targetSampleRate}Hz`);
+                Logger.log(`[MediaProcessor] Audio output: ${targetChannels} channels @ ${targetSampleRate}Hz`);
             }
 
             await output.start();
@@ -908,7 +909,7 @@ export class MediaProcessor {
             let currentTimestamp = 0;
 
             for (let i = 0; i < videoInfos.length; i++) {
-                console.log(`[MediaProcessor] Processing video ${i + 1}/${videoInfos.length}...`);
+                Logger.log(`[MediaProcessor] Processing video ${i + 1}/${videoInfos.length}...`);
 
                 const info = videoInfos[i];
                 const input = info.input;
@@ -955,13 +956,13 @@ export class MediaProcessor {
                     }
                 }
 
-                console.log(`[MediaProcessor] Processed ${frameCount} frames from video ${i + 1}`);
+                Logger.log(`[MediaProcessor] Processed ${frameCount} frames from video ${i + 1}`);
 
                 // Process audio
                 if (audioSource && audioTrack) {
                     const canDecodeAudio = await audioTrack.canDecode();
                     if (canDecodeAudio) {
-                        console.log(`[MediaProcessor] Processing audio from video ${i + 1}...`);
+                        Logger.log(`[MediaProcessor] Processing audio from video ${i + 1}...`);
 
                         const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
                         const audioStartTime = await audioTrack.getFirstTimestamp();
@@ -972,7 +973,7 @@ export class MediaProcessor {
                         const needsRemixing = audioTrack.numberOfChannels !== targetChannels;
 
                         if (needsResampling || needsRemixing) {
-                            console.log(`[MediaProcessor] Audio conversion needed: ${audioTrack.numberOfChannels}ch @ ${audioTrack.sampleRate}Hz -> ${targetChannels}ch @ ${targetSampleRate}Hz`);
+                            Logger.log(`[MediaProcessor] Audio conversion needed: ${audioTrack.numberOfChannels}ch @ ${audioTrack.sampleRate}Hz -> ${targetChannels}ch @ ${targetSampleRate}Hz`);
                         }
 
                         for await (const sample of audioSink.samples()) {
@@ -1014,7 +1015,7 @@ export class MediaProcessor {
 
                                     sample.close(); // Close original sample
                                 } catch (resampleError) {
-                                    console.error(`[MediaProcessor] Error resampling audio:`, resampleError);
+                                    Logger.error(`[MediaProcessor] Error resampling audio:`, resampleError);
                                     sample.close();
                                     throw resampleError;
                                 }
@@ -1033,12 +1034,12 @@ export class MediaProcessor {
                             audioSampleCount++;
                         }
 
-                        console.log(`[MediaProcessor] Processed ${audioSampleCount} audio samples from video ${i + 1}`);
+                        Logger.log(`[MediaProcessor] Processed ${audioSampleCount} audio samples from video ${i + 1}`);
                     } else {
-                        console.warn(`[MediaProcessor] Cannot decode audio from video ${i + 1}, skipping`);
+                        Logger.warn(`[MediaProcessor] Cannot decode audio from video ${i + 1}, skipping`);
                     }
                 } else if (!audioSource && audioTrack) {
-                    console.log(`[MediaProcessor] No audio encoder available, skipping audio`);
+                    Logger.log(`[MediaProcessor] No audio encoder available, skipping audio`);
                 }
 
                 // Update timestamp for next video
@@ -1051,7 +1052,7 @@ export class MediaProcessor {
             }
 
             // Step 4: Finalize
-            console.log('[MediaProcessor] Finalizing merge...');
+            Logger.log('[MediaProcessor] Finalizing merge...');
             canvasSource.close();
             if (audioSource) {
                 audioSource.close();
@@ -1060,22 +1061,22 @@ export class MediaProcessor {
 
             if (onProgress) onProgress(1.0);
 
-            console.log('[MediaProcessor] Merge complete!');
+            Logger.log('[MediaProcessor] Merge complete!');
             return new Blob([output.target.buffer], { type: `video/${format}` });
 
         } catch (error) {
-            console.error('[MediaProcessor] Merge failed:', error);
+            Logger.error('[MediaProcessor] Merge failed:', error);
             throw new Error(`Video merge failed: ${error.message}`);
         } finally {
             // CRITICAL: Clean up all MediaBunny resources to prevent memory leaks
-            console.log('[MediaProcessor] Cleaning up resources...');
+            Logger.log('[MediaProcessor] Cleaning up resources...');
 
             // Dispose Output
             if (output && typeof output.dispose === 'function') {
                 try {
                     output.dispose();
                 } catch (e) {
-                    console.warn('Error disposing output during merge cleanup:', e);
+                    Logger.warn('Error disposing output during merge cleanup:', e);
                 }
             }
 
@@ -1084,7 +1085,7 @@ export class MediaProcessor {
                 try {
                     canvasSource.dispose();
                 } catch (e) {
-                    console.warn('Error disposing canvasSource during merge cleanup:', e);
+                    Logger.warn('Error disposing canvasSource during merge cleanup:', e);
                 }
             }
 
@@ -1093,7 +1094,7 @@ export class MediaProcessor {
                 try {
                     audioSource.dispose();
                 } catch (e) {
-                    console.warn('Error disposing audioSource during merge cleanup:', e);
+                    Logger.warn('Error disposing audioSource during merge cleanup:', e);
                 }
             }
 
@@ -1103,7 +1104,7 @@ export class MediaProcessor {
                     try {
                         input.dispose();
                     } catch (e) {
-                        console.warn('Error disposing input during merge cleanup:', e);
+                        Logger.warn('Error disposing input during merge cleanup:', e);
                     }
                 }
             }
@@ -1122,7 +1123,7 @@ export class MediaProcessor {
             canvasSource = null;
             audioSource = null;
 
-            console.log('[MediaProcessor] Cleanup complete');
+            Logger.log('[MediaProcessor] Cleanup complete');
         }
     }
 
@@ -1254,7 +1255,7 @@ export class MediaProcessor {
      * @returns {Promise<Blob>}
      */
     static async reverseVideo({ source, includeAudio = false, speed = 1, onProgress }) {
-        console.log('[MediaProcessor] Starting video reversal with samplesAtTimestamps...');
+        Logger.log('[MediaProcessor] Starting video reversal with samplesAtTimestamps...');
 
         const blobSource = new MediaBunny.BlobSource(source);
         const input = new MediaBunny.Input({
@@ -1283,7 +1284,7 @@ export class MediaProcessor {
                 const stats = await videoTrack.computePacketStats();
                 sourceFps = stats.averagePacketRate || 30;
             } catch (e) {
-                console.warn("[MediaProcessor] Could not compute frame rate, defaulting to 30fps", e);
+                Logger.warn("[MediaProcessor] Could not compute frame rate, defaulting to 30fps", e);
             }
 
             // Clamp speed to valid range
@@ -1300,8 +1301,8 @@ export class MediaProcessor {
             const frameDuration = 1 / outputFps;
             const totalOutputFrames = Math.ceil(outputDuration * outputFps);
 
-            console.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, ${sourceFps.toFixed(1)}fps`);
-            console.log(`[MediaProcessor] Speed: ${clampedSpeed}x, Output: ${outputDuration.toFixed(2)}s, ${totalOutputFrames} frames`);
+            Logger.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, ${sourceFps.toFixed(1)}fps`);
+            Logger.log(`[MediaProcessor] Speed: ${clampedSpeed}x, Output: ${outputDuration.toFixed(2)}s, ${totalOutputFrames} frames`);
 
             // Step 2: Setup Output
             const outputFormat = new MediaBunny.Mp4OutputFormat();
@@ -1342,7 +1343,7 @@ export class MediaProcessor {
             await output.start();
 
             // Step 3: Use samplesAtTimestamps with reverse timestamp generator
-            console.log('[MediaProcessor] Extracting frames in reverse order using samplesAtTimestamps...');
+            Logger.log('[MediaProcessor] Extracting frames in reverse order using samplesAtTimestamps...');
 
             const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
 
@@ -1385,46 +1386,46 @@ export class MediaProcessor {
                 }
             }
 
-            console.log(`[MediaProcessor] Encoded ${frameCount} frames`);
+            Logger.log(`[MediaProcessor] Encoded ${frameCount} frames`);
 
             // Step 4: Handle Audio (if requested)
             if (includeAudio && audioSource) {
-                console.log('[MediaProcessor] Reversing audio...');
+                Logger.log('[MediaProcessor] Reversing audio...');
                 try {
                     const audioTrack = await input.getPrimaryAudioTrack();
                     if (audioTrack) {
                         await MediaProcessor._reverseAudioWithSink(audioTrack, audioSource, duration, clampedSpeed, onProgress);
-                        console.log('[MediaProcessor] Audio reversal complete');
+                        Logger.log('[MediaProcessor] Audio reversal complete');
                     }
                 } catch (e) {
-                    console.warn('[MediaProcessor] Audio reversal failed:', e);
+                    Logger.warn('[MediaProcessor] Audio reversal failed:', e);
                 }
             }
 
             // Step 5: Finalize
-            console.log('[MediaProcessor] Finalizing...');
+            Logger.log('[MediaProcessor] Finalizing...');
             canvasSource.close();
             if (audioSource) audioSource.close();
             await output.finalize();
 
             if (onProgress) onProgress(1.0);
 
-            console.log('[MediaProcessor] Reverse complete!');
+            Logger.log('[MediaProcessor] Reverse complete!');
             return new Blob([output.target.buffer], { type: 'video/mp4' });
 
         } finally {
             // Cleanup
             if (input && typeof input.dispose === 'function') {
-                try { input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+                try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
             }
             if (output && typeof output.dispose === 'function') {
-                try { output.dispose(); } catch (e) { console.warn('Error disposing output:', e); }
+                try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
             }
             if (canvasSource && typeof canvasSource.dispose === 'function') {
-                try { canvasSource.dispose(); } catch (e) { console.warn('Error disposing canvasSource:', e); }
+                try { canvasSource.dispose(); } catch (e) { Logger.warn('Error disposing canvasSource:', e); }
             }
             if (audioSource && typeof audioSource.dispose === 'function') {
-                try { audioSource.dispose(); } catch (e) { console.warn('Error disposing audioSource:', e); }
+                try { audioSource.dispose(); } catch (e) { Logger.warn('Error disposing audioSource:', e); }
             }
         }
     }
@@ -1449,7 +1450,7 @@ export class MediaProcessor {
             samples.push(sample);
         }
 
-        console.log(`[MediaProcessor] Collected ${samples.length} audio samples`);
+        Logger.log(`[MediaProcessor] Collected ${samples.length} audio samples`);
 
         // Reverse order
         samples.reverse();
@@ -1494,7 +1495,7 @@ export class MediaProcessor {
 
                     finalBuffer = await offlineCtx.startRendering();
                 } catch (e) {
-                    console.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
+                    Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
                 }
             }
 
@@ -1543,7 +1544,7 @@ export class MediaProcessor {
             const sampleRate = audioBuffer.sampleRate;
             const numberOfChannels = audioBuffer.numberOfChannels;
 
-            console.log(`[MediaProcessor] Audio: ${numberOfChannels} channels @ ${sampleRate}Hz`);
+            Logger.log(`[MediaProcessor] Audio: ${numberOfChannels} channels @ ${sampleRate}Hz`);
 
             let outputTimestamp = 0;
 

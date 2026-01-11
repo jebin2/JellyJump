@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 import { IndexedDBService } from './IndexedDBService.js';
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
@@ -68,9 +69,9 @@ export class Playlist {
 
         // Save state on beforeunload (works for most cases)
         window.addEventListener('beforeunload', () => {
-            console.log('[Playlist] beforeunload - saving state');
+            Logger.log('[Playlist] beforeunload - saving state');
             this._saveState();
-            console.log('[Playlist] beforeunload - revoking blob URLs');
+            Logger.log('[Playlist] beforeunload - revoking blob URLs');
             // Revoke all blob URLs to help browser release memory
             for (const item of this.items) {
                 if (item.url && item.url.startsWith('blob:')) {
@@ -120,7 +121,7 @@ export class Playlist {
      */
     _initPlayerNavigation() {
         if (!this.player) {
-            console.error('Playlist: Player instance is missing!');
+            Logger.error('Playlist: Player instance is missing!');
             return;
         }
         this.player.setNavigationCallbacks(
@@ -196,7 +197,7 @@ export class Playlist {
     _createHeader() {
         const template = document.getElementById('playlist-header-controls-template');
         if (!template) {
-            console.error('Playlist header template not found!');
+            Logger.error('Playlist header template not found!');
             return;
         }
 
@@ -217,10 +218,10 @@ export class Playlist {
             import('./SidebarToggle.js').then(({ SidebarToggle }) => {
                 new SidebarToggle(sidebarElement, toggleButton);
             }).catch(err => {
-                console.error('Failed to load SidebarToggle:', err);
+                Logger.error('Failed to load SidebarToggle:', err);
             });
         } else {
-            console.warn('Sidebar toggle elements not found', { sidebarElement, toggleButton });
+            Logger.warn('Sidebar toggle elements not found', { sidebarElement, toggleButton });
         }
 
         // Attach events
@@ -393,7 +394,7 @@ export class Playlist {
         this.player.reset();
         this._updateUI();
         this._updatePlayerNavigationState();
-        console.log('[Playlist] Playback stopped - select a video to play');
+        Logger.log('[Playlist] Playback stopped - select a video to play');
     }
 
     /**
@@ -588,7 +589,7 @@ export class Playlist {
                     if (indexToRestore >= 0 && indexToRestore < this.items.length) {
                         const itemToRestore = this.items[indexToRestore];
 
-                        console.log('[Playlist] Restoring item:', itemToRestore.title, {
+                        Logger.log('[Playlist] Restoring item:', itemToRestore.title, {
                             isLocal: itemToRestore.isLocal,
                             hasFile: !!itemToRestore.file,
                             url: itemToRestore.url,
@@ -605,7 +606,7 @@ export class Playlist {
                 this.render(); // Render empty state
             }
         } catch (e) {
-            console.error('Error loading playlist:', e);
+            Logger.error('Error loading playlist:', e);
             this.isLoading = false; // Stop loading on error
             this.render();
         }
@@ -675,7 +676,7 @@ export class Playlist {
             // file.path is only available in Electron, not in browsers
             if (file.path) {
                 item.localPath = file.path;
-                console.log('[Electron] Storing localPath for:', file.name, '->', file.path);
+                Logger.log('[Electron] Storing localPath for:', file.name, '->', file.path);
             }
 
             return item;
@@ -806,23 +807,23 @@ export class Playlist {
     async _prefetchMetadata(item) {
         // Don't prefetch for streams (HLS/M3U8) - MediaBunny doesn't understand them
         if (item.isStream) {
-            console.log('[Playlist] Skipping metadata prefetch for stream:', item.title);
+            Logger.log('[Playlist] Skipping metadata prefetch for stream:', item.title);
             return;
         }
 
         // Don't prefetch if already cached
         if (item.videoInfo || item.audioInfo) {
-            console.log('[Playlist] Metadata already cached for:', item.title);
+            Logger.log('[Playlist] Metadata already cached for:', item.title);
             return;
         }
 
         // Don't block - this runs in background
         try {
-            console.log('[Playlist] Prefetching metadata for:', item.title);
+            Logger.log('[Playlist] Prefetching metadata for:', item.title);
             await this._ensureMetadata(item);
-            console.log('[Playlist] Metadata prefetch complete:', item.title);
+            Logger.log('[Playlist] Metadata prefetch complete:', item.title);
         } catch (error) {
-            console.warn('[Playlist] Metadata prefetch failed for:', item.title, error);
+            Logger.warn('[Playlist] Metadata prefetch failed for:', item.title, error);
             // Non-critical error - will retry if user opens info/trim
         }
     }
@@ -910,7 +911,7 @@ export class Playlist {
 
         // Clear any existing stale thumbnail from previous video
         if (video.thumbnail) {
-            console.log(`[Playlist] Keeping existing thumbnail for: ${video.title}`);
+            Logger.log(`[Playlist] Keeping existing thumbnail for: ${video.title}`);
             return;
         }
 
@@ -953,13 +954,13 @@ export class Playlist {
                 video.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
                 this._updateItemUI(video);
                 this._saveState();
-                console.log(`[Playlist] Captured thumbnail via render loop for: ${video.title}`);
+                Logger.log(`[Playlist] Captured thumbnail via render loop for: ${video.title}`);
 
                 // Remove the callback since we're done
                 this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
 
             } catch (e) {
-                console.warn('[Playlist] Failed to capture thumbnail in render loop:', e);
+                Logger.warn('[Playlist] Failed to capture thumbnail in render loop:', e);
                 // Remove callback on error to prevent endless errors
                 this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
             }
@@ -1018,10 +1019,10 @@ export class Playlist {
                         video.thumbnail = thumbnail;
                         this._updateItemUI(video);
                         this._saveState();
-                        console.log(`[Playlist] Captured thumbnail for local file: ${video.title}`);
+                        Logger.log(`[Playlist] Captured thumbnail for local file: ${video.title}`);
                     }
                 } catch (e) {
-                    console.warn('[Playlist] Failed to capture local file thumbnail:', e);
+                    Logger.warn('[Playlist] Failed to capture local file thumbnail:', e);
                 }
             }, 500); // Wait 500ms for first frame
         }
@@ -1080,10 +1081,10 @@ export class Playlist {
         // Process M3U playlists asynchronously
         for (const m3u of m3uItems) {
             try {
-                console.log(`[Playlist] Expanding M3U playlist: ${m3u.title || m3u.url}`);
+                Logger.log(`[Playlist] Expanding M3U playlist: ${m3u.title || m3u.url}`);
                 await this._handleM3UPlaylist(m3u.url);
             } catch (error) {
-                console.error(`[Playlist] Failed to expand M3U: ${m3u.url}`, error);
+                Logger.error(`[Playlist] Failed to expand M3U: ${m3u.url}`, error);
                 // Add as a regular item if expansion fails
                 if (!m3u.id) m3u.id = generateId();
                 this.items.push(m3u);
@@ -1249,7 +1250,7 @@ export class Playlist {
             this.render();
             this._updatePlayerNavigationState();
 
-            console.log('Application state reset successfully');
+            Logger.log('Application state reset successfully');
         }
     }
 
@@ -1264,7 +1265,7 @@ export class Playlist {
             if (this.player.loopMode === 'playlist') {
                 this.selectItem(0);
             } else {
-                console.log('Playlist ended');
+                Logger.log('Playlist ended');
             }
         }
     }
@@ -1298,7 +1299,7 @@ export class Playlist {
             if (this.activeIndex !== -1 && this.activeIndex !== index) {
                 const prevItem = this.items[this.activeIndex];
                 if (prevItem && prevItem.isLocal && prevItem.url) {
-                    console.log(`Releasing memory for: ${prevItem.title}`);
+                    Logger.log(`Releasing memory for: ${prevItem.title}`);
                     URL.revokeObjectURL(prevItem.url);
                     prevItem.url = null;
                     prevItem.file = null; // Release Blob
@@ -1345,18 +1346,18 @@ export class Playlist {
                         const cachedBlob = await MediaMetadata.checkCache(video);
 
                         if (cachedBlob) {
-                            console.log(`[Playlist] Playing from cache: ${video.title}`);
+                            Logger.log(`[Playlist] Playing from cache: ${video.title}`);
                             video.blob_url = URL.createObjectURL(cachedBlob);
                             // Mark as having file so we don't try to download again
                             video.file = cachedBlob;
                         } else {
-                            console.log(`[Playlist] Playing directly from URL (background caching): ${video.title}`);
+                            Logger.log(`[Playlist] Playing directly from URL (background caching): ${video.title}`);
                             // Direct playback
                             video.blob_url = video.url;
 
                             // Trigger background cache
                             MediaMetadata.cacheInBackground(video, () => {
-                                console.log(`[Playlist] Background cache complete for: ${video.title}`);
+                                Logger.log(`[Playlist] Background cache complete for: ${video.title}`);
                                 this._saveState();
                             });
                         }
@@ -1365,7 +1366,7 @@ export class Playlist {
                         if (this.player.ui && this.player.ui.loader) {
                             this.player.ui.loader.classList.add('visible');
                         }
-                        console.log(`Loading file from storage: ${video.title}`);
+                        Logger.log(`Loading file from storage: ${video.title}`);
                         this.player.already_fetching = true;
                         await MediaMetadata.getProcessedSourceURL(video);
                     }
@@ -1379,14 +1380,14 @@ export class Playlist {
                         this.player.already_fetching = false;
                     }
                 } catch (e) {
-                    console.error('Error loading file from storage:', e);
+                    Logger.error('Error loading file from storage:', e);
                     if (this.player.ui && this.player.ui.loader) {
                         this.player.ui.loader.classList.remove('visible');
                     }
 
                     // Show user-friendly popup for missing file
                     try {
-                        console.log('Showing modal for file not found...');
+                        Logger.log('Showing modal for file not found...');
                         const shouldRemove = await ConfirmModal.confirm({
                             title: 'File Not Found',
                             message: `"${video.title}" could not be loaded.\n\nThis file was likely too large to save in browser storage (>500MB) and needs to be re-added to the playlist.`,
@@ -1407,7 +1408,7 @@ export class Playlist {
                             this._updatePlayerNavigationState();
                         }
                     } catch (modalError) {
-                        console.error('Error showing modal:', modalError);
+                        Logger.error('Error showing modal:', modalError);
                     }
                     return;
                 }
@@ -1415,7 +1416,7 @@ export class Playlist {
 
             // Final safety check: Ensure we have a valid URL before loading
             if (!video.blob_url) {
-                console.error('Video URL is null, cannot load:', video.title);
+                Logger.error('Video URL is null, cannot load:', video.title);
                 return;
             }
 
@@ -1430,7 +1431,7 @@ export class Playlist {
                     cues: [...track.cues]
                 }));
                 this._saveState();
-                console.log(`Saved ${subtitleTracks.length} subtitle track(s) for: ${video.title}`);
+                Logger.log(`Saved ${subtitleTracks.length} subtitle track(s) for: ${video.title}`);
             };
 
             // Load video with saved subtitles (if any) - pass isAudio for audio files
@@ -2138,7 +2139,7 @@ export class Playlist {
                     downloadBtn.style.opacity = '1';
                 }
 
-                console.log(`Getting source for download: ${item.title}`);
+                Logger.log(`Getting source for download: ${item.title}`);
 
                 await MediaMetadata.getProcessedSourceURL(item, () => this._saveState());
 
@@ -2158,7 +2159,7 @@ export class Playlist {
                 setTimeout(() => URL.revokeObjectURL(item.blob_url), 100);
             }
 
-            console.log(`Downloading: ${filename}`);
+            Logger.log(`Downloading: ${filename}`);
 
             // Restore download button icon
             if (downloadBtn) {
@@ -2171,7 +2172,7 @@ export class Playlist {
             }
 
         } catch (error) {
-            console.error('Download failed:', error);
+            Logger.error('Download failed:', error);
             alert(`Failed to download video: ${error.message}\n\nThis may be due to CORS restrictions on the remote server.`);
 
             // Restore download button icon on error
@@ -2263,7 +2264,7 @@ export class Playlist {
                 this._openUrlModal();
             });
         } else {
-            console.warn('URL Upload button not found');
+            Logger.warn('URL Upload button not found');
         }
     }
 
@@ -2386,7 +2387,7 @@ export class Playlist {
             // IPTV playlists contain #EXTINF channel entries; HLS manifests contain #EXT-X-* tags
             if (hasM3u8Extension && !looksLikeStream) {
                 try {
-                    console.log('[Playlist] Fetching .m3u8 to determine if IPTV or HLS:', url);
+                    Logger.log('[Playlist] Fetching .m3u8 to determine if IPTV or HLS:', url);
                     const response = await fetch(url);
                     const content = await response.text();
 
@@ -2399,13 +2400,13 @@ export class Playlist {
                         !content.includes('#EXT-X-TARGETDURATION');
 
                     if (isIPTVPlaylist) {
-                        console.log('[Playlist] Detected IPTV playlist in .m3u8 format, parsing as M3U');
+                        Logger.log('[Playlist] Detected IPTV playlist in .m3u8 format, parsing as M3U');
                         await this._handleM3UPlaylist(url);
                         return;
                     }
-                    console.log('[Playlist] Detected HLS stream manifest');
+                    Logger.log('[Playlist] Detected HLS stream manifest');
                 } catch (fetchError) {
-                    console.warn('[Playlist] Could not fetch .m3u8 for inspection, treating as HLS stream:', fetchError);
+                    Logger.warn('[Playlist] Could not fetch .m3u8 for inspection, treating as HLS stream:', fetchError);
                 }
             }
 
@@ -2596,7 +2597,7 @@ export class Playlist {
                 // but actually the caller should handle removal or we do it here.
                 // Let's do it here.
                 this.items = this.items.filter(item => item.m3uSource !== url);
-                console.log(`[M3U] Removed old items for sync: ${url}`);
+                Logger.log(`[M3U] Removed old items for sync: ${url}`);
             }
 
             // Add all items at once
@@ -2611,10 +2612,10 @@ export class Playlist {
             // Show success message
             this._showToast(`${isSync ? 'Synced' : 'Added'} ${channels.length} channels from ${playlistName}`);
 
-            console.log(`[M3U] Imported ${channels.length} channels from: ${url}`);
+            Logger.log(`[M3U] Imported ${channels.length} channels from: ${url}`);
 
         } catch (error) {
-            console.error('[M3U] Failed to import playlist:', error);
+            Logger.error('[M3U] Failed to import playlist:', error);
             if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
                 throw new Error('CORS Error: Cannot access this M3U playlist. The server must allow cross-origin requests.');
             }
@@ -2869,7 +2870,7 @@ export class Playlist {
 
         item.isBroken = true;
         item.errorMessage = error || 'Stream unavailable';
-        console.log(`[Playlist] Marked as broken: ${item.title}`);
+        Logger.log(`[Playlist] Marked as broken: ${item.title}`);
 
         // Update UI for this item
         const index = this.items.indexOf(item);

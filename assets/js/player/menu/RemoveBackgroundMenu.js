@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { CorePlayer } from '../../core/Player.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
@@ -15,7 +16,7 @@ export class RemoveBackgroundMenu {
         const footerTemplate = document.getElementById('remove-bg-footer-template');
 
         if (!contentTemplate || !footerTemplate) {
-            console.error('Remove Background modal templates not found!');
+            Logger.error('Remove Background modal templates not found!');
             return;
         }
 
@@ -147,11 +148,11 @@ export class RemoveBackgroundMenu {
 
                         const detectedColor = detectBackgroundColor(imageData, width, height);
                         if (detectedColor) {
-                            console.log('[RemoveBackground] Auto-detected color:', detectedColor);
+                            Logger.log('[RemoveBackground] Auto-detected color:', detectedColor);
                             addColor(detectedColor);
                         }
                     } catch (e) {
-                        console.warn('[RemoveBackground] Auto-detection failed:', e);
+                        Logger.warn('[RemoveBackground] Auto-detection failed:', e);
                     }
                 }, 100);
             }
@@ -215,7 +216,7 @@ export class RemoveBackgroundMenu {
             createFrameOverlay();
 
         } catch (e) {
-            console.error('Failed to load video:', e);
+            Logger.error('Failed to load video:', e);
             errorMessage.textContent = 'Failed to load video: ' + e.message;
             errorMessage.classList.remove('hidden');
             return;
@@ -493,7 +494,7 @@ export class RemoveBackgroundMenu {
                 playlist.render();
 
             } catch (e) {
-                console.error('Processing failed:', e);
+                Logger.error('Processing failed:', e);
                 errorMessage.textContent = `Processing failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');

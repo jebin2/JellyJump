@@ -34,7 +34,7 @@ class TimelineManager {
         this.createPlayhead();
         this.attachScrubHandlers();
         this.syncHorizontalScroll();
-        console.log('TimelineManager initialized');
+        Logger.log('TimelineManager initialized');
     }
 
     createTrackContainer() {
@@ -251,7 +251,7 @@ class TimelineManager {
         // Settings
         if (this.settingsBtn) {
             this.settingsBtn.addEventListener('click', () => {
-                console.log('Timeline settings clicked');
+                Logger.log('Timeline settings clicked');
                 // Future: Open settings menu
             });
         }
@@ -339,7 +339,7 @@ class TimelineManager {
         document.addEventListener('mousemove', this.trimMoveHandler);
         document.addEventListener('mouseup', this.trimEndHandler);
 
-        console.log(`Started trimming ${action} on clip ${clipId}`);
+        Logger.log(`Started trimming ${action} on clip ${clipId}`);
     }
 
     handleTrimMove(e) {
@@ -439,7 +439,7 @@ class TimelineManager {
 
         this.trimClipElement = null;
         this.currentTrimValues = null;
-        console.log('Trim ended');
+        Logger.log('Trim ended');
     }
 
     selectClip(clipId, isMultiSelect = false) {
@@ -579,7 +579,7 @@ class TimelineManager {
             }
 
             if (!media) {
-                console.error('Media not found for ID:', mediaId);
+                Logger.error('Media not found for ID:', mediaId);
                 return;
             }
 
@@ -593,7 +593,7 @@ class TimelineManager {
             }
 
             if (!isValid) {
-                console.warn(`Invalid media type ${media.type} for track ${trackType}`);
+                Logger.warn(`Invalid media type ${media.type} for track ${trackType}`);
                 // Show error feedback (flash red maybe)
                 return;
             }
@@ -622,7 +622,7 @@ class TimelineManager {
             }
 
         } catch (err) {
-            console.error('Error handling drop:', err);
+            Logger.error('Error handling drop:', err);
         }
     }
 
@@ -720,7 +720,7 @@ class TimelineManager {
         if (this.zoomLevelDisplay) {
             this.zoomLevelDisplay.textContent = `${this.zoomLevel}%`;
         }
-        console.log(`Zoom level: ${this.zoomLevel}%`);
+        Logger.log(`Zoom level: ${this.zoomLevel}%`);
 
         // Store previous scroll center time to restore focus?
         // For now, simple re-render.

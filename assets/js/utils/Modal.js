@@ -1,3 +1,4 @@
+import { Logger } from "./Logger.js";
 /**
  * Modal Utility
  * Reusable modal dialog component for confirmations, alerts, and custom content
@@ -27,7 +28,7 @@ export class Modal {
     } = {}) {
         // Skip if a modal is already open
         if (this._isOpen) {
-            console.log('Modal already open, skipping');
+            Logger.log('Modal already open, skipping');
             return Promise.resolve(false);
         }
         this._isOpen = true;

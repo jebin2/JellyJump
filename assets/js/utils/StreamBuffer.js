@@ -1,3 +1,4 @@
+import { Logger } from "./Logger.js";
 /**
  * StreamBuffer - Captures HLS segments for DVR-style playback
  * Uses XHR interception to capture raw segment data from HLS.js
@@ -61,7 +62,7 @@ export class StreamBuffer {
      */
     startCapture() {
         this.isCapturing = true;
-        console.log('[StreamBuffer] Capture started');
+        Logger.log('[StreamBuffer] Capture started');
     }
 
     /**
@@ -69,7 +70,7 @@ export class StreamBuffer {
      */
     stopCapture() {
         this.isCapturing = false;
-        console.log('[StreamBuffer] Capture stopped');
+        Logger.log('[StreamBuffer] Capture stopped');
     }
 
     /**
@@ -87,7 +88,7 @@ export class StreamBuffer {
         this.segments.push(segment);
         this.totalBytes += segment.data.byteLength;
 
-        console.log(`[StreamBuffer] Captured segment: ${(segment.data.byteLength / 1024).toFixed(1)}KB. Total: ${this.segments.length} segments, ${(this.totalBytes / 1024 / 1024).toFixed(2)}MB`);
+        Logger.log(`[StreamBuffer] Captured segment: ${(segment.data.byteLength / 1024).toFixed(1)}KB. Total: ${this.segments.length} segments, ${(this.totalBytes / 1024 / 1024).toFixed(2)}MB`);
 
         // Trim old segments if buffer is too large
         this._trimBuffer();
@@ -106,7 +107,7 @@ export class StreamBuffer {
         while (this.totalBytes > this.maxBytes && this.segments.length > 1) {
             const removed = this.segments.shift();
             this.totalBytes -= removed.data.byteLength;
-            console.log(`[StreamBuffer] Trimmed segment, buffer now ${(this.totalBytes / 1024 / 1024).toFixed(2)}MB`);
+            Logger.log(`[StreamBuffer] Trimmed segment, buffer now ${(this.totalBytes / 1024 / 1024).toFixed(2)}MB`);
         }
     }
 
@@ -123,7 +124,7 @@ export class StreamBuffer {
         const arrays = this.segments.map(s => s.data);
         const blob = new Blob(arrays, { type: 'video/mp2t' });
 
-        console.log(`[StreamBuffer] Created blob: ${(blob.size / 1024 / 1024).toFixed(2)}MB from ${this.segments.length} segments`);
+        Logger.log(`[StreamBuffer] Created blob: ${(blob.size / 1024 / 1024).toFixed(2)}MB from ${this.segments.length} segments`);
         return blob;
     }
 
@@ -166,7 +167,7 @@ export class StreamBuffer {
     clear() {
         this.segments = [];
         this.totalBytes = 0;
-        console.log('[StreamBuffer] Buffer cleared');
+        Logger.log('[StreamBuffer] Buffer cleared');
     }
 
     /**

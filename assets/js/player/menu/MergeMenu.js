@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
@@ -155,7 +156,7 @@ export class MergeMenu {
 
             selectedVideos.forEach((item, idx) => {
                 if (!item) {
-                    console.warn('Undefined item in selectedVideos at index', idx);
+                    Logger.warn('Undefined item in selectedVideos at index', idx);
                     return;
                 }
 
@@ -325,7 +326,7 @@ export class MergeMenu {
                 }
 
             } catch (e) {
-                console.error('Merge failed:', e);
+                Logger.error('Merge failed:', e);
                 errorMsg.textContent = `Merge failed: ${e.message}`;
                 errorMsg.classList.remove('hidden');
                 mergeBtn.disabled = false;

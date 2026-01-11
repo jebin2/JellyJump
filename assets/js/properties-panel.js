@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * PropertiesPanel
  * Manages the properties panel on the right side of the editor.
@@ -25,7 +26,7 @@ class PropertiesPanel {
         // Listen for selection events
         window.addEventListener('timeline-selection-changed', (e) => this.onSelectionChanged(e.detail));
 
-        console.log('PropertiesPanel initialized');
+        Logger.log('PropertiesPanel initialized');
     }
 
     onSelectionChanged({ selectedClipIds }) {

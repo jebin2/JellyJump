@@ -1,3 +1,4 @@
+import { Logger } from "./Logger.js";
 /**
  * ElectronHelper - Utility for Electron-specific operations
  * Provides a clean interface for detecting Electron and accessing its APIs
@@ -66,7 +67,7 @@ export class ElectronHelper {
     static async readFileAsBlob(filePath, mimeType = 'video/mp4') {
         const result = await this.readFile(filePath);
         if (!result.success) {
-            console.error('[ElectronHelper] Failed to read file:', result.error);
+            Logger.error('[ElectronHelper] Failed to read file:', result.error);
             return null;
         }
         return new Blob([result.buffer], { type: mimeType });

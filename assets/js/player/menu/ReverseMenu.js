@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
@@ -19,7 +20,7 @@ export class ReverseMenu {
         const footerTemplate = document.getElementById('reverse-footer-template');
 
         if (!contentTemplate || !footerTemplate) {
-            console.error('Reverse modal templates not found!');
+            Logger.error('Reverse modal templates not found!');
             return;
         }
 
@@ -131,7 +132,7 @@ export class ReverseMenu {
                 try {
                     sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
                 } catch (e) {
-                    console.error('Failed to get source blob:', e);
+                    Logger.error('Failed to get source blob:', e);
                     throw new Error('Cannot access video file');
                 }
 
@@ -212,7 +213,7 @@ export class ReverseMenu {
                 // (Optional: trigger thumbnail generation)
 
             } catch (e) {
-                console.error('Reversal failed:', e);
+                Logger.error('Reversal failed:', e);
                 errorMessage.textContent = `Reversal failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');

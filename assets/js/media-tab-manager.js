@@ -4,6 +4,7 @@
  * Phase: 40
  */
 
+import { Logger } from "./utils/Logger.js";
 import { StorageHelper } from './storage-helper.js';
 
 export class MediaTabManager {
@@ -17,7 +18,7 @@ export class MediaTabManager {
 
     init() {
         if (!this.tabsContainer || !this.contentContainer) {
-            console.warn('Media tab elements not found');
+            Logger.warn('Media tab elements not found');
             return;
         }
 
@@ -54,7 +55,7 @@ export class MediaTabManager {
         // Don't switch if already active
         if (category === this.activeCategory) return;
 
-        console.log(`Switched to category: ${category}`);
+        Logger.log(`Switched to category: ${category}`);
 
         this.setActiveTab(category);
         this.showContent(category);

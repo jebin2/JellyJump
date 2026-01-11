@@ -14,12 +14,13 @@ import { StreamBuffer } from '../utils/StreamBuffer.js';
 import { HLSPlayer } from './HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { AudioVisualizer } from '../player/AudioVisualizer.js';
+import { Logger } from '../utils/Logger.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
         this.container = document.getElementById(containerId);
         if (!this.container) {
-            console.error(`Container with ID "${containerId}" not found.`);
+            Logger.error(`Container with ID "${containerId}" not found.`);
             return;
         }
 
@@ -1081,7 +1082,7 @@ export class CorePlayer {
         }
         this.loopMode = 'ab'; // Auto-enable A-B mode
         this._updateLoopUI();
-        console.log('Loop Start set:', this.loopStart);
+        Logger.log('Loop Start set:', this.loopStart);
     }
 
     setLoopEnd() {
@@ -1090,13 +1091,13 @@ export class CorePlayer {
             return;
         }
         if (this.currentTime <= this.loopStart) {
-            console.warn('Loop End must be after Loop Start');
+            Logger.warn('Loop End must be after Loop Start');
             return;
         }
         this.loopEnd = this.currentTime;
         this.loopMode = 'ab'; // Auto-enable A-B mode
         this._updateLoopUI();
-        console.log('Loop End set:', this.loopEnd);
+        Logger.log('Loop End set:', this.loopEnd);
     }
 
     clearLoopMarkers() {
@@ -1271,7 +1272,7 @@ export class CorePlayer {
         this.activeSubtitleTrackId = trackId;
         this.isSubtitlesEnabled = true;
         this._updateSubtitleMenu();
-        console.log(`Switched to subtitle track: ${track.name}`);
+        Logger.log(`Switched to subtitle track: ${track.name}`);
     }
 
     async _switchAudioTrack(trackId) {
@@ -1294,7 +1295,7 @@ export class CorePlayer {
 
             // Update UI
             this._updateAudioTracks();
-            console.log(`Switched to audio track: ${track.id}`);
+            Logger.log(`Switched to audio track: ${track.id}`);
         }
     }
 
@@ -1547,13 +1548,13 @@ export class CorePlayer {
         this.duration = 0;
         // Dispose MediaBunny resources
         if (this.videoSink && typeof this.videoSink.dispose === 'function') {
-            try { this.videoSink.dispose(); } catch (e) { console.warn('Error disposing videoSink:', e); }
+            try { this.videoSink.dispose(); } catch (e) { Logger.warn('Error disposing videoSink:', e); }
         }
         if (this.audioSink && typeof this.audioSink.dispose === 'function') {
-            try { this.audioSink.dispose(); } catch (e) { console.warn('Error disposing audioSink:', e); }
+            try { this.audioSink.dispose(); } catch (e) { Logger.warn('Error disposing audioSink:', e); }
         }
         if (this.input && typeof this.input.dispose === 'function') {
-            try { this.input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+            try { this.input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
         }
 
         this.input = null;
@@ -1579,7 +1580,7 @@ export class CorePlayer {
             this.activeSources = [];
         }
 
-        console.log('[Player] Reset complete - select a video to play');
+        Logger.log('[Player] Reset complete - select a video to play');
     }
 
     /**
@@ -1623,7 +1624,7 @@ export class CorePlayer {
             // Force mute on mobile for autoplay (browser policy requirement)
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             if (autoplay && isMobile) {
-                console.log('[Player] Mobile Autoplay requested - enforcing muted playback');
+                Logger.log('[Player] Mobile Autoplay requested - enforcing muted playback');
                 this.config.muted = true;
                 this._updateVolumeUI();
             }
@@ -1681,13 +1682,13 @@ export class CorePlayer {
 
             // Dispose previous resources
             if (this.videoSink && typeof this.videoSink.dispose === 'function') {
-                try { this.videoSink.dispose(); } catch (e) { console.warn('Error disposing videoSink:', e); }
+                try { this.videoSink.dispose(); } catch (e) { Logger.warn('Error disposing videoSink:', e); }
             }
             if (this.audioSink && typeof this.audioSink.dispose === 'function') {
-                try { this.audioSink.dispose(); } catch (e) { console.warn('Error disposing audioSink:', e); }
+                try { this.audioSink.dispose(); } catch (e) { Logger.warn('Error disposing audioSink:', e); }
             }
             if (this.input && typeof this.input.dispose === 'function') {
-                try { this.input.dispose(); } catch (e) { console.warn('Error disposing input:', e); }
+                try { this.input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
             }
 
             this.videoSink = null;
@@ -1704,7 +1705,7 @@ export class CorePlayer {
             }
 
             this.ui.loader.classList.add('visible');
-            console.log(`Loading media: ${url}`);
+            Logger.log(`Loading media: ${url}`);
             this.currentVideoId = videoId || url;
 
             // Initialize MediaBunny Input with UrlSource
@@ -1724,9 +1725,9 @@ export class CorePlayer {
                 try {
                     const stats = await this.videoTrack.computePacketStats();
                     this.frameRate = stats.averagePacketRate || 30;
-                    console.log(`Detected frame rate: ${this.frameRate} fps`);
+                    Logger.log(`Detected frame rate: ${this.frameRate} fps`);
                 } catch (e) {
-                    console.warn("Could not compute frame rate, defaulting to 30fps", e);
+                    Logger.warn("Could not compute frame rate, defaulting to 30fps", e);
                     this.frameRate = 30;
                 }
 
@@ -1778,16 +1779,16 @@ export class CorePlayer {
                     const match = track.id.match(/custom-(\d+)/);
                     return match ? Math.max(max, parseInt(match[1])) : max;
                 }, 0);
-                console.log(`Restored ${savedSubtitles.length} subtitle track(s) for video`);
+                Logger.log(`Restored ${savedSubtitles.length} subtitle track(s) for video`);
             }
 
             this._updateSubtitleMenu();
 
             this.ui.loader.classList.remove('visible');
-            console.log('Media loaded successfully');
+            Logger.log('Media loaded successfully');
 
         } catch (error) {
-            console.error('Error loading media:', error);
+            Logger.error('Error loading media:', error);
             this.ui.loader.classList.remove('visible');
 
             // Notify playlist to mark item as broken
@@ -1807,7 +1808,7 @@ export class CorePlayer {
      */
     async _loadAudioFile(url, autoplay, videoId) {
         try {
-            console.log('[Audio] Loading audio file:', url);
+            Logger.log('[Audio] Loading audio file:', url);
 
             // Cleanup previous playback
             this._cleanupAudio();
@@ -1874,10 +1875,10 @@ export class CorePlayer {
                 await this.play();
             }
 
-            console.log('[Audio] Audio file loaded successfully');
+            Logger.log('[Audio] Audio file loaded successfully');
 
         } catch (error) {
-            console.error('[Audio] Error loading audio:', error);
+            Logger.error('[Audio] Error loading audio:', error);
             this.ui.loader.classList.remove('visible');
             this.isAudioMode = false;
         }
@@ -1956,7 +1957,7 @@ export class CorePlayer {
      */
     async _loadHLSStream(url, autoplay, videoId) {
         try {
-            console.log('[Stream] Loading HLS stream:', url);
+            Logger.log('[Stream] Loading HLS stream:', url);
             this._lastStreamUrl = url; // Save for retry
 
             // Stop any current playback and clean up MediaBunny resources
@@ -1983,7 +1984,7 @@ export class CorePlayer {
 
                 // Setup event handlers
                 this.hlsPlayer.onManifestParsed = (data) => {
-                    console.log('[Stream] Manifest parsed:', data.levels?.length, 'quality levels');
+                    Logger.log('[Stream] Manifest parsed:', data.levels?.length, 'quality levels');
                     this._updateQualityMenu();
                 };
 
@@ -1992,7 +1993,7 @@ export class CorePlayer {
                 };
 
                 this.hlsPlayer.onError = (error) => {
-                    console.warn('[Stream] HLS error:', error);
+                    Logger.warn('[Stream] HLS error:', error);
                     // Only show fatal/network errors if NOT recoverable
                     if (error.fatal || error.type === 'networkError') {
                         const errorDetails = HLSPlayer.getErrorDetails(error);
@@ -2003,7 +2004,7 @@ export class CorePlayer {
                                 this.onStreamError(this.currentVideoId, errorDetails.message);
                             }
                         } else {
-                            console.log('[Stream] Suppressed recoverable error:', errorDetails.message);
+                            Logger.log('[Stream] Suppressed recoverable error:', errorDetails.message);
                         }
                     }
                 };
@@ -2027,7 +2028,7 @@ export class CorePlayer {
             }
 
             this.ui.loader.classList.remove('visible');
-            console.log('[Stream] HLS stream loaded successfully. Live:', this.isLive);
+            Logger.log('[Stream] HLS stream loaded successfully. Live:', this.isLive);
 
             // Mark that we need to seek to live on first play
             if (this.isLive) {
@@ -2048,7 +2049,7 @@ export class CorePlayer {
             }
 
         } catch (error) {
-            console.error('[Stream] Error loading HLS stream:', error);
+            Logger.error('[Stream] Error loading HLS stream:', error);
             this.ui.loader.classList.remove('visible');
 
             // Show error overlay for load failures
@@ -2193,7 +2194,7 @@ export class CorePlayer {
                 if (this.isLive && !this._stallRecoveryTimer) {
                     this._stallRecoveryTimer = setTimeout(() => {
                         if (this.isStreamMode && this.isLive && !this.paused) {
-                            console.log('[Stream] Stall detected, attempting recovery...');
+                            Logger.log('[Stream] Stall detected, attempting recovery...');
                             this._recoverFromStall();
                         }
                     }, 5000);
@@ -2204,7 +2205,7 @@ export class CorePlayer {
         // Handle stalled event (network issues)
         this.streamVideo.onstalled = () => {
             if (this.isStreamMode && this.isLive && !this.paused) {
-                console.log('[Stream] Video stalled, starting recovery timer...');
+                Logger.log('[Stream] Video stalled, starting recovery timer...');
                 if (!this._stallRecoveryTimer) {
                     this._stallRecoveryTimer = setTimeout(() => {
                         this._recoverFromStall();
@@ -2215,12 +2216,12 @@ export class CorePlayer {
 
         // Handle error event (critical for native HLS recovery)
         this.streamVideo.onerror = (e) => {
-            console.warn('[Stream] Video error:', e);
+            Logger.warn('[Stream] Video error:', e);
             if (this.isStreamMode && this.isLive) {
                 // For live streams, attempt recovery by reloading
                 setTimeout(() => {
                     if (this._lastStreamUrl) {
-                        console.log('[Stream] Attempting to reload stream after error...');
+                        Logger.log('[Stream] Attempting to reload stream after error...');
                         this._loadHLSStream(this._lastStreamUrl, true);
                     }
                 }, 2000);
@@ -2265,7 +2266,7 @@ export class CorePlayer {
             // Restore configured muted state (in case it was changed during muted autoplay retry)
             if (this.streamVideo.muted !== this.config.muted) {
                 this.streamVideo.muted = this.config.muted;
-                console.log('[Stream] Restored muted state to:', this.config.muted);
+                Logger.log('[Stream] Restored muted state to:', this.config.muted);
             }
 
             // Start canvas render loop for stream (copies video frames to canvas)
@@ -2281,10 +2282,10 @@ export class CorePlayer {
                     // Respect liveMode setting - buffer mode seeks to 30s behind
                     if (this.liveMode === 'buffer') {
                         this.hlsPlayer.seekToLatency(30);
-                        console.log('[Stream] First play - seeked to 30s buffer');
+                        Logger.log('[Stream] First play - seeked to 30s buffer');
                     } else {
                         this.hlsPlayer.seekToLive();
-                        console.log('[Stream] First play - seeked to live edge');
+                        Logger.log('[Stream] First play - seeked to live edge');
                     }
                 }, 300);
             }
@@ -2321,7 +2322,7 @@ export class CorePlayer {
             if (this.streamVideo.videoWidth && this.streamVideo.videoHeight) {
                 this.canvas.width = this.streamVideo.videoWidth;
                 this.canvas.height = this.streamVideo.videoHeight;
-                console.log('[Stream] Canvas size set to:', this.canvas.width, 'x', this.canvas.height);
+                Logger.log('[Stream] Canvas size set to:', this.canvas.width, 'x', this.canvas.height);
                 // Render first frame
                 this._renderStreamFrame();
             }
@@ -2338,7 +2339,7 @@ export class CorePlayer {
     _startStreamRenderLoop() {
         if (this.streamRenderLoopId) return; // Already running
 
-        console.log('[Stream] Starting canvas render loop');
+        Logger.log('[Stream] Starting canvas render loop');
 
         const renderFrame = () => {
             if (!this.isStreamMode || !this.isPlaying) {
@@ -2361,7 +2362,7 @@ export class CorePlayer {
         if (this.streamRenderLoopId) {
             cancelAnimationFrame(this.streamRenderLoopId);
             this.streamRenderLoopId = null;
-            console.log('[Stream] Stopped canvas render loop');
+            Logger.log('[Stream] Stopped canvas render loop');
         }
     }
 
@@ -2387,7 +2388,7 @@ export class CorePlayer {
             try {
                 callback(this.canvas, this.ctx);
             } catch (e) {
-                console.warn('After-frame callback error:', e);
+                Logger.warn('After-frame callback error:', e);
             }
         }
     }
@@ -2678,10 +2679,10 @@ export class CorePlayer {
 
             if (this.liveMode === 'buffer') {
                 this.hlsPlayer.seekToLatency(30);
-                console.log('[Stream] Seeked to 30s buffer');
+                Logger.log('[Stream] Seeked to 30s buffer');
             } else {
                 this.hlsPlayer.seekToLive();
-                console.log('[Stream] Seeked to live edge');
+                Logger.log('[Stream] Seeked to live edge');
             }
 
             // Update LIVE badge to show we're at live edge
@@ -2704,7 +2705,7 @@ export class CorePlayer {
     _recoverFromStall() {
         if (!this.isStreamMode || !this.isLive || !this.streamVideo) return;
 
-        console.log('[Stream] Attempting stall recovery...');
+        Logger.log('[Stream] Attempting stall recovery...');
 
         // Clear recovery timer
         if (this._stallRecoveryTimer) {
@@ -2719,21 +2720,21 @@ export class CorePlayer {
             // Seek to a few seconds behind live edge for buffer room
             const targetTime = Math.max(seekable.start(0), liveEdge - 5);
 
-            console.log(`[Stream] Seeking to ${targetTime}s (live edge: ${liveEdge}s)`);
+            Logger.log(`[Stream] Seeking to ${targetTime}s (live edge: ${liveEdge}s)`);
             this.streamVideo.currentTime = targetTime;
 
             // Try to resume playback
             this.streamVideo.play().then(() => {
-                console.log('[Stream] Stall recovery successful');
+                Logger.log('[Stream] Stall recovery successful');
             }).catch(e => {
-                console.warn('[Stream] Stall recovery play failed:', e);
+                Logger.warn('[Stream] Stall recovery play failed:', e);
             });
         } else if (this.hlsPlayer) {
             // Use hlsPlayer if available
             this._seekToLive();
         } else {
             // Last resort: reload the stream
-            console.log('[Stream] No seekable range, reloading stream...');
+            Logger.log('[Stream] No seekable range, reloading stream...');
             if (this._lastStreamUrl) {
                 this._loadHLSStream(this._lastStreamUrl, true);
             }
@@ -2805,10 +2806,10 @@ export class CorePlayer {
         this.streamBuffer = new StreamBuffer();
         this.streamBuffer.onSegmentAdded = (segment, count, totalBytes) => {
             if (count % 5 === 0) {
-                console.log(`[DVR] Captured ${count} segments, ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
+                Logger.log(`[DVR] Captured ${count} segments, ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
             }
         };
-        console.log('[DVR] Segment capture enabled. Load a stream to start capturing.');
+        Logger.log('[DVR] Segment capture enabled. Load a stream to start capturing.');
     }
 
     /**
@@ -2819,7 +2820,7 @@ export class CorePlayer {
             this.streamBuffer.stopCapture();
             this.streamBuffer.clear();
             this.streamBuffer = null;
-            console.log('[DVR] Segment capture disabled.');
+            Logger.log('[DVR] Segment capture disabled.');
         }
     }
 
@@ -2839,13 +2840,13 @@ export class CorePlayer {
      */
     async tryDVRPlayback() {
         if (!this.streamBuffer || !this.streamBuffer.hasEnoughData()) {
-            console.warn('[DVR] Not enough data captured. Need at least 3 segments.');
+            Logger.warn('[DVR] Not enough data captured. Need at least 3 segments.');
             return false;
         }
 
-        console.log('[DVR] Attempting MediaBunny playback from buffer...');
+        Logger.log('[DVR] Attempting MediaBunny playback from buffer...');
         const stats = this.streamBuffer.getStats();
-        console.log(`[DVR] Buffer: ${stats.segmentCount} segments, ${stats.totalMB}MB`);
+        Logger.log(`[DVR] Buffer: ${stats.segmentCount} segments, ${stats.totalMB}MB`);
 
         try {
             // Stop live stream
@@ -2855,7 +2856,7 @@ export class CorePlayer {
             // Get blob URL from buffer
             const blobUrl = this.streamBuffer.toBlobURL();
             if (!blobUrl) {
-                console.error('[DVR] Failed to create blob URL');
+                Logger.error('[DVR] Failed to create blob URL');
                 return false;
             }
 
@@ -2877,7 +2878,7 @@ export class CorePlayer {
 
             // Try loading through MediaBunny
             this.ui.loader.classList.add('visible');
-            console.log('[DVR] Loading blob through MediaBunny...');
+            Logger.log('[DVR] Loading blob through MediaBunny...');
 
             // Create MediaBunny Input with BlobSource
             this.input = new MediaBunny.Input({
@@ -2887,7 +2888,7 @@ export class CorePlayer {
 
             // Get Duration (this will fail if format isn't supported)
             this.duration = await this.input.computeDuration();
-            console.log('[DVR] Duration computed:', this.duration);
+            Logger.log('[DVR] Duration computed:', this.duration);
 
             // Get Video Track
             this.videoTrack = await this.input.getPrimaryVideoTrack();
@@ -2909,14 +2910,14 @@ export class CorePlayer {
             await this._handleInitialFrame(false);
 
             this.ui.loader.classList.remove('visible');
-            console.log('[DVR] ✅ MediaBunny playback initialized! Try player.play()');
+            Logger.log('[DVR] ✅ MediaBunny playback initialized! Try player.play()');
 
             return true;
 
         } catch (error) {
-            console.error('[DVR] ❌ MediaBunny playback failed:', error.message);
-            console.log('[DVR] The TS segment format may not be supported by MediaBunny.');
-            console.log('[DVR] Consider using canvas-copy mode (Option 1) instead.');
+            Logger.error('[DVR] ❌ MediaBunny playback failed:', error.message);
+            Logger.log('[DVR] The TS segment format may not be supported by MediaBunny.');
+            Logger.log('[DVR] Consider using canvas-copy mode (Option 1) instead.');
 
             this.ui.loader.classList.remove('visible');
             return false;
@@ -3016,11 +3017,11 @@ export class CorePlayer {
      */
     async loadSubtitle(url) {
         if (!this.subtitleManager) {
-            console.warn('Subtitle manager not initialized (captions disabled)');
+            Logger.warn('Subtitle manager not initialized (captions disabled)');
             return;
         }
         try {
-            console.log(`Loading subtitles: ${url}`);
+            Logger.log(`Loading subtitles: ${url}`);
             const response = await fetch(url);
             const content = await response.text();
 
@@ -3031,9 +3032,9 @@ export class CorePlayer {
                     const { parseTranscriptJSON, jsonToVTT } = await import('./SubtitleConverter.js');
                     const words = parseTranscriptJSON(content);
                     vttContent = jsonToVTT(words);
-                    console.log('Converted JSON transcript to VTT format');
+                    Logger.log('Converted JSON transcript to VTT format');
                 } catch (jsonError) {
-                    console.warn('Failed to parse as JSON transcript, treating as VTT:', jsonError);
+                    Logger.warn('Failed to parse as JSON transcript, treating as VTT:', jsonError);
                 }
             }
 
@@ -3055,14 +3056,14 @@ export class CorePlayer {
             this.activeSubtitleTrackId = trackId;
             this.isSubtitlesEnabled = true;
             this._updateSubtitleMenu();
-            console.log(`Subtitles loaded successfully as "${trackName}"`);
+            Logger.log(`Subtitles loaded successfully as "${trackName}"`);
 
             // Notify callback (for playlist to persist subtitles)
             if (this.onSubtitleChange) {
                 this.onSubtitleChange(this.subtitleTracks);
             }
         } catch (error) {
-            console.error('Error loading subtitles:', error);
+            Logger.error('Error loading subtitles:', error);
         }
     }
 
@@ -3216,10 +3217,10 @@ export class CorePlayer {
                     }, 500);
                 }
             } catch (e) {
-                console.warn('[Stream] Play failed:', e.message);
+                Logger.warn('[Stream] Play failed:', e.message);
                 // Handle autoplay policy - try muted on mobile/any failure
                 if (true) {
-                    console.log('[Stream] Autoplay/Play failed (' + e.name + '), trying muted...');
+                    Logger.log('[Stream] Autoplay/Play failed (' + e.name + '), trying muted...');
                     try {
                         this.streamVideo.muted = true;
                         await this.streamVideo.play();
@@ -3232,16 +3233,16 @@ export class CorePlayer {
                         // const unmuteHandler = () => {
                         //     if (this.streamVideo && this.isPlaying) {
                         //         this.streamVideo.muted = this.config.muted || false;
-                        //         console.log('[Stream] Unmuted after user interaction');
+                        //         Logger.log('[Stream] Unmuted after user interaction');
                         //     }
                         //     document.removeEventListener('click', unmuteHandler);
                         //     document.removeEventListener('touchstart', unmuteHandler);
                         // };
                         // document.addEventListener('click', unmuteHandler, { once: true });
                         // document.addEventListener('touchstart', unmuteHandler, { once: true });
-                        console.log('[Stream] Playing muted (touch/click to unmute)');
+                        Logger.log('[Stream] Playing muted (touch/click to unmute)');
                     } catch (mutedError) {
-                        console.error('[Stream] Even muted play failed:', mutedError);
+                        Logger.error('[Stream] Even muted play failed:', mutedError);
                     }
                 }
             }
@@ -3278,7 +3279,7 @@ export class CorePlayer {
                     }, 500);
                 }
             } catch (e) {
-                console.warn('[Audio] Play failed:', e.message);
+                Logger.warn('[Audio] Play failed:', e.message);
             }
             return;
         }
@@ -3334,7 +3335,7 @@ export class CorePlayer {
     }
 
     pause(showOverlay = true) {
-        console.log("Player.pause() called");
+        Logger.log("Player.pause() called");
 
         // Handle stream mode
         if (this.isStreamMode && this.streamVideo) {
@@ -3379,7 +3380,7 @@ export class CorePlayer {
             this.audioBufferIterator = null;
             this.audioIteratorCleanupPromise = iterator.return().catch(e => {
                 // Iterator might already be closed or in error state, ignore
-                console.debug("Error closing audio iterator:", e);
+                Logger.debug("Error closing audio iterator:", e);
             }).finally(() => {
                 this.audioIteratorCleanupPromise = null;
             });
@@ -3516,12 +3517,25 @@ export class CorePlayer {
      * Loops over the audio buffer iterator, scheduling the audio to be played in the audio context.
      */
     async _runAudioIterator() {
-        if (!this.audioSink) return;
+        if (!this.audioSink) {
+            Logger.warn('[Audio Debug] _runAudioIterator called but audioSink is null');
+            return;
+        }
+
+        const iteratorId = Date.now(); // Unique ID for this iterator run
+        let sampleCount = 0;
+        let lastTimestamp = 0;
+
+        Logger.log(`[Audio Debug #${iteratorId}] Iterator STARTED at playback time ${this._getPlaybackTime().toFixed(2)}s`);
+        Logger.log(`[Audio Debug #${iteratorId}] AudioContext state: ${this.audioContext?.state}, isPlaying: ${this.isPlaying}`);
 
         try {
             // Iterating over AudioSamples
             for await (const audioSample of this.audioBufferIterator) {
+                sampleCount++;
+
                 if (!this.isPlaying) {
+                    Logger.log(`[Audio Debug #${iteratorId}] Breaking: isPlaying=false after ${sampleCount} samples at timestamp ${audioSample.timestamp.toFixed(2)}s`);
                     // Close the AudioSample before breaking
                     audioSample.close();
                     break;
@@ -3530,7 +3544,13 @@ export class CorePlayer {
                 // Convert AudioSample to AudioBuffer and CLOSE the sample
                 const buffer = audioSample.toAudioBuffer();
                 const timestamp = audioSample.timestamp;
+                lastTimestamp = timestamp;
                 audioSample.close(); // Critical: Close AudioSample after converting
+
+                // Log every 100 samples to avoid spam
+                if (sampleCount % 100 === 0) {
+                    Logger.log(`[Audio Debug #${iteratorId}] Processed ${sampleCount} samples, current timestamp: ${timestamp.toFixed(2)}s, playback: ${this._getPlaybackTime().toFixed(2)}s, duration: ${this.duration?.toFixed(2)}s`);
+                }
 
                 // Create AudioBufferSourceNode
                 const audioSource = this.audioContext.createBufferSource();
@@ -3583,44 +3603,42 @@ export class CorePlayer {
                     });
                 }
             }
+
+            // Iterator completed normally (reached end of for await loop)
+            Logger.log(`[Audio Debug #${iteratorId}] Iterator COMPLETED NORMALLY after ${sampleCount} samples`);
+            Logger.log(`[Audio Debug #${iteratorId}] Last timestamp: ${lastTimestamp.toFixed(2)}s, Duration: ${this.duration?.toFixed(2)}s, isPlaying: ${this.isPlaying}`);
+            Logger.log(`[Audio Debug #${iteratorId}] Current playback time: ${this._getPlaybackTime().toFixed(2)}s`);
+
         } catch (error) {
             // Ignore InputDisposedError as it happens during reset/unload
-            if (error.name === 'InputDisposedError' || error.message.includes('Input has been disposed')) {
-                // console.debug('Audio iterator stopped due to input disposal');
+            if (error.name === 'InputDisposedError' || error.message?.includes('Input has been disposed')) {
+                Logger.log(`[Audio Debug #${iteratorId}] Iterator stopped: Input disposed (normal during reset/unload)`);
             } else {
-                console.error("Error in audio iterator:", error);
+                Logger.error(`[Audio Debug #${iteratorId}] Iterator ERROR after ${sampleCount} samples:`, error);
+                Logger.error(`[Audio Debug #${iteratorId}] Error details:`, {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack?.split('\n').slice(0, 5).join('\n')
+                });
             }
         } finally {
+            Logger.log(`[Audio Debug #${iteratorId}] Iterator FINALLY block - isPlaying: ${this.isPlaying}, sampleCount: ${sampleCount}`);
+
             // Ensure the iterator is properly closed to clean up any AudioSample objects
             // This is critical to prevent memory leaks as per MediaBunny's resource management requirements
             if (this.audioBufferIterator) {
                 try {
                     await this.audioBufferIterator.return();
+                    Logger.log(`[Audio Debug #${iteratorId}] Iterator cleanup successful`);
                 } catch (e) {
-                    // Iterator might already be closed, ignore errors
+                    Logger.log(`[Audio Debug #${iteratorId}] Iterator cleanup error (may be already closed):`, e.message);
                 }
-            }
-
-            // Auto-restart audio iterator if still playing and not at end of media
-            // This prevents random audio dropouts caused by iterator exiting unexpectedly
-            const currentTime = this._getPlaybackTime();
-            const isNearEnd = this.duration > 0 && currentTime >= this.duration - 0.5;
-
-            if (this.isPlaying && this.audioSink && !isNearEnd) {
-                console.warn('[Audio] Iterator exited unexpectedly, restarting...');
-                // Small delay to prevent rapid restart loops
-                setTimeout(() => {
-                    if (this.isPlaying && this.audioSink) {
-                        this.audioBufferIterator = this.audioSink.samples(this._getPlaybackTime());
-                        this._runAudioIterator();
-                    }
-                }, 100);
             }
         }
     }
 
     async _seekTo(time) {
-        console.log(`_seekTo called with time: ${time}`);
+        Logger.log(`_seekTo called with time: ${time}`);
 
         // Handle audio-only mode
         if (this.isAudioMode && this.audioElement) {
@@ -3683,7 +3701,7 @@ export class CorePlayer {
         if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
             if (this.container.requestFullscreen) {
                 this.container.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                    Logger.error(`Error attempting to enable fullscreen: ${err.message}`);
                 });
             } else if (this.container.webkitRequestFullscreen) {
                 this.container.webkitRequestFullscreen();
@@ -3956,7 +3974,7 @@ export class CorePlayer {
                 this.controlBarMode = savedMode;
             }
         } catch (e) {
-            console.warn('Failed to load control bar mode:', e);
+            Logger.warn('Failed to load control bar mode:', e);
         }
         this._applyControlBarMode();
     }
@@ -3969,7 +3987,7 @@ export class CorePlayer {
         try {
             localStorage.setItem('controlBarMode', this.controlBarMode);
         } catch (e) {
-            console.warn('Failed to save control bar mode:', e);
+            Logger.warn('Failed to save control bar mode:', e);
         }
     }
 
@@ -4100,7 +4118,7 @@ export class CorePlayer {
             this.config.controls[name] = visible;
             this._applyControlVisibility();
         } else {
-            console.warn(`Control '${name}' not found in configuration.`);
+            Logger.warn(`Control '${name}' not found in configuration.`);
         }
     }
 
@@ -4120,7 +4138,7 @@ export class CorePlayer {
         if (this.PRESETS[presetName]) {
             this.setControlsConfig(this.PRESETS[presetName]);
         } else {
-            console.warn(`Preset '${presetName}' not found.`);
+            Logger.warn(`Preset '${presetName}' not found.`);
         }
     }
 
@@ -4178,11 +4196,11 @@ export class CorePlayer {
         let startTimestamp = 0;
 
         if (savedState && savedState.videoIdentifier === this.currentVideoId) {
-            console.log('Restoring playback state:', savedState);
+            Logger.log('Restoring playback state:', savedState);
             startTimestamp = savedState.timestamp;
         } else {
             // Default: 50% frame
-            console.log('No saved state, using default frame');
+            Logger.log('No saved state, using default frame');
 
             if (!autoplay) {
                 // We want to show the 50% frame, but start playback from 0
@@ -4209,7 +4227,7 @@ export class CorePlayer {
                 );
                 await Promise.race([playPromise, timeoutPromise]);
             } catch (e) {
-                console.warn('Autoplay failed or timed out, falling back to paused state:', e);
+                Logger.warn('Autoplay failed or timed out, falling back to paused state:', e);
                 // Ensure we are in a clean state
                 this.isPlaying = false;
                 this._updatePlayPauseUI();
@@ -4285,7 +4303,7 @@ export class CorePlayer {
         try {
             localStorage.setItem(`jellyjump-state-${this.currentVideoId}`, JSON.stringify(state));
         } catch (e) {
-            console.warn('Failed to save playback state:', e);
+            Logger.warn('Failed to save playback state:', e);
         }
     }
 

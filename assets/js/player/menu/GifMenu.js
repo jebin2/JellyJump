@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
@@ -19,7 +20,7 @@ export class GifMenu {
         const footerTemplate = document.getElementById('gif-footer-template');
 
         if (!contentTemplate || !footerTemplate) {
-            console.error('GIF modal templates not found!');
+            Logger.error('GIF modal templates not found!');
             return;
         }
 
@@ -223,7 +224,7 @@ export class GifMenu {
                     // Get source with caching
                     sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
                 } catch (e) {
-                    console.error('Failed to get source blob:', e);
+                    Logger.error('Failed to get source blob:', e);
                     throw new Error('Cannot access video file');
                 }
 
@@ -294,7 +295,7 @@ export class GifMenu {
                 createBtn.disabled = false;
 
             } catch (e) {
-                console.error('GIF creation failed:', e);
+                Logger.error('GIF creation failed:', e);
                 errorMessage.textContent = `GIF creation failed: ${e.message} `;
                 errorMessage.classList.remove('hidden');
 

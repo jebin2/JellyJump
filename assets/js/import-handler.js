@@ -5,6 +5,7 @@
  * Handles media file import, metadata extraction, and storage
  */
 
+import { Logger } from "./utils/Logger.js";
 import { dbHelper } from './indexeddb-helper.js';
 import { showNotification, updateMediaLibraryCounts } from './media-library.js';
 
@@ -111,14 +112,14 @@ async function processFile(file) {
             metadata = await extractImageMetadata(file);
         }
     } catch (error) {
-        console.warn(`Failed to extract metadata for ${file.name}:`, error);
+        Logger.warn(`Failed to extract metadata for ${file.name}:`, error);
         // Use defaults if extraction fails
     }
 
     // Warn for large files
     const MAX_SIZE = 500 * 1024 * 1024; // 500MB
     if (file.size > MAX_SIZE) {
-        console.warn(`Large file detected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        Logger.warn(`Large file detected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
     }
 
     // Create media object
@@ -152,7 +153,7 @@ export async function handleImport(files) {
             await processFile(file);
             successCount++;
         } catch (error) {
-            console.error(`Failed to import ${file.name}:`, error);
+            Logger.error(`Failed to import ${file.name}:`, error);
             showNotification(`❌ Failed to import ${file.name}: ${error.message}`, 'error');
             errorCount++;
         }

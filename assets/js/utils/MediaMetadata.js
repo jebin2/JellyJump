@@ -1,3 +1,4 @@
+import { Logger } from "./Logger.js";
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
 import { IndexedDBService } from '../player/IndexedDBService.js';
@@ -33,7 +34,7 @@ export class MediaMetadata {
                     if (onUpdate) onUpdate(item);
                     if (onSave) onSave();
                 } catch (e) {
-                    console.warn('Failed to load metadata for', item.title, e);
+                    Logger.warn('Failed to load metadata for', item.title, e);
                     item.duration = '--:--';
                     if (onUpdate) onUpdate(item);
                 }
@@ -53,11 +54,11 @@ export class MediaMetadata {
         try {
             const file = await _dbService.loadFile(item.id);
             if (file) {
-                console.log('[Cache] Found in cache:', item.title);
+                Logger.log('[Cache] Found in cache:', item.title);
                 return file;
             }
         } catch (e) {
-            console.warn('[Cache] Error checking cache:', e);
+            Logger.warn('[Cache] Error checking cache:', e);
         }
         return null;
     }
@@ -70,13 +71,13 @@ export class MediaMetadata {
     static async cacheInBackground(item, onSave) {
         if (!item.url || !item.id) return;
 
-        console.log('[Cache] Starting background cache for:', item.title);
+        Logger.log('[Cache] Starting background cache for:', item.title);
 
         try {
             // Check if already cached first to avoid redundant download
             const existing = await this.checkCache(item);
             if (existing) {
-                console.log('[Cache] Item already cached, skipping download:', item.title);
+                Logger.log('[Cache] Item already cached, skipping download:', item.title);
                 return;
             }
 
@@ -88,7 +89,7 @@ export class MediaMetadata {
             const MAX_CACHE_SIZE_MB = 500;
 
             if (sizeMB > MAX_CACHE_SIZE_MB) {
-                console.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB)`);
+                Logger.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB)`);
                 return;
             }
 
@@ -96,11 +97,11 @@ export class MediaMetadata {
             const saved = await _dbService.saveFile(item.id, blob, filename, blob.type);
 
             if (saved) {
-                console.log('[Cache] Successfully cached in background:', item.title);
+                Logger.log('[Cache] Successfully cached in background:', item.title);
                 if (onSave) onSave();
             }
         } catch (error) {
-            console.warn('[Cache] Background caching failed:', error);
+            Logger.warn('[Cache] Background caching failed:', error);
         }
     }
 
@@ -142,7 +143,7 @@ export class MediaMetadata {
         // 4. Remote URL - fetch and persist to IndexedDB (Blocking Legacy Mode)
         // Note: For better UX, use cacheInBackground() in the UI layer instead of this blocking call
         if (item.url) {
-            console.log('[Cache] Fetching remote video (blocking):', item.title);
+            Logger.log('[Cache] Fetching remote video (blocking):', item.title);
 
             const response = await fetch(item.url);
             if (!response.ok) {
@@ -155,7 +156,7 @@ export class MediaMetadata {
             // Size limit check (500MB default)
             const MAX_CACHE_SIZE_MB = 500;
             if (sizeMB > MAX_CACHE_SIZE_MB) {
-                console.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB)`);
+                Logger.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB)`);
                 return blob; // Return without caching
             }
 
@@ -165,7 +166,7 @@ export class MediaMetadata {
                 const saved = await _dbService.saveFile(item.id, blob, filename, blob.type);
                 if (saved) {
                     if (onSave) onSave();
-                    console.log('[Cache] Blob persisted to IndexedDB:', item.title);
+                    Logger.log('[Cache] Blob persisted to IndexedDB:', item.title);
                 }
             }
 
@@ -235,7 +236,7 @@ export class MediaMetadata {
             const duration = await input.computeDuration();
             return duration;
         } catch (error) {
-            console.error('Error getting video duration:', error);
+            Logger.error('Error getting video duration:', error);
             return 0;
         }
     }

@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * ClipManager
  * Manages clip data structures and project state.
@@ -44,7 +45,7 @@ class ClipManager {
     addClip(clip) {
         this.clips.push(clip);
         this.updateProjectDuration();
-        console.log('Clip added:', clip);
+        Logger.log('Clip added:', clip);
 
         // Render visual clip
         if (window.clipRenderer) {

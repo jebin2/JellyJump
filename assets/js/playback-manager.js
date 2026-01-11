@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * PlaybackManager
  * Orchestrates synchronization between the PreviewPlayer and TimelineManager.
@@ -19,7 +20,7 @@ class PlaybackManager {
         // Listen for seek requests (if any external ones come in)
         // window.addEventListener('timeline-seek', (e) => this.seek(e.detail.time));
 
-        console.log('PlaybackManager initialized');
+        Logger.log('PlaybackManager initialized');
     }
 
     togglePlay() {
@@ -35,7 +36,7 @@ class PlaybackManager {
 
         const player = window.previewPlayer;
         if (!player) {
-            console.warn('PreviewPlayer not found');
+            Logger.warn('PreviewPlayer not found');
             return;
         }
 
@@ -45,7 +46,7 @@ class PlaybackManager {
             this.startLoop();
             this.dispatchStateChange();
         } catch (err) {
-            console.error('Failed to play:', err);
+            Logger.error('Failed to play:', err);
         }
     }
 

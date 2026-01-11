@@ -1,3 +1,4 @@
+import { Logger } from "./Logger.js";
 /**
  * M3U Playlist Parser
  * Parses IPTV channel lists in M3U/M3U8 format
@@ -13,7 +14,7 @@ export class M3UParser {
         const channels = [];
 
         if (!lines[0]?.toUpperCase().startsWith('#EXTM3U')) {
-            console.warn('[M3U] Invalid M3U file - missing #EXTM3U header');
+            Logger.warn('[M3U] Invalid M3U file - missing #EXTM3U header');
         }
 
         let currentInfo = null;

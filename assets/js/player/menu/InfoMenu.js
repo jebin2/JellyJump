@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 
@@ -205,7 +206,7 @@ export class InfoMenu {
             modal.body.dataset.rawInfo = JSON.stringify(metadata);
 
         } catch (e) {
-            console.error('Failed to load video info:', e);
+            Logger.error('Failed to load video info:', e);
             // Show error or partial content
             if (loadingEl) loadingEl.classList.add('hidden');
             if (contentEl) contentEl.classList.remove('hidden');
@@ -222,7 +223,7 @@ export class InfoMenu {
                         await navigator.clipboard.writeText(value);
                         playlist._showToast('Copied to clipboard!');
                     } catch (err) {
-                        console.error('Failed to copy:', err);
+                        Logger.error('Failed to copy:', err);
                     }
                 }
             });
@@ -261,7 +262,7 @@ Language: ${metadata.language}
                     await navigator.clipboard.writeText(text);
                     playlist._showToast('All info copied to clipboard!');
                 } catch (err) {
-                    console.error('Failed to copy all:', err);
+                    Logger.error('Failed to copy all:', err);
                 }
             });
         }

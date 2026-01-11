@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
@@ -82,7 +83,7 @@ export class ResizeMenu {
                 throw new Error('No video metadata available');
             }
         } catch (e) {
-            console.error('Failed to load video info:', e);
+            Logger.error('Failed to load video info:', e);
             resolutionDisplay.textContent = 'Unknown';
             errorDisplay.textContent = 'Failed to load video info. Resizing may not work.';
             errorDisplay.classList.remove('hidden');
@@ -230,7 +231,7 @@ export class ResizeMenu {
                 modal.closeBtn.disabled = false;
 
             } catch (e) {
-                console.error('Resize failed:', e);
+                Logger.error('Resize failed:', e);
                 errorDisplay.textContent = `Resize failed: ${e.message}`;
                 errorDisplay.classList.remove('hidden');
                 progressSection.classList.add('hidden');

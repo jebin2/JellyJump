@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 /**
  * Screenshot Manager
  * Handles video frame capture, preview, and download functionality  
@@ -127,7 +128,7 @@ export class ScreenshotManager {
         const hasCanvas = this.player.canvas && this.player.ctx;
 
         if (!hasMediaBunny && !hasCanvas) {
-            console.warn('No video loaded');
+            Logger.warn('No video loaded');
             return;
         }
 
@@ -147,27 +148,27 @@ export class ScreenshotManager {
                 // Stream mode: capture directly from canvas
                 dataUrl = this.player.canvas.toDataURL('image/png');
                 timestamp = this.player.currentTime || 0;
-                console.log('[Screenshot] Captured from stream canvas');
+                Logger.log('[Screenshot] Captured from stream canvas');
             } else if (hasMediaBunny) {
                 // MediaBunny mode: use videoSink
                 const frame = await this.player.videoSink.getCanvas(this.player.currentTime);
 
                 if (!frame || !frame.canvas) {
-                    console.error('Failed to capture frame');
+                    Logger.error('Failed to capture frame');
                     return;
                 }
 
                 dataUrl = frame.canvas.toDataURL('image/png');
                 timestamp = frame.timestamp;
             } else {
-                console.error('No capture method available');
+                Logger.error('No capture method available');
                 return;
             }
 
             // Show modal with preview
             this.showModal(dataUrl, timestamp);
         } catch (error) {
-            console.error('Error capturing frame:', error);
+            Logger.error('Error capturing frame:', error);
         }
     }
 
@@ -196,7 +197,7 @@ export class ScreenshotManager {
             const frame = await this.player.videoSink.getCanvas(newTimestamp);
 
             if (!frame || !frame.canvas) {
-                console.error('Failed to capture adjacent frame');
+                Logger.error('Failed to capture adjacent frame');
                 return;
             }
 
@@ -212,7 +213,7 @@ export class ScreenshotManager {
             const timeStr = this._formatTime(frame.timestamp);
             this.ui.timestamp.textContent = `at ${timeStr}`;
         } catch (error) {
-            console.error('Error capturing adjacent frame:', error);
+            Logger.error('Error capturing adjacent frame:', error);
         }
     }
 
@@ -284,7 +285,7 @@ export class ScreenshotManager {
             // Close modal
             this.closeModal();
         } catch (error) {
-            console.error('Error downloading screenshot:', error);
+            Logger.error('Error downloading screenshot:', error);
         }
     }
 

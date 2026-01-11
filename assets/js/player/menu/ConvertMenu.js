@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
@@ -17,9 +18,9 @@ export class ConvertMenu {
         const contentTemplate = document.getElementById('conversion-content-template');
         const footerTemplate = document.getElementById('conversion-footer-template');
 
-        console.log('Opening Conversion Modal');
+        Logger.log('Opening Conversion Modal');
         if (!contentTemplate || !footerTemplate) {
-            console.error('Conversion modal templates not found!');
+            Logger.error('Conversion modal templates not found!');
             return;
         }
 
@@ -136,7 +137,7 @@ export class ConvertMenu {
                 modal.closeBtn.disabled = false;
 
             } catch (error) {
-                console.error('Conversion failed:', error);
+                Logger.error('Conversion failed:', error);
                 errorMessage.textContent = `Operation failed: ${error.message}`;
                 errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
@@ -179,7 +180,7 @@ export class ConvertMenu {
 
             // Fallback if format not supported
             if (!['mp4', 'webm', 'mov'].includes(targetFormat)) {
-                console.warn(`Format ${targetFormat} not explicitly supported, defaulting to MP4.`);
+                Logger.warn(`Format ${targetFormat} not explicitly supported, defaulting to MP4.`);
                 targetFormat = 'mp4';
             }
         }
@@ -195,7 +196,7 @@ export class ConvertMenu {
             // Handle Success
             ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, addToPlaylist, playlist, downloadBtn);
         } catch (error) {
-            console.error("Conversion failed:", error);
+            Logger.error("Conversion failed:", error);
             throw error;
         }
     }

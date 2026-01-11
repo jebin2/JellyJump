@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * ThumbnailExtractor
  * Extracts and manages video thumbnails for timeline clips.
@@ -39,7 +40,7 @@ class ThumbnailExtractor {
             try {
                 // Get media file from IndexedDB
                 if (!window.indexedDBHelper) {
-                    console.error('IndexedDBHelper not available');
+                    Logger.error('IndexedDBHelper not available');
                     return null;
                 }
 
@@ -64,7 +65,7 @@ class ThumbnailExtractor {
 
                 return dataURL;
             } catch (err) {
-                console.error('Error extracting thumbnail:', err);
+                Logger.error('Error extracting thumbnail:', err);
                 return null;
             } finally {
                 this.pending.delete(mediaId);

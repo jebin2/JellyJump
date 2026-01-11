@@ -5,6 +5,7 @@
  * Manages media library UI updates and notification system
  */
 
+import { Logger } from "./utils/Logger.js";
 import { dbHelper } from './indexeddb-helper.js';
 import { thumbnailGenerator } from './thumbnail-generator.js';
 import { previewPlayerManager } from './preview-player.js';
@@ -57,7 +58,7 @@ export async function updateMediaLibraryCounts() {
         await renderMediaTiles('audio');
         await renderMediaTiles('images');
     } catch (error) {
-        console.error('Failed to update media library counts:', error);
+        Logger.error('Failed to update media library counts:', error);
     }
 }
 
@@ -145,7 +146,7 @@ async function processVideoFiles(files) {
             successCount++;
 
         } catch (error) {
-            console.error(`Failed to import ${file.name}:`, error);
+            Logger.error(`Failed to import ${file.name}:`, error);
             showNotification(`❌ Failed to import ${file.name}`, 'error');
             errorCount++;
         }
@@ -164,7 +165,7 @@ async function processVideoFiles(files) {
 function uploadVideos() {
     const fileInput = document.getElementById('video-upload-input');
     if (!fileInput) {
-        console.error('Video upload input not found');
+        Logger.error('Video upload input not found');
         return;
     }
 
@@ -243,7 +244,7 @@ async function processAudioFiles(files) {
             successCount++;
 
         } catch (error) {
-            console.error(`Failed to import ${file.name}:`, error);
+            Logger.error(`Failed to import ${file.name}:`, error);
             showNotification(`❌ Failed to import ${file.name}`, 'error');
             errorCount++;
         }
@@ -262,7 +263,7 @@ async function processAudioFiles(files) {
 function uploadAudio() {
     const fileInput = document.getElementById('audio-upload-input');
     if (!fileInput) {
-        console.error('Audio upload input not found');
+        Logger.error('Audio upload input not found');
         return;
     }
 
@@ -346,7 +347,7 @@ async function processImageFiles(files) {
             successCount++;
 
         } catch (error) {
-            console.error(`Failed to import ${file.name}:`, error);
+            Logger.error(`Failed to import ${file.name}:`, error);
             showNotification(`❌ Failed to import ${file.name}`, 'error');
             errorCount++;
         }
@@ -365,7 +366,7 @@ async function processImageFiles(files) {
 function uploadImages() {
     const fileInput = document.getElementById('image-upload-input');
     if (!fileInput) {
-        console.error('Image upload input not found');
+        Logger.error('Image upload input not found');
         return;
     }
 
@@ -418,7 +419,7 @@ async function handleUrlImport(url) {
         await updateMediaLibraryCounts();
 
     } catch (error) {
-        console.error('Failed to import URL:', error);
+        Logger.error('Failed to import URL:', error);
         showNotification(`❌ Failed to import URL: ${error.message}`, 'error');
     }
 }
@@ -486,7 +487,7 @@ function highlightMatch(text, query) {
 async function searchMedia(query) {
     searchQuery = query.toLowerCase().trim();
 
-    console.log(`Searching for: "${searchQuery}"`);
+    Logger.log(`Searching for: "${searchQuery}"`);
 
     // Re-render tiles for all categories to apply search filter
     await renderMediaTiles('videos');
@@ -510,7 +511,7 @@ async function clearSearch() {
     }
 
     searchQuery = '';
-    console.log('Search cleared');
+    Logger.log('Search cleared');
 
     // Re-render tiles to show all items
     await renderMediaTiles('videos');
@@ -638,7 +639,7 @@ function createTile(item) {
         if (item.type === 'video' && !item.thumbnailGenerated && item.blob) {
             tile.setAttribute('data-thumbnail-status', 'loading');
             loadThumbnailForTile(tile, item).catch(err => {
-                console.error(`Failed to generate thumbnail for ${item.name}:`, err);
+                Logger.error(`Failed to generate thumbnail for ${item.name}:`, err);
                 tile.setAttribute('data-thumbnail-status', 'error');
             });
         }
@@ -680,7 +681,7 @@ function createTile(item) {
                 const source = item.url || item.blob;
                 await previewPlayerManager.loadVideo(source, item.id, item.name);
             } catch (error) {
-                console.error('Failed to load video in preview:', error);
+                Logger.error('Failed to load video in preview:', error);
             }
         });
     }
@@ -724,7 +725,7 @@ async function loadThumbnailForTile(tile, item) {
 
         tile.setAttribute('data-thumbnail-status', 'loaded');
     } catch (error) {
-        console.error('Thumbnail generation failed:', error);
+        Logger.error('Thumbnail generation failed:', error);
         tile.setAttribute('data-thumbnail-status', 'error');
         throw error;
     }
@@ -746,7 +747,7 @@ function onDragStart(event, item) {
     event.currentTarget.classList.add('media-tile--dragging');
 
     // Log for debugging
-    console.log(`Dragging: ${item.name}`);
+    Logger.log(`Dragging: ${item.name}`);
 }
 
 /**
@@ -772,7 +773,7 @@ function selectTile(tileId) {
         tile.setAttribute('aria-selected', isSelected ? 'true' : 'false');
     });
 
-    console.log(`Selected tile: ${tileId}`);
+    Logger.log(`Selected tile: ${tileId}`);
 }
 
 /**
@@ -840,7 +841,7 @@ async function renderMediaTiles(category) {
             });
         }
     } catch (error) {
-        console.error(`Failed to render tiles for ${category}:`, error);
+        Logger.error(`Failed to render tiles for ${category}:`, error);
     }
 }
 
@@ -924,7 +925,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
     } catch (error) {
-        console.error('Failed to initialize media library:', error);
+        Logger.error('Failed to initialize media library:', error);
         showNotification('❌ Failed to initialize media library', 'error');
     }
 });

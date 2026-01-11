@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 
 /**
@@ -16,7 +17,7 @@ export class RecordMenu {
      */
     static async init(item, playlist) {
         if (!playlist.player || !playlist.player.canvas) {
-            console.error('RecordMenu: Player canvas not available');
+            Logger.error('RecordMenu: Player canvas not available');
             playlist._showToast('Error: Player not ready', 'error');
             return;
         }
@@ -72,12 +73,12 @@ export class RecordMenu {
                 const audioTracks = audioStream.getAudioTracks();
                 if (audioTracks.length > 0) {
                     tracks.push(...audioTracks);
-                    console.log('RecordMenu: Audio tracks added');
+                    Logger.log('RecordMenu: Audio tracks added');
                 } else {
-                    console.warn('RecordMenu: No audio tracks found on video element stream');
+                    Logger.warn('RecordMenu: No audio tracks found on video element stream');
                 }
             } else {
-                console.warn('RecordMenu: Could not capture audio stream from video element');
+                Logger.warn('RecordMenu: Could not capture audio stream from video element');
             }
 
             const combinedStream = new MediaStream(tracks);
@@ -141,7 +142,7 @@ export class RecordMenu {
             }
 
         } catch (err) {
-            console.error('RecordMenu: Start Error', err);
+            Logger.error('RecordMenu: Start Error', err);
             playlist._showToast('Failed to start recording: ' + err.message, 'error');
             this.isRecording = false;
         }
@@ -165,7 +166,7 @@ export class RecordMenu {
      */
     static handleItemChange(playlist) {
         if (this.isRecording) {
-            console.log('RecordMenu: Item changed, stopping recording...');
+            Logger.log('RecordMenu: Item changed, stopping recording...');
             this.stopRecording(playlist);
         }
     }

@@ -1,3 +1,4 @@
+import { Logger } from "../utils/Logger.js";
 /**
  * SidebarToggle - Manages playlist sidebar collapse/expand functionality
  * Phase 16: Collapsible Sidebar
@@ -9,7 +10,7 @@ export class SidebarToggle {
      */
     constructor(sidebarElement, buttonElement) {
         if (!sidebarElement || !buttonElement) {
-            console.error('SidebarToggle: Missing required elements');
+            Logger.error('SidebarToggle: Missing required elements');
             return;
         }
 
@@ -31,7 +32,7 @@ export class SidebarToggle {
         // Attach event listeners
         this._attachEventListeners();
 
-        console.log('SidebarToggle initialized successfully');
+        Logger.log('SidebarToggle initialized successfully');
     }
 
     /**
@@ -42,7 +43,7 @@ export class SidebarToggle {
         // Button click
         this.button.addEventListener('click', (e) => {
             e.preventDefault();
-            console.log('Toggle button clicked, current state:', this.isCollapsed ? 'collapsed' : 'expanded');
+            Logger.log('Toggle button clicked, current state:', this.isCollapsed ? 'collapsed' : 'expanded');
             this.toggle();
         });
 
@@ -50,7 +51,7 @@ export class SidebarToggle {
         if (this.mobileExpandBtn) {
             this.mobileExpandBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                console.log('Mobile expand button clicked');
+                Logger.log('Mobile expand button clicked');
                 this.expand();
             });
         }
@@ -79,7 +80,7 @@ export class SidebarToggle {
      * Collapse the sidebar
      */
     collapse() {
-        console.log('Collapsing sidebar');
+        Logger.log('Collapsing sidebar');
         this.isCollapsed = true;
         this.sidebar.classList.add('collapsed');
 
@@ -101,7 +102,7 @@ export class SidebarToggle {
      * Expand the sidebar
      */
     expand() {
-        console.log('Expanding sidebar');
+        Logger.log('Expanding sidebar');
         this.isCollapsed = false;
         this.sidebar.classList.remove('collapsed');
 

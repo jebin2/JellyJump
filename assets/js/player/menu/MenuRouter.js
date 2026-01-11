@@ -1,3 +1,4 @@
+import { Logger } from "../../utils/Logger.js";
 import { ConvertMenu } from './ConvertMenu.js';
 import { TrimMenu } from './TrimMenu.js';
 import { ResizeMenu } from './ResizeMenu.js';
@@ -24,11 +25,11 @@ export class MenuRouter {
         const item = playlist.items[index];
 
         if (!item) {
-            console.error(`MenuRouter: Invalid index ${index}`);
+            Logger.error(`MenuRouter: Invalid index ${index}`);
             return;
         }
 
-        console.log(`MenuRouter: Routing action "${action}" for item "${item.title}"`);
+        Logger.log(`MenuRouter: Routing action "${action}" for item "${item.title}"`);
 
         switch (action) {
             case 'convert':
@@ -62,7 +63,7 @@ export class MenuRouter {
                 await TrackManagerMenu.init(item, playlist);
                 break;
             default:
-                console.warn(`MenuRouter: Unknown action "${action}"`);
+                Logger.warn(`MenuRouter: Unknown action "${action}"`);
         }
     }
 }

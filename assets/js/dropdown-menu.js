@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * Dropdown Menu Module
  * Phase 28: File Menu Dropdown
@@ -85,7 +86,7 @@ class DropdownMenu {
         menuItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 const action = item.dataset.action;
-                console.log(`Menu action: ${action}`);
+                Logger.log(`Menu action: ${action}`);
 
                 // Close the dropdown after menu item click
                 this.closeAllMenus();

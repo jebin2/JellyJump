@@ -1,3 +1,4 @@
+import { Logger } from "./utils/Logger.js";
 /**
  * TimelineToolbar
  * Handles interactions for the timeline edit toolbar.
@@ -21,7 +22,7 @@ class TimelineToolbar {
 
     init() {
         this.attachEventListeners();
-        console.log('TimelineToolbar initialized');
+        Logger.log('TimelineToolbar initialized');
     }
 
     attachEventListeners() {
@@ -39,7 +40,7 @@ class TimelineToolbar {
     }
 
     handleAction(action) {
-        console.log(`Toolbar action: ${action}`);
+        Logger.log(`Toolbar action: ${action}`);
         // Future: Dispatch event or call editor method
         // const event = new CustomEvent('timeline-action', { detail: { action } });
         // window.dispatchEvent(event);
