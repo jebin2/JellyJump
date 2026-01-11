@@ -114,8 +114,9 @@ cat > build/player.html << 'PLAYER_HTML'
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JellyJump - Player</title>
     <link rel="icon" href="assets/icons/jelly_jump_logo.png">
+    <meta name="description" content="JellyJump - A modern, feature-rich video player and editor. Play local files, stream HLS, trim, convert, and create GIFs - all in your browser with complete privacy.">
     <link rel="preload" href="assets/icons/jelly_jump_logo.gif" as="image">
-    <link rel="preload" href="assets/icons/jelly_play.png" as="image">
+    <link rel="preload" href="assets/icons/jelly_play.webp" as="image">
     <meta name="theme-color" content="#00d9a5">
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/jelly_jump_logo.png">
@@ -239,6 +240,7 @@ log_info "Copying static assets..."
 find . \
     \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
        -o -name "*.gif" -o -name "*.svg" -o -name "*.ico" \
+       -o -name "*.webp" \
        -o -name "*.woff" -o -name "*.woff2" -o -name "*.ttf" \
        -o -name "*.eot" -o -name "*.json" -o -name "*.webmanifest" \) \
     -not -path "./node_modules/*" \

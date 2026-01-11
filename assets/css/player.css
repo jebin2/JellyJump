@@ -1346,7 +1346,7 @@ button:focus-visible {
 .play-icon {
     width: 120px;
     height: 120px;
-    background-image: url('../../assets/icons/jelly_play.png');
+    background-image: url('../../assets/icons/jelly_play.webp');
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
@@ -2779,6 +2779,7 @@ body.fullscreen-active {
 .validation-ok-btn:hover {
     background: var(--accent-secondary);
 }
+
 /* -----------------------------------------
    Bezel Overlay (Volume/Status)
    ----------------------------------------- */
@@ -2799,7 +2800,7 @@ body.fullscreen-active {
     pointer-events: none;
     backdrop-filter: blur(4px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .bezel-icon {
