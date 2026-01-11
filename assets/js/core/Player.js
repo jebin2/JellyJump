@@ -327,29 +327,22 @@ export class CorePlayer {
         // Set initial volume
         this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
 
-        this.isInitialized = true; // Fix: Use isAudioInitialized? No, existing code used isAudioInitialized
+        // Initialize AudioVisualizer
+        if (!this.audioVisualizer && this.canvas) {
+            this.audioVisualizer = new AudioVisualizer(this.canvas);
+        }
+
+        // Connect Gain -> Visualizer -> Destination
+        // or Gain -> Destination (if no visualizer needed/supported)
+        if (this.audioVisualizer) {
+            this.audioVisualizer.connect(this.audioContext, this.gainNode);
+        } else {
+            this.gainNode.connect(this.audioContext.destination);
+        }
+
+        this.isInitialized = true;
         this.isAudioInitialized = true;
     }
-
-    /**
-     * Create custom controls UI
-     * @private
-     */
-    _createControls() {
-        // ... (existing code)
-    }
-
-    // ... inside _createControls or similar where UI is cached ...
-    // Wait, I need to find where UI caching happens. It's in the constructor usually or _createControls.
-    // Let's look at the previous view of Player.js.
-    // UI caching is in the constructor after _createControls.
-
-    // I will split this into two edits if needed, but I can probably do it in one if I target the right lines.
-    // The previous view showed _initAudio at line 280.
-    // The UI caching was around line 316.
-
-    // Let's stick to _initAudio first.
-
 
     /**
      * Create custom controls UI
@@ -1637,16 +1630,6 @@ export class CorePlayer {
                 return this._loadHLSStream(url, autoplay, videoId);
             }
 
-            // Detect audio-only files by extension OR by isAudio flag
-            const urlLower = url.toLowerCase();
-            const audioExtensions = ['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma'];
-            const isAudioByExtension = audioExtensions.some(ext => urlLower.endsWith(ext));
-            const isAudioFile = options.isAudio || isAudioByExtension;
-
-            if (isAudioFile) {
-                return this._loadAudioFile(url, autoplay, videoId);
-            }
-
             // Reset audio mode if loading a video
             this._cleanupAudio();
 
@@ -1742,14 +1725,15 @@ export class CorePlayer {
                 this.canvas.width = this.videoTrack.displayWidth;
                 this.canvas.height = this.videoTrack.displayHeight;
 
-                // Render first frame or saved state
-                await this._handleInitialFrame(autoplay);
+            } else {
+                // No video track - assume Audio Only Mode
+                Logger.log('No video track found - enabling Audio Mode');
+                this.isAudioMode = true;
 
-                // Ensure overlay is visible if not autoplaying
-                // Managed by _setLoading(false) -> _updatePlayPauseUI later
-                // if (!autoplay && this.ui.playOverlay) {
-                //    this.ui.playOverlay.style.display = 'flex';
-                // }
+                // Set canvas size for visualizer (default to container size)
+                const containerRect = this.container.getBoundingClientRect();
+                this.canvas.width = containerRect.width || 1280;
+                this.canvas.height = containerRect.height || 720;
             }
 
             // Setup Audio Track
@@ -1784,6 +1768,10 @@ export class CorePlayer {
                 Logger.log(`Restored ${savedSubtitles.length} subtitle track(s) for video`);
             }
 
+            // Phase 19: Handle Initial Frame & State (Now called after Audio setup too)
+            // This ensures saved state is restored for both Video and Audio
+            await this._handleInitialFrame(autoplay);
+
             this._updateSubtitleMenu();
 
             this._setLoading(false);
@@ -1802,115 +1790,7 @@ export class CorePlayer {
     }
 
     /**
-     * Load an audio file and display visualizer
-     * @param {string} url - Audio file URL
-     * @param {boolean} autoplay - Whether to start playing automatically
-     * @param {string} videoId - Optional unique identifier
-     * @private
-     */
-    async _loadAudioFile(url, autoplay, videoId) {
-        try {
-            Logger.log('[Audio] Loading audio file:', url);
-
-            // Cleanup previous playback
-            this._cleanupAudio();
-            this._cleanupMediaBunny();
-            if (this.hlsPlayer) this._cleanupHLS();
-
-            this.isAudioMode = true;
-            this.isStreamMode = false;
-            this.isLive = false;
-            this.currentVideoId = videoId || url;
-            this._setLoading(true);
-
-            // Resize canvas to fill the container for fullscreen visualizer
-            const containerRect = this.container.getBoundingClientRect();
-            this.canvas.width = containerRect.width || 1280;
-            this.canvas.height = containerRect.height || 720;
-
-            // Create audio element
-            this.audioElement = new Audio();
-            this.audioElement.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
-            this.audioElement.src = url;
-            this.audioElement.preload = 'metadata';
-
-            // Wait for metadata
-            await new Promise((resolve, reject) => {
-                this.audioElement.onloadedmetadata = () => {
-                    this.duration = this.audioElement.duration;
-                    this._updateTimeDisplay();
-                    resolve();
-                };
-                this.audioElement.onerror = (e) => {
-                    reject(new Error('Failed to load audio: ' + (e.target?.error?.message || 'Unknown error')));
-                };
-            });
-
-            // Setup audio context and visualizer
-            await this._initAudioVisualizerForAudioFile();
-
-            // Setup event listeners
-            this.audioElement.ontimeupdate = () => {
-                this.currentTime = this.audioElement.currentTime;
-                this._updateTimeDisplay();
-                this._updateProgress();
-            };
-
-            this.audioElement.onended = () => {
-                this.isPlaying = false;
-                this._updatePlayPauseUI();
-                if (this.onEnded) this.onEnded();
-            };
-
-            // Draw static background
-            if (this.audioVisualizer) {
-                this.audioVisualizer.drawStaticBackground();
-            }
-
-            // Hide loader and show play overlay
-            this._setLoading(false);
-            if (this.ui.playOverlay) {
-                this.ui.playOverlay.style.display = 'flex';
-            }
-
-            if (autoplay) {
-                await this.play();
-            }
-
-            Logger.log('[Audio] Audio file loaded successfully');
-
-        } catch (error) {
-            Logger.error('[Audio] Error loading audio:', error);
-            this._setLoading(false);
-            this.isAudioMode = false;
-        }
-    }
-
-    /**
-     * Initialize audio visualizer for audio file playback
-     * @private
-     */
-    async _initAudioVisualizerForAudioFile() {
-        // Initialize audio context if needed
-        if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        // Resume if suspended
-        if (this.audioContext.state === 'suspended') {
-            await this.audioContext.resume();
-        }
-
-        // Create audio source from audio element
-        const source = this.audioContext.createMediaElementSource(this.audioElement);
-
-        // Create and connect visualizer
-        this.audioVisualizer = new AudioVisualizer(this.canvas);
-        this.audioVisualizer.connect(this.audioContext, source);
-    }
-
-    /**
-     * Cleanup audio-only playback
+     * Cleanup audio-only playback visualizer
      * @private
      */
     _cleanupAudio() {
@@ -1920,16 +1800,9 @@ export class CorePlayer {
             this.audioVisualizer.disconnect();
             this.audioVisualizer = null;
         }
-
-        if (this.audioElement) {
-            // Remove event listeners before cleanup
-            this.audioElement.ontimeupdate = null;
-            this.audioElement.onended = null;
-            this.audioElement.pause();
-            this.audioElement.src = '';
-            this.audioElement = null;
-        }
     }
+
+
 
     /**
      * Reset UI elements (canvas, time, progress)
@@ -3251,43 +3124,10 @@ export class CorePlayer {
             return;
         }
 
-        // Handle audio-only mode
-        if (this.isAudioMode && this.audioElement) {
-            try {
-                // Resume audio context if suspended
-                if (this.audioContext && this.audioContext.state === 'suspended') {
-                    await this.audioContext.resume();
-                }
 
-                await this.audioElement.play();
-                this.isPlaying = true;
-                this._updatePlayPauseUI();
-
-                // Start visualizer
-                if (this.audioVisualizer) {
-                    this.audioVisualizer.start();
-                }
-
-                if (this.ui.playOverlay) {
-                    this.ui.playOverlay.style.display = 'none';
-                }
-
-                // Start auto-hide timer for overlay mode
-                if (this.controlBarMode === 'overlay') {
-                    setTimeout(() => {
-                        if (this.isPlaying && this.controlBarMode === 'overlay') {
-                            this._startAutoHideTimer();
-                        }
-                    }, 500);
-                }
-            } catch (e) {
-                Logger.warn('[Audio] Play failed:', e.message);
-            }
-            return;
-        }
-
-        // File-based playback (MediaBunny)
         if (!this.videoTrack && !this.audioTrack) return;
+
+        Logger.log(`[Play] Starting playback - isAudioMode: ${this.isAudioMode}, playbackTimeAtStart: ${this.playbackTimeAtStart}`);
 
         // Initialize Audio Context on first user interaction
         this._initAudio();
@@ -3314,8 +3154,15 @@ export class CorePlayer {
             // Start the audio iterator
             if (this.audioBufferIterator) await this.audioBufferIterator.return();
             // Use samples() instead of buffers() since we're using AudioSampleSink
-            this.audioBufferIterator = this.audioSink.samples(this._getPlaybackTime());
+            const startTime = this._getPlaybackTime();
+            Logger.log(`[Play] Starting audio iterator at time: ${startTime.toFixed(2)}s`);
+            this.audioBufferIterator = this.audioSink.samples(startTime);
             this._runAudioIterator();
+
+            // Start visualizer if in audio mode
+            if (this.isAudioMode && this.audioVisualizer) {
+                this.audioVisualizer.start();
+            }
         }
 
         this._startRenderLoop();
@@ -3351,23 +3198,7 @@ export class CorePlayer {
             return;
         }
 
-        // Handle audio-only mode
-        if (this.isAudioMode && this.audioElement) {
-            this.audioElement.pause();
-            this.isPlaying = false;
-            this._clearAutoHideTimer();
-            this._updatePlayPauseUI();
 
-            // Stop visualizer
-            if (this.audioVisualizer) {
-                this.audioVisualizer.stop();
-            }
-
-            if (this.ui.playOverlay) {
-                this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
-            }
-            return;
-        }
 
         // File-based playback (MediaBunny)
         this.playbackTimeAtStart = this._getPlaybackTime();
@@ -3412,6 +3243,11 @@ export class CorePlayer {
         // Show/Hide overlay
         if (this.ui.playOverlay) {
             this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
+        }
+
+        // Stop visualizer if active
+        if (this.isAudioMode && this.audioVisualizer) {
+            this.audioVisualizer.stop();
         }
     }
 
@@ -3528,12 +3364,17 @@ export class CorePlayer {
         let sampleCount = 0;
         let lastTimestamp = 0;
 
+        // CRITICAL: Store reference to the specific iterator this run is using
+        // This prevents the finally block from closing a newer iterator that was
+        // created after a seek operation
+        const myIterator = this.audioBufferIterator;
+
         Logger.log(`[Audio Debug #${iteratorId}] Iterator STARTED at playback time ${this._getPlaybackTime().toFixed(2)}s`);
         Logger.log(`[Audio Debug #${iteratorId}] AudioContext state: ${this.audioContext?.state}, isPlaying: ${this.isPlaying}`);
 
         try {
-            // Iterating over AudioSamples
-            for await (const audioSample of this.audioBufferIterator) {
+            // Iterating over AudioSamples - use local reference to avoid race conditions
+            for await (const audioSample of myIterator) {
                 sampleCount++;
 
                 if (!this.isPlaying) {
@@ -3626,15 +3467,18 @@ export class CorePlayer {
         } finally {
             Logger.log(`[Audio Debug #${iteratorId}] Iterator FINALLY block - isPlaying: ${this.isPlaying}, sampleCount: ${sampleCount}`);
 
-            // Ensure the iterator is properly closed to clean up any AudioSample objects
-            // This is critical to prevent memory leaks as per MediaBunny's resource management requirements
-            if (this.audioBufferIterator) {
+            // CRITICAL: Only clean up if the current iterator is still the one we were running
+            // If a seek happened during playback, this.audioBufferIterator may now point to a new iterator
+            // We must NOT close the new iterator - only clean up if it's still ours
+            if (this.audioBufferIterator === myIterator) {
                 try {
-                    await this.audioBufferIterator.return();
+                    await myIterator.return();
                     Logger.log(`[Audio Debug #${iteratorId}] Iterator cleanup successful`);
                 } catch (e) {
                     Logger.log(`[Audio Debug #${iteratorId}] Iterator cleanup error (may be already closed):`, e.message);
                 }
+            } else {
+                Logger.log(`[Audio Debug #${iteratorId}] Iterator was replaced (seek occurred), skipping cleanup of new iterator`);
             }
         }
     }
@@ -3642,19 +3486,6 @@ export class CorePlayer {
     async _seekTo(time) {
         Logger.log(`_seekTo called with time: ${time}`);
 
-        // Handle audio-only mode
-        if (this.isAudioMode && this.audioElement) {
-            const wasPlaying = this.isPlaying;
-            this.audioElement.currentTime = Math.max(0, Math.min(this.duration, time));
-            this.currentTime = this.audioElement.currentTime;
-            this._updateProgress();
-            if (wasPlaying) {
-                await this.play();
-            }
-            return;
-        }
-
-        // Show loader during seek
         this._setLoading(true);
 
         const wasPlaying = this.isPlaying;
@@ -4277,8 +4108,6 @@ export class CorePlayer {
      * @param {boolean} autoplay - Whether to autoplay
      */
     async _handleInitialFrame(autoplay = false) {
-        if (!this.videoTrack) return;
-
         const savedState = this._loadPlaybackState();
         let startTimestamp = 0;
 
@@ -4290,19 +4119,20 @@ export class CorePlayer {
             Logger.log('No saved state, using default frame');
 
             if (!autoplay) {
-                // We want to show the 50% frame, but start playback from 0
-                // So we'll extract and draw the 50% frame, but keep playbackTimeAtStart at 0
                 const middleTimestamp = this.duration * 0.5;
-                await this._extractAndDrawFrame(middleTimestamp);
-                return; // Done, we stay at 0 for playback
+                if (this.videoTrack) {
+                    await this._extractAndDrawFrame(middleTimestamp);
+                }
+                return;
             }
-            // If autoplaying, we skip the default frame and start from 0
         }
 
         // If we have a saved state, we seek to it
         this.playbackTimeAtStart = startTimestamp;
         this.currentTime = startTimestamp;
         this._updateProgress();
+
+        Logger.log(`[InitialFrame] Restored state - isAudioMode: ${this.isAudioMode}, playbackTimeAtStart: ${this.playbackTimeAtStart}, currentTime: ${this.currentTime}`);
 
         // If autoplay is requested, we play immediately
         if (autoplay) {
