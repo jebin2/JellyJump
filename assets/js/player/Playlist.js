@@ -1104,12 +1104,26 @@ export class Playlist {
             this.items.splice(idx, 1);
         });
 
-        // 2. Update Active Index
+        // 2. Update Active Index (Play Next Logic)
         if (originalActive) {
             const newIndex = this.items.indexOf(originalActive);
             if (newIndex === -1) {
-                this.activeIndex = -1;
-                if (this.player) this.player.reset();
+                // Active item was removed. Play Next.
+                // Smallest removed index points to the "hole" now filled by next item
+                // (or end of list)
+                const nextIndexCandidate = indicesToRemove[indicesToRemove.length - 1];
+
+                let targetIndex = nextIndexCandidate;
+                if (targetIndex >= this.items.length) {
+                    targetIndex = this.items.length - 1;
+                }
+
+                if (targetIndex >= 0 && this.items.length > 0) {
+                    this.selectItem(targetIndex);
+                } else {
+                    this.activeIndex = -1;
+                    this.clear(false);
+                }
             } else {
                 this.activeIndex = newIndex;
             }
