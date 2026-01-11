@@ -3266,8 +3266,8 @@ export class CorePlayer {
             await this.audioContext.resume();
         }
 
-        if (this._getPlaybackTime() >= this.duration) {
-            // If we're at the end, let's snap back to the start
+        if (this.duration > 0 && this._getPlaybackTime() >= this.duration - 0.1) {
+            // If we're at the end (and duration is known), let's snap back to the start
             this.playbackTimeAtStart = 0;
             await this._startVideoIterator();
         } else if (!this.videoFrameIterator) {
@@ -4161,7 +4161,7 @@ export class CorePlayer {
                 // Race play against a timeout to prevent hanging on iOS/Autoplay restrictions
                 const playPromise = this.play();
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Autoplay timeout')), 1000)
+                    setTimeout(() => reject(new Error('Autoplay timeout')), 10000)
                 );
                 await Promise.race([playPromise, timeoutPromise]);
             } catch (e) {

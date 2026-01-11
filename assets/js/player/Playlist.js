@@ -1104,11 +1104,11 @@ export class Playlist {
 
             // CRITICAL: Pause current video FIRST and wait for cleanup
             // This prevents audio/video mismatch during rapid switching
-            if (this.player.isPlaying || this.player.videoTrack || this.player.audioTrack) {
-                this.player.pause(false);
-                // Small delay to ensure audio context and iterators are properly cleaned up
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
+            // if (this.player.isPlaying || this.player.videoTrack || this.player.audioTrack) {
+            //     this.player.pause(false);
+            //     // Small delay to ensure audio context and iterators are properly cleaned up
+            //     await new Promise(resolve => setTimeout(resolve, 50));
+            // }
 
             // Cleanup previous item's resources if it was local
             if (this.activeIndex !== -1 && this.activeIndex !== index) {
