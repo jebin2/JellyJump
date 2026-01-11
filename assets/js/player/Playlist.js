@@ -604,10 +604,9 @@ export class Playlist {
         // Process metadata for new items
         this._processMetadata(newItems);
 
-        // If playlist was empty, play the first new file
-        if (this.items.length === newItems.length) {
-            this.selectItem(0);
-        }
+        // Always play the first new file that was added
+        const firstNewIndex = this.items.length - newItems.length;
+        this.selectItem(firstNewIndex);
     }
 
     /**
@@ -1232,8 +1231,8 @@ export class Playlist {
                 return;
             }
 
-            // Load video into player (autoplay based on whether we WERE playing)
-            const shouldAutoplay = autoplay && wasPlaying;
+            // Load video into player (always autoplay if autoplay param is true)
+            const shouldAutoplay = autoplay;
 
             // Set up callback to save subtitles when user uploads them
             this.player.onSubtitleChange = (subtitleTracks) => {
@@ -1980,10 +1979,8 @@ export class Playlist {
 
                 this.addItem(newItem);
 
-                // Select the new item if playlist was empty
-                if (this.items.length === 1) {
-                    this.selectItem(0);
-                }
+                // Always select and play the new stream item
+                this.selectItem(this.items.length - 1);
 
                 return;
             }
@@ -2016,10 +2013,8 @@ export class Playlist {
 
                 this.addItem(newItem);
 
-                // Select the new item if playlist was empty
-                if (this.items.length === 1) {
-                    this.selectItem(0);
-                }
+                // Always select and play the new audio item
+                this.selectItem(this.items.length - 1);
 
                 return;
             }
@@ -2068,10 +2063,8 @@ export class Playlist {
             // Process metadata
             this._processMetadata([newItem]);
 
-            // Select the new item
-            if (this.items.length === 1) {
-                this.selectItem(0);
-            }
+            // Always select and play the new video item
+            this.selectItem(this.items.length - 1);
 
         } catch (error) {
             if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
