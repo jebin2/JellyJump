@@ -317,27 +317,23 @@ export class CorePlayer {
             const eqInput = this.audioEqualizer.init();
             const eqOutput = this.audioEqualizer.getOutputNode();
 
-            // Chain: EQ Output -> Gain Node -> Destination
-            // Note: Source connection happens in _setupAudioNodes
+            // Chain: EQ Output -> Gain Node
+            // Note: Source connection happens in _runAudioIterator
             eqOutput.connect(this.gainNode);
         }
 
+        // Connect gainNode to destination for audio output
         this.gainNode.connect(this.audioContext.destination);
 
         // Set initial volume
         this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
 
-        // Initialize AudioVisualizer
+        // Initialize AudioVisualizer (taps into gainNode for analysis)
         if (!this.audioVisualizer && this.canvas) {
             this.audioVisualizer = new AudioVisualizer(this.canvas);
-        }
-
-        // Connect Gain -> Visualizer -> Destination
-        // or Gain -> Destination (if no visualizer needed/supported)
-        if (this.audioVisualizer) {
+            // Connect gainNode -> analyser (parallel path for visualization)
+            // Analyser doesn't need to connect to destination since gainNode already does
             this.audioVisualizer.connect(this.audioContext, this.gainNode);
-        } else {
-            this.gainNode.connect(this.audioContext.destination);
         }
 
         this.isInitialized = true;
@@ -3160,8 +3156,16 @@ export class CorePlayer {
             this._runAudioIterator();
 
             // Start visualizer if in audio mode
-            if (this.isAudioMode && this.audioVisualizer) {
-                this.audioVisualizer.start();
+            if (this.isAudioMode) {
+                // Create visualizer if it doesn't exist (may have been cleaned up)
+                if (!this.audioVisualizer && this.canvas) {
+                    const { AudioVisualizer } = await import('../player/AudioVisualizer.js');
+                    this.audioVisualizer = new AudioVisualizer(this.canvas);
+                    this.audioVisualizer.connect(this.audioContext, this.gainNode);
+                }
+                if (this.audioVisualizer) {
+                    this.audioVisualizer.start();
+                }
             }
         }
 

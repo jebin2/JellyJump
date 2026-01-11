@@ -42,7 +42,7 @@ export class AudioVisualizer {
     /**
      * Connect to an audio context and source
      * @param {AudioContext} audioContext
-     * @param {MediaElementAudioSourceNode} source
+     * @param {AudioNode} source - The audio node to analyze (e.g., gainNode)
      */
     connect(audioContext, source) {
         // Create analyser node
@@ -50,9 +50,9 @@ export class AudioVisualizer {
         this.analyser.fftSize = 256;
         this.analyser.smoothingTimeConstant = this.smoothing;
 
-        // Connect: source -> analyser -> destination
+        // Connect source -> analyser (for frequency analysis only)
+        // Audio already flows via source -> destination, so analyser just taps in
         source.connect(this.analyser);
-        this.analyser.connect(audioContext.destination);
 
         // Create data array for frequency data
         const bufferLength = this.analyser.frequencyBinCount;
@@ -116,10 +116,13 @@ export class AudioVisualizer {
     start() {
         if (this.isRunning) return;
 
-        // If no analyser, use simulated mode
+        // Set mode based on analyser availability
         if (!this.analyser) {
             this.simulatedMode = true;
-            Logger.log('[AudioVisualizer] Starting in simulated mode');
+            Logger.log('[AudioVisualizer] Starting in simulated mode (no analyser)');
+        } else {
+            this.simulatedMode = false;
+            Logger.log('[AudioVisualizer] Starting with audio analyser');
         }
 
         this.isRunning = true;
