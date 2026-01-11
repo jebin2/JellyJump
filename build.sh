@@ -113,6 +113,16 @@ cat > build/player.html << 'PLAYER_HTML'
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JellyJump - Player</title>
+    <script>
+        // Set base URL for subdirectory deployments (e.g., /JellyJump/)
+        (function() {
+            var path = window.location.pathname;
+            var base = path.substring(0, path.lastIndexOf('/') + 1);
+            var tag = document.createElement('base');
+            tag.href = base;
+            document.head.appendChild(tag);
+        })();
+    </script>
     <link rel="icon" href="assets/icons/jelly_jump_logo.png">
     <meta name="description" content="JellyJump - A modern, feature-rich video player and editor. Play local files, stream HLS, trim, convert, and create GIFs - all in your browser with complete privacy.">
     <link rel="preload" href="assets/icons/jelly_jump_logo.gif" as="image">
