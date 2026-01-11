@@ -604,9 +604,7 @@ export class Playlist {
         // Process metadata for new items
         this._processMetadata(newItems);
 
-        // Always play the first new file that was added
-        const firstNewIndex = this.items.length - newItems.length;
-        this.selectItem(firstNewIndex);
+        // Note: addItems() handles autoplay, no selectItem needed here
     }
 
     /**
@@ -962,8 +960,9 @@ export class Playlist {
     /**
      * Add multiple videos
      * @param {Array} videos 
+     * @param {boolean} autoplay - Whether to auto-play the first item (default: true)
      */
-    async addItems(videos) {
+    async addItems(videos, autoplay = true) {
         // Separate M3U playlist URLs from regular items
         const m3uItems = [];
         const regularItems = [];
@@ -989,10 +988,8 @@ export class Playlist {
             this.render();
             this._updatePlayerNavigationState();
 
-            // Auto-load if single file added (Phase 21)
-            if (regularItems.length === 1 && m3uItems.length === 0) {
-                this.selectItem(startIndex);
-            }
+            // Auto-play the first item from the batch that was just added
+            this.selectItem(startIndex, autoplay);
         }
 
         // Process M3U playlists asynchronously

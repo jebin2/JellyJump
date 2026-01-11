@@ -16,7 +16,7 @@
     <meta name="theme-color" content="#00d9a5">
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/jelly_jump_logo.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="JellyJump">
     <script>
@@ -156,9 +156,7 @@
                         title: "30A Ridiculous TV",
                         isStream: true
                     }
-                ]);
-
-                playlist.selectItem(0, false);
+                ], false); // false = don't autoplay on page load
             }
         }
 
