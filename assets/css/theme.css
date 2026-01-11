@@ -11,14 +11,6 @@
 @font-face {
   font-family: 'Space Grotesk';
   font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url('../fonts/SpaceGrotesk-Light.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url('../fonts/SpaceGrotesk-Regular.ttf') format('truetype');
@@ -58,26 +50,10 @@
 
 @font-face {
   font-family: 'Space Mono';
-  font-style: italic;
-  font-weight: 400;
-  font-display: swap;
-  src: url('../fonts/SpaceMono-Italic.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: 'Space Mono';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
   src: url('../fonts/SpaceMono-Bold.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: 'Space Mono';
-  font-style: italic;
-  font-weight: 700;
-  font-display: swap;
-  src: url('../fonts/SpaceMono-BoldItalic.ttf') format('truetype');
 }
 
 /* -----------------------------------------
