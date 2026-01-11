@@ -9,12 +9,21 @@ export class SubtitleManager {
     }
 
     /**
-     * Parse WebVTT content
-     * @param {string} vttContent 
+     * Parse WebVTT or SRT content
+     * @param {string} content - VTT or SRT subtitle content
      */
-    parse(vttContent) {
+    parse(content) {
         this.cues = [];
-        const lines = vttContent.split(/\r\n|\n|\r/);
+
+        // Normalize SRT to VTT format:
+        // - SRT uses commas in timestamps (01:38:58,496), VTT uses periods (01:38:58.496)
+        // - Replace comma before milliseconds with period
+        const normalizedContent = content.replace(
+            /(\d{2}:\d{2}:\d{2}),(\d{3})/g,
+            '$1.$2'
+        );
+
+        const lines = normalizedContent.split(/\r\n|\n|\r/);
         let currentCue = null;
 
         // Simple VTT parser
