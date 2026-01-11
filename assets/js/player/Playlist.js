@@ -34,12 +34,13 @@ export class Playlist {
         this.expandedFolders = new Set(); // Track expanded folders
         this.searchQuery = ''; // Search query state
 
-        // Storage
-        this.storage = new IndexedDBService();
-        this.saveTimeout = null; // For debouncing saves
+        // Initial Loading State
+        this.isLoading = true;
 
-        // Clear placeholder
-        this.container.innerHTML = '';
+        // Note: Do NOT clear container.innerHTML here.
+        // We want to keep the "Loading..." placeholder from player.html visible
+        // until the first render() call.
+
 
         // Initialize sortable
         // Initialize sortable
@@ -490,6 +491,7 @@ export class Playlist {
 
             if (items.length > 0) {
                 this.items = items;
+                this.isLoading = false; // Loaded successfully
                 this.render();
 
                 if (playbackState) {
@@ -521,10 +523,12 @@ export class Playlist {
                     }
                 }
             } else {
+                this.isLoading = false; // Loaded empty
                 this.render(); // Render empty state
             }
         } catch (e) {
             console.error('Error loading playlist:', e);
+            this.isLoading = false; // Stop loading on error
             this.render();
         }
     }
@@ -980,6 +984,9 @@ export class Playlist {
             }
         }
 
+        // Disable loading state since we have new items
+        this.isLoading = false;
+
         // Add regular items immediately
         if (regularItems.length > 0) {
             const startIndex = this.items.length;
@@ -1270,6 +1277,16 @@ export class Playlist {
      */
     render() {
         this.container.innerHTML = '';
+        const sidebar = this.container.closest('.playlist-section');
+
+        if (this.isLoading) {
+            // Ensure sidebar is hidden while loading
+            if (sidebar) sidebar.classList.add('hidden');
+            return;
+        } else {
+            // Show sidebar when data is ready
+            if (sidebar) sidebar.classList.remove('hidden');
+        }
 
         if (this.items.length === 0) {
             const template = document.getElementById('playlist-empty-template');
