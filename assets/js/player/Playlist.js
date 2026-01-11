@@ -1376,7 +1376,65 @@ export class Playlist {
             current.items.push({ ...item, originalIndex: index });
         });
 
+        // Tag folders that are purely from an M3U source
+        this._tagM3UFolders(root);
+
         return root;
+    }
+
+    /**
+     * Recursively identify folders that belong to an M3U playlist
+     * @param {Object} node 
+     * @returns {string|null} m3uSource if consistent, null otherwise
+     */
+    _tagM3UFolders(node) {
+        let commonSource = undefined; // undefined means not set yet
+
+        // Check Items
+        for (const item of node.items) {
+            if (!item.m3uSource) {
+                commonSource = null;
+                break;
+            }
+            if (commonSource === undefined) {
+                commonSource = item.m3uSource;
+            } else if (commonSource !== item.m3uSource) {
+                commonSource = null;
+                break;
+            }
+        }
+
+        // Check Children Folders
+        if (commonSource !== null) {
+            for (const child of Object.values(node.children)) {
+                const childSource = this._tagM3UFolders(child);
+                if (childSource === null) {
+                    commonSource = null;
+                    // We must continue traversing other children to tag THEM correctly
+                    // But for THIS node, it's null. 
+                    // However, we shouldn't break early because siblings depend on recursion.
+                    // Wait, we can't break early from the loop if we want to process all children.
+                } else {
+                    if (commonSource === undefined) {
+                        commonSource = childSource;
+                    } else if (commonSource !== childSource) {
+                        commonSource = null;
+                    }
+                }
+            }
+        } else {
+            // Even if parent is mixed, we must process children
+            for (const child of Object.values(node.children)) {
+                this._tagM3UFolders(child);
+            }
+        }
+
+        // Tag the node
+        if (commonSource && commonSource !== undefined) {
+            node.m3uSource = commonSource;
+        }
+
+        return commonSource === undefined ? null : commonSource;
     }
 
     /**
@@ -1478,6 +1536,29 @@ export class Playlist {
         const toggle = header.querySelector('.playlist-toggle');
         const folderName = header.querySelector('.folder-name');
         const removeBtn = header.querySelector('.folder-remove-btn');
+
+        // Add Sync Button if M3U Source
+        if (folder.m3uSource) {
+            const syncBtn = document.createElement('button');
+            syncBtn.className = 'playlist-action-btn folder-sync-btn';
+            syncBtn.title = 'Sync Playlist';
+            syncBtn.ariaLabel = 'Sync Playlist from Source';
+            // Use icon-loop as closest match to sync/refresh
+            syncBtn.innerHTML = `
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-loop"></use>
+                </svg>
+            `;
+            syncBtn.onclick = (e) => {
+                e.stopPropagation();
+                this._syncM3UPlaylist(folder.name, folder.m3uSource);
+            };
+            // Insert before remove button
+            removeBtn.parentNode.insertBefore(syncBtn, removeBtn);
+
+            // Add margin to remove button for spacing
+            removeBtn.style.marginLeft = '5px';
+        }
 
         if (isExpanded) {
             toggle.classList.add('expanded');
@@ -2094,7 +2175,7 @@ export class Playlist {
      * @param {string} url - URL to the M3U playlist
      * @private
      */
-    async _handleM3UPlaylist(url) {
+    async _handleM3UPlaylist(url, isSync = false) {
         try {
             // Fetch and parse the M3U playlist
             const channels = await M3UParser.fetchAndParse(url);
@@ -2131,6 +2212,7 @@ export class Playlist {
                     mimeType: 'application/vnd.apple.mpegurl',
                     path: path,
                     id: channel.id || generateId(),
+                    m3uSource: url, // Store source for sync
                     // Store M3U metadata for potential future use
                     m3uData: {
                         tvgId: channel.tvgId,
@@ -2142,6 +2224,15 @@ export class Playlist {
                 };
             });
 
+            // If syncing, remove OLD items from this source first
+            if (isSync) {
+                // We do this inside to ensure atomic-ish replacement
+                // but actually the caller should handle removal or we do it here.
+                // Let's do it here.
+                this.items = this.items.filter(item => item.m3uSource !== url);
+                console.log(`[M3U] Removed old items for sync: ${url}`);
+            }
+
             // Add all items at once
             newItems.forEach(item => {
                 if (!item.id) item.id = generateId();
@@ -2152,7 +2243,7 @@ export class Playlist {
             this._updatePlayerNavigationState();
 
             // Show success message
-            this._showToast(`Added ${channels.length} channels from ${playlistName}`);
+            this._showToast(`${isSync ? 'Synced' : 'Added'} ${channels.length} channels from ${playlistName}`);
 
             console.log(`[M3U] Imported ${channels.length} channels from: ${url}`);
 
@@ -2162,6 +2253,21 @@ export class Playlist {
                 throw new Error('CORS Error: Cannot access this M3U playlist. The server must allow cross-origin requests.');
             }
             throw error;
+        }
+    }
+
+    /**
+     * Sync/Re-update M3U Playlist
+     * @param {string} name - Playlist/Folder name
+     * @param {string} url - Source URL
+     */
+    async _syncM3UPlaylist(name, url) {
+        if (!url) return;
+        this._showToast(`Syncing ${name}...`);
+        try {
+            await this._handleM3UPlaylist(url, true);
+        } catch (e) {
+            this._showToast(`Sync failed: ${e.message}`, 3000, true);
         }
     }
 

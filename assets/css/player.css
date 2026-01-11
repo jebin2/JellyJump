@@ -2617,4 +2617,26 @@ body.fullscreen-active {
 
 .jellyjump-error-dismiss {
     padding: 8px 20px;
+}/* Sync Button Styles (M3U) */
+.folder-sync-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.playlist-folder-header:hover .folder-sync-btn {
+    opacity: 1;
+}
+
+.folder-sync-btn:hover {
+    color: var(--accent-primary, #00aff0);
+    background: rgba(var(--accent-primary-rgb, 0, 175, 240), 0.1);
 }
