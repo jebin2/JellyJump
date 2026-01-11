@@ -430,45 +430,50 @@ export class Playlist {
     /**
      * Scroll to the currently playing item and highlight it
      */
-    scrollToPlaying() {
-        if (this.activeIndex < 0 || this.activeIndex >= this.items.length) {
-            console.log('[Playlist] No active item to scroll to');
-            return;
-        }
-
-        // Clear any active search first (to show tree view)
-        const searchInput = document.querySelector('#mb-playlist-search-input');
-        if (searchInput && searchInput.value) {
-            searchInput.value = '';
-            this.searchQuery = '';
-            const searchClearBtn = document.querySelector('#mb-playlist-search-clear');
-            searchClearBtn?.classList.add('hidden');
-            this.render();
-        }
-
-        // Find the item's parent folders and expand them
+    async scrollToPlaying() {
+        if (this.activeIndex < 0) return;
         const item = this.items[this.activeIndex];
+        if (!item) return;
+
+        // Ensure path expansion (Iterative lazy load)
         if (item.path && item.path.includes('/')) {
-            const pathParts = item.path.split('/');
-            let currentPath = '';
-            for (let i = 0; i < pathParts.length - 1; i++) {
-                currentPath = currentPath ? `${currentPath}/${pathParts[i]}` : pathParts[i];
-                this.expandedFolders.add(currentPath);
+            const parts = item.path.split('/');
+            for (let i = 0; i < parts.length - 1; i++) {
+                const folderPath = parts.slice(0, i + 1).join('/');
+                await this._ensureFolderExpanded(folderPath);
             }
-            this.render();
         }
 
-        // Find the DOM element for the active item
+        // Wait for DOM paint after expansion
+        await new Promise(r => setTimeout(r, 50));
+
         const itemEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
         if (itemEl) {
-            // Scroll into view
             itemEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-            // Add highlight animation
             itemEl.classList.add('playlist-item--highlight');
             setTimeout(() => {
                 itemEl.classList.remove('playlist-item--highlight');
             }, 1500);
+        }
+    }
+
+    /**
+     * Recursively ensure a folder is expanded in the DOM
+     */
+    async _ensureFolderExpanded(path) {
+        // Find wrapper
+        const folderEl = this.container.querySelector(`.playlist-folder[data-path="${path}"]`);
+        if (!folderEl) return;
+
+        const children = folderEl.querySelector('.playlist-children');
+        // Check if hidden or not loaded
+        if (children && children.classList.contains('hidden')) {
+            const header = folderEl.querySelector('.playlist-folder-header');
+            if (header) {
+                header.click(); // Triggers toggleDrawer -> setupInfiniteScroll
+                // Wait a tick for rendering
+                await new Promise(r => setTimeout(r, 50));
+            }
         }
     }
 
@@ -1725,9 +1730,8 @@ export class Playlist {
 
         removeBtn.onclick = (e) => {
             e.stopPropagation();
-            if (confirm(`Delete folder "${folderData.name}"?`)) {
-                this.removeFolder(folderData.path);
-            }
+            // Direct remove without confirmation as requested
+            this.removeFolder(folderData.path);
         };
 
         // Initialize children if already expanded
