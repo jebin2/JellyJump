@@ -171,8 +171,12 @@ export class CorePlayer {
             loopStartInput: null,
             loopStartInput: null,
             loopEndInput: null,
-            playOverlay: null
+            playOverlay: null,
+            bezelOverlay: null
         };
+
+        this.isLoading = false;
+        this.bezelTimer = null;
 
         // Navigation callbacks
         this.onNext = null;
@@ -375,6 +379,7 @@ export class CorePlayer {
         // Cache control container and play overlay (always needed)
         this.ui.controls = this.container.querySelector('.jellyjump-controls');
         this.ui.playOverlay = this.container.querySelector('.jellyjump-play-overlay');
+        this.ui.bezelOverlay = this.container.querySelector('.jellyjump-bezel-overlay');
 
         // Cache elements only if their control is enabled
         // Visibility is handled by data-control attributes (hidden by default in HTML)
@@ -1059,11 +1064,7 @@ export class CorePlayer {
             this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings (Muted)');
             // this.ui.audioSettingsBtn.style.color = 'var(--accent-warning)'; // Removed to use default/theme color
         } else {
-            if (this.volume < 0.5) {
-                iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-low');
-            } else {
-                iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
-            }
+            iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
             this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings');
 
             // Highlight if EQ is active
@@ -1704,7 +1705,7 @@ export class CorePlayer {
                 this.subtitleManager.cues = [];
             }
 
-            this.ui.loader.classList.add('visible');
+            this._setLoading(true);
             Logger.log(`Loading media: ${url}`);
             this.currentVideoId = videoId || url;
 
@@ -1745,9 +1746,10 @@ export class CorePlayer {
                 await this._handleInitialFrame(autoplay);
 
                 // Ensure overlay is visible if not autoplaying
-                if (!autoplay && this.ui.playOverlay) {
-                    this.ui.playOverlay.style.display = 'flex';
-                }
+                // Managed by _setLoading(false) -> _updatePlayPauseUI later
+                // if (!autoplay && this.ui.playOverlay) {
+                //    this.ui.playOverlay.style.display = 'flex';
+                // }
             }
 
             // Setup Audio Track
@@ -1784,12 +1786,12 @@ export class CorePlayer {
 
             this._updateSubtitleMenu();
 
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
             Logger.log('Media loaded successfully');
 
         } catch (error) {
             Logger.error('Error loading media:', error);
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
 
             // Notify playlist to mark item as broken
             if (this.onStreamError && this.currentVideoId) {
@@ -1819,7 +1821,7 @@ export class CorePlayer {
             this.isStreamMode = false;
             this.isLive = false;
             this.currentVideoId = videoId || url;
-            this.ui.loader.classList.add('visible');
+            this._setLoading(true);
 
             // Resize canvas to fill the container for fullscreen visualizer
             const containerRect = this.container.getBoundingClientRect();
@@ -1866,7 +1868,7 @@ export class CorePlayer {
             }
 
             // Hide loader and show play overlay
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
             if (this.ui.playOverlay) {
                 this.ui.playOverlay.style.display = 'flex';
             }
@@ -1879,7 +1881,7 @@ export class CorePlayer {
 
         } catch (error) {
             Logger.error('[Audio] Error loading audio:', error);
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
             this.isAudioMode = false;
         }
     }
@@ -1945,7 +1947,7 @@ export class CorePlayer {
         this._updateProgress();
 
         // Hide loader if visible (optional, but good for full reset)
-        // this.ui.loader.classList.remove('visible'); 
+        this._setLoading(false);
     }
 
     /**
@@ -1966,7 +1968,7 @@ export class CorePlayer {
 
             this.isStreamMode = true;
             this.currentVideoId = videoId || url;
-            this.ui.loader.classList.add('visible');
+            this._setLoading(true);
             this._hideStreamError(); // Hide any previous errors
 
             // Reset UI (clear canvas, reset time/progress)
@@ -2027,7 +2029,7 @@ export class CorePlayer {
                 this.streamVideo.muted = this.config.muted;
             }
 
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
             Logger.log('[Stream] HLS stream loaded successfully. Live:', this.isLive);
 
             // Mark that we need to seek to live on first play
@@ -2050,7 +2052,7 @@ export class CorePlayer {
 
         } catch (error) {
             Logger.error('[Stream] Error loading HLS stream:', error);
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
 
             // Show error overlay for load failures
             const errorDetails = HLSPlayer.getErrorDetails({
@@ -2187,7 +2189,7 @@ export class CorePlayer {
         // Handle Stalling/Waiting (Show Loader)
         this.streamVideo.onwaiting = () => {
             if (this.isStreamMode && !this.paused) {
-                this.ui.loader.classList.add('visible');
+                this._setLoading(true);
 
                 // Start stall recovery timer for live streams (native HLS on iOS/Android)
                 // If stalled for more than 5 seconds, seek to live edge
@@ -2231,7 +2233,7 @@ export class CorePlayer {
         // Handle Playing (Hide Loader & Clear Errors)
         this.streamVideo.onplaying = () => {
             if (this.isStreamMode) {
-                this.ui.loader.classList.remove('visible');
+                this._setLoading(false);
                 this._hideStreamError(); // Recovery successful!
                 // Clear stall recovery timer
                 if (this._stallRecoveryTimer) {
@@ -2251,7 +2253,7 @@ export class CorePlayer {
         // Seek completed - hide loader
         this.streamVideo.onseeked = () => {
             if (this.isStreamMode) {
-                this.ui.loader.classList.remove('visible');
+                this._setLoading(false);
             }
         };
 
@@ -2276,7 +2278,7 @@ export class CorePlayer {
             if (this._needsSeekToLive && this.hlsPlayer) {
                 this._needsSeekToLive = false;
                 // Show loader during seek
-                this.ui.loader.classList.add('visible');
+                this._setLoading(true);
                 // Small delay to ensure seekable range is populated
                 setTimeout(() => {
                     // Respect liveMode setting - buffer mode seeks to 30s behind
@@ -2675,7 +2677,7 @@ export class CorePlayer {
     _seekToLive() {
         if (this.isStreamMode && this.isLive && this.hlsPlayer) {
             // Show loader during seek
-            this.ui.loader.classList.add('visible');
+            this._setLoading(true);
 
             if (this.liveMode === 'buffer') {
                 this.hlsPlayer.seekToLatency(30);
@@ -2877,7 +2879,7 @@ export class CorePlayer {
             }
 
             // Try loading through MediaBunny
-            this.ui.loader.classList.add('visible');
+            this._setLoading(true);
             Logger.log('[DVR] Loading blob through MediaBunny...');
 
             // Create MediaBunny Input with BlobSource
@@ -2909,7 +2911,7 @@ export class CorePlayer {
             // Get first frame
             await this._handleInitialFrame(false);
 
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
             Logger.log('[DVR] ✅ MediaBunny playback initialized! Try player.play()');
 
             return true;
@@ -2919,7 +2921,7 @@ export class CorePlayer {
             Logger.log('[DVR] The TS segment format may not be supported by MediaBunny.');
             Logger.log('[DVR] Consider using canvas-copy mode (Option 1) instead.');
 
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
             return false;
         }
     }
@@ -2984,7 +2986,7 @@ export class CorePlayer {
         retryBtn.style.display = errorDetails.recoverable ? 'inline-block' : 'none';
 
         // Hide loader, show error
-        this.ui.loader.classList.remove('visible');
+        this._setLoading(false);
         overlay.style.display = 'flex';
 
         // Send error notification to parent (Mini-NVR) so it can show Live button for retry
@@ -3653,7 +3655,7 @@ export class CorePlayer {
         }
 
         // Show loader during seek
-        this.ui.loader.classList.add('visible');
+        this._setLoading(true);
 
         const wasPlaying = this.isPlaying;
 
@@ -3668,7 +3670,7 @@ export class CorePlayer {
         try {
             await this._startVideoIterator();
         } finally {
-            this.ui.loader.classList.remove('visible');
+            this._setLoading(false);
         }
 
         if (wasPlaying && this.playbackTimeAtStart < this.duration) {
@@ -3742,10 +3744,18 @@ export class CorePlayer {
             this.ui.playBtn.setAttribute('aria-label', 'Pause');
             this.ui.playBtn.setAttribute('aria-pressed', 'true');
             if (use) use.setAttribute('href', 'assets/icons/sprite.svg#icon-pause');
+
+            // Hide overlay when playing
+            if (this.ui.playOverlay) this.ui.playOverlay.style.display = 'none';
         } else {
             this.ui.playBtn.setAttribute('aria-label', 'Play');
             this.ui.playBtn.setAttribute('aria-pressed', 'false');
             if (use) use.setAttribute('href', 'assets/icons/sprite.svg#icon-play');
+
+            // Show overlay when paused, BUT ONLY IF NOT LOADING
+            if (this.ui.playOverlay) {
+                this.ui.playOverlay.style.display = this.isLoading ? 'none' : 'flex';
+            }
         }
     }
 
@@ -3797,6 +3807,75 @@ export class CorePlayer {
      * Set volume (0.0 to 1.0)
      * @param {number} value 
      */
+    /**
+     * Set loading state
+     * Handles mutually exclusive visibility of loader and play overlay
+     * @param {boolean} isLoading 
+     */
+    _setLoading(isLoading) {
+        this.isLoading = isLoading;
+
+        if (this.ui.loader) {
+            if (isLoading) {
+                this.ui.loader.classList.add('visible');
+                // Force hide play overlay when loading
+                if (this.ui.playOverlay) {
+                    this.ui.playOverlay.style.display = 'none';
+                }
+            } else {
+                this.ui.loader.classList.remove('visible');
+                // Restore play overlay logic
+                this._updatePlayPauseUI();
+            }
+        }
+    }
+
+    /**
+     * Show bezel overlay (e.g. for volume)
+     * @param {string} icon - SVG icon ID (e.g. 'icon-volume-high')
+     * @param {string} text - Text to display (e.g. '50%')
+     */
+    _showBezel(icon, text) {
+        if (!this.ui.bezelOverlay) return;
+
+        const iconContainer = this.ui.bezelOverlay.querySelector('.bezel-icon');
+        const textContainer = this.ui.bezelOverlay.querySelector('.bezel-text');
+
+        // Update Icon
+        if (iconContainer) {
+            iconContainer.innerHTML = `
+                <svg width="100%" height="100%" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#${icon}"></use>
+                </svg>`;
+        }
+
+        // Update Text
+        if (textContainer) {
+            textContainer.textContent = text;
+        }
+
+        // Show Overlay
+        this.ui.bezelOverlay.style.display = 'flex';
+        this.ui.bezelOverlay.style.opacity = '1';
+
+        // Clear previous timer
+        if (this.bezelTimer) {
+            clearTimeout(this.bezelTimer);
+        }
+
+        // Hide after delay
+        this.bezelTimer = setTimeout(() => {
+            this.ui.bezelOverlay.style.opacity = '0';
+            setTimeout(() => {
+                // Only hide display if opacity is still 0 (timer wasn't reset)
+                if (this.ui.bezelOverlay.style.opacity === '0') {
+                    this.ui.bezelOverlay.style.display = 'none';
+                }
+            }, 200); // Wait for transition
+            this.bezelTimer = null;
+        }, 800);
+    }
+
     setVolume(value) {
         this.config.volume = Math.max(0, Math.min(1, value));
         if (this.config.volume > 0) {
@@ -3819,6 +3898,14 @@ export class CorePlayer {
         }
 
         this._updateVolumeUI();
+
+        // Show bezel
+        const volumePercent = Math.round(this.config.volume * 100);
+        let icon = 'icon-volume-high';
+        if (this.config.muted || this.config.volume === 0) icon = 'icon-volume-mute';
+
+        const text = this.config.muted ? 'Muted' : `${volumePercent}%`;
+        this._showBezel(icon, text);
     }
 
     /**
