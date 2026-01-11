@@ -78,6 +78,17 @@ npx cleancss -o build/assets/css/player.bundle.css \
     }
 log_success "Created player.bundle.css"
 
+# Landing page bundle
+npx cleancss -o build/assets/css/landing.bundle.css \
+    assets/css/theme.css \
+    assets/css/common.css \
+    assets/css/landing.css \
+    2>/dev/null || {
+        log_error "Landing CSS bundle failed"
+        exit 1
+    }
+log_success "Created landing.bundle.css"
+
 # ============================================
 # 4. COPY & MINIFY HTML FILES
 # ============================================
@@ -248,7 +259,24 @@ PLAYER_HTML
 log_success "Created optimized player.html with bundles"
 
 # ============================================
-# 6. COPY STATIC ASSETS
+# 6. OPTIMIZE index.html TO USE LANDING BUNDLE
+# ============================================
+log_info "Optimizing index.html for production..."
+
+# Replace the 3 CSS links with single bundle in index.html
+# Using a simple approach: sed replacement
+sed -i 's|<link rel="stylesheet" href="assets/css/theme.css">.*<link rel="stylesheet" href="assets/css/common.css">.*<link rel="stylesheet" href="assets/css/landing.css">|<link rel="stylesheet" href="assets/css/landing.bundle.css">|g' build/index.html 2>/dev/null || true
+
+# If minified (no newlines), try inline
+sed -i 's|<link rel=stylesheet href=assets/css/theme.css><link rel=stylesheet href=assets/css/common.css><link rel=stylesheet href=assets/css/landing.css>|<link rel=stylesheet href=assets/css/landing.bundle.css>|g' build/index.html 2>/dev/null || true
+
+# Also add base URL script for subdirectory deployment (after <title>)
+sed -i 's|</title>|</title><script>(function(){var p=window.location.pathname;var b=p.substring(0,p.lastIndexOf("/")+1);var t=document.createElement("base");t.href=b;document.head.appendChild(t);})();</script>|' build/index.html 2>/dev/null || true
+
+log_success "Created optimized index.html with bundle"
+
+# ============================================
+# 7. COPY STATIC ASSETS
 # ============================================
 log_info "Copying static assets..."
 find . \
