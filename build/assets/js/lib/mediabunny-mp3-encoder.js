@@ -1,4 +1,4 @@
-import{registerEncoder as A,CustomAudioEncoder as I,EncodedPacket as g}from"/npm/mediabunny@1.27.0/+esm";
+import{registerEncoder as A,CustomAudioEncoder as I,EncodedPacket as g}from"/npm/mediabunny@1.27.4/+esm";
 /*!
  * Copyright (c) 2025-present, Vanilagy and contributors
  *
