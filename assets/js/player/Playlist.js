@@ -1315,6 +1315,10 @@ export class Playlist {
 
             this.activeIndex = index;
 
+            // INSTANT FEEDBACK: Update UI immediately
+            this._updateUI();
+            this._updatePlayerNavigationState();
+
             // Handle Recording State (Stop if active)
             RecordMenu.handleItemChange(this);
 
@@ -1327,9 +1331,7 @@ export class Playlist {
                 // Update item metadata after stream loads
                 this._updateStreamItemMetadata(video, index);
 
-                this._updateUI();
                 this._saveState();
-                this._updatePlayerNavigationState();
                 if (shouldAutoplay) {
                     this.player.play();
                 }
@@ -1444,10 +1446,7 @@ export class Playlist {
             // Update item metadata (duration and thumbnail) after video loads
             this._updateLocalItemMetadata(video, index);
 
-            // Update UI
-            this._updateUI();
             this._saveState();
-            this._updatePlayerNavigationState();
 
             // Auto play if requested AND we were playing before
             if (shouldAutoplay) {
