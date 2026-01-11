@@ -457,7 +457,7 @@
 .playlist-children {
     padding-left: 10px;
     margin-left: 12px;
-    max-height: 280px;
+    /* max-height: 280px; */
     overflow-y: auto;
     overflow-x: hidden;
     /* Vertical Indent Line - Green Theme */
