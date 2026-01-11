@@ -29,6 +29,52 @@ export class HLSPlayer {
     }
 
     /**
+     * Validate if an HLS stream URL is accessible
+     * Creates a temporary hls.js instance to check if manifest loads
+     * @param {string} url - HLS manifest URL to validate
+     * @param {number} timeoutMs - Timeout in milliseconds (default 5000)
+     * @returns {Promise<boolean>} - True if valid stream, false if broken
+     */
+    static async validate(url, timeoutMs = 5000) {
+        if (!Hls.isSupported()) {
+            // Can't validate without hls.js support, assume it might work
+            return true;
+        }
+
+        return new Promise((resolve) => {
+            const hls = new Hls({
+                enableWorker: false, // Lightweight, no worker
+                maxBufferLength: 1,  // Minimal buffering
+                maxMaxBufferLength: 1
+            });
+
+            const timeout = setTimeout(() => {
+                hls.destroy();
+                resolve(false); // Timeout = broken
+            }, timeoutMs);
+
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                clearTimeout(timeout);
+                hls.destroy();
+                resolve(true); // Manifest loaded = working
+            });
+
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    clearTimeout(timeout);
+                    hls.destroy();
+                    resolve(false); // Fatal error = broken
+                }
+            });
+
+            // Create a hidden video element for hls.js
+            const tempVideo = document.createElement('video');
+            hls.loadSource(url);
+            hls.attachMedia(tempVideo);
+        });
+    }
+
+    /**
      * Load an HLS stream
      * @param {string} url - M3U8 manifest URL
      * @param {Object} options - Optional config

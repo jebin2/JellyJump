@@ -1789,6 +1789,12 @@ export class CorePlayer {
         } catch (error) {
             console.error('Error loading media:', error);
             this.ui.loader.classList.remove('visible');
+
+            // Notify playlist to mark item as broken
+            if (this.onStreamError && this.currentVideoId) {
+                const errorMsg = error.message || 'Failed to load media';
+                this.onStreamError(this.currentVideoId, errorMsg);
+            }
         }
     }
 
@@ -1992,6 +1998,10 @@ export class CorePlayer {
                         const errorDetails = HLSPlayer.getErrorDetails(error);
                         if (!errorDetails.recoverable) {
                             this._showStreamError(errorDetails);
+                            // Notify playlist to mark stream as broken
+                            if (this.onStreamError && this.currentVideoId) {
+                                this.onStreamError(this.currentVideoId, errorDetails.message);
+                            }
                         } else {
                             console.log('[Stream] Suppressed recoverable error:', errorDetails.message);
                         }

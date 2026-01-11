@@ -12,6 +12,8 @@ import { FileDropHandler } from '../utils/FileDropHandler.js';
 import { ElectronHelper } from '../utils/ElectronHelper.js';
 import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
+import { HLSPlayer } from '../core/HLSPlayer.js';
+import { StreamDetector } from '../utils/StreamDetector.js';
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
@@ -103,6 +105,13 @@ export class Playlist {
                 this._closeAllMenus();
             }
         });
+
+        // Setup player error callback to mark broken streams
+        if (this.player) {
+            this.player.onStreamError = (videoId, error) => {
+                this.markItemBroken(videoId, error);
+            };
+        }
     }
 
     /**
@@ -1691,6 +1700,17 @@ export class Playlist {
             };
             // Insert before remove btn
             header.insertBefore(syncBtn, removeBtn);
+
+            // Validate Streams Button
+            const validateBtn = document.createElement('button');
+            validateBtn.className = 'playlist-action-btn folder-validate-btn';
+            validateBtn.title = 'Validate Streams';
+            validateBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-search"></use></svg>';
+            validateBtn.onclick = (e) => {
+                e.stopPropagation();
+                this._validateStreams(folderData.path, folderData.m3uSource);
+            };
+            header.insertBefore(validateBtn, removeBtn);
             removeBtn.style.marginLeft = '5px';
         }
 
@@ -2186,6 +2206,7 @@ export class Playlist {
         // Status classes
         if (item.needsReload) itemEl.classList.add('needs-reload');
         if (item.error) itemEl.classList.add('error');
+        if (item.isBroken) itemEl.classList.add('playlist-item--broken');
 
         // Thumbnail
         if (item.thumbnail) {
@@ -2835,5 +2856,227 @@ export class Playlist {
             toast.style.opacity = '0';
             setTimeout(() => document.body.removeChild(toast), 300);
         }, 2000);
+    }
+
+    /**
+     * Mark a playlist item as broken (stream failed to load)
+     * @param {string} itemId - ID of the item to mark as broken
+     * @param {string} [error] - Optional error message
+     */
+    markItemBroken(itemId, error) {
+        const item = this.items.find(i => i.id === itemId);
+        if (!item || item.isBroken) return;
+
+        item.isBroken = true;
+        item.errorMessage = error || 'Stream unavailable';
+        console.log(`[Playlist] Marked as broken: ${item.title}`);
+
+        // Update UI for this item
+        const index = this.items.indexOf(item);
+        const itemEl = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
+        if (itemEl) {
+            itemEl.classList.add('playlist-item--broken');
+        }
+
+        this._saveState();
+    }
+
+    /**
+     * Validate streams in a folder (check if they're accessible)
+     * @param {string} folderPath - Path of the folder to validate
+     * @param {string} m3uSource - Source URL of the M3U (for reference)
+     * @private
+     */
+    async _validateStreams(folderPath, m3uSource) {
+        // Get all stream items in this folder
+        const prefix = folderPath + '/';
+        const folderItems = this.items.filter(item => {
+            const path = item.path || '';
+            return path.startsWith(prefix) && item.isStream;
+        });
+
+        if (folderItems.length === 0) {
+            this._showToast('No streams found in this folder');
+            return;
+        }
+
+        // Create validation modal
+        const modal = this._createValidationModal(folderItems.length);
+        document.body.appendChild(modal.overlay);
+
+        let cancelled = false;
+        let checkedCount = 0;
+        let brokenCount = 0;
+        let workingCount = 0;
+
+        modal.okBtn.onclick = () => {
+            cancelled = true;
+            this._closeValidationModal(modal);
+        };
+
+        // Validate each stream one by one
+        for (const item of folderItems) {
+            if (cancelled) break;
+
+            // Update progress UI
+            checkedCount++;
+            modal.progressFill.style.width = `${(checkedCount / folderItems.length) * 100}%`;
+            modal.status.textContent = `Checking ${checkedCount} of ${folderItems.length}...`;
+            modal.currentItem.textContent = item.title;
+            modal.brokenCountEl.textContent = brokenCount;
+            modal.workingCountEl.textContent = workingCount;
+
+            try {
+                // Check stream accessibility with HEAD request + timeout
+                const isAccessible = await this._checkStreamAccessibility(item.url);
+
+                if (isAccessible) {
+                    workingCount++;
+                } else {
+                    brokenCount++;
+                    this.markItemBroken(item.id, 'Failed to connect');
+                }
+            } catch (err) {
+                brokenCount++;
+                this.markItemBroken(item.id, err.message);
+            }
+
+            // Small delay to avoid overwhelming the UI and network
+            await new Promise(r => setTimeout(r, 50));
+        }
+
+        // Final update
+        modal.progressFill.style.width = '100%';
+        modal.status.textContent = cancelled ? 'Validation cancelled' : 'Validation complete!';
+        modal.currentItem.textContent = '';
+        modal.brokenCountEl.textContent = brokenCount;
+        modal.workingCountEl.textContent = workingCount;
+
+        // Change button to OK
+        modal.okBtn.textContent = 'OK';
+        modal.okBtn.onclick = () => this._closeValidationModal(modal);
+
+        this._showToast(`Validation complete: ${brokenCount} broken, ${workingCount} working`);
+    }
+
+    /**
+     * Check if a stream URL is accessible
+     * @param {string} url - Stream URL to check
+     * @returns {Promise<boolean>} - True if accessible
+     * @private
+     */
+    async _checkStreamAccessibility(url) {
+        const streamType = StreamDetector.detect(url);
+
+        // For HLS streams, use HLSPlayer.validate() for accurate checking
+        if (streamType === StreamDetector.TYPE_HLS) {
+            try {
+                return await HLSPlayer.validate(url, 5000);
+            } catch {
+                return false;
+            }
+        }
+
+        // TYPE_FILE means URL doesn't look like a valid stream (e.g., twitch.tv/user, youtube.com/channel)
+        // In the context of IPTV validation, these are broken - not playable streams
+        if (streamType === StreamDetector.TYPE_FILE) {
+            return false;
+        }
+
+        // For M3U playlists or other types, use fetch-based checking
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        try {
+            // Try regular fetch first - this can properly detect 404, 403, etc.
+            const response = await fetch(url, {
+                method: 'HEAD',
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            return response.ok; // true for 2xx status codes
+        } catch (err) {
+            clearTimeout(timeoutId);
+
+            if (err.name === 'AbortError') {
+                return false; // Timeout = broken
+            }
+
+            // CORS error - try no-cors mode as fallback
+            // With no-cors, we can only check if the server responds at all
+            // If server returns 404/403, the request still completes (opaque response)
+            // So we assume it MIGHT work if no-cors doesn't throw
+            try {
+                const controller2 = new AbortController();
+                const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
+
+                await fetch(url, {
+                    method: 'HEAD',
+                    signal: controller2.signal,
+                    mode: 'no-cors'
+                });
+
+                clearTimeout(timeoutId2);
+                // no-cors completed without network error - assume working
+                // (We can't tell if it's 404 in no-cors mode, but the stream 
+                // will be marked broken when user actually tries to play it)
+                return true;
+            } catch {
+                return false; // Network error = definitely broken
+            }
+        }
+    }
+
+    /**
+     * Create validation progress modal
+     * @param {number} totalCount - Total items to validate
+     * @returns {Object} - Modal elements
+     * @private
+     */
+    _createValidationModal(totalCount) {
+        const overlay = document.createElement('div');
+        overlay.className = 'mb-modal-overlay';
+        overlay.innerHTML = `
+            <div class="mb-modal" style="max-width: 400px;">
+                <div class="mb-modal-header">
+                    <h3>Validating Streams</h3>
+                </div>
+                <div class="validation-modal-content">
+                    <div class="validation-progress-container">
+                        <div class="validation-progress-bar">
+                            <div class="validation-progress-fill"></div>
+                        </div>
+                        <div class="validation-status">Checking 0 of ${totalCount}...</div>
+                        <div class="validation-counts">
+                            <span>Broken: <span class="count-broken">0</span></span>
+                            <span>Working: <span class="count-working">0</span></span>
+                        </div>
+                        <div class="validation-current-item"></div>
+                    </div>
+                    <div class="validation-actions">
+                        <button class="validation-ok-btn">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return {
+            overlay,
+            progressFill: overlay.querySelector('.validation-progress-fill'),
+            status: overlay.querySelector('.validation-status'),
+            currentItem: overlay.querySelector('.validation-current-item'),
+            brokenCountEl: overlay.querySelector('.count-broken'),
+            workingCountEl: overlay.querySelector('.count-working'),
+            okBtn: overlay.querySelector('.validation-ok-btn')
+        };
+    }
+
+    /**
+     * Close validation modal
+     * @param {Object} modal - Modal elements
+     * @private
+     */
+    _closeValidationModal(modal) {
+        modal.overlay.remove();
     }
 }
