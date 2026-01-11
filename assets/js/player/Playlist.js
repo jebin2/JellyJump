@@ -1363,7 +1363,9 @@ export class Playlist {
                         }
                     } else {
                         // Local files or legacy behavior
-                        if (this.player.ui && this.player.ui.loader) {
+                        if (this.player && typeof this.player._setLoading === 'function') {
+                            this.player._setLoading(true);
+                        } else if (this.player.ui && this.player.ui.loader) {
                             this.player.ui.loader.classList.add('visible');
                         }
                         Logger.log(`Loading file from storage: ${video.title}`);
@@ -1381,7 +1383,9 @@ export class Playlist {
                     }
                 } catch (e) {
                     Logger.error('Error loading file from storage:', e);
-                    if (this.player.ui && this.player.ui.loader) {
+                    if (this.player && typeof this.player._setLoading === 'function') {
+                        this.player._setLoading(false);
+                    } else if (this.player.ui && this.player.ui.loader) {
                         this.player.ui.loader.classList.remove('visible');
                     }
 
