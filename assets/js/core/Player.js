@@ -2262,6 +2262,12 @@ export class CorePlayer {
                 this.ui.playOverlay.style.display = 'none';
             }
 
+            // Restore configured muted state (in case it was changed during muted autoplay retry)
+            if (this.streamVideo.muted !== this.config.muted) {
+                this.streamVideo.muted = this.config.muted;
+                console.log('[Stream] Restored muted state to:', this.config.muted);
+            }
+
             // Start canvas render loop for stream (copies video frames to canvas)
             this._startStreamRenderLoop();
 
