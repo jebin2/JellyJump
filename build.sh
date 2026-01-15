@@ -166,6 +166,9 @@ log_success "Created optimized player.html with bundles"
 # ============================================
 log_info "Optimizing embed.html for production..."
 
+# Start with fresh unminified source (prevents sed from destroying minified single-line file)
+cp embed.html build/embed.html
+
 # 1. Add Base URL Script (for subdirectory deployment)
 sed -i 's|<title>JellyJump - Embed</title>|<title>JellyJump - Embed</title><script>(function(){var p=window.location.pathname;var b=p.substring(0,p.lastIndexOf("/")+1);var t=document.createElement("base");t.href=b;document.head.appendChild(t);})();</script>|' build/embed.html
 
@@ -194,8 +197,18 @@ perl -0777 -i -pe 'BEGIN{local $/; open(F, "<", "build/temp_embed_importmap.html
 rm build/temp_embed_importmap.html
 
 # 4. Replace JS Import with Bundle
-# Regex targets only the import path, preserving variable assignment (e.g. const {CorePlayer: m} =)
-perl -i -pe "s|import\s*\(['\"]\.?/assets/js/core/Player\.js['\"]\)|import('./assets/js/bundles/player.bundle.js')|g" build/embed.html
+# Simple string replacement of the path - works better with minified code
+# Matches both ./assets/... and assets/...
+sed -i "s|assets/js/core/Player.js|assets/js/bundles/player.bundle.js|g" build/embed.html
+
+# 5. Minify the final file
+npx html-minifier-terser \
+    --collapse-whitespace \
+    --remove-comments \
+    --minify-css true \
+    --minify-js true \
+    --output build/embed.html \
+    build/embed.html 2>/dev/null || true
 
 log_success "Created optimized embed.html with bundles"
 
