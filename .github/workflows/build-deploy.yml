@@ -29,69 +29,10 @@ jobs:
           node-version: '20'
       
       - name: Install dependencies
-        run: |
-          npm install --save-dev terser
-          npm install --save-dev clean-css-cli
-          npm install --save-dev html-minifier-terser
+        run: npm install
       
-      - name: Create build directory
-        run: mkdir -p build
-      
-      - name: Minify JavaScript files
-        run: |
-          find . -name "*.js" \
-            -not -path "./node_modules/*" \
-            -not -path "./build/*" \
-            -not -path "./desktop/*" \
-            -not -path "./.git/*" | while read file; do
-              output_file="build/${file#./}"
-              mkdir -p "$(dirname "$output_file")"
-              npx terser "$file" --compress --mangle --output "$output_file"
-            done
-      
-      - name: Minify CSS files
-        run: |
-          find . -name "*.css" \
-            -not -path "./node_modules/*" \
-            -not -path "./build/*" \
-            -not -path "./desktop/*" \
-            -not -path "./.git/*" | while read file; do
-              output_file="build/${file#./}"
-              mkdir -p "$(dirname "$output_file")"
-              npx cleancss -o "$output_file" "$file"
-            done
-      
-      - name: Minify HTML files
-        run: |
-          find . -name "*.html" \
-            -not -path "./node_modules/*" \
-            -not -path "./build/*" \
-            -not -path "./desktop/*" \
-            -not -path "./.git/*" | while read file; do
-              output_file="build/${file#./}"
-              mkdir -p "$(dirname "$output_file")"
-              npx html-minifier-terser \
-                --collapse-whitespace \
-                --remove-comments \
-                --minify-css true \
-                --minify-js true \
-                --output "$output_file" \
-                "$file"
-            done
-      
-      - name: Copy other assets
-        run: |
-          find . \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" \
-                  -o -name "*.svg" -o -name "*.ico" -o -name "*.woff" -o -name "*.woff2" \
-                  -o -name "*.ttf" -o -name "*.eot" \) \
-            -not -path "./node_modules/*" \
-            -not -path "./build/*" \
-            -not -path "./desktop/*" \
-            -not -path "./.git/*" | while read file; do
-              output_file="build/${file#./}"
-              mkdir -p "$(dirname "$output_file")"
-              cp "$file" "$output_file"
-            done
+      - name: Build with build.sh
+        run: npm run build
       
       - name: Deploy to release branch
         run: |
