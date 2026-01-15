@@ -194,7 +194,8 @@ perl -0777 -i -pe 'BEGIN{local $/; open(F, "<", "build/temp_embed_importmap.html
 rm build/temp_embed_importmap.html
 
 # 4. Replace JS Import with Bundle
-sed -i "s|const { CorePlayer } = await import('./assets/js/core/Player.js');|const { CorePlayer } = await import('./assets/js/bundles/player.bundle.js');|g" build/embed.html
+# Regex targets only the import path, preserving variable assignment (e.g. const {CorePlayer: m} =)
+perl -i -pe "s|import\s*\(['\"]\.?/assets/js/core/Player\.js['\"]\)|import('./assets/js/bundles/player.bundle.js')|g" build/embed.html
 
 log_success "Created optimized embed.html with bundles"
 
