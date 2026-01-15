@@ -162,7 +162,44 @@ sed -i "/const { Playlist } = await import('\.\/assets\/js\/player\/Playlist\.js
 log_success "Created optimized player.html with bundles"
 
 # ============================================
-# 6. OPTIMIZE index.html TO USE LANDING BUNDLE
+# 6. OPTIMIZE embed.html TO USE BUNDLES
+# ============================================
+log_info "Optimizing embed.html for production..."
+
+# 1. Add Base URL Script (for subdirectory deployment)
+sed -i 's|<title>JellyJump - Embed</title>|<title>JellyJump - Embed</title><script>(function(){var p=window.location.pathname;var b=p.substring(0,p.lastIndexOf("/")+1);var t=document.createElement("base");t.href=b;document.head.appendChild(t);})();</script>|' build/embed.html
+
+# 2. Replace CSS with Bundle (same as player - uses player.bundle.css)
+sed -i '/assets\/css\/theme.css/c\    <link rel="stylesheet" href="assets/css/player.bundle.css">' build/embed.html
+sed -i '/assets\/css\/common.css/d' build/embed.html
+sed -i '/assets\/css\/player.css/d' build/embed.html
+sed -i '/assets\/css\/screenshot.css/d' build/embed.html
+
+# 3. Update Import Map for Production (fix path resolution)
+cat > build/temp_embed_importmap.html << 'EOF'
+    <script type="importmap">
+    {
+        "imports": {
+            "/npm/mediabunny@1.27.4/+esm": "./assets/js/lib/mediabunny.js",
+            "../../../../assets/js/lib/mediabunny.js": "./assets/js/lib/mediabunny.js",
+            "../../../../assets/js/lib/mediabunny-mp3-encoder.js": "./assets/js/lib/mediabunny-mp3-encoder.js",
+            "../../../../assets/js/lib/hls.js": "./assets/js/lib/hls.js",
+            "../../../../assets/js/lib/gif.js": "./assets/js/lib/gif.js"
+        }
+    }
+    </script>
+EOF
+
+perl -0777 -i -pe 'BEGIN{local $/; open(F, "<", "build/temp_embed_importmap.html"); $c = <F>; close(F)} s/<script type="importmap">.*?<\/script>/$c/gs' build/embed.html
+rm build/temp_embed_importmap.html
+
+# 4. Replace JS Import with Bundle
+sed -i "s|const { CorePlayer } = await import('./assets/js/core/Player.js');|const { CorePlayer } = await import('./assets/js/bundles/player.bundle.js');|g" build/embed.html
+
+log_success "Created optimized embed.html with bundles"
+
+# ============================================
+# 7. OPTIMIZE index.html TO USE LANDING BUNDLE
 # ============================================
 log_info "Optimizing index.html for production..."
 
@@ -179,7 +216,7 @@ sed -i 's|</title>|</title><script>(function(){var p=window.location.pathname;va
 log_success "Created optimized index.html with bundle"
 
 # ============================================
-# 7. COPY STATIC ASSETS
+# 8. COPY STATIC ASSETS
 # ============================================
 log_info "Copying static assets..."
 find . \
@@ -199,7 +236,7 @@ done
 log_success "Copied static assets"
 
 # ============================================
-# 7. COPY TEMPLATES
+# 8. COPY TEMPLATES
 # ============================================
 log_info "Copying templates..."
 mkdir -p build/assets/templates
@@ -207,7 +244,7 @@ cp assets/templates/*.html build/assets/templates/ 2>/dev/null || true
 log_success "Copied templates"
 
 # ============================================
-# 8. COPY SERVICE WORKER
+# 9. COPY SERVICE WORKER
 # ============================================
 log_info "Copying service worker..."
 cp sw.js build/sw.js 2>/dev/null || true
