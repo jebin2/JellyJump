@@ -3986,7 +3986,27 @@ export class CorePlayer {
                 );
                 await Promise.race([playPromise, timeoutPromise]);
             } catch (e) {
-                Logger.warn('Autoplay failed or timed out, falling back to paused state:', e);
+                Logger.warn('Autoplay failed or timed out:', e);
+
+                // If we failed and weren't muted, try muting and playing again (AutoPlay Policy often allows muted)
+                if (!this.config.muted) {
+                    Logger.log('Attempting fallback to muted autoplay...');
+                    this.config.muted = true;
+                    if (this.ui.muteBtn) this._updateVolumeIcon(); // Update UI
+
+                    try {
+                        // Reset audio context state if needed before retry
+                        if (this.audioContext && this.audioContext.state === 'running') {
+                            try { await this.audioContext.suspend(); } catch (ignore) { }
+                        }
+                        await this.play();
+                        return; // Success! Return early
+                    } catch (retryErr) {
+                        Logger.warn('Muted autoplay fallback also failed:', retryErr);
+                    }
+                }
+
+                Logger.warn('Falling back to paused state.');
                 // Ensure we are in a clean state
                 this.isPlaying = false;
                 this._updatePlayPauseUI();
