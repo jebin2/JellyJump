@@ -2969,7 +2969,12 @@ export class CorePlayer {
 
             // Resume AudioContext if suspended (e.g., after pause suspends it)
             if (this.audioContext && this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
+                // Wrap resume in a timeout so we don't hang if browser keeps it pending
+                const resumePromise = this.audioContext.resume();
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('AudioContext resume timed out')), 500)
+                );
+                await Promise.race([resumePromise, timeoutPromise]);
             }
         } catch (e) {
             Logger.warn('[Play] AudioContext blocked/failed:', e);
