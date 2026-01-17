@@ -1563,6 +1563,8 @@ export class CorePlayer {
         // Reset state
         this.currentTime = 0;
         this.duration = 0;
+        this.audioContextStartTime = null;
+        this.fallbackStartTime = undefined;
 
         // Dispose MediaBunny resources
         this._disposeMediaBunnyResources();
@@ -1926,6 +1928,9 @@ export class CorePlayer {
             this.streamVideo.muted = true;
             this.streamVideo.setAttribute('muted', '');
         }
+
+        // Ensure volume is synchronized
+        this.streamVideo.volume = this.config.volume;
 
         // Keep video hidden but accessible
         this.streamVideo.style.position = 'absolute';
@@ -2875,16 +2880,18 @@ export class CorePlayer {
      * but audio sources play at playbackRate speed, effectively advancing media time faster.
      */
     _getPlaybackTime() {
-        if (this.isPlaying) {
-            if (this.audioContext && this.audioContext.state === 'running') {
-                const elapsedRealTime = this.audioContext.currentTime - this.audioContextStartTime;
-                return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
-            } else if (this.fallbackStartTime !== undefined) {
-                // Fallback clock for when AudioContext is blocked/suspended
-                const elapsedRealTime = (performance.now() - this.fallbackStartTime) / 1000;
-                return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
-            }
+        // Stream mode (HLS) delegates to video element
+        if (this.isStreamMode && this.streamVideo) {
+            return this.streamVideo.currentTime;
         }
+
+        // File-based playback (MediaBunny) - Stopwatch Mode
+        // We use performance.now() as the Master Clock to ensure linearity and prevent jumps.
+        if (this.isPlaying && this.fallbackStartTime !== undefined) {
+            const elapsedRealTime = (performance.now() - this.fallbackStartTime) / 1000;
+            return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
+        }
+
         return this.playbackTimeAtStart;
     }
 
@@ -2955,8 +2962,10 @@ export class CorePlayer {
                     }
                 }
             }
-            return;
         }
+
+        // Prevent restarting clock if already playing (fixes jump-to-zero on double play call)
+        if (this.isPlaying) return;
 
 
         if (!this.videoTrack && !this.audioTrack) return;
@@ -2997,9 +3006,7 @@ export class CorePlayer {
             await this._startVideoIterator();
         }
 
-        if (this.audioContext) {
-            this.audioContextStartTime = this.audioContext.currentTime;
-        }
+        // Stopwatch clock initialization
         this.fallbackStartTime = performance.now();
         this.isPlaying = true;
         this._updatePlayPauseUI();
@@ -3063,7 +3070,15 @@ export class CorePlayer {
 
 
         // File-based playback (MediaBunny)
-        this.playbackTimeAtStart = this._getPlaybackTime();
+        const calculatedTime = this._getPlaybackTime();
+        // Sanity check: If calculated time is 0 but we were playing at a later time (e.g. > 1s), use the UI time.
+        // This prevents the "progress bar goes to initial" bug if clocks desync on pause.
+        if (calculatedTime < 0.1 && this.currentTime > 1.0) {
+            Logger.warn(`[Pause] Correction: _getPlaybackTime returned ${calculatedTime} but currentTime is ${this.currentTime}. Keeping ${this.currentTime}.`);
+            this.playbackTimeAtStart = this.currentTime;
+        } else {
+            this.playbackTimeAtStart = calculatedTime;
+        }
         this.isPlaying = false;
         this._clearAutoHideTimer();
         this._updatePlayPauseUI();
@@ -3226,6 +3241,11 @@ export class CorePlayer {
         let sampleCount = 0;
         let lastTimestamp = 0;
 
+        // Tracking for Linear Scheduling
+        // Start slightly in the future to avoid immediate underrun.
+        // The first chunk inside the loop will catch up or buffer appropriately.
+        let nextAudioTime = (this.audioContext?.currentTime || 0) + 0.1;
+
         // CRITICAL: Store reference to the specific iterator this run is using
         // This prevents the finally block from closing a newer iterator that was
         // created after a seek operation
@@ -3269,27 +3289,37 @@ export class CorePlayer {
                     audioSource.connect(this.gainNode);
                 }
 
-                // Calculate when this buffer should start playing
-                // 'timestamp' is in media time, but audioContext.currentTime is real time
-                // At faster playback rates, real-time delay is shorter than media-time delay
-                const now = this.audioContext.currentTime;
-                const mediaTimeDelay = timestamp - this._getPlaybackTime();
-                const realTimeDelay = mediaTimeDelay / this.playbackRate;
-                const startTime = now + Math.max(0, realTimeDelay);
+                // =========================================================================
+                // Linear Contiguous Scheduling (Fixes "Dot Dot" Noise)
+                // =========================================================================
 
-                // Queue the buffer with proper timing
-                if (realTimeDelay >= 0) {
-                    // Sample is in the future - schedule it
-                    audioSource.start(startTime);
-                } else {
-                    // Sample is in the past - play only the remaining audible portion
-                    const offset = -realTimeDelay;  // How far into the buffer to start
-                    if (offset < buffer.duration / this.playbackRate) {
-                        // There's still some audio left to play
-                        audioSource.start(now, offset * this.playbackRate);
+                // 1. Initial Setup or Underrun Correction
+                // If we haven't started scheduling yet, or we fell behind (underrun), 
+                // snap to current time + small lookahead.
+                const now = this.audioContext.currentTime;
+                if (nextAudioTime < now) {
+                    // We are behind! (Underrun). Resync.
+                    // Use a small lookahead (0.05s) to prevent immediate underrun again
+                    const lookahead = 0.05;
+                    if (sampleCount > 1) {
+                        Logger.warn(`[Audio Debug #${iteratorId}] Underrun detected! Resyncing (Delay: ${(now - nextAudioTime).toFixed(3)}s)`);
                     }
-                    // If offset >= buffer duration, skip this sample entirely
+                    nextAudioTime = now + lookahead;
                 }
+
+                // 2. Schedule the buffer strictly at the next available slot
+                audioSource.start(nextAudioTime);
+
+                // 3. Increment the next slot by the *played* duration
+                // Note: buffer.duration is in seconds (frameLen / sampleRate)
+                // We divide by playbackRate because if we play 2x faster, we occupy half the time.
+                const scheduledDuration = buffer.duration / this.playbackRate;
+                nextAudioTime += scheduledDuration;
+
+                // 4. (Optional) Drift Check
+                // If audio drifts > 0.5s from video, we could force-seek, but linear scheduling 
+                // is usually self-correcting or the drift is imperceptible for short videos.
+                // We leave it purely linear for maximum smoothness.
 
                 // Track source for cleanup
                 this.queuedAudioNodes.add(audioSource);
