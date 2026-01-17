@@ -39,10 +39,14 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           
-          # Move build directory and files to temp location
+          # Move build directory contents and other files to temp location
           TEMP_DIR=/tmp/release-artifacts
           mkdir -p "$TEMP_DIR"
-          mv build "$TEMP_DIR/"
+          
+          # Move contents of build to root of temp dir (Flattens the structure)
+          cp -r build/* "$TEMP_DIR/" 2>/dev/null || true
+          
+          # Copy other necessary files
           cp build.sh "$TEMP_DIR/" 2>/dev/null || true
           cp -r desktop "$TEMP_DIR/" 2>/dev/null || true
           cp build-desktop.sh "$TEMP_DIR/" 2>/dev/null || true
@@ -60,8 +64,8 @@ jobs:
           # Move selected files/folders back
           mv "$TEMP_DIR"/* . 2>/dev/null || true
           
-          # Force add all files (override .gitignore)
-          git add -f build/ build.sh desktop/ build-desktop.sh package-lock.json package.json 2>/dev/null || true
+          # Force add all files
+          git add -A
           
           # Commit if there are changes
           if ! git diff --staged --quiet 2>/dev/null; then
