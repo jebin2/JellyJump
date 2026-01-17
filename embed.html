@@ -94,7 +94,7 @@
             const params = new URLSearchParams(window.location.search);
             const videoUrl = params.get('video_url');
             const controlsParam = params.get('controls');
-            const autoplay = params.get('autoplay') !== '0';
+            const autoplay = params.get('autoplay') === '1';
             const muted = params.get('muted') === '1';
             const withCredentials = params.get('credentials') === 'true';
             const controlBarMode = params.get('controlBarMode') || 'fixed';
