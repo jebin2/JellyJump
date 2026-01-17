@@ -202,7 +202,8 @@ export class CorePlayer {
 
         // Global Event Handlers (created conditionally based on which controls are enabled)
         this._handlers = {
-            click: (e) => this._handleDocumentClick(e)
+            click: (e) => this._handleDocumentClick(e),
+            visibilitychange: () => this._handleVisibilityChange()
         };
         // Only create handlers that will be used
         if (this.config.controls.fullscreen) {
@@ -697,6 +698,9 @@ export class CorePlayer {
             document.addEventListener('mozfullscreenchange', this._handlers.fullscreen);
             document.addEventListener('MSFullscreenChange', this._handlers.fullscreen);
         }
+
+        // Visibility Change Event - prevents video fast-forward when switching tabs
+        document.addEventListener('visibilitychange', this._handlers.visibilitychange);
 
         // Loop Control (only if loop enabled)
         if (this.config.controls.loop) {
@@ -2894,6 +2898,39 @@ export class CorePlayer {
         }
 
         return this.playbackTimeAtStart;
+    }
+
+    /**
+     * Handle visibility change (tab switching).
+     * Prevents video fast-forwarding when returning to the tab.
+     * When the tab is hidden, requestAnimationFrame stops but audio continues.
+     * When visible again, instantly seek video to current audio position.
+     * @private
+     */
+    _handleVisibilityChange() {
+        // Skip for stream mode - native video element handles this
+        if (this.isStreamMode) return;
+
+        // Only handle if we're currently playing
+        if (!this.isPlaying) return;
+
+        if (document.hidden) {
+            // Tab is now hidden - audio continues playing
+            // Just mark that we were hidden so we can handle the return
+            this._wasHiddenWhilePlaying = true;
+            Logger.log(`[Visibility] Tab hidden at playback time: ${this._getPlaybackTime().toFixed(2)}s`);
+        } else if (this._wasHiddenWhilePlaying) {
+            // Tab is now visible again - instantly jump video to current audio position
+            const currentTime = this._getPlaybackTime();
+            Logger.log(`[Visibility] Tab visible, instantly syncing video to: ${currentTime.toFixed(2)}s`);
+
+            // Clear the flag
+            this._wasHiddenWhilePlaying = false;
+
+            // Restart video iterator from current position to instantly show the correct frame
+            // This skips all intermediate frames and jumps directly to where audio is
+            this._startVideoIterator();
+        }
     }
 
     /**
