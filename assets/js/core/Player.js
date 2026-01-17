@@ -3998,8 +3998,13 @@ export class CorePlayer {
                 }
                 // Suspend AudioContext if it was started
                 if (this.audioContext && this.audioContext.state === 'running') {
-                    this.audioContext.suspend();
+                    try {
+                        await this.audioContext.suspend();
+                    } catch (e) {
+                        // Ignore suspend errors if already closed/suspended
+                    }
                 }
+
                 // Clear any queued audio nodes
                 for (const node of this.queuedAudioNodes) {
                     try { node.stop(); } catch (e) { }
@@ -4016,12 +4021,22 @@ export class CorePlayer {
                 }
 
                 // Fallback: Draw frame and show overlay
-                await this._startVideoIterator();
+                try {
+                    await this._startVideoIterator();
+                } catch (e) {
+                    Logger.warn('Fallback video iterator failed:', e);
+                }
+
                 if (this.ui.playOverlay) this.ui.playOverlay.style.display = 'flex';
+                this.isPlaying = false; // Ensure state is correct
             }
         } else {
-            // Otherwise just draw the frame
-            await this._startVideoIterator(); // This draws the frame at startTimestamp
+            try {
+                // Otherwise just draw the frame
+                await this._startVideoIterator(); // This draws the frame at startTimestamp
+            } catch (e) {
+                Logger.warn('Initial video iterator failed:', e);
+            }
         }
     }
 
