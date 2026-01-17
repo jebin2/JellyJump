@@ -141,7 +141,7 @@
 
                 // Disabled in embed mode
                 captions: false,
-                loop: false,
+                loop: !isNone && (allowedControls.includes('loop') || params.get('loop') === '1' || params.get('loop') === 'true'),
                 filters: false,
                 equalizer: !isNone && allowedControls.includes('volume'),
                 volumeOnly: true,
@@ -175,6 +175,15 @@
                     withCredentials: withCredentials,
                     controls: controlsConfig
                 });
+
+                // Apply loop setting if requested
+                if (params.get('loop') === '1' || params.get('loop') === 'true') {
+                    player.loopMode = 'one';
+                    // Try to update UI if method is accessible, otherwise logic still works
+                    if (typeof player._updateLoopUI === 'function') {
+                        player._updateLoopUI();
+                    }
+                }
 
                 // Load the video (use load() method with autoplay param)
                 const decodedUrl = decodeURIComponent(videoUrl);
