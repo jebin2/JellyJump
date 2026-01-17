@@ -2938,7 +2938,10 @@ export class CorePlayer {
                 if (true) {
                     Logger.log('[Stream] Autoplay/Play failed (' + e.name + '), trying muted...');
                     try {
+                        this.config.muted = true;
                         this.streamVideo.muted = true;
+                        this.streamVideo.setAttribute('muted', '');
+                        this._updateVolumeUI();
                         await this.streamVideo.play();
                         this.isPlaying = true;
                         this._updatePlayPauseUI();
@@ -2963,6 +2966,7 @@ export class CorePlayer {
                 }
             }
         }
+        this._updateVolumeUI();
 
         // Prevent restarting clock if already playing (fixes jump-to-zero on double play call)
         if (this.isPlaying) return;
@@ -3675,12 +3679,14 @@ export class CorePlayer {
         // Update panel mute button icon
         if (this.ui.panelMuteBtn) {
             const use = this.ui.panelMuteBtn.querySelector('use');
-            if (this.isMuted || this.volume === 0) {
-                use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
-                this.ui.panelMuteBtn.setAttribute('aria-label', 'Unmute');
-            } else {
-                use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
-                this.ui.panelMuteBtn.setAttribute('aria-label', 'Mute');
+            if (use) {
+                if (this.isMuted || this.volume === 0) {
+                    use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
+                    this.ui.panelMuteBtn.setAttribute('aria-label', 'Unmute');
+                } else {
+                    use.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
+                    this.ui.panelMuteBtn.setAttribute('aria-label', 'Mute');
+                }
             }
         }
 
@@ -4112,6 +4118,7 @@ export class CorePlayer {
                 Logger.warn('Initial video iterator failed:', e);
             }
         }
+        this._updateVolumeUI();
     }
 
     /**
