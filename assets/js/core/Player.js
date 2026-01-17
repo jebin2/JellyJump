@@ -2997,6 +2997,10 @@ export class CorePlayer {
             if (!this.config.muted) {
                 Logger.log('[Play] Auto-muting due to audio block...');
                 this.config.muted = true;
+                // CRITICAL: Also set gainNode to 0 so audio is actually silenced
+                if (this.gainNode) {
+                    this.gainNode.gain.value = 0;
+                }
                 if (this.ui.muteBtn) this._updateVolumeUI();
             }
             // We proceed to play using fallbackStartTime defined below
