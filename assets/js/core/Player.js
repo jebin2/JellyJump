@@ -567,7 +567,7 @@ export class CorePlayer {
                 if (this.gainNode) {
                     this.gainNode.gain.value = this.config.volume;
                 }
-                this._updateVolumeIcon();
+                this._updateVolumeUI();
             });
         }
 
@@ -578,7 +578,7 @@ export class CorePlayer {
                 if (this.gainNode) {
                     this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
                 }
-                this._updateVolumeIcon();
+                this._updateVolumeUI();
             });
         }
 
@@ -2983,7 +2983,7 @@ export class CorePlayer {
             if (!this.config.muted) {
                 Logger.log('[Play] Auto-muting due to audio block...');
                 this.config.muted = true;
-                if (this.ui.muteBtn) this._updateVolumeIcon();
+                if (this.ui.muteBtn) this._updateVolumeUI();
             }
             // We proceed to play using fallbackStartTime defined below
         }
@@ -4016,7 +4016,7 @@ export class CorePlayer {
                 if (!this.config.muted) {
                     Logger.log('Attempting fallback to muted autoplay...');
                     this.config.muted = true;
-                    if (this.ui.muteBtn) this._updateVolumeIcon(); // Update UI
+                    if (this.ui.muteBtn) this._updateVolumeUI(); // Update UI
 
                     try {
                         // Reset audio context state if needed before retry
