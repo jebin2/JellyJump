@@ -149,6 +149,8 @@
                 keyboard: true  // Keep shortcuts
             };
 
+            controlsConfig.loopMode = controlsConfig.loop ? "one" : 'off';
+
             try {
                 // Load player and screenshot templates
                 const [playerResponse, screenshotResponse] = await Promise.all([
@@ -175,15 +177,6 @@
                     withCredentials: withCredentials,
                     controls: controlsConfig
                 });
-
-                // Apply loop setting if requested
-                if (params.get('loop') === '1' || params.get('loop') === 'true') {
-                    player.loopMode = 'one';
-                    // Try to update UI if method is accessible, otherwise logic still works
-                    if (typeof player._updateLoopUI === 'function') {
-                        player._updateLoopUI();
-                    }
-                }
 
                 // Load the video (use load() method with autoplay param)
                 const decodedUrl = decodeURIComponent(videoUrl);

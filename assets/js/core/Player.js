@@ -31,7 +31,7 @@ export class CorePlayer {
         this.currentTime = 0;
         this.duration = 0;
         this.playbackRate = parseFloat(localStorage.getItem('jellyjump-speed')) || 1.0;
-        this.loopMode = 'off'; // 'off', 'all', 'ab'
+        this.loopMode = this.config.loopMode || 'off'; // 'off', 'all', 'ab'
         this.loopStart = null;
         this.loopEnd = null;
         this.animationFrameId = null;
@@ -700,6 +700,7 @@ export class CorePlayer {
 
         // Loop Control (only if loop enabled)
         if (this.config.controls.loop) {
+            this.toggleLoopMode();
             this.ui.loopBtn.addEventListener('click', () => this.toggleLoopMode());
             // Context menu to open loop panel
             this.ui.loopBtn.addEventListener('contextmenu', (e) => {
