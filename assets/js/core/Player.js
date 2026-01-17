@@ -2875,13 +2875,17 @@ export class CorePlayer {
      * but audio sources play at playbackRate speed, effectively advancing media time faster.
      */
     _getPlaybackTime() {
-        if (this.isPlaying && this.audioContext) {
-            const elapsedRealTime = this.audioContext.currentTime - this.audioContextStartTime;
-            // Media time advances at playbackRate speed
-            return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
-        } else {
-            return this.playbackTimeAtStart;
+        if (this.isPlaying) {
+            if (this.audioContext && this.audioContext.state === 'running') {
+                const elapsedRealTime = this.audioContext.currentTime - this.audioContextStartTime;
+                return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
+            } else if (this.fallbackStartTime !== undefined) {
+                // Fallback clock for when AudioContext is blocked/suspended
+                const elapsedRealTime = (performance.now() - this.fallbackStartTime) / 1000;
+                return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
+            }
         }
+        return this.playbackTimeAtStart;
     }
 
     /**
@@ -2960,11 +2964,23 @@ export class CorePlayer {
         Logger.log(`[Play] Starting playback - isAudioMode: ${this.isAudioMode}, playbackTimeAtStart: ${this.playbackTimeAtStart}`);
 
         // Initialize Audio Context on first user interaction
-        this._initAudio();
+        try {
+            this._initAudio();
 
-        // Resume AudioContext if suspended (e.g., after pause suspends it)
-        if (this.audioContext && this.audioContext.state === 'suspended') {
-            await this.audioContext.resume();
+            // Resume AudioContext if suspended (e.g., after pause suspends it)
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+        } catch (e) {
+            Logger.warn('[Play] AudioContext blocked/failed:', e);
+
+            // "Plain and simple" logic: If audio fails, force mute and PLAY anyway.
+            if (!this.config.muted) {
+                Logger.log('[Play] Auto-muting due to audio block...');
+                this.config.muted = true;
+                if (this.ui.muteBtn) this._updateVolumeIcon();
+            }
+            // We proceed to play using fallbackStartTime defined below
         }
 
         if (this.duration > 0 && this._getPlaybackTime() >= this.duration - 0.1) {
@@ -2976,7 +2992,10 @@ export class CorePlayer {
             await this._startVideoIterator();
         }
 
-        this.audioContextStartTime = this.audioContext.currentTime;
+        if (this.audioContext) {
+            this.audioContextStartTime = this.audioContext.currentTime;
+        }
+        this.fallbackStartTime = performance.now();
         this.isPlaying = true;
         this._updatePlayPauseUI();
 
