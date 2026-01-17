@@ -701,7 +701,16 @@ export class CorePlayer {
         // Loop Control (only if loop enabled)
         if (this.config.controls.loop) {
             this.toggleLoopMode();
-            this.ui.loopBtn.addEventListener('click', () => this.toggleLoopMode());
+            this.ui.loopBtn.addEventListener('click', () => {
+                if (this.loopMode === 'off') {
+                    this.loopMode = 'one';
+                } else if (this.loopMode === 'one') {
+                    this.loopMode = 'playlist';
+                } else {
+                    this.loopMode = 'off';
+                }
+                this._updateLoopUI();
+            });
             // Context menu to open loop panel
             this.ui.loopBtn.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
@@ -928,13 +937,6 @@ export class CorePlayer {
      * Toggle Loop Mode: Off -> Playlist -> One -> Off
      */
     toggleLoopMode() {
-        if (this.loopMode === 'off') {
-            this.loopMode = 'playlist';
-        } else if (this.loopMode === 'playlist') {
-            this.loopMode = 'one';
-        } else {
-            this.loopMode = 'off';
-        }
         // If we were in A-B, this cycle exits it.
         // If we want to clear A-B markers when leaving A-B mode via button:
         if (this.loopStart !== null || this.loopEnd !== null) {
