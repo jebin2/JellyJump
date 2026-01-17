@@ -31,7 +31,7 @@ export class CorePlayer {
         this.currentTime = 0;
         this.duration = 0;
         this.playbackRate = parseFloat(localStorage.getItem('jellyjump-speed')) || 1.0;
-        this.loopMode = this.config.controls.loopMode || 'off'; // 'off', 'all', 'ab'
+        this.loopMode = this.config.controls ? this.config.controls.loopMode : 'off';
         this.loopStart = null;
         this.loopEnd = null;
         this.animationFrameId = null;
