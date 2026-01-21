@@ -136,6 +136,9 @@ export class IndexedDBService {
             [this.STORES.PLAYLIST, this.STORES.FILES],
             'readwrite',
             (transaction, resolve, reject) => {
+                const MAX_SIZE = 500 * 1024 * 1024;
+                const persistedItemIds = new Set(); // Track items that were successfully saved to generic file store
+
                 transaction.oncomplete = () => {
                     if (items.length > 0) {
                         localStorage.setItem(this.DB_NAME + '-playlist', 'true');
@@ -144,10 +147,9 @@ export class IndexedDBService {
                     }
 
                     // Release file blobs from memory after successful persistence.
-                    // Files are now safely stored in IndexedDB and can be reloaded on-demand.
-                    // We keep the URL alive (browser holds blob reference) for current playback.
+                    // Only release if we ACTUALLY saved it to DB.
                     for (const item of items) {
-                        if (item.isLocal && item.file) {
+                        if (item.isLocal && item.file && persistedItemIds.has(item.id)) {
                             Logger.log(`[IndexedDB] Releasing memory for persisted file: ${item.title}`);
                             item.file = null;
                         }
@@ -161,14 +163,10 @@ export class IndexedDBService {
                 const fileStore = transaction.objectStore(this.STORES.FILES);
 
                 // Clear existing playlist first (simplest approach for now)
-                // Ideally we'd diff, but clearing is safer to ensure sync
                 playlistStore.clear();
 
                 // CRITICAL: Do NOT clear fileStore here. 
-                // Since we unload files from memory to save RAM, clearing the store would delete 
-                // the persisted files for items that are currently unloaded (item.file is null).
                 // We only want to ADD/UPDATE files that are present in memory.
-                // Garbage collection of unused files should be a separate process if needed.
 
                 items.forEach(item => {
                     // 1. Prepare item for storage
@@ -182,20 +180,16 @@ export class IndexedDBService {
                         // Keep URL for remote items, clear for local
                         url: item.isLocal ? '' : item.url,
                         originalIndex: item.originalIndex,
-                        fileSize: item.fileSize,  // Persist for InfoMenu
-                        fileType: item.fileType,  // Persist for InfoMenu
-                        mimeType: item.mimeType,  // Persist for Electron blob creation
-                        localPath: item.localPath // Persist for Electron disk access
+                        fileSize: item.fileSize,
+                        fileType: item.fileType,
+                        mimeType: item.mimeType,
+                        localPath: item.localPath
                     };
 
                     playlistStore.put(storedItem);
 
                     // 2. If local and has file in memory, save it to files store
-                    // Note: Most files are already in DB via saveFile() from MediaMetadata
-                    // This handles files that were added via file input (not downloaded)
                     if (item.isLocal && item.file) {
-                        // Check size limit (500MB)
-                        const MAX_SIZE = 500 * 1024 * 1024;
                         if (item.file.size < MAX_SIZE) {
                             fileStore.put({
                                 id: item.id,
@@ -203,8 +197,10 @@ export class IndexedDBService {
                                 name: item.file.name || item.title,
                                 type: item.file.type
                             });
+                            persistedItemIds.add(item.id);
                         } else {
                             Logger.warn(`[IndexedDB] File ${item.title} too large to persist (${(item.file.size / 1024 / 1024).toFixed(2)} MB)`);
+                            // Do NOT add to persistedItemIds, so it stays in memory
                         }
                     }
                 });

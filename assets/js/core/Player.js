@@ -1281,14 +1281,15 @@ export class CorePlayer {
         if (track) {
             this.audioTrack = track;
 
-            // Re-create sink
-            if (this.audioSink) {
-                // Ideally we should destroy the old sink if method exists, 
-                // but JS GC should handle it if we drop reference
-            }
-            // Use AudioSampleSink instead of AudioBufferSink to avoid MediaBunny bug
-            // where AudioSamples aren't closed properly
             this.audioSink = new MediaBunny.AudioSampleSink(this.audioTrack);
+
+            // If playing, we must restart the audio iterator to pick up the new track
+            if (this.isPlaying) {
+                this.pause();
+                const startTime = this._getPlaybackTime();
+                Logger.log(`[Audio] Switching track while playing - restarting iterator at ${startTime.toFixed(2)}s`);
+                this.play();
+            }
 
             // Update UI
             this._updateAudioTracks();
