@@ -1391,30 +1391,23 @@ export class Playlist {
                         this.player.ui.loader.classList.remove('visible');
                     }
 
-                    // Show user-friendly popup for missing file
-                    try {
-                        Logger.log('Showing modal for file not found...');
-                        const shouldRemove = await ConfirmModal.confirm({
-                            title: 'File Not Found',
-                            message: `"${video.title}" could not be loaded.\n\nThis file was likely too large to save in browser storage (>500MB) and needs to be re-added to the playlist.`,
-                            confirmText: 'Remove',
-                            cancelText: 'Keep',
-                            confirmStyle: 'danger',
-                            icon: '⚠️'
-                        });
+                    // Auto-remove and skip to next
+                    Logger.warn(`File not found: ${video.title}. Removing and skipping.`);
 
-                        if (shouldRemove) {
-                            // Remove the corrupted/missing item
-                            this.items.splice(index, 1);
-                            if (this.activeIndex >= index) {
-                                this.activeIndex = Math.max(-1, this.activeIndex - 1);
-                            }
-                            this._saveState();
-                            this.render();
-                            this._updatePlayerNavigationState();
-                        }
-                    } catch (modalError) {
-                        Logger.error('Error showing modal:', modalError);
+                    this.items.splice(index, 1);
+                    this._saveState();
+                    this.render();
+
+                    // Since we removed the item at 'index', the next item is now at 'index'
+                    if (index < this.items.length) {
+                        // Play the next available item
+                        this.selectItem(index, autoplay);
+                    } else if (this.items.length > 0 && this.player.loopMode === 'playlist') {
+                        // Loop back to start if needed
+                        this.selectItem(0, autoplay);
+                    } else {
+                        // End of playlist
+                        this._stopPlayback();
                     }
                     return;
                 }
