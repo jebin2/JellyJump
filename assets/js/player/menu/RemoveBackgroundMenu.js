@@ -20,7 +20,7 @@ export class RemoveBackgroundMenu {
             return;
         }
 
-        const modal = new Modal({ maxWidth: '900px' });
+        const modal = new Modal({ maxWidth: '600px' });
         modal.setTitle('Remove Background');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
@@ -62,17 +62,19 @@ export class RemoveBackgroundMenu {
                 controlBarMode: 'fixed', // Fixed control bar as requested
                 controls: {
                     playPause: true,
-                    navigation: false,  // No prev/next buttons
-                    volume: false,
+                    navigation: false,
                     time: true,
                     progress: true,
                     captions: false,
                     settings: false,
                     fullscreen: false,
-                    loop: true,
+                    loop: false,
                     speed: false,
+                    filters: false,
+                    equalizer: true,
+                    volumeOnly: true,
                     modeToggle: false,
-                    keyboard: false  // Disable keyboard shortcuts for modal player
+                    keyboard: false
                 },
                 autoplay: false
             });

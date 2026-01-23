@@ -264,11 +264,6 @@
 
 <!-- Conversion Content Template -->
 <template id="conversion-content-template">
-    <div class="source-info mb-md">
-        <span class="text-secondary text-sm font-mono">SOURCE:</span>
-        <div class="source-filename text-base font-bold truncate" title=""></div>
-    </div>
-
     <!-- Format Selection -->
     <div class="format-selection mb-lg">
         <div class="text-secondary text-sm font-mono mb-sm">SELECT FORMAT:</div>
@@ -354,7 +349,7 @@
     </div>
 
     <!-- Quality Slider (Always Visible) -->
-    <div class="quality-section mb-lg">
+    <div class="quality-section">
         <div class="flex-between mb-sm">
             <span class="text-secondary text-sm font-mono">QUALITY:</span>
             <span class="quality-value text-sm font-bold">Original (100%)</span>
@@ -368,48 +363,36 @@
         </div>
         <div class="estimated-reduction text-xs text-accent mt-sm">No size reduction</div>
     </div>
-
-    <div class="options-group mb-lg">
-        <label class="checkbox-option">
-            <input type="checkbox" name="addToPlaylist" checked>
-            <span class="checkbox-custom"></span>
-            <span class="checkbox-label">Add to playlist after conversion</span>
-        </label>
-    </div>
-
-    <!-- Progress Section (Hidden by default) -->
-    <div class="progress-section hidden">
-        <div class="flex-between mb-xs">
-            <span class="progress-status text-sm font-mono">Processing...</span>
-            <span class="progress-percentage text-sm font-bold">0%</span>
-        </div>
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill" style="width: 0%"></div>
-        </div>
-    </div>
-
-    <!-- Error Message (Hidden by default) -->
-    <div class="error-message hidden mt-md p-sm border-danger text-danger text-sm"></div>
-
-    <!-- Success Message (Hidden by default) -->
-    <div class="success-message hidden mt-md p-sm border-success text-success text-sm">
-        Operation complete!
-    </div>
 </template>
 
 <!-- Conversion Footer Template -->
 <template id="conversion-footer-template">
-    <div class="action-buttons flex gap-sm">
-        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-download"></use>
-            </svg>
-        </a>
-        <button class="btn jellyjump-btn-small convert-btn" title="Convert" aria-label="Convert">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-convert"></use>
-            </svg>
-        </button>
+    <div class="conversion-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="conversion-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small convert-btn" title="Convert" aria-label="Convert">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-convert"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 
@@ -538,11 +521,6 @@
 
 <!-- Trim Content Template -->
 <template id="trim-content-template">
-    <div class="source-info mb-md">
-        <span class="text-secondary text-sm font-mono">SOURCE:</span>
-        <div class="source-filename text-base font-bold truncate" title=""></div>
-    </div>
-
     <!-- Loading State -->
     <div class="trim-loading flex flex-col items-center justify-center p-xl text-muted">
         <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
@@ -555,26 +533,8 @@
         <div id="trim-player-container" class="mb-lg aspect-video bg-black rounded overflow-hidden relative h300pximpl">
         </div>
 
-        <!-- Time Inputs -->
-        <div class="time-inputs-container mb-lg">
-            <div class="time-input-group">
-                <label for="trim-start-input" class="text-xs text-secondary font-mono mb-xs block">START</label>
-                <input type="text" id="trim-start-input" class="mb-input font-mono text-center time-input-field"
-                    placeholder="00:00:00" value="00:00:00">
-            </div>
-            <div class="duration-display flex flex-col items-center justify-center duration-display-container">
-                <span class="text-xs text-secondary font-mono">DUR</span>
-                <span class="trim-duration text-sm font-bold text-accent">00:00:00</span>
-            </div>
-            <div class="time-input-group">
-                <label for="trim-end-input" class="text-xs text-secondary font-mono mb-xs block">END</label>
-                <input type="text" id="trim-end-input" class="mb-input font-mono text-center time-input-field"
-                    placeholder="00:00:00" value="00:00:00">
-            </div>
-        </div>
-
         <!-- Visual Timeline Slider -->
-        <div class="timeline-slider-container mb-lg select-none">
+        <div class="timeline-slider-container select-none">
             <div class="timeline-slider relative h-12 bg-tertiary rounded cursor-pointer">
                 <!-- Track Background -->
                 <div class="timeline-track absolute inset-0 rounded overflow-hidden">
@@ -590,56 +550,54 @@
                 <div class="timeline-handle end-handle absolute top-0 bottom-0 w-4 bg-accent cursor-ew-resize z-10 -ml-2 rounded-full border-2 border-white shadow-md timeline-handle-end"
                     tabindex="0" role="slider" aria-label="End time"></div>
             </div>
-            <div class="flex-between mt-xs text-xs text-secondary font-mono">
-                <span>00:00</span>
-                <span class="total-duration">00:00</span>
+
+            <!-- Time Labels -->
+            <div class="flex-between mt-sm text-xs font-mono items-center px-xs">
+                <div class="flex flex-col items-start">
+                    <span class="text-secondary text-[10px] mb-[2px]">START</span>
+                    <span class="trim-start-time text-primary font-bold">00:00:00</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <span class="text-secondary text-[10px] mb-[2px]">DURATION</span>
+                    <span class="trim-duration text-accent font-bold">00:00:00</span>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-secondary text-[10px] mb-[2px]">END</span>
+                    <span class="trim-end-time text-primary font-bold">00:00:00</span>
+                </div>
             </div>
-        </div>
-
-
-
-        <div class="options-group mb-lg">
-            <label class="checkbox-option">
-                <input type="checkbox" name="addToPlaylist" checked>
-                <span class="checkbox-custom"></span>
-                <span class="checkbox-label">Add to playlist after trimming</span>
-            </label>
-        </div>
-
-        <!-- Progress Section (Hidden by default) -->
-        <div class="progress-section hidden">
-            <div class="flex-between mb-xs">
-                <span class="progress-status text-sm font-mono">Trimming video...</span>
-                <span class="progress-percentage text-sm font-bold">0%</span>
-            </div>
-            <div class="progress-bar-container">
-                <div class="progress-bar-fill" style="width: 0%"></div>
-            </div>
-        </div>
-
-        <!-- Error Message (Hidden by default) -->
-        <div class="error-message hidden mt-md p-sm border-danger text-danger text-sm"></div>
-
-        <!-- Success Message (Hidden by default) -->
-        <div class="success-message hidden mt-md p-sm border-success text-success text-sm">
-            Trimming complete!
         </div>
     </div>
 </template>
 
 <!-- Trim Footer Template -->
 <template id="trim-footer-template">
-    <div class="action-buttons flex gap-sm">
-        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-download"></use>
-            </svg>
-        </a>
-        <button class="btn jellyjump-btn-small trim-btn" title="Trim" aria-label="Trim">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-scissors"></use>
-            </svg>
-        </button>
+    <div class="trim-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="trim-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono">Trimming...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small trim-btn" title="Trim" aria-label="Trim">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-scissors"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 
@@ -1115,13 +1073,7 @@
 
 <!-- GIF Creation Content Template -->
 <template id="gif-content-template">
-    <div class="source-info mb-md">
-        <span class="text-secondary text-sm font-mono">SOURCE:</span>
-        <div class="source-filename text-base font-bold truncate" title=""></div>
-        <div class="source-details text-xs text-muted mt-xs">
-            <span class="source-duration"></span> • <span class="source-resolution"></span>
-        </div>
-    </div>
+
 
     <!-- Loading State -->
     <div class="gif-loading flex flex-col items-center justify-center p-xl text-muted">
@@ -1135,21 +1087,38 @@
         <div id="gif-player-container" class="mb-lg aspect-video bg-black rounded overflow-hidden relative h300pximpl">
         </div>
 
-        <!-- Time Selection -->
-        <div class="time-inputs-container mb-lg">
-            <div class="time-input-group">
-                <label for="gif-start-input" class="text-xs text-secondary font-mono mb-xs block">START TIME</label>
-                <input type="text" id="gif-start-input" class="mb-input font-mono text-center time-input-field"
-                    placeholder="00:00:00" value="00:00:00">
+        <!-- Visual Timeline Slider -->
+        <div class="timeline-slider-container select-none mb-lg">
+            <div class="timeline-slider relative h-12 bg-tertiary rounded cursor-pointer">
+                <!-- Track Background -->
+                <div class="timeline-track absolute inset-0 rounded overflow-hidden">
+                    <!-- Ticks generated by JS -->
+                </div>
+                <!-- Selected Range -->
+                <div
+                    class="timeline-range absolute top-0 bottom-0 bg-primary opacity-30 pointer-events-none timeline-range-initial">
+                </div>
+                <!-- Handles -->
+                <div class="timeline-handle start-handle absolute top-0 bottom-0 w-4 bg-accent cursor-ew-resize z-10 -ml-2 rounded-full border-2 border-white shadow-md timeline-handle-start"
+                    tabindex="0" role="slider" aria-label="Start time"></div>
+                <div class="timeline-handle end-handle absolute top-0 bottom-0 w-4 bg-accent cursor-ew-resize z-10 -ml-2 rounded-full border-2 border-white shadow-md timeline-handle-end"
+                    tabindex="0" role="slider" aria-label="End time"></div>
             </div>
-            <div class="duration-display flex flex-col items-center justify-center duration-display-container">
-                <span class="text-xs text-secondary font-mono">DURATION</span>
-                <span class="gif-duration text-sm font-bold text-accent">0.0s</span>
-            </div>
-            <div class="time-input-group">
-                <label for="gif-end-input" class="text-xs text-secondary font-mono mb-xs block">END TIME</label>
-                <input type="text" id="gif-end-input" class="mb-input font-mono text-center time-input-field"
-                    placeholder="00:00:00" value="00:00:00">
+
+            <!-- Time Labels -->
+            <div class="flex-between mt-sm text-xs font-mono items-center px-xs">
+                <div class="flex flex-col items-start">
+                    <span class="text-secondary text-[10px] mb-[2px]">START</span>
+                    <span class="gif-start-time text-primary font-bold">00:00:00</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <span class="text-secondary text-[10px] mb-[2px]">DURATION</span>
+                    <span class="gif-duration text-accent font-bold">00:00:00</span>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-secondary text-[10px] mb-[2px]">END</span>
+                    <span class="gif-end-time text-primary font-bold">00:00:00</span>
+                </div>
             </div>
         </div>
 
@@ -1160,26 +1129,29 @@
         <div class="gif-settings mb-lg">
             <div class="text-xs text-secondary font-mono mb-sm">GIF SETTINGS</div>
 
-            <!-- Frame Rate -->
-            <div class="setting-group mb-sm">
-                <label class="text-xs font-bold mb-xs block">Frame Rate</label>
-                <select class="mb-select w-full" id="gif-fps">
-                    <option value="5">5 FPS (Smallest file)</option>
-                    <option value="10">10 FPS (Smooth)</option>
-                    <option value="15" selected>15 FPS (Recommended)</option>
-                    <option value="20">20 FPS (Very smooth)</option>
-                </select>
-            </div>
+            <!-- Frame Rate & Size Row -->
+            <div class="flex gap-sm mb-sm">
+                <!-- Frame Rate -->
+                <div class="setting-group flex-1">
+                    <label class="text-xs font-bold mb-xs block">Frame Rate</label>
+                    <select class="mb-select w-full" id="gif-fps">
+                        <option value="5">5 FPS (Smallest file)</option>
+                        <option value="10">10 FPS (Smooth)</option>
+                        <option value="15" selected>15 FPS (Recommended)</option>
+                        <option value="20">20 FPS (Very smooth)</option>
+                    </select>
+                </div>
 
-            <!-- Size -->
-            <div class="setting-group mb-sm">
-                <label class="text-xs font-bold mb-xs block">Size</label>
-                <select class="mb-select w-full" id="gif-size">
-                    <option value="original">Original Size</option>
-                    <option value="720">720p (1280×720)</option>
-                    <option value="480" selected>480p (854×480)</option>
-                    <option value="360">360p (640×360)</option>
-                </select>
+                <!-- Size -->
+                <div class="setting-group flex-1">
+                    <label class="text-xs font-bold mb-xs block">Size</label>
+                    <select class="mb-select w-full" id="gif-size">
+                        <option value="original">Original Size</option>
+                        <option value="720">720p (1280×720)</option>
+                        <option value="480" selected>480p (854×480)</option>
+                        <option value="360">360p (640×360)</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Quality -->
@@ -1198,25 +1170,7 @@
             </div>
         </div>
 
-        <!-- Add to Playlist Option -->
-        <div class="options-group mb-lg">
-            <label class="checkbox-option">
-                <input type="checkbox" name="addToPlaylist" checked>
-                <span class="checkbox-custom"></span>
-                <span class="checkbox-label">Add GIF to playlist after creation</span>
-            </label>
-        </div>
 
-        <!-- Progress Section -->
-        <div class="progress-section hidden">
-            <div class="flex-between mb-xs">
-                <span class="progress-status text-sm font-mono">Creating GIF...</span>
-                <span class="progress-percentage text-sm font-bold">0%</span>
-            </div>
-            <div class="progress-bar-container">
-                <div class="progress-bar-fill" style="width: 0%"></div>
-            </div>
-        </div>
 
         <!-- GIF Preview Section -->
         <div class="gif-preview-section hidden mt-md">
@@ -1230,26 +1184,38 @@
             </div>
         </div>
 
-        <!-- Error/Success Messages -->
-        <div class="error-message hidden mt-md p-sm border-danger text-danger text-sm"></div>
-        <div class="success-message hidden mt-md p-sm border-success text-success text-sm">
-            GIF created! Click Download to save.
-        </div>
+
     </div>
 </template>
 
 <!-- GIF Footer Template -->
 <template id="gif-footer-template">
-    <div class="action-buttons flex gap-sm">
-        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download GIF" aria-label="Download GIF"
-            download>
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-download"></use>
-            </svg>
-        </a>
-        <button class="btn jellyjump-btn-small create-gif-btn" title="Create GIF" aria-label="Create GIF">
-            <span>🎞️</span>
-        </button>
+    <div class="gif-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="gif-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono">Creating...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download GIF"
+                aria-label="Download GIF" download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small create-gif-btn" title="Create GIF" aria-label="Create GIF">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-video"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 
@@ -1608,7 +1574,7 @@
 
 <!-- Remove Background Content Template -->
 <template id="remove-bg-content-template">
-    <div class="remove-bg-container grid grid-cols-2 gap-md h-full">
+    <div class="remove-bg-container flex flex-col gap-md">
         <!-- Left Column: Video Preview -->
         <div class="preview-column flex flex-col gap-sm">
             <div class="preview-header flex-between items-center">
@@ -1640,8 +1606,8 @@
             </div>
         </div>
 
-        <!-- Right Column: Controls -->
-        <div class="controls-column flex flex-col gap-md overflow-y-auto pr-xs">
+        <!-- Controls Section -->
+        <div class="controls-column flex flex-col gap-md">
             <!-- Color Picker Section -->
             <div class="color-picker-section">
                 <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
@@ -1676,39 +1642,41 @@
                 </div>
             </div>
 
-            <!-- Progress Section -->
-            <div class="progress-section hidden mt-auto">
-                <div class="flex-between mb-xs">
-                    <span class="progress-status text-sm font-mono">Processing...</span>
-                    <span class="progress-percentage text-sm font-bold">0%</span>
-                </div>
-                <div class="progress-bar-container h-2 bg-tertiary rounded overflow-hidden">
-                    <div class="progress-bar-fill h-full bg-primary transition-all duration-300" style="width: 0%">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Messages -->
-            <div class="error-message hidden mt-sm p-sm border-danger text-danger text-sm bg-danger-soft rounded"></div>
-            <div class="success-message hidden mt-sm p-sm border-success text-success text-sm bg-success-soft rounded">
-                Background removed! Added to playlist.
-            </div>
         </div>
     </div>
 </template>
 
 <!-- Remove Background Footer Template -->
 <template id="remove-bg-footer-template">
-    <div class="action-buttons flex gap-sm w-full justify-end">
-        <button class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download">
-            <svg width="16" height="16" fill="currentColor" class="mr-xs">
-                <use href="assets/icons/sprite.svg#icon-download"></use>
-            </svg>
-            Download
-        </button>
-        <button class="btn jellyjump-btn-primary process-btn w-full md:w-auto" title="Process Video">
-            Process Video
-        </button>
+    <div class="remove-bg-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="remove-bg-status flex-1">
+            <div class="progress-section hidden">
+                <div class="flex items-center gap-sm mb-xs">
+                    <span class="progress-status text-sm font-mono">Processing...</span>
+                    <span class="progress-percentage text-sm font-bold">0%</span>
+                </div>
+                <div class="progress-bar-container h-1 bg-tertiary rounded overflow-hidden w-full max-w-[200px]">
+                    <div class="progress-bar-fill h-full bg-primary transition-all duration-300" style="width: 0%">
+                    </div>
+                </div>
+            </div>
+            <div class="error-message hidden text-danger text-xs"></div>
+            <div class="success-message hidden text-success text-xs font-bold">✓ Added to playlist</div>
+        </div>
+
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <button class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download">
+                <svg width="16" height="16" fill="currentColor" class="mr-xs">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+                Download
+            </button>
+            <button class="btn jellyjump-btn-primary process-btn" title="Process Video">
+                Process Video
+            </button>
+        </div>
     </div>
 </template>
 
@@ -1733,19 +1701,19 @@
             <div class="flex items-center gap-sm text-xs text-secondary">
                 <span class="w-16 font-mono">Sim</span>
                 <input type="range" class="quality-slider similarity-slider flex-1" min="0" max="100" value="40"
-                    onclick="event.stopPropagation()" style="background: var(--border-dark); height: 4px;">
+                    onclick="event.stopPropagation()">
                 <span class="similarity-value font-mono w-8 text-right text-primary">0.40</span>
             </div>
             <div class="flex items-center gap-sm text-xs text-secondary">
                 <span class="w-16 font-mono">Smooth</span>
                 <input type="range" class="quality-slider smoothness-slider flex-1" min="0" max="100" value="8"
-                    onclick="event.stopPropagation()" style="background: var(--border-dark); height: 4px;">
+                    onclick="event.stopPropagation()">
                 <span class="smoothness-value font-mono w-8 text-right text-primary">0.08</span>
             </div>
             <div class="flex items-center gap-sm text-xs text-secondary">
                 <span class="w-16 font-mono">Spill</span>
                 <input type="range" class="quality-slider spill-slider flex-1" min="0" max="100" value="10"
-                    onclick="event.stopPropagation()" style="background: var(--border-dark); height: 4px;">
+                    onclick="event.stopPropagation()">
                 <span class="spill-value font-mono w-8 text-right text-primary">0.10</span>
             </div>
         </div>
