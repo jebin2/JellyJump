@@ -27,7 +27,7 @@ export class CropMenu {
 
         const modalContent = modal.modal;
 
-        // Elements
+        // Elements - Body
         const originalResDisplay = modalContent.querySelector('.original-resolution');
         const cropSizeDisplay = modalContent.querySelector('.crop-size');
         const previewCanvas = modalContent.querySelector('.crop-preview-canvas');
@@ -38,10 +38,11 @@ export class CropMenu {
         const widthInput = modalContent.querySelector('#crop-width');
         const heightInput = modalContent.querySelector('#crop-height');
         const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
+
+        // Elements - Footer (progress/status now in footer for visibility)
         const cropBtn = modalContent.querySelector('.crop-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.crop-progress');
-        const progressBarFill = modalContent.querySelector('.progress-bar-fill');
         const progressText = modalContent.querySelector('.progress-percentage');
         const statusText = modalContent.querySelector('.status-text');
         const errorDisplay = modalContent.querySelector('.crop-error');
@@ -317,6 +318,7 @@ export class CropMenu {
             }
 
             errorDisplay.classList.add('hidden');
+            successDisplay.classList.add('hidden');
             progressSection.classList.remove('hidden');
             cropBtn.disabled = true;
             modal.closeBtn.disabled = true;
@@ -337,7 +339,6 @@ export class CropMenu {
                     },
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
-                        progressBarFill.style.width = `${percent}%`;
                         progressText.textContent = `${percent}%`;
                     }
                 });
@@ -357,8 +358,7 @@ export class CropMenu {
                 // Reset for another crop
                 cropBtn.disabled = false;
                 cropBtn.classList.remove('hidden');
-                statusText.textContent = 'Cropping video...';
-                progressBarFill.style.width = '0%';
+                statusText.textContent = 'Cropping...';
                 progressText.textContent = '0%';
 
                 // Add to Playlist
