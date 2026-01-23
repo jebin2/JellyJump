@@ -264,11 +264,6 @@
 
 <!-- Conversion Content Template -->
 <template id="conversion-content-template">
-    <div class="source-info mb-md">
-        <span class="text-secondary text-sm font-mono">SOURCE:</span>
-        <div class="source-filename text-base font-bold truncate" title=""></div>
-    </div>
-
     <!-- Format Selection -->
     <div class="format-selection mb-lg">
         <div class="text-secondary text-sm font-mono mb-sm">SELECT FORMAT:</div>
@@ -354,7 +349,7 @@
     </div>
 
     <!-- Quality Slider (Always Visible) -->
-    <div class="quality-section mb-lg">
+    <div class="quality-section">
         <div class="flex-between mb-sm">
             <span class="text-secondary text-sm font-mono">QUALITY:</span>
             <span class="quality-value text-sm font-bold">Original (100%)</span>
@@ -368,48 +363,36 @@
         </div>
         <div class="estimated-reduction text-xs text-accent mt-sm">No size reduction</div>
     </div>
-
-    <div class="options-group mb-lg">
-        <label class="checkbox-option">
-            <input type="checkbox" name="addToPlaylist" checked>
-            <span class="checkbox-custom"></span>
-            <span class="checkbox-label">Add to playlist after conversion</span>
-        </label>
-    </div>
-
-    <!-- Progress Section (Hidden by default) -->
-    <div class="progress-section hidden">
-        <div class="flex-between mb-xs">
-            <span class="progress-status text-sm font-mono">Processing...</span>
-            <span class="progress-percentage text-sm font-bold">0%</span>
-        </div>
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill" style="width: 0%"></div>
-        </div>
-    </div>
-
-    <!-- Error Message (Hidden by default) -->
-    <div class="error-message hidden mt-md p-sm border-danger text-danger text-sm"></div>
-
-    <!-- Success Message (Hidden by default) -->
-    <div class="success-message hidden mt-md p-sm border-success text-success text-sm">
-        Operation complete!
-    </div>
 </template>
 
 <!-- Conversion Footer Template -->
 <template id="conversion-footer-template">
-    <div class="action-buttons flex gap-sm">
-        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-download"></use>
-            </svg>
-        </a>
-        <button class="btn jellyjump-btn-small convert-btn" title="Convert" aria-label="Convert">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-convert"></use>
-            </svg>
-        </button>
+    <div class="conversion-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="conversion-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small convert-btn" title="Convert" aria-label="Convert">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-convert"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 

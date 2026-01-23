@@ -31,18 +31,10 @@ export class ConvertMenu {
 
         const modalContent = modal.modal;
 
-        // Populate Source Info
-        const sourceFilename = modalContent.querySelector('.source-filename');
-        if (sourceFilename) {
-            sourceFilename.textContent = item.title;
-            sourceFilename.title = item.title;
-        }
-
         // Elements
         const convertBtn = modalContent.querySelector('.convert-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
-        const progressBarFill = modalContent.querySelector('.progress-bar-fill');
         const progressPercentage = modalContent.querySelector('.progress-percentage');
         const successMessage = modalContent.querySelector('.success-message');
         const errorMessage = modalContent.querySelector('.error-message');
@@ -89,7 +81,6 @@ export class ConvertMenu {
         // Convert Handler
         convertBtn.addEventListener('click', async () => {
             const format = modalContent.querySelector('input[name="format"]:checked').value;
-            const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
             const quality = parseInt(qualitySlider.value);
 
             // Validation: No Op check
@@ -110,9 +101,8 @@ export class ConvertMenu {
             downloadBtn.classList.add('hidden');
 
             try {
-                await ConvertMenu._startConversion(item, format, quality, addToPlaylist, playlist, (progress) => {
+                await ConvertMenu._startConversion(item, format, quality, playlist, (progress) => {
                     const percent = Math.round(progress * 100) + '%';
-                    progressBarFill.style.width = percent;
                     progressPercentage.textContent = percent;
                 }, downloadBtn);
 
@@ -168,7 +158,7 @@ export class ConvertMenu {
      * @param {HTMLElement} downloadBtn - Download button element
      * @private
      */
-    static async _startConversion(item, format, quality, addToPlaylist, playlist, onProgress, downloadBtn) {
+    static async _startConversion(item, format, quality, playlist, onProgress, downloadBtn) {
         // Get source with caching
         const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
@@ -193,8 +183,8 @@ export class ConvertMenu {
                 onProgress: onProgress
             });
 
-            // Handle Success
-            ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, addToPlaylist, playlist, downloadBtn);
+            // Handle Success (always add to playlist)
+            ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
         } catch (error) {
             Logger.error("Conversion failed:", error);
             throw error;
@@ -211,7 +201,7 @@ export class ConvertMenu {
      * @param {HTMLElement} downloadBtn - Download button element
      * @private
      */
-    static _handleConversionSuccess(blob, originalItem, format, addToPlaylist, playlist, downloadBtn) {
+    static _handleConversionSuccess(blob, originalItem, format, playlist, downloadBtn) {
         const newFilename = originalItem.title.replace(/\.[^/.]+$/, "") + `-converted.${format}`;
         const url = URL.createObjectURL(blob);
 
@@ -221,24 +211,23 @@ export class ConvertMenu {
             downloadBtn.download = newFilename;
         }
 
-        if (addToPlaylist) {
-            const newItem = {
-                title: newFilename,
-                url: url,
-                file: new File([blob], newFilename, { type: blob.type }),
-                duration: originalItem.duration, // Approx same duration
-                type: 'video',
-                path: (originalItem.path || originalItem.title) + '/' + newFilename,
-                id: generateId()
-            };
+        // Always add to playlist
+        const newItem = {
+            title: newFilename,
+            url: url,
+            file: new File([blob], newFilename, { type: blob.type }),
+            duration: originalItem.duration,
+            type: 'video',
+            path: (originalItem.path || originalItem.title) + '/' + newFilename,
+            id: generateId()
+        };
 
-            // Insert after original item
-            const index = playlist.items.indexOf(originalItem);
-            playlist.items.splice(index + 1, 0, newItem);
+        // Insert after original item
+        const index = playlist.items.indexOf(originalItem);
+        playlist.items.splice(index + 1, 0, newItem);
 
-            // Re-render playlist
-            playlist.render();
-            playlist._saveState();
-        }
+        // Re-render playlist
+        playlist.render();
+        playlist._saveState();
     }
 }
