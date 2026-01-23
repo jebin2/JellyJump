@@ -3,7 +3,6 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatDuration, formatFileSize } from '../../utils/mediaUtils.js';
-import { SpeedDropdown } from '../../utils/SpeedDropdown.js';
 
 /**
  * Reverse Menu Handler
@@ -40,13 +39,23 @@ export class ReverseMenu {
         const sourceResolution = modalContent.querySelector('.source-resolution');
         const audioCheckbox = modalContent.querySelector('#reverse-include-audio');
 
-        // Speed dropdown (using common utility)
-        const speedBtn = modalContent.querySelector('[data-speed-btn]');
-        const speedMenu = modalContent.querySelector('[data-speed-menu]');
-        const speedDropdown = SpeedDropdown.init({
-            button: speedBtn,
-            menu: speedMenu
+        // Speed control (Slider)
+        const speedSlider = modalContent.querySelector('.quality-slider');
+        const speedDisplay = modalContent.querySelector('.speed-display');
+
+        // Helper: Update UI
+        const updateSpeedUI = (speed) => {
+            speedDisplay.textContent = `${speed}x`;
+        };
+
+        // Slider Event
+        speedSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            updateSpeedUI(val);
         });
+
+        // Initialize Speed UI
+        updateSpeedUI(1);
 
         const processingInfo = modalContent.querySelector('.processing-info');
         const longVideoWarning = modalContent.querySelector('#long-video-warning');
@@ -57,7 +66,6 @@ export class ReverseMenu {
         const progressBar = modalContent.querySelector('.progress-bar-fill');
         const progressText = modalContent.querySelector('.progress-percentage');
         const progressStatus = modalContent.querySelector('.progress-status');
-        const frameCounter = modalContent.querySelector('.frame-counter');
         const errorMessage = modalContent.querySelector('.error-message');
         const successMessage = modalContent.querySelector('.success-message');
 
@@ -106,7 +114,7 @@ export class ReverseMenu {
 
         const startReversal = async () => {
             const includeAudio = audioCheckbox.checked;
-            const speed = speedDropdown.getCurrentSpeed();
+            const speed = parseFloat(speedSlider.value);
 
             // UI Updates
             reverseBtn.disabled = true;
@@ -115,7 +123,7 @@ export class ReverseMenu {
             downloadBtn.disabled = true;
 
             audioCheckbox.disabled = true;
-            speedDropdown.setDisabled(true);
+            speedSlider.disabled = true;
 
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
@@ -143,8 +151,8 @@ export class ReverseMenu {
                     speed: speed,
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
-                        progressBar.style.width = `${pct}%`;
-                        progressText.textContent = `${pct}%`;
+                        if (progressBar) progressBar.style.width = `${pct}%`;
+                        if (progressText) progressText.textContent = `${pct}%`;
 
                         if (progress < 0.4) {
                             progressStatus.textContent = "Extracting frames...";
@@ -180,7 +188,7 @@ export class ReverseMenu {
 
                 // Re-enable controls for another run
                 audioCheckbox.disabled = false;
-                speedDropdown.setDisabled(false);
+                speedSlider.disabled = false;
                 reverseBtn.disabled = false;
 
                 // Add to playlist
@@ -220,7 +228,7 @@ export class ReverseMenu {
 
                 // Re-enable controls on error
                 audioCheckbox.disabled = false;
-                speedDropdown.setDisabled(false);
+                speedSlider.disabled = false;
                 reverseBtn.disabled = false;
             } finally {
                 // Restore close functionality

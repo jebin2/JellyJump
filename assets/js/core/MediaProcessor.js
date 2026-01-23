@@ -1442,6 +1442,220 @@ export class MediaProcessor {
     }
 
     /**
+     * Change video speed (slow motion / fast forward)
+     * @param {Object} options
+     * @param {Blob|File} options.source
+     * @param {number} options.speed - Speed multiplier (0.1 to 10)
+     * @param {Function} [options.onProgress]
+     * @returns {Promise<Blob>}
+     */
+    static async changeVideoSpeed({ source, speed = 1, onProgress, includeAudio = true }) {
+        Logger.log(`[MediaProcessor] Changing speed to ${speed}x...`);
+
+        const blobSource = new MediaBunny.BlobSource(source);
+        const input = new MediaBunny.Input({
+            source: blobSource,
+            formats: MediaBunny.ALL_FORMATS
+        });
+
+        let output = null;
+        let canvasSource = null;
+        let canvas = null;
+
+        try {
+            // Analyze input
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error('No video track found');
+
+            const width = videoTrack.displayWidth || videoTrack.codedWidth;
+            const height = videoTrack.displayHeight || videoTrack.codedHeight;
+            const duration = await videoTrack.computeDuration();
+            const firstTimestamp = await videoTrack.getFirstTimestamp();
+
+            // Compute frame rate
+            let sourceFps = 30;
+            try {
+                const stats = await videoTrack.computePacketStats();
+                sourceFps = stats.averagePacketRate || 30;
+            } catch (e) {
+                Logger.warn("[MediaProcessor] Could not compute frame rate, defaulting to 30fps", e);
+            }
+
+            // Calculations
+            const clampedSpeed = Math.max(0.1, Math.min(10, speed));
+            const outputFps = sourceFps;
+            const sourceDuration = duration;
+            const outputDuration = sourceDuration / clampedSpeed;
+            const frameDuration = 1 / outputFps;
+            const totalOutputFrames = Math.ceil(outputDuration * outputFps);
+
+            Logger.log(`[MediaProcessor] Speed: ${clampedSpeed}x, Output: ${outputDuration.toFixed(2)}s, ${totalOutputFrames} frames`);
+
+            // Setup Output
+            const outputFormat = new MediaBunny.Mp4OutputFormat();
+            output = new MediaBunny.Output({
+                format: outputFormat,
+                target: new MediaBunny.BufferTarget()
+            });
+
+            // Setup Canvas
+            canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+            canvasSource = new MediaBunny.CanvasSource(canvas, {
+                codec: 'avc',
+                bitrate: Math.min(8000000, Math.floor(width * height * 2)), // Adaptive bitrate
+                frameRate: outputFps
+            });
+
+            output.addVideoTrack(canvasSource, { frameRate: outputFps });
+
+            // Setup Audio (if requested)
+            let audioSource = null;
+            if (includeAudio) {
+                const audioTrack = await input.getPrimaryAudioTrack();
+                if (audioTrack) {
+                    const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
+                    if (supportedCodecs.length > 0) {
+                        try {
+                            // Determine audio config
+                            // Note: Simple re-encoding doesn't change pitch/speed yet.
+                            // Ideally we would resample, but for now we follow the reverseVideo pattern 
+                            // which likely just includes the track.
+                            // However, we must ensure duration matches or it will be out of sync.
+                            // If we can't change speed, let's at least include it.
+                            audioSource = new MediaBunny.AudioSampleSource({
+                                codec: supportedCodecs[0],
+                                bitrate: 128000
+                            });
+                            output.addAudioTrack(audioSource);
+                            Logger.log('[MediaProcessor] Audio track added (experimental speed sync)');
+                        } catch (e) {
+                            Logger.warn('[MediaProcessor] Failed to setup audio:', e);
+                        }
+                    }
+                }
+            }
+
+            await output.start();
+
+            // Process Video
+            Logger.log('[MediaProcessor] Processing video frames...');
+
+            // Generate timestamps for speed adjustment
+            const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
+            const timestampGenerator = (async function* () {
+                for (let outputFrame = 0; outputFrame < totalOutputFrames; outputFrame++) {
+                    const outputProgress = outputFrame / totalOutputFrames;
+                    const sourceTime = sourceDuration * outputProgress;
+                    yield firstTimestamp + sourceTime;
+                }
+            })();
+
+            let outputTimestamp = 0;
+            let frameCount = 0;
+
+            for await (const sample of videoSink.samplesAtTimestamps(timestampGenerator)) {
+                if (sample) {
+                    sample.draw(ctx, 0, 0, width, height);
+                    await canvasSource.add(outputTimestamp, frameDuration);
+                    outputTimestamp += frameDuration;
+                    sample.close();
+                    frameCount++;
+
+                    if (onProgress) {
+                        onProgress(frameCount / totalOutputFrames);
+                    }
+                }
+            }
+
+            Logger.log(`[MediaProcessor] Encoded ${frameCount} frames`);
+
+            // Step 4: Handle Audio (if requested)
+            if (includeAudio && audioSource) {
+                Logger.log('[MediaProcessor] Processing audio...');
+                try {
+                    const audioTrack = await input.getPrimaryAudioTrack();
+                    if (audioTrack) {
+                        // We use a helper to process audio samples (resampling for speed)
+                        await MediaProcessor._processAudioWithSpeed(audioTrack, audioSource, speed, onProgress);
+                        Logger.log('[MediaProcessor] Audio processing complete');
+                    }
+                } catch (e) {
+                    Logger.warn('[MediaProcessor] Audio processing failed:', e);
+                }
+            }
+
+            await output.finalize();
+            return new Blob([output.target.buffer], { type: 'video/mp4' });
+
+        } finally {
+            if (input && typeof input.dispose === 'function') input.dispose();
+            if (output && typeof output.dispose === 'function') output.dispose();
+            if (canvasSource && typeof canvasSource.dispose === 'function') canvasSource.dispose();
+        }
+    }
+
+    /**
+     * Process audio with speed change (resampling)
+     * @param {Object} audioTrack
+     * @param {Object} audioSource
+     * @param {number} speed
+     * @param {Function} [onProgress]
+     * @private
+     */
+    static async _processAudioWithSpeed(audioTrack, audioSource, speed = 1, onProgress) {
+        const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
+        let outputTimestamp = 0;
+        let sampleCount = 0;
+
+        for await (const sample of audioSink.samples()) {
+            let finalBuffer = sample.toAudioBuffer();
+
+            // Time-stretch if speed != 1
+            if (speed !== 1) {
+                try {
+                    // At 2x speed, audio duration is halved, pitch is higher
+                    const originalDuration = finalBuffer.duration;
+                    const targetDuration = originalDuration / speed;
+                    const targetFrames = Math.ceil(targetDuration * finalBuffer.sampleRate);
+
+                    const offlineCtx = new OfflineAudioContext(
+                        finalBuffer.numberOfChannels,
+                        targetFrames,
+                        finalBuffer.sampleRate
+                    );
+
+                    const source = offlineCtx.createBufferSource();
+                    source.buffer = finalBuffer;
+                    source.playbackRate.value = speed;
+                    source.connect(offlineCtx.destination);
+                    source.start(0);
+
+                    finalBuffer = await offlineCtx.startRendering();
+                } catch (e) {
+                    Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
+                }
+            }
+
+            // Create new sample(s)
+            const processedSamples = MediaBunny.AudioSample.fromAudioBuffer(finalBuffer, outputTimestamp);
+            const samplesToAdd = Array.isArray(processedSamples) ? processedSamples : [processedSamples];
+
+            for (const s of samplesToAdd) {
+                await audioSource.add(s);
+                outputTimestamp += s.duration;
+                s.close();
+            }
+
+            sample.close();
+            sampleCount++;
+        }
+    }
+
+    /**
      * Reverse audio using AudioSampleSink with chunked encoding.
      * Collects samples, reverses them, then encodes in chunks to limit memory.
      * 

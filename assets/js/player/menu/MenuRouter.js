@@ -10,6 +10,7 @@ import { TrackManagerMenu } from './TrackManagerMenu.js';
 import { ReverseMenu } from './ReverseMenu.js';
 import { RemoveBackgroundMenu } from './RemoveBackgroundMenu.js';
 import { RecordMenu } from './RecordMenu.js';
+import { SpeedMenu } from './SpeedMenu.js';
 
 /**
  * Menu Router
@@ -56,6 +57,9 @@ export class MenuRouter {
                 break;
             case 'record':
                 await RecordMenu.init(item, playlist);
+                break;
+            case 'speed':
+                await SpeedMenu.init(item, playlist);
                 break;
             case 'info':
                 await InfoMenu.init(item, playlist);

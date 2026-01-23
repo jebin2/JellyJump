@@ -3040,3 +3040,7 @@ body.fullscreen-active {
     transform: scale(1.2);
     background: var(--accent-secondary);
 }
+
+.speed-display {
+    margin-left: 10px;
+}
