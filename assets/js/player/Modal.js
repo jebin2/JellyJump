@@ -44,9 +44,12 @@ export class Modal {
 
         // Close handlers
         this.closeBtn.addEventListener('click', () => this.close());
-        this.overlay.addEventListener('click', (e) => {
+
+        // Store handler reference for potential removal by subcomponents
+        this.overlay._closeHandler = (e) => {
             if (e.target === this.overlay) this.close();
-        });
+        };
+        this.overlay.addEventListener('click', this.overlay._closeHandler);
     }
 
     /**

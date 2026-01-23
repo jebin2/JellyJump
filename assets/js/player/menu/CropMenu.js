@@ -89,7 +89,7 @@ export class CropMenu {
             cropState.top = Math.max(0, Math.min(cropState.top, originalHeight - MIN_CROP_SIZE));
             cropState.width = Math.max(MIN_CROP_SIZE, Math.min(cropState.width, originalWidth - cropState.left));
             cropState.height = Math.max(MIN_CROP_SIZE, Math.min(cropState.height, originalHeight - cropState.top));
-            
+
             // Ensure even dimensions for codec compatibility
             cropState.width = Math.floor(cropState.width / 2) * 2;
             cropState.height = Math.floor(cropState.height / 2) * 2;
@@ -102,7 +102,7 @@ export class CropMenu {
                 const video = document.createElement('video');
                 video.muted = true;
                 video.src = URL.createObjectURL(source);
-                
+
                 await new Promise((resolve, reject) => {
                     video.onloadedmetadata = resolve;
                     video.onerror = reject;
@@ -113,24 +113,24 @@ export class CropMenu {
 
                 const maxPreviewWidth = 580;
                 const maxPreviewHeight = 320;
-                
+
                 const videoWidth = video.videoWidth;
                 const videoHeight = video.videoHeight;
-                
+
                 previewScale = Math.min(maxPreviewWidth / videoWidth, maxPreviewHeight / videoHeight, 1);
-                
+
                 previewCanvas.width = videoWidth * previewScale;
                 previewCanvas.height = videoHeight * previewScale;
-                
+
                 const ctx = previewCanvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, previewCanvas.width, previewCanvas.height);
-                
+
                 // Set overlay size to match canvas
                 cropOverlay.style.width = `${previewCanvas.width}px`;
                 cropOverlay.style.height = `${previewCanvas.height}px`;
-                
+
                 URL.revokeObjectURL(video.src);
-                
+
                 return { videoWidth, videoHeight };
             } catch (e) {
                 Logger.error('Failed to draw preview:', e);
@@ -230,7 +230,7 @@ export class CropMenu {
             } else {
                 // Handle resize
                 const h = dragHandle;
-                
+
                 if (h.includes('w')) {
                     cropState.left = cropStart.left + dx;
                     cropState.width = cropStart.width - dx;
@@ -252,7 +252,15 @@ export class CropMenu {
             updateInputsFromState();
         };
 
+        // Track if we just finished dragging (to prevent modal close on mouseup)
+        let wasDragging = false;
+
         const handleMouseUp = () => {
+            if (isDragging) {
+                wasDragging = true;
+                // Reset wasDragging after a short delay (after click event fires)
+                setTimeout(() => { wasDragging = false; }, 100);
+            }
             isDragging = false;
             dragHandle = null;
         };
@@ -261,11 +269,25 @@ export class CropMenu {
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
 
+        // Prevent modal from closing while dragging or just after drag ends
+        const modalOverlay = modal.overlay;
+        const preventCloseWhileDragging = (e) => {
+            // Only close if clicking directly on overlay AND not during/after drag
+            if (e.target === modalOverlay && !isDragging && !wasDragging) {
+                modal.close();
+            }
+        };
+
+        // Remove original click handler and add our custom one
+        modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
+        modalOverlay.addEventListener('click', preventCloseWhileDragging);
+
         // Cleanup on modal close
         const originalClose = modal.close.bind(modal);
         modal.close = () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            modalOverlay.removeEventListener('click', preventCloseWhileDragging);
             originalClose();
         };
 
