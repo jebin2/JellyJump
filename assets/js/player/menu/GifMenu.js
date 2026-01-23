@@ -120,7 +120,7 @@ export class GifMenu {
         // Initialize displays
         startDisplay.textContent = formatTime(startTime);
         endDisplay.textContent = formatTime(endTime);
-        durationDisplay.textContent = formatDuration(endTime - startTime);
+        durationDisplay.textContent = formatTime(endTime - startTime);
 
         // Load Video into Player
         if (player) {
@@ -142,7 +142,7 @@ export class GifMenu {
 
             // Update Duration
             const gifDuration = Math.max(0, endTime - startTime);
-            durationDisplay.textContent = formatDuration(gifDuration);
+            durationDisplay.textContent = formatTime(gifDuration);
 
             // Update Slider
             const startPercent = (startTime / duration) * 100;
@@ -168,8 +168,8 @@ export class GifMenu {
                 validationError.textContent = 'Start time must be before end time';
                 validationError.classList.remove('hidden');
                 createBtn.disabled = true;
-            } else if (gifDuration < 0.5) {
-                validationError.textContent = 'GIF duration must be at least 0.5 seconds';
+            } else if (gifDuration < 1) {
+                validationError.textContent = 'GIF duration must be at least 1 second';
                 validationError.classList.remove('hidden');
                 createBtn.disabled = true;
             } else if (gifDuration > 60) {
@@ -190,10 +190,10 @@ export class GifMenu {
             const time = percent * duration;
 
             if (isStart) {
-                if (time < endTime - 0.5) startTime = time;
+                if (time < endTime - 1) startTime = time;
                 if (player) player.seek(startTime);
             } else {
-                if (time > startTime + 0.5) endTime = time;
+                if (time > startTime + 1) endTime = time;
                 if (player) player.seek(endTime);
             }
             updateUI();
