@@ -1129,26 +1129,29 @@
         <div class="gif-settings mb-lg">
             <div class="text-xs text-secondary font-mono mb-sm">GIF SETTINGS</div>
 
-            <!-- Frame Rate -->
-            <div class="setting-group mb-sm">
-                <label class="text-xs font-bold mb-xs block">Frame Rate</label>
-                <select class="mb-select w-full" id="gif-fps">
-                    <option value="5">5 FPS (Smallest file)</option>
-                    <option value="10">10 FPS (Smooth)</option>
-                    <option value="15" selected>15 FPS (Recommended)</option>
-                    <option value="20">20 FPS (Very smooth)</option>
-                </select>
-            </div>
+            <!-- Frame Rate & Size Row -->
+            <div class="flex gap-sm mb-sm">
+                <!-- Frame Rate -->
+                <div class="setting-group flex-1">
+                    <label class="text-xs font-bold mb-xs block">Frame Rate</label>
+                    <select class="mb-select w-full" id="gif-fps">
+                        <option value="5">5 FPS (Smallest file)</option>
+                        <option value="10">10 FPS (Smooth)</option>
+                        <option value="15" selected>15 FPS (Recommended)</option>
+                        <option value="20">20 FPS (Very smooth)</option>
+                    </select>
+                </div>
 
-            <!-- Size -->
-            <div class="setting-group mb-sm">
-                <label class="text-xs font-bold mb-xs block">Size</label>
-                <select class="mb-select w-full" id="gif-size">
-                    <option value="original">Original Size</option>
-                    <option value="720">720p (1280×720)</option>
-                    <option value="480" selected>480p (854×480)</option>
-                    <option value="360">360p (640×360)</option>
-                </select>
+                <!-- Size -->
+                <div class="setting-group flex-1">
+                    <label class="text-xs font-bold mb-xs block">Size</label>
+                    <select class="mb-select w-full" id="gif-size">
+                        <option value="original">Original Size</option>
+                        <option value="720">720p (1280×720)</option>
+                        <option value="480" selected>480p (854×480)</option>
+                        <option value="360">360p (640×360)</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Quality -->

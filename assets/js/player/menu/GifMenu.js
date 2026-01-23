@@ -34,6 +34,15 @@ export class GifMenu {
         // Open Modal
         modal.open();
 
+        // ---------------------------------------------------------
+        // Disable Outside Click Close
+        // ---------------------------------------------------------
+        // Remove the default overlay click handler to prevent closing on outside click
+        const modalOverlay = modal.overlay;
+        if (modalOverlay && modalOverlay._closeHandler) {
+            modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
+        }
+
         // Initialize Player
         const playerContainer = modalContent.querySelector('#gif-player-container');
         let player = null;
@@ -289,6 +298,17 @@ export class GifMenu {
                 gifFileSize.textContent = formatFileSize(gifBlob.size);
                 gifPreviewSection.classList.remove('hidden');
 
+                // Scroll to bottom of modal
+                if (modal.body) {
+                    // Small timeout to ensure layout is updated
+                    setTimeout(() => {
+                        modal.body.scrollTo({
+                            top: modal.body.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }, 50);
+                }
+
                 // Setup download
                 const timestamp = Math.round(start).toString().padStart(2, '0') + '-' + Math.round(end).toString().padStart(2, '0');
                 const filename = `${item.title.replace(/\.[^.]+$/, '')} -${timestamp}.gif`;
@@ -301,7 +321,7 @@ export class GifMenu {
                 const newItem = {
                     title: filename,
                     url: previewUrl,
-                    duration: formatDuration(end - start),
+                    duration: formatTime(end - start),
                     thumbnail: previewUrl,
                     isLocal: true,
                     file: new File([gifBlob], filename, { type: 'image/gif' }),
