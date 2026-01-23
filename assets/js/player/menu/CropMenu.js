@@ -228,22 +228,38 @@ export class CropMenu {
                 cropState.left = cropStart.left + dx;
                 cropState.top = cropStart.top + dy;
             } else {
-                // Handle resize
+                // Handle resize - keep opposite edge fixed
                 const h = dragHandle;
 
+                // Calculate fixed edges from start state
+                const rightEdge = cropStart.left + cropStart.width;
+                const bottomEdge = cropStart.top + cropStart.height;
+
                 if (h.includes('w')) {
-                    cropState.left = cropStart.left + dx;
-                    cropState.width = cropStart.width - dx;
+                    // Moving left edge, right edge stays fixed
+                    let newLeft = cropStart.left + dx;
+                    newLeft = Math.max(0, Math.min(newLeft, rightEdge - MIN_CROP_SIZE));
+                    cropState.left = newLeft;
+                    cropState.width = rightEdge - newLeft;
                 }
                 if (h.includes('e')) {
-                    cropState.width = cropStart.width + dx;
+                    // Moving right edge, left edge stays fixed
+                    let newWidth = cropStart.width + dx;
+                    newWidth = Math.max(MIN_CROP_SIZE, Math.min(newWidth, originalWidth - cropStart.left));
+                    cropState.width = newWidth;
                 }
                 if (h.includes('n')) {
-                    cropState.top = cropStart.top + dy;
-                    cropState.height = cropStart.height - dy;
+                    // Moving top edge, bottom edge stays fixed
+                    let newTop = cropStart.top + dy;
+                    newTop = Math.max(0, Math.min(newTop, bottomEdge - MIN_CROP_SIZE));
+                    cropState.top = newTop;
+                    cropState.height = bottomEdge - newTop;
                 }
                 if (h.includes('s')) {
-                    cropState.height = cropStart.height + dy;
+                    // Moving bottom edge, top edge stays fixed
+                    let newHeight = cropStart.height + dy;
+                    newHeight = Math.max(MIN_CROP_SIZE, Math.min(newHeight, originalHeight - cropStart.top));
+                    cropState.height = newHeight;
                 }
             }
 
