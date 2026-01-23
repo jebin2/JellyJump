@@ -2825,3 +2825,163 @@ body.fullscreen-active {
     font-weight: 600;
     font-family: var(--font-primary, system-ui, sans-serif);
 }
+
+/* -----------------------------------------
+   Crop Modal Styles
+   ----------------------------------------- */
+.crop-preview-container {
+    position: relative;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+}
+
+.crop-preview-wrapper {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+.crop-preview-canvas {
+    display: block;
+    max-width: 100%;
+    border-radius: 4px;
+    background: #000;
+}
+
+.crop-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.crop-box {
+    position: absolute;
+    border: 2px dashed var(--accent-primary);
+    background: rgba(0, 175, 240, 0.1);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+    cursor: move;
+    min-width: 40px;
+    min-height: 40px;
+}
+
+.crop-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--accent-primary);
+    border: 2px solid var(--text-primary);
+    border-radius: 50%;
+    pointer-events: auto;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s, background-color 0.1s;
+}
+
+.crop-handle:hover {
+    transform: scale(1.2);
+    background: var(--accent-secondary);
+}
+
+/* Corner handles */
+.crop-handle-nw {
+    top: -6px;
+    left: -6px;
+    cursor: nw-resize;
+}
+
+.crop-handle-ne {
+    top: -6px;
+    right: -6px;
+    cursor: ne-resize;
+}
+
+.crop-handle-se {
+    bottom: -6px;
+    right: -6px;
+    cursor: se-resize;
+}
+
+.crop-handle-sw {
+    bottom: -6px;
+    left: -6px;
+    cursor: sw-resize;
+}
+
+/* Edge handles */
+.crop-handle-n {
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: n-resize;
+}
+
+.crop-handle-n:hover {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.crop-handle-e {
+    top: 50%;
+    right: -6px;
+    transform: translateY(-50%);
+    cursor: e-resize;
+}
+
+.crop-handle-e:hover {
+    transform: translateY(-50%) scale(1.2);
+}
+
+.crop-handle-s {
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: s-resize;
+}
+
+.crop-handle-s:hover {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.crop-handle-w {
+    top: 50%;
+    left: -6px;
+    transform: translateY(-50%);
+    cursor: w-resize;
+}
+
+.crop-handle-w:hover {
+    transform: translateY(-50%) scale(1.2);
+}
+
+/* Crop coordinates grid */
+.crop-coords-container {
+    padding: 0 5px;
+}
+
+.crop-coords-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.crop-coords-grid .input-group {
+    min-width: 0;
+}
+
+.crop-coords-grid .mb-input {
+    width: 100%;
+    padding: 8px 4px;
+    font-size: 0.85em;
+}
+
+@media (max-width: 500px) {
+    .crop-coords-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

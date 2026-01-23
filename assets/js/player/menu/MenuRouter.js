@@ -2,6 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { ConvertMenu } from './ConvertMenu.js';
 import { TrimMenu } from './TrimMenu.js';
 import { ResizeMenu } from './ResizeMenu.js';
+import { CropMenu } from './CropMenu.js';
 import { GifMenu } from './GifMenu.js';
 import { InfoMenu } from './InfoMenu.js';
 import { MergeMenu } from './MergeMenu.js';
@@ -40,6 +41,9 @@ export class MenuRouter {
                 break;
             case 'resize':
                 await ResizeMenu.init(item, playlist);
+                break;
+            case 'crop':
+                await CropMenu.init(item, playlist);
                 break;
             case 'create-gif':
                 await GifMenu.init(item, playlist);

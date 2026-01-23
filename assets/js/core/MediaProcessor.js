@@ -40,19 +40,20 @@ export class MediaProcessor {
     }
 
     /**
-     * Process video (transcode, trim, resize, etc.)
+     * Process video (transcode, trim, resize, crop, etc.)
      * @param {Object} options
      * @param {Blob|File} options.source
      * @param {string} options.format - 'mp4', 'webm', 'mov'
      * @param {number} options.quality - 0-100
      * @param {Object} [options.trim] - { start, end } in seconds
      * @param {Object} [options.resolution] - { width, height }
+     * @param {Object} [options.crop] - { left, top, width, height } in pixels
      * @param {Object} [options.removeBackgroundOptions] - { colors, bgType, bgColor }
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, removeBackgroundOptions = null, onProgress }) {
-        Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, removeBackgroundOptions });
+    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, crop = null, removeBackgroundOptions = null, onProgress }) {
+        Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions });
 
         let conversion = null;
         let videoUrl = null;
@@ -112,6 +113,16 @@ export class MediaProcessor {
                 videoConfig.width = resolution.width;
                 videoConfig.height = resolution.height;
                 videoConfig.fit = 'fill'; // Use fill as requested
+            }
+
+            // Crop
+            if (crop) {
+                videoConfig.crop = {
+                    left: Math.round(crop.left),
+                    top: Math.round(crop.top),
+                    width: Math.round(crop.width),
+                    height: Math.round(crop.height)
+                };
             }
 
             // Process callback for frame manipulation

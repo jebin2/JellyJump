@@ -50,6 +50,10 @@
             <span class="menu-icon">📐</span>
             <span class="menu-label">Resize Video...</span>
         </div>
+        <div class="playlist-menu-item" data-action="crop" role="menuitem">
+            <span class="menu-icon">🖼️</span>
+            <span class="menu-label">Crop Video...</span>
+        </div>
         <div class="playlist-menu-item" data-action="create-gif" role="menuitem">
             <span class="menu-icon">🎞️</span>
             <span class="menu-label">Create GIF...</span>
@@ -864,6 +868,105 @@
         <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
             <svg width="16" height="16" fill="currentColor">
                 <use href="assets/icons/sprite.svg#icon-maximize"></use>
+            </svg>
+        </button>
+    </div>
+</template>
+
+<!-- Crop Content Template -->
+<template id="crop-content-template">
+    <div class="source-info mb-lg p-sm bg-tertiary rounded flex-between items-center">
+        <div class="flex flex-col">
+            <span class="text-xs text-secondary font-mono">ORIGINAL RESOLUTION</span>
+            <span class="original-resolution text-sm font-bold text-primary">Checking...</span>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-xs text-secondary font-mono">CROP SIZE</span>
+            <span class="crop-size text-sm font-bold text-accent">--x--</span>
+        </div>
+    </div>
+
+    <!-- Video Preview with Crop Box -->
+    <div class="crop-preview-container mb-lg">
+        <div class="crop-preview-wrapper">
+            <canvas class="crop-preview-canvas"></canvas>
+            <div class="crop-overlay">
+                <div class="crop-box" data-crop-box>
+                    <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
+                    <div class="crop-handle crop-handle-n" data-handle="n"></div>
+                    <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
+                    <div class="crop-handle crop-handle-e" data-handle="e"></div>
+                    <div class="crop-handle crop-handle-se" data-handle="se"></div>
+                    <div class="crop-handle crop-handle-s" data-handle="s"></div>
+                    <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
+                    <div class="crop-handle crop-handle-w" data-handle="w"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Crop Coordinates -->
+    <div class="crop-coords-container mb-lg">
+        <div class="crop-coords-grid">
+            <div class="input-group">
+                <label for="crop-left" class="text-xs text-secondary font-mono mb-xs block">LEFT (px)</label>
+                <input type="number" id="crop-left" class="mb-input font-mono text-center" min="0" step="1" value="0">
+            </div>
+            <div class="input-group">
+                <label for="crop-top" class="text-xs text-secondary font-mono mb-xs block">TOP (px)</label>
+                <input type="number" id="crop-top" class="mb-input font-mono text-center" min="0" step="1" value="0">
+            </div>
+            <div class="input-group">
+                <label for="crop-width" class="text-xs text-secondary font-mono mb-xs block">WIDTH (px)</label>
+                <input type="number" id="crop-width" class="mb-input font-mono text-center" min="64" step="2" value="0">
+            </div>
+            <div class="input-group">
+                <label for="crop-height" class="text-xs text-secondary font-mono mb-xs block">HEIGHT (px)</label>
+                <input type="number" id="crop-height" class="mb-input font-mono text-center" min="64" step="2"
+                    value="0">
+            </div>
+        </div>
+    </div>
+
+    <div class="options-group mb-lg">
+        <label class="checkbox-option flex items-center cursor-pointer select-none">
+            <input type="checkbox" name="addToPlaylist" checked class="accent-primary">
+            <span class="checkbox-custom"></span>
+            <span class="text-sm">Add to playlist after cropping</span>
+        </label>
+    </div>
+
+    <!-- Progress Section (Hidden by default) -->
+    <div class="crop-progress hidden">
+        <div class="flex-between mb-xs">
+            <span class="status-text text-sm font-mono">Cropping video...</span>
+            <span class="progress-percentage text-sm font-bold">0%</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Error Message (Hidden by default) -->
+    <div class="crop-error hidden mt-md p-sm border-danger text-danger text-sm"></div>
+
+    <!-- Success Message (Hidden by default) -->
+    <div class="crop-success hidden mt-md p-sm border-success text-success text-sm">
+        Crop complete!
+    </div>
+</template>
+
+<!-- Crop Footer Template -->
+<template id="crop-footer-template">
+    <div class="action-buttons flex gap-sm">
+        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-download"></use>
+            </svg>
+        </a>
+        <button class="btn jellyjump-btn-small crop-btn" title="Crop" aria-label="Crop">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-crop"></use>
             </svg>
         </button>
     </div>
