@@ -947,16 +947,18 @@
         <div class="merge-options">
             <!-- Merge Options (Flex Single Line) -->
             <!-- Merge Options (Flex Single Line) -->
-            <div class="merge-options flex gap-lg items-start mb-md w-full">
+            <div class="merge-options flex gap-lg items-end mb-md w-full">
                 <!-- Target Resolution -->
-                <div class="resolution-options flex flex-col gap-xs" style="flex: 2;">
+                <div class="resolution-options flex flex-col gap-xs" style="flex: 3;">
                     <div class="text-xs text-secondary font-mono uppercase text-nowrap">Target Resolution</div>
                     <div class="flex items-center gap-xs">
-                        <input type="number" id="merge-width" class="mb-input font-mono text-center w-full h-8 p-1"
-                            placeholder="W" min="128" max="7680" step="2">
+                        <input type="number" id="merge-width"
+                            class="mb-input font-mono text-center w-full p-1 box-border" placeholder="W" min="128"
+                            max="7680" step="2" style="height: 36px;">
                         <span class="text-secondary font-bold select-none">&times;</span>
-                        <input type="number" id="merge-height" class="mb-input font-mono text-center w-full h-8 p-1"
-                            placeholder="H" min="128" max="7680" step="2">
+                        <input type="number" id="merge-height"
+                            class="mb-input font-mono text-center w-full p-1 box-border" placeholder="H" min="128"
+                            max="7680" step="2" style="height: 36px;">
                     </div>
                     <div class="text-[10px] text-muted truncate max-w-[200px] min-h-[15px]">
                         <span class="max-resolution-hint">Detecting...</span>
@@ -964,9 +966,9 @@
                 </div>
 
                 <!-- Scale Mode -->
-                <div class="scale-options flex flex-col gap-xs" style="flex: 1.5;">
+                <div class="scale-options flex flex-col gap-xs" style="flex: 3;">
                     <div class="text-xs text-secondary font-mono uppercase text-nowrap">Scale Mode</div>
-                    <select class="mb-select w-full h-8 py-0 px-2 text-sm scale-select">
+                    <select class="mb-select w-full py-0 px-2 text-sm scale-select box-border" style="height: 36px;">
                         <option value="proportional">Scale Proportionally</option>
                         <option value="center">Keep Original Size</option>
                         <option value="fill">Scale to Fill</option>
@@ -978,8 +980,8 @@
                     <div class="text-xs text-secondary font-mono uppercase text-nowrap">Bg Color</div>
                     <div class="flex items-center">
                         <input type="color" id="merge-bg-color"
-                            class="h-8 w-full rounded border border-border cursor-pointer p-0" value="#000000"
-                            title="Background Color">
+                            class="w-full rounded border border-border cursor-pointer p-0 box-border" value="#000000"
+                            title="Background Color" style="height: 36px;">
                     </div>
                 </div>
             </div>
