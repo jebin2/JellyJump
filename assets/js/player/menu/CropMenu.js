@@ -42,7 +42,6 @@ export class CropMenu {
                 controls: {
                     playPause: true,
                     navigation: false,
-                    volume: false,
                     time: true,
                     progress: true,
                     captions: false,
@@ -50,6 +49,9 @@ export class CropMenu {
                     fullscreen: false,
                     loop: false,
                     speed: false,
+                    filters: false,
+                    equalizer: true,
+                    volumeOnly: true,
                     modeToggle: false,
                     keyboard: false
                 },
