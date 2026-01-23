@@ -533,24 +533,6 @@
         <div id="trim-player-container" class="mb-lg aspect-video bg-black rounded overflow-hidden relative h300pximpl">
         </div>
 
-        <!-- Time Inputs -->
-        <div class="time-inputs-container mb-lg">
-            <div class="time-input-group">
-                <label for="trim-start-input" class="text-xs text-secondary font-mono mb-xs block">START</label>
-                <input type="text" id="trim-start-input" class="mb-input font-mono text-center time-input-field"
-                    placeholder="00:00:00" value="00:00:00">
-            </div>
-            <div class="duration-display flex flex-col items-center justify-center duration-display-container">
-                <span class="text-xs text-secondary font-mono">DUR</span>
-                <span class="trim-duration text-sm font-bold text-accent">00:00:00</span>
-            </div>
-            <div class="time-input-group">
-                <label for="trim-end-input" class="text-xs text-secondary font-mono mb-xs block">END</label>
-                <input type="text" id="trim-end-input" class="mb-input font-mono text-center time-input-field"
-                    placeholder="00:00:00" value="00:00:00">
-            </div>
-        </div>
-
         <!-- Visual Timeline Slider -->
         <div class="timeline-slider-container select-none">
             <div class="timeline-slider relative h-12 bg-tertiary rounded cursor-pointer">
@@ -568,9 +550,21 @@
                 <div class="timeline-handle end-handle absolute top-0 bottom-0 w-4 bg-accent cursor-ew-resize z-10 -ml-2 rounded-full border-2 border-white shadow-md timeline-handle-end"
                     tabindex="0" role="slider" aria-label="End time"></div>
             </div>
-            <div class="flex-between mt-xs text-xs text-secondary font-mono">
-                <span>00:00</span>
-                <span class="total-duration">00:00</span>
+
+            <!-- Time Labels -->
+            <div class="flex-between mt-sm text-xs font-mono items-center px-xs">
+                <div class="flex flex-col items-start">
+                    <span class="text-secondary text-[10px] mb-[2px]">START</span>
+                    <span class="trim-start-time text-primary font-bold">00:00:00</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <span class="text-secondary text-[10px] mb-[2px]">DURATION</span>
+                    <span class="trim-duration text-accent font-bold">00:00:00</span>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-secondary text-[10px] mb-[2px]">END</span>
+                    <span class="trim-end-time text-primary font-bold">00:00:00</span>
+                </div>
             </div>
         </div>
     </div>

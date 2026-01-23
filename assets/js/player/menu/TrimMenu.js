@@ -41,8 +41,7 @@ export class TrimMenu {
                 controlBarMode: 'fixed',  // Always show control bar
                 controls: {
                     playPause: true,
-                    navigation: false,  // No prev/next buttons
-                    volume: false,
+                    navigation: false,
                     time: true,
                     progress: true,
                     captions: false,
@@ -50,8 +49,11 @@ export class TrimMenu {
                     fullscreen: false,
                     loop: false,
                     speed: false,
+                    filters: false,
+                    equalizer: true,
+                    volumeOnly: true,
                     modeToggle: false,
-                    keyboard: false  // Disable keyboard shortcuts for modal player
+                    keyboard: false
                 },
                 autoplay: false
             });
@@ -60,10 +62,9 @@ export class TrimMenu {
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
         const trimContent = modalContent.querySelector('.trim-content');
-        const startInput = modalContent.querySelector('#trim-start-input');
-        const endInput = modalContent.querySelector('#trim-end-input');
+        const startDisplay = modalContent.querySelector('.trim-start-time');
+        const endDisplay = modalContent.querySelector('.trim-end-time');
         const durationDisplay = modalContent.querySelector('.trim-duration');
-        const totalDurationDisplay = modalContent.querySelector('.total-duration');
         const timelineSlider = modalContent.querySelector('.timeline-slider');
         const timelineRange = modalContent.querySelector('.timeline-range');
         const startHandle = modalContent.querySelector('.start-handle');
@@ -115,7 +116,10 @@ export class TrimMenu {
         trimContent.classList.remove('hidden');
         trimBtn.disabled = false;
 
-        totalDurationDisplay.textContent = formatTime(duration);
+        // Initialize displays
+        startDisplay.textContent = formatTime(0);
+        endDisplay.textContent = formatTime(duration);
+        durationDisplay.textContent = formatTime(duration);
 
         // State
         let startTime = 0;
@@ -135,9 +139,9 @@ export class TrimMenu {
 
         // Update UI
         const updateUI = () => {
-            // Update Inputs
-            if (document.activeElement !== startInput) startInput.value = formatTime(startTime);
-            if (document.activeElement !== endInput) endInput.value = formatTime(endTime);
+            // Update Displays
+            startDisplay.textContent = formatTime(startTime);
+            endDisplay.textContent = formatTime(endTime);
 
             // Update Duration
             const trimDuration = Math.max(0, endTime - startTime);
@@ -176,18 +180,7 @@ export class TrimMenu {
         updateUI();
 
         // Input Handlers
-        const handleInput = (input, isStart) => {
-            const time = parseTime(input.value);
-            if (isStart) {
-                if (time >= 0 && time < duration) startTime = time;
-            } else {
-                if (time > 0 && time <= duration) endTime = time;
-            }
-            updateUI();
-        };
 
-        startInput.addEventListener('change', () => handleInput(startInput, true));
-        endInput.addEventListener('change', () => handleInput(endInput, false));
 
         // Slider Drag Logic
         const handleDrag = (e, isStart) => {
