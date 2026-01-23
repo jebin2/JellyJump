@@ -875,21 +875,12 @@
 
 <!-- Crop Content Template -->
 <template id="crop-content-template">
-    <div class="source-info mb-lg p-sm bg-tertiary rounded flex-between items-center">
-        <div class="flex flex-col">
-            <span class="text-xs text-secondary font-mono">ORIGINAL RESOLUTION</span>
-            <span class="original-resolution text-sm font-bold text-primary">Checking...</span>
-        </div>
-        <div class="flex flex-col items-end">
-            <span class="text-xs text-secondary font-mono">CROP SIZE</span>
-            <span class="crop-size text-sm font-bold text-accent">--x--</span>
-        </div>
-    </div>
-
     <!-- Video Preview with Crop Box -->
     <div class="crop-preview-container mb-lg">
         <div class="crop-preview-wrapper">
-            <canvas class="crop-preview-canvas"></canvas>
+            <!-- Player Container -->
+            <div id="crop-player-container" class="crop-player-container"></div>
+            <!-- Crop Overlay (positioned over video) -->
             <div class="crop-overlay">
                 <div class="crop-box" data-crop-box>
                     <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
@@ -906,7 +897,7 @@
     </div>
 
     <!-- Crop Coordinates -->
-    <div class="crop-coords-container mb-lg">
+    <div class="crop-coords-container">
         <div class="crop-coords-grid">
             <div class="input-group">
                 <label for="crop-left" class="text-xs text-secondary font-mono mb-xs block">LEFT (px)</label>
@@ -927,48 +918,36 @@
             </div>
         </div>
     </div>
-
-    <div class="options-group mb-lg">
-        <label class="checkbox-option flex items-center cursor-pointer select-none">
-            <input type="checkbox" name="addToPlaylist" checked class="accent-primary">
-            <span class="checkbox-custom"></span>
-            <span class="text-sm">Add to playlist after cropping</span>
-        </label>
-    </div>
-
-    <!-- Progress Section (Hidden by default) -->
-    <div class="crop-progress hidden">
-        <div class="flex-between mb-xs">
-            <span class="status-text text-sm font-mono">Cropping video...</span>
-            <span class="progress-percentage text-sm font-bold">0%</span>
-        </div>
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill" style="width: 0%"></div>
-        </div>
-    </div>
-
-    <!-- Error Message (Hidden by default) -->
-    <div class="crop-error hidden mt-md p-sm border-danger text-danger text-sm"></div>
-
-    <!-- Success Message (Hidden by default) -->
-    <div class="crop-success hidden mt-md p-sm border-success text-success text-sm">
-        Crop complete!
-    </div>
 </template>
 
 <!-- Crop Footer Template -->
 <template id="crop-footer-template">
-    <div class="action-buttons flex gap-sm">
-        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-download"></use>
-            </svg>
-        </a>
-        <button class="btn jellyjump-btn-small crop-btn" title="Crop" aria-label="Crop">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-scissors"></use>
-            </svg>
-        </button>
+    <div class="crop-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="crop-footer-status flex-1">
+            <div class="crop-progress hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="status-text text-sm font-mono">Cropping...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="crop-error hidden text-danger text-sm"></div>
+            <div class="crop-success hidden text-success text-sm font-bold">✓ Crop complete!</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small crop-btn" title="Crop" aria-label="Crop">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-scissors"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 

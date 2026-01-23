@@ -60,15 +60,12 @@ export class CropMenu {
         }
 
         // Elements - Body
-        const originalResDisplay = modalContent.querySelector('.original-resolution');
-        const cropSizeDisplay = modalContent.querySelector('.crop-size');
         const cropBox = modalContent.querySelector('[data-crop-box]');
         const cropOverlay = modalContent.querySelector('.crop-overlay');
         const leftInput = modalContent.querySelector('#crop-left');
         const topInput = modalContent.querySelector('#crop-top');
         const widthInput = modalContent.querySelector('#crop-width');
         const heightInput = modalContent.querySelector('#crop-height');
-        const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
 
         // Elements - Footer
         const cropBtn = modalContent.querySelector('.crop-btn');
@@ -91,10 +88,7 @@ export class CropMenu {
 
         const MIN_CROP_SIZE = 64;
 
-        // Helper: Update crop size display
-        const updateCropSizeDisplay = () => {
-            cropSizeDisplay.textContent = `${cropState.width}x${cropState.height}`;
-        };
+
 
         // Helper: Update crop box position from state
         const updateCropBoxFromState = () => {
@@ -110,7 +104,6 @@ export class CropMenu {
             topInput.value = Math.round(cropState.top);
             widthInput.value = Math.round(cropState.width);
             heightInput.value = Math.round(cropState.height);
-            updateCropSizeDisplay();
         };
 
         // Helper: Clamp crop state to valid bounds
@@ -164,7 +157,7 @@ export class CropMenu {
                 }
             }
 
-            originalResDisplay.textContent = `${originalWidth}x${originalHeight}`;
+
 
             // Initialize crop to 10% inset
             const inset = 0.1;
@@ -368,25 +361,26 @@ export class CropMenu {
                 statusText.textContent = 'Cropping...';
                 progressText.textContent = '0%';
 
-                // Add to Playlist
-                if (addToPlaylistCheckbox.checked) {
-                    const newItem = {
-                        id: generateId(),
-                        title: filename,
-                        url: url,
-                        file: new File([blob], filename, { type: 'video/mp4' }),
-                        duration: item.duration,
-                        type: 'video',
-                        isLocal: true,
-                        isNew: true,
-                        path: (item.path || item.title) + '/' + filename
-                    };
+                // Always add to Playlist
+                const newItem = {
+                    id: generateId(),
+                    title: filename,
+                    url: url,
+                    file: new File([blob], filename, { type: 'video/mp4' }),
+                    duration: item.duration,
+                    type: 'video',
+                    isLocal: true,
+                    isNew: true,
+                    path: (item.path || item.title) + '/' + filename
+                };
 
-                    const insertIndex = playlist.items.indexOf(item) + 1;
-                    playlist.items.splice(insertIndex, 0, newItem);
-                    playlist.render();
-                    playlist._saveState();
-                }
+                const insertIndex = playlist.items.indexOf(item) + 1;
+                playlist.items.splice(insertIndex, 0, newItem);
+                playlist.render();
+                playlist._saveState();
+
+                // Update success message
+                successDisplay.textContent = `✓ Added to playlist: ${filename}`;
 
                 modal.closeBtn.disabled = false;
 

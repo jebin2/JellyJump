@@ -875,17 +875,6 @@
 
 <!-- Crop Content Template -->
 <template id="crop-content-template">
-    <div class="source-info mb-lg p-sm bg-tertiary rounded flex-between items-center">
-        <div class="flex flex-col">
-            <span class="text-xs text-secondary font-mono">ORIGINAL RESOLUTION</span>
-            <span class="original-resolution text-sm font-bold text-primary">Checking...</span>
-        </div>
-        <div class="flex flex-col items-end">
-            <span class="text-xs text-secondary font-mono">CROP SIZE</span>
-            <span class="crop-size text-sm font-bold text-accent">--x--</span>
-        </div>
-    </div>
-
     <!-- Video Preview with Crop Box -->
     <div class="crop-preview-container mb-lg">
         <div class="crop-preview-wrapper">
@@ -908,7 +897,7 @@
     </div>
 
     <!-- Crop Coordinates -->
-    <div class="crop-coords-container mb-lg">
+    <div class="crop-coords-container">
         <div class="crop-coords-grid">
             <div class="input-group">
                 <label for="crop-left" class="text-xs text-secondary font-mono mb-xs block">LEFT (px)</label>
@@ -928,14 +917,6 @@
                     value="0">
             </div>
         </div>
-    </div>
-
-    <div class="options-group mb-lg">
-        <label class="checkbox-option flex items-center cursor-pointer select-none">
-            <input type="checkbox" name="addToPlaylist" checked class="accent-primary">
-            <span class="checkbox-custom"></span>
-            <span class="text-sm">Add to playlist after cropping</span>
-        </label>
     </div>
 </template>
 
