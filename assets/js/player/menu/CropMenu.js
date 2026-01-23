@@ -380,7 +380,7 @@ export class CropMenu {
                 playlist._saveState();
 
                 // Update success message
-                successDisplay.textContent = `✓ Added to playlist: ${filename}`;
+                successDisplay.textContent = `✓ Added to playlist`;
 
                 modal.closeBtn.disabled = false;
 
