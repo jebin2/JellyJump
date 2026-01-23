@@ -7,10 +7,9 @@ import { GifMenu } from './GifMenu.js';
 import { InfoMenu } from './InfoMenu.js';
 import { MergeMenu } from './MergeMenu.js';
 import { TrackManagerMenu } from './TrackManagerMenu.js';
-import { ReverseMenu } from './ReverseMenu.js';
 import { RemoveBackgroundMenu } from './RemoveBackgroundMenu.js';
 import { RecordMenu } from './RecordMenu.js';
-import { SpeedMenu } from './SpeedMenu.js';
+import { SpeedReverseMenu } from './SpeedReverseMenu.js';
 
 /**
  * Menu Router
@@ -50,16 +49,15 @@ export class MenuRouter {
                 await GifMenu.init(item, playlist);
                 break;
             case 'reverse':
-                await ReverseMenu.init(item, playlist);
+            case 'speed':
+                // Both routed to unified menu
+                await SpeedReverseMenu.init(item, playlist);
                 break;
             case 'remove-bg':
                 await RemoveBackgroundMenu.init(item, playlist);
                 break;
             case 'record':
                 await RecordMenu.init(item, playlist);
-                break;
-            case 'speed':
-                await SpeedMenu.init(item, playlist);
                 break;
             case 'info':
                 await InfoMenu.init(item, playlist);

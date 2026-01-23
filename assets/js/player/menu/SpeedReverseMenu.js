@@ -5,70 +5,42 @@ import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatDuration } from '../../utils/mediaUtils.js';
 
 /**
- * Speed Menu Handler
- * Handles video speed adjustment (Slow Motion / Fast Forward)
+ * Speed & Reverse Menu Handler
+ * Handles both video playback speed adjustment and reversal.
  */
-export class SpeedMenu {
+export class SpeedReverseMenu {
     /**
-     * Initialize and open Speed Control modal
+     * Initialize and open Speed/Reverse control modal
      * @param {Object} item - Playlist item
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        // reuse same template of reverse video modal
         const contentTemplate = document.getElementById('reverse-content-template');
         const footerTemplate = document.getElementById('reverse-footer-template');
 
         if (!contentTemplate || !footerTemplate) {
-            Logger.error('Speed modal templates not found!');
+            Logger.error('Speed/Reverse modal templates not found!');
             return;
         }
 
         const modal = new Modal({ maxWidth: '500px' });
-        modal.setTitle('Video Speed Control');
+        modal.setTitle('Playback Speed & Direction');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
 
         const modalContent = modal.modal;
-
-        // Customizations for Speed Menu
-        // 1. Update Info Text
-        const infoText = modalContent.querySelector('.info-text');
-        if (infoText) {
-            infoText.textContent = "Adjust playback speed. Audio will be preserved but might be out of sync.";
-        }
-
-        // 2. Update Checkbox Label
-        const audioCheckbox = modalContent.querySelector('#reverse-include-audio'); // Reused ID
-        if (audioCheckbox) {
-            const checkboxContainer = audioCheckbox.closest('label');
-            if (checkboxContainer) {
-                const labelSpan = checkboxContainer.querySelector('.checkbox-label');
-                if (labelSpan) {
-                    labelSpan.textContent = "Include audio";
-                }
-            }
-        }
-
-        // 3. Update Button Text
-        const processBtn = modalContent.querySelector('.reverse-btn'); // Reused class from footer
-        if (processBtn) {
-            processBtn.classList.remove('reverse-btn');
-            processBtn.classList.add('speed-process-btn');
-            processBtn.innerHTML = '<span>Change Speed</span>';
-        }
-
-        // Open Modal
-        modal.open();
 
         // Elements
         const sourceFilename = modalContent.querySelector('.source-filename');
         const sourceDuration = modalContent.querySelector('.source-duration');
         const sourceResolution = modalContent.querySelector('.source-resolution');
 
-        const speedSlider = modalContent.querySelector('.quality-slider'); // Reused class input[type=range]
+        const speedSlider = modalContent.querySelector('.quality-slider');
         const speedDisplay = modalContent.querySelector('.speed-display');
+        const audioCheckbox = modalContent.querySelector('#reverse-include-audio');
+        const directionRadios = modalContent.querySelectorAll('input[name="direction"]');
 
+        const processBtn = modalContent.querySelector('.reverse-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
         const progressBar = modalContent.querySelector('.progress-bar-fill');
@@ -79,6 +51,8 @@ export class SpeedMenu {
 
         const loadingSection = modalContent.querySelector('.reverse-loading');
         const contentSection = modalContent.querySelector('.reverse-content');
+        const longVideoWarning = modalContent.querySelector('#long-video-warning');
+        const processingInfo = modalContent.querySelector('.processing-info');
 
         // Initial Data
         sourceFilename.textContent = item.title;
@@ -101,41 +75,80 @@ export class SpeedMenu {
                 videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
             }
         }
-
         sourceDuration.textContent = formatDuration(videoDuration);
         sourceResolution.textContent = item.videoInfo
             ? `${item.videoInfo.width}×${item.videoInfo.height}`
             : 'Unknown';
 
+        // Check for long video (only warning if reverse is selected later)
+        const isLongVideo = videoDuration > 60;
+
         // Helper: Update UI
-        const updateUI = (speed) => {
-            if (speedDisplay) {
-                const newDuration = videoDuration / speed;
-                speedDisplay.textContent = `${speed}x (${formatDuration(newDuration)})`;
+        const updateUI = () => {
+            const speed = parseFloat(speedSlider.value);
+            const isReverse = modalContent.querySelector('input[name="direction"]:checked').value === 'reverse';
+
+            // Update Speed Display
+            const newDuration = videoDuration / speed;
+            speedDisplay.textContent = `${speed}x (${formatDuration(newDuration)})`;
+
+            // Update Info / Warnings
+            if (isReverse && isLongVideo) {
+                if (longVideoWarning) longVideoWarning.classList.remove('hidden');
+                if (processingInfo) processingInfo.classList.remove('hidden');
+            } else {
+                if (longVideoWarning) longVideoWarning.classList.add('hidden');
+                // We keep processing info container, just hide warning
+                if (!longVideoWarning || longVideoWarning.classList.contains('hidden')) {
+                    // Maybe hide parent if empty, but CSS handles it via hidden class on element
+                }
+            }
+
+            // Update Checkbox Label
+            const checkboxContainer = audioCheckbox.closest('label');
+            if (checkboxContainer) {
+                const labelSpan = checkboxContainer.querySelector('.checkbox-label');
+                if (labelSpan) {
+                    labelSpan.textContent = isReverse ? "Include reversed audio" : "Include audio";
+                }
+            }
+
+            // Update Button Text
+            if (processBtn && !processBtn.disabled) {
+                processBtn.innerHTML = isReverse ? '<span>Reverse Video</span>' : '<span>Change Speed</span>';
             }
         };
 
         // Slider Event
         if (speedSlider) {
-            speedSlider.addEventListener('input', (e) => {
-                const val = parseFloat(e.target.value);
-                updateUI(val);
-            });
-            // Initialize UI
-            updateUI(parseFloat(speedSlider.value));
+            speedSlider.addEventListener('input', updateUI);
         }
+
+        // Radio Event
+        directionRadios.forEach(radio => {
+            radio.addEventListener('change', updateUI);
+        });
+
+        // Initialize UI
+        updateUI();
+
+        // Open Modal
+        modal.open();
 
         // Process Handler
         if (processBtn) {
             processBtn.addEventListener('click', async () => {
                 const speed = speedSlider ? parseFloat(speedSlider.value) : 1;
                 const includeAudio = audioCheckbox ? audioCheckbox.checked : true;
+                const isReverse = modalContent.querySelector('input[name="direction"]:checked').value === 'reverse';
 
                 // UI Updates
                 processBtn.disabled = true;
+                processBtn.innerHTML = '<span>Processing...</span>';
                 if (downloadBtn) downloadBtn.disabled = true;
                 if (speedSlider) speedSlider.disabled = true;
                 if (audioCheckbox) audioCheckbox.disabled = true;
+                directionRadios.forEach(r => r.disabled = true);
 
                 if (progressSection) progressSection.classList.remove('hidden');
                 if (errorMessage) errorMessage.classList.add('hidden');
@@ -157,32 +170,43 @@ export class SpeedMenu {
                         throw new Error('Cannot access video file');
                     }
 
-                    // Execute Speed Change
-                    const outputBlob = await MediaProcessor.changeVideoSpeed({
-                        source: sourceFile,
-                        speed: speed,
-                        includeAudio: includeAudio,
-                        onProgress: (progress) => {
-                            const pct = Math.round(progress * 100);
-                            if (progressText) progressText.textContent = `${pct}%`;
-                            if (progressBar) progressBar.style.width = `${pct}%`;
+                    let outputBlob;
+                    const onProgress = (progress) => {
+                        const pct = Math.round(progress * 100);
+                        if (progressText) progressText.textContent = `${pct}%`;
+                        if (progressBar) progressBar.style.width = `${pct}%`;
 
-                            if (progressStatus) {
-                                if (progress < 0.9) {
-                                    progressStatus.textContent = "Processing frames...";
-                                } else {
-                                    progressStatus.textContent = "Finalizing...";
-                                }
+                        if (progressStatus) {
+                            if (progress < 0.9) {
+                                progressStatus.textContent = isReverse ? "Reversing & Encoding..." : "Processing frames...";
+                            } else {
+                                progressStatus.textContent = "Finalizing...";
                             }
                         }
-                    });
+                    };
+
+                    if (isReverse) {
+                        outputBlob = await MediaProcessor.reverseVideo({
+                            source: sourceFile,
+                            includeAudio: includeAudio,
+                            speed: speed,
+                            onProgress: onProgress
+                        });
+                    } else {
+                        outputBlob = await MediaProcessor.changeVideoSpeed({
+                            source: sourceFile,
+                            speed: speed,
+                            includeAudio: includeAudio,
+                            onProgress: onProgress
+                        });
+                    }
 
                     // Success
                     if (successMessage) successMessage.classList.remove('hidden');
                     if (progressSection) progressSection.classList.add('hidden');
 
                     // Filename
-                    const speedTag = speed < 1 ? `slow-${speed}x` : `fast-${speed}x`;
+                    const speedTag = isReverse ? `reversed-${speed}x` : (speed < 1 ? `slow-${speed}x` : `fast-${speed}x`);
                     // @ts-ignore
                     const filename = `${item.title.replace(/\.[^.]+$/, '')}-${speedTag}.mp4`;
                     const url = URL.createObjectURL(outputBlob);
@@ -201,14 +225,6 @@ export class SpeedMenu {
                         downloadBtn.disabled = false;
                         downloadBtn.classList.remove('hidden');
                     }
-
-                    // Re-enable controls for another run
-                    if (processBtn) {
-                        processBtn.disabled = false;
-                        processBtn.innerHTML = '<span>Change Speed</span>';
-                    }
-                    if (speedSlider) speedSlider.disabled = false;
-                    if (audioCheckbox) audioCheckbox.disabled = false;
 
                     // Add to playlist
                     const newItem = {
@@ -234,19 +250,26 @@ export class SpeedMenu {
                     playlist.render();
 
                 } catch (e) {
-                    Logger.error('Speed change failed:', e);
+                    Logger.error('Processing failed:', e);
                     if (errorMessage) {
                         errorMessage.textContent = `Processing failed: ${e.message}`;
                         errorMessage.classList.remove('hidden');
                     }
                     if (progressSection) progressSection.classList.add('hidden');
-
-                    processBtn.disabled = false;
-                    if (speedSlider) speedSlider.disabled = false;
-                    if (audioCheckbox) audioCheckbox.disabled = false;
                 } finally {
                     modal.close = originalClose;
                     if (closeBtn) closeBtn.style.display = '';
+
+                    // Re-enable controls
+                    if (processBtn) {
+                        processBtn.disabled = false;
+                        // Determine label again based on current selection (which hasn't changed)
+                        const isReverseNow = modalContent.querySelector('input[name="direction"]:checked').value === 'reverse';
+                        processBtn.innerHTML = isReverseNow ? '<span>Reverse Video</span>' : '<span>Change Speed</span>';
+                    }
+                    if (speedSlider) speedSlider.disabled = false;
+                    if (audioCheckbox) audioCheckbox.disabled = false;
+                    directionRadios.forEach(r => r.disabled = false);
                 }
             });
         }

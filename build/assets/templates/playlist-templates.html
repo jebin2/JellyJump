@@ -60,15 +60,11 @@
         </div>
         <div class="playlist-menu-item" data-action="reverse" role="menuitem">
             <span class="menu-icon">⏪</span>
-            <span class="menu-label">Reverse Video...</span>
+            <span class="menu-label">Speed / Reverse...</span>
         </div>
         <div class="playlist-menu-item" data-action="remove-bg" role="menuitem">
             <span class="menu-icon">🎨</span>
             <span class="menu-label">Remove Background...</span>
-        </div>
-        <div class="playlist-menu-item" data-action="speed" role="menuitem">
-            <span class="menu-icon">⏩</span>
-            <span class="menu-label">Change Speed...</span>
         </div>
         <div class="menu-divider"></div>
         <div class="playlist-menu-item" data-action="info" role="menuitem">
@@ -1489,7 +1485,30 @@
 
     <div class="reverse-content hidden">
         <div class="info-text mb-lg p-sm bg-tertiary rounded text-sm text-secondary">
-            This will create a new video that plays in reverse.
+            Adjust playback speed or reverse the video.
+        </div>
+
+        <!-- Direction Options -->
+        <div class="direction-selection mb-lg">
+            <div class="text-xs font-bold uppercase text-secondary tracking-wider mb-sm">Playback Direction</div>
+            <div class="radio-group flex gap-md">
+                <label class="radio-option">
+                    <input type="radio" name="direction" value="forward" checked>
+                    <span class="radio-custom"></span>
+                    <div class="radio-label">
+                        <span class="format-name">Forward</span>
+                        <span class="format-desc">Normal Playback</span>
+                    </div>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="direction" value="reverse">
+                    <span class="radio-custom"></span>
+                    <div class="radio-label">
+                        <span class="format-name">Reverse</span>
+                        <span class="format-desc">Backwards Playback</span>
+                    </div>
+                </label>
+            </div>
         </div>
 
         <!-- Audio Options -->
@@ -1521,7 +1540,6 @@
                 <span>3.75x</span>
                 <span>4x</span>
             </div>
-            <div class="text-[10px] text-muted mt-xs">Affects final video speed</div>
         </div>
 
         <!-- Processing Info -->
