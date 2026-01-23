@@ -1,12 +1,13 @@
 import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
+import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 
 /**
  * Crop Menu Handler
- * Handles video cropping functionality with a resizable crop box overlay
+ * Handles video cropping functionality with a resizable crop box overlay and live video preview
  */
 export class CropMenu {
     /**
@@ -27,10 +28,38 @@ export class CropMenu {
 
         const modalContent = modal.modal;
 
+        // Open Modal Immediately
+        modal.open();
+
+        // Initialize Player
+        const playerContainer = modalContent.querySelector('#crop-player-container');
+        let player = null;
+
+        if (playerContainer) {
+            player = new CorePlayer('crop-player-container', {
+                mode: 'player',
+                controlBarMode: 'fixed',
+                controls: {
+                    playPause: true,
+                    navigation: false,
+                    volume: false,
+                    time: true,
+                    progress: true,
+                    captions: false,
+                    settings: false,
+                    fullscreen: false,
+                    loop: false,
+                    speed: false,
+                    modeToggle: false,
+                    keyboard: false
+                },
+                autoplay: false
+            });
+        }
+
         // Elements - Body
         const originalResDisplay = modalContent.querySelector('.original-resolution');
         const cropSizeDisplay = modalContent.querySelector('.crop-size');
-        const previewCanvas = modalContent.querySelector('.crop-preview-canvas');
         const cropBox = modalContent.querySelector('[data-crop-box]');
         const cropOverlay = modalContent.querySelector('.crop-overlay');
         const leftInput = modalContent.querySelector('#crop-left');
@@ -39,7 +68,7 @@ export class CropMenu {
         const heightInput = modalContent.querySelector('#crop-height');
         const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
 
-        // Elements - Footer (progress/status now in footer for visibility)
+        // Elements - Footer
         const cropBtn = modalContent.querySelector('.crop-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.crop-progress');
@@ -47,8 +76,6 @@ export class CropMenu {
         const statusText = modalContent.querySelector('.status-text');
         const errorDisplay = modalContent.querySelector('.crop-error');
         const successDisplay = modalContent.querySelector('.crop-success');
-
-        modal.open();
 
         // State
         let originalWidth = 0;
@@ -96,46 +123,17 @@ export class CropMenu {
             cropState.height = Math.floor(cropState.height / 2) * 2;
         };
 
-        // Draw video frame to canvas
-        const drawPreview = async () => {
-            try {
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-                const video = document.createElement('video');
-                video.muted = true;
-                video.src = URL.createObjectURL(source);
+        // Helper: Update overlay size to match player canvas
+        const updateOverlaySize = () => {
+            if (player && player.canvas) {
+                const canvasRect = player.canvas.getBoundingClientRect();
+                cropOverlay.style.width = `${canvasRect.width}px`;
+                cropOverlay.style.height = `${canvasRect.height}px`;
 
-                await new Promise((resolve, reject) => {
-                    video.onloadedmetadata = resolve;
-                    video.onerror = reject;
-                });
+                // Calculate scale based on canvas size vs original video
+                previewScale = canvasRect.width / originalWidth;
 
-                video.currentTime = 0.1;
-                await new Promise(resolve => video.onseeked = resolve);
-
-                const maxPreviewWidth = 580;
-                const maxPreviewHeight = 320;
-
-                const videoWidth = video.videoWidth;
-                const videoHeight = video.videoHeight;
-
-                previewScale = Math.min(maxPreviewWidth / videoWidth, maxPreviewHeight / videoHeight, 1);
-
-                previewCanvas.width = videoWidth * previewScale;
-                previewCanvas.height = videoHeight * previewScale;
-
-                const ctx = previewCanvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, previewCanvas.width, previewCanvas.height);
-
-                // Set overlay size to match canvas
-                cropOverlay.style.width = `${previewCanvas.width}px`;
-                cropOverlay.style.height = `${previewCanvas.height}px`;
-
-                URL.revokeObjectURL(video.src);
-
-                return { videoWidth, videoHeight };
-            } catch (e) {
-                Logger.error('Failed to draw preview:', e);
-                throw e;
+                updateCropBoxFromState();
             }
         };
 
@@ -146,11 +144,22 @@ export class CropMenu {
             if (item.videoInfo && item.videoInfo.width && item.videoInfo.height) {
                 originalWidth = item.videoInfo.width;
                 originalHeight = item.videoInfo.height;
-            } else {
-                // Try to get from video directly
-                const dims = await drawPreview();
-                originalWidth = dims.videoWidth;
-                originalHeight = dims.videoHeight;
+            }
+
+            // Load video into player
+            if (player) {
+                await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
+                await player.load(item.blob_url, false);
+
+                // Get dimensions from player if not available
+                if (!originalWidth || !originalHeight) {
+                    // Wait a bit for video to load
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    if (player.canvas) {
+                        originalWidth = player.canvas.width || 1920;
+                        originalHeight = player.canvas.height || 1080;
+                    }
+                }
             }
 
             originalResDisplay.textContent = `${originalWidth}x${originalHeight}`;
@@ -164,9 +173,11 @@ export class CropMenu {
                 height: Math.floor(originalHeight * (1 - inset) / 2) * 2
             };
 
-            await drawPreview();
-            updateCropBoxFromState();
-            updateInputsFromState();
+            // Wait for player to render then update overlay
+            setTimeout(() => {
+                updateOverlaySize();
+                updateInputsFromState();
+            }, 200);
 
         } catch (e) {
             Logger.error('Failed to load video info:', e);
@@ -209,7 +220,6 @@ export class CropMenu {
                 cropStart = { ...cropState };
                 e.preventDefault();
             } else if (e.target === cropBox) {
-                // Drag the whole box
                 isDragging = true;
                 dragHandle = 'move';
                 dragStart = getMousePos(e);
@@ -232,32 +242,27 @@ export class CropMenu {
                 // Handle resize - keep opposite edge fixed
                 const h = dragHandle;
 
-                // Calculate fixed edges from start state
                 const rightEdge = cropStart.left + cropStart.width;
                 const bottomEdge = cropStart.top + cropStart.height;
 
                 if (h.includes('w')) {
-                    // Moving left edge, right edge stays fixed
                     let newLeft = cropStart.left + dx;
                     newLeft = Math.max(0, Math.min(newLeft, rightEdge - MIN_CROP_SIZE));
                     cropState.left = newLeft;
                     cropState.width = rightEdge - newLeft;
                 }
                 if (h.includes('e')) {
-                    // Moving right edge, left edge stays fixed
                     let newWidth = cropStart.width + dx;
                     newWidth = Math.max(MIN_CROP_SIZE, Math.min(newWidth, originalWidth - cropStart.left));
                     cropState.width = newWidth;
                 }
                 if (h.includes('n')) {
-                    // Moving top edge, bottom edge stays fixed
                     let newTop = cropStart.top + dy;
                     newTop = Math.max(0, Math.min(newTop, bottomEdge - MIN_CROP_SIZE));
                     cropState.top = newTop;
                     cropState.height = bottomEdge - newTop;
                 }
                 if (h.includes('s')) {
-                    // Moving bottom edge, top edge stays fixed
                     let newHeight = cropStart.height + dy;
                     newHeight = Math.max(MIN_CROP_SIZE, Math.min(newHeight, originalHeight - cropStart.top));
                     cropState.height = newHeight;
@@ -269,13 +274,12 @@ export class CropMenu {
             updateInputsFromState();
         };
 
-        // Track if we just finished dragging (to prevent modal close on mouseup)
+        // Track if we just finished dragging
         let wasDragging = false;
 
         const handleMouseUp = () => {
             if (isDragging) {
                 wasDragging = true;
-                // Reset wasDragging after a short delay (after click event fires)
                 setTimeout(() => { wasDragging = false; }, 100);
             }
             isDragging = false;
@@ -286,16 +290,14 @@ export class CropMenu {
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
 
-        // Prevent modal from closing while dragging or just after drag ends
+        // Prevent modal from closing while dragging
         const modalOverlay = modal.overlay;
         const preventCloseWhileDragging = (e) => {
-            // Only close if clicking directly on overlay AND not during/after drag
             if (e.target === modalOverlay && !isDragging && !wasDragging) {
                 modal.close();
             }
         };
 
-        // Remove original click handler and add our custom one
         modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
         modalOverlay.addEventListener('click', preventCloseWhileDragging);
 
@@ -305,6 +307,9 @@ export class CropMenu {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
             modalOverlay.removeEventListener('click', preventCloseWhileDragging);
+            if (player) {
+                player.destroy();
+            }
             originalClose();
         };
 

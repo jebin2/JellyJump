@@ -2842,15 +2842,21 @@ body.fullscreen-active {
 
 .crop-preview-wrapper {
     position: relative;
-    display: inline-block;
+    display: block;
     line-height: 0;
+    width: 100%;
 }
 
-.crop-preview-canvas {
-    display: block;
-    max-width: 100%;
-    border-radius: 4px;
+.crop-player-container {
+    width: 100%;
+    height: 280px;
     background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.crop-player-container .jellyjump-video-wrapper {
+    height: 100%;
 }
 
 .crop-overlay {
@@ -2858,6 +2864,7 @@ body.fullscreen-active {
     top: 0;
     left: 0;
     pointer-events: none;
+    z-index: 10;
 }
 
 .crop-box {
