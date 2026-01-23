@@ -2692,12 +2692,13 @@ export class Playlist {
 
         // Conditional Logic
         const item = this.items[index];
-        const isLive = item.isLive; // Only true for actual live streams
+        // Treat streams, IPTV, and live content as restricted (limited menu options)
+        const isRestricted = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/live/') || item.url.includes('/hls/')));
 
         menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
             const action = menuItem.dataset.action;
 
-            if (isLive) {
+            if (isRestricted) {
                 // Live Stream: Show ONLY Record and Info
                 if (action === 'info' || action === 'record') {
                     menuItem.style.display = 'flex'; // Ensure it's visible
@@ -2727,8 +2728,8 @@ export class Playlist {
             }
         });
 
-        // Hide dividers for Live since we only have 2 items
-        if (isLive) {
+        // Hide dividers for Live/Streams since we only have 2 items
+        if (isRestricted) {
             menu.querySelectorAll('.menu-divider').forEach(divider => {
                 divider.style.display = 'none';
             });

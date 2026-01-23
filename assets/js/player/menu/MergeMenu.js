@@ -109,9 +109,10 @@ export class MergeMenu {
         const renderAvailable = () => {
             availableList.innerHTML = '';
 
-            // Filter video items only
+            // Filter video items only (exclude streams)
             const videoItems = playlist.items.filter(item => {
-                return !item.type || item.type.startsWith('video/');
+                const isStream = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/hls/')));
+                return (!item.type || item.type.startsWith('video/')) && !isStream;
             });
 
             if (videoItems.length === 0) {
@@ -216,11 +217,20 @@ export class MergeMenu {
         };
 
         // Initial Selection
-        if (typeof initialIndex === 'number' && playlist.items[initialIndex]) {
-            selectedVideos.push(playlist.items[initialIndex]);
-            if (playlist.items[initialIndex + 1]) {
-                selectedVideos.push(playlist.items[initialIndex + 1]);
+        // Initial Selection
+        if (typeof initialIndex === 'number') {
+            const checkAndAdd = (idx) => {
+                const item = playlist.items[idx];
+                if (item) {
+                    const isRestricted = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/hls/')));
+                    if ((!item.type || item.type.startsWith('video/')) && !isRestricted) {
+                        selectedVideos.push(item);
+                    }
+                }
             }
+
+            checkAndAdd(initialIndex);
+            checkAndAdd(initialIndex + 1);
         }
 
         modal.open();
@@ -236,7 +246,7 @@ export class MergeMenu {
             const targetHeight = parseInt(heightInput.value);
             const scaleMode = scaleSelect.value;
             const backgroundColor = bgColorInput.value;
-            const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
+            const addToPlaylist = true; // Always add to playlist by default now
 
             // Validate
             if (!targetWidth || !targetHeight || targetWidth < 128 || targetHeight < 128) {
@@ -245,7 +255,7 @@ export class MergeMenu {
             }
 
             // UI State
-            modalContent.querySelector('.options-group').classList.add('disabled');
+            // modalContent.querySelector('.options-group').classList.add('disabled'); // Removed
             widthInput.disabled = true;
             heightInput.disabled = true;
             scaleSelect.disabled = true;
@@ -288,8 +298,18 @@ export class MergeMenu {
                 });
 
                 // Success
+                progressSection.classList.add('hidden'); // Hide progress bar
+                successMsg.textContent = '✓ Added to playlist';
                 successMsg.classList.remove('hidden');
-                mergeBtn.innerHTML = 'Merged';
+
+                // Re-enable inputs for next operation
+                widthInput.disabled = false;
+                heightInput.disabled = false;
+                scaleSelect.disabled = false;
+                bgColorInput.disabled = false;
+
+                // Actually keep disabled to prevent double merge but maybe change icon
+                mergeBtn.innerHTML = '<span>Added</span><svg width="16" height="16" fill="currentColor" class="ml-xs"><use href="assets/icons/sprite.svg#icon-check"></use></svg>';
 
                 // Setup Download
                 const url = URL.createObjectURL(mergedBlob);
@@ -327,8 +347,16 @@ export class MergeMenu {
 
             } catch (e) {
                 Logger.error('Merge failed:', e);
+                progressSection.classList.add('hidden'); // Hide progress bar on error
                 errorMsg.textContent = `Merge failed: ${e.message}`;
                 errorMsg.classList.remove('hidden');
+
+                // Re-enable inputs on error
+                widthInput.disabled = false;
+                heightInput.disabled = false;
+                scaleSelect.disabled = false;
+                bgColorInput.disabled = false;
+
                 mergeBtn.disabled = false;
                 mergeBtn.innerHTML = '<span class="mr-xs">Merge</span><svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-layers"></use></svg>';
             }

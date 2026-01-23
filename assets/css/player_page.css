@@ -534,7 +534,7 @@
 
 .selected-section {
     border-color: var(--accent-primary);
-    background-color: rgba(var(--accent-primary-rgb), 0.05);
+    /* background-color: rgba(var(--accent-primary-rgb), 0.05); */
 }
 
 .section-header {
@@ -620,12 +620,12 @@
 
 /* Selected state in available list */
 .available-list .merge-item.bg-primary {
-    background-color: rgba(var(--accent-primary-rgb), 0.15);
+    background-color: var(--bg-tertiary);
     border-color: var(--accent-primary);
     border-width: 2px;
 }
 
-.available-list .merge-item.bg-primary::before {
+/* .available-list .merge-item.bg-primary::before {
     content: '✓';
     position: absolute;
     left: -8px;
@@ -642,19 +642,19 @@
     font-size: 12px;
     font-weight: bold;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
+} */
 
 .available-list .merge-item.bg-primary:hover {
-    background-color: rgba(var(--accent-primary-rgb), 0.2);
+    background-color: var(--bg-tertiary);
     transform: translateX(2px);
 }
 
 /* Items in selected list with order numbers */
-.selected-list .merge-item {
+/* .selected-list .merge-item {
     padding-left: 2.5rem;
-}
+} */
 
-.selected-list .merge-item::before {
+/* .selected-list .merge-item::before {
     content: attr(data-order);
     position: absolute;
     left: 0.5rem;
@@ -671,7 +671,7 @@
     font-size: 12px;
     font-weight: bold;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
+} */
 
 .selected-list .merge-item:hover {
     background-color: rgba(255, 255, 255, 0.05);
