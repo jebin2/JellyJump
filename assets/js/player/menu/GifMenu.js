@@ -3,11 +3,11 @@ import { Modal } from '../Modal.js';
 import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId, formatDuration, formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
+import { generateId, formatDuration, formatTime, formatFileSize } from '../../utils/mediaUtils.js';
 
 /**
  * GIF Menu Handler
- * Handles GIF creation from video segments with A-B loop preview
+ * Handles GIF creation from video segments with timeline slider and player preview
  */
 export class GifMenu {
     /**
@@ -44,8 +44,7 @@ export class GifMenu {
                 controlBarMode: 'fixed',  // Always show control bar
                 controls: {
                     playPause: true,
-                    navigation: false,  // No prev/next buttons
-                    volume: false,
+                    navigation: false,
                     time: true,
                     progress: true,
                     captions: false,
@@ -53,8 +52,11 @@ export class GifMenu {
                     fullscreen: false,
                     loop: false,
                     speed: false,
+                    filters: false,
+                    equalizer: true,
+                    volumeOnly: true,
                     modeToggle: false,
-                    keyboard: false  // Disable keyboard shortcuts for modal player
+                    keyboard: false
                 },
                 autoplay: false
             });
@@ -63,32 +65,62 @@ export class GifMenu {
         // Elements
         const gifLoading = modalContent.querySelector('.gif-loading');
         const gifContent = modalContent.querySelector('.gif-content');
-        const sourceFilename = modalContent.querySelector('.source-filename');
-        const sourceDuration = modalContent.querySelector('.source-duration');
-        const sourceResolution = modalContent.querySelector('.source-resolution');
 
-        sourceFilename.textContent = item.title;
-        sourceFilename.title = item.title;
+        // Time Display Elements
+        const startDisplay = modalContent.querySelector('.gif-start-time');
+        const endDisplay = modalContent.querySelector('.gif-end-time');
+        const durationDisplay = modalContent.querySelector('.gif-duration');
+
+        // Timeline Slider Elements
+        const timelineSlider = modalContent.querySelector('.timeline-slider');
+        const timelineRange = modalContent.querySelector('.timeline-range');
+        const startHandle = modalContent.querySelector('.start-handle');
+        const endHandle = modalContent.querySelector('.end-handle');
+
+        const validationError = modalContent.querySelector('.time-validation-error');
+        const fpsSelect = modalContent.querySelector('#gif-fps');
+        const sizeSelect = modalContent.querySelector('#gif-size');
+        const qualitySlider = modalContent.querySelector('#gif-quality');
+        const qualityValue = modalContent.querySelector('#gif-quality-value');
+
+        const createBtn = modalContent.querySelector('.create-gif-btn');
+        const downloadBtn = modalContent.querySelector('.download-btn');
+
+        const progressSection = modalContent.querySelector('.progress-section');
+        const progressText = modalContent.querySelector('.progress-percentage');
+
+        const gifPreviewSection = modalContent.querySelector('.gif-preview-section');
+        const gifPreviewImage = modalContent.querySelector('.gif-preview-image');
+        const gifFileSize = modalContent.querySelector('.gif-file-size');
+        const errorMessage = modalContent.querySelector('.error-message');
+        const successMessage = modalContent.querySelector('.success-message');
 
         // Ensure metadata
         await playlist._ensureMetadata(item);
-        gifLoading.classList.add('hidden');
-        gifContent.classList.remove('hidden');
 
         // Get video duration
-        let videoDuration = 0;
+        let duration = 0;
         if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
             const parts = item.duration.split(':').map(Number);
             if (parts.length === 2) {
-                videoDuration = parts[0] * 60 + parts[1];
+                duration = parts[0] * 60 + parts[1];
             } else if (parts.length === 3) {
-                videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
             }
         }
-        sourceDuration.textContent = formatDuration(videoDuration);
-        sourceResolution.textContent = item.videoInfo
-            ? `${item.videoInfo.width}×${item.videoInfo.height} `
-            : 'Unknown';
+
+        // Show Content
+        gifLoading.classList.add('hidden');
+        gifContent.classList.remove('hidden');
+
+        // State
+        let startTime = 0;
+        let endTime = Math.min(duration, 10); // Default 10s or full duration
+
+        // Initialize displays
+        startDisplay.textContent = formatTime(startTime);
+        endDisplay.textContent = formatTime(endTime);
+        durationDisplay.textContent = formatDuration(endTime - startTime);
 
         // Load Video into Player
         if (player) {
@@ -98,84 +130,90 @@ export class GifMenu {
 
             // Enable A-B Loop Mode
             player.loopMode = 'ab';
-            player.loopStart = 0;
-            player.loopEnd = Math.min(videoDuration, 10);
+            player.loopStart = startTime;
+            player.loopEnd = endTime;
         }
 
-        // Control Elements
-        const startInput = modalContent.querySelector('#gif-start-input');
-        const endInput = modalContent.querySelector('#gif-end-input');
-        const durationDisplay = modalContent.querySelector('.gif-duration');
-        const validationError = modalContent.querySelector('.time-validation-error');
-        const fpsSelect = modalContent.querySelector('#gif-fps');
-        const sizeSelect = modalContent.querySelector('#gif-size');
-        const qualitySlider = modalContent.querySelector('#gif-quality');
-        const qualityValue = modalContent.querySelector('#gif-quality-value');
+        // Update UI
+        const updateUI = () => {
+            // Update Displays
+            startDisplay.textContent = formatTime(startTime);
+            endDisplay.textContent = formatTime(endTime);
 
-        const createBtn = modalContent.querySelector('.create-gif-btn');
-        const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.progress-section');
-        const progressBar = modalContent.querySelector('.progress-bar-fill');
-        const progressText = modalContent.querySelector('.progress-percentage');
-        const gifPreviewSection = modalContent.querySelector('.gif-preview-section');
-        const gifPreviewImage = modalContent.querySelector('.gif-preview-image');
-        const gifFileSize = modalContent.querySelector('.gif-file-size');
-        const errorMessage = modalContent.querySelector('.error-message');
-        const successMessage = modalContent.querySelector('.success-message');
+            // Update Duration
+            const gifDuration = Math.max(0, endTime - startTime);
+            durationDisplay.textContent = formatDuration(gifDuration);
 
-        // Initialize end time
-        endInput.value = formatTime(Math.min(videoDuration, 10));
+            // Update Slider
+            const startPercent = (startTime / duration) * 100;
+            const endPercent = (endTime / duration) * 100;
 
-        // Validation
-        const validateAndUpdate = () => {
-            const start = parseTime(startInput.value);
-            const end = parseTime(endInput.value);
-            const duration = end - start;
+            startHandle.style.left = `${startPercent}%`;
+            endHandle.style.left = `${endPercent}%`;
+            timelineRange.style.left = `${startPercent}%`;
+            timelineRange.style.width = `${endPercent - startPercent}%`;
 
-            // Update A-B loop points
+            // Update Player Loop Points
             if (player) {
-                player.loopStart = start;
-                player.loopEnd = end;
+                player.loopStart = startTime;
+                player.loopEnd = endTime;
+                if (player.loopMode !== 'ab') player.loopMode = 'ab';
             }
 
+            // Validation
             validationError.classList.add('hidden');
             createBtn.disabled = false;
 
-            if (start >= end) {
+            if (startTime >= endTime) {
                 validationError.textContent = 'Start time must be before end time';
                 validationError.classList.remove('hidden');
                 createBtn.disabled = true;
-                return false;
-            }
-
-            if (duration < 0.5) {
+            } else if (gifDuration < 0.5) {
                 validationError.textContent = 'GIF duration must be at least 0.5 seconds';
                 validationError.classList.remove('hidden');
                 createBtn.disabled = true;
-                return false;
-            }
-
-            if (duration > 60) {
+            } else if (gifDuration > 60) {
                 validationError.textContent = 'GIF duration must not exceed 60 seconds';
                 validationError.classList.remove('hidden');
                 createBtn.disabled = true;
-                return false;
             }
-
-            if (end > videoDuration) {
-                validationError.textContent = 'End time exceeds video duration';
-                validationError.classList.remove('hidden');
-                createBtn.disabled = true;
-                return false;
-            }
-
-            durationDisplay.textContent = `${duration.toFixed(1)} s`;
-            return true;
         };
 
-        // Event Listeners
-        startInput.addEventListener('input', validateAndUpdate);
-        endInput.addEventListener('input', validateAndUpdate);
+        // Initialize UI
+        updateUI();
+
+        // Slider Drag Logic
+        const handleDrag = (e, isStart) => {
+            const rect = timelineSlider.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percent = Math.max(0, Math.min(1, x / rect.width));
+            const time = percent * duration;
+
+            if (isStart) {
+                if (time < endTime - 0.5) startTime = time;
+                if (player) player.seek(startTime);
+            } else {
+                if (time > startTime + 0.5) endTime = time;
+                if (player) player.seek(endTime);
+            }
+            updateUI();
+        };
+
+        const initDrag = (handle, isStart) => {
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                const onMouseMove = (e) => handleDrag(e, isStart);
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        };
+
+        initDrag(startHandle, true);
+        initDrag(endHandle, false);
 
         qualitySlider.addEventListener('input', () => {
             const value = parseInt(qualitySlider.value);
@@ -185,26 +223,24 @@ export class GifMenu {
 
         // Create GIF action
         createBtn.addEventListener('click', async () => {
-            if (!validateAndUpdate()) return;
-
-            const start = parseTime(startInput.value);
-            const end = parseTime(endInput.value);
+            const start = startTime;
+            const end = endTime;
             const fps = parseInt(fpsSelect.value);
             const sizePreset = sizeSelect.value;
             const quality = parseInt(qualitySlider.value);
-            const addToPlaylist = modalContent.querySelector('input[name="addToPlaylist"]').checked;
 
             // Disable inputs
-            startInput.disabled = true;
-            endInput.disabled = true;
             fpsSelect.disabled = true;
             sizeSelect.disabled = true;
             qualitySlider.disabled = true;
             createBtn.disabled = true;
+            modal.closeBtn.disabled = true;
 
             progressSection.classList.remove('hidden');
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
+            gifPreviewSection.classList.add('hidden');
+            downloadBtn.classList.add('hidden');
 
             try {
                 // Calculate dimensions
@@ -239,12 +275,12 @@ export class GifMenu {
                     quality: quality,
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
-                        progressBar.style.width = `${pct}% `;
-                        progressText.textContent = `${pct}% `;
+                        progressText.textContent = `${pct}%`;
                     }
                 });
 
                 // Success
+                progressSection.classList.add('hidden');
                 successMessage.classList.remove('hidden');
 
                 // Show preview
@@ -261,34 +297,32 @@ export class GifMenu {
                 downloadBtn.download = filename;
                 downloadBtn.classList.remove('hidden');
 
-                // Add to playlist
-                if (addToPlaylist) {
-                    const newItem = {
-                        title: filename,
-                        url: previewUrl,
-                        duration: formatDuration(end - start),
-                        thumbnail: previewUrl,
-                        isLocal: true,
-                        file: new File([gifBlob], filename, { type: 'image/gif' }),
-                        id: generateId(),
-                        type: 'image/gif',
-                        path: (item.path || item.title) + '/' + filename
-                    };
+                // Always add to playlist
+                const newItem = {
+                    title: filename,
+                    url: previewUrl,
+                    duration: formatDuration(end - start),
+                    thumbnail: previewUrl,
+                    isLocal: true,
+                    file: new File([gifBlob], filename, { type: 'image/gif' }),
+                    id: generateId(),
+                    type: 'image/gif',
+                    path: (item.path || item.title) + '/' + filename
+                };
 
-                    const sourceIndex = playlist.items.indexOf(item);
-                    if (sourceIndex !== -1) {
-                        playlist.items.splice(sourceIndex + 1, 0, newItem);
-                    } else {
-                        playlist.items.push(newItem);
-                    }
-
-                    playlist._saveState();
-                    playlist.render();
+                const sourceIndex = playlist.items.indexOf(item);
+                if (sourceIndex !== -1) {
+                    playlist.items.splice(sourceIndex + 1, 0, newItem);
+                } else {
+                    playlist.items.push(newItem);
                 }
 
+                playlist._saveState();
+                playlist.render();
+
+                modal.closeBtn.disabled = false;
+
                 // Re-enable  inputs
-                startInput.disabled = false;
-                endInput.disabled = false;
                 fpsSelect.disabled = false;
                 sizeSelect.disabled = false;
                 qualitySlider.disabled = false;
@@ -296,16 +330,16 @@ export class GifMenu {
 
             } catch (e) {
                 Logger.error('GIF creation failed:', e);
-                errorMessage.textContent = `GIF creation failed: ${e.message} `;
+                errorMessage.textContent = `GIF creation failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
+                progressSection.classList.add('hidden');
 
                 // Re-enable inputs
-                startInput.disabled = false;
-                endInput.disabled = false;
                 fpsSelect.disabled = false;
                 sizeSelect.disabled = false;
                 qualitySlider.disabled = false;
                 createBtn.disabled = false;
+                modal.closeBtn.disabled = false;
             }
         });
 
@@ -317,7 +351,5 @@ export class GifMenu {
             }
             originalClose();
         };
-
-        validateAndUpdate(); // Initial validation
     }
 }
