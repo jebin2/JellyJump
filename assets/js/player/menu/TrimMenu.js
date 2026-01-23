@@ -60,7 +60,6 @@ export class TrimMenu {
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
         const trimContent = modalContent.querySelector('.trim-content');
-        const sourceFilename = modalContent.querySelector('.source-filename');
         const startInput = modalContent.querySelector('#trim-start-input');
         const endInput = modalContent.querySelector('#trim-end-input');
         const durationDisplay = modalContent.querySelector('.trim-duration');
@@ -69,11 +68,9 @@ export class TrimMenu {
         const timelineRange = modalContent.querySelector('.timeline-range');
         const startHandle = modalContent.querySelector('.start-handle');
         const endHandle = modalContent.querySelector('.end-handle');
-        const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
         const trimBtn = modalContent.querySelector('.trim-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
-        const progressBar = modalContent.querySelector('.progress-bar-fill');
         const progressPercentage = modalContent.querySelector('.progress-percentage');
         const errorMessage = modalContent.querySelector('.error-message');
         const successMessage = modalContent.querySelector('.success-message');
@@ -97,9 +94,7 @@ export class TrimMenu {
             return 0;
         };
 
-        // Initialize Data
-        sourceFilename.textContent = item.title;
-        sourceFilename.title = item.title;
+
 
         // Ensure metadata
         await playlist._ensureMetadata(item);
@@ -261,12 +256,12 @@ export class TrimMenu {
                     },
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
-                        progressBar.style.width = `${percent}% `;
-                        progressPercentage.textContent = `${percent}% `;
+                        progressPercentage.textContent = `${percent}%`;
                     }
                 });
 
                 // Success
+                progressSection.classList.add('hidden');
                 successMessage.classList.remove('hidden');
 
                 // Configure Download
@@ -278,25 +273,23 @@ export class TrimMenu {
                 downloadBtn.download = filename;
                 downloadBtn.classList.remove('hidden');
 
-                // Add to Playlist
-                if (addToPlaylistCheckbox.checked) {
-                    const newItem = {
-                        id: generateId(),
-                        title: filename,
-                        url: url,
-                        file: new File([blob], filename, { type: `video/${ext}` }),
-                        duration: formatTime(endTime - startTime),
-                        type: 'video',
-                        isLocal: true,
-                        isNew: true,
-                        path: (item.path || item.title) + '/' + filename
-                    };
+                // Always add to Playlist
+                const newItem = {
+                    id: generateId(),
+                    title: filename,
+                    url: url,
+                    file: new File([blob], filename, { type: `video/${ext}` }),
+                    duration: formatTime(endTime - startTime),
+                    type: 'video',
+                    isLocal: true,
+                    isNew: true,
+                    path: (item.path || item.title) + '/' + filename
+                };
 
-                    const insertIndex = playlist.items.indexOf(item) + 1;
-                    playlist.items.splice(insertIndex, 0, newItem);
-                    playlist.render();
-                    playlist._saveState();
-                }
+                const insertIndex = playlist.items.indexOf(item) + 1;
+                playlist.items.splice(insertIndex, 0, newItem);
+                playlist.render();
+                playlist._saveState();
 
                 modal.closeBtn.disabled = false;
 
