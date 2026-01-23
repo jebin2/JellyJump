@@ -232,9 +232,8 @@ export class RemoveBackgroundMenu {
                 pickColorBtn.classList.add('active');
                 pickColorBtn.innerHTML = `
                     <svg width="16" height="16" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-check"></use>
+                        <use href="assets/icons/sprite.svg?v=2#icon-check"></use>
                     </svg>
-                    Done
                 `;
                 player.pause(); // Pause video when picking starts
 
@@ -247,9 +246,8 @@ export class RemoveBackgroundMenu {
                 pickColorBtn.classList.remove('active');
                 pickColorBtn.innerHTML = `
                     <svg width="16" height="16" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-eyedropper"></use>
+                        <use href="assets/icons/sprite.svg?v=2#icon-eyedropper"></use>
                     </svg>
-                    Pick Color from Video
                 `;
 
                 // Hide overlay

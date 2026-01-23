@@ -1577,8 +1577,12 @@
     <div class="remove-bg-container flex flex-col gap-md">
         <!-- Left Column: Video Preview -->
         <div class="preview-column flex flex-col gap-sm">
-            <div class="preview-header flex-between items-center">
-                <div class="text-sm font-bold text-secondary">PREVIEW</div>
+            <div class="preview-header flex-between items-center mb-xs">
+                <button id="pick-color-btn" class="btn jellyjump-btn-small" title="Pick Color">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg?v=2#icon-eyedropper"></use>
+                    </svg>
+                </button>
                 <label class="checkbox-option flex items-center cursor-pointer select-none">
                     <input type="checkbox" id="live-preview-toggle" checked>
                     <span class="checkbox-custom"></span>
@@ -1593,17 +1597,7 @@
                 </div>
             </div>
 
-            <div class="flex justify-center mt-sm">
-                <button id="pick-color-btn" class="btn jellyjump-btn-secondary btn-sm flex items-center gap-xs">
-                    <svg width="16" height="16" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-eyedropper"></use>
-                    </svg>
-                    Pick Color from Video
-                </button>
-            </div>
-            <div class="text-xs text-muted text-center mt-xs">
-                Click "Pick Color" to pause and select a color.
-            </div>
+
         </div>
 
         <!-- Controls Section -->
@@ -1682,7 +1676,7 @@
 
 <!-- Color Item Template -->
 <template id="color-item-template">
-    <div class="playlist-item color-item flex gap-md p-sm h-auto items-start">
+    <div class="playlist-item color-item flex gap-md p-sm h-auto items-center">
         <!-- Left: Color Info -->
         <div class="flex flex-col items-center gap-xs min-w-[60px]">
             <div class="playlist-thumbnail color-swatch border border-border shadow-sm flex-shrink-0 mb-0"
@@ -1697,21 +1691,21 @@
         </div>
 
         <!-- Right: Sliders -->
-        <div class="flex-1 grid gap-xs w-full pt-xs">
+        <div class="flex-1 grid gap-sm w-full">
             <div class="flex items-center gap-sm text-xs text-secondary">
-                <span class="w-16 font-mono">Sim</span>
+                <span class="font-mono shrink-0 text-right" style="width: 70px;">Sim</span>
                 <input type="range" class="quality-slider similarity-slider flex-1" min="0" max="100" value="40"
                     onclick="event.stopPropagation()">
                 <span class="similarity-value font-mono w-8 text-right text-primary">0.40</span>
             </div>
             <div class="flex items-center gap-sm text-xs text-secondary">
-                <span class="w-16 font-mono">Smooth</span>
+                <span class="font-mono shrink-0 text-right" style="width: 70px;">Smooth</span>
                 <input type="range" class="quality-slider smoothness-slider flex-1" min="0" max="100" value="8"
                     onclick="event.stopPropagation()">
                 <span class="smoothness-value font-mono w-8 text-right text-primary">0.08</span>
             </div>
             <div class="flex items-center gap-sm text-xs text-secondary">
-                <span class="w-16 font-mono">Spill</span>
+                <span class="font-mono shrink-0 text-right" style="width: 70px;">Spill</span>
                 <input type="range" class="quality-slider spill-slider flex-1" min="0" max="100" value="10"
                     onclick="event.stopPropagation()">
                 <span class="spill-value font-mono w-8 text-right text-primary">0.10</span>

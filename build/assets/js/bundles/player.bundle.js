@@ -77,14 +77,12 @@ This can happen when the browser cache is cleared or the file was not properly s
                         background: #000;
                     `,n.appendChild(S),S.addEventListener("click",_=>{if(!f)return;let F=document.createElement("canvas");F.width=g.canvas.width,F.height=g.canvas.height;let N=F.getContext("2d",{willReadFrequently:!0});N.drawImage(S,0,0,F.width,F.height);let D=S.getBoundingClientRect(),U=F.width/D.width,R=F.height/D.height,O=Math.floor((_.clientX-D.left)*U),X=Math.floor((_.clientY-D.top)*R),z=N.getImageData(O,X,1,1).data;z[3]!==0&&x({r:z[0],g:z[1],b:z[2]})}))}catch(E){c.error("Failed to load video:",E),y.textContent="Failed to load video: "+E.message,y.classList.remove("hidden");return}function B(E){f=E,f?(l.classList.add("active"),l.innerHTML=`
                     <svg width="16" height="16" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-check"></use>
+                        <use href="assets/icons/sprite.svg?v=2#icon-check"></use>
                     </svg>
-                    Done
                 `,g.pause(),g.canvas&&S&&(S.src=g.canvas.toDataURL("image/png"),S.style.display="block")):(l.classList.remove("active"),l.innerHTML=`
                     <svg width="16" height="16" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-eyedropper"></use>
+                        <use href="assets/icons/sprite.svg?v=2#icon-eyedropper"></use>
                     </svg>
-                    Pick Color from Video
                 `,S&&(S.style.display="none"))}l.onclick=()=>{B(!f)},d.onchange=()=>{g.isPlaying||g.seek(g.currentTime)};function x(E){T.some(F=>Math.abs(F.r-E.r)<5&&Math.abs(F.g-E.g)<5&&Math.abs(F.b-E.b)<5)||(T.push({...E,similarity:0,smoothness:.08,spill:.1}),q(),g.isPlaying||g.seek(g.currentTime))}function k(E){T.splice(E,1),q(),g.isPlaying||g.seek(g.currentTime)}function q(){if(r.innerHTML="",T.length===0){r.innerHTML=`
                     <div class="empty-state text-xs text-muted text-center py-md">
                         No colors selected.
