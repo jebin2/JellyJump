@@ -140,7 +140,7 @@ cat > build/temp_importmap.html << 'EOF'
     <script type="importmap">
     {
         "imports": {
-            "/npm/mediabunny@1.27.4/+esm": "./assets/js/lib/mediabunny.js",
+            "/npm/mediabunny@1.30.1/+esm": "./assets/js/lib/mediabunny.js",
             "../../../../assets/js/lib/mediabunny.js": "./assets/js/lib/mediabunny.js",
             "../../../../assets/js/lib/mediabunny-mp3-encoder.js": "./assets/js/lib/mediabunny-mp3-encoder.js",
             "../../../../assets/js/lib/hls.js": "./assets/js/lib/hls.js",
@@ -183,7 +183,7 @@ cat > build/temp_embed_importmap.html << 'EOF'
     <script type="importmap">
     {
         "imports": {
-            "/npm/mediabunny@1.27.4/+esm": "./assets/js/lib/mediabunny.js",
+            "/npm/mediabunny@1.30.1/+esm": "./assets/js/lib/mediabunny.js",
             "../../../../assets/js/lib/mediabunny.js": "./assets/js/lib/mediabunny.js",
             "../../../../assets/js/lib/mediabunny-mp3-encoder.js": "./assets/js/lib/mediabunny-mp3-encoder.js",
             "../../../../assets/js/lib/hls.js": "./assets/js/lib/hls.js",
