@@ -139,7 +139,12 @@ export class CorePlayer {
         this.queuedAudioNodes = new Set();
         this.asyncId = 0;
         this.playbackTimeAtStart = 0;
+        this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
+
+        // Scrubbing state
+        this.isScrubbing = false;
+        this.scrubWasPlaying = false;
 
         // Render Callbacks
         this.afterFrameRenderCallbacks = [];
@@ -564,7 +569,10 @@ export class CorePlayer {
 
         // Seek (only if progress enabled)
         if (this.config.controls.progress && this.ui.progressContainer) {
-            this.ui.progressContainer.addEventListener('click', (e) => this._seek(e));
+            // Mouse down to start scrubbing
+            this.ui.progressContainer.addEventListener('mousedown', (e) => {
+                this._onScrubStart(e);
+            });
         }
 
         // Volume (only if enabled)
@@ -3462,8 +3470,49 @@ export class CorePlayer {
 
     _seek(e) {
         const rect = this.ui.progressContainer.getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
+        // Clamp position between 0 and 1
+        let pos = (e.clientX - rect.left) / rect.width;
+        pos = Math.max(0, Math.min(1, pos));
         this._seekTo(pos * this.duration);
+    }
+
+    _onScrubStart(e) {
+        this.isScrubbing = true;
+        this.scrubWasPlaying = this.isPlaying;
+
+        // Pause playback but don't show overlay
+        if (this.isPlaying) {
+            this.pause(false);
+        }
+
+        // Seek to initial position
+        this._seek(e);
+
+        // Attach global listeners
+        this._scrubMoveHandler = (e) => this._onScrubMove(e);
+        this._scrubEndHandler = (e) => this._onScrubEnd(e);
+
+        document.addEventListener('mousemove', this._scrubMoveHandler);
+        document.addEventListener('mouseup', this._scrubEndHandler);
+    }
+
+    _onScrubMove(e) {
+        if (!this.isScrubbing) return;
+        e.preventDefault(); // Prevent text selection
+        this._seek(e);
+    }
+
+    _onScrubEnd(e) {
+        if (!this.isScrubbing) return;
+
+        this.isScrubbing = false;
+        document.removeEventListener('mousemove', this._scrubMoveHandler);
+        document.removeEventListener('mouseup', this._scrubEndHandler);
+
+        // Resume if it was playing before scrub
+        if (this.scrubWasPlaying) {
+            this.play();
+        }
     }
 
     /**
