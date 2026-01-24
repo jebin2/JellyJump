@@ -210,7 +210,7 @@ Sometimes, you may want to cancel an ongoing conversion process. For this, use t
 await conversion.cancel(); // Resolves once the conversion is canceled
 ```
 
-This automatically frees up all resources used by the conversion process.
+This automatically frees up all resources used by the conversion process and will cause any ongoing call to `execute` to throw a `ConversionCanceledError`.
 
 ## Video options
 
@@ -223,11 +223,13 @@ type ConversionVideoOptions = {
 	height?: number;
 	fit?: 'fill' | 'contain' | 'cover';
 	rotate?: 0 | 90 | 180 | 270;
+	allowRotationMetadata?: boolean;
 	crop?: { left: number; top: number; width: number; height: number };
 	frameRate?: number;
 	codec?: VideoCodec;
 	bitrate?: number | Quality;
 	alpha?: 'discard' | 'keep'; // Defaults to 'discard'
+	hardwareAcceleration?: 'no-preference' | 'prefer-hardware' | 'prefer-software';
 	keyFrameInterval?: number;
 	forceTranscode?: boolean;
 	process?: (sample: VideoSample) => MaybePromise<
@@ -280,6 +282,8 @@ In the rare case that the input video changes size over time, the `fit` field ca
 
 `rotation` rotates the video by the specified number of degrees clockwise. This rotation is applied on top of any rotation metadata in the original input file and happens before cropping and resizing.
 
+By default, Mediabunny will try to make use of rotation metadata in the output file to perform the rotation whenever possible. However, if you don't want this to happen, or you want to use Mediabunny to strip all rotation metadata from a file, you can set `allowRotationMetadata` to `false`.
+
 ### Cropping video
 
 `crop` can be used to extract a rectangular region from the original video. The rectangle is specified using `left`, `top`, `width` and `height` and is clamped to the dimensions of the video. Cropping is applied after rotation but before resizing.
@@ -295,8 +299,9 @@ Use the `codec` property to control the codec of the output track. This should b
 Use the `bitrate` property to control the bitrate of the output video. For example, you can use this field to compress the video track. Accepted values are the number of bits per second or a [subjective quality](./media-sources#subjective-qualities). If this property is set, transcoding will always happen. If this property is not set but transcoding is still required, `QUALITY_HIGH` will be used as the value.
 
 Use the `keyFrameInterval` property to control the maximum interval in seconds between key frames in the output video. Setting this fields forces a transcode.
-
 If you want to prevent direct copying of media data and force a transcoding step, use `forceTranscode: true`.
+
+Use the `hardwareAcceleration` property to control whether hardware or software acceleration is used for video transcoding.
 
 ### Processing video
 
@@ -409,8 +414,8 @@ const conversion = await Conversion.init({
 	output,
 
 	// Function gets invoked for each video track:
-	video: (videoTrack, n) => {
-		if (n > 1) {
+	video: (videoTrack) => {
+		if (videoTrack.number > 1) {
 			// Keep only the first video track
 			return { discard: true };
 		}
@@ -422,7 +427,7 @@ const conversion = await Conversion.init({
 	},
 
 	// Async functions work too:
-	audio: async (audioTrack, n) => {
+	audio: async (audioTrack) => {
 		if (audioTrack.languageCode !== 'rus') {
 			// Keep only Russian audio tracks
 			return { discard: true };
@@ -468,6 +473,8 @@ const conversion = await Conversion.init({
 In this case, the output will be 15 seconds long.
 
 If only `start` is set, the clip will run until the end of the input file. If only `end` is set, the clip will start at the beginning of the input file.
+
+Note that when using the trimming defaults, the resulting media file will always begin at timestamp 0. If your input file has a start time offset (like is common with MPEG-TS files) and you want to retain that, use `trim: { start: 0 }` to ensure timestamps don't get shifted.
 
 ## Metadata tags
 
@@ -609,6 +616,7 @@ import {
 	OGG, // Ogg input format singleton
 	ADTS, // ADTS input format singleton
 	FLAC, // FLAC input format singleton
+	MPEG_TS, // MPEG-TS input format singleton
 } from 'mediabunny';
 ```
 
@@ -661,6 +669,7 @@ In addition to singletons, input format classes are structured hierarchically:
   * `OggInputFormat`
   * `AdtsInputFormat`
   * `FlacInputFormat`
+  * `MpegTsInputFormat`
 
 This means you can also perform input format checks using `instanceof` instead of `===` comparisons. For example:
 
@@ -752,7 +761,7 @@ Here's a long list of stuff this library does:
 * Converting media files
 * Hardware-accelerated decoding & encoding (via the WebCodecs API)
 * Support for multiple video, audio and subtitle tracks
-* Read & write support for many container formats (.mp4, .mov, .webm, .mkv, .mp3, .wav, .ogg, .aac, .flac), including variations such as MP4 with Fast Start, fragmented MP4, streamable Matroska, transparent WebM, etc.
+* Read & write support for many container formats (.mp4, .mov, .webm, .mkv, .mp3, .wav, .ogg, .aac, .flac, .ts), including variations such as MP4 with Fast Start, fragmented MP4, streamable Matroska, transparent WebM, etc.
 * Support for 25 different codecs
 * Lazy, optimized, on-demand file reading
 * Input and output streaming, arbitrary file size support
@@ -1609,6 +1618,17 @@ videoTrackSource.errorPromise.catch((error) => ...);
 
 This source requires no additional method calls; data will automatically be captured and piped to the output file as soon as `start()` is called on the `Output`. Make sure to `stop()` on `videoTrack` after finalizing the `Output` if you don't need the user's media anymore.
 
+If you want to temporarily stop capturing video frames from this source, you can use the `pause()` and `resume()` methods:
+
+```ts
+videoTrackSource.pause();
+
+// Later:
+videoTrackSource.resume();
+```
+
+While paused, video frames emitted by the stream will be ignored. When resumed, video frames are let through again, offset in timestamp such that the result plays back continuously with no gap in playback. Note that pausing does *not* stop the underlying media stream.
+
 ::: info
 If this source is the only MediaStreamTrack source in the `Output`, then the first video sample added by it starts at timestamp 0. If there are multiple, then the earliest media sample across all tracks starts at timestamp 0, and all tracks will be perfectly synchronized with each other.
 :::
@@ -1772,6 +1792,17 @@ audioTrackSource.errorPromise.catch((error) => ...);
 ```
 
 This source requires no additional method calls; data will automatically be captured and piped to the output file as soon as `start()` is called on the `Output`. Make sure to `stop()` on `audioTrack` after finalizing the `Output` if you don't need the user's media anymore.
+
+If you want to temporarily stop capturing audio data from this source, you can use the `pause()` and `resume()` methods:
+
+```ts
+audioTrackSource.pause();
+
+// Later:
+audioTrackSource.resume();
+```
+
+While paused, audio data emitted by the stream will be ignored. When resumed, audio data are let through again, offset in timestamp such that the result plays back continuously with no gap in playback. Note that pausing does *not* stop the underlying media stream.
 
 ::: info
 If this source is the only MediaStreamTrack source in the `Output`, then the first audio sample added by it starts at timestamp 0. If there are multiple, then the earliest media sample across all tracks starts at timestamp 0, and all tracks will be perfectly synchronized with each other.
@@ -2116,10 +2147,13 @@ The following options are available:
 
 ```ts
 type OggOutputFormatOptions = {
+	maximumPageDuration?: number;
 	onPage?: (data: Uint8Array, position: number, source: MediaSource) => unknown;
 };
 ```
 
+* `maximumPageDuration`\
+  The maximum duration in seconds of each Ogg page. Pages will be flushed early if adding another packet would cause the page to exceed this duration. This is useful for streaming contexts where more frequent page output is desired. By default, pages are only flushed when they exceed a certain size.
 * `onPage`\
   Will be called for each finalized Ogg page of the output file. The [media source](./media-sources) backing the page's track (logical bitstream) is also passed.
 
@@ -2202,6 +2236,10 @@ const output = new Output({
 });
 ```
 
+::: info
+This format ensures [append-only writing](#append-only-writing).
+:::
+
 The following options are available:
 
 ```ts
@@ -2218,7 +2256,7 @@ type AdtsOutputFormatOptions = {
 This output format creates FLAC (.flac) files.
 
 ```ts
-import { Output, FlacOutputFormat } from 'mediabunny';	
+import { Output, FlacOutputFormat } from 'mediabunny';
 
 const output = new Output({
 	format: new FlacOutputFormat(options),
@@ -2236,6 +2274,34 @@ type FlacOutputFormatOptions = {
 
 * `onFrame`\
   Will be called for each FLAC frame that is written.
+
+## MPEG-TS
+
+This output format creates MPEG Transport Stream (.ts) files.
+
+```ts
+import { Output, MpegTsOutputFormat } from 'mediabunny';
+
+const output = new Output({
+	format: new MpegTsOutputFormat(options),
+	// ...
+});
+```
+
+::: info
+This format ensures [append-only writing](#append-only-writing).
+:::
+
+The following options are available:
+
+```ts
+type MpegTsOutputFormatOptions = {
+	onPacket?: (data: Uint8Array, position: number) => unknown;
+};
+```
+
+* `onPacket`\
+  Will be called for each 188-byte Transport Stream packet that is written.
 
 ---
 
@@ -2434,7 +2500,7 @@ Negative sequence numbers mean the packet's ordering is undefined. When creating
 
 ### Cloning packets
 
-Use the `clone` method to create a new packet from an existing packet. While doing so, you can change its timestamp and duration.
+Use the `clone` method to create a new packet from an existing packet. While doing so, you can partially change its data.
 
 ```ts
 // Creates a clone identical to the original:
@@ -2650,13 +2716,11 @@ Then, use `copyTo` to copy the pixel data into the destination buffer:
 
 ```ts
 const bytes = new Uint8Array(bytesNeeded);
-videoSample.copyTo(bytes);
+const planeLayout = await videoSample.copyTo(bytes);
 ```
 
 ::: info
-The data will always be in the pixel format specified in the `format` field.
-
-To convert the data into a different pixel format, or to extract only a section of the frame, please use the [`allocationSize`](https://developer.mozilla.org/en-US/docs/Web/API/VideoFrame/allocationSize) and [`copyTo`](https://developer.mozilla.org/en-US/docs/Web/API/VideoFrame/copyTo) methods on `VideoFrame` instead. Get a `VideoFrame` by running `videoSample.toVideoFrame()`.
+You can pass additional options to `allocationSize` and `copyTo` to extract data in a different pixel format.
 :::
 
 ***
@@ -3409,14 +3473,16 @@ const output = new Output(...);
 const conversion = await Conversion.init({
 	input,
 	output,
-	video: {
+	video: track => ({
 		width: 480,
 		bitrate: QUALITY_LOW,
-	},
-	audio: {
+		discard: track.number > 1, // Keep only the first video track
+	}),
+	audio: track => ({
 		numberOfChannels: 1,
 		bitrate: QUALITY_LOW,
-	},
+		discard: track.number > 1, // Keep only the first audio track
+	}),
 	trim: {
 		// Let's keep only the first 60 seconds
 		start: 0,
@@ -3552,6 +3618,12 @@ await input.computeDuration(); // => 1905.4615
 
 More specifically, the duration is defined as the maximum end timestamp across all tracks.
 
+Since not all media files begin at time zero, you can also retrieve the *starting timestamp* of the media file in seconds:
+
+```ts
+await input.getFirstTimestamp(); // => 0.0
+```
+
 Mediabunny also lets you read descriptive metadata tags from media files, such as title, artist, or cover art:
 
 ```ts
@@ -3589,6 +3661,10 @@ Once you have an `InputTrack`, you can start extracting metadata from it.
 ```ts
 // Get a unique ID for this track in the input file:
 track.id; // => number
+
+// Get the 1-based index of this track among all tracks of the same type
+// (e.g., first video track is 1, second video track is 2, etc.):
+track.number; // => number
 
 // Check the track's type:
 track.type; // => 'video' | 'audio' | 'subtitle';
@@ -4258,6 +4334,7 @@ Mediabunny supports many commonly used media container formats, all of which are
 * WAVE (.wav)
 * ADTS (.aac)
 * FLAC (.flac)
+* MPEG Transport Stream (.ts)
 
 ## Codecs
 
@@ -4307,33 +4384,33 @@ Mediabunny ships with built-in decoders and encoders for all audio PCM codecs, m
 
 Not all codecs can be used with all containers. The following table specifies the supported codec-container combinations:
 
-|                |   .mp4   | .mov  | .mkv  | .webm\[^1] | .ogg  | .mp3  | .wav  | .aac  | .flac |
-|:--------------:|:--------:|:-----:|:-----:|:---------:|:-----:|:-----:|:-----:|:-----:|:-----:|
-| `'avc'`        |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |
-| `'hevc'`       |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |
-| `'vp8'`        |    âœ“     |   âœ“   |   âœ“   |     âœ“     |       |       |       |       |       |
-| `'vp9'`        |    âœ“     |   âœ“   |   âœ“   |     âœ“     |       |       |       |       |       |
-| `'av1'`        |    âœ“     |   âœ“   |   âœ“   |     âœ“     |       |       |       |       |       |
-| `'aac'`        |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |   âœ“   |       |
-| `'opus'`       |    âœ“     |   âœ“   |   âœ“   |     âœ“     |   âœ“   |       |       |       |       |
-| `'mp3'`        |    âœ“     |   âœ“   |   âœ“   |           |       |   âœ“   |       |       |       |
-| `'vorbis'`     |    âœ“     |   âœ“   |   âœ“   |     âœ“     |   âœ“   |       |       |       |       |
-| `'flac'`       |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |   âœ“   |
-| `'pcm-u8'`     |          |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |
-| `'pcm-s8'`     |          |   âœ“   |       |           |       |       |       |       |       |
-| `'pcm-s16'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |
-| `'pcm-s16be'`  |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |
-| `'pcm-s24'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |
-| `'pcm-s24be'`  |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |
-| `'pcm-s32'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |
-| `'pcm-s32be'`  |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |
-| `'pcm-f32'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |
-| `'pcm-f32be'`  |    âœ“     |   âœ“   |       |           |       |       |       |       |       |
-| `'pcm-f64'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |
-| `'pcm-f64be'`  |    âœ“     |   âœ“   |       |           |       |       |       |       |       |
-| `'ulaw'`       |          |   âœ“   |       |           |       |       |   âœ“   |       |       |
-| `'alaw'`       |          |   âœ“   |       |           |       |       |   âœ“   |       |       |
-| `'webvtt'`\[^2] |   (âœ“)    |       |  (âœ“)  |    (âœ“)    |       |       |       |       |       |
+|                |   .mp4   | .mov  | .mkv  | .webm\[^1] | .ogg  | .mp3  | .wav  | .aac  | .flac |  .ts  |
+|:--------------:|:--------:|:-----:|:-----:|:---------:|:-----:|:-----:|:-----:|:-----:|:-----:|:-----:|
+| `'avc'`        |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |   âœ“   |
+| `'hevc'`       |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |   âœ“   |
+| `'vp8'`        |    âœ“     |   âœ“   |   âœ“   |     âœ“     |       |       |       |       |       |       |
+| `'vp9'`        |    âœ“     |   âœ“   |   âœ“   |     âœ“     |       |       |       |       |       |       |
+| `'av1'`        |    âœ“     |   âœ“   |   âœ“   |     âœ“     |       |       |       |       |       |       |
+| `'aac'`        |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |   âœ“   |       |   âœ“   |
+| `'opus'`       |    âœ“     |   âœ“   |   âœ“   |     âœ“     |   âœ“   |       |       |       |       |       |
+| `'mp3'`        |    âœ“     |   âœ“   |   âœ“   |           |       |   âœ“   |       |       |       |   âœ“   |
+| `'vorbis'`     |    âœ“     |   âœ“   |   âœ“   |     âœ“     |   âœ“   |       |       |       |       |       |
+| `'flac'`       |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |   âœ“   |       |
+| `'pcm-u8'`     |          |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |       |
+| `'pcm-s8'`     |          |   âœ“   |       |           |       |       |       |       |       |       |
+| `'pcm-s16'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |       |
+| `'pcm-s16be'`  |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |       |
+| `'pcm-s24'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |       |
+| `'pcm-s24be'`  |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |       |
+| `'pcm-s32'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |       |
+| `'pcm-s32be'`  |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |       |
+| `'pcm-f32'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |   âœ“   |       |       |       |
+| `'pcm-f32be'`  |    âœ“     |   âœ“   |       |           |       |       |       |       |       |       |
+| `'pcm-f64'`    |    âœ“     |   âœ“   |   âœ“   |           |       |       |       |       |       |       |
+| `'pcm-f64be'`  |    âœ“     |   âœ“   |       |           |       |       |       |       |       |       |
+| `'ulaw'`       |          |   âœ“   |       |           |       |       |   âœ“   |       |       |       |
+| `'alaw'`       |          |   âœ“   |       |           |       |       |   âœ“   |       |       |       |
+| `'webvtt'`\[^2] |   (âœ“)    |       |  (âœ“)  |    (âœ“)    |       |       |       |       |       |       |
 
 \[^1]: WebM only supports a small subset of the codecs supported by Matroska. However, this library can technically read all codecs from a WebM that are supported by Matroska.
 \[^2]: WebVTT can only be written, not read.

@@ -1,139 +1,126 @@
 import { Logger } from "../utils/Logger.js";
+import { MediaBunny } from "../core/MediaBunny.js";
+
+const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink } = MediaBunny;
 
 /**
- * Generates thumbnails for a video by seeking and capturing frames.
+ * Generates thumbnails for a video using Mediabunny.
  */
 export class ThumbnailGenerator {
     constructor() {
-        this.video = document.createElement('video');
-        this.video.muted = true;
-        this.video.playsInline = true;
-        this.video.crossOrigin = "anonymous"; // Handle CORS if needed
-        this.video.style.display = 'none'; // Ensure hidden
-
-        this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
-
         this.thumbnails = []; // Array of { time, url }
         this.isGenerating = false;
-        this.abortController = null;
         this.progressCallback = null;
+        this.generationInterval = 1;
     }
 
     /**
-     * Start generating thumbnails
-     * @param {string} videoUrl - Blob URL or src
-     * @param {number} duration - Video duration in seconds
-     * @param {Object} options - { interval: number, width: number, height: number }
-     * @returns {Promise<Array>} - Resolves with thumbnails array
+     * Start generating thumbnails (Mediabunny version)
+     * @param {string|File|Blob} resource - Video URL or File/Blob
+     * @param {number} duration - Video duration in seconds (optional fallback)
+     * @param {Object} options - { interval: number, width: number }
      */
-    async generate(videoUrl, duration, options = {}) {
+    async generate(resource, duration, options = {}) {
         if (this.isGenerating) {
             this.cancel();
         }
 
         this.isGenerating = true;
         this.thumbnails = [];
-        this.abortController = new AbortController();
-        const signal = this.abortController.signal;
+        this.generationInterval = options.interval || 1;
+        const targetWidth = options.width || 160;
 
-        const interval = options.interval || 1; // Default 1 second
-        this.generationInterval = interval;
-        const width = options.width || 160;
+        try {
+            // 1. Setup Mediabunny Input
+            // Handle File/Blob vs String URL
+            const source = (resource instanceof File || resource instanceof Blob)
+                ? new BlobSource(resource)
+                : new UrlSource(resource);
 
-        // Calculate aspect ratio later once video loads
-        // We'll generate times: 0, 1, 2, ... duration
-        const times = [];
-        for (let t = 0; t < duration; t += interval) {
-            times.push(t);
-        }
-        // Always include the very end? Maybe not needed.
+            const input = new Input({
+                formats: ALL_FORMATS,
+                source,
+            });
 
-        return new Promise((resolve, reject) => {
-            if (signal.aborted) return reject(new Error('Aborted'));
+            // 2. Get Video Track
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) {
+                Logger.warn('[Thumbnails] No video track found');
+                return;
+            }
 
-            // Cleanup handler
-            const cleanup = () => {
-                this.video.removeAttribute('src');
-                this.video.load();
-                this.isGenerating = false;
-                this.abortController = null;
-            };
+            if (!(await videoTrack.canDecode())) {
+                Logger.warn('[Thumbnails] Browser cannot decode video track');
+                return;
+            }
 
-            this.video.onloadedmetadata = () => {
-                if (signal.aborted) {
-                    cleanup();
-                    return reject(new Error('Aborted'));
+            // 3. Setup CanvasSink
+            // We just specify width, let height be auto-calculated if supported, 
+            // or we could calculate if needed. CanvasSink usually handles aspect ratio.
+            const sink = new CanvasSink(videoTrack, {
+                width: targetWidth,
+                // fit: 'contain' // Optional
+            });
+
+            // 4. Calculate timestamps
+            // Use track's actual start time and duration if available
+            const startTimestamp = await videoTrack.getFirstTimestamp();
+            const trackDuration = await videoTrack.computeDuration();
+
+            // Generate timestamps
+            const timestamps = [];
+            // If duration was passed roughly, adhere to interval, but bounded by track limits
+            // Using logic: generate every 'interval' seconds starting from startTimestamp
+
+            const endTimestamp = startTimestamp + (duration || trackDuration);
+
+            for (let t = startTimestamp; t < endTimestamp; t += this.generationInterval) {
+                timestamps.push(t);
+            }
+
+            // 5. Generate via iterator
+            const iterator = sink.canvasesAtTimestamps(timestamps);
+            let processedCount = 0;
+
+            for await (const result of iterator) {
+                if (!this.isGenerating) break;
+
+                const { canvas, timestamp } = result;
+
+                if (!canvas) continue;
+
+                // Convert canvas to blob URL
+                let blobUrl;
+                if (canvas.convertToBlob) {
+                    const b = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+                    blobUrl = URL.createObjectURL(b);
+                } else if (canvas.toBlob) {
+                    blobUrl = await new Promise(resolve =>
+                        canvas.toBlob(b => resolve(URL.createObjectURL(b)), 'image/jpeg', 0.7)
+                    );
+                } else {
+                    Logger.warn('[Thumbnails] Canvas conversion not supported');
+                    continue;
                 }
 
-                // Set canvas size
-                const aspect = this.video.videoWidth / this.video.videoHeight;
-                this.canvas.width = width;
-                this.canvas.height = width / aspect;
+                this.thumbnails.push({ time: timestamp, url: blobUrl });
 
-                // Start processing
-                this._processNextFrame(times, 0, resolve, reject, signal, cleanup);
-            };
-
-            this.video.onerror = (e) => {
-                cleanup();
-                Logger.error('Thumbnail generation failed:', e);
-                reject(e);
-            };
-
-            this.video.src = videoUrl;
-            this.video.load();
-        });
-    }
-
-    _processNextFrame(times, index, resolve, reject, signal, cleanup) {
-        if (signal.aborted) {
-            cleanup();
-            reject(new Error('Aborted'));
-            return;
-        }
-
-        if (index >= times.length) {
-            // Done
-            cleanup();
-            resolve(this.thumbnails);
-            return;
-        }
-
-        const time = times[index];
-
-        // Seek
-        this.video.currentTime = time;
-
-        const onSeeked = () => {
-            // Capture frame
-            this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-
-            // To Blob URL (efficient for memory?)
-            this.canvas.toBlob((blob) => {
-                if (signal.aborted) return;
-
-                const url = URL.createObjectURL(blob);
-                this.thumbnails.push({ time, url });
-
-                // Notify progress
+                processedCount++;
                 if (this.progressCallback) {
-                    this.progressCallback(this.thumbnails.length / times.length);
+                    this.progressCallback(processedCount / timestamps.length);
                 }
+            }
 
-                // Next frame
-                this._processNextFrame(times, index + 1, resolve, reject, signal, cleanup);
-            }, 'image/jpeg', 0.7); // Low quality JPEG for thumbnails is fine
-        };
-
-        // One-time listener
-        this.video.addEventListener('seeked', onSeeked, { once: true });
+        } catch (e) {
+            if (this.isGenerating) {
+                Logger.error('[Thumbnails] Generation error:', e);
+            }
+        } finally {
+            this.isGenerating = false;
+        }
     }
 
     cancel() {
-        if (this.abortController) {
-            this.abortController.abort();
-        }
         this.isGenerating = false;
         this._revokeThumbnails();
         this.thumbnails = [];
@@ -147,9 +134,6 @@ export class ThumbnailGenerator {
 
     destroy() {
         this.cancel();
-        this.video = null;
-        this.canvas = null;
-        this.ctx = null;
     }
 
     /**
@@ -161,10 +145,6 @@ export class ThumbnailGenerator {
         if (!this.thumbnails.length) return null;
 
         // Find closest
-        // Since sorted by time, we can just find locally
-        // Assuming generated at regular intervals
-
-        // Ideally binary search, but linear scan is fine for < 100 items
         let closest = this.thumbnails[0];
         let minDiff = Math.abs(time - closest.time);
 
@@ -175,7 +155,6 @@ export class ThumbnailGenerator {
                 minDiff = diff;
                 closest = t;
             } else {
-                // Since sorted, if diff starts increasing, we found it
                 break;
             }
         }
