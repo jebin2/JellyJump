@@ -10,7 +10,7 @@ import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
-import { StreamBuffer } from '../utils/StreamBuffer.js';
+
 import { HLSPlayer } from './HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { AudioVisualizer } from '../player/AudioVisualizer.js';
@@ -214,7 +214,6 @@ export class CorePlayer {
         this.isLive = false;
         this.liveMode = options.liveMode || 'buffer'; // 'live' or 'buffer' - default to 30s buffer for stability
         this.streamRenderLoopId = null;
-        this.streamBuffer = null; // DVR-style segment capture (experimental)
 
         // Audio-only playback
         this.audioVisualizer = null;
@@ -2777,13 +2776,6 @@ export class CorePlayer {
     _cleanupHLS() {
         // Stop render loop
         this._stopStreamRenderLoop();
-
-        // Clear StreamBuffer
-        if (this.streamBuffer) {
-            this.streamBuffer.stopCapture();
-            this.streamBuffer.clear();
-            this.streamBuffer = null;
-        }
 
         if (this.hlsPlayer) {
             this.hlsPlayer.destroy();

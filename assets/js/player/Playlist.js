@@ -1,7 +1,5 @@
 import { Logger } from "../utils/Logger.js";
 import { IndexedDBService } from './IndexedDBService.js';
-import { MediaBunny } from '../core/MediaBunny.js';
-import { MediaProcessor } from '../core/MediaProcessor.js';
 import { CorePlayer } from '../core/Player.js';
 import { Modal as ConfirmModal } from '../utils/Modal.js'; // Static confirm/alert dialogs
 import { Modal as DialogModal } from './Modal.js';         // Instance-based custom dialogs
@@ -11,7 +9,7 @@ import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { FileDropHandler } from '../utils/FileDropHandler.js';
 import { ElectronHelper } from '../utils/ElectronHelper.js';
-import { formatTime, parseTime, formatDuration, formatFileSize, generateId } from '../utils/mediaUtils.js';
+import { formatDuration, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
 import { HLSPlayer } from '../core/HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
