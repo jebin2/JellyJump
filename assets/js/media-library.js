@@ -7,7 +7,7 @@
 
 import { Logger } from "./utils/Logger.js";
 import { dbHelper } from './indexeddb-helper.js';
-import { thumbnailGenerator } from './thumbnail-generator.js';
+
 import { previewPlayerManager } from './preview-player.js';
 import { modalDialog } from './modal-dialog.js';
 
@@ -636,13 +636,7 @@ function createTile(item) {
 
         // For videos without thumbnails, generate asynchronously
         // Only if we have a blob (local file)
-        if (item.type === 'video' && !item.thumbnailGenerated && item.blob) {
-            tile.setAttribute('data-thumbnail-status', 'loading');
-            loadThumbnailForTile(tile, item).catch(err => {
-                Logger.error(`Failed to generate thumbnail for ${item.name}:`, err);
-                tile.setAttribute('data-thumbnail-status', 'error');
-            });
-        }
+
     }
 
     // Duration badge (for video/audio)
@@ -689,47 +683,7 @@ function createTile(item) {
     return tile;
 }
 
-/**
- * Load or generate thumbnail for a video tile
- * @param {HTMLElement} tile - The tile element
- * @param {Object} item - Media item data
- */
-async function loadThumbnailForTile(tile, item) {
-    try {
-        // Generate thumbnail from video blob
-        const thumbnailBlob = await thumbnailGenerator.generateThumbnail(item.blob);
 
-        // Save to IndexedDB
-        await dbHelper.updateMediaThumbnail(item.id, thumbnailBlob);
-
-        // Update the tile's thumbnail display
-        const thumbnailElement = tile.querySelector('.media-tile__thumbnail');
-        if (thumbnailElement) {
-            // Clear placeholder icon
-            thumbnailElement.textContent = '';
-
-            // Add thumbnail image
-            const img = document.createElement('img');
-            img.src = URL.createObjectURL(thumbnailBlob);
-            img.alt = item.name;
-            thumbnailElement.appendChild(img);
-
-            // Re-add duration badge if it exists
-            if (item.duration) {
-                const durationBadge = document.createElement('span');
-                durationBadge.className = 'media-tile__duration';
-                durationBadge.textContent = formatDuration(item.duration);
-                thumbnailElement.appendChild(durationBadge);
-            }
-        }
-
-        tile.setAttribute('data-thumbnail-status', 'loaded');
-    } catch (error) {
-        Logger.error('Thumbnail generation failed:', error);
-        tile.setAttribute('data-thumbnail-status', 'error');
-        throw error;
-    }
-}
 
 /**
  * Handle drag start event

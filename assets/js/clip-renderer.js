@@ -6,23 +6,10 @@ import { Logger } from "./utils/Logger.js";
 class ClipRenderer {
     constructor() {
         this.minClipWidth = 20; // px
-        this.setupThumbnailListener();
+
     }
 
-    setupThumbnailListener() {
-        window.addEventListener('thumbnail-ready', (e) => {
-            const { mediaId, thumbnail } = e.detail;
-            this.updateClipThumbnails(mediaId, thumbnail);
-        });
-    }
 
-    updateClipThumbnails(mediaId, thumbnail) {
-        const clips = document.querySelectorAll(`.timeline-clip[data-media-id="${mediaId}"]`);
-        clips.forEach(el => {
-            el.style.backgroundImage = `url(${thumbnail})`;
-            el.classList.add('timeline-clip--has-thumbnail');
-        });
-    }
 
     /**
      * Render a single clip
@@ -68,13 +55,7 @@ class ClipRenderer {
         el.appendChild(handleRight);
 
         // Apply thumbnail if available
-        if (clip.type === 'video' && window.thumbnailExtractor) {
-            const thumbnail = window.thumbnailExtractor.getThumbnail(clip.mediaId);
-            if (thumbnail) {
-                el.style.backgroundImage = `url(${thumbnail})`;
-                el.classList.add('timeline-clip--has-thumbnail');
-            }
-        }
+
 
         // Re-query track content safely to avoid any stale references or nesting issues
         const targetTrackContent = document.querySelector(`.timeline-track[data-track-id="${clip.trackId}"] .timeline-track__content`);
