@@ -1,9 +1,20 @@
 import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
-import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
+import {
+    loadVideo,
+    updateOverlay,
+    setupDragHandlers,
+    updateBoxPosition,
+    showError,
+    hideMessage,
+    showProgress,
+    hideProgress,
+    showSuccess,
+    setupCleanup
+} from './BoxEditorUtils.js';
 
 /**
  * Watermark Menu Handler - KISS Flow
@@ -55,10 +66,11 @@ export class WatermarkMenu {
             }
         };
 
-        // State - KISS: video dimensions + watermark position
+        // State - using shared box format + watermark-specific props
         const state = {
             video: { width: 0, height: 0 },
-            watermark: { x: 0, y: 0, width: 0, height: 0, type: 'text', text: 'JellyJump', imageFile: null, opacity: 1.0 },
+            box: { x: 0, y: 0, width: 0, height: 0 },
+            watermark: { type: 'text', text: 'JellyJump', imageFile: null, opacity: 1.0 },
             preview: { scale: 1 },
             drag: { active: false, handle: null, startX: 0, startY: 0, startBox: {} }
         };
@@ -66,7 +78,7 @@ export class WatermarkMenu {
         const MIN_SIZE = 100;
 
         // === STEP 1: Load Video ===
-        const player = await loadVideo(elements.playerContainer, item, playlist, state);
+        const player = await loadVideo('watermark-player-container', item, playlist, state);
         if (!player) {
             showError(elements.messages.error, 'Failed to load video');
             return;
@@ -76,7 +88,10 @@ export class WatermarkMenu {
         setupWatermarkUI(elements, state);
 
         // === STEP 3: Handle Dragging ===
-        setupDragHandlers(elements, state, MIN_SIZE);
+        const onUpdate = () => {
+            updateWatermarkBox(elements, state);
+        };
+        const cleanup = setupDragHandlers(elements.overlay, elements.watermarkBox, state, MIN_SIZE, onUpdate);
 
         // === STEP 4: Handle Controls ===
         setupControlHandlers(elements, state);
@@ -85,235 +100,49 @@ export class WatermarkMenu {
         setupApplyButton(elements, state, item, playlist, modal);
 
         // === STEP 6: Cleanup ===
-        setupCleanup(modal, player, elements);
+        setupCleanup(modal, player, cleanup);
     }
 }
 
-// === HELPER FUNCTIONS - Each does ONE thing ===
-
-async function loadVideo(container, item, playlist, state) {
-    if (!container) return null;
-
-    const player = new CorePlayer('watermark-player-container', {
-        mode: 'player',
-        controlBarMode: 'fixed',
-        controls: {
-            playPause: true, time: true, progress: true,
-            navigation: false, captions: false, settings: false,
-            fullscreen: false, loop: false, speed: false,
-            filters: false, equalizer: true, volumeOnly: true,
-            modeToggle: false, keyboard: false
-        },
-        autoplay: false
-    });
-
-    try {
-        await playlist._ensureMetadata(item);
-
-        // Get video dimensions
-        if (item.videoInfo?.width && item.videoInfo?.height) {
-            state.video.width = item.videoInfo.width;
-            state.video.height = item.videoInfo.height;
-        }
-
-        // Load video
-        await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-        await player.load(item.blob_url, false);
-
-        // Wait for metadata
-        for (let i = 0; i < 10 && !state.video.width; i++) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            const videoEl = player.displayContainer?.querySelector('video');
-            if (videoEl?.videoWidth) {
-                state.video.width = videoEl.videoWidth;
-                state.video.height = videoEl.videoHeight;
-            }
-        }
-
-        // Fallback
-        if (!state.video.width) {
-            state.video.width = 1920;
-            state.video.height = 1080;
-        }
-
-        return player;
-    } catch (e) {
-        Logger.error('Video load failed:', e);
-        return null;
-    }
-}
+// === WATERMARK-SPECIFIC FUNCTIONS ===
 
 function setupWatermarkUI(elements, state) {
-    // Initialize watermark to center, 25% width
+    // Initialize box to center, 25% width
     const initialW = state.video.width * 0.25;
     const initialH = initialW * 0.4;
-    state.watermark.width = initialW;
-    state.watermark.height = initialH;
-    state.watermark.x = (state.video.width - initialW) / 2;
-    state.watermark.y = (state.video.height - initialH) / 2;
+    state.box = {
+        x: (state.video.width - initialW) / 2,
+        y: (state.video.height - initialH) / 2,
+        width: initialW,
+        height: initialH
+    };
 
     // Update overlay after player renders
     setTimeout(() => {
-        updateOverlay(elements, state);
+        updateOverlay(elements.overlay, elements.playerContainer, state, () => {
+            updateWatermarkBox(elements, state);
+        });
     }, 300);
 }
 
-function updateOverlay(elements, state) {
-    const canvas = elements.playerContainer?.querySelector('canvas');
-    if (!canvas) return;
-
-    const canvasRect = canvas.getBoundingClientRect();
-    const videoAspect = state.video.width / state.video.height;
-    const canvasAspect = canvasRect.width / canvasRect.height;
-
-    let displayWidth, displayHeight, offsetX, offsetY;
-
-    if (canvasAspect > videoAspect) {
-        // Pillarbox (black bars left/right)
-        displayHeight = canvasRect.height;
-        displayWidth = displayHeight * videoAspect;
-        offsetX = (canvasRect.width - displayWidth) / 2;
-        offsetY = 0;
-    } else {
-        // Letterbox (black bars top/bottom)
-        displayWidth = canvasRect.width;
-        displayHeight = displayWidth / videoAspect;
-        offsetX = 0;
-        offsetY = (canvasRect.height - displayHeight) / 2;
-    }
-
-    // Position overlay over video
-    elements.overlay.style.width = `${displayWidth}px`;
-    elements.overlay.style.height = `${displayHeight}px`;
-    elements.overlay.style.left = `${offsetX}px`;
-    elements.overlay.style.top = `${offsetY}px`;
-
-    // Calculate scale
-    state.preview.scale = displayWidth / state.video.width;
-
-    updateWatermarkBox(elements, state);
-}
-
 function updateWatermarkBox(elements, state) {
-    const { x, y, width, height, opacity, type, text } = state.watermark;
-    const scale = state.preview.scale;
-
-    elements.watermarkBox.style.left = `${x * scale}px`;
-    elements.watermarkBox.style.top = `${y * scale}px`;
-    elements.watermarkBox.style.width = `${width * scale}px`;
-    elements.watermarkBox.style.height = `${height * scale}px`;
+    // Update box position
+    updateBoxPosition(elements.watermarkBox, state);
 
     // Update content preview
+    const { type, text, opacity } = state.watermark;
     const content = type === 'text' ? elements.textPreview : elements.imagePreview;
     content.style.opacity = opacity;
 
     // Text sizing
     if (type === 'text') {
-        const heightConstraint = height * scale * 0.8;
+        const scale = state.preview.scale;
+        const heightConstraint = state.box.height * scale * 0.8;
         const charCount = Math.max(1, text.length);
-        const widthConstraint = (width * scale * 0.9) / (charCount * 0.5);
+        const widthConstraint = (state.box.width * scale * 0.9) / (charCount * 0.5);
         let fontSize = Math.max(12, Math.min(heightConstraint, widthConstraint));
         elements.textPreview.style.fontSize = `${fontSize}px`;
     }
-}
-
-function setupDragHandlers(elements, state, MIN_SIZE) {
-    const getMousePos = (e) => {
-        const rect = elements.overlay.getBoundingClientRect();
-        return {
-            x: (e.clientX - rect.left) / state.preview.scale,
-            y: (e.clientY - rect.top) / state.preview.scale
-        };
-    };
-
-    const onMouseDown = (e) => {
-        const isHandle = e.target.classList.contains('crop-handle');
-        const isBox = e.target.closest('[data-watermark-box]');
-
-        if (isHandle || isBox) {
-            state.drag.active = true;
-            state.drag.handle = isHandle ? e.target.dataset.handle : 'move';
-            const pos = getMousePos(e);
-            state.drag.startX = pos.x;
-            state.drag.startY = pos.y;
-            state.drag.startBox = {
-                x: state.watermark.x,
-                y: state.watermark.y,
-                w: state.watermark.width,
-                h: state.watermark.height
-            };
-            e.preventDefault();
-        }
-    };
-
-    const onMouseMove = (e) => {
-        if (!state.drag.active) return;
-
-        const pos = getMousePos(e);
-        const dx = pos.x - state.drag.startX;
-        const dy = pos.y - state.drag.startY;
-        const h = state.drag.handle;
-        const start = state.drag.startBox;
-
-        // Reset to start values (EXACT same as crop menu)
-        state.watermark.x = start.x;
-        state.watermark.y = start.y;
-        state.watermark.width = start.w;
-        state.watermark.height = start.h;
-
-        if (h === 'move') {
-            // Move box
-            state.watermark.x = Math.max(0, Math.min(start.x + dx, state.video.width - start.w));
-            state.watermark.y = Math.max(0, Math.min(start.y + dy, state.video.height - start.h));
-        } else {
-            // Resize - CRITICAL: Calculate fixed edges first, then moving edges
-            // This ensures the opposite edge stays locked in place
-
-            if (h.includes('w')) {
-                // Moving LEFT edge - RIGHT edge is fixed at (start.x + start.w)
-                const fixedRight = start.x + start.w;
-                const newLeft = Math.max(0, Math.min(start.x + dx, fixedRight - MIN_SIZE));
-                state.watermark.x = newLeft;
-                state.watermark.width = fixedRight - newLeft;
-            }
-
-            if (h.includes('e')) {
-                // Moving RIGHT edge - LEFT edge is fixed at start.x
-                const maxRight = state.video.width;
-                const newWidth = Math.max(MIN_SIZE, Math.min(start.w + dx, maxRight - start.x));
-                state.watermark.width = newWidth;
-            }
-
-            if (h.includes('n')) {
-                // Moving TOP edge - BOTTOM edge is fixed at (start.y + start.h)
-                const fixedBottom = start.y + start.h;
-                const newTop = Math.max(0, Math.min(start.y + dy, fixedBottom - MIN_SIZE));
-                state.watermark.y = newTop;
-                state.watermark.height = fixedBottom - newTop;
-            }
-
-            if (h.includes('s')) {
-                // Moving BOTTOM edge - TOP edge is fixed at start.y
-                const maxBottom = state.video.height;
-                const newHeight = Math.max(MIN_SIZE, Math.min(start.h + dy, maxBottom - start.y));
-                state.watermark.height = newHeight;
-            }
-        }
-
-        updateWatermarkBox(elements, state);
-    };
-
-    const onMouseUp = () => {
-        state.drag.active = false;
-        state.drag.handle = null;
-    };
-
-    elements.overlay.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-
-    // Store for cleanup
-    elements._cleanup = { onMouseMove, onMouseUp };
 }
 
 function setupControlHandlers(elements, state) {
@@ -357,7 +186,7 @@ function setupControlHandlers(elements, state) {
                 const tempImg = new Image();
                 tempImg.onload = () => {
                     const aspect = tempImg.width / tempImg.height;
-                    state.watermark.height = state.watermark.width / aspect;
+                    state.box.height = state.box.width / aspect;
                     updateWatermarkBox(elements, state);
                 };
                 tempImg.src = evt.target.result;
@@ -391,10 +220,10 @@ function setupApplyButton(elements, state, item, playlist, modal) {
                 text: state.watermark.text,
                 image: state.watermark.imageFile,
                 opacity: state.watermark.opacity,
-                x: Math.round(state.watermark.x),
-                y: Math.round(state.watermark.y),
-                width: Math.round(state.watermark.width),
-                height: Math.round(state.watermark.height)
+                x: Math.round(state.box.x),
+                y: Math.round(state.box.y),
+                width: Math.round(state.box.width),
+                height: Math.round(state.box.height)
             };
 
             const ext = item.title.split('.').pop().toLowerCase();
@@ -407,8 +236,8 @@ function setupApplyButton(elements, state, item, playlist, modal) {
                 watermark: watermarkConfig,
                 onProgress: (p) => {
                     const percent = Math.round(p * 100);
-                    elements.progress.bar.style.width = `${percent}%`;
-                    elements.progress.text.textContent = `${percent}%`;
+                    if (elements.progress.bar) elements.progress.bar.style.width = `${percent}%`;
+                    if (elements.progress.text) elements.progress.text.textContent = `${percent}%`;
                 }
             });
 
@@ -448,41 +277,4 @@ function setupApplyButton(elements, state, item, playlist, modal) {
             modal.closeBtn.disabled = false;
         }
     });
-}
-
-function setupCleanup(modal, player, elements) {
-    const originalClose = modal.close.bind(modal);
-    modal.close = () => {
-        if (elements._cleanup) {
-            document.removeEventListener('mousemove', elements._cleanup.onMouseMove);
-            document.removeEventListener('mouseup', elements._cleanup.onMouseUp);
-        }
-        if (player) player.destroy();
-        originalClose();
-    };
-}
-
-// UI Helpers
-function showError(element, message) {
-    element.textContent = message;
-    element.classList.remove('hidden');
-}
-
-function hideMessage(element) {
-    element.classList.add('hidden');
-}
-
-function showProgress(progress) {
-    progress.bar.style.width = '0%';
-    progress.text.textContent = '0%';
-    progress.section.classList.remove('hidden');
-}
-
-function hideProgress(progress) {
-    progress.section.classList.add('hidden');
-}
-
-function showSuccess(element, message) {
-    element.textContent = `✓ ${message}`;
-    element.classList.remove('hidden');
 }
