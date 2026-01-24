@@ -1,9 +1,9 @@
 import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
-import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatDuration, formatTime, formatFileSize } from '../../utils/mediaUtils.js';
+import { loadVideo } from './BoxEditorUtils.js';
 
 /**
  * GIF Menu Handler
@@ -41,34 +41,6 @@ export class GifMenu {
         const modalOverlay = modal.overlay;
         if (modalOverlay && modalOverlay._closeHandler) {
             modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
-        }
-
-        // Initialize Player
-        const playerContainer = modalContent.querySelector('#gif-player-container');
-        let player = null;
-
-        if (playerContainer) {
-            player = new CorePlayer('gif-player-container', {
-                mode: 'player',
-                controlBarMode: 'fixed',  // Always show control bar
-                controls: {
-                    playPause: true,
-                    navigation: false,
-                    time: true,
-                    progress: true,
-                    captions: false,
-                    settings: false,
-                    fullscreen: false,
-                    loop: false,
-                    speed: false,
-                    filters: false,
-                    equalizer: true,
-                    volumeOnly: true,
-                    modeToggle: false,
-                    keyboard: false
-                },
-                autoplay: false
-            });
         }
 
         // Elements
@@ -131,12 +103,11 @@ export class GifMenu {
         endDisplay.textContent = formatTime(endTime);
         durationDisplay.textContent = formatTime(endTime - startTime);
 
-        // Load Video into Player
-        if (player) {
-            // Get source blob - handles memory vs IndexedDB vs URL
-            await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-            await player.load(item.blob_url, false);
+        // Load Video
+        const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
+        const player = await loadVideo('gif-player-container', item, playlist, state);
 
+        if (player) {
             // Enable A-B Loop Mode
             player.loopMode = 'ab';
             player.loopStart = startTime;

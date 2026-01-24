@@ -1,9 +1,9 @@
 import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
-import { CorePlayer } from '../../core/Player.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
+import { loadVideo } from './BoxEditorUtils.js';
 
 /**
  * Trim Menu Handler
@@ -30,34 +30,6 @@ export class TrimMenu {
 
         // Open Modal Immediately
         modal.open();
-
-        // Initialize Player
-        const playerContainer = modalContent.querySelector('#trim-player-container');
-        let player = null;
-
-        if (playerContainer) {
-            player = new CorePlayer('trim-player-container', {
-                mode: 'player',
-                controlBarMode: 'fixed',  // Always show control bar
-                controls: {
-                    playPause: true,
-                    navigation: false,
-                    time: true,
-                    progress: true,
-                    captions: false,
-                    settings: false,
-                    fullscreen: false,
-                    loop: false,
-                    speed: false,
-                    filters: false,
-                    equalizer: true,
-                    volumeOnly: true,
-                    modeToggle: false,
-                    keyboard: false
-                },
-                autoplay: false
-            });
-        }
 
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
@@ -125,12 +97,11 @@ export class TrimMenu {
         let startTime = 0;
         let endTime = duration;
 
-        // Load Video into Player
-        if (player) {
-            // Get source blob - handles memory vs IndexedDB vs URL
-            await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-            await player.load(item.blob_url, false);
+        // Load Video
+        const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
+        const player = await loadVideo('trim-player-container', item, playlist, state);
 
+        if (player) {
             // Enable A-B Loop Mode
             player.loopMode = 'ab';
             player.loopStart = startTime;

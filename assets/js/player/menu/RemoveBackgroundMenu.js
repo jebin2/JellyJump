@@ -1,9 +1,9 @@
 import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
-import { CorePlayer } from '../../core/Player.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { generateId, formatDuration } from '../../utils/mediaUtils.js';
+import { loadVideo } from './BoxEditorUtils.js';
 
 export class RemoveBackgroundMenu {
     /**
@@ -51,34 +51,12 @@ export class RemoveBackgroundMenu {
         // State
         let selectedColors = []; // Array of {r, g, b, tolerance}
         let sourceBlob = null;
-        let player = null;
         let isPickingColor = false;
         let frameOverlay = null; // Overlay image for color picking
 
-        // Initialize Player
-        if (playerContainer) {
-            player = new CorePlayer('remove-bg-player-container', {
-                mode: 'player',
-                controlBarMode: 'fixed', // Fixed control bar as requested
-                controls: {
-                    playPause: true,
-                    navigation: false,
-                    time: true,
-                    progress: true,
-                    captions: false,
-                    settings: false,
-                    fullscreen: false,
-                    loop: false,
-                    speed: false,
-                    filters: false,
-                    equalizer: true,
-                    volumeOnly: true,
-                    modeToggle: false,
-                    keyboard: false
-                },
-                autoplay: false
-            });
-        }
+        // Load Video
+        const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
+        const player = await loadVideo('remove-bg-player-container', item, playlist, state);
 
         // Render Callback
         const renderCallback = (ctx, width, height) => {
@@ -103,11 +81,11 @@ export class RemoveBackgroundMenu {
 
         // Initialize Video
         try {
-            await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-            await player.load(item.blob_url, false);
+            // Video is already loaded by loadVideo, but we need to ensure processed source URL logic (handled by loadVideo)
+            // loadVideo handles getting processed source URL internally.
 
             // Auto-detect background color
-            if (player.canvas) {
+            if (player && player.canvas) {
                 // Wait a moment for the frame to render
                 setTimeout(() => {
                     try {
