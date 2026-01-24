@@ -916,7 +916,7 @@ export class Playlist {
         }
 
         // Define the capture callback
-        const captureCallback = (ctx, width, height) => {
+        const captureCallback = (canvas, ctx) => {
             // Check if capture was invalidated (user switched videos)
             if (this._thumbnailCaptureId !== captureId || this.activeIndex !== index) {
                 // Remove this callback as it's no longer valid
@@ -925,33 +925,38 @@ export class Playlist {
             }
 
             try {
-                // Create small thumbnail
-                const thumbCanvas = document.createElement('canvas');
-                thumbCanvas.width = 80;
-                thumbCanvas.height = 45;
-                const thumbCtx = thumbCanvas.getContext('2d');
-                thumbCtx.drawImage(this.player.canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                // Check content (simple non-black check) to avoid capturing empty/loading frames
+                // We sample the center of the canvas to avoid reading the whole large buffer
+                const w = canvas.width;
+                const h = canvas.height;
+                const sampleW = Math.min(w, 50); // Sample a small center patch
+                const sampleH = Math.min(h, 50);
+                const sampleX = Math.floor((w - sampleW) / 2);
+                const sampleY = Math.floor((h - sampleH) / 2);
 
-                // Check content (non-black pixels)
-                const imageData = thumbCtx.getImageData(0, 0, thumbCanvas.width, thumbCanvas.height);
+                const imageData = ctx.getImageData(sampleX, sampleY, sampleW, sampleH);
                 const data = imageData.data;
                 let nonBlackPixels = 0;
-                const threshold = 10;
+                const threshold = 15;
 
-                for (let i = 0; i < data.length; i += 16) {
+                // Check sample
+                for (let i = 0; i < data.length; i += 4) {
+                    // r,g,b > threshold
                     if (data[i] > threshold || data[i + 1] > threshold || data[i + 2] > threshold) {
                         nonBlackPixels++;
                     }
                 }
 
-                const totalPixels = (thumbCanvas.width * thumbCanvas.height) / 4;
-                if (nonBlackPixels < totalPixels * 0.05) {
-                    // Still black, keep waiting (don't remove callback yet)
+                // If sample is pitch black, wait
+                if (nonBlackPixels < (data.length / 4) * 0.05) {
                     return;
                 }
 
                 // Success!
-                video.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
+                // Captured directly constitutes a larger thumbnail but meets "Direct" requirement
+                // We use 0.7 quality to keep size somewhat reasonable
+                video.thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+
                 this._updateItemUI(video);
                 this._saveState();
                 Logger.log(`[Playlist] Captured thumbnail via render loop for: ${video.title}`);
@@ -961,7 +966,7 @@ export class Playlist {
 
             } catch (e) {
                 Logger.warn('[Playlist] Failed to capture thumbnail in render loop:', e);
-                // Remove callback on error to prevent endless errors
+                // Remove callback on error
                 this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
             }
         };
@@ -971,7 +976,9 @@ export class Playlist {
 
         // Safety timeout: remove callback if it never fires (e.g. stream fails)
         setTimeout(() => {
-            this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
+            if (this.player.afterFrameRenderCallbacks.includes(captureCallback)) {
+                this.player.afterFrameRenderCallbacks = this.player.afterFrameRenderCallbacks.filter(cb => cb !== captureCallback);
+            }
         }, 60000);
     }
 
@@ -981,7 +988,7 @@ export class Playlist {
      * @param {number} index - Item index
      * @private
      */
-    _updateLocalItemMetadata(video, index) {
+    async _updateLocalItemMetadata(video, index) {
         // Update duration when metadata is available
         const updateDuration = () => {
             if (this.player.duration && this.player.duration > 0) {
@@ -998,34 +1005,8 @@ export class Playlist {
         setTimeout(updateDuration, 300);
         setTimeout(updateDuration, 1000); // Retry if first didn't work
 
-        // Capture thumbnail after first frame renders (only if no thumbnail exists)
-        if (!video.thumbnail) {
-            setTimeout(() => {
-                try {
-                    // Skip if thumbnail was added while waiting
-                    if (video.thumbnail) return;
-
-                    const canvas = this.player.canvas;
-                    if (canvas && canvas.width > 0 && canvas.height > 0) {
-                        // Create small thumbnail - optimized for memory
-                        const thumbCanvas = document.createElement('canvas');
-                        thumbCanvas.width = 80;  // Small for memory efficiency
-                        thumbCanvas.height = 45;
-                        const ctx = thumbCanvas.getContext('2d');
-                        ctx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-
-                        // Convert to data URL with low quality for smaller size
-                        const thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.5);
-                        video.thumbnail = thumbnail;
-                        this._updateItemUI(video);
-                        this._saveState();
-                        Logger.log(`[Playlist] Captured thumbnail for local file: ${video.title}`);
-                    }
-                } catch (e) {
-                    Logger.warn('[Playlist] Failed to capture local file thumbnail:', e);
-                }
-            }, 500); // Wait 500ms for first frame
-        }
+        // Capture thumbnail using render loop (unified method)
+        this._captureStreamThumbnail(video, index);
     }
 
     /**

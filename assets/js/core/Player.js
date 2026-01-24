@@ -3002,7 +3002,7 @@ export class CorePlayer {
 
                 // Execute render callbacks
                 if (this.afterFrameRenderCallbacks.length > 0) {
-                    this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+                    this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
                 }
             } else {
                 // Save it for later
@@ -3393,7 +3393,7 @@ export class CorePlayer {
 
             // Execute render callbacks
             if (this.afterFrameRenderCallbacks.length > 0) {
-                this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+                this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
             }
         }
     }
@@ -3440,7 +3440,7 @@ export class CorePlayer {
 
                     // Execute render callbacks
                     if (this.afterFrameRenderCallbacks.length > 0) {
-                        this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+                        this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
                     }
 
                     this.nextFrame = null;
@@ -4418,7 +4418,7 @@ export class CorePlayer {
 
             // Execute render callbacks
             if (this.afterFrameRenderCallbacks.length > 0) {
-                this.afterFrameRenderCallbacks.forEach(cb => cb(this.ctx, this.canvas.width, this.canvas.height));
+                this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
             }
         }
 
