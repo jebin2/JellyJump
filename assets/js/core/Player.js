@@ -1506,6 +1506,9 @@ export class CorePlayer {
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
         if (e.ctrlKey || e.altKey || e.metaKey) return;
 
+        // Block player keyboard controls if screenshot modal is open
+        if (this.screenshotManager && this.screenshotManager.isModalOpen()) return;
+
         const key = e.key.toLowerCase();
 
         switch (key) {
@@ -1580,8 +1583,6 @@ export class CorePlayer {
             case 'escape':
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
-                } else if (this.screenshotManager && this.screenshotManager.isModalOpen()) {
-                    this.screenshotManager.closeModal();
                 } else if (this.ui.helpOverlay.style.display !== 'none') {
                     this._toggleHelp();
                 }

@@ -239,6 +239,10 @@ export class ScreenshotManager {
 
         // Show modal
         this.ui.modal.style.display = 'flex';
+
+        // Attach keyboard listener
+        this._keydownHandler = this._handleKeydown.bind(this);
+        document.addEventListener('keydown', this._keydownHandler);
     }
 
     /**
@@ -253,6 +257,12 @@ export class ScreenshotManager {
         // Restore body scroll
         document.body.style.overflow = '';
 
+        // Detach keyboard listener
+        if (this._keydownHandler) {
+            document.removeEventListener('keydown', this._keydownHandler);
+            this._keydownHandler = null;
+        }
+
         // Clean up
         this.ui.preview.src = '';
         this.screenshotDataUrl = null;
@@ -262,6 +272,33 @@ export class ScreenshotManager {
         if (this.wasPlayingBeforeCapture) {
             this.player.play();
             this.wasPlayingBeforeCapture = false;
+        }
+    }
+
+    /**
+     * Handle keyboard events for modal navigation
+     * @param {KeyboardEvent} e
+     * @private
+     */
+    _handleKeydown(e) {
+        if (!this.isModalOpen()) return;
+
+        switch (e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                e.stopPropagation();
+                this.captureAdjacentFrame(-1);
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                e.stopPropagation();
+                this.captureAdjacentFrame(1);
+                break;
+            case 'Escape':
+                e.preventDefault();
+                e.stopPropagation();
+                this.closeModal();
+                break;
         }
     }
 
