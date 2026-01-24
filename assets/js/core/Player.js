@@ -43,6 +43,7 @@ export class CorePlayer {
         // Controls Configuration
         this.config.controls = {
             controlBar: true,  // Show/hide the entire control bar
+            playOverlay: true, // Show/hide the big play overlay
             playPause: true,
             navigation: true,  // Enable/disable prev/next buttons
             volume: true,
@@ -366,10 +367,15 @@ export class CorePlayer {
             this.screenshotManager.init();
         }
 
-        // Cache control container and play overlay (always needed)
+        // Cache control container and play overlay
         this.ui.controls = this.container.querySelector('.jellyjump-controls');
         this.ui.playOverlay = this.container.querySelector('.jellyjump-play-overlay');
         this.ui.bezelOverlay = this.container.querySelector('.jellyjump-bezel-overlay');
+
+        // Hide play overlay if disabled in config
+        if (!this.config.controls.playOverlay && this.ui.playOverlay) {
+            this.ui.playOverlay.style.display = 'none';
+        }
 
         // Cache elements only if their control is enabled
         // Visibility is handled by data-control attributes (hidden by default in HTML)
@@ -533,7 +539,9 @@ export class CorePlayer {
         if (this.config.controls.playPause && this.ui.playBtn) {
             this.ui.playBtn.addEventListener('click', () => this.togglePlay());
         }
-        this.canvas.addEventListener('click', () => this.togglePlay());
+        this.canvas.addEventListener('click', () => {
+            if (this.config.controls.playOverlay) this.togglePlay();
+        });
         if (this.ui.playOverlay) {
             this.ui.playOverlay.addEventListener('click', () => this.togglePlay());
         }
@@ -1892,7 +1900,7 @@ export class CorePlayer {
                 this.play();
             } else {
                 // Show play overlay
-                if (this.ui.playOverlay) {
+                if (this.ui.playOverlay && this.config.controls.playOverlay) {
                     this.ui.playOverlay.style.display = 'flex';
                 }
                 // Show as not-live when paused initially
@@ -2183,7 +2191,9 @@ export class CorePlayer {
         };
 
         // Click on stream video to toggle play/pause
-        this.streamVideo.addEventListener('click', () => this.togglePlay());
+        this.streamVideo.addEventListener('click', () => {
+            if (this.config.controls.playOverlay) this.togglePlay();
+        });
     }
 
     /**
@@ -3109,7 +3119,8 @@ export class CorePlayer {
             this._clearAutoHideTimer();
             this._updatePlayPauseUI();
             if (this.ui.playOverlay) {
-                this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
+                const shouldShow = showOverlay && this.config.controls.playOverlay;
+                this.ui.playOverlay.style.display = shouldShow ? 'flex' : 'none';
             }
             return;
         }
@@ -3166,7 +3177,8 @@ export class CorePlayer {
 
         // Show/Hide overlay
         if (this.ui.playOverlay) {
-            this.ui.playOverlay.style.display = showOverlay ? 'flex' : 'none';
+            const shouldShow = showOverlay && this.config.controls.playOverlay;
+            this.ui.playOverlay.style.display = shouldShow ? 'flex' : 'none';
         }
 
         // Stop visualizer if active
@@ -3524,7 +3536,8 @@ export class CorePlayer {
 
             // Show overlay when paused, BUT ONLY IF NOT LOADING
             if (this.ui.playOverlay) {
-                this.ui.playOverlay.style.display = this.isLoading ? 'none' : 'flex';
+                const isVisible = !this.isLoading && this.config.controls.playOverlay;
+                this.ui.playOverlay.style.display = isVisible ? 'flex' : 'none';
             }
         }
     }
@@ -4150,7 +4163,7 @@ export class CorePlayer {
                     Logger.warn('Fallback video iterator failed:', e);
                 }
 
-                if (this.ui.playOverlay) this.ui.playOverlay.style.display = 'flex';
+                if (this.ui.playOverlay && this.config.controls.playOverlay) this.ui.playOverlay.style.display = 'flex';
                 this.isPlaying = false; // Ensure state is correct
             }
         } else {

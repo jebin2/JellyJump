@@ -23,6 +23,7 @@ export async function loadVideo(containerId, item, playlist, state) {
         mode: 'player',
         controlBarMode: 'fixed',
         controls: {
+            playOverlay: false, // Hide big play overlay in modals
             playPause: true, time: true, progress: true,
             navigation: false, captions: false, settings: false,
             fullscreen: false, loop: false, speed: false,
