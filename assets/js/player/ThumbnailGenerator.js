@@ -27,8 +27,20 @@ export class ThumbnailGenerator {
 
         this.isGenerating = true;
         this.thumbnails = [];
-        this.generationInterval = options.interval || 1;
-        const targetWidth = options.width || 160;
+        // Determine optimization strategy
+        const width = options.width || 160;
+        const count = options.count || 100; // Target number of thumbnails
+
+        // Calculate interval: if not provided, adapt to duration/count
+        let interval = options.interval;
+        if (!interval) {
+            // Target ~100 thumbnails for the whole video
+            // But ensure min interval of 1s to avoid excessive processing on short cliips
+            interval = Math.max(1, duration / count);
+        }
+        this.generationInterval = interval;
+
+        Logger.log('[ThumbnailGenerator] Generating with settings:', { width, interval, duration });
 
         try {
             // 1. Setup Mediabunny Input
@@ -58,7 +70,7 @@ export class ThumbnailGenerator {
             // We just specify width, let height be auto-calculated if supported, 
             // or we could calculate if needed. CanvasSink usually handles aspect ratio.
             const sink = new CanvasSink(videoTrack, {
-                width: targetWidth,
+                width: width,
                 // fit: 'contain' // Optional
             });
 

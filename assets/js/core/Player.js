@@ -430,7 +430,7 @@ export class CorePlayer {
         try {
             await this.thumbnailGenerator.generate(url, this.duration, {
                 width: 160,
-                interval: Math.max(1, Math.ceil(this.duration / 50)) // Cap at ~50 thumbs
+                count: 100 // Target ~100 thumbnails regardless of duration
             });
             Logger.log('[Thumbnails] Generation complete');
             // Force update if still hovering?
