@@ -52,13 +52,14 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, crop = null, removeBackgroundOptions = null, onProgress }) {
-        Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions });
+    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, crop = null, removeBackgroundOptions = null, watermark = null, onProgress }) {
+        Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions, watermark });
 
         let conversion = null;
         let videoUrl = null;
         let input = null;
         let output = null;
+        let watermarkImg = null;
 
         // If removing background, we need to handle it via the process callback
         // and potentially force transcoding to a format that supports alpha (WebM) if transparent
@@ -67,6 +68,15 @@ export class MediaProcessor {
         }
 
         try {
+            // Pre-load watermark image if needed
+            if (watermark && watermark.type === 'image' && watermark.image) {
+                try {
+                    watermarkImg = await createImageBitmap(watermark.image);
+                } catch (e) {
+                    Logger.error('Failed to load watermark image:', e);
+                }
+            }
+
             let inputSource;
             if (typeof source === 'string') {
                 inputSource = new MediaBunny.UrlSource(source);
@@ -88,7 +98,6 @@ export class MediaProcessor {
             // Configure Output Format
             let outputFormat;
             if (format === 'gif') {
-                // ... GIF logic remains separate for now as it uses a different pipeline ...
                 return this.createGif({ source, trim, onProgress });
             } else if (format === 'webm') {
                 outputFormat = new MediaBunny.WebMOutputFormat();
@@ -126,14 +135,13 @@ export class MediaProcessor {
             }
 
             // Process callback for frame manipulation
-            // We define this generically so it can be extended for other features
             const useOffscreen = typeof OffscreenCanvas !== 'undefined';
             let canvas = null;
             let ctx = null;
 
             videoConfig.process = (sample) => {
                 // If no processing options are active, return sample as-is
-                if (!removeBackgroundOptions) {
+                if (!removeBackgroundOptions && !watermark) {
                     return sample;
                 }
 
@@ -155,17 +163,79 @@ export class MediaProcessor {
                 ctx.clearRect(0, 0, width, height);
                 sample.draw(ctx, 0, 0, width, height);
 
-                // Get image data
-                const imageData = ctx.getImageData(0, 0, width, height);
-
-                // Apply Background Removal if requested
+                // --- 1. Background Removal ---
                 if (removeBackgroundOptions) {
+                    const imageData = ctx.getImageData(0, 0, width, height);
                     const { colors, bgType, bgColor } = removeBackgroundOptions;
                     MediaProcessor.applyChromaKey(imageData, colors, bgType, bgColor);
+                    ctx.putImageData(imageData, 0, 0);
                 }
 
-                // Put modified data back
-                ctx.putImageData(imageData, 0, 0);
+                // --- 2. Watermark ---
+                if (watermark) {
+                    ctx.save();
+                    ctx.globalAlpha = watermark.opacity || 1.0;
+
+                    // Determine scale
+                    // Base size relative to video height (e.g., 15% is default scale)
+                    const scale = watermark.scale || 0.15;
+
+                    let drawX = 0, drawY = 0;
+
+                    if (watermark.type === 'image' && watermarkImg) {
+                        // Image Watermark
+                        // Calculate dimensions maintaining aspect ratio
+                        const aspect = watermarkImg.width / watermarkImg.height;
+                        const wHeight = height * scale;
+                        const wWidth = wHeight * aspect;
+
+                        // Positioning
+                        const padding = height * 0.05; // 5% padding
+                        const pos = watermark.position || 'br';
+
+                        if (pos.includes('l')) drawX = padding;
+                        else if (pos.includes('r')) drawX = width - wWidth - padding;
+                        else drawX = (width - wWidth) / 2; // center horizontal
+
+                        if (pos.includes('t')) drawY = padding;
+                        else if (pos.includes('b')) drawY = height - wHeight - padding;
+                        else drawY = (height - wHeight) / 2; // center vertical
+
+                        ctx.drawImage(watermarkImg, drawX, drawY, wWidth, wHeight);
+
+                    } else if (watermark.type === 'text' && watermark.text) {
+                        // Text Watermark
+                        const fontSize = height * scale; // Scale is roughly font size ratio
+                        ctx.font = `bold ${fontSize}px sans-serif`;
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                        ctx.lineWidth = fontSize * 0.05;
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'top';
+
+                        const text = watermark.text;
+                        const metrics = ctx.measureText(text);
+                        const wWidth = metrics.width;
+                        const wHeight = fontSize; // Approx
+
+                        // Positioning
+                        const padding = height * 0.05;
+                        const pos = watermark.position || 'c';
+
+                        if (pos.includes('l')) drawX = padding;
+                        else if (pos.includes('r')) drawX = width - wWidth - padding;
+                        else drawX = (width - wWidth) / 2;
+
+                        if (pos.includes('t')) drawY = padding;
+                        else if (pos.includes('b')) drawY = height - wHeight - padding;
+                        else drawY = (height - wHeight) / 2;
+
+                        ctx.strokeText(text, drawX, drawY);
+                        ctx.fillText(text, drawX, drawY);
+                    }
+
+                    ctx.restore();
+                }
 
                 return canvas;
             };

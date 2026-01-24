@@ -49,7 +49,10 @@ export class Modal {
         this.overlay._closeHandler = (e) => {
             if (e.target === this.overlay) this.close();
         };
-        this.overlay.addEventListener('click', this.overlay._closeHandler);
+
+        // if (this.options.closeOnClickOutside !== false) {
+        //     this.overlay.addEventListener('click', this.overlay._closeHandler);
+        // }
     }
 
     /**

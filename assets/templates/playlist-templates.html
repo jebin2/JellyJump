@@ -66,6 +66,10 @@
             <span class="menu-icon">🎨</span>
             <span class="menu-label">Remove Background...</span>
         </div>
+        <div class="playlist-menu-item" data-action="watermark" role="menuitem">
+            <span class="menu-icon">💧</span>
+            <span class="menu-label">Add Watermark...</span>
+        </div>
         <div class="menu-divider"></div>
         <div class="playlist-menu-item" data-action="info" role="menuitem">
             <div class="menu-icon">
@@ -1764,6 +1768,107 @@
                 </svg>
                 Download
             </button>
+        </div>
+    </div>
+</template>
+
+<!-- Watermark Content Template -->
+<template id="watermark-content-template">
+    <!-- Preview Area -->
+    <div class="crop-preview-container mb-lg">
+        <div class="crop-preview-wrapper">
+            <!-- Reuse crop-player-container class for consistent sizing -->
+            <div id="watermark-player-container" class="crop-player-container"></div>
+
+            <!-- Interactive Overlay -->
+            <div class="crop-overlay watermark-overlay">
+                <!-- Use crop-box class exactly like CropMenu -->
+                <div class="crop-box" data-watermark-box>
+                    <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
+                    <div class="crop-handle crop-handle-n" data-handle="n"></div>
+                    <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
+                    <div class="crop-handle crop-handle-e" data-handle="e"></div>
+                    <div class="crop-handle crop-handle-se" data-handle="se"></div>
+                    <div class="crop-handle crop-handle-s" data-handle="s"></div>
+                    <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
+                    <div class="crop-handle crop-handle-w" data-handle="w"></div>
+
+                    <!-- Content Preview -->
+                    <div class="watermark-content-preview w-full h-full flex items-center justify-center overflow-hidden"
+                        style="font-family: sans-serif; font-weight: bold; color: rgba(255,255,255,0.8); text-shadow: 1px 1px 2px black;">
+                        <span class="text-content">JellyJump</span>
+                        <img class="image-content hidden w-full h-full object-contain" src="" alt="">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="watermark-controls">
+        <!-- Top Row: Type and Content -->
+        <div class="flex gap-md items-end mb-md">
+            <!-- Type Selection -->
+            <div class="watermark-type-selection flex-shrink-0">
+                <div class="text-secondary text-sm font-mono mb-xs">TYPE</div>
+                <label class="toggle-switch">
+                    <span class="toggle-label label-left active-text">TEXT</span>
+                    <input type="checkbox" id="wm-type-toggle">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label label-right">IMAGE</span>
+                </label>
+            </div>
+
+            <!-- Text Input (Flex Grow) -->
+            <div class="wm-text-input-group flex-1">
+                <label class="text-xs text-secondary font-mono mb-xs block">TEXT CONTENT</label>
+                <input type="text" id="wm-text-content" class="mb-input w-full" placeholder="Enter watermark text"
+                    value="JellyJump">
+            </div>
+
+            <!-- Image Input (Hidden by default, Flex Grow) -->
+            <div class="wm-image-input-group flex-1 hidden">
+                <label class="text-xs text-secondary font-mono mb-xs block">IMAGE SOURCE</label>
+                <input type="file" id="wm-image-file" class="mb-input w-full mb-input-file-choose"
+                    accept="image/png,image/jpeg,image/webp">
+            </div>
+        </div>
+
+        <!-- Opacity -->
+        <div class="wm-opacity-group mb-md">
+            <div class="flex-between mb-sm">
+                <span class="text-secondary text-sm font-mono">OPACITY:</span>
+                <span class="wm-opacity-value text-sm font-bold">100%</span>
+            </div>
+            <input type="range" id="wm-opacity" class="quality-slider" min="10" max="100" value="100">
+        </div>
+    </div>
+</template>
+
+<!-- Watermark Footer Template -->
+<template id="watermark-footer-template">
+    <div class="watermark-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="watermark-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Watermark added!</div>
+        </div>
+
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small apply-btn" title="Apply Watermark">Apply</button>
         </div>
     </div>
 </template>

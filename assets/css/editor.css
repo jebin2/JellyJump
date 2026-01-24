@@ -2023,3 +2023,97 @@ mark {
     background-color: rgba(255, 255, 255, 0.2);
     border-color: var(--accent-secondary);
 }
+
+/* Watermark Modal Styles */
+.watermark-modal {
+    max-width: 500px;
+}
+
+.watermark-type-selection .radio-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.watermark-type-selection .radio-custom {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-secondary);
+    border-radius: 50%;
+    margin-right: 8px;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.watermark-type-selection input:checked+.radio-custom {
+    border-color: var(--accent-primary);
+}
+
+.watermark-type-selection input:checked+.radio-custom::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+}
+
+.wm-position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 120px;
+    margin: 0 auto;
+}
+
+.wm-pos-btn {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border-dark);
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wm-pos-btn::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background-color: var(--text-muted);
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.wm-pos-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-primary);
+}
+
+.wm-pos-btn:hover::after {
+    background-color: var(--text-primary);
+}
+
+.wm-pos-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+.wm-pos-btn.active::after {
+    background-color: #000000;
+    transform: scale(1.2);
+}
+
+.wm-opacity-group input[type="range"],
+.wm-scale-group input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent-primary);
+}

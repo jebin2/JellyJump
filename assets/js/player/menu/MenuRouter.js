@@ -10,6 +10,7 @@ import { TrackManagerMenu } from './TrackManagerMenu.js';
 import { RemoveBackgroundMenu } from './RemoveBackgroundMenu.js';
 import { RecordMenu } from './RecordMenu.js';
 import { SpeedReverseMenu } from './SpeedReverseMenu.js';
+import { WatermarkMenu } from './WatermarkMenu.js';
 
 /**
  * Menu Router
@@ -55,6 +56,9 @@ export class MenuRouter {
                 break;
             case 'remove-bg':
                 await RemoveBackgroundMenu.init(item, playlist);
+                break;
+            case 'watermark':
+                await WatermarkMenu.init(item, playlist);
                 break;
             case 'record':
                 await RecordMenu.init(item, playlist);
