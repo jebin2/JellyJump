@@ -103,6 +103,15 @@
     <script type="module" src="assets/js/lib/gif.js"></script>
 
     <!-- Scripts -->
+    <script>
+        // Function to hide loader
+        function hideLoader() {
+            const loader = document.getElementById('page-loader');
+            if (loader) {
+                loader.classList.add('hidden');
+            }
+        }
+    </script>
     <script type="module">
         // Load templates first, then initialize player
         async function initializeApp() {
@@ -154,6 +163,8 @@
                     }
                 ], true); // true = autoplay on page load
             }
+            // Hide loader only after app is fully initialized
+            hideLoader();
         }
 
         // Initialize when DOM is ready
@@ -163,11 +174,11 @@
             initializeApp();
         }
 
-        // Hide page loader after initialization
-        window.addEventListener('load', function () {
-            const loader = document.getElementById('page-loader');
-            if (loader) {
-                loader.classList.add('hidden');
+        // Handle browser back/forward cache (bfcache)
+        window.addEventListener('pageshow', function (event) {
+            // If page is loaded from cache, hide the loader
+            if (event.persisted) {
+                hideLoader();
             }
         });
 
