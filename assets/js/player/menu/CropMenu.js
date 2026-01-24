@@ -6,392 +6,427 @@ import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 
 /**
- * Crop Menu Handler
- * Handles video cropping functionality with a resizable crop box overlay and live video preview
+ * Crop Menu Handler - KISS Flow
+ * Simple, clear flow: Load video -> Setup crop UI -> Drag to crop -> Process
  */
 export class CropMenu {
-    /**
-     * Initialize and open Crop modal
-     * @param {Object} item - Playlist item
-     * @param {Playlist} playlist - Playlist instance
-     */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('crop-content-template');
         const footerTemplate = document.getElementById('crop-footer-template');
-
         if (!contentTemplate || !footerTemplate) return;
 
+        // Create modal
         const modal = new Modal({ maxWidth: '650px' });
         modal.setTitle('Crop Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.open();
 
         const modalContent = modal.modal;
 
-        // Open Modal Immediately
-        modal.open();
+        // Get all elements
+        const elements = {
+            playerContainer: modalContent.querySelector('#crop-player-container'),
+            cropBox: modalContent.querySelector('[data-crop-box]'),
+            cropOverlay: modalContent.querySelector('.crop-overlay'),
+            inputs: {
+                left: modalContent.querySelector('#crop-left'),
+                top: modalContent.querySelector('#crop-top'),
+                width: modalContent.querySelector('#crop-width'),
+                height: modalContent.querySelector('#crop-height')
+            },
+            buttons: {
+                crop: modalContent.querySelector('.crop-btn'),
+                download: modalContent.querySelector('.download-btn')
+            },
+            progress: {
+                section: modalContent.querySelector('.crop-progress'),
+                text: modalContent.querySelector('.progress-percentage'),
+                status: modalContent.querySelector('.status-text')
+            },
+            messages: {
+                error: modalContent.querySelector('.crop-error'),
+                success: modalContent.querySelector('.crop-success')
+            }
+        };
 
-        // Initialize Player
-        const playerContainer = modalContent.querySelector('#crop-player-container');
-        let player = null;
+        // State - KISS: just 4 numbers
+        const state = {
+            video: { width: 0, height: 0 },
+            crop: { left: 0, top: 0, width: 0, height: 0 },
+            preview: { scale: 1 },
+            drag: { active: false, handle: null, startX: 0, startY: 0, startCrop: {} }
+        };
 
-        if (playerContainer) {
-            player = new CorePlayer('crop-player-container', {
-                mode: 'player',
-                controlBarMode: 'fixed',
-                controls: {
-                    playPause: true,
-                    navigation: false,
-                    time: true,
-                    progress: true,
-                    captions: false,
-                    settings: false,
-                    fullscreen: false,
-                    loop: false,
-                    speed: false,
-                    filters: false,
-                    equalizer: true,
-                    volumeOnly: true,
-                    modeToggle: false,
-                    keyboard: false
-                },
-                autoplay: false
-            });
+        const MIN_SIZE = 100;
+
+        // === STEP 1: Load Video ===
+        const player = await loadVideo(elements.playerContainer, item, playlist, state);
+        if (!player) {
+            showError(elements.messages.error, 'Failed to load video');
+            return;
         }
 
-        // Elements - Body
-        const cropBox = modalContent.querySelector('[data-crop-box]');
-        const cropOverlay = modalContent.querySelector('.crop-overlay');
-        const leftInput = modalContent.querySelector('#crop-left');
-        const topInput = modalContent.querySelector('#crop-top');
-        const widthInput = modalContent.querySelector('#crop-width');
-        const heightInput = modalContent.querySelector('#crop-height');
+        // === STEP 2: Setup Crop UI ===
+        setupCropUI(elements, state);
 
-        // Elements - Footer
-        const cropBtn = modalContent.querySelector('.crop-btn');
-        const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.crop-progress');
-        const progressText = modalContent.querySelector('.progress-percentage');
-        const statusText = modalContent.querySelector('.status-text');
-        const errorDisplay = modalContent.querySelector('.crop-error');
-        const successDisplay = modalContent.querySelector('.crop-success');
+        // === STEP 3: Handle Dragging ===
+        setupDragHandlers(elements, state, MIN_SIZE);
 
-        // State
-        let originalWidth = 0;
-        let originalHeight = 0;
-        let cropState = { left: 0, top: 0, width: 0, height: 0 };
-        let previewScale = 1;
-        let isDragging = false;
-        let dragHandle = null;
-        let dragStart = { x: 0, y: 0 };
-        let cropStart = { left: 0, top: 0, width: 0, height: 0 };
+        // === STEP 4: Handle Inputs ===
+        setupInputHandlers(elements, state);
 
-        const MIN_CROP_SIZE = 64;
+        // === STEP 5: Process Crop ===
+        setupCropButton(elements, state, item, playlist, modal);
 
+        // === STEP 6: Cleanup ===
+        setupCleanup(modal, player, elements);
+    }
+}
 
+// === HELPER FUNCTIONS - Each does ONE thing ===
 
-        // Helper: Update crop box position from state
-        const updateCropBoxFromState = () => {
-            cropBox.style.left = `${cropState.left * previewScale}px`;
-            cropBox.style.top = `${cropState.top * previewScale}px`;
-            cropBox.style.width = `${cropState.width * previewScale}px`;
-            cropBox.style.height = `${cropState.height * previewScale}px`;
-        };
+async function loadVideo(container, item, playlist, state) {
+    if (!container) return null;
 
-        // Helper: Update input fields from state
-        const updateInputsFromState = () => {
-            leftInput.value = Math.round(cropState.left);
-            topInput.value = Math.round(cropState.top);
-            widthInput.value = Math.round(cropState.width);
-            heightInput.value = Math.round(cropState.height);
-        };
+    const player = new CorePlayer('crop-player-container', {
+        mode: 'player',
+        controlBarMode: 'fixed',
+        controls: {
+            playPause: true, time: true, progress: true,
+            navigation: false, captions: false, settings: false,
+            fullscreen: false, loop: false, speed: false,
+            filters: false, equalizer: true, volumeOnly: true,
+            modeToggle: false, keyboard: false
+        },
+        autoplay: false
+    });
 
-        // Helper: Clamp crop state to valid bounds
-        const clampCropState = () => {
-            cropState.left = Math.max(0, Math.min(cropState.left, originalWidth - MIN_CROP_SIZE));
-            cropState.top = Math.max(0, Math.min(cropState.top, originalHeight - MIN_CROP_SIZE));
-            cropState.width = Math.max(MIN_CROP_SIZE, Math.min(cropState.width, originalWidth - cropState.left));
-            cropState.height = Math.max(MIN_CROP_SIZE, Math.min(cropState.height, originalHeight - cropState.top));
+    try {
+        await playlist._ensureMetadata(item);
 
-            // Ensure even dimensions for codec compatibility
-            cropState.width = Math.floor(cropState.width / 2) * 2;
-            cropState.height = Math.floor(cropState.height / 2) * 2;
-        };
+        // Get video dimensions
+        if (item.videoInfo?.width && item.videoInfo?.height) {
+            state.video.width = item.videoInfo.width;
+            state.video.height = item.videoInfo.height;
+        }
 
-        // Helper: Update overlay size to match player canvas
-        const updateOverlaySize = () => {
-            if (player && player.canvas) {
-                const canvasRect = player.canvas.getBoundingClientRect();
-                cropOverlay.style.width = `${canvasRect.width}px`;
-                cropOverlay.style.height = `${canvasRect.height}px`;
+        // Load video
+        await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
+        await player.load(item.blob_url, false);
 
-                // Calculate scale based on canvas size vs original video
-                previewScale = canvasRect.width / originalWidth;
-
-                updateCropBoxFromState();
+        // Wait for metadata
+        for (let i = 0; i < 10 && !state.video.width; i++) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const videoEl = player.displayContainer?.querySelector('video');
+            if (videoEl?.videoWidth) {
+                state.video.width = videoEl.videoWidth;
+                state.video.height = videoEl.videoHeight;
             }
-        };
+        }
 
-        // Load Metadata and initialize
+        // Fallback
+        if (!state.video.width) {
+            state.video.width = 1920;
+            state.video.height = 1080;
+        }
+
+        return player;
+    } catch (e) {
+        Logger.error('Video load failed:', e);
+        return null;
+    }
+}
+
+function setupCropUI(elements, state) {
+    // Initialize crop to full video
+    state.crop = {
+        left: 0,
+        top: 0,
+        width: state.video.width,
+        height: state.video.height
+    };
+
+    // Update overlay to match video display area
+    setTimeout(() => {
+        updateOverlay(elements, state);
+        updateInputs(elements, state);
+    }, 200);
+}
+
+function updateOverlay(elements, state) {
+    const canvas = elements.playerContainer.querySelector('canvas');
+    if (!canvas) return;
+
+    const canvasRect = canvas.getBoundingClientRect();
+    const videoAspect = state.video.width / state.video.height;
+    const canvasAspect = canvasRect.width / canvasRect.height;
+
+    let displayWidth, displayHeight, offsetX, offsetY;
+
+    if (canvasAspect > videoAspect) {
+        // Pillarbox (black bars left/right)
+        displayHeight = canvasRect.height;
+        displayWidth = displayHeight * videoAspect;
+        offsetX = (canvasRect.width - displayWidth) / 2;
+        offsetY = 0;
+    } else {
+        // Letterbox (black bars top/bottom)
+        displayWidth = canvasRect.width;
+        displayHeight = displayWidth / videoAspect;
+        offsetX = 0;
+        offsetY = (canvasRect.height - displayHeight) / 2;
+    }
+
+    // Position overlay over video
+    elements.cropOverlay.style.width = `${displayWidth}px`;
+    elements.cropOverlay.style.height = `${displayHeight}px`;
+    elements.cropOverlay.style.left = `${offsetX}px`;
+    elements.cropOverlay.style.top = `${offsetY}px`;
+
+    // Calculate scale
+    state.preview.scale = displayWidth / state.video.width;
+
+    updateCropBox(elements, state);
+}
+
+function updateCropBox(elements, state) {
+    const { left, top, width, height } = state.crop;
+    const scale = state.preview.scale;
+
+    elements.cropBox.style.left = `${left * scale}px`;
+    elements.cropBox.style.top = `${top * scale}px`;
+    elements.cropBox.style.width = `${width * scale}px`;
+    elements.cropBox.style.height = `${height * scale}px`;
+}
+
+function updateInputs(elements, state) {
+    elements.inputs.left.value = Math.round(state.crop.left);
+    elements.inputs.top.value = Math.round(state.crop.top);
+    elements.inputs.width.value = Math.round(state.crop.width);
+    elements.inputs.height.value = Math.round(state.crop.height);
+}
+
+function setupDragHandlers(elements, state, MIN_SIZE) {
+    const getMousePos = (e) => {
+        const rect = elements.cropOverlay.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) / state.preview.scale,
+            y: (e.clientY - rect.top) / state.preview.scale
+        };
+    };
+
+    const onMouseDown = (e) => {
+        const handle = e.target.dataset.handle;
+        if (handle || e.target === elements.cropBox) {
+            state.drag.active = true;
+            state.drag.handle = handle || 'move';
+            const pos = getMousePos(e);
+            state.drag.startX = pos.x;
+            state.drag.startY = pos.y;
+            state.drag.startCrop = { ...state.crop };
+            e.preventDefault();
+        }
+    };
+
+    const onMouseMove = (e) => {
+        if (!state.drag.active) return;
+
+        const pos = getMousePos(e);
+        const dx = pos.x - state.drag.startX;
+        const dy = pos.y - state.drag.startY;
+        const h = state.drag.handle;
+        const start = state.drag.startCrop;
+
+        // Reset to start values
+        state.crop = { ...start };
+
+        if (h === 'move') {
+            // Move box
+            state.crop.left = Math.max(0, Math.min(start.left + dx, state.video.width - start.width));
+            state.crop.top = Math.max(0, Math.min(start.top + dy, state.video.height - start.height));
+        } else {
+            // Resize - CRITICAL: Calculate fixed edges first, then moving edges
+            // This ensures the opposite edge stays locked in place
+
+            if (h.includes('w')) {
+                // Moving LEFT edge - RIGHT edge is fixed at (start.left + start.width)
+                const fixedRight = start.left + start.width;
+                const newLeft = Math.max(0, Math.min(start.left + dx, fixedRight - MIN_SIZE));
+                state.crop.left = newLeft;
+                state.crop.width = fixedRight - newLeft;
+            }
+
+            if (h.includes('e')) {
+                // Moving RIGHT edge - LEFT edge is fixed at start.left
+                const maxRight = state.video.width;
+                const newWidth = Math.max(MIN_SIZE, Math.min(start.width + dx, maxRight - start.left));
+                state.crop.width = newWidth;
+            }
+
+            if (h.includes('n')) {
+                // Moving TOP edge - BOTTOM edge is fixed at (start.top + start.height)
+                const fixedBottom = start.top + start.height;
+                const newTop = Math.max(0, Math.min(start.top + dy, fixedBottom - MIN_SIZE));
+                state.crop.top = newTop;
+                state.crop.height = fixedBottom - newTop;
+            }
+
+            if (h.includes('s')) {
+                // Moving BOTTOM edge - TOP edge is fixed at start.top
+                const maxBottom = state.video.height;
+                const newHeight = Math.max(MIN_SIZE, Math.min(start.height + dy, maxBottom - start.top));
+                state.crop.height = newHeight;
+            }
+        }
+
+        updateCropBox(elements, state);
+        updateInputs(elements, state);
+    };
+
+    const onMouseUp = () => {
+        state.drag.active = false;
+        state.drag.handle = null;
+    };
+
+    elements.cropOverlay.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    // Store for cleanup
+    elements._cleanup = { onMouseMove, onMouseUp };
+}
+
+function setupInputHandlers(elements, state) {
+    const handleChange = () => {
+        state.crop.left = Math.max(0, parseInt(elements.inputs.left.value) || 0);
+        state.crop.top = Math.max(0, parseInt(elements.inputs.top.value) || 0);
+        state.crop.width = Math.max(100, parseInt(elements.inputs.width.value) || 100);
+        state.crop.height = Math.max(100, parseInt(elements.inputs.height.value) || 100);
+
+        // Clamp to video bounds
+        state.crop.left = Math.min(state.crop.left, state.video.width - 100);
+        state.crop.top = Math.min(state.crop.top, state.video.height - 100);
+        state.crop.width = Math.min(state.crop.width, state.video.width - state.crop.left);
+        state.crop.height = Math.min(state.crop.height, state.video.height - state.crop.top);
+
+        updateCropBox(elements, state);
+        updateInputs(elements, state);
+    };
+
+    Object.values(elements.inputs).forEach(input => {
+        input.addEventListener('input', handleChange);
+    });
+}
+
+function setupCropButton(elements, state, item, playlist, modal) {
+    elements.buttons.crop.addEventListener('click', async () => {
+        // Ensure even dimensions
+        let width = Math.floor(state.crop.width / 2) * 2;
+        let height = Math.floor(state.crop.height / 2) * 2;
+
+        if (width < 64 || height < 64) {
+            showError(elements.messages.error, 'Crop must be at least 64px');
+            return;
+        }
+
+        hideMessage(elements.messages.error);
+        hideMessage(elements.messages.success);
+        showProgress(elements.progress, `Cropping to ${width}x${height}...`);
+        elements.buttons.crop.disabled = true;
+        modal.closeBtn.disabled = true;
+
         try {
-            await playlist._ensureMetadata(item);
+            const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
-            if (item.videoInfo && item.videoInfo.width && item.videoInfo.height) {
-                originalWidth = item.videoInfo.width;
-                originalHeight = item.videoInfo.height;
-            }
-
-            // Load video into player
-            if (player) {
-                await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-                await player.load(item.blob_url, false);
-
-                // Get dimensions from player if not available
-                if (!originalWidth || !originalHeight) {
-                    // Wait a bit for video to load
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    if (player.canvas) {
-                        originalWidth = player.canvas.width || 1920;
-                        originalHeight = player.canvas.height || 1080;
-                    }
+            const blob = await MediaProcessor.process({
+                source: source,
+                format: 'mp4',
+                quality: 100,
+                crop: {
+                    left: Math.round(state.crop.left),
+                    top: Math.round(state.crop.top),
+                    width: width,
+                    height: height
+                },
+                onProgress: (progress) => {
+                    elements.progress.text.textContent = `${Math.round(progress * 100)}%`;
                 }
-            }
+            });
 
+            // Success
+            hideProgress(elements.progress);
+            const filename = item.title.replace(/\.[^/.]+$/, "") + `-crop-${width}x${height}.mp4`;
+            const url = URL.createObjectURL(blob);
 
+            elements.buttons.download.href = url;
+            elements.buttons.download.download = filename;
+            elements.buttons.download.classList.remove('hidden');
 
-            // Initialize crop to 10% inset
-            const inset = 0.1;
-            cropState = {
-                left: Math.floor(originalWidth * inset / 2) * 2,
-                top: Math.floor(originalHeight * inset / 2) * 2,
-                width: Math.floor(originalWidth * (1 - inset) / 2) * 2,
-                height: Math.floor(originalHeight * (1 - inset) / 2) * 2
+            // Add to playlist
+            const newItem = {
+                id: generateId(),
+                title: filename,
+                url: url,
+                file: new File([blob], filename, { type: 'video/mp4' }),
+                duration: item.duration,
+                type: 'video',
+                isLocal: true,
+                isNew: true,
+                path: (item.path || item.title) + '/' + filename
             };
 
-            // Wait for player to render then update overlay
-            setTimeout(() => {
-                updateOverlaySize();
-                updateInputsFromState();
-            }, 200);
+            playlist.items.splice(playlist.items.indexOf(item) + 1, 0, newItem);
+            playlist.render();
+            playlist._saveState();
+
+            showSuccess(elements.messages.success, 'Added to playlist');
+            elements.buttons.crop.disabled = false;
+            modal.closeBtn.disabled = false;
 
         } catch (e) {
-            Logger.error('Failed to load video info:', e);
-            originalResDisplay.textContent = 'Unknown';
-            errorDisplay.textContent = 'Failed to load video info.';
-            errorDisplay.classList.remove('hidden');
+            Logger.error('Crop failed:', e);
+            showError(elements.messages.error, `Crop failed: ${e.message}`);
+            hideProgress(elements.progress);
+            elements.buttons.crop.disabled = false;
+            modal.closeBtn.disabled = false;
         }
+    });
+}
 
-        // Input Handlers
-        const handleInputChange = () => {
-            cropState.left = parseInt(leftInput.value) || 0;
-            cropState.top = parseInt(topInput.value) || 0;
-            cropState.width = parseInt(widthInput.value) || MIN_CROP_SIZE;
-            cropState.height = parseInt(heightInput.value) || MIN_CROP_SIZE;
-            clampCropState();
-            updateCropBoxFromState();
-            updateInputsFromState();
-        };
+function setupCleanup(modal, player, elements) {
+    const originalClose = modal.close.bind(modal);
+    modal.close = () => {
+        if (elements._cleanup) {
+            document.removeEventListener('mousemove', elements._cleanup.onMouseMove);
+            document.removeEventListener('mouseup', elements._cleanup.onMouseUp);
+        }
+        if (player) player.destroy();
+        originalClose();
+    };
+}
 
-        leftInput.addEventListener('input', handleInputChange);
-        topInput.addEventListener('input', handleInputChange);
-        widthInput.addEventListener('input', handleInputChange);
-        heightInput.addEventListener('input', handleInputChange);
+// UI Helpers
+function showError(element, message) {
+    element.textContent = message;
+    element.classList.remove('hidden');
+}
 
-        // Crop Box Drag Handlers
-        const getMousePos = (e) => {
-            const rect = cropOverlay.getBoundingClientRect();
-            return {
-                x: (e.clientX - rect.left) / previewScale,
-                y: (e.clientY - rect.top) / previewScale
-            };
-        };
+function hideMessage(element) {
+    element.classList.add('hidden');
+}
 
-        const handleMouseDown = (e) => {
-            const handle = e.target.dataset.handle;
-            if (handle) {
-                isDragging = true;
-                dragHandle = handle;
-                dragStart = getMousePos(e);
-                cropStart = { ...cropState };
-                e.preventDefault();
-            } else if (e.target === cropBox) {
-                isDragging = true;
-                dragHandle = 'move';
-                dragStart = getMousePos(e);
-                cropStart = { ...cropState };
-                e.preventDefault();
-            }
-        };
+function showProgress(progress, status) {
+    progress.status.textContent = status;
+    progress.text.textContent = '0%';
+    progress.section.classList.remove('hidden');
+}
 
-        const handleMouseMove = (e) => {
-            if (!isDragging) return;
+function hideProgress(progress) {
+    progress.section.classList.add('hidden');
+}
 
-            const pos = getMousePos(e);
-            const dx = pos.x - dragStart.x;
-            const dy = pos.y - dragStart.y;
-
-            if (dragHandle === 'move') {
-                cropState.left = cropStart.left + dx;
-                cropState.top = cropStart.top + dy;
-            } else {
-                // Handle resize - keep opposite edge fixed
-                const h = dragHandle;
-
-                const rightEdge = cropStart.left + cropStart.width;
-                const bottomEdge = cropStart.top + cropStart.height;
-
-                if (h.includes('w')) {
-                    let newLeft = cropStart.left + dx;
-                    newLeft = Math.max(0, Math.min(newLeft, rightEdge - MIN_CROP_SIZE));
-                    cropState.left = newLeft;
-                    cropState.width = rightEdge - newLeft;
-                }
-                if (h.includes('e')) {
-                    let newWidth = cropStart.width + dx;
-                    newWidth = Math.max(MIN_CROP_SIZE, Math.min(newWidth, originalWidth - cropStart.left));
-                    cropState.width = newWidth;
-                }
-                if (h.includes('n')) {
-                    let newTop = cropStart.top + dy;
-                    newTop = Math.max(0, Math.min(newTop, bottomEdge - MIN_CROP_SIZE));
-                    cropState.top = newTop;
-                    cropState.height = bottomEdge - newTop;
-                }
-                if (h.includes('s')) {
-                    let newHeight = cropStart.height + dy;
-                    newHeight = Math.max(MIN_CROP_SIZE, Math.min(newHeight, originalHeight - cropStart.top));
-                    cropState.height = newHeight;
-                }
-            }
-
-            clampCropState();
-            updateCropBoxFromState();
-            updateInputsFromState();
-        };
-
-        // Track if we just finished dragging
-        let wasDragging = false;
-
-        const handleMouseUp = () => {
-            if (isDragging) {
-                wasDragging = true;
-                setTimeout(() => { wasDragging = false; }, 100);
-            }
-            isDragging = false;
-            dragHandle = null;
-        };
-
-        cropOverlay.addEventListener('mousedown', handleMouseDown);
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-
-        // Prevent modal from closing while dragging
-        const modalOverlay = modal.overlay;
-        const preventCloseWhileDragging = (e) => {
-            if (e.target === modalOverlay && !isDragging && !wasDragging) {
-                modal.close();
-            }
-        };
-
-        modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
-        modalOverlay.addEventListener('click', preventCloseWhileDragging);
-
-        // Cleanup on modal close
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-            modalOverlay.removeEventListener('click', preventCloseWhileDragging);
-            if (player) {
-                player.destroy();
-            }
-            originalClose();
-        };
-
-        // Crop Action
-        cropBtn.addEventListener('click', async () => {
-            // Validation
-            if (cropState.width < MIN_CROP_SIZE || cropState.height < MIN_CROP_SIZE) {
-                errorDisplay.textContent = `Crop dimensions must be at least ${MIN_CROP_SIZE}px.`;
-                errorDisplay.classList.remove('hidden');
-                return;
-            }
-
-            errorDisplay.classList.add('hidden');
-            successDisplay.classList.add('hidden');
-            progressSection.classList.remove('hidden');
-            cropBtn.disabled = true;
-            modal.closeBtn.disabled = true;
-            statusText.textContent = `Cropping to ${cropState.width}x${cropState.height}...`;
-
-            try {
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-                const blob = await MediaProcessor.process({
-                    source: source,
-                    format: 'mp4',
-                    quality: 100,
-                    crop: {
-                        left: Math.round(cropState.left),
-                        top: Math.round(cropState.top),
-                        width: Math.round(cropState.width),
-                        height: Math.round(cropState.height)
-                    },
-                    onProgress: (progress) => {
-                        const percent = Math.round(progress * 100);
-                        progressText.textContent = `${percent}%`;
-                    }
-                });
-
-                // Success
-                successDisplay.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-
-                // Configure Download
-                const filename = item.title.replace(/\.[^/.]+$/, "") + `-crop-${cropState.width}x${cropState.height}.mp4`;
-                const url = URL.createObjectURL(blob);
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                // Reset for another crop
-                cropBtn.disabled = false;
-                cropBtn.classList.remove('hidden');
-                statusText.textContent = 'Cropping...';
-                progressText.textContent = '0%';
-
-                // Always add to Playlist
-                const newItem = {
-                    id: generateId(),
-                    title: filename,
-                    url: url,
-                    file: new File([blob], filename, { type: 'video/mp4' }),
-                    duration: item.duration,
-                    type: 'video',
-                    isLocal: true,
-                    isNew: true,
-                    path: (item.path || item.title) + '/' + filename
-                };
-
-                const insertIndex = playlist.items.indexOf(item) + 1;
-                playlist.items.splice(insertIndex, 0, newItem);
-                playlist.render();
-                playlist._saveState();
-
-                // Update success message
-                successDisplay.textContent = `✓ Added to playlist`;
-
-                modal.closeBtn.disabled = false;
-
-            } catch (e) {
-                Logger.error('Crop failed:', e);
-                errorDisplay.textContent = `Crop failed: ${e.message}`;
-                errorDisplay.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-                cropBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-            }
-        });
-    }
+function showSuccess(element, message) {
+    element.textContent = `✓ ${message}`;
+    element.classList.remove('hidden');
 }
