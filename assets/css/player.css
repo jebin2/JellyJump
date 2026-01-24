@@ -3115,3 +3115,76 @@ body.fullscreen-active {
 .toggle-switch input:not(:checked)~.label-left {
     color: var(--text-primary);
 }
+
+/* -----------------------------------------
+   Thumbnail Preview Overlay
+   ----------------------------------------- */
+.jellyjump-thumbnail-overlay {
+    position: absolute;
+    bottom: 30px;
+    /* Above progress bar */
+    width: 160px;
+    height: 90px;
+    background-color: #000;
+    border: 2px solid var(--accent-primary);
+    border-radius: 4px;
+    background-size: cover;
+    background-position: center;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    /* Flex for loader/time */
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.jellyjump-thumbnail-overlay.visible {
+    display: flex;
+}
+
+.jellyjump-thumbnail-time {
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-size: 12px;
+    margin-top: auto;
+    /* Push to bottom */
+    margin-bottom: 4px;
+}
+
+/* Jelly Loader Animation */
+.jelly-loader {
+    width: 40px;
+    height: 40px;
+    background-image: url('../../assets/icons/jelly_jump_logo.gif');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    /* Center in flex container (push to middle, time is at bottom) */
+    margin: auto;
+}
+
+@keyframes jelly {
+    0% {
+        transform: scale(1, 1);
+    }
+
+    25% {
+        transform: scale(0.9, 1.1);
+    }
+
+    50% {
+        transform: scale(1.1, 0.9);
+    }
+
+    75% {
+        transform: scale(0.95, 1.05);
+    }
+
+    100% {
+        transform: scale(1, 1);
+    }
+}

@@ -15,6 +15,7 @@ import { HLSPlayer } from './HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { AudioVisualizer } from '../player/AudioVisualizer.js';
 import { Logger } from '../utils/Logger.js';
+import { ThumbnailGenerator } from '../player/ThumbnailGenerator.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -142,6 +143,17 @@ export class CorePlayer {
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
 
+        // Thumbnail Generator
+        this.thumbnailGenerator = new ThumbnailGenerator();
+        this.thumbnailGenerator.progressCallback = () => {
+            if (this.ui.thumbnailOverlay && this.ui.thumbnailOverlay.classList.contains('visible')) {
+                this._updateThumbnailImage(this.lastThumbnailHoverTime);
+            }
+        };
+        this.thumbnailGenerationStarted = false;
+        this.thumbnailHoverTimer = null;
+        this.lastThumbnailHoverTime = 0;
+
         // Scrubbing state
         this.isScrubbing = false;
         this.scrubWasPlaying = false;
@@ -191,6 +203,9 @@ export class CorePlayer {
 
         // Current loaded video ID (url)
         this.currentVideoId = null;
+        this.sourceUrl = null;
+
+        // HLS/Stream playback
 
         // HLS/Stream playback
         this.hlsPlayer = null;
@@ -303,6 +318,141 @@ export class CorePlayer {
         this.ui.helpOverlay.addEventListener('click', (e) => {
             if (e.target === this.ui.helpOverlay) this._toggleHelp();
         });
+    }
+
+    /**
+     * Create Thumbnail Overlay
+     * @private
+     */
+    _createThumbnailOverlay() {
+        if (this.ui.thumbnailOverlay) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'jellyjump-thumbnail-overlay';
+        overlay.innerHTML = `
+            <div class="jelly-loader"></div>
+            <div class="jellyjump-thumbnail-time">00:00</div>
+        `;
+
+        // Append to progress container so it moves relative to it? 
+        // No, absolute pos based on mouse is better, but inside progressContainer makes scoping easier.
+        // But progressContainer might overflow hidden? No, usually not.
+        // Let's append to container and position manually for safety.
+        this.container.appendChild(overlay);
+        this.ui.thumbnailOverlay = overlay;
+        this.ui.thumbnailTime = overlay.querySelector('.jellyjump-thumbnail-time');
+        this.ui.thumbnailLoader = overlay.querySelector('.jelly-loader');
+    }
+
+    _handleThumbnailHover(e) {
+        if (this.isStreamMode || !this.ui.thumbnailOverlay) return;
+
+        const rect = this.ui.progressContainer.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const pos = Math.max(0, Math.min(1, offsetX / rect.width));
+        const time = pos * this.duration;
+
+        // Show overlay
+        this.ui.thumbnailOverlay.classList.add('visible');
+
+        // Position overlay (centered above cursor)
+        const overlayRect = this.ui.thumbnailOverlay.getBoundingClientRect();
+        let overlayLeft = e.clientX - rect.left - (overlayRect.width / 2);
+
+        // Clamp to container bounds
+        overlayLeft = Math.max(0, Math.min(overlayLeft, rect.width - overlayRect.width));
+
+        // Update CSS variables or left/bottom if not relative
+        // Since we appended to container, coordinate system is container
+        // But e.clientX is viewport.
+        // Let's calculate relative to container
+        const containerRect = this.container.getBoundingClientRect();
+        const relativeLeft = e.clientX - containerRect.left - (overlayRect.width / 2);
+        const clampedRelLeft = Math.max(10, Math.min(relativeLeft, containerRect.width - overlayRect.width - 10));
+
+        this.ui.thumbnailOverlay.style.left = `${clampedRelLeft}px`;
+
+        // Dynamic bottom position: distance from container bottom to progress top + 15px
+        const bottomOffset = containerRect.bottom - rect.top + 15;
+        this.ui.thumbnailOverlay.style.bottom = `${bottomOffset}px`;
+
+        // Update time text
+        this.ui.thumbnailTime.textContent = this._formatTime(time);
+
+        // Store for live updates
+        this.lastThumbnailHoverTime = time;
+
+        // Check/Get Thumbnail
+        this._updateThumbnailImage(time);
+    }
+
+    _updateThumbnailImage(time) {
+        if (!this.ui.thumbnailOverlay) return;
+
+        const thumb = this.thumbnailGenerator.getThumbnail(time);
+        if (thumb) {
+            this.ui.thumbnailOverlay.style.backgroundImage = `url(${thumb})`;
+            this.ui.thumbnailLoader.style.display = 'none';
+        } else {
+            this.ui.thumbnailOverlay.style.backgroundImage = 'none';
+            this.ui.thumbnailLoader.style.display = 'block';
+
+            // Trigger generation if not started
+            if (!this.thumbnailGenerationStarted && !this.thumbnailHoverTimer) {
+                // Wait 300ms of hover to start heavy process
+                this.thumbnailHoverTimer = setTimeout(() => {
+                    this._startThumbnailGeneration();
+                }, 300);
+            }
+        }
+    }
+
+    _handleThumbnailLeave() {
+        if (this.ui.thumbnailOverlay) {
+            this.ui.thumbnailOverlay.classList.remove('visible');
+        }
+        if (this.thumbnailHoverTimer) {
+            clearTimeout(this.thumbnailHoverTimer);
+            this.thumbnailHoverTimer = null;
+        }
+    }
+
+    async _startThumbnailGeneration() {
+        if (this.thumbnailGenerationStarted) return;
+        this.thumbnailGenerationStarted = true;
+
+        // Use current video source
+        const url = this.sourceUrl;
+        if (!url) return;
+
+        Logger.log('[Thumbnails] Starting generation with URL:', url);
+
+        try {
+            await this.thumbnailGenerator.generate(url, this.duration, {
+                width: 160,
+                interval: Math.max(1, Math.ceil(this.duration / 50)) // Cap at ~50 thumbs
+            });
+            Logger.log('[Thumbnails] Generation complete');
+            // Force update if still hovering?
+            // User moving mouse will trigger update
+        } catch (e) {
+            Logger.warn('[Thumbnails] Generation failed:', e);
+            this.thumbnailGenerationStarted = false;
+        }
+    }
+
+    _cleanupThumbnails() {
+        if (this.thumbnailGenerator) {
+            this.thumbnailGenerator.cancel();
+        }
+        this.thumbnailGenerationStarted = false;
+        if (this.thumbnailHoverTimer) {
+            clearTimeout(this.thumbnailHoverTimer);
+            this.thumbnailHoverTimer = null;
+        }
+        if (this.ui.thumbnailOverlay) {
+            this.ui.thumbnailOverlay.style.backgroundImage = 'none';
+        }
     }
 
     /**
@@ -505,6 +655,9 @@ export class CorePlayer {
         // Create Stream Error Overlay
         this._createErrorOverlay();
 
+        // Create Thumbnail Overlay
+        this._createThumbnailOverlay();
+
         // Apply visibility based on config (removes control--hidden class for enabled controls)
         this._applyControlVisibility();
 
@@ -567,12 +720,15 @@ export class CorePlayer {
             });
         }
 
-        // Seek (only if progress enabled)
         if (this.config.controls.progress && this.ui.progressContainer) {
             // Mouse down to start scrubbing
             this.ui.progressContainer.addEventListener('mousedown', (e) => {
                 this._onScrubStart(e);
             });
+
+            // Thumbnail Preview (Hover)
+            this.ui.progressContainer.addEventListener('mousemove', (e) => this._handleThumbnailHover(e));
+            this.ui.progressContainer.addEventListener('mouseleave', () => this._handleThumbnailLeave());
         }
 
         // Volume (only if enabled)
@@ -1590,6 +1746,14 @@ export class CorePlayer {
         this.audioContextStartTime = null;
         this.fallbackStartTime = undefined;
 
+        // Reset state
+        this.currentTime = 0;
+        this.duration = 0;
+        this.audioContextStartTime = null;
+        this.fallbackStartTime = undefined;
+
+        this._cleanupThumbnails();
+
         // Dispose MediaBunny resources
         this._disposeMediaBunnyResources();
 
@@ -1625,6 +1789,7 @@ export class CorePlayer {
      * @param {Object} options - Additional options { isAudio: boolean }
      */
     async load(url, autoplay = false, videoId = null, savedSubtitles = null, options = {}) {
+        this.sourceUrl = url;
         try {
             // Force mute on mobile for autoplay (browser policy requirement)
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -1633,6 +1798,8 @@ export class CorePlayer {
                 this.config.muted = true;
                 this._updateVolumeUI();
             }
+
+            this._cleanupThumbnails();
 
             // Detect stream type
             const streamType = StreamDetector.detect(url);
@@ -3863,6 +4030,12 @@ export class CorePlayer {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
+        }
+
+        // Clean up Thumbnail Generator
+        if (this.thumbnailGenerator) {
+            this.thumbnailGenerator.destroy();
+            this.thumbnailGenerator = null;
         }
 
         // Clean up DOM elements
