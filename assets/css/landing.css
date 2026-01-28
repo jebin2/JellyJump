@@ -101,6 +101,123 @@
     font-size: var(--text-lg);
 }
 
+@media (max-width: 768px) {
+    .nav-links {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        width: 80%;
+        max-width: 300px;
+        height: 100vh;
+        background-color: var(--bg-secondary);
+        flex-direction: column;
+        justify-content: center;
+        padding: var(--space-2xl);
+        border-left: var(--border-medium) solid var(--accent-primary);
+        transition: right var(--transition-normal) var(--ease-standard);
+        z-index: 1001;
+    }
+
+    .nav-links.active {
+        right: 0;
+        box-shadow: -100px 0 0 rgba(0,0,0,0.5); /* Overlay effect on the left */
+    }
+
+    /* Mobile Menu Button */
+    .mobile-menu-btn {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 40px;
+        height: 40px;
+        z-index: 1002;
+    }
+
+    .hamburger-box {
+        width: 30px;
+        height: 24px;
+        display: inline-block;
+        position: relative;
+    }
+
+    .hamburger-inner {
+        display: block;
+        top: 50%;
+        margin-top: -2px;
+    }
+
+    .hamburger-inner, .hamburger-inner::before, .hamburger-inner::after {
+        width: 30px;
+        height: 3px; /* Slightly chunkier for brutalism */
+        background-color: var(--text-primary);
+        position: absolute;
+        transition-property: transform;
+        transition-duration: 0.15s;
+        transition-timing-function: ease;
+    }
+
+    .hamburger-inner::before, .hamburger-inner::after {
+        content: "";
+        display: block;
+    }
+
+    .hamburger-inner::before {
+        top: -10px;
+    }
+
+    .hamburger-inner::after {
+        bottom: -10px;
+    }
+
+    /* Active State for Hamburger */
+    .mobile-menu-btn.active .hamburger-inner {
+        transform: rotate(45deg);
+    }
+
+    .mobile-menu-btn.active .hamburger-inner::before {
+        top: 0;
+        opacity: 0;
+    }
+
+    .mobile-menu-btn.active .hamburger-inner::after {
+        bottom: 0;
+        transform: rotate(-90deg);
+    }
+    
+    .mobile-menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity var(--transition-normal);
+    }
+    
+    .mobile-menu-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    body.no-scroll {
+        overflow: hidden;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-menu-btn {
+        display: none;
+    }
+    .mobile-menu-overlay {
+        display: none;
+    }
+}
+
+
 @media (max-width: 640px) {
     .hero-title {
         font-size: var(--text-2xl);
@@ -113,6 +230,10 @@
 
     .btn-lg {
         width: 100%;
+    }
+    
+    .feature-card {
+        padding: var(--space-md);
     }
 }
 

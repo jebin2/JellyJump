@@ -67,6 +67,12 @@
                 <img src="assets/icons/jelly_jump_logo.png" alt="JellyJump Logo" class="nav-logo-img">
                 JellyJump
             </a>
+            <button class="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false">
+                <span class="hamburger-box">
+                    <span class="hamburger-inner"></span>
+                </span>
+            </button>
+            <div class="mobile-menu-overlay"></div>
             <nav class="nav-links">
                 <a href="#features" class="nav-link">Features</a>
                 <a href="#downloads" class="nav-link">Download</a>
@@ -396,8 +402,37 @@
                     // Let the browser navigate naturally (don't preventDefault)
                 });
             });
+
+            // Mobile Menu Logic
+            const mobileBtn = document.querySelector('.mobile-menu-btn');
+            const navLinksContainer = document.querySelector('.nav-links');
+            const overlay = document.querySelector('.mobile-menu-overlay');
+
+            if (mobileBtn && navLinksContainer) {
+                function toggleMenu() {
+                    const isExpanded = mobileBtn.getAttribute('aria-expanded') === 'true';
+                    mobileBtn.setAttribute('aria-expanded', !isExpanded);
+                    navLinksContainer.classList.toggle('active');
+                    mobileBtn.classList.toggle('active');
+                    if(overlay) overlay.classList.toggle('active');
+                    document.body.classList.toggle('no-scroll');
+                }
+
+                mobileBtn.addEventListener('click', toggleMenu);
+                if(overlay) overlay.addEventListener('click', toggleMenu);
+
+                // Close menu when clicking a link
+                navLinksContainer.querySelectorAll('a, button').forEach(link => {
+                    link.addEventListener('click', () => {
+                        if (navLinksContainer.classList.contains('active')) {
+                            toggleMenu();
+                        }
+                    });
+                });
+            }
         });
     </script>
+
 </body>
 
 </html>
