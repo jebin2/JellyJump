@@ -2226,14 +2226,14 @@ export class CorePlayer {
 
         // Handle Stalling/Waiting (Show Loader)
         this.streamVideo.onwaiting = () => {
-            if (this.isStreamMode && !this.paused) {
+            if (this.isStreamMode && this.isPlaying) {
                 this._setLoading(true);
 
                 // Start stall recovery timer for live streams (native HLS on iOS/Android)
                 // If stalled for more than 5 seconds, seek to live edge
                 if (this.isLive && !this._stallRecoveryTimer) {
                     this._stallRecoveryTimer = setTimeout(() => {
-                        if (this.isStreamMode && this.isLive && !this.paused) {
+                        if (this.isStreamMode && this.isLive && this.isPlaying) {
                             Logger.log('[Stream] Stall detected, attempting recovery...');
                             this._recoverFromStall();
                         }
@@ -2244,7 +2244,7 @@ export class CorePlayer {
 
         // Handle stalled event (network issues)
         this.streamVideo.onstalled = () => {
-            if (this.isStreamMode && this.isLive && !this.paused) {
+            if (this.isStreamMode && this.isLive && this.isPlaying) {
                 Logger.log('[Stream] Video stalled, starting recovery timer...');
                 if (!this._stallRecoveryTimer) {
                     this._stallRecoveryTimer = setTimeout(() => {
@@ -2297,6 +2297,12 @@ export class CorePlayer {
 
         // Playing state sync
         this.streamVideo.onplay = () => {
+            // If video is actually paused (user clicked pause), ignore this stale onplay event
+            if (this.streamVideo.paused) {
+                Logger.log('[Stream] Ignoring stale onplay event - video is paused');
+                return;
+            }
+
             this.isPlaying = true;
             this._updatePlayPauseUI();
             if (this.ui.playOverlay) {
@@ -2341,7 +2347,6 @@ export class CorePlayer {
         this.streamVideo.onpause = () => {
             this.isPlaying = false;
             this._clearAutoHideTimer();
-            this._updatePlayPauseUI();
             // Stop render loop
             this._stopStreamRenderLoop();
             // Clear stall recovery timer (intentional pause)
@@ -2349,6 +2354,13 @@ export class CorePlayer {
                 clearTimeout(this._stallRecoveryTimer);
                 this._stallRecoveryTimer = null;
             }
+
+            // Always update play/pause button (overlay won't show due to isLoading check inside)
+            this._updatePlayPauseUI();
+
+            // Skip live badge update if loading (switching streams)
+            if (this.isLoading) return;
+
             // Show as not-live when paused
             if (this.isLive && this.ui.liveBadge) {
                 this.ui.liveBadge.classList.add('not-live');
@@ -2733,6 +2745,12 @@ export class CorePlayer {
      */
     _recoverFromStall() {
         if (!this.isStreamMode || !this.isLive || !this.streamVideo) return;
+
+        // Don't recover if user has paused
+        if (!this.isPlaying) {
+            Logger.log('[Stream] Skipping stall recovery - user paused');
+            return;
+        }
 
         Logger.log('[Stream] Attempting stall recovery...');
 
@@ -3154,34 +3172,29 @@ export class CorePlayer {
                 }
             } catch (e) {
                 Logger.warn('[Stream] Play failed:', e.message);
+
+                // If play was interrupted by pause (AbortError), respect the pause - don't retry
+                // Don't hide loader - may be from stream switch where new stream is still loading
+                if (e.name === 'AbortError') {
+                    Logger.log('[Stream] Play aborted (user paused), not retrying');
+                    return;
+                }
+
                 // Handle autoplay policy - try muted on mobile/any failure
-                if (true) {
-                    Logger.log('[Stream] Autoplay/Play failed (' + e.name + '), trying muted...');
-                    try {
-                        this.config.muted = true;
-                        this.streamVideo.muted = true;
-                        this.streamVideo.setAttribute('muted', '');
-                        this._updateVolumeUI();
-                        await this.streamVideo.play();
-                        this.isPlaying = true;
-                        this._updatePlayPauseUI();
-                        // if (this.ui.playOverlay) {
-                        //     this.ui.playOverlay.style.display = 'none';
-                        // }
-                        // Set up one-time click handler to unmute
-                        // const unmuteHandler = () => {
-                        //     if (this.streamVideo && this.isPlaying) {
-                        //         this.streamVideo.muted = this.config.muted || false;
-                        //         Logger.log('[Stream] Unmuted after user interaction');
-                        //     }
-                        //     document.removeEventListener('click', unmuteHandler);
-                        //     document.removeEventListener('touchstart', unmuteHandler);
-                        // };
-                        // document.addEventListener('click', unmuteHandler, { once: true });
-                        // document.addEventListener('touchstart', unmuteHandler, { once: true });
-                        Logger.log('[Stream] Playing muted (touch/click to unmute)');
-                    } catch (mutedError) {
-                        Logger.error('[Stream] Even muted play failed:', mutedError);
+                Logger.log('[Stream] Autoplay/Play failed (' + e.name + '), trying muted...');
+                try {
+                    this.config.muted = true;
+                    this.streamVideo.muted = true;
+                    this.streamVideo.setAttribute('muted', '');
+                    this._updateVolumeUI();
+                    await this.streamVideo.play();
+                    this.isPlaying = true;
+                    this._updatePlayPauseUI();
+                    Logger.log('[Stream] Playing muted (touch/click to unmute)');
+                } catch (mutedError) {
+                    Logger.error('[Stream] Even muted play failed:', mutedError);
+                    // Don't hide loader on AbortError - may be from stream switch
+                    if (mutedError.name !== 'AbortError') {
                         this._setLoading(false);
                     }
                 }
@@ -3290,6 +3303,13 @@ export class CorePlayer {
             this.streamVideo.pause();
             this.isPlaying = false;
             this._clearAutoHideTimer();
+
+            // If user explicitly paused (showOverlay=true), hide loader and show paused state
+            // If internal pause (showOverlay=false, e.g. stream switch), keep loader visible
+            if (showOverlay) {
+                this._setLoading(false);
+            }
+
             this._updatePlayPauseUI();
             if (this.ui.playOverlay) {
                 const shouldShow = showOverlay && this.config.controls.playOverlay;
@@ -3312,6 +3332,8 @@ export class CorePlayer {
         }
         this.isPlaying = false;
         this._clearAutoHideTimer();
+
+        // Always update play/pause button (overlay won't show due to isLoading check inside)
         this._updatePlayPauseUI();
 
         if (this.audioBufferIterator) {
@@ -3348,8 +3370,8 @@ export class CorePlayer {
         // Save state
         this._savePlaybackState();
 
-        // Show/Hide overlay
-        if (this.ui.playOverlay) {
+        // Show/Hide overlay - skip if loading
+        if (this.ui.playOverlay && !this.isLoading) {
             const shouldShow = showOverlay && this.config.controls.playOverlay;
             this.ui.playOverlay.style.display = shouldShow ? 'flex' : 'none';
         }

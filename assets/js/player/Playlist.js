@@ -1304,16 +1304,13 @@ export class Playlist {
             // Handle streams (HLS/Live) - load directly without MediaMetadata processing
             if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {
                 video.isStream = true; // Mark for metadata prefetch skip
-                const shouldAutoplay = autoplay && this.player.isPlaying;
-                await this.player.load(video.url, shouldAutoplay, video.id, null);
+                // For streams, use autoplay directly - user clicked to play
+                await this.player.load(video.url, autoplay, video.id, null);
 
                 // Update item metadata after stream loads
                 this._updateStreamItemMetadata(video, index);
 
                 this._saveState();
-                if (shouldAutoplay) {
-                    this.player.play();
-                }
                 return;
             }
 
