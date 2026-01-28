@@ -171,6 +171,10 @@ export class PullToRefresh {
 }
 
 // Initialize on load
-window.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        new PullToRefresh();
+    });
+} else {
     new PullToRefresh();
-});
+}

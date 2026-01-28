@@ -72,6 +72,7 @@ npx cleancss -o build/assets/css/player.bundle.css \
     assets/css/screenshot.css \
     assets/css/modal.css \
     assets/css/player_page.css \
+    assets/css/pull-to-refresh.css \
     2>/dev/null || {
         log_error "CSS bundle failed"
         exit 1
@@ -83,11 +84,22 @@ npx cleancss -o build/assets/css/landing.bundle.css \
     assets/css/theme.css \
     assets/css/common.css \
     assets/css/landing.css \
+    assets/css/pull-to-refresh.css \
     2>/dev/null || {
         log_error "Landing CSS bundle failed"
         exit 1
     }
 log_success "Created landing.bundle.css"
+
+# Pull-to-Refresh JS (Minify only, no bundling needed as it has no deps)
+npx esbuild assets/js/pull-to-refresh.js \
+    --minify \
+    --outfile=build/assets/js/pull-to-refresh.js \
+    2>/dev/null || {
+        log_error "Failed to minify pull-to-refresh.js"
+        exit 1
+    }
+log_success "Created pull-to-refresh.js"
 
 # ============================================
 # 4. COPY & MINIFY HTML FILES
@@ -133,6 +145,7 @@ sed -i '/assets\/css\/player.css/d' build/player.html
 sed -i '/assets\/css\/screenshot.css/d' build/player.html
 sed -i '/assets\/css\/modal.css/d' build/player.html
 sed -i '/assets\/css\/player_page.css/d' build/player.html
+sed -i 's|<link rel="stylesheet" href="assets/css/pull-to-refresh.css">||g' build/player.html
 
 # 3. Update Import Map for Production (fix path resolution)
 # We will replace the entire simple import map with the comprehensive one
@@ -220,6 +233,9 @@ log_info "Optimizing index.html for production..."
 # Replace the 3 CSS links with single bundle in index.html
 # Using a simple approach: sed replacement
 sed -i 's|<link rel="stylesheet" href="assets/css/theme.css">.*<link rel="stylesheet" href="assets/css/common.css">.*<link rel="stylesheet" href="assets/css/landing.css">|<link rel="stylesheet" href="assets/css/landing.bundle.css">|g' build/index.html 2>/dev/null || true
+
+# Remove pull-to-refresh.css link as it is now in the bundle (use substitution, not delete line)
+sed -i 's|<link rel="stylesheet" href="assets/css/pull-to-refresh.css">||g' build/index.html 2>/dev/null || true
 
 # If minified (no newlines), try inline
 sed -i 's|<link rel=stylesheet href=assets/css/theme.css><link rel=stylesheet href=assets/css/common.css><link rel=stylesheet href=assets/css/landing.css>|<link rel=stylesheet href=assets/css/landing.bundle.css>|g' build/index.html 2>/dev/null || true
