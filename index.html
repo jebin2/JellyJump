@@ -35,6 +35,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="JellyJump">
+    <script type="module" src="assets/js/pull-to-refresh.js"></script>
     <script>
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
@@ -52,6 +53,7 @@
     <link rel="stylesheet" href="assets/css/common.css">
     <!-- Landing CSS -->
     <link rel="stylesheet" href="assets/css/landing.css">
+    <link rel="stylesheet" href="assets/css/pull-to-refresh.css">
 </head>
 
 <body>
@@ -414,12 +416,12 @@
                     mobileBtn.setAttribute('aria-expanded', !isExpanded);
                     navLinksContainer.classList.toggle('active');
                     mobileBtn.classList.toggle('active');
-                    if(overlay) overlay.classList.toggle('active');
+                    if (overlay) overlay.classList.toggle('active');
                     document.body.classList.toggle('no-scroll');
                 }
 
                 mobileBtn.addEventListener('click', toggleMenu);
-                if(overlay) overlay.addEventListener('click', toggleMenu);
+                if (overlay) overlay.addEventListener('click', toggleMenu);
 
                 // Close menu when clicking a link
                 navLinksContainer.querySelectorAll('a, button').forEach(link => {
