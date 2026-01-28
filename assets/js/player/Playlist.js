@@ -1078,13 +1078,13 @@ export class Playlist {
      * @param {number} index 
      */
     /**
-     * Remove item (Surgical DOM Update)
-     * @param {number} index 
+     * Remove item from playlist (Surgical DOM Update)
+     * @param {number} index
      */
     removeItem(index) {
         if (index < 0 || index >= this.items.length) return;
 
-        // If removing the currently playing item, stop playback (KISS)
+        // If removing the currently playing item, stop playback
         const wasActive = index === this.activeIndex;
 
         // Adjust activeIndex if removing item before it
@@ -1107,20 +1107,18 @@ export class Playlist {
             const folder = itemEl.closest('.playlist-folder');
             if (folder) {
                 const header = folder.querySelector('.playlist-folder-header');
-                const countSpan = header.querySelector('span:last-child'); // Assumption: Count is last span
-                // Better lookup: count is the one with opacity 0.7
+                const countSpan = header.querySelector('span:last-child');
                 if (countSpan && countSpan.textContent.startsWith('(')) {
                     const currentCount = parseInt(countSpan.textContent.replace(/\D/g, ''));
                     const newCount = Math.max(0, currentCount - 1);
                     countSpan.textContent = `(${newCount})`;
-                    if (newCount === 0) folder.remove(); // Optional: remove empty folder
+                    if (newCount === 0) folder.remove();
                 }
             }
             itemEl.remove();
         }
 
-        // 3. Patch Indices (Crucial for correct subsequent clicks)
-        // Find all items with index > removed index
+        // 3. Patch visible indices (collapsed folders use ID-based lookup)
         const allItems = this.container.querySelectorAll('.playlist-item');
         for (const el of allItems) {
             const curr = parseInt(el.dataset.index);
@@ -1129,14 +1127,14 @@ export class Playlist {
             }
         }
 
-        // 4. Stop playback if active item was removed (KISS)
+        // 4. Stop playback if active item was removed
         if (wasActive) {
             this._stopPlayback();
         }
     }
 
     /**
-     * Remove a folder (Surgical)
+     * Remove a folder and all its contents (Surgical DOM Update)
      */
     removeFolder(folderPath) {
         // Find items to remove
@@ -1161,7 +1159,7 @@ export class Playlist {
             this.items.splice(idx, 1);
         });
 
-        // 2. Update Active Index - KISS approach: stop if active was removed
+        // 2. Update Active Index
         let wasActiveRemoved = false;
         if (originalActive) {
             const newIndex = this.items.indexOf(originalActive);
@@ -1185,13 +1183,10 @@ export class Playlist {
             folderEl.remove();
         }
 
-        // 4. Robust Index Patching
-        // Iterate all remaining DOM items and shift their indices
+        // 4. Patch visible indices (collapsed folders use ID-based lookup)
         const allItems = this.container.querySelectorAll('.playlist-item');
-
         for (const el of allItems) {
             const oldIdx = parseInt(el.dataset.index);
-            // Count how many removed items were BEFORE this item's old index
             let shift = 0;
             for (const removedIdx of indicesToRemove) {
                 if (removedIdx < oldIdx) {
@@ -1203,7 +1198,7 @@ export class Playlist {
             }
         }
 
-        // 5. Stop playback if active was removed (KISS)
+        // 5. Stop playback if active was removed
         if (wasActiveRemoved) {
             this._stopPlayback();
         }
@@ -1995,11 +1990,21 @@ export class Playlist {
      * @private
      */
     _attachItemEvents(itemEl) {
+        // Helper to get current index by ID (handles stale cached indices in folders)
+        const getCurrentIndex = () => {
+            const id = itemEl.dataset.id;
+            if (id) {
+                const index = this.items.findIndex(i => i.id === id);
+                if (index !== -1) return index;
+            }
+            // Fallback to data-index if ID lookup fails
+            return parseInt(itemEl.dataset.index);
+        };
+
         // Click to play
         itemEl.addEventListener('click', (e) => {
             if (e.target.closest('.playlist-remove-btn') || e.target.closest('.playlist-download-btn')) return;
-            const index = parseInt(itemEl.dataset.index);
-            this.selectItem(index);
+            this.selectItem(getCurrentIndex());
         });
 
         // Download button
@@ -2007,8 +2012,7 @@ export class Playlist {
         if (downloadBtn) {
             downloadBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const index = parseInt(itemEl.dataset.index);
-                this._downloadItem(index);
+                this._downloadItem(getCurrentIndex());
             });
         }
 
@@ -2017,8 +2021,7 @@ export class Playlist {
         if (removeBtn) {
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const index = parseInt(itemEl.dataset.index);
-                this.removeItem(index);
+                this.removeItem(getCurrentIndex());
             });
         }
 
@@ -2027,8 +2030,7 @@ export class Playlist {
         if (settingsBtn) {
             settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const index = parseInt(itemEl.dataset.index);
-                this._toggleSettingsMenu(index, settingsBtn);
+                this._toggleSettingsMenu(getCurrentIndex(), settingsBtn);
             });
         }
     }
@@ -2177,6 +2179,7 @@ export class Playlist {
 
         // Set attributes
         itemEl.dataset.index = index;
+        itemEl.dataset.id = item.id; // Store ID for reliable lookup after deletions
         itemEl.setAttribute('aria-label', `Play ${item.title || 'Unknown Video'}`);
 
         // Status classes
