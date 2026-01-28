@@ -1981,8 +1981,7 @@ export class CorePlayer {
         this._updateTimeDisplay();
         this._updateProgress();
 
-        // Hide loader if visible
-        this._setLoading(false);
+        // Note: Don't hide loader here - let the caller control loading state
     }
 
     /**
@@ -2064,7 +2063,6 @@ export class CorePlayer {
                 this.streamVideo.muted = this.config.muted;
             }
 
-            this._setLoading(false);
             Logger.log('[Stream] HLS stream loaded successfully. Live:', this.isLive);
 
             // Mark that we need to seek to live on first play
@@ -2073,9 +2071,11 @@ export class CorePlayer {
             }
 
             if (autoplay) {
+                // Keep loading visible until onplaying fires
                 this.play();
             } else {
-                // Show play overlay
+                // Only hide loader and show play overlay if not autoplaying
+                this._setLoading(false);
                 if (this.ui.playOverlay && this.config.controls.playOverlay) {
                     this.ui.playOverlay.style.display = 'flex';
                 }
@@ -3135,6 +3135,8 @@ export class CorePlayer {
     async play() {
         // Handle stream mode
         if (this.isStreamMode && this.streamVideo) {
+            // Show loading until onplaying fires
+            this._setLoading(true);
             try {
                 await this.streamVideo.play();
                 this.isPlaying = true;
@@ -3180,9 +3182,11 @@ export class CorePlayer {
                         Logger.log('[Stream] Playing muted (touch/click to unmute)');
                     } catch (mutedError) {
                         Logger.error('[Stream] Even muted play failed:', mutedError);
+                        this._setLoading(false);
                     }
                 }
             }
+            return; // Stream mode handled, don't continue to file-based logic
         }
         this._updateVolumeUI();
 

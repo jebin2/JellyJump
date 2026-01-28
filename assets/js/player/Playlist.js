@@ -1252,7 +1252,12 @@ export class Playlist {
     async selectItem(index, autoplay = true) {
         if (index < 0 || index >= this.items.length) return;
 
-        // Reset UI immediately for instant feedback
+        // Show loading immediately for instant feedback
+        if (this.player && typeof this.player._setLoading === 'function') {
+            this.player._setLoading(true);
+        }
+
+        // Reset UI (clear canvas, reset time/progress)
         if (this.player && typeof this.player.resetUI === 'function') {
             this.player.resetUI();
         }
