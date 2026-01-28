@@ -1746,13 +1746,14 @@ export class CorePlayer {
         this.audioContextStartTime = null;
         this.fallbackStartTime = undefined;
 
-        // Reset state
-        this.currentTime = 0;
-        this.duration = 0;
-        this.audioContextStartTime = null;
-        this.fallbackStartTime = undefined;
-
         this._cleanupThumbnails();
+
+        // Clean up iterators BEFORE disposing resources to prevent orphaned VideoSamples
+        if (this.videoFrameIterator) {
+            this.videoFrameIterator.return().catch(() => { });
+        }
+        // Wait for any pending audio iterator cleanup from pause()
+        // Note: audioBufferIterator is already cleaned up in pause()
 
         // Dispose MediaBunny resources
         this._disposeMediaBunnyResources();
