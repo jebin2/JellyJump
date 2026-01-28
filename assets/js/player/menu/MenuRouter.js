@@ -76,6 +76,10 @@ export class MenuRouter {
                 const { CutDetectionMenu } = await import('./CutDetectionMenu.js');
                 new CutDetectionMenu(playlist).execute(item);
                 break;
+            case 'detect-motion':
+                const { MotionDetectionMenu } = await import('./MotionDetectionMenu.js');
+                new MotionDetectionMenu(playlist).execute(item);
+                break;
             default:
                 Logger.warn(`MenuRouter: Unknown action "${action}"`);
         }
