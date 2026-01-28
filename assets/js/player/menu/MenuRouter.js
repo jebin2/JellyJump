@@ -72,6 +72,10 @@ export class MenuRouter {
             case 'download-manage':
                 await TrackManagerMenu.init(item, playlist);
                 break;
+            case 'detect-cuts':
+                const { CutDetectionMenu } = await import('./CutDetectionMenu.js');
+                new CutDetectionMenu(playlist).execute(item);
+                break;
             default:
                 Logger.warn(`MenuRouter: Unknown action "${action}"`);
         }
