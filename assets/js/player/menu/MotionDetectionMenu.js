@@ -15,7 +15,8 @@ export class MotionDetectionMenu {
      * @param {Object} item - The playlist item object
      */
     async execute(item) {
-        if (!item || !item.url) {
+        const videoUrl = item?.blob_url || item?.url;
+        if (!item || !videoUrl) {
             Logger.warn('MotionDetectionMenu: No valid item or URL provided');
             return;
         }
@@ -95,7 +96,7 @@ export class MotionDetectionMenu {
             };
 
             try {
-                const results = await detector.detect(item.url);
+                const results = await detector.detect(videoUrl);
                 if (isCancelled) return;
 
                 statusText.textContent = 'Scan complete!';

@@ -4,18 +4,13 @@
   "description": "JellyJump Media Player",
   "type": "module",
   "scripts": {
-    "build": "./build.sh",
-    "build:bundle": "npm run bundle:player && npm run bundle:css",
-    "bundle:player": "esbuild assets/js/player-entry.js --bundle --minify --format=esm --outfile=build/assets/js/bundles/player.bundle.js --external:./assets/js/lib/*",
-    "bundle:css": "npx cleancss -o build/assets/css/player.bundle.css assets/css/theme.css assets/css/common.css assets/css/player.css assets/css/screenshot.css assets/css/modal.css assets/css/player_page.css",
-    "clean": "rm -rf build",
-    "dev": "python3 -m http.server 8080",
-    "preview": "npm run clean && npm run build && cd build && python3 -m http.server 8080"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "build:desktop": "./build-desktop.sh"
   },
   "devDependencies": {
-    "clean-css-cli": "^5.6.3",
-    "esbuild": "^0.24.2",
-    "html-minifier-terser": "^7.2.0",
-    "terser": "^5.44.1"
+    "vite": "^7.3.1"
   }
 }

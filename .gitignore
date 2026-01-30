@@ -3,6 +3,8 @@ node_modules/
 desktop/node_modules/
 
 # Frontend build output (generated)
+dist/
+build/
 desktop/build/
 
 # Electron dist output

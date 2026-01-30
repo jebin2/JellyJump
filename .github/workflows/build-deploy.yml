@@ -31,23 +31,22 @@ jobs:
       - name: Install dependencies
         run: npm install
       
-      - name: Build with build.sh
+      - name: Build with Vite
         run: npm run build
-      
+
       - name: Deploy to release branch
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          
+
           # Move build directory contents and other files to temp location
           TEMP_DIR=/tmp/release-artifacts
           mkdir -p "$TEMP_DIR"
-          
-          # Move contents of build to root of temp dir (Flattens the structure)
-          cp -r build/* "$TEMP_DIR/" 2>/dev/null || true
-          
+
+          # Move contents of dist to root of temp dir (Flattens the structure)
+          cp -r dist/* "$TEMP_DIR/" 2>/dev/null || true
+
           # Copy other necessary files
-          cp build.sh "$TEMP_DIR/" 2>/dev/null || true
           cp -r desktop "$TEMP_DIR/" 2>/dev/null || true
           cp build-desktop.sh "$TEMP_DIR/" 2>/dev/null || true
           cp package-lock.json "$TEMP_DIR/" 2>/dev/null || true

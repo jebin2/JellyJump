@@ -15,7 +15,8 @@ export class CutDetectionMenu {
      * @param {Object} item - The playlist item object
      */
     async execute(item) {
-        if (!item || !item.url) {
+        const videoUrl = item?.blob_url || item?.url;
+        if (!item || !videoUrl) {
             Logger.warn('CutDetectionMenu: No valid item or URL provided');
             return;
         }
@@ -110,7 +111,7 @@ export class CutDetectionMenu {
                     }
                 }
 
-                const cuts = await detector.detect(item.url);
+                const cuts = await detector.detect(videoUrl);
                 if (isCancelled) return;
 
                 statusText.textContent = 'Detection complete!';

@@ -33,15 +33,12 @@ jobs:
         run: npm install
 
       - name: Build Web App
-        run: |
-          chmod +x build.sh
-          ./build.sh
-        shell: bash
+        run: npm run build
 
       - name: Prepare Desktop Build
         run: |
           mkdir -p desktop/build
-          cp -r build/* desktop/build/
+          cp -r dist/* desktop/build/
         shell: bash
 
       - name: Install Desktop Dependencies
