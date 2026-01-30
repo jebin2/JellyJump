@@ -215,15 +215,51 @@ function setupApplyButton(elements, state, item, playlist, modal) {
         try {
             const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
+            // Calculate font size for video (same logic as preview, but in video coords)
+            let finalFontSize = 0;
+            let finalX = Math.round(state.box.x);
+            let finalY = Math.round(state.box.y);
+
+            if (state.watermark.type === 'text') {
+                const heightConstraint = state.box.height * 0.8;
+                const charCount = Math.max(1, state.watermark.text.length);
+                const widthConstraint = (state.box.width * 0.9) / (charCount * 0.5);
+                finalFontSize = Math.max(12, Math.min(heightConstraint, widthConstraint));
+
+                // Calculate Centering
+                // Create a temporary canvas to measure text width with the exact font used later
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.font = `bold ${finalFontSize}px sans-serif`;
+                const textMetrics = tempCtx.measureText(state.watermark.text);
+                const textWidth = textMetrics.width;
+
+                // Center horizontally within the box
+                finalX += (state.box.width - textWidth) / 2;
+
+                // Center vertically within the box
+                finalY += (state.box.height - finalFontSize) / 2;
+            }
+
             const watermarkConfig = {
                 type: state.watermark.type,
                 text: state.watermark.text,
                 image: state.watermark.imageFile,
                 opacity: state.watermark.opacity,
-                x: Math.round(state.box.x),
-                y: Math.round(state.box.y),
+                x: Math.round(finalX),
+                y: Math.round(finalY),
                 width: Math.round(state.box.width),
-                height: Math.round(state.box.height)
+                height: Math.round(state.box.height),
+                fontSize: Math.round(finalFontSize),
+                isPreCalculated: true,
+
+                // Explicit Styling Control
+                font: `bold ${Math.round(finalFontSize)}px sans-serif`,
+                fillStyle: 'rgba(255, 255, 255, 0.8)',
+                strokeStyle: 'rgba(0, 0, 0, 0.5)',
+                lineWidth: Math.round(finalFontSize) * 0.05,
+                textAlign: 'left',
+                textBaseline: 'top'
             };
 
             const ext = item.title.split('.').pop().toLowerCase();

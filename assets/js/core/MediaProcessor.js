@@ -176,62 +176,26 @@ export class MediaProcessor {
                     ctx.save();
                     ctx.globalAlpha = watermark.opacity || 1.0;
 
-                    // Determine scale
-                    // Base size relative to video height (e.g., 15% is default scale)
-                    const scale = watermark.scale || 0.15;
-
+                    // Determine dimensions & Position
                     let drawX = 0, drawY = 0;
+                    let wWidth = 0, wHeight = 0;
 
                     if (watermark.type === 'image' && watermarkImg) {
-                        // Image Watermark
-                        // Calculate dimensions maintaining aspect ratio
-                        const aspect = watermarkImg.width / watermarkImg.height;
-                        const wHeight = height * scale;
-                        const wWidth = wHeight * aspect;
-
-                        // Positioning
-                        const padding = height * 0.05; // 5% padding
-                        const pos = watermark.position || 'br';
-
-                        if (pos.includes('l')) drawX = padding;
-                        else if (pos.includes('r')) drawX = width - wWidth - padding;
-                        else drawX = (width - wWidth) / 2; // center horizontal
-
-                        if (pos.includes('t')) drawY = padding;
-                        else if (pos.includes('b')) drawY = height - wHeight - padding;
-                        else drawY = (height - wHeight) / 2; // center vertical
-
-                        ctx.drawImage(watermarkImg, drawX, drawY, wWidth, wHeight);
+                        ctx.drawImage(watermarkImg, watermark.x, watermark.y, watermark.width, watermark.height);
 
                     } else if (watermark.type === 'text' && watermark.text) {
-                        // Text Watermark
-                        const fontSize = height * scale; // Scale is roughly font size ratio
-                        ctx.font = `bold ${fontSize}px sans-serif`;
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-                        ctx.lineWidth = fontSize * 0.05;
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'top';
+                        const fontSize = watermark.fontSize || 24;
 
-                        const text = watermark.text;
-                        const metrics = ctx.measureText(text);
-                        const wWidth = metrics.width;
-                        const wHeight = fontSize; // Approx
+                        // Use explicit styles from configuration
+                        ctx.font = watermark.font;
+                        ctx.fillStyle = watermark.fillStyle;
+                        ctx.strokeStyle = watermark.strokeStyle;
+                        ctx.lineWidth = watermark.lineWidth;
+                        ctx.textAlign = watermark.textAlign;
+                        ctx.textBaseline = watermark.textBaseline;
 
-                        // Positioning
-                        const padding = height * 0.05;
-                        const pos = watermark.position || 'c';
-
-                        if (pos.includes('l')) drawX = padding;
-                        else if (pos.includes('r')) drawX = width - wWidth - padding;
-                        else drawX = (width - wWidth) / 2;
-
-                        if (pos.includes('t')) drawY = padding;
-                        else if (pos.includes('b')) drawY = height - wHeight - padding;
-                        else drawY = (height - wHeight) / 2;
-
-                        ctx.strokeText(text, drawX, drawY);
-                        ctx.fillText(text, drawX, drawY);
+                        ctx.strokeText(watermark.text, watermark.x, watermark.y);
+                        ctx.fillText(watermark.text, watermark.x, watermark.y);
                     }
 
                     ctx.restore();
@@ -240,7 +204,6 @@ export class MediaProcessor {
                 return canvas;
             };
 
-            // Initialize Conversion
             // Initialize Conversion
             const conversionOptions = {
                 input: input,
