@@ -1828,10 +1828,16 @@
             </div>
 
             <!-- Text Input (Flex Grow) -->
-            <div class="wm-text-input-group flex-1">
-                <label class="text-xs text-secondary font-mono mb-xs block">TEXT CONTENT</label>
-                <input type="text" id="wm-text-content" class="mb-input w-full" placeholder="Enter watermark text"
-                    value="JellyJump">
+            <div class="wm-text-input-group flex-1 flex gap-sm">
+                <div class="flex-1">
+                    <label class="text-xs text-secondary font-mono mb-xs block">TEXT CONTENT</label>
+                    <input type="text" id="wm-text-content" class="mb-input w-full" placeholder="Enter watermark text"
+                        value="JellyJump">
+                </div>
+                <div>
+                    <label class="text-xs text-secondary font-mono mb-xs block">COLOR</label>
+                    <input type="color" id="wm-color" class="w-[38px] h-[38px] p-0 border-0 rounded cursor-pointer bg-transparent" value="#ffffff">
+                </div>
             </div>
 
             <!-- Image Input (Hidden by default, Flex Grow) -->

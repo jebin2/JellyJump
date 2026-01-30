@@ -47,6 +47,7 @@ export class WatermarkMenu {
                 textGroup: modalContent.querySelector('.wm-text-input-group'),
                 imageGroup: modalContent.querySelector('.wm-image-input-group'),
                 textInput: modalContent.querySelector('#wm-text-content'),
+                colorInput: modalContent.querySelector('#wm-color'),
                 imageInput: modalContent.querySelector('#wm-image-file'),
                 opacitySlider: modalContent.querySelector('#wm-opacity'),
                 opacityValue: modalContent.querySelector('.wm-opacity-value')
@@ -70,7 +71,7 @@ export class WatermarkMenu {
         const state = {
             video: { width: 0, height: 0 },
             box: { x: 0, y: 0, width: 0, height: 0 },
-            watermark: { type: 'text', text: 'JellyJump', imageFile: null, opacity: 1.0 },
+            watermark: { type: 'text', text: 'JellyJump', color: '#ffffff', imageFile: null, opacity: 1.0 },
             preview: { scale: 1 },
             drag: { active: false, handle: null, startX: 0, startY: 0, startBox: {} }
         };
@@ -146,7 +147,7 @@ function updateWatermarkBox(elements, state) {
 }
 
 function setupControlHandlers(elements, state) {
-    const { typeToggle, textGroup, imageGroup, textInput, imageInput, opacitySlider, opacityValue } = elements.controls;
+    const { typeToggle, textGroup, imageGroup, textInput, colorInput, imageInput, opacitySlider, opacityValue } = elements.controls;
 
     // Type toggle
     typeToggle.addEventListener('change', (e) => {
@@ -171,6 +172,12 @@ function setupControlHandlers(elements, state) {
         state.watermark.text = e.target.value;
         elements.textPreview.textContent = state.watermark.text;
         updateWatermarkBox(elements, state);
+    });
+
+    // Color input
+    colorInput.addEventListener('input', (e) => {
+        state.watermark.color = e.target.value;
+        elements.textPreview.style.color = state.watermark.color;
     });
 
     // Image input
@@ -255,7 +262,10 @@ function setupApplyButton(elements, state, item, playlist, modal) {
 
                 // Explicit Styling Control
                 font: `bold ${Math.round(finalFontSize)}px sans-serif`,
-                fillStyle: 'rgba(255, 255, 255, 0.8)',
+                fillStyle: (() => {
+                    const rgb = hexToRgb(state.watermark.color);
+                    return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+                })(),
                 strokeStyle: 'rgba(0, 0, 0, 0.5)',
                 lineWidth: Math.round(finalFontSize) * 0.05,
                 textAlign: 'left',
@@ -313,4 +323,13 @@ function setupApplyButton(elements, state, item, playlist, modal) {
             modal.closeBtn.disabled = false;
         }
     });
+}
+
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : { r: 255, g: 255, b: 255 };
 }
