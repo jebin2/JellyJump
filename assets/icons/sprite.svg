@@ -32,12 +32,16 @@
         <path d="M12 2 A10 10 0 0 1 22 12" stroke="currentColor" stroke-width="2" fill="none"/>
     </symbol>
 
+
     <!-- Play Icon -->
     <symbol id="icon-play" viewBox="0 0 24 24">
         <path d="M8 5v14l11-7z"/>
     </symbol>
 
-
+    <!-- Record Icon -->
+    <symbol id="icon-record" viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+    </symbol>
 
     <!-- Camera/Screenshot Icon -->
     <symbol id="icon-camera" viewBox="0 0 24 24">

@@ -225,9 +225,17 @@ export class Playlist {
         // Attach events
         const addFilesBtn = header.querySelector('#mb-add-files');
         const addFolderBtn = header.querySelector('#mb-add-folder');
+        const screenRecordBtn = header.querySelector('#mb-screen-record');
         const clearBtn = header.querySelector('#mb-clear-playlist');
         const searchInput = header.querySelector('#mb-playlist-search-input');
         const searchClearBtn = header.querySelector('#mb-playlist-search-clear');
+
+        if (screenRecordBtn) {
+            screenRecordBtn.addEventListener('click', async () => {
+                const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
+                ScreenRecorderMenu.init(this);
+            });
+        }
 
         if (searchInput) {
             // Debounce function
