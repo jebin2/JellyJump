@@ -2414,9 +2414,11 @@ export class CorePlayer {
      * Start recording webcam stream using MediaBunny
      * @param {MediaStream} stream 
      */
-    async startWebcamRecording(stream) {
-        if (this._isWebcamRecording) return;
-
+    /**
+     * Load a webcam stream into the player
+     * @param {MediaStream} stream
+     */
+    async loadWebcamStream(stream) {
         // 1. Setup Preview (Existing CorePlayer Logic)
         this._createStreamVideo();
         // Setup events to ensure canvas resizing (sets up onloadedmetadata)
@@ -2440,32 +2442,48 @@ export class CorePlayer {
 
         this._startStreamRenderLoop();
         this._updatePlayPauseUI();
+    }
 
-        // 2. Setup Recording (MediaBunny)
-        this._isWebcamRecording = true;
-        this._webcamChunks = [];
+    /**
+     * Start recording the current canvas content (Webcam/HLS/etc)
+     * @param {Object} options
+     * @param {MediaStreamTrack} options.audioTrack - Optional specific audio track
+     */
+    async startCanvasRecording(options = {}) {
+        if (this._isCanvasRecording) return;
+
+        Logger.log('[Stream] Video Bitrate: 50 Mbps (Raw Quality)');
+
+        // Setup Recording (MediaBunny)
+        this._isCanvasRecording = true;
+        this._canvasChunks = [];
+
+        // Determine Audio Track
+        let audioTrack = options.audioTrack;
+        if (!audioTrack && this.streamVideo && this.streamVideo.srcObject) {
+            // Try to get track from stream object if available
+            const stream = this.streamVideo.srcObject;
+            if (stream.getAudioTracks && stream.getAudioTracks().length > 0) {
+                audioTrack = stream.getAudioTracks()[0];
+            }
+        }
 
         // Check audio support
         const audioIsEncodable = await MediaBunny.canEncodeAudio('opus', {
             bitrate: 128000,
         });
 
-        let audioTrack = null;
-        if (audioIsEncodable && stream.getAudioTracks().length > 0) {
-            audioTrack = stream.getAudioTracks()[0];
-        }
-
-        this._webcamOutput = new MediaBunny.Output({
+        this._canvasOutput = new MediaBunny.Output({
             format: new MediaBunny.Mp4OutputFormat({ fastStart: 'fragmented' }),
             target: new MediaBunny.StreamTarget(new WritableStream({
                 write: (chunk) => {
-                    this._webcamChunks.push(chunk.data);
+                    this._canvasChunks.push(chunk.data);
                 },
             })),
         });
 
         // Video Source (Canvas)
-        const frameRate = 30;
+        const frameRate = 30; // Capture rate
         const videoSource = new MediaBunny.CanvasSource(this.canvas, {
             codec: 'avc',
             bitrate: 50_000_000, // 50 Mbps for "Raw"/Near-Lossless Quality
@@ -2474,71 +2492,85 @@ export class CorePlayer {
             width: this.canvas.width,
             height: this.canvas.height
         });
-        this._webcamOutput.addVideoTrack(videoSource, { frameRate });
+        this._canvasOutput.addVideoTrack(videoSource, { frameRate });
 
         // Audio Source
-        if (audioTrack) {
+        if (audioTrack && audioIsEncodable) {
             const audioSource = new MediaBunny.MediaStreamAudioTrackSource(audioTrack, {
                 codec: 'opus',
                 bitrate: 128000,
             });
-            this._webcamOutput.addAudioTrack(audioSource);
+            this._canvasOutput.addAudioTrack(audioSource);
         }
 
-        await this._webcamOutput.start();
+        await this._canvasOutput.start();
 
         // Start Capture Loop
-        // Use document.timeline if available, else performance.now()
-        this._webcamStartTime = (typeof document.timeline !== 'undefined') ? Number(document.timeline.currentTime) : performance.now();
-        this._webcamReadyForMoreFrames = true;
-        this._webcamLastFrameNumber = -1;
+        this._canvasStartTime = (typeof document.timeline !== 'undefined') ? Number(document.timeline.currentTime) : performance.now();
+        this._canvasReadyForMoreFrames = true;
+        this._canvasLastFrameNumber = -1;
 
         const addVideoFrame = async () => {
-            if (!this._isWebcamRecording) return;
-            if (!this._webcamReadyForMoreFrames) return;
+            if (!this._isCanvasRecording) return;
+            if (!this._canvasReadyForMoreFrames) return;
 
             const now = (typeof document.timeline !== 'undefined') ? Number(document.timeline.currentTime) : performance.now();
-            const elapsedSeconds = (now - this._webcamStartTime) / 1000;
+            const elapsedSeconds = (now - this._canvasStartTime) / 1000;
             const frameNumber = Math.round(elapsedSeconds * frameRate);
 
-            if (frameNumber === this._webcamLastFrameNumber) return;
+            if (frameNumber === this._canvasLastFrameNumber) return;
 
-            this._webcamLastFrameNumber = frameNumber;
+            this._canvasLastFrameNumber = frameNumber;
             const timestamp = frameNumber / frameRate;
 
-            this._webcamReadyForMoreFrames = false;
+            this._canvasReadyForMoreFrames = false;
             try {
                 await videoSource.add(timestamp, 1 / frameRate);
             } catch (e) {
                 Logger.warn('Frame add error', e);
             }
-            this._webcamReadyForMoreFrames = true;
+            this._canvasReadyForMoreFrames = true;
         };
 
         // Loop
-        this._webcamCaptureInterval = setInterval(() => {
+        this._canvasCaptureInterval = setInterval(() => {
             addVideoFrame().catch(e => Logger.error(e));
         }, 1000 / frameRate);
 
-        Logger.log('[Stream] Webcam Recording Started (MediaBunny)');
+        Logger.log('[Stream] Canvas Recording Started (MediaBunny)');
     }
 
     /**
-     * Stop webcam recording and return the blob
+     * Stop canvas recording and return the blob
      * @returns {Promise<Blob|null>}
      */
-    async stopWebcamRecording() {
-        if (!this._isWebcamRecording) return null;
+    async stopCanvasRecording() {
+        if (!this._isCanvasRecording) return null;
 
-        this._isWebcamRecording = false;
-        clearInterval(this._webcamCaptureInterval);
+        this._isCanvasRecording = false;
+        clearInterval(this._canvasCaptureInterval);
+
+        Logger.log('[Stream] Finalizing Canvas Recording...');
 
         // Finalize
-        if (this._webcamOutput) {
-            await this._webcamOutput.finalize();
+        if (this._canvasOutput) {
+            await this._canvasOutput.finalize();
         }
 
-        // Stop Preview
+        // Create Blob
+        if (this._canvasChunks && this._canvasChunks.length > 0) {
+            const blob = new Blob(this._canvasChunks, { type: 'video/mp4' });
+            this._canvasOutput = null;
+            this._canvasChunks = null;
+            return blob;
+        }
+        return null;
+    }
+
+    /**
+     * Stop webcam stream mode (cleanup preview, stop render loop)
+     */
+    stopWebcamStreamMode() {
         if (this.streamVideo) {
             this.streamVideo.srcObject = null;
             this.streamVideo.pause();
@@ -2552,13 +2584,6 @@ export class CorePlayer {
         }
 
         this._updatePlayPauseUI();
-
-        // Create Blob
-        if (this._webcamChunks.length > 0) {
-            const blob = new Blob(this._webcamChunks, { type: 'video/mp4' });
-            return blob;
-        }
-        return null;
     }
 
     /**

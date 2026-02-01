@@ -221,16 +221,19 @@ export class ScreenRecorderMenu {
             this.currentMode = 'webcam';
             this.playlist = playlist;
 
-            // Delegate completely to CorePlayer
-            if (window.player && typeof window.player.startWebcamRecording === 'function') {
-                await window.player.startWebcamRecording(stream);
+            // Delegate to CorePlayer (split API)
+            if (window.player) {
+                // 1. Load Webcam Stream (setup preview)
+                await window.player.loadWebcamStream(stream);
+                // 2. Start Canvas Recording
+                await window.player.startCanvasRecording({ audioTrack: stream.getAudioTracks()[0] });
             } else {
-                throw new Error("CorePlayer startWebcamRecording not available");
+                throw new Error("CorePlayer not available");
             }
 
             // Update UI State
             this._updateButtonState(true);
-            playlist._showToast('Webcam recording started (MediaBunny)', 'info');
+            playlist._showToast('Webcam recording started', 'info');
 
         } catch (err) {
             console.error("Error starting webcam:", err);
@@ -525,16 +528,17 @@ export class ScreenRecorderMenu {
             this.isRecording = false;
             this._updateButtonState(false);
 
-            // Handle MediaBunny Webcam via CorePlayer
-            // Note: CorePlayer stops the loop and finalizing might take a moment.
-            if (window.player && typeof window.player.stopWebcamRecording === 'function') {
+            // Stop Canvas Recording
+            if (window.player && typeof window.player.stopCanvasRecording === 'function') {
                 playlist._showToast('Finalizing webcam recording...', 'info');
-                const blob = await window.player.stopWebcamRecording();
+                const blob = await window.player.stopCanvasRecording();
                 if (blob) {
                     this._saveRecordingBlob(playlist, blob);
                 } else {
                     playlist._showToast('No recording data found.', 'warning');
                 }
+                // Stop Webcam Stream Mode (preview cleanup)
+                window.player.stopWebcamStreamMode();
             }
 
             // Cleanup local stream reference
