@@ -2616,7 +2616,14 @@ export class CorePlayer {
 
                         samplesToAdd.forEach(s => {
                             if (this._canvasAudioSource) {
-                                this._canvasAudioSource.add(s);
+                                // IMPORTANT: add() is async, must wait before closing
+                                this._canvasAudioSource.add(s).then(() => {
+                                    s.close();
+                                }).catch(err => {
+                                    Logger.warn('[Record] Failed to add audio sample:', err);
+                                    s.close();
+                                });
+                            } else {
                                 s.close();
                             }
                         });
