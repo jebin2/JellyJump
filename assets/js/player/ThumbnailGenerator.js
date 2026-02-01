@@ -97,6 +97,9 @@ export class ThumbnailGenerator {
             for await (const result of iterator) {
                 if (!this.isGenerating) break;
 
+                // Skip null results
+                if (!result) continue;
+
                 const { canvas, timestamp } = result;
 
                 if (!canvas) continue;

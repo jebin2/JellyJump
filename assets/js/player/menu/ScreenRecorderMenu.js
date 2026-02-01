@@ -101,6 +101,55 @@ export class ScreenRecorderMenu {
         preferTabCheckbox.addEventListener('change', updateVisibility);
         enableFacecamCheckbox.addEventListener('change', updateVisibility);
 
+        // Mic Selector Elements (Screen tab)
+        const captureAudioCheckbox = modalOverlay.querySelector('#capture-audio');
+        const micSelectorContainer = modalOverlay.querySelector('#mic-selector-container');
+        const micDeviceSelect = modalOverlay.querySelector('#mic-device-select');
+
+        // Mic Selector Elements (Webcam tab)
+        const webcamCaptureAudioCheckbox = modalOverlay.querySelector('#webcam-capture-audio');
+        const webcamMicSelectorContainer = modalOverlay.querySelector('#webcam-mic-selector-container');
+        const webcamMicDeviceSelect = modalOverlay.querySelector('#webcam-mic-device-select');
+
+        // Helper to populate mic dropdown
+        const populateMicDropdown = async (selectElement) => {
+            try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+                selectElement.innerHTML = audioInputs.map(d =>
+                    `<option value="${d.deviceId}">${d.label || 'Microphone ' + (audioInputs.indexOf(d) + 1)}</option>`
+                ).join('');
+            } catch (err) {
+                selectElement.innerHTML = '<option value="">Mic access denied</option>';
+            }
+        };
+
+        // Screen tab mic checkbox logic
+        captureAudioCheckbox.addEventListener('change', async () => {
+            if (captureAudioCheckbox.checked) {
+                micSelectorContainer.style.display = 'block';
+                await populateMicDropdown(micDeviceSelect);
+            } else {
+                micSelectorContainer.style.display = 'none';
+            }
+        });
+
+        // Webcam tab mic checkbox logic
+        if (webcamCaptureAudioCheckbox) {
+            webcamCaptureAudioCheckbox.addEventListener('change', async () => {
+                if (webcamCaptureAudioCheckbox.checked) {
+                    webcamMicSelectorContainer.style.display = 'block';
+                    await populateMicDropdown(webcamMicDeviceSelect);
+                } else {
+                    webcamMicSelectorContainer.style.display = 'none';
+                }
+            });
+            // Auto-populate on load since checkbox is checked by default
+            populateMicDropdown(webcamMicDeviceSelect);
+        }
+
         // Initial State
         preferTabCheckbox.checked = false;
         enableFacecamCheckbox.checked = false;
@@ -175,8 +224,10 @@ export class ScreenRecorderMenu {
 
         startBtn.addEventListener('click', () => {
             if (currentMode === 'webcam') {
+                const captureAudio = webcamCaptureAudioCheckbox ? webcamCaptureAudioCheckbox.checked : true;
+                const micDeviceId = captureAudio && webcamMicDeviceSelect ? webcamMicDeviceSelect.value : null;
                 closeModal();
-                this._startWebcamRecording(playlist);
+                this._startWebcamRecording(playlist, captureAudio, micDeviceId);
                 return;
             }
 
@@ -189,9 +240,11 @@ export class ScreenRecorderMenu {
             }
 
             const preferCurrentTab = preferTabCheckbox ? preferTabCheckbox.checked : false;
+            const captureAudio = captureAudioCheckbox ? captureAudioCheckbox.checked : false;
+            const micDeviceId = captureAudio && micDeviceSelect ? micDeviceSelect.value : null;
 
             closeModal();
-            this._startRecording(playlist, mode, preferCurrentTab);
+            this._startRecording(playlist, mode, preferCurrentTab, captureAudio, micDeviceId);
         });
     }
 
@@ -209,11 +262,22 @@ export class ScreenRecorderMenu {
      * @param {string} mode - 'pip', 'popup', 'in-page', 'off'
      * @param {boolean} preferCurrentTab - Whether to restrict to current tab
      */
-    static async _startWebcamRecording(playlist) {
+    static async _startWebcamRecording(playlist, captureAudio = true, micDeviceId = null) {
         try {
+            // Build audio constraints
+            let audioConstraints = captureAudio;
+            if (captureAudio && micDeviceId) {
+                audioConstraints = {
+                    deviceId: { exact: micDeviceId },
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                };
+            }
+
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: true,
-                audio: true
+                audio: audioConstraints
             });
 
             this.stream = stream;
@@ -226,14 +290,16 @@ export class ScreenRecorderMenu {
                 // 1. Load Webcam Stream (setup preview)
                 await window.player.loadWebcamStream(stream);
                 // 2. Start Canvas Recording
-                await window.player.startCanvasRecording({ audioTrack: stream.getAudioTracks()[0] });
+                const audioTrack = captureAudio ? stream.getAudioTracks()[0] : null;
+                await window.player.startCanvasRecording({ audioTrack });
             } else {
                 throw new Error("CorePlayer not available");
             }
 
             // Update UI State
             this._updateButtonState(true);
-            playlist._showToast('Webcam recording started', 'info');
+            const audioStatus = captureAudio ? '🎤 Mic ON' : '🔇 No Audio';
+            playlist._showToast(`Webcam recording started (${audioStatus})`, 'info');
 
         } catch (err) {
             console.error("Error starting webcam:", err);
@@ -241,7 +307,7 @@ export class ScreenRecorderMenu {
         }
     }
 
-    static async _startRecording(playlist, mode, preferCurrentTab = false) {
+    static async _startRecording(playlist, mode, preferCurrentTab = false, captureAudio = false, micDeviceId = null) {
         try {
             this.chunks = [];
             this.currentMode = mode;
@@ -251,7 +317,7 @@ export class ScreenRecorderMenu {
                 await this._startFacecam(playlist, mode);
             }
 
-            // 2. Request Screen Stream
+            // 2. Request Screen Stream (video only)
             const constraints = {
                 video: {
                     cursor: "always"
@@ -266,17 +332,53 @@ export class ScreenRecorderMenu {
             }
 
             this.stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+            let combinedStream = this.stream;
 
-            this.stream.getVideoTracks()[0].onended = () => {
+            // 3. If audio requested, get microphone and create combined stream
+            if (captureAudio) {
+                try {
+                    const audioConstraints = {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    };
+                    if (micDeviceId) {
+                        audioConstraints.deviceId = { exact: micDeviceId };
+                    }
+
+                    const micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+                    this.micStream = micStream;
+
+                    const micTracks = micStream.getAudioTracks();
+                    Logger.log(`[ScreenRecorder] Mic tracks: ${micTracks.length}`);
+                    if (micTracks.length > 0) {
+                        Logger.log(`[ScreenRecorder] Using mic: ${micTracks[0].label}`);
+                    }
+
+                    const videoTrack = this.stream.getVideoTracks()[0];
+                    const audioTrack = micStream.getAudioTracks()[0];
+                    combinedStream = new MediaStream([videoTrack, audioTrack]);
+
+                    Logger.log(`[ScreenRecorder] Combined stream: video=${combinedStream.getVideoTracks().length}, audio=${combinedStream.getAudioTracks().length}`);
+                } catch (micErr) {
+                    Logger.warn('[ScreenRecorder] Microphone access denied:', micErr);
+                    playlist._showToast('Microphone access denied', 'warning');
+                }
+            }
+
+            combinedStream.getVideoTracks()[0].onended = () => {
                 this.stopRecording(playlist);
             };
 
-            const options = { mimeType: 'video/webm;codecs=vp9' };
+            const options = { mimeType: 'video/webm;codecs=vp9,opus' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                delete options.mimeType;
+                options.mimeType = 'video/webm;codecs=vp9';
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    delete options.mimeType;
+                }
             }
 
-            this.mediaRecorder = new MediaRecorder(this.stream, options);
+            this.mediaRecorder = new MediaRecorder(combinedStream, options);
 
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
@@ -291,8 +393,10 @@ export class ScreenRecorderMenu {
             this.mediaRecorder.start(1000);
             this.isRecording = true;
 
+            const audioTracks = combinedStream.getAudioTracks();
             this._updateButtonState(true);
-            playlist._showToast(`Recording started (${mode === 'off' ? 'No Facecam' : 'Facecam Active'})`, 'info');
+            const audioStatus = captureAudio ? (audioTracks.length > 0 ? '🎤 Mic ON' : '⚠️ No mic') : '🔇 No Audio';
+            playlist._showToast(`Recording started (${audioStatus})`, 'info');
 
         } catch (err) {
             Logger.error('ScreenRecorder: Start Error', err);
@@ -555,6 +659,12 @@ export class ScreenRecorderMenu {
             if (this.stream) {
                 this.stream.getTracks().forEach(track => track.stop());
                 this.stream = null;
+            }
+
+            // Cleanup mic stream if it exists
+            if (this.micStream) {
+                this.micStream.getTracks().forEach(track => track.stop());
+                this.micStream = null;
             }
 
             this._stopFacecam();

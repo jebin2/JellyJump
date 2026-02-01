@@ -1472,6 +1472,23 @@ button:focus-visible {
     border-color: var(--accent-primary);
 }
 
+.mb-select option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 8px;
+}
+
+.mb-select option:hover,
+.mb-select option:focus,
+.mb-select option:checked,
+.mb-select option:active {
+    background: var(--accent-primary) !important;
+    background-color: var(--accent-primary) !important;
+    color: var(--bg-primary) !important;
+    /* Hack to override browser's default blue highlight */
+    box-shadow: 0 0 10px 100px var(--accent-primary) inset;
+}
+
 .mb-select-xs {
     background: var(--bg-tertiary);
     border: 2px solid var(--accent-primary);

@@ -1921,6 +1921,22 @@
                             </div>
                         </label>
 
+                        <!-- Capture Audio Checkbox -->
+                        <label class="checkbox-option flex items-center mb-sm cursor-pointer">
+                            <input type="checkbox" id="capture-audio" class="mr-sm">
+                            <span class="block text-sm font-bold text-primary">Record Microphone</span>
+                        </label>
+
+                        <!-- Microphone Selector (shown when capture-audio is checked) -->
+                        <div id="mic-selector-container" style="display: none;" class="mb-md pl-md">
+                            <select id="mic-device-select" class="mb-select w-full">
+                                <option value="">Loading microphones...</option>
+                            </select>
+                            <a href="https://webcammictest.com/mic/" target="_blank" rel="noopener noreferrer"
+                                class="text-xs text-accent hover-underline mt-xs inline-block">🎙️ Test your
+                                microphone: https://webcammictest.com/mic/</a>
+                        </div>
+
                         <!-- Enable Facecam Checkbox -->
                         <label class="checkbox-option flex items-center mb-md cursor-pointer">
                             <input type="checkbox" id="enable-facecam" class="mr-sm">
@@ -1976,8 +1992,26 @@
                         📹
                     </div>
                     <h3 class="text-lg font-bold text-primary mb-sm">Record Camera Only</h3>
-                    <p class="text-sm text-secondary">This will display your camera in the main player and record it
+                    <p class="text-sm text-secondary mb-md">This will display your camera in the main player and record
+                        it
                         directly.</p>
+
+                    <!-- Microphone Option for Webcam -->
+                    <div class="text-left mt-md">
+                        <label class="checkbox-option flex items-center mb-sm cursor-pointer justify-center">
+                            <input type="checkbox" id="webcam-capture-audio" class="mr-sm" checked>
+                            <span class="block text-sm font-bold text-primary">Record Microphone</span>
+                        </label>
+
+                        <div id="webcam-mic-selector-container" class="mb-md px-lg">
+                            <select id="webcam-mic-device-select" class="mb-select w-full">
+                                <option value="">Loading microphones...</option>
+                            </select>
+                            <a href="https://webcammictest.com/" target="_blank" rel="noopener noreferrer"
+                                class="text-xs text-accent hover-underline mt-xs inline-block">📹 Test your webcam &
+                                mic: https://webcammictest.com/mic/</a>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="mb-modal-footer flex justify-end gap-sm">
