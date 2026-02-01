@@ -2319,7 +2319,8 @@ body.fullscreen-active {
 }
 
 /* Stream mode - hide unsupported controls */
-.stream-mode-hidden {
+.stream-mode-hidden,
+.webcam-mode-hidden {
     display: none !important;
 }
 

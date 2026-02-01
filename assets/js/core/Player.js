@@ -215,6 +215,7 @@ export class CorePlayer {
         this.hlsPlayer = null;
         this.streamVideo = null;
         this.isStreamMode = false;
+        this.isWebcamMode = false;
         this.isLive = false;
         this.liveMode = options.liveMode || 'buffer'; // 'live' or 'buffer' - default to 30s buffer for stability
         this.streamRenderLoopId = null;
@@ -1821,6 +1822,8 @@ export class CorePlayer {
                 this._cleanupHLS();
             }
             this.isStreamMode = false;
+            this.isWebcamMode = false;
+            this._setWebcamModeControls(false);
             this.isLive = false;
             if (this.streamVideo && this.streamVideo.srcObject) {
                 Logger.log('[Player] Clearing webcam stream in load()');
@@ -2027,6 +2030,8 @@ export class CorePlayer {
             }
 
             this.isStreamMode = true;
+            this.isWebcamMode = false; // Regular HLS is not a webcam
+            this._setWebcamModeControls(false);
             this.currentVideoId = videoId || url;
             this._setLoading(true);
             this._hideStreamError(); // Hide any previous errors
@@ -2459,8 +2464,10 @@ export class CorePlayer {
         this.streamVideo.autoplay = true;
 
         this.isStreamMode = true;
+        this.isWebcamMode = true;
         this.isPlaying = true;
         this._showStreamVideo(); // Ensure canvas is visible
+        this._setWebcamModeControls(true);
 
         try {
             // Use player's play() instead of direct streamVideo.play()
@@ -2811,6 +2818,47 @@ export class CorePlayer {
                 control.classList.toggle('stream-mode-hidden', isStreamMode);
             }
         });
+    }
+
+    /**
+     * Hide/show controls specifically for webcam mode
+     * @param {boolean} isWebcamMode - Whether webcam mode is active
+     * @private
+     */
+    _setWebcamModeControls(isWebcamMode) {
+        // Hide EVERYTHING except Play/Pause, Fullscreen, and Pin
+        const webcamUnsupported = [
+            this.ui.progressContainer,
+            this.ui.timeDisplay,
+            this.ui.prevBtn,
+            this.ui.nextBtn,
+            this.ui.volumeSlider,
+            this.ui.muteBtn,
+            this.ui.ccBtn,
+            this.ui.speedBtn,
+            this.ui.audioBtn,
+            this.ui.audioSettingsBtn, // Volume/Equalizer button
+            this.ui.filtersBtn,        // Video Filters button
+            this.ui.loopBtn
+        ];
+
+        // Handle Screenshot button (managed by ScreenshotManager)
+        if (this.screenshotManager && this.screenshotManager.ui.btn) {
+            webcamUnsupported.push(this.screenshotManager.ui.btn);
+        }
+
+        webcamUnsupported.forEach(control => {
+            if (control) {
+                control.classList.toggle('webcam-mode-hidden', isWebcamMode);
+            }
+        });
+
+        // If entering webcam mode, ensure panels are closed
+        if (isWebcamMode) {
+            if (this.ui.filterPanel) this.ui.filterPanel.classList.remove('visible');
+            if (this.ui.audioPanel) this.ui.audioPanel.classList.remove('visible');
+            if (this.ui.loopPanel) this.ui.loopPanel.classList.remove('visible');
+        }
     }
 
     /**
