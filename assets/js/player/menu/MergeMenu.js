@@ -264,11 +264,10 @@ export class MergeMenu {
             mergeBtn.disabled = true;
             mergeBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Merging...';
 
-            const progressSection = modalContent.querySelector('.merge-progress');
-            const progressBar = progressSection.querySelector('.progress-bar-fill');
+            const progressSection = modalContent.querySelector('.progress-section');
             const progressText = progressSection.querySelector('.progress-percentage');
-            const errorMsg = modalContent.querySelector('.merge-error');
-            const successMsg = modalContent.querySelector('.merge-success');
+            const errorMsg = modalContent.querySelector('.error-message');
+            const successMsg = modalContent.querySelector('.success-message');
             const downloadBtn = modalContent.querySelector('.download-btn');
 
             progressSection.classList.remove('hidden');
@@ -292,7 +291,6 @@ export class MergeMenu {
                     backgroundColor: backgroundColor,
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
-                        progressBar.style.width = `${pct}%`;
                         progressText.textContent = `${pct}%`;
                     }
                 });

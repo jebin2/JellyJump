@@ -1,5 +1,6 @@
 /* Modal Dialog Styles */
-.modal-overlay {
+/* Unified for Player and Global usage */
+.mb-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -9,81 +10,139 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
-    backdrop-filter: blur(2px);
+    z-index: 20000;
+    /* High z-index to overlay everything including playlist (10000) */
+    backdrop-filter: blur(4px);
     animation: fadeIn 0.2s ease-out forwards;
 }
 
-.modal-overlay.closing {
+.mb-modal-overlay.closing {
     animation: fadeOut 0.2s ease-out forwards;
 }
 
-.modal-overlay.closing .modal {
+.mb-modal-overlay.closing .mb-modal {
     animation: scaleOut 0.2s ease-out forwards;
 }
 
-.modal {
-    background-color: var(--bg-secondary);
-    border: 4px solid var(--border-primary);
-    box-shadow: var(--shadow-lg) #000;
-    padding: var(--space-lg);
-    max-width: 500px;
+.mb-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     width: 90%;
+    max-width: 500px;
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    position: relative;
+    max-height: 90vh;
     animation: scaleIn 0.2s ease-out;
 }
 
-.modal__title {
-    font-size: var(--text-xl);
-    font-weight: var(--font-bold);
-    color: var(--text-primary);
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
+.mb-modal-large {
+    max-width: 800px;
 }
 
-.modal__icon {
+/* Header */
+.mb-modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mb-modal-title {
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mb-modal-icon {
     font-size: 24px;
     line-height: 1;
 }
 
-.modal__message {
-    font-size: var(--text-md);
+.mb-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.mb-modal-close:hover {
+    color: var(--text-primary);
+}
+
+/* Body */
+.mb-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    font-size: 1em;
+    color: var(--text-primary);
+}
+
+.mb-modal-body-scrollable {
+    max-height: 60vh;
+}
+
+.mb-modal-message {
+    font-size: 1em;
     color: var(--text-secondary);
     margin: 0;
     line-height: 1.5;
     white-space: pre-line;
 }
 
-.modal__actions {
+/* Footer & Actions */
+.mb-modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-light);
     display: flex;
     justify-content: flex-end;
-    gap: var(--space-md);
-    margin-top: var(--space-sm);
+    gap: 10px;
 }
 
+.mb-modal-footer.hidden {
+    display: none;
+}
+
+.mb-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    width: 100%;
+}
+
+/* Modal Buttons */
 .modal-btn {
-    padding: var(--space-sm) var(--space-lg);
-    font-family: var(--font-primary);
-    font-weight: var(--font-bold);
-    font-size: var(--text-sm);
+    padding: 8px 16px;
+    font-family: var(--font-primary, sans-serif);
+    font-weight: bold;
+    font-size: 0.9em;
     cursor: pointer;
-    border: 2px solid var(--border-primary);
-    transition: all var(--transition-fast) var(--ease-standard);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    /* Match player rounding */
+    transition: all 0.2s ease;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
 
 .modal-btn:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 4px 4px 0 0 #000;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .modal-btn:active {
-    transform: translate(0, 0);
+    transform: translateY(0);
     box-shadow: none;
 }
 
@@ -92,25 +151,64 @@
     outline-offset: 2px;
 }
 
-/* Button Types */
+/* Button Variants */
 .modal-btn--primary {
     background-color: var(--accent-primary);
     color: #000;
-    border-color: #000;
+    border-color: var(--accent-primary);
+}
+
+.modal-btn--primary:hover {
+    filter: brightness(1.1);
 }
 
 .modal-btn--danger {
-    background-color: var(--accent-danger);
+    background-color: var(--error-color, #ff4444);
     color: #fff;
-    border-color: #000;
+    border-color: var(--error-color, #ff4444);
 }
 
 .modal-btn--secondary {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
-    border-color: var(--border-dark);
+    border-color: var(--border-light);
 }
 
+.modal-btn--secondary:hover {
+    background-color: var(--border-light);
+}
+
+/* Inputs (Common in modals) */
+.mb-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.mb-input-group label {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+.mb-input,
+.mb-select {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 1em;
+    font-family: inherit;
+}
+
+.mb-input:focus,
+.mb-select:focus {
+    outline: 2px solid var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+/* Animations */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -133,7 +231,7 @@
 
 @keyframes scaleIn {
     from {
-        transform: scale(0.9);
+        transform: scale(0.95);
         opacity: 0;
     }
 
@@ -150,7 +248,102 @@
     }
 
     to {
-        transform: scale(0.9);
+        transform: scale(0.95);
         opacity: 0;
     }
+}
+
+/* Progress Section (Footer) */
+.progress-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-section.hidden {
+    display: none;
+}
+
+.progress-status {
+    font-size: 0.85em;
+    font-family: var(--font-mono, monospace);
+    color: var(--text-secondary);
+}
+
+.progress-percentage {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--accent-primary);
+}
+
+.progress-bar-container {
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+    flex: 1;
+    min-width: 100px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    border-radius: 3px;
+    transition: width 0.2s ease;
+}
+
+/* Spinner */
+.spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Success/Error Messages */
+.success-message {
+    color: var(--success-color, #00cc66);
+    font-weight: bold;
+}
+
+.error-message {
+    color: var(--error-color, #ff4444);
+}
+
+/* Helpers */
+.mb-modal-error {
+    margin-top: 10px;
+    color: var(--error-color, #ff4444);
+    font-size: 0.9em;
+    background: rgba(255, 0, 0, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.mb-modal-loading {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-secondary);
+}
+
+.mb-modal-loading .spinner-rotate {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.hidden {
+    display: none !important;
 }

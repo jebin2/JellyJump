@@ -2,6 +2,17 @@
 <!-- All HTML templates for the playlist component -->
 <!-- These are cloned and populated with data in Playlist.js -->
 
+<!-- Unified Progress Status Template (Clone into footer status area) -->
+<template id="progress-status-template">
+    <div class="progress-section hidden flex items-center gap-sm">
+        <div class="spinner-sm"></div>
+        <span class="progress-status text-sm font-mono">Processing...</span>
+        <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+    </div>
+    <div class="error-message hidden text-danger text-sm"></div>
+    <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+</template>
+
 <!-- Playlist Item Template -->
 <template id="playlist-item-template">
     <div class="playlist-item" data-index="" tabindex="0" role="button">
@@ -900,14 +911,13 @@
     <div class="crop-footer-container flex-between items-center w-full gap-md">
         <!-- Status Area (Left) -->
         <div class="crop-footer-status flex-1">
-            <div class="crop-progress hidden flex items-center gap-sm">
-                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
-                </div>
-                <span class="status-text text-sm font-mono">Cropping...</span>
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm"></div>
+                <span class="progress-status text-sm font-mono">Cropping...</span>
                 <span class="progress-percentage text-sm font-bold text-accent">0%</span>
             </div>
-            <div class="crop-error hidden text-danger text-sm"></div>
-            <div class="crop-success hidden text-success text-sm font-bold">✓ Crop complete!</div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
         </div>
         <!-- Action Buttons (Right) -->
         <div class="action-buttons flex gap-sm flex-shrink-0">
@@ -1017,17 +1027,13 @@
     <div class="flex-between w-full">
         <!-- Progress & Messages (Left) -->
         <div class="flex-1 mr-md flex items-center">
-            <div class="merge-progress hidden w-full">
-                <div class="flex items-center gap-sm mb-xs">
-                    <span class="status-text text-xs text-muted font-mono">Merging...</span>
-                    <span class="progress-percentage text-xs font-bold text-primary">0%</span>
-                </div>
-                <div class="progress-bar-container h-1 w-full bg-tertiary rounded overflow-hidden">
-                    <div class="progress-bar-fill h-full bg-primary" style="width: 0%"></div>
-                </div>
+            <div class="progress-section hidden flex items-center gap-sm w-full">
+                <div class="spinner-sm"></div>
+                <span class="progress-status text-sm font-mono">Merging...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
             </div>
-            <div class="merge-error hidden text-danger text-xs"></div>
-            <div class="merge-success hidden text-success text-xs font-bold">✓ Merge complete!</div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
         </div>
 
         <!-- Action Buttons (Right) -->
@@ -1068,17 +1074,31 @@
 </template>
 
 <template id="resize-footer-template">
-    <div class="action-buttons flex gap-sm">
-        <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-download"></use>
-            </svg>
-        </a>
-        <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-convert"></use>
-            </svg>
-        </button>
+    <div class="resize-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="resize-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm"></div>
+                <span class="progress-status text-sm font-mono">Resizing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-convert"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
@@ -1575,9 +1595,8 @@
         <!-- Status Area (Left) -->
         <div class="reverse-footer-status flex-1">
             <div class="progress-section hidden flex items-center gap-sm">
-                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
-                </div>
-                <span class="progress-status status-text text-sm font-mono">Processing...</span>
+                <div class="spinner-sm"></div>
+                <span class="progress-status text-sm font-mono">Processing...</span>
                 <span class="progress-percentage text-sm font-bold text-accent">0%</span>
                 <!-- Hidden detailed progress bar for footer, or we simplify like crop -->
             </div>

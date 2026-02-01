@@ -391,7 +391,7 @@ export class CorePlayer {
     }
 
     _updateThumbnailImage(time) {
-        if (!this.ui.thumbnailOverlay) return;
+        if (!this.ui.thumbnailOverlay || !this.thumbnailGenerator) return;
 
         const thumb = this.thumbnailGenerator.getThumbnail(time);
         if (thumb) {

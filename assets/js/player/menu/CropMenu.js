@@ -51,13 +51,13 @@ export class CropMenu {
                 download: modalContent.querySelector('.download-btn')
             },
             progress: {
-                section: modalContent.querySelector('.crop-progress'),
+                section: modalContent.querySelector('.progress-section'),
                 text: modalContent.querySelector('.progress-percentage'),
-                status: modalContent.querySelector('.status-text')
+                status: modalContent.querySelector('.progress-status')
             },
             messages: {
-                error: modalContent.querySelector('.crop-error'),
-                success: modalContent.querySelector('.crop-success')
+                error: modalContent.querySelector('.error-message'),
+                success: modalContent.querySelector('.success-message')
             }
         };
 

@@ -1,7 +1,7 @@
 import { Logger } from "./Logger.js";
 /**
  * Modal Utility
- * Reusable modal dialog component for confirmations, alerts, and custom content
+ * Reusable modal dialog component that matches the unified .mb-modal system.
  */
 export class Modal {
     // Lock to prevent multiple modals from showing at once
@@ -36,20 +36,39 @@ export class Modal {
             const overlay = this._createOverlay();
             const modal = this._createModal();
 
-            // Title
-            const titleEl = document.createElement('h2');
-            titleEl.className = 'modal__title';
-            titleEl.style.setProperty('--modal-icon', `"${icon}"`);
-            titleEl.innerHTML = `<span class="modal__icon">${icon}</span> ${this._escapeHtml(title)}`;
+            // Header
+            const header = document.createElement('div');
+            header.className = 'mb-modal-header';
 
-            // Message
+            const titleEl = document.createElement('h3');
+            titleEl.className = 'mb-modal-title';
+            titleEl.innerHTML = `<span class="mb-modal-icon">${icon}</span> ${this._escapeHtml(title)}`;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'mb-modal-close';
+            closeBtn.ariaLabel = 'Close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.onclick = () => {
+                this._close(overlay);
+                resolve(false);
+            };
+
+            header.appendChild(titleEl);
+            header.appendChild(closeBtn);
+
+            // Body
+            const body = document.createElement('div');
+            body.className = 'mb-modal-body';
+
             const messageEl = document.createElement('p');
-            messageEl.className = 'modal__message';
+            messageEl.className = 'mb-modal-message';
             messageEl.textContent = message;
 
-            // Actions
-            const actionsEl = document.createElement('div');
-            actionsEl.className = 'modal__actions';
+            body.appendChild(messageEl);
+
+            // Footer (Actions)
+            const footer = document.createElement('div');
+            footer.className = 'mb-modal-footer';
 
             // Cancel button
             const cancelBtn = document.createElement('button');
@@ -69,12 +88,13 @@ export class Modal {
                 resolve(true);
             };
 
-            actionsEl.appendChild(cancelBtn);
-            actionsEl.appendChild(confirmBtn);
+            footer.appendChild(cancelBtn);
+            footer.appendChild(confirmBtn);
 
-            modal.appendChild(titleEl);
-            modal.appendChild(messageEl);
-            modal.appendChild(actionsEl);
+            // Assemble
+            modal.appendChild(header);
+            modal.appendChild(body);
+            modal.appendChild(footer);
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
 
@@ -121,6 +141,11 @@ export class Modal {
                     this._close(overlay);
                     resolve(true);
                 };
+                closeBtn.onclick = () => {
+                    cleanup();
+                    this._close(overlay);
+                    resolve(false);
+                };
             }, 50);
         });
     }
@@ -146,19 +171,39 @@ export class Modal {
             const overlay = this._createOverlay();
             const modal = this._createModal();
 
-            // Title
-            const titleEl = document.createElement('h2');
-            titleEl.className = 'modal__title';
-            titleEl.innerHTML = `<span class="modal__icon">${icon}</span> ${this._escapeHtml(title)}`;
+            // Header
+            const header = document.createElement('div');
+            header.className = 'mb-modal-header';
 
-            // Message
+            const titleEl = document.createElement('h3');
+            titleEl.className = 'mb-modal-title';
+            titleEl.innerHTML = `<span class="mb-modal-icon">${icon}</span> ${this._escapeHtml(title)}`;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'mb-modal-close';
+            closeBtn.ariaLabel = 'Close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.onclick = () => {
+                this._close(overlay);
+                resolve();
+            };
+
+            header.appendChild(titleEl);
+            header.appendChild(closeBtn);
+
+            // Body
+            const body = document.createElement('div');
+            body.className = 'mb-modal-body';
+
             const messageEl = document.createElement('p');
-            messageEl.className = 'modal__message';
+            messageEl.className = 'mb-modal-message';
             messageEl.textContent = message;
 
-            // Actions
-            const actionsEl = document.createElement('div');
-            actionsEl.className = 'modal__actions';
+            body.appendChild(messageEl);
+
+            // Footer
+            const footer = document.createElement('div');
+            footer.className = 'mb-modal-footer';
 
             // OK button
             const okBtn = document.createElement('button');
@@ -169,11 +214,12 @@ export class Modal {
                 resolve();
             };
 
-            actionsEl.appendChild(okBtn);
+            footer.appendChild(okBtn);
 
-            modal.appendChild(titleEl);
-            modal.appendChild(messageEl);
-            modal.appendChild(actionsEl);
+            // Assemble
+            modal.appendChild(header);
+            modal.appendChild(body);
+            modal.appendChild(footer);
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
 
@@ -198,7 +244,7 @@ export class Modal {
      */
     static _createOverlay() {
         const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
+        overlay.className = 'mb-modal-overlay';
         return overlay;
     }
 
@@ -208,7 +254,9 @@ export class Modal {
      */
     static _createModal() {
         const modal = document.createElement('div');
-        modal.className = 'modal';
+        modal.className = 'mb-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
         return modal;
     }
 

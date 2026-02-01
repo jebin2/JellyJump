@@ -2056,7 +2056,6 @@ export class Playlist {
         if (settingsBtn) {
             settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                console.log('[Playlist] Settings button clicked', { index: getCurrentIndex(), btn: settingsBtn });
                 this._toggleSettingsMenu(getCurrentIndex(), settingsBtn);
             });
         }
@@ -2692,12 +2691,8 @@ export class Playlist {
      * @private
      */
     _createSettingsMenu(index, buttonEl) {
-        console.log('[Playlist] Creating settings menu for index:', index);
         const template = document.getElementById('playlist-settings-menu-template');
-        if (!template) {
-            console.error('[Playlist] Template "playlist-settings-menu-template" not found!');
-            return;
-        }
+        if (!template) return;
 
         const clone = template.content.cloneNode(true);
         const menu = clone.querySelector('.playlist-context-menu');
@@ -2771,20 +2766,13 @@ export class Playlist {
         });
 
         document.body.appendChild(menu);
-        console.log('[Playlist] Menu appended to body. document.body.contains(menu):', document.body.contains(menu), 'Z-Index:', window.getComputedStyle(menu).zIndex);
 
         // Position the menu
         this._positionSettingsMenu(menu, buttonEl);
 
         // Show with animation
-        // Force reflow
-        const _ = menu.offsetHeight;
-
         requestAnimationFrame(() => {
-            menu.style.opacity = '1';
-            menu.style.zIndex = '100000'; // Insanely high z-index
             menu.classList.add('visible');
-            console.log('[Playlist] Menu forced visible. Computed opacity:', window.getComputedStyle(menu).opacity);
         });
     }
 
@@ -2820,7 +2808,6 @@ export class Playlist {
 
         menu.style.top = `${top}px`;
         menu.style.left = `${left}px`;
-        console.log(`[Playlist] Positioned menu at top: ${top}px, left: ${left}px (Rect:`, rect, 'MenuRect:', menuRect, 'VP:', viewportHeight, ')');
     }
 
     /**
@@ -2829,9 +2816,6 @@ export class Playlist {
      */
     _closeAllMenus() {
         const menus = document.querySelectorAll('.playlist-context-menu');
-        if (menus.length > 0) {
-            console.trace('[Playlist] _closeAllMenus called. Closing ' + menus.length + ' menus.');
-        }
         menus.forEach(menu => {
             menu.classList.remove('visible');
             setTimeout(() => {
