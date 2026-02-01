@@ -50,6 +50,7 @@ export class CorePlayer {
             volume: true,
             time: true,
             progress: true,
+            thumbnails: true,  // Enable/disable thumbnail preview on hover
             captions: true,
             settings: true,
             fullscreen: true,
@@ -143,13 +144,16 @@ export class CorePlayer {
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
 
-        // Thumbnail Generator
-        this.thumbnailGenerator = new ThumbnailGenerator();
-        this.thumbnailGenerator.progressCallback = () => {
-            if (this.ui.thumbnailOverlay && this.ui.thumbnailOverlay.classList.contains('visible')) {
-                this._updateThumbnailImage(this.lastThumbnailHoverTime);
-            }
-        };
+        // Thumbnail Generator (only if enabled)
+        this.thumbnailGenerator = null;
+        if (this.config.controls.thumbnails) {
+            this.thumbnailGenerator = new ThumbnailGenerator();
+            this.thumbnailGenerator.progressCallback = () => {
+                if (this.ui.thumbnailOverlay && this.ui.thumbnailOverlay.classList.contains('visible')) {
+                    this._updateThumbnailImage(this.lastThumbnailHoverTime);
+                }
+            };
+        }
         this.thumbnailGenerationStarted = false;
         this.thumbnailHoverTimer = null;
         this.lastThumbnailHoverTime = 0;

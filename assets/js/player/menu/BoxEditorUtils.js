@@ -28,7 +28,8 @@ export async function loadVideo(containerId, item, playlist, state) {
             navigation: false, captions: false, settings: false,
             fullscreen: false, loop: false, speed: false,
             filters: false, equalizer: true, volumeOnly: true,
-            modeToggle: false, keyboard: false
+            modeToggle: false, keyboard: false,
+            thumbnails: false  // Disable thumbnail generation in editor modals
         },
         autoplay: false
     });
