@@ -1155,59 +1155,59 @@ export class Playlist {
             }
         });
 
-        if (indicesToRemove.length === 0) return;
-
-        // Sort desc to splice correctly from end
-        indicesToRemove.sort((a, b) => b - a);
-
         // Active Item Logic
         const originalActive = this.activeIndex >= 0 ? this.items[this.activeIndex] : null;
-
-        // 1. Remove Data
-        indicesToRemove.forEach(idx => {
-            this.items.splice(idx, 1);
-        });
-
-        // 2. Update Active Index
         let wasActiveRemoved = false;
-        if (originalActive) {
-            const newIndex = this.items.indexOf(originalActive);
-            if (newIndex === -1) {
-                // Active item was removed - stop playback
-                wasActiveRemoved = true;
-                this.activeIndex = -1;
+
+        // 1. Remove Data (if any items to remove)
+        if (indicesToRemove.length > 0) {
+            // Sort desc to splice correctly from end
+            indicesToRemove.sort((a, b) => b - a);
+
+            indicesToRemove.forEach(idx => {
+                this.items.splice(idx, 1);
+            });
+
+            // 2. Update Active Index
+            if (originalActive) {
+                const newIndex = this.items.indexOf(originalActive);
+                if (newIndex === -1) {
+                    // Active item was removed - stop playback
+                    wasActiveRemoved = true;
+                    this.activeIndex = -1;
+                } else {
+                    this.activeIndex = newIndex;
+                }
             } else {
-                this.activeIndex = newIndex;
+                this.activeIndex = -1;
             }
-        } else {
-            this.activeIndex = -1;
+
+            // Patch visible indices (collapsed folders use ID-based lookup)
+            const allItems = this.container.querySelectorAll('.playlist-item');
+            for (const el of allItems) {
+                const oldIdx = parseInt(el.dataset.index);
+                let shift = 0;
+                for (const removedIdx of indicesToRemove) {
+                    if (removedIdx < oldIdx) {
+                        shift++;
+                    }
+                }
+                if (shift > 0) {
+                    el.dataset.index = oldIdx - shift;
+                }
+            }
         }
 
         this._saveState();
         this._updatePlayerNavigationState();
 
-        // 3. Surgical DOM Removal
+        // 3. Surgical DOM Removal - ALWAYS remove folder from DOM (even if empty)
         const folderEl = this.container.querySelector(`.playlist-folder[data-path="${folderPath}"]`);
         if (folderEl) {
             folderEl.remove();
         }
 
-        // 4. Patch visible indices (collapsed folders use ID-based lookup)
-        const allItems = this.container.querySelectorAll('.playlist-item');
-        for (const el of allItems) {
-            const oldIdx = parseInt(el.dataset.index);
-            let shift = 0;
-            for (const removedIdx of indicesToRemove) {
-                if (removedIdx < oldIdx) {
-                    shift++;
-                }
-            }
-            if (shift > 0) {
-                el.dataset.index = oldIdx - shift;
-            }
-        }
-
-        // 5. Stop playback if active was removed
+        // 4. Stop playback if active was removed
         if (wasActiveRemoved) {
             this._stopPlayback();
         }
