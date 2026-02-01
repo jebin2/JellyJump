@@ -5,6 +5,7 @@ import { Modal as ConfirmModal } from '../utils/Modal.js'; // Static confirm/ale
 import { Modal as DialogModal } from './Modal.js';         // Instance-based custom dialogs
 import { MenuRouter } from './menu/MenuRouter.js';
 import { RecordMenu } from './menu/RecordMenu.js';
+import { ScreenRecorderMenu } from './menu/ScreenRecorderMenu.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { FileDropHandler } from '../utils/FileDropHandler.js';
@@ -1308,6 +1309,21 @@ export class Playlist {
 
             // Handle Recording State (Stop if active)
             RecordMenu.handleItemChange(this);
+
+            // Handle Live Webcam Restore
+            if (video.isWebcam) {
+                Logger.log('[Playlist] Selecting Live Webcam Item');
+                if (ScreenRecorderMenu.stream) {
+                    Logger.log('[Playlist] Restoring live webcam stream');
+                    await this.player.loadWebcamStream(ScreenRecorderMenu.stream);
+                    this.activeIndex = index;
+                    this._updateUI();
+                    this._isSelectingItem = false;
+                    return;
+                } else {
+                    Logger.warn('[Playlist] Webcam item selected but no stream found in ScreenRecorderMenu');
+                }
+            }
 
             // Handle streams (HLS/Live) - load directly without MediaMetadata processing
             if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {

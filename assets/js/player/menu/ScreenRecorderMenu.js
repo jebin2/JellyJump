@@ -300,6 +300,8 @@ export class ScreenRecorderMenu {
 
             // Update UI State
             this._updateButtonState(true);
+            this._addLiveCameraItem(playlist);
+
             const audioStatus = captureAudio ? '🎤 Mic ON' : '🔇 No Audio';
             playlist._showToast(`Webcam recording started (${audioStatus})`, 'info');
 
@@ -636,6 +638,7 @@ export class ScreenRecorderMenu {
         if (this.currentMode === 'webcam') {
             this.isRecording = false;
             this._updateButtonState(false);
+            this._removeLiveCameraItem(playlist);
 
             // Stop Canvas Recording
             if (window.player && typeof window.player.stopCanvasRecording === 'function') {
@@ -751,6 +754,35 @@ export class ScreenRecorderMenu {
                 </svg>
             `;
             btn.title = "Record Screen";
+        }
+    }
+
+    // --- Playlist Helpers ---
+
+    static _addLiveCameraItem(playlist) {
+        // Remove existing if any (safety)
+        this._removeLiveCameraItem(playlist);
+
+        const liveItem = {
+            id: 'live-webcam',
+            title: '📹 LIVE: Camera Feed',
+            isLive: true,
+            isWebcam: true,
+            type: 'video',
+            isLocal: true,
+            duration: 'LIVE',
+            thumbnail: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0icmVkIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjwvc3ZnPg=='
+        };
+
+        playlist.items.unshift(liveItem);
+        playlist.render();
+    }
+
+    static _removeLiveCameraItem(playlist) {
+        const index = playlist.items.findIndex(item => item.id === 'live-webcam');
+        if (index > -1) {
+            playlist.items.splice(index, 1);
+            playlist.render();
         }
     }
 }

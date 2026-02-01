@@ -39,14 +39,20 @@ export class PlaylistStorage {
     static savePlaylist(items, activeIndex, currentTime = 0) {
         const storage = new IndexedDBService();
 
-        // Save playlist items
-        storage.savePlaylist(items);
+        // 1. Filter out transient "Live Camera" items (don't save to DB)
+        const persistentItems = items.filter(item => !item.isWebcam);
 
-        // Save playback state
+        // Save playlist items
+        storage.savePlaylist(persistentItems);
+
+        // 2. Save playback state for the currently active persistent item
         const activeItem = items[activeIndex];
-        if (activeItem) {
+        if (activeItem && !activeItem.isWebcam) {
+            // Find correct index in persistent list
+            const persistentIndex = persistentItems.findIndex(i => i.id === activeItem.id);
+
             storage.savePlaybackState({
-                index: activeIndex,
+                index: persistentIndex,
                 activeId: activeItem.id,
                 time: currentTime
             });

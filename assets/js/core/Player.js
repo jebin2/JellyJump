@@ -1822,7 +1822,17 @@ export class CorePlayer {
             }
             this.isStreamMode = false;
             this.isLive = false;
+            if (this.streamVideo && this.streamVideo.srcObject) {
+                Logger.log('[Player] Clearing webcam stream in load()');
+                this.streamVideo.srcObject = null;
+            }
             this._hideStreamVideo();
+            this._stopStreamRenderLoop();
+
+            // Clear canvas to prevent "ghost frames" from previous media
+            if (this.ctx && this.canvas) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
 
             // Stop any current playback
             this.pause(false);
@@ -2003,6 +2013,18 @@ export class CorePlayer {
             // Stop any current playback and clean up MediaBunny resources
             this.pause(false);
             this._cleanupMediaBunny();
+
+            // Clear any active webcam stream if we're switching to HLS
+            if (this.streamVideo && this.streamVideo.srcObject) {
+                Logger.log('[Stream] Clearing webcam stream for HLS loading');
+                this.streamVideo.srcObject = null;
+            }
+            this._stopStreamRenderLoop();
+
+            // Clear canvas to prevent "ghost frames" from previous media
+            if (this.ctx && this.canvas) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
 
             this.isStreamMode = true;
             this.currentVideoId = videoId || url;
@@ -2423,6 +2445,10 @@ export class CorePlayer {
      * @param {MediaStream} stream
      */
     async loadWebcamStream(stream) {
+        // Stop current playback and cleanup MediaBunny resources
+        this.pause(false);
+        this._cleanupMediaBunny();
+
         // 1. Setup Preview (Existing CorePlayer Logic)
         this._createStreamVideo();
         // Setup events to ensure canvas resizing (sets up onloadedmetadata)
@@ -2436,7 +2462,17 @@ export class CorePlayer {
         this.isPlaying = true;
         this._showStreamVideo(); // Ensure canvas is visible
 
-        await this.streamVideo.play();
+        try {
+            // Use player's play() instead of direct streamVideo.play()
+            // This ensures that recording audio sources are also resumed if active
+            await this.play();
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                Logger.log('[Stream] Webcam play() interrupted (expected if switching back quickly).');
+            } else {
+                throw err;
+            }
+        }
 
         // Resize Canvas to match Webcam Source (Raw Quality)
         if (this.streamVideo.videoWidth && this.streamVideo.videoHeight) {
@@ -2461,6 +2497,11 @@ export class CorePlayer {
         // Setup Recording (MediaBunny)
         this._isCanvasRecording = true;
         this._canvasChunks = [];
+        this._canvasRecordedSeconds = 0;
+        this._canvasAudioSource = null;
+        this._canvasReadyForMoreFrames = true;
+        this._canvasLastFrameNumber = -1;
+        this._canvasStartTime = performance.now();
 
         // Determine Audio Track
         let audioTrack = options.audioTrack;
@@ -2494,38 +2535,41 @@ export class CorePlayer {
             keyFrameInterval: 2, // 2s GOP
             latencyMode: 'realtime',
             width: this.canvas.width,
-            height: this.canvas.height
+            height: this.canvas.height,
+            sizeChangeBehavior: 'contain' // Automatically resize if canvas resolution changes
         });
         this._canvasOutput.addVideoTrack(videoSource, { frameRate });
 
         // Audio Source
         if (audioTrack && audioIsEncodable) {
-            const audioSource = new MediaBunny.MediaStreamAudioTrackSource(audioTrack, {
+            this._canvasAudioSource = new MediaBunny.MediaStreamAudioTrackSource(audioTrack, {
                 codec: 'opus',
                 bitrate: 128000,
             });
-            this._canvasOutput.addAudioTrack(audioSource);
+            this._canvasOutput.addAudioTrack(this._canvasAudioSource);
         }
 
         await this._canvasOutput.start();
 
-        // Start Capture Loop
-        this._canvasStartTime = (typeof document.timeline !== 'undefined') ? Number(document.timeline.currentTime) : performance.now();
-        this._canvasReadyForMoreFrames = true;
-        this._canvasLastFrameNumber = -1;
+        // Initial state sync: If player is paused, recording audio must also be paused
+        if (!this.isPlaying && this._canvasAudioSource) {
+            try {
+                if (typeof this._canvasAudioSource.pause === 'function') {
+                    this._canvasAudioSource.pause();
+                    Logger.log('[Record] Initialized recording audio in PAUSED state (player is paused)');
+                }
+            } catch (e) {
+                Logger.error('[Record] Failed to set initial pause state for recording audio', e);
+            }
+        }
+
 
         const addVideoFrame = async () => {
-            if (!this._isCanvasRecording) return;
+            if (!this._isCanvasRecording || !this.isPlaying) return;
             if (!this._canvasReadyForMoreFrames) return;
 
-            const now = (typeof document.timeline !== 'undefined') ? Number(document.timeline.currentTime) : performance.now();
-            const elapsedSeconds = (now - this._canvasStartTime) / 1000;
-            const frameNumber = Math.round(elapsedSeconds * frameRate);
-
-            if (frameNumber === this._canvasLastFrameNumber) return;
-
-            this._canvasLastFrameNumber = frameNumber;
-            const timestamp = frameNumber / frameRate;
+            const timestamp = this._canvasRecordedSeconds;
+            this._canvasRecordedSeconds += (1 / frameRate);
 
             this._canvasReadyForMoreFrames = false;
             try {
@@ -2560,6 +2604,8 @@ export class CorePlayer {
         if (this._canvasOutput) {
             await this._canvasOutput.finalize();
         }
+
+        this._canvasAudioSource = null;
 
         // Create Blob
         if (this._canvasChunks && this._canvasChunks.length > 0) {
@@ -3335,6 +3381,21 @@ export class CorePlayer {
     }
 
     async play() {
+        // Software-wise resume for recording
+        // IMPORTANT: Must be done before any early returns (like stream mode)
+        if (this._isCanvasRecording && this._canvasAudioSource) {
+            try {
+                if (typeof this._canvasAudioSource.resume === 'function') {
+                    this._canvasAudioSource.resume();
+                    Logger.log('[Record] Resumed recording audio source');
+                } else {
+                    Logger.warn('[Record] _canvasAudioSource does NOT have a resume() method', this._canvasAudioSource);
+                }
+            } catch (e) {
+                Logger.error('[Record] Failed to resume recording audio source', e);
+            }
+        }
+
         // Handle stream mode
         if (this.isStreamMode && this.streamVideo) {
             // Show loading until onplaying fires
@@ -3435,6 +3496,7 @@ export class CorePlayer {
 
         // Stopwatch clock initialization
         this.fallbackStartTime = performance.now();
+
         this.isPlaying = true;
         this._updatePlayPauseUI();
 
@@ -3481,6 +3543,20 @@ export class CorePlayer {
 
     pause(showOverlay = true) {
         Logger.log("Player.pause() called");
+
+        // Software-wise pause for recording
+        if (this._isCanvasRecording && this._canvasAudioSource) {
+            try {
+                if (typeof this._canvasAudioSource.pause === 'function') {
+                    this._canvasAudioSource.pause();
+                    Logger.log('[Record] Paused recording audio source');
+                } else {
+                    Logger.warn('[Record] _canvasAudioSource does NOT have a pause() method', this._canvasAudioSource);
+                }
+            } catch (e) {
+                Logger.error('[Record] Failed to pause recording audio source', e);
+            }
+        }
 
         // Handle stream mode
         if (this.isStreamMode && this.streamVideo) {
