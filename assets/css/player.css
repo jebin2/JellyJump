@@ -3314,12 +3314,14 @@ body.fullscreen-active {
 .checkbox-option:hover input[type='checkbox'] {
     border-color: var(--text-primary) !important;
 }
+
 /* Recorder Tabs */
 .recorder-tabs {
     display: flex;
     background-color: var(--bg-tertiary);
     padding: var(--space-xs);
-    border-radius: 8px; /* Hardcoded radius as radius-md unused */
+    border-radius: 8px;
+    /* Hardcoded radius as radius-md unused */
     margin-bottom: var(--space-lg);
 }
 
@@ -3342,23 +3344,31 @@ body.fullscreen-active {
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     font-weight: var(--font-bold);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* Recording State (Red Dot/Border) */
-.btn-icon.recording {
+.recording-active {
     border-color: var(--accent-danger);
     color: var(--accent-danger);
     animation: pulse-recording 2s infinite;
 }
 
-.btn-icon.recording svg {
+.recording-active svg {
     fill: var(--accent-danger);
     stroke: var(--accent-danger);
 }
 
 @keyframes pulse-recording {
-    0% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0.4); }
-    70% { box-shadow: 0 0 0 10px rgba(255, 51, 102, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0); }
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 51, 102, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 51, 102, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 51, 102, 0);
+    }
 }
