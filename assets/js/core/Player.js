@@ -1805,6 +1805,14 @@ export class CorePlayer {
                 this._updateVolumeUI();
             }
 
+            this._isMediaReady = false;
+            // REMOVED CLEARRECT: We want to keep the last frame visible until the new one is ready
+            // to ensure a seamless transition in the recording (Old Frame -> New Frame, no black gap).
+            // if (this.ctx && this.canvas) {
+            //     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            // }
+            this.pause(false);
+
             this._cleanupThumbnails();
 
             // Detect stream type
@@ -1832,13 +1840,6 @@ export class CorePlayer {
             this._hideStreamVideo();
             this._stopStreamRenderLoop();
 
-            // Clear canvas to prevent "ghost frames" from previous media
-            if (this.ctx && this.canvas) {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            }
-
-            // Stop any current playback
-            this.pause(false);
             this.currentTime = 0;
 
             // Reset new state
@@ -2013,21 +2014,16 @@ export class CorePlayer {
             Logger.log('[Stream] Loading HLS stream:', url);
             this._lastStreamUrl = url; // Save for retry
 
+            // Show loader immediately
+            this._setLoading(true);
+
+            this._isMediaReady = false;
             // Stop any current playback and clean up MediaBunny resources
             this.pause(false);
-            this._cleanupMediaBunny();
-
-            // Clear any active webcam stream if we're switching to HLS
-            if (this.streamVideo && this.streamVideo.srcObject) {
-                Logger.log('[Stream] Clearing webcam stream for HLS loading');
-                this.streamVideo.srcObject = null;
-            }
-            this._stopStreamRenderLoop();
-
-            // Clear canvas to prevent "ghost frames" from previous media
             if (this.ctx && this.canvas) {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             }
+            this._cleanupMediaBunny();
 
             this.isStreamMode = true;
             this.isWebcamMode = false; // Regular HLS is not a webcam
@@ -2420,21 +2416,22 @@ export class CorePlayer {
      * @private
      */
     _startStreamRenderLoop() {
-        if (this.streamRenderLoopId) return; // Already running
+        if (this.streamRenderLoopId) return;
 
-        Logger.log('[Stream] Starting canvas render loop');
-
-        const renderFrame = () => {
-            if (!this.isStreamMode || !this.isPlaying) {
-                this.streamRenderLoopId = null;
+        const render = () => {
+            if (!this.isPlaying || !this.streamVideo) {
+                this._stopStreamRenderLoop();
                 return;
             }
 
-            this._renderStreamFrame();
-            this.streamRenderLoopId = requestAnimationFrame(renderFrame);
+            // Draw current video frame to canvas
+            this.ctx.drawImage(this.streamVideo, 0, 0, this.canvas.width, this.canvas.height);
+            this._isMediaReady = true; // First frame is now on canvas
+
+            this.streamRenderLoopId = requestAnimationFrame(render);
         };
 
-        this.streamRenderLoopId = requestAnimationFrame(renderFrame);
+        this.streamRenderLoopId = requestAnimationFrame(render);
     }
 
     /**
@@ -2450,8 +2447,16 @@ export class CorePlayer {
      * @param {MediaStream} stream
      */
     async loadWebcamStream(stream) {
+        // Show loader immediately for smooth transition
+        this._setLoading(true); // Will be hidden when first frame renders (via _isMediaReady logic if we hook it, or handled manually)
+
+        this._isMediaReady = false;
         // Stop current playback and cleanup MediaBunny resources
         this.pause(false);
+        if (this.ctx && this.canvas) {
+            // REMOVED CLEARRECT for seamless transition
+            // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
         this._cleanupMediaBunny();
 
         // 1. Setup Preview (Existing CorePlayer Logic)
@@ -2468,6 +2473,7 @@ export class CorePlayer {
         this.isPlaying = true;
         this._showStreamVideo(); // Ensure canvas is visible
         this._setWebcamModeControls(true);
+        this._setLoading(false); // Hide loader once stream is ready
 
         try {
             // Use player's play() instead of direct streamVideo.play()
@@ -2504,11 +2510,29 @@ export class CorePlayer {
         // Setup Recording (MediaBunny)
         this._isCanvasRecording = true;
         this._canvasChunks = [];
-        this._canvasRecordedSeconds = 0;
+        this._canvasChunks = [];
         this._canvasAudioSource = null;
         this._canvasReadyForMoreFrames = true;
         this._canvasLastFrameNumber = -1;
-        this._canvasStartTime = performance.now();
+        this._canvasAudioSource = null;
+        this._canvasReadyForMoreFrames = true;
+        this._canvasLastFrameNumber = -1;
+        // this._canvasStartTime will be set after output starts for sync
+
+        // Continuous Clock Tracking
+        this._canvasRecordedDuration = 0; // Total accumulated video duration
+        this._lastFrameWallTime = performance.now(); // Anchor for calculating delta
+        this._resetRecordingClock = true; // Signal to reset anchor on next frame
+
+        // Manual Audio Sync State
+        this._audioContext = null;
+        this._audioStreamSource = null;
+        this._audioProcessor = null;
+        this._audioRecordedDuration = 0; // Independent audio clock to match video
+
+        // Smart Pause Tracking
+        this._canvasRecordingPausedTime = 0; // Total time spent paused
+        this._canvasPauseStartTime = null;   // Timestamp when current pause started
 
         // Determine Audio Track
         let audioTrack = options.audioTrack;
@@ -2547,16 +2571,90 @@ export class CorePlayer {
         });
         this._canvasOutput.addVideoTrack(videoSource, { frameRate });
 
-        // Audio Source
+        // --- MANUAL AUDIO PIPELINE SETUP ---
+        // We use AudioSampleSource instead of MediaStreamAudioTrackSource to manually control timestamps
+        // and ensure audio pauses exactly when video pauses (preventing frozen frames at end).
         if (audioTrack && audioIsEncodable) {
-            this._canvasAudioSource = new MediaBunny.MediaStreamAudioTrackSource(audioTrack, {
-                codec: 'opus',
-                bitrate: 128000,
-            });
-            this._canvasOutput.addAudioTrack(this._canvasAudioSource);
+            try {
+                // 1. Initialize Audio Source
+                this._canvasAudioSource = new MediaBunny.AudioSampleSource({
+                    codec: 'opus',
+                    bitrate: 128000,
+                    sampleRate: 48000 // Standardize
+                });
+                this._canvasOutput.addAudioTrack(this._canvasAudioSource);
+
+                // 2. Setup Audio Context & Processor
+                this._audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+
+                // Create stream source from the track
+                const streamForCtx = new MediaStream([audioTrack]);
+                this._audioStreamSource = this._audioContext.createMediaStreamSource(streamForCtx);
+
+                // Use ScriptProcessor for capture (bufferSize 4096 = ~85ms latency)
+                this._audioProcessor = this._audioContext.createScriptProcessor(4096, 2, 2);
+
+                // 3. Audio Process Loop
+                this._audioProcessor.onaudioprocess = (e) => {
+                    if (!this._isCanvasRecording) return;
+
+                    // CRITICAL: Only record audio when VIDEO is also recording (Clock is running)
+                    // If we are in a "gap" (resetRecordingClock is true), DROP samples.
+                    if (this._resetRecordingClock || !this._isMediaReady) {
+                        return;
+                    }
+
+                    const inputBuffer = e.inputBuffer;
+
+                    // Convert WebAudio Buffer to MediaBunny AudioSample
+                    // Use OUR manual clock to sync with video
+                    const timestamp = this._audioRecordedDuration;
+                    const duration = inputBuffer.duration;
+
+                    // Increment clock
+                    this._audioRecordedDuration += duration;
+
+                    try {
+                        const currentTimestamp = Number(timestamp);
+                        if (isNaN(currentTimestamp)) {
+                            Logger.warn('[Record] Timestamp is NaN, resetting to 0');
+                            this._audioRecordedDuration = 0;
+                            return;
+                        }
+
+                        // We must clone the data because inputBuffer is reused
+                        const syncedSamples = MediaBunny.AudioSample.fromAudioBuffer(inputBuffer, currentTimestamp);
+                        const samplesToAdd = Array.isArray(syncedSamples) ? syncedSamples : [syncedSamples];
+
+                        samplesToAdd.forEach(s => {
+                            if (this._canvasAudioSource) {
+                                this._canvasAudioSource.add(s);
+                                s.close();
+                            }
+                        });
+
+                    } catch (err) {
+                        Logger.warn('[Record] Audio encode error:', err);
+                    }
+                };
+
+                // Connect graph
+                this._audioStreamSource.connect(this._audioProcessor);
+                this._audioProcessor.connect(this._audioContext.destination); // Required for chrome to fire events
+
+                Logger.log('[Record] Manual Audio Pipeline Started');
+
+            } catch (e) {
+                Logger.error('[Record] Audio setup failed', e);
+                this._canvasAudioSource = null;
+            }
         }
 
         await this._canvasOutput.start();
+
+        // SYNC FIX: Set start time NOW, after the output engine is ready.
+        // This ensures video timestamps align with the "zero" point of the audio track.
+        this._canvasStartTime = performance.now();
 
         // Initial state sync: If player is paused, recording audio must also be paused
         if (!this.isPlaying && this._canvasAudioSource) {
@@ -2572,11 +2670,30 @@ export class CorePlayer {
 
 
         const addVideoFrame = async () => {
-            if (!this._isCanvasRecording || !this.isPlaying) return;
+            if (!this._isCanvasRecording || !this.isPlaying || !this._isMediaReady) return;
             if (!this._canvasReadyForMoreFrames) return;
 
-            const timestamp = this._canvasRecordedSeconds;
-            this._canvasRecordedSeconds += (1 / frameRate);
+            if (!this._canvasReadyForMoreFrames) return;
+
+            const now = performance.now();
+
+            // CLOCK RESET / RESUME LOGIC
+            // If we just came back from a "gap" (loading, pause, etc),
+            // reset the anchor to 'now' so we ignore the time passed during the gap.
+            if (this._resetRecordingClock) {
+                this._lastFrameWallTime = now;
+                this._resetRecordingClock = false;
+                // Logger.log('[Record] Resume detected. Clock anchor reset.');
+                // Skip adding a frame on the exact reset tick to avoid tiny delta oddities
+                return;
+            }
+
+            // Continuous Integration: Accumulate real-time delta
+            const delta = (now - this._lastFrameWallTime) / 1000;
+            this._lastFrameWallTime = now;
+            this._canvasRecordedDuration += delta;
+
+            const timestamp = this._canvasRecordedDuration;
 
             this._canvasReadyForMoreFrames = false;
             try {
@@ -2596,6 +2713,16 @@ export class CorePlayer {
     }
 
     /**
+     * Helper to resume recording smart pause tracking
+     * Signals the clock to reset on next frame
+     * @private
+     */
+    _resumeRecordingSmartPause() {
+        if (!this._isCanvasRecording) return;
+        this._resetRecordingClock = true;
+    }
+
+    /**
      * Stop canvas recording and return the blob
      * @returns {Promise<Blob|null>}
      */
@@ -2606,6 +2733,21 @@ export class CorePlayer {
         clearInterval(this._canvasCaptureInterval);
 
         Logger.log('[Stream] Finalizing Canvas Recording...');
+
+        // Cleanup Manual Audio Pipeline
+        if (this._audioProcessor) {
+            this._audioProcessor.disconnect();
+            this._audioProcessor.onaudioprocess = null;
+            this._audioProcessor = null;
+        }
+        if (this._audioStreamSource) {
+            this._audioStreamSource.disconnect();
+            this._audioStreamSource = null;
+        }
+        if (this._audioContext) {
+            await this._audioContext.close();
+            this._audioContext = null;
+        }
 
         // Finalize
         if (this._canvasOutput) {
@@ -2637,7 +2779,8 @@ export class CorePlayer {
         this._stopStreamRenderLoop();
 
         if (this.ctx && this.canvas) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            // REMOVED CLEARRECT for seamless transition
+            // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         }
 
         this._updatePlayPauseUI();
@@ -2671,6 +2814,14 @@ export class CorePlayer {
             this.canvas.width,
             this.canvas.height
         );
+
+        // Mark media as ready and handle recording resume if needed
+        if (!this._isMediaReady) {
+            this._isMediaReady = true;
+            if (this.isPlaying) {
+                this._resumeRecordingSmartPause();
+            }
+        }
 
         // Run after-frame callbacks (for subtitles, overlays, etc.)
         for (const callback of this.afterFrameRenderCallbacks) {
@@ -2948,7 +3099,7 @@ export class CorePlayer {
 
         levels.forEach(level => {
             html += `
-                <div class="jellyjump-menu-item ${!isAuto && currentLevel === level.index ? 'active' : ''}" 
+                <div class="jellyjump-menu-item ${!isAuto && currentLevel === level.index ? 'active' : ''}"
                      data-value="${level.index}">
                     ${level.label}
                 </div>
@@ -3260,7 +3411,7 @@ export class CorePlayer {
 
     /**
      * Render a specific frame
-     * @param {number} timestamp 
+     * @param {number} timestamp
      * @param {boolean} updateTime - Whether to update the player's current time from the frame
      */
     /**
@@ -3289,6 +3440,14 @@ export class CorePlayer {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 this.ctx.drawImage(newNextFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
 
+                // Mark media as ready and handle recording resume if needed
+                if (!this._isMediaReady) {
+                    this._isMediaReady = true;
+                    if (this.isPlaying) {
+                        this._resumeRecordingSmartPause();
+                    }
+                }
+
                 // Execute render callbacks
                 if (this.afterFrameRenderCallbacks.length > 0) {
                     this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
@@ -3303,7 +3462,7 @@ export class CorePlayer {
 
     /**
      * Render subtitles on the canvas
-     * @param {number} timestamp 
+     * @param {number} timestamp
      * @private
      */
     _renderSubtitles(timestamp) {
@@ -3431,16 +3590,20 @@ export class CorePlayer {
     async play() {
         // Software-wise resume for recording
         // IMPORTANT: Must be done before any early returns (like stream mode)
-        if (this._isCanvasRecording && this._canvasAudioSource) {
-            try {
-                if (typeof this._canvasAudioSource.resume === 'function') {
-                    this._canvasAudioSource.resume();
-                    Logger.log('[Record] Resumed recording audio source');
-                } else {
-                    Logger.warn('[Record] _canvasAudioSource does NOT have a resume() method', this._canvasAudioSource);
-                }
-            } catch (e) {
-                Logger.error('[Record] Failed to resume recording audio source', e);
+        if (this._isCanvasRecording) {
+            // Manual Audio Resume: done by "connecting" or just via the flag check in onaudioprocess
+            // Since we never disconnected the processor, simply setting _resetRecordingClock = false (implied by logic) 
+            // and having _isMediaReady = true (eventually) will resume recording samples.
+            // We might need to resume the AudioContext if it was suspended?
+            if (this._audioContext && this._audioContext.state === 'suspended') {
+                this._audioContext.resume();
+            }
+
+            // Smart Pause: Only resume tracking if media is ALREADY ready.
+            // If media is not ready (loading), we keep the pause timer running
+            // until _isMediaReady becomes true (handled in _renderStreamFrame/_updateNextFrame).
+            if (this._isMediaReady) {
+                this._resumeRecordingSmartPause();
             }
         }
 
@@ -3593,17 +3756,18 @@ export class CorePlayer {
         Logger.log("Player.pause() called");
 
         // Software-wise pause for recording
-        if (this._isCanvasRecording && this._canvasAudioSource) {
-            try {
-                if (typeof this._canvasAudioSource.pause === 'function') {
-                    this._canvasAudioSource.pause();
-                    Logger.log('[Record] Paused recording audio source');
-                } else {
-                    Logger.warn('[Record] _canvasAudioSource does NOT have a pause() method', this._canvasAudioSource);
-                }
-            } catch (e) {
-                Logger.error('[Record] Failed to pause recording audio source', e);
+        // Software-wise pause for recording
+        if (this._isCanvasRecording) {
+            // Manual Audio Pause:
+            // onaudioprocess checks _resetRecordingClock and _isMediaReady, so setting resetClock=true stops inputs.
+            // We can also suspend context to save CPU
+            if (this._audioContext && this._audioContext.state === 'running') {
+                this._audioContext.suspend();
             }
+
+            // Smart Pause: No need to set start time, just stop accumulating (which happens automatically since addVideoFrame stops running)
+            // But we mark reset for safety when resuming
+            this._resetRecordingClock = true;
         }
 
         // Handle stream mode
@@ -3715,7 +3879,8 @@ export class CorePlayer {
 
         if (firstFrame) {
             // Draw the first frame
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            // REMOVED CLEARRECT for seamless transition
+            // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.ctx.drawImage(firstFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
 
             // Execute render callbacks
@@ -4740,7 +4905,6 @@ export class CorePlayer {
         const frame = result.value;
 
         if (frame) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.ctx.drawImage(frame.canvas, 0, 0, this.canvas.width, this.canvas.height);
 
             // Execute render callbacks
