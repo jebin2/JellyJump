@@ -233,7 +233,7 @@ export class Playlist {
         if (screenRecordBtn) {
             screenRecordBtn.addEventListener('click', async () => {
                 const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
-                ScreenRecorderMenu.init(this);
+                ScreenRecorderMenu.showOptions(this);
             });
         }
 

@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 
 /**
  * Screen Recorder Menu Handler
- * Handles recording of the screen/window/tab via getDisplayMedia
+ * Handles recording of the screen/window/tab with Multi-Mode Facecam support.
  */
 export class ScreenRecorderMenu {
     static isRecording = false;
@@ -10,47 +10,202 @@ export class ScreenRecorderMenu {
     static chunks = [];
     static stream = null;
 
+    // Facecam State
+    static facecamStream = null;
+    static facecamVideo = null;     // used for PiP and In-Page
+    static facecamContainer = null; // used for In-Page
+    static facecamWindow = null;    // used for Popup
+    static currentMode = 'off';
+
     /**
-     * Initialize and handle recording
-     * @param {Playlist} playlist - Playlist instance
+     * Show Recording Options Modal
+     * @param {Playlist} playlist 
      */
-    static async init(playlist) {
-        // Toggle logic
+    static async showOptions(playlist) {
         if (this.isRecording) {
             this.stopRecording(playlist);
             return;
         }
 
-        // Start Recording
-        this._startRecording(playlist);
+        const template = document.getElementById('screen-record-options-modal-template');
+        if (!template) {
+            this.init(playlist);
+            return;
+        }
+
+        const clone = template.content.cloneNode(true);
+        const modalOverlay = clone.querySelector('.mb-modal-overlay');
+        document.body.appendChild(modalOverlay);
+
+        const closeBtn = modalOverlay.querySelector('.mb-modal-close');
+        const cancelBtn = modalOverlay.querySelector('.mb-modal-cancel');
+        const startBtn = modalOverlay.querySelector('.mb-modal-start');
+        const hint = modalOverlay.querySelector('#facecam-hint');
+        const radios = modalOverlay.querySelectorAll('input[name="facecam-mode"]');
+        const preferTabCheckbox = modalOverlay.querySelector('#prefer-current-tab');
+        const enableFacecamCheckbox = modalOverlay.querySelector('#enable-facecam');
+        const facecamOptions = modalOverlay.querySelector('#facecam-options');
+
+        // Option Containers
+        const optPiP = modalOverlay.querySelector('.option-pip');
+        const optPopup = modalOverlay.querySelector('.option-popup');
+        const optInPage = modalOverlay.querySelector('.option-in-page');
+
+        // Dynamic Visibility Function
+        const updateVisibility = () => {
+            const isTabOnly = preferTabCheckbox.checked;
+            const isFacecamEnabled = enableFacecamCheckbox.checked;
+
+            if (!isFacecamEnabled) {
+                facecamOptions.style.display = 'none';
+                hint.className = 'hidden';
+                return;
+            }
+
+            facecamOptions.style.display = 'block';
+
+            if (isTabOnly) {
+                // Show In-Page, Hide PiP/Popup
+                if (optInPage) optInPage.style.display = 'flex';
+                if (optPiP) optPiP.style.display = 'none';
+                if (optPopup) optPopup.style.display = 'none';
+
+                // Auto-select In-Page if currently off/pip/popup (or nothing selected)
+                const current = Array.from(radios).find(r => r.checked);
+                if (!current || (current.value !== 'in-page')) {
+                    const inPageRadio = modalOverlay.querySelector('input[value="in-page"]');
+                    if (inPageRadio) {
+                        inPageRadio.checked = true;
+                        inPageRadio.dispatchEvent(new Event('change'));
+                    }
+                }
+            } else {
+                // Show PiP/Popup, Hide In-Page
+                if (optInPage) optInPage.style.display = 'none';
+                if (optPiP) optPiP.style.display = 'flex';
+                if (optPopup) optPopup.style.display = 'flex';
+
+                // Auto-select PiP if currently in-page (or nothing selected)
+                const current = Array.from(radios).find(r => r.checked);
+                if (!current || (current.value === 'in-page')) {
+                    const pipRadio = modalOverlay.querySelector('input[value="pip"]');
+                    if (pipRadio) {
+                        pipRadio.checked = true;
+                        pipRadio.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+        };
+
+        // Attach Checkbox Listeners
+        preferTabCheckbox.addEventListener('change', updateVisibility);
+        enableFacecamCheckbox.addEventListener('change', updateVisibility);
+
+        // Initial State
+        preferTabCheckbox.checked = false;
+        enableFacecamCheckbox.checked = false;
+        updateVisibility();
+
+        // Handle Hint Logic
+        radios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (!hint) return;
+
+                if (e.target.value === 'pip') {
+                    // Start of Selection
+                    hint.innerHTML = '<strong>Tip:</strong> If Facecam hides behind apps, try <strong>Popup Window</strong> mode.';
+                    hint.className = 'alert alert-info text-xs mb-lg';
+                } else if (e.target.value === 'popup') {
+                    hint.innerHTML = '<strong>Tip:</strong> Right-Click window title -> Select <strong>"Sticky"</strong> or "Always on Top".';
+                    hint.className = 'alert alert-warning text-xs mb-lg';
+                } else if (e.target.value === 'in-page') {
+                    hint.innerHTML = '<strong>Tip:</strong> Facecam only visible inside this browser tab.';
+                    hint.className = 'alert alert-success text-xs mb-lg';
+                } else {
+                    hint.className = 'hidden';
+                }
+            });
+        });
+
+        const closeModal = () => {
+            if (modalOverlay.parentNode) {
+                document.body.removeChild(modalOverlay);
+            }
+        };
+
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+
+        // Prevent closing on overlay click
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            const isFacecamEnabled = enableFacecamCheckbox ? enableFacecamCheckbox.checked : false;
+            let mode = 'off';
+
+            if (isFacecamEnabled) {
+                const selected = Array.from(radios).find(r => r.checked);
+                mode = selected ? selected.value : 'off';
+            }
+
+            const preferCurrentTab = preferTabCheckbox ? preferTabCheckbox.checked : false;
+
+            closeModal();
+            this._startRecording(playlist, mode, preferCurrentTab);
+        });
+    }
+
+    static async init(playlist) {
+        if (this.isRecording) {
+            this.stopRecording(playlist);
+            return;
+        }
+        this._startRecording(playlist, 'off', false);
     }
 
     /**
      * Start Recording
      * @param {Playlist} playlist 
+     * @param {string} mode - 'pip', 'popup', 'in-page', 'off'
+     * @param {boolean} preferCurrentTab - Whether to restrict to current tab
      */
-    static async _startRecording(playlist) {
+    static async _startRecording(playlist, mode, preferCurrentTab = false) {
         try {
-            this.chunks = []; // Reset chunks
+            this.chunks = [];
+            this.currentMode = mode;
 
-            // Request Screen Stream
-            // Constraint: audio: false as per user request
-            this.stream = await navigator.mediaDevices.getDisplayMedia({
+            // 1. Start Facecam
+            if (mode !== 'off') {
+                await this._startFacecam(playlist, mode);
+            }
+
+            // 2. Request Screen Stream
+            const constraints = {
                 video: {
                     cursor: "always"
                 },
                 audio: false
-            });
+            };
 
-            // Handle user stopping via browser UI
+            if (preferCurrentTab) {
+                constraints.video.displaySurface = "browser";
+                constraints.selfBrowserSurface = "include";
+                constraints.preferCurrentTab = true;
+            }
+
+            this.stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+
             this.stream.getVideoTracks()[0].onended = () => {
                 this.stopRecording(playlist);
             };
 
-            // Use VP9 for better compression, fallback to VP8/H264
             const options = { mimeType: 'video/webm;codecs=vp9' };
             if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                Logger.warn('ScreenRecorder: VP9 not supported, falling back to default');
                 delete options.mimeType;
             }
 
@@ -66,66 +221,275 @@ export class ScreenRecorderMenu {
                 this._saveRecording(playlist);
             };
 
-            this.mediaRecorder.start(1000); // Write chunks every second
+            this.mediaRecorder.start(1000);
             this.isRecording = true;
 
-            // Update UI to show recording state (optional: could change button icon)
             this._updateButtonState(true);
-
-            playlist._showToast('Screen recording started', 'info');
+            playlist._showToast(`Recording started (${mode === 'off' ? 'No Facecam' : 'Facecam Active'})`, 'info');
 
         } catch (err) {
             Logger.error('ScreenRecorder: Start Error', err);
-            if (err.name !== 'NotAllowedError') { // Ignore if user cancelled
+            if (err.name !== 'NotAllowedError') {
                 playlist._showToast('Failed to start recording: ' + err.message, 'error');
             }
+            this._stopFacecam();
             this.isRecording = false;
         }
     }
 
     /**
-     * Stop Recording
-     * @param {Playlist} playlist 
+     * Start Facecam based on mode
      */
+    static async _startFacecam(playlist, mode) {
+        try {
+            this.facecamStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 320, height: 240, facingMode: "user" },
+                audio: false
+            });
+
+            if (mode === 'pip') {
+                await this._startPiPMode(playlist);
+            } else if (mode === 'popup') {
+                await this._startPopupMode(playlist);
+            } else if (mode === 'in-page') {
+                await this._startInPageMode(playlist);
+            }
+
+        } catch (err) {
+            Logger.error('ScreenRecorder: Facecam Error', err);
+            playlist._showToast('Facecam failed: ' + err.message, 'error');
+            this._stopFacecam();
+        }
+    }
+
+    // --- Mode Implementations ---
+
+    static async _startPiPMode(playlist) {
+        this.facecamVideo = document.createElement('video');
+        this.facecamVideo.srcObject = this.facecamStream;
+        this.facecamVideo.muted = true;
+        this.facecamVideo.playsInline = true;
+        // Ideally hide it but keep it in DOM for PiP
+        this.facecamVideo.style.position = 'fixed';
+        this.facecamVideo.style.opacity = '0';
+        this.facecamVideo.style.pointerEvents = 'none';
+        document.body.appendChild(this.facecamVideo);
+
+        await this.facecamVideo.play();
+
+        if (this.facecamVideo.requestPictureInPicture) {
+            await this.facecamVideo.requestPictureInPicture();
+        } else {
+            throw new Error('PiP not supported');
+        }
+    }
+
+    static async _startPopupMode(playlist) {
+        const width = 320;
+        const height = 240;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+
+        this.facecamWindow = window.open('', 'Facecam',
+            `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+        );
+
+        if (!this.facecamWindow) {
+            throw new Error('Popup blocked. Allow popups for this site.');
+        }
+
+        // Setup Popup Content
+        this.facecamWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Facecam</title>
+                <style>
+                    body { margin: 0; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+                </style>
+            </head>
+            <body>
+                <video id="v" autoplay playsinline muted></video>
+            </body>
+            </html>
+        `);
+
+        const video = this.facecamWindow.document.getElementById('v');
+        video.srcObject = this.facecamStream;
+
+        // Handle popup close
+        this.facecamWindow.onbeforeunload = () => {
+            this.facecamWindow = null; // Mark as closed
+        };
+    }
+
+    static async _startInPageMode(playlist) {
+        // Container
+        this.facecamContainer = document.createElement('div');
+        Object.assign(this.facecamContainer.style, {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            width: '180px',
+            height: '180px',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            zIndex: '9999',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            border: '3px solid white',
+            cursor: 'move',
+            touchAction: 'none'
+        });
+
+        // Video
+        this.facecamVideo = document.createElement('video');
+        this.facecamVideo.srcObject = this.facecamStream;
+        this.facecamVideo.muted = true;
+        this.facecamVideo.playsInline = true;
+        Object.assign(this.facecamVideo.style, {
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: 'scaleX(-1)' // Mirror effect
+        });
+
+        this.facecamContainer.appendChild(this.facecamVideo);
+        document.body.appendChild(this.facecamContainer);
+
+        await this.facecamVideo.play();
+        this._enableDrag(this.facecamContainer);
+    }
+
+    /**
+     * Enable dragging for In-Page element
+     */
+    static _enableDrag(element) {
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        const dragStart = (e) => {
+            if (e.type === "touchstart") {
+                initialX = e.touches[0].clientX - xOffset;
+                initialY = e.touches[0].clientY - yOffset;
+            } else {
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+            }
+            if (e.target === element || element.contains(e.target)) {
+                isDragging = true;
+            }
+        };
+
+        const dragEnd = (e) => {
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+        };
+
+        const drag = (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                if (e.type === "touchmove") {
+                    currentX = e.touches[0].clientX - initialX;
+                    currentY = e.touches[0].clientY - initialY;
+                } else {
+                    currentX = e.clientX - initialX;
+                    currentY = e.clientY - initialY;
+                }
+
+                xOffset = currentX;
+                yOffset = currentY;
+
+                element.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+            }
+        };
+
+        element.addEventListener("touchstart", dragStart, { passive: false });
+        element.addEventListener("touchend", dragEnd, { passive: false });
+        element.addEventListener("touchmove", drag, { passive: false });
+
+        element.addEventListener("mousedown", dragStart);
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("mousemove", drag);
+
+        element._cleanupDrag = () => {
+            document.removeEventListener("mouseup", dragEnd);
+            document.removeEventListener("mousemove", drag);
+        };
+    }
+
+    // --- Cleanup ---
+
+    static _stopFacecam() {
+        // Stop Stream
+        if (this.facecamStream) {
+            this.facecamStream.getTracks().forEach(track => track.stop());
+            this.facecamStream = null;
+        }
+
+        // Cleanup PiP
+        if (this.facecamVideo && document.pictureInPictureElement === this.facecamVideo) {
+            document.exitPictureInPicture().catch(() => { });
+        }
+        if (this.facecamVideo && this.facecamVideo.parentNode) {
+            this.facecamVideo.parentNode.removeChild(this.facecamVideo);
+        }
+        this.facecamVideo = null;
+
+        // Cleanup Popup
+        if (this.facecamWindow) {
+            this.facecamWindow.close();
+            this.facecamWindow = null;
+        }
+
+        // Cleanup In-Page
+        if (this.facecamContainer) {
+            if (this.facecamContainer._cleanupDrag) this.facecamContainer._cleanupDrag();
+            if (this.facecamContainer.parentNode) this.facecamContainer.parentNode.removeChild(this.facecamContainer);
+            this.facecamContainer = null;
+        }
+    }
+
     static stopRecording(playlist) {
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
             this.mediaRecorder.stop();
-            // Stop all tracks to release camera/screen
+
             if (this.stream) {
                 this.stream.getTracks().forEach(track => track.stop());
                 this.stream = null;
             }
-            // Button update is handled in save or here? Better here for immediate feedback
+
+            this._stopFacecam();
+
             this.isRecording = false;
             this._updateButtonState(false);
             playlist._showToast('Processing recording...', 'info');
         }
     }
 
-    /**
-     * Save Recording to Playlist
-     * @param {Playlist} playlist 
-     */
     static _saveRecording(playlist) {
         if (this.chunks.length === 0) return;
 
         try {
             const blob = new Blob(this.chunks, { type: 'video/webm' });
 
-            // Create meaningful filename
             const date = new Date();
             const timestamp = date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
             const filename = `ScreenRecording_${timestamp}.webm`;
 
-            // Create File object
             const file = new File([blob], filename, { type: 'video/webm' });
 
-            // Create Playlist Item
             const newItem = {
                 title: filename,
                 url: URL.createObjectURL(blob),
                 file: file,
-                duration: 'Loading...', // Will be updated by metadata processor
+                duration: 'Loading...',
                 type: 'video',
                 isLocal: true,
                 path: filename,
@@ -134,12 +498,8 @@ export class ScreenRecorderMenu {
                 fileSize: blob.size
             };
 
-            // Add to Playlist
             playlist.addItems([newItem]);
             playlist._showToast('Recording saved to playlist', 'success');
-
-            // Optionally auto-play the recording?
-            // playlist.selectItem(playlist.items.length - 1);
 
         } catch (err) {
             Logger.error('ScreenRecorder: Save Error', err);
@@ -149,20 +509,17 @@ export class ScreenRecorderMenu {
             this.isRecording = false;
             this.mediaRecorder = null;
             this.stream = null;
+            this._stopFacecam();
             this._updateButtonState(false);
         }
     }
 
-    /**
-     * Update Button UI
-     * @param {boolean} isRecording 
-     */
     static _updateButtonState(isRecording) {
         const btn = document.getElementById('mb-screen-record');
         if (!btn) return;
 
         if (isRecording) {
-            btn.classList.add('recording-active'); // Add a class for styling (red pulse?)
+            btn.classList.add('recording-active');
             btn.innerHTML = `
                 <svg width="16" height="16" fill="currentColor" class="text-danger animate-pulse">
                     <use href="assets/icons/sprite.svg#icon-record"></use>

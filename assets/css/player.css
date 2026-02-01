@@ -3188,3 +3188,129 @@ body.fullscreen-active {
         transform: scale(1, 1);
     }
 }
+
+/* -----------------------------------------
+   Form Elements (Radio & Checkbox)
+   ----------------------------------------- */
+/* -----------------------------------------
+   Form Elements (Radio & Checkbox)
+   ----------------------------------------- */
+.radio-option {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.radio-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Use :has() if supported, or fallback logic if needed. 
+   Since this is a modern environment, :has is likely fine, 
+   but simplistic JS or adjacent sibling approach is safer for broader compat if needed.
+   For now, we will rely on :has() or just the input feedback. */
+
+.radio-option:has(input[type='radio']:checked) {
+    background: rgba(var(--accent-primary-rgb, 100, 255, 218), 0.1);
+    border-color: var(--accent-primary);
+}
+
+.radio-option input[type='radio'] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-secondary);
+    border-radius: 50%;
+    margin-right: 12px;
+    margin-top: 2px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.radio-option input[type='radio']:checked {
+    border-color: var(--accent-primary);
+    background-color: transparent;
+}
+
+.radio-option input[type='radio']:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    background-color: var(--accent-primary);
+    border-radius: 50%;
+    box-shadow: 0 0 5px var(--accent-primary);
+}
+
+.radio-option:hover input[type='radio'] {
+    border-color: var(--text-primary);
+}
+
+
+/* -----------------------------------------
+   Checkbox Option Styles (Similar to Radio)
+   ----------------------------------------- */
+.checkbox-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+    /* Add slight hit area */
+}
+
+/* Force visibility and reset styles */
+.checkbox-option input[type='checkbox'] {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    display: inline-block !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    /* prevent shrinking */
+    min-height: 20px !important;
+    border: 2px solid var(--text-secondary) !important;
+    border-radius: 4px !important;
+    margin-right: 12px;
+    position: relative;
+    cursor: pointer;
+    background-color: transparent;
+    opacity: 1 !important;
+    visibility: visible !important;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.checkbox-option input[type='checkbox']:checked {
+    border-color: var(--accent-primary) !important;
+    background-color: var(--accent-primary) !important;
+}
+
+.checkbox-option input[type='checkbox']:checked::after {
+    content: '';
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    width: 6px;
+    height: 12px;
+    border: solid #000;
+    border-width: 0 2px 2px 0;
+    display: block !important;
+}
+
+.checkbox-option:hover input[type='checkbox'] {
+    border-color: var(--text-primary) !important;
+}

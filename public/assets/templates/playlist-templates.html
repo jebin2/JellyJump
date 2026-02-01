@@ -1892,3 +1892,76 @@
         </div>
     </div>
 </template>
+<!-- Screen Record Options Modal Template -->
+<template id="screen-record-options-modal-template">
+    <div class="mb-modal-overlay">
+        <div class="mb-modal" role="dialog" aria-modal="true">
+            <div class="mb-modal-header">
+                <h3 class="mb-modal-title">Screen Recording Options</h3>
+                <button class="mb-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="mb-modal-body">
+                <p class="text-secondary text-sm mb-lg">Choose your recording preferences:</p>
+
+                <div class="options-group mb-lg">
+                    <!-- Source Constraint (Top) -->
+                    <label
+                        class="checkbox-option flex items-center cursor-pointer mb-md p-sm bg-bg-tertiary rounded-md border border-border-light">
+                        <input type="checkbox" id="prefer-current-tab" class="mr-sm">
+                        <div>
+                            <span class="block text-sm font-bold text-primary">Record this tab only</span>
+                            <span class="block text-xs text-secondary">Uncheck to record other windows/apps.</span>
+                        </div>
+                    </label>
+
+                    <!-- Enable Facecam Checkbox -->
+                    <label class="checkbox-option flex items-center mb-md cursor-pointer">
+                        <input type="checkbox" id="enable-facecam" class="mr-sm">
+                        <span class="block text-sm font-bold text-primary">Enable Facecam</span>
+                    </label>
+
+                    <div id="facecam-options" style="display: none;" class="pl-md border-l-2 border-border-light ml-xs">
+                        <!-- Global PiP (Visible when Unchecked) -->
+                        <label class="radio-option option-pip flex items-start mb-md cursor-pointer">
+                            <input type="radio" name="facecam-mode" value="pip" class="mr-sm mt-xs">
+                            <div>
+                                <span class="block text-sm font-medium">Global PiP (Recommended)</span>
+                                <span class="block text-xs text-secondary">Floating window, visible over all apps.
+                                    (Requires "Always on Top")</span>
+                            </div>
+                        </label>
+
+                        <!-- Popup Window (Visible when Unchecked) -->
+                        <label class="radio-option option-popup flex items-start mb-md cursor-pointer">
+                            <input type="radio" name="facecam-mode" value="popup" class="mr-sm mt-xs">
+                            <div>
+                                <span class="block text-sm font-medium">Popup Window</span>
+                                <span class="block text-xs text-secondary">Separate popup window. Alternative for
+                                    Linux.</span>
+                            </div>
+                        </label>
+
+                        <!-- In-Page Bubble (Visible when Checked) -->
+                        <label class="radio-option option-in-page flex items-start mb-md cursor-pointer">
+                            <input type="radio" name="facecam-mode" value="in-page" class="mr-sm mt-xs">
+                            <div>
+                                <span class="block text-sm font-medium">In-Page Bubble</span>
+                                <span class="block text-xs text-secondary">Draggable bubble, only visible inside this
+                                    tab.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="alert alert-info text-xs mb-lg" id="facecam-hint">
+                    <strong>Tip:</strong> If the Facecam hides behind other windows, try right-clicking it and selecting
+                    "Always on Top".
+                </div>
+            </div>
+            <div class="mb-modal-footer flex justify-end gap-sm">
+                <button class="jellyjump-btn-secondary mb-modal-cancel">Cancel</button>
+                <button class="jellyjump-btn-primary mb-modal-start">Start Recording</button>
+            </div>
+        </div>
+    </div>
+</template>

@@ -5,16 +5,16 @@ import './pull-to-refresh.js';
 
 // Load templates first, then initialize player
 async function initializeApp() {
-    // Load playlist templates
-    const playlistResponse = await fetch('assets/templates/playlist-templates.html');
+    // Load templates first, then initialize player (v=2 forces refresh)
+    const playlistResponse = await fetch('assets/templates/playlist-templates.html?v=2');
     const playlistHtml = await playlistResponse.text();
 
     // Load screenshot templates
-    const screenshotResponse = await fetch('assets/templates/screenshot-templates.html');
+    const screenshotResponse = await fetch('assets/templates/screenshot-templates.html?v=2');
     const screenshotHtml = await screenshotResponse.text();
 
     // Load player templates
-    const playerResponse = await fetch('assets/templates/player-templates.html');
+    const playerResponse = await fetch('assets/templates/player-templates.html?v=2');
     const playerHtml = await playerResponse.text();
 
     const tempDiv = document.createElement('div');
