@@ -144,7 +144,42 @@ export class ScreenRecorderMenu {
             }
         });
 
+        // Tab Logic
+        const tabScreen = modalOverlay.querySelector('#tab-screen-record');
+        const tabWebcam = modalOverlay.querySelector('#tab-webcam-record');
+        const screenOptions = modalOverlay.querySelector('#screen-record-options');
+        const webcamOptions = modalOverlay.querySelector('#webcam-record-options');
+        let currentMode = 'screen'; // 'screen' or 'webcam'
+
+        const switchTab = (mode) => {
+            currentMode = mode;
+            if (mode === 'screen') {
+                tabScreen.classList.add('active');
+                tabWebcam.classList.remove('active');
+                screenOptions.style.display = 'block';
+                webcamOptions.style.display = 'none';
+                webcamOptions.classList.add('hidden');
+            } else {
+                tabScreen.classList.remove('active');
+                tabWebcam.classList.add('active');
+                screenOptions.style.display = 'none';
+                webcamOptions.style.display = 'block';
+                webcamOptions.classList.remove('hidden');
+            }
+        };
+
+        if (tabScreen && tabWebcam) {
+            tabScreen.addEventListener('click', () => switchTab('screen'));
+            tabWebcam.addEventListener('click', () => switchTab('webcam'));
+        }
+
         startBtn.addEventListener('click', () => {
+            if (currentMode === 'webcam') {
+                closeModal();
+                this._startWebcamRecording(playlist);
+                return;
+            }
+
             const isFacecamEnabled = enableFacecamCheckbox ? enableFacecamCheckbox.checked : false;
             let mode = 'off';
 
@@ -174,6 +209,35 @@ export class ScreenRecorderMenu {
      * @param {string} mode - 'pip', 'popup', 'in-page', 'off'
      * @param {boolean} preferCurrentTab - Whether to restrict to current tab
      */
+    static async _startWebcamRecording(playlist) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+
+            this.stream = stream;
+            this.isRecording = true;
+            this.currentMode = 'webcam';
+            this.playlist = playlist;
+
+            // Delegate completely to CorePlayer
+            if (window.player && typeof window.player.startWebcamRecording === 'function') {
+                await window.player.startWebcamRecording(stream);
+            } else {
+                throw new Error("CorePlayer startWebcamRecording not available");
+            }
+
+            // Update UI State
+            this._updateButtonState(true);
+            playlist._showToast('Webcam recording started (MediaBunny)', 'info');
+
+        } catch (err) {
+            console.error("Error starting webcam:", err);
+            playlist._showToast('Webcam access denied or error.', 'error');
+        }
+    }
+
     static async _startRecording(playlist, mode, preferCurrentTab = false) {
         try {
             this.chunks = [];
@@ -456,7 +520,31 @@ export class ScreenRecorderMenu {
         }
     }
 
-    static stopRecording(playlist) {
+    static async stopRecording(playlist) {
+        if (this.currentMode === 'webcam') {
+            this.isRecording = false;
+            this._updateButtonState(false);
+
+            // Handle MediaBunny Webcam via CorePlayer
+            // Note: CorePlayer stops the loop and finalizing might take a moment.
+            if (window.player && typeof window.player.stopWebcamRecording === 'function') {
+                playlist._showToast('Finalizing webcam recording...', 'info');
+                const blob = await window.player.stopWebcamRecording();
+                if (blob) {
+                    this._saveRecordingBlob(playlist, blob);
+                } else {
+                    playlist._showToast('No recording data found.', 'warning');
+                }
+            }
+
+            // Cleanup local stream reference
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+            return;
+        }
+
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
             this.mediaRecorder.stop();
 
@@ -478,28 +566,7 @@ export class ScreenRecorderMenu {
 
         try {
             const blob = new Blob(this.chunks, { type: 'video/webm' });
-
-            const date = new Date();
-            const timestamp = date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            const filename = `ScreenRecording_${timestamp}.webm`;
-
-            const file = new File([blob], filename, { type: 'video/webm' });
-
-            const newItem = {
-                title: filename,
-                url: URL.createObjectURL(blob),
-                file: file,
-                duration: 'Loading...',
-                type: 'video',
-                isLocal: true,
-                path: filename,
-                id: Date.now().toString(),
-                mimeType: 'video/webm',
-                fileSize: blob.size
-            };
-
-            playlist.addItems([newItem]);
-            playlist._showToast('Recording saved to playlist', 'success');
+            this._saveRecordingBlob(playlist, blob);
 
         } catch (err) {
             Logger.error('ScreenRecorder: Save Error', err);
@@ -512,6 +579,37 @@ export class ScreenRecorderMenu {
             this._stopFacecam();
             this._updateButtonState(false);
         }
+    }
+
+    static _saveRecordingBlob(playlist, blob) {
+        const date = new Date();
+        const timestamp = date.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+        const filename = `Recording_${timestamp}.${ext}`;
+        const file = new File([blob], filename, { type: blob.type });
+
+        const newItem = {
+            title: filename,
+            url: URL.createObjectURL(blob),
+            file: file,
+            duration: 'Loading...',
+            type: 'video',
+            isLocal: true,
+            path: filename,
+            id: Date.now().toString(),
+            mimeType: blob.type,
+            fileSize: blob.size
+        };
+
+        if (typeof playlist.addItems === 'function') {
+            playlist.addItems([newItem]);
+        } else {
+            // Fallback if addItems not available (e.g. old Playlist version)
+            playlist.files.push(newItem);
+            if (playlist.renderPlaylist) playlist.renderPlaylist();
+            if (playlist.loadMedia) playlist.loadMedia(playlist.files.length - 1);
+        }
+        playlist._showToast('Recording saved to playlist', 'success');
     }
 
     static _updateButtonState(isRecording) {

@@ -1901,61 +1901,83 @@
                 <button class="mb-modal-close" aria-label="Close">&times;</button>
             </div>
             <div class="mb-modal-body">
-                <p class="text-secondary text-sm mb-lg">Choose your recording preferences:</p>
+                <p class="text-secondary text-sm mb-lg">Choose your recording source:</p>
 
-                <div class="options-group mb-lg">
-                    <!-- Source Constraint (Top) -->
-                    <label
-                        class="checkbox-option flex items-center cursor-pointer mb-md p-sm bg-bg-tertiary rounded-md border border-border-light">
-                        <input type="checkbox" id="prefer-current-tab" class="mr-sm">
-                        <div>
-                            <span class="block text-sm font-bold text-primary">Record this tab only</span>
-                            <span class="block text-xs text-secondary">Uncheck to record other windows/apps.</span>
+                <!-- Recording Mode Tabs -->
+                <div class="recorder-tabs">
+                    <button class="recorder-tab-btn active" id="tab-screen-record">Screen</button>
+                    <button class="recorder-tab-btn" id="tab-webcam-record">Camera</button>
+                </div>
+
+                <div id="screen-record-options">
+                    <div class="options-group mb-lg">
+                        <!-- Source Constraint (Top) -->
+                        <label
+                            class="checkbox-option flex items-center cursor-pointer mb-md p-sm bg-bg-tertiary rounded-md border border-border-light">
+                            <input type="checkbox" id="prefer-current-tab" class="mr-sm">
+                            <div>
+                                <span class="block text-sm font-bold text-primary">Record this tab only</span>
+                                <span class="block text-xs text-secondary">Uncheck to record other windows/apps.</span>
+                            </div>
+                        </label>
+
+                        <!-- Enable Facecam Checkbox -->
+                        <label class="checkbox-option flex items-center mb-md cursor-pointer">
+                            <input type="checkbox" id="enable-facecam" class="mr-sm">
+                            <span class="block text-sm font-bold text-primary">Enable Facecam</span>
+                        </label>
+
+                        <div id="facecam-options" style="display: none;"
+                            class="pl-md border-l-2 border-border-light ml-xs">
+                            <!-- Global PiP (Visible when Unchecked) -->
+                            <label class="radio-option option-pip flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="pip" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">Global PiP (Recommended)</span>
+                                    <span class="block text-xs text-secondary">Floating window, visible over all apps.
+                                        (Requires "Always on Top")</span>
+                                </div>
+                            </label>
+
+                            <!-- Popup Window (Visible when Unchecked) -->
+                            <label class="radio-option option-popup flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="popup" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">Popup Window</span>
+                                    <span class="block text-xs text-secondary">Separate popup window. Alternative for
+                                        Linux.</span>
+                                </div>
+                            </label>
+
+                            <!-- In-Page Bubble (Visible when Checked) -->
+                            <label class="radio-option option-in-page flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="in-page" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">In-Page Bubble</span>
+                                    <span class="block text-xs text-secondary">Draggable bubble, only visible inside
+                                        this
+                                        tab.</span>
+                                </div>
+                            </label>
                         </div>
-                    </label>
+                    </div>
 
-                    <!-- Enable Facecam Checkbox -->
-                    <label class="checkbox-option flex items-center mb-md cursor-pointer">
-                        <input type="checkbox" id="enable-facecam" class="mr-sm">
-                        <span class="block text-sm font-bold text-primary">Enable Facecam</span>
-                    </label>
-
-                    <div id="facecam-options" style="display: none;" class="pl-md border-l-2 border-border-light ml-xs">
-                        <!-- Global PiP (Visible when Unchecked) -->
-                        <label class="radio-option option-pip flex items-start mb-md cursor-pointer">
-                            <input type="radio" name="facecam-mode" value="pip" class="mr-sm mt-xs">
-                            <div>
-                                <span class="block text-sm font-medium">Global PiP (Recommended)</span>
-                                <span class="block text-xs text-secondary">Floating window, visible over all apps.
-                                    (Requires "Always on Top")</span>
-                            </div>
-                        </label>
-
-                        <!-- Popup Window (Visible when Unchecked) -->
-                        <label class="radio-option option-popup flex items-start mb-md cursor-pointer">
-                            <input type="radio" name="facecam-mode" value="popup" class="mr-sm mt-xs">
-                            <div>
-                                <span class="block text-sm font-medium">Popup Window</span>
-                                <span class="block text-xs text-secondary">Separate popup window. Alternative for
-                                    Linux.</span>
-                            </div>
-                        </label>
-
-                        <!-- In-Page Bubble (Visible when Checked) -->
-                        <label class="radio-option option-in-page flex items-start mb-md cursor-pointer">
-                            <input type="radio" name="facecam-mode" value="in-page" class="mr-sm mt-xs">
-                            <div>
-                                <span class="block text-sm font-medium">In-Page Bubble</span>
-                                <span class="block text-xs text-secondary">Draggable bubble, only visible inside this
-                                    tab.</span>
-                            </div>
-                        </label>
+                    <div class="alert alert-info text-xs mb-lg" id="facecam-hint">
+                        <strong>Tip:</strong> If the Facecam hides behind other windows, try right-clicking it and
+                        selecting
+                        "Always on Top".
                     </div>
                 </div>
 
-                <div class="alert alert-info text-xs mb-lg" id="facecam-hint">
-                    <strong>Tip:</strong> If the Facecam hides behind other windows, try right-clicking it and selecting
-                    "Always on Top".
+                <!-- Webcam Only Options -->
+                <div id="webcam-record-options" class="hidden text-center py-lg">
+                    <div
+                        class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-bg-tertiary mb-md text-3xl">
+                        📹
+                    </div>
+                    <h3 class="text-lg font-bold text-primary mb-sm">Record Camera Only</h3>
+                    <p class="text-sm text-secondary">This will display your camera in the main player and record it
+                        directly.</p>
                 </div>
             </div>
             <div class="mb-modal-footer flex justify-end gap-sm">
