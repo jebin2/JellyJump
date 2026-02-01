@@ -74,6 +74,8 @@
     flex-shrink: 0;
     /* Isolate layout to prevent folder expansion from affecting video */
     contain: layout style;
+    z-index: 10000;
+    /* Ensure sidebar containers are above video section components */
 }
 
 
@@ -82,6 +84,7 @@
     width: 0;
     min-width: 0;
     overflow: visible !important;
+    z-index: 10000;
     /* CRITICAL: Allow button to show outside collapsed area */
 }
 
@@ -118,7 +121,9 @@
     right: 20px;
     transform: none;
     /* Remove centering */
-    z-index: 100;
+    z-index: 10005;
+    /* Above play-overlay and other UI elements */
+    pointer-events: auto !important;
     background-color: var(--bg-primary);
     border: 2px solid var(--accent-primary);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -157,6 +162,9 @@
     border-radius: 2px;
     position: relative;
     /* Default positioning in header */
+    z-index: 10;
+    /* Ensure it's above basic header content */
+    pointer-events: auto;
 }
 
 .sidebar-collapse-btn:hover {
@@ -281,7 +289,7 @@
         position: fixed;
         bottom: 20px;
         right: 20px;
-        z-index: 9999;
+        z-index: 10005;
         background-color: var(--bg-primary);
         border: 3px solid var(--accent-primary);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
