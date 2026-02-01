@@ -242,9 +242,11 @@ export class ScreenRecorderMenu {
             const preferCurrentTab = preferTabCheckbox ? preferTabCheckbox.checked : false;
             const captureAudio = captureAudioCheckbox ? captureAudioCheckbox.checked : false;
             const micDeviceId = captureAudio && micDeviceSelect ? micDeviceSelect.value : null;
+            const disableEchoCancelCheckbox = modalOverlay.querySelector('#disable-echo-cancel');
+            const disableEchoCancel = disableEchoCancelCheckbox ? disableEchoCancelCheckbox.checked : false;
 
             closeModal();
-            this._startRecording(playlist, mode, preferCurrentTab, captureAudio, micDeviceId);
+            this._startRecording(playlist, mode, preferCurrentTab, captureAudio, micDeviceId, disableEchoCancel);
         });
     }
 
@@ -307,7 +309,7 @@ export class ScreenRecorderMenu {
         }
     }
 
-    static async _startRecording(playlist, mode, preferCurrentTab = false, captureAudio = false, micDeviceId = null) {
+    static async _startRecording(playlist, mode, preferCurrentTab = false, captureAudio = false, micDeviceId = null, disableEchoCancel = false) {
         try {
             this.chunks = [];
             this.currentMode = mode;
@@ -337,15 +339,18 @@ export class ScreenRecorderMenu {
             // 3. If audio requested, get microphone and create combined stream
             if (captureAudio) {
                 try {
+                    // When disableEchoCancel is true, we disable all audio processing
+                    // to allow capturing speaker audio through the mic
                     const audioConstraints = {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
+                        echoCancellation: !disableEchoCancel,
+                        noiseSuppression: !disableEchoCancel,
+                        autoGainControl: !disableEchoCancel
                     };
                     if (micDeviceId) {
                         audioConstraints.deviceId = { exact: micDeviceId };
                     }
 
+                    Logger.log(`[ScreenRecorder] Audio constraints: echoCancellation=${!disableEchoCancel}`);
                     const micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
                     this.micStream = micStream;
 
