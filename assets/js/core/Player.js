@@ -1806,11 +1806,6 @@ export class CorePlayer {
             }
 
             this._isMediaReady = false;
-            // REMOVED CLEARRECT: We want to keep the last frame visible until the new one is ready
-            // to ensure a seamless transition in the recording (Old Frame -> New Frame, no black gap).
-            // if (this.ctx && this.canvas) {
-            //     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            // }
             this.pause(false);
 
             this._cleanupThumbnails();
@@ -2020,9 +2015,6 @@ export class CorePlayer {
             this._isMediaReady = false;
             // Stop any current playback and clean up MediaBunny resources
             this.pause(false);
-            if (this.ctx && this.canvas) {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            }
             this._cleanupMediaBunny();
 
             this.isStreamMode = true;
@@ -2453,10 +2445,6 @@ export class CorePlayer {
         this._isMediaReady = false;
         // Stop current playback and cleanup MediaBunny resources
         this.pause(false);
-        if (this.ctx && this.canvas) {
-            // REMOVED CLEARRECT for seamless transition
-            // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        }
         this._cleanupMediaBunny();
 
         // 1. Setup Preview (Existing CorePlayer Logic)
@@ -2777,11 +2765,6 @@ export class CorePlayer {
         this.isStreamMode = false;
         this.isPlaying = false;
         this._stopStreamRenderLoop();
-
-        if (this.ctx && this.canvas) {
-            // REMOVED CLEARRECT for seamless transition
-            // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        }
 
         this._updatePlayPauseUI();
     }
@@ -3879,8 +3862,6 @@ export class CorePlayer {
 
         if (firstFrame) {
             // Draw the first frame
-            // REMOVED CLEARRECT for seamless transition
-            // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.ctx.drawImage(firstFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
 
             // Execute render callbacks
