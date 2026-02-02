@@ -34,15 +34,15 @@ export class ResizeMenu {
         const heightInput = modalContent.querySelector('#resize-height');
         const lockBtn = modalContent.querySelector('.aspect-lock-btn');
         const presetBtns = modalContent.querySelectorAll('.preset-btn');
-        const addToPlaylistCheckbox = modalContent.querySelector('input[name="addToPlaylist"]');
         const resizeBtn = modalContent.querySelector('.resize-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.resize-progress');
-        const progressBarFill = modalContent.querySelector('.progress-bar-fill');
+
+        // Footer elements (unified modal pattern)
+        const progressSection = modalContent.querySelector('.progress-section');
+        const progressStatus = modalContent.querySelector('.progress-status');
         const progressText = modalContent.querySelector('.progress-percentage');
-        const statusText = modalContent.querySelector('.status-text');
-        const errorDisplay = modalContent.querySelector('.resize-error');
-        const successDisplay = modalContent.querySelector('.resize-success');
+        const errorDisplay = modalContent.querySelector('.error-message');
+        const successDisplay = modalContent.querySelector('.success-message');
 
         modal.open();
 
@@ -166,11 +166,13 @@ export class ResizeMenu {
                 return;
             }
 
+            // Hide previous messages and show progress
             errorDisplay.classList.add('hidden');
+            successDisplay.classList.add('hidden');
             progressSection.classList.remove('hidden');
             resizeBtn.disabled = true;
             modal.closeBtn.disabled = true;
-            statusText.textContent = `Resizing to ${targetW}x${targetH}...`;
+            progressStatus.textContent = `Resizing to ${targetW}x${targetH}...`;
 
             try {
                 // Get source with caching
@@ -183,7 +185,6 @@ export class ResizeMenu {
                     resolution: { width: targetW, height: targetH },
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
-                        progressBarFill.style.width = `${percent}%`;
                         progressText.textContent = `${percent}%`;
                     }
                 });
@@ -204,29 +205,26 @@ export class ResizeMenu {
                 // Reset for another resize
                 resizeBtn.disabled = false;
                 resizeBtn.classList.remove('hidden');
-                statusText.textContent = 'Resizing video...';
-                progressBarFill.style.width = '0%';
+                progressStatus.textContent = 'Processing...';
                 progressText.textContent = '0%';
 
-                // Add to Playlist
-                if (addToPlaylistCheckbox.checked) {
-                    const newItem = {
-                        id: generateId(),
-                        title: filename,
-                        url: url,
-                        file: new File([blob], filename, { type: `video/${ext}` }),
-                        duration: item.duration,
-                        type: 'video',
-                        isLocal: true,
-                        isNew: true,
-                        path: (item.path || item.title) + '/' + filename
-                    };
+                // Always add to Playlist
+                const newItem = {
+                    id: generateId(),
+                    title: filename,
+                    url: url,
+                    file: new File([blob], filename, { type: `video/${ext}` }),
+                    duration: item.duration,
+                    type: 'video',
+                    isLocal: true,
+                    isNew: true,
+                    path: (item.path || item.title) + '/' + filename
+                };
 
-                    const insertIndex = playlist.items.indexOf(item) + 1;
-                    playlist.items.splice(insertIndex, 0, newItem);
-                    playlist.render();
-                    playlist._saveState();
-                }
+                const insertIndex = playlist.items.indexOf(item) + 1;
+                playlist.items.splice(insertIndex, 0, newItem);
+                playlist.render();
+                playlist._saveState();
 
                 modal.closeBtn.disabled = false;
 

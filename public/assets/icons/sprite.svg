@@ -168,5 +168,13 @@
     <symbol id="icon-check" viewBox="0 0 24 24">
         <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
     </symbol>
+    <!-- Crop Icon -->
+    <symbol id="icon-crop" viewBox="0 0 24 24">
+        <path d="M17 15h2V7c0-1.1-.9-2-2-2H9v2h8v8zM7 17V1H5v4H1v2h4v10c0 1.1.9 2 2 2h10v4h2v-4h4v-2H7z"/>
+    </symbol>
+    <!-- Maximize/Resize Icon -->
+    <symbol id="icon-maximize" viewBox="0 0 24 24">
+        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+    </symbol>
 
 </svg>

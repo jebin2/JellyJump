@@ -150,9 +150,10 @@ export class SpeedReverseMenu {
                 if (audioCheckbox) audioCheckbox.disabled = true;
                 directionRadios.forEach(r => r.disabled = true);
 
-                if (progressSection) progressSection.classList.remove('hidden');
+                // Hide previous messages and show progress
                 if (errorMessage) errorMessage.classList.add('hidden');
                 if (successMessage) successMessage.classList.add('hidden');
+                if (progressSection) progressSection.classList.remove('hidden');
 
                 // Prevent closing
                 const originalClose = modal.close;

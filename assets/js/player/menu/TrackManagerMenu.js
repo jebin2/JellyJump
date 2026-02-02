@@ -216,9 +216,10 @@ export class TrackManagerMenu {
         modal.querySelectorAll('button').forEach(btn => btn.disabled = true);
         if (speedDropdown) speedDropdown.setDisabled(true);
 
-        progressSection.classList.remove('hidden');
+        // Hide previous messages and show progress
         errorMessage.classList.add('hidden');
         successMessage.classList.add('hidden');
+        progressSection.classList.remove('hidden');
         progressPercentage.textContent = '0%';
         progressStatus.textContent = 'Extracting...';
 

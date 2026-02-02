@@ -201,9 +201,10 @@ export class TrimMenu {
             modalContent.classList.add('processing');
             trimBtn.disabled = true;
             modal.closeBtn.disabled = true;
-            progressSection.classList.remove('hidden');
+            // Hide previous messages and show progress
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
+            progressSection.classList.remove('hidden');
 
             try {
                 // Get source with caching

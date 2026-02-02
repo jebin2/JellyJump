@@ -146,9 +146,10 @@ export class CutDetectionMenu {
 
                             if (!progressSection.classList.contains('hidden')) return;
 
-                            progressSection.classList.remove('hidden');
+                            // Hide previous messages and show progress
                             successMessage.classList.add('hidden');
                             errorMessage.classList.add('hidden');
+                            progressSection.classList.remove('hidden');
                             addBtns.forEach(b => b.disabled = true);
 
                             const start = parseFloat(btn.dataset.start);

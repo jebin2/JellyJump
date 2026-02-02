@@ -395,9 +395,10 @@ export class RemoveBackgroundMenu {
             // UI Updates
             processBtn.disabled = true;
             downloadBtn.classList.add('hidden');
-            progressSection.classList.remove('hidden');
+            // Hide previous messages and show progress
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
+            progressSection.classList.remove('hidden');
 
             // Disable inputs
             pickColorBtn.disabled = true;

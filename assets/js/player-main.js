@@ -44,7 +44,7 @@ async function initializeApp() {
         playlist.addItems([
             {
                 title: 'Homepage',
-                url: '/JellyJump/homepage.mp4',
+                url: window.location.href.includes('//localhost:') ? '/homepage.mp4' : '/JellyJump/homepage.mp4',
                 isLocal: true
             },
             {

@@ -337,7 +337,7 @@
 <!-- URL Upload Footer Template -->
 <template id="url-upload-footer-template">
     <div class="flex justify-end w-full">
-        <button class="btn jellyjump-btn-small jellyjump-btn-primary mb-modal-add" disabled>Add Video</button>
+        <button class="btn jellyjump-btn-small mb-modal-add" disabled>Add Video</button>
     </div>
 </template>
 
@@ -420,7 +420,7 @@
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
             </a>
-            <button class="btn jellyjump-btn-small jellyjump-btn-primary trim-btn" title="Trim" aria-label="Trim">
+            <button class="btn jellyjump-btn-small trim-btn" title="Trim" aria-label="Trim">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-scissors"></use>
                 </svg>
@@ -693,34 +693,6 @@
             <button class="btn jellyjump-btn-secondary preset-btn" data-preset="480p">480p (SD)</button>
             <button class="btn jellyjump-btn-secondary preset-btn" data-preset="360p">360p</button>
         </div>
-    </div>
-
-    <div class="options-group mb-lg">
-        <label class="checkbox-option flex items-center cursor-pointer select-none">
-            <input type="checkbox" name="addToPlaylist" checked class="accent-primary">
-            <span class="checkbox-custom"></span>
-            <span class="text-sm">Add to playlist after resizing</span>
-        </label>
-    </div>
-
-    <!-- Progress Section (Hidden by default) -->
-    <div class="resize-progress hidden">
-        <div class="flex-between mb-xs">
-            <span class="status-text text-sm font-mono">Resizing video...</span>
-            <span class="progress-percentage text-sm font-bold">0%</span>
-        </div>
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill" style="width: 0%"></div>
-        </div>
-    </div>
-
-    <!-- Error Message (Hidden by default) -->
-    <div class="resize-error hidden mt-md p-sm border-danger text-danger text-sm"></div>
-
-    <!-- Success Message (Hidden by default) -->
-    <div class="resize-success hidden mt-md p-sm border-success text-success text-sm">
-        Resize complete!
-    </div>
 </template>
 
 <!-- Resize Footer Template -->
@@ -835,7 +807,7 @@
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
             </a>
-            <button class="btn jellyjump-btn-small jellyjump-btn-primary crop-btn" title="Crop" aria-label="Crop">
+            <button class="btn jellyjump-btn-small crop-btn" title="Crop" aria-label="Crop">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-crop"></use>
                 </svg>
@@ -959,8 +931,7 @@
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
             </a>
-            <button class="btn jellyjump-btn-small jellyjump-btn-primary merge-btn" title="Merge" aria-label="Merge"
-                disabled>
+            <button class="btn jellyjump-btn-small merge-btn" title="Merge" aria-label="Merge" disabled>
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-link"></use>
                 </svg>
@@ -994,12 +965,19 @@
         <!-- Status Area (Left) -->
         <div class="resize-footer-status flex-1">
             <div class="progress-section hidden flex items-center gap-sm">
-                <div class="spinner-sm"></div>
-                <span class="progress-status text-sm font-mono">Resizing...</span>
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
                 <span class="progress-percentage text-sm font-bold text-accent">0%</span>
             </div>
-            <div class="error-message hidden text-danger text-sm"></div>
-            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
         </div>
         <!-- Action Buttons (Right) -->
         <div class="action-buttons flex gap-sm flex-shrink-0">
@@ -1011,16 +989,11 @@
             </a>
             <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
                 <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-convert"></use>
+                    <use href="assets/icons/sprite.svg#icon-maximize"></use>
                 </svg>
             </button>
         </div>
     </div>
-</template>
-<button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
-    <span class="font-bold">Resize</span>
-</button>
-</div>
 </template>
 
 <!-- GIF Creation Content Template -->
@@ -1146,13 +1119,19 @@
         <!-- Status Area (Left) -->
         <div class="gif-footer-status flex-1">
             <div class="progress-section hidden flex items-center gap-sm">
-                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
                 </div>
-                <span class="progress-status text-sm font-mono">Creating...</span>
+                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
                 <span class="progress-percentage text-sm font-bold text-accent">0%</span>
             </div>
-            <div class="error-message hidden text-danger text-sm"></div>
-            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
         </div>
         <!-- Action Buttons (Right) -->
         <div class="action-buttons flex gap-sm flex-shrink-0">
@@ -1535,7 +1514,7 @@
                 </svg>
             </a>
 
-            <button class="btn jellyjump-btn-small jellyjump-btn-primary reverse-btn" title="Start" aria-label="Start">
+            <button class="btn jellyjump-btn-small reverse-btn" title="Start" aria-label="Start">
                 <svg width="16" height="16" fill="currentColor" style="transform: rotate(180deg);">
                     <use href="assets/icons/sprite.svg#icon-play"></use>
                 </svg>
@@ -1641,7 +1620,7 @@
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
             </a>
-            <button class="btn jellyjump-btn-small jellyjump-btn-primary process-btn" title="Process Video">
+            <button class="btn jellyjump-btn-small process-btn" title="Process Video">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-play"></use>
                 </svg>
@@ -1721,8 +1700,7 @@
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
             </a>
-            <button class="btn jellyjump-btn-small jellyjump-btn-primary speed-process-btn" title="Change Speed"
-                aria-label="Change Speed">
+            <button class="btn jellyjump-btn-small speed-process-btn" title="Change Speed" aria-label="Change Speed">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-play"></use>
                 </svg>
@@ -1840,8 +1818,7 @@
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
             </a>
-            <button class="btn jellyjump-btn-small jellyjump-btn-primary wm-process-btn" title="Apply Watermark"
-                aria-label="Apply Watermark">
+            <button class="btn jellyjump-btn-small wm-process-btn" title="Apply Watermark" aria-label="Apply Watermark">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-check"></use>
                 </svg>

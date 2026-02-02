@@ -216,11 +216,12 @@ export class GifMenu {
             createBtn.disabled = true;
             modal.closeBtn.disabled = true;
 
-            progressSection.classList.remove('hidden');
+            // Hide previous messages and show progress
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
             gifPreviewSection.classList.add('hidden');
             downloadBtn.classList.add('hidden');
+            progressSection.classList.remove('hidden');
 
             try {
                 // Calculate dimensions
