@@ -22,7 +22,7 @@ export class TrimMenu {
         if (!contentTemplate || !footerTemplate) return;
 
         const modal = new Modal({ maxWidth: '600px' });
-        modal.setTitle('Trim Video');
+        modal.setTitle('Cut Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
 

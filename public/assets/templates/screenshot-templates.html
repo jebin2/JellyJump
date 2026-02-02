@@ -10,38 +10,61 @@
     </button>
 </template>
 
-<!-- Screenshot Modal Template -->
-<template id="screenshot-modal-template">
-    <div class="jellyjump-screenshot-modal" style="display: none;">
-        <div class="jellyjump-screenshot-modal-content">
-            <div class="jellyjump-screenshot-header">
-                <h3>Screenshot Preview</h3>
-                <span class="jellyjump-screenshot-timestamp" id="mb-screenshot-timestamp"></span>
-                <button class="jellyjump-screenshot-close" id="mb-screenshot-close" aria-label="Close">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-close"></use>
-                    </svg>
-                </button>
+<!-- Screenshot Content Template -->
+<template id="screenshot-content-template">
+    <div class="jellyjump-screenshot-content">
+        <div class="source-info mb-md p-sm bg-tertiary rounded flex-between items-center">
+            <div class="flex flex-col">
+                <span class="text-xs text-secondary font-mono">TIMESTAMP</span>
+                <span class="jellyjump-screenshot-timestamp text-sm font-bold text-primary"
+                    id="mb-screenshot-timestamp">--:--</span>
             </div>
-            <div class="jellyjump-screenshot-preview-container">
-                <button class="jellyjump-screenshot-nav jellyjump-screenshot-prev" id="mb-screenshot-prev"
-                    aria-label="Previous Frame" title="Previous Frame">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-chevron-left"></use>
-                    </svg>
-                </button>
-                <img class="jellyjump-screenshot-preview" id="mb-screenshot-preview" alt="Screenshot preview" />
-                <button class="jellyjump-screenshot-nav jellyjump-screenshot-next" id="mb-screenshot-next"
-                    aria-label="Next Frame" title="Next Frame">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-chevron-right"></use>
-                    </svg>
-                </button>
+            <div class="flex flex-col items-end">
+                <span class="text-xs text-secondary font-mono">FRAME NAVIGATION</span>
+                <div class="flex gap-xs mt-xs">
+                    <button class="btn jellyjump-btn-small" id="mb-screenshot-prev" title="Previous Frame (Left Arrow)">
+                        <svg width="16" height="16" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-chevron-left"></use>
+                        </svg>
+                    </button>
+                    <button class="btn jellyjump-btn-small" id="mb-screenshot-next" title="Next Frame (Right Arrow)">
+                        <svg width="16" height="16" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-chevron-right"></use>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <div class="jellyjump-screenshot-actions">
-                <button class="jellyjump-btn-primary" id="mb-screenshot-download">Download PNG</button>
-                <button class="jellyjump-btn jellyjump-btn-secondary" id="mb-screenshot-cancel">Cancel</button>
+        </div>
+
+        <div class="jellyjump-screenshot-preview-container bg-black rounded overflow-hidden relative"
+            style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
+            <img class="jellyjump-screenshot-preview max-w-full max-h-full object-contain" id="mb-screenshot-preview"
+                alt="Screenshot preview" />
+        </div>
+    </div>
+</template>
+
+<!-- Screenshot Footer Template -->
+<template id="screenshot-footer-template">
+    <div class="screenshot-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="screenshot-footer-status flex-1">
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Screenshot ready!</span>
             </div>
+            <div class="error-message hidden text-danger text-sm font-bold">Extraction failed</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small jellyjump-btn-primary download-btn" id="mb-screenshot-download"
+                title="Download Screenshot" aria-label="Download Screenshot" download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
         </div>
     </div>
 </template>

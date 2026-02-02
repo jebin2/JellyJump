@@ -21,65 +21,39 @@ export class CutDetectionMenu {
             return;
         }
 
-        Logger.log('CutDetectionMenu: Executing for', item.title);
+        const contentTemplate = document.getElementById('detection-content-template');
+        const footerTemplate = document.getElementById('detection-footer-template');
+        if (!contentTemplate || !footerTemplate) return;
 
-        const modal = new ModalDialog();
+        const modal = new ModalDialog({
+            maxWidth: '600px',
+            onClose: () => {
+                isCancelled = true;
+                if (detector) detector.cancel();
+            }
+        });
+
         modal.setTitle('Hard Cut Detection');
+        modal.setBody(contentTemplate.content.cloneNode(true));
+        modal.setFooter(footerTemplate.content.cloneNode(true));
 
-        modal.setBody(`
-            <div class="cut-detection-content flex flex-col h-[50vh] max-h-[500px]">
-                <div class="flex-none pb-sm border-b border-white/10">
-                    <p class="mb-sm truncate">Detecting scene changes in: <strong>${item.title}</strong></p>
-                    
-                    <div class="detection-status">
-                        <div class="flex-between mb-xs">
-                            <span class="status-text text-sm font-mono">Initializing...</span>
-                            <span class="status-percent text-sm font-bold">0%</span>
-                        </div>
-                        <div class="progress-bar-container h-2 bg-tertiary rounded overflow-hidden">
-                            <div class="progress-bar-fill bg-primary h-full w-0 transition-all duration-300"></div>
-                        </div>
-                    </div>
-                </div>
+        const modalContent = modal.modal;
 
-                <div class="detected-cuts-list flex-auto overflow-y-auto p-sm space-y-xs min-h-0 bg-secondary/30 mt-sm rounded">
-                    <div class="flex-center h-full text-muted italic status-placeholder">Starting detection...</div>
-                </div>
-            </div>
-        `);
+        // UI Elements from Content
+        const targetFilename = modalContent.querySelector('.target-filename');
+        const statusText = modalContent.querySelector('.status-text');
+        const statusPercent = modalContent.querySelector('.status-percent');
+        const progressBar = modalContent.querySelector('.progress-bar-fill');
+        const cutsList = modalContent.querySelector('.detected-items-list');
 
-        // Footer: Buttons + Progress (Styled like TrimMenu)
-        modal.setFooter(`
-            <div class="trim-footer-container flex-between items-center w-full gap-md">
-                <!-- Status Area (Left) -->
-                <div class="trim-footer-status flex-1">
-                    <div class="progress-section hidden flex items-center gap-sm">
-                        <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin"></div>
-                        <span class="progress-status text-sm font-mono">Trimming...</span>
-                        <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-                    </div>
-                    <div class="error-message hidden text-danger text-sm"></div>
-                    <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
-                </div>
-                <!-- Action Buttons (Right) -->
-                <div class="action-buttons flex gap-sm flex-shrink-0 ml-auto">
-                    <button class="btn jellyjump-btn-secondary" id="btn-cancel-cut">Close</button>
-                </div>
-            </div>
-        `);
+        // UI Elements from Footer
+        const progressSection = modalContent.querySelector('.progress-section');
+        const progressPercentage = modalContent.querySelector('.progress-percentage');
+        const successMessage = modalContent.querySelector('.success-message');
+        const errorMessage = modalContent.querySelector('.error-message');
 
+        targetFilename.textContent = item.title;
         modal.open();
-
-        const cancelBtn = modal.footer.querySelector('#btn-cancel-cut');
-        const progressSection = modal.footer.querySelector('.progress-section');
-        const progressPercentage = modal.footer.querySelector('.progress-percentage');
-        const successMessage = modal.footer.querySelector('.success-message');
-        const errorMessage = modal.footer.querySelector('.error-message');
-
-        const statusText = modal.querySelector('.status-text');
-        const statusPercent = modal.querySelector('.status-percent');
-        const progressBar = modal.querySelector('.progress-bar-fill');
-        const cutsList = modal.querySelector('.detected-cuts-list');
 
         let detector = new HardCutDetector();
         let isCancelled = false;
@@ -147,9 +121,9 @@ export class CutDetectionMenu {
                         const durationStr = (seg.end - seg.start).toFixed(1) + 's';
 
                         return `
-                        <div class="segment-item p-sm rounded bg-tertiary flex-between hover:bg-white/5 transition-colors group">
+                        <div class="segment-item p-sm rounded bg-tertiary flex-between hover:bg-white/5 transition-colors group border border-transparent hover:border-white/10">
                             <div class="flex flex-col gap-xs flex-1">
-                                <span class="font-bold text-accent">Segment ${seg.index}</span>
+                                <span class="font-bold text-accent text-sm">Segment ${seg.index}</span>
                                 <span class="text-xs text-muted font-mono">${startStr} - ${endStr} (${durationStr})</span>
                             </div>
                             <div class="flex gap-sm items-center">
@@ -157,7 +131,7 @@ export class CutDetectionMenu {
                                     data-start="${seg.start}" 
                                     data-end="${seg.end}" 
                                     data-index="${seg.index}">
-                                    Add to Playlist
+                                    Add Clip
                                 </button>
                             </div>
                         </div>`;
@@ -170,17 +144,11 @@ export class CutDetectionMenu {
                         btn.onclick = async (e) => {
                             e.stopPropagation();
 
-                            // Prevent concurrent operations
-                            if (!progressSection.classList.contains('hidden')) {
-                                return;
-                            }
+                            if (!progressSection.classList.contains('hidden')) return;
 
-                            // Show global footer progress
                             progressSection.classList.remove('hidden');
                             successMessage.classList.add('hidden');
                             errorMessage.classList.add('hidden');
-                            cancelBtn.disabled = true;
-                            // Disable all add buttons
                             addBtns.forEach(b => b.disabled = true);
 
                             const start = parseFloat(btn.dataset.start);
@@ -191,17 +159,14 @@ export class CutDetectionMenu {
                                 await this.addSegmentToPlaylist(item, start, end, index, btn, (pct) => {
                                     progressPercentage.textContent = `${Math.round(pct * 100)}%`;
                                 });
-                                // Show success in footer
                                 successMessage.classList.remove('hidden');
                             } catch (err) {
                                 Logger.error('Failed to add segment', err);
-                                errorMessage.textContent = `Error: ${err.message}`;
+                                errorMessage.textContent = err.message;
                                 errorMessage.classList.remove('hidden');
-                                btn.disabled = false; // Re-enable on error
+                                btn.disabled = false;
                             } finally {
                                 progressSection.classList.add('hidden');
-                                cancelBtn.disabled = false;
-                                // Re-enable other buttons, keep clicked one disabled if success
                                 addBtns.forEach(b => {
                                     if (!b.classList.contains('bg-success')) b.disabled = false;
                                 });
@@ -216,22 +181,10 @@ export class CutDetectionMenu {
                 statusText.textContent = 'Error: ' + err.message;
                 statusText.classList.add('text-danger');
                 cutsList.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
-            } finally {
-                cancelBtn.textContent = 'Close';
             }
         };
 
-        // Run immediately
         runDetection();
-
-        // Cancel/Close handler
-        cancelBtn.onclick = () => {
-            isCancelled = true;
-            if (detector) {
-                detector.cancel();
-            }
-            modal.close();
-        };
     }
 
     async addSegmentToPlaylist(originalItem, start, end, index, btn, onProgress) {

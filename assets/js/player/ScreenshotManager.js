@@ -1,128 +1,53 @@
 import { Logger } from "../utils/Logger.js";
+import { Modal } from "./Modal.js";
+
 /**
  * Screenshot Manager
  * Handles video frame capture, preview, and download functionality  
- * Phase 17: Player Frame Capture
  */
-
 export class ScreenshotManager {
     constructor(player) {
         this.player = player;
         this.wasPlayingBeforeCapture = false;
         this.screenshotDataUrl = null;
         this.screenshotTimestamp = null;
+        this.modalInstance = null;
 
         this.ui = {
             btn: null,
-            modal: null,
             preview: null,
             timestamp: null,
             downloadBtn: null,
             cancelBtn: null,
-            closeBtn: null,
             prevBtn: null,
             nextBtn: null
         };
     }
 
     /**
-     * Initialize screenshot UI and attach event listeners
+     * Initialize screenshot button
      */
     init() {
-        this._createUI();
-        this._cacheElements();
-        this._attachEvents();
-    }
-
-    /**
-     * Create screenshot UI elements
-     * @private
-     */
-    /**
-     * Create screenshot UI elements
-     * @private
-     */
-    _createUI() {
         // Insert button before fullscreen button
         const fullscreenBtn = this.player.container.querySelector('#mb-fullscreen-btn');
         if (fullscreenBtn) {
             const btnTemplate = document.getElementById('screenshot-button-template');
-            const btnClone = btnTemplate.content.cloneNode(true);
-            fullscreenBtn.parentNode.insertBefore(btnClone, fullscreenBtn);
+            if (btnTemplate) {
+                const btnClone = btnTemplate.content.cloneNode(true);
+                fullscreenBtn.parentNode.insertBefore(btnClone, fullscreenBtn);
+            }
         }
 
-        // Insert modal at end of body to avoid layout constraints
-        const modalTemplate = document.getElementById('screenshot-modal-template');
-        const modalClone = modalTemplate.content.cloneNode(true);
-        document.body.appendChild(modalClone);
-    }
-
-
-
-    /**
-     * Cache DOM elements
-     * @private
-     */
-    _cacheElements() {
-        const container = this.player.container;
-        this.ui.btn = container.querySelector('#mb-screenshot-btn');
-        this.ui.modal = document.querySelector('.jellyjump-screenshot-modal');
-        // Note: Preview and other elements are inside the modal, so we should query from modal
-        if (this.ui.modal) {
-            this.ui.preview = this.ui.modal.querySelector('#mb-screenshot-preview');
-            this.ui.timestamp = this.ui.modal.querySelector('#mb-screenshot-timestamp');
-            this.ui.downloadBtn = this.ui.modal.querySelector('#mb-screenshot-download');
-            this.ui.cancelBtn = this.ui.modal.querySelector('#mb-screenshot-cancel');
-            this.ui.closeBtn = this.ui.modal.querySelector('#mb-screenshot-close');
-            this.ui.prevBtn = this.ui.modal.querySelector('#mb-screenshot-prev');
-            this.ui.nextBtn = this.ui.modal.querySelector('#mb-screenshot-next');
-        }
-    }
-
-    /**
-     * Attach event listeners
-     * @private
-     */
-    _attachEvents() {
+        this.ui.btn = this.player.container.querySelector('#mb-screenshot-btn');
         if (this.ui.btn) {
             this.ui.btn.addEventListener('click', () => this.capture());
-        }
-
-        if (this.ui.downloadBtn) {
-            this.ui.downloadBtn.addEventListener('click', () => this.download());
-        }
-
-        if (this.ui.cancelBtn) {
-            this.ui.cancelBtn.addEventListener('click', () => this.closeModal());
-        }
-
-        if (this.ui.closeBtn) {
-            this.ui.closeBtn.addEventListener('click', () => this.closeModal());
-        }
-
-        if (this.ui.prevBtn) {
-            this.ui.prevBtn.addEventListener('click', () => this.captureAdjacentFrame(-1));
-        }
-
-        if (this.ui.nextBtn) {
-            this.ui.nextBtn.addEventListener('click', () => this.captureAdjacentFrame(1));
-        }
-
-        if (this.ui.modal) {
-            this.ui.modal.addEventListener('click', (e) => {
-                if (e.target === this.ui.modal) {
-                    this.closeModal();
-                }
-            });
         }
     }
 
     /**
      * Capture current video frame as screenshot
-     * Works in both MediaBunny mode and stream mode (canvas-based)
      */
     async capture() {
-        // Check if we have something to capture
         const isStreamMode = this.player.isStreamMode;
         const hasMediaBunny = this.player.videoSink && this.player.videoTrack;
         const hasCanvas = this.player.canvas && this.player.ctx;
@@ -133,31 +58,21 @@ export class ScreenshotManager {
         }
 
         try {
-            // Track if video was playing
             this.wasPlayingBeforeCapture = this.player.isPlaying;
-
-            // Pause video if playing
-            if (this.player.isPlaying) {
-                this.player.pause();
-            }
+            if (this.player.isPlaying) this.player.pause();
 
             let dataUrl;
             let timestamp;
 
             if (isStreamMode && hasCanvas) {
-                // Stream mode: capture directly from canvas
                 dataUrl = this.player.canvas.toDataURL('image/png');
                 timestamp = this.player.currentTime || 0;
-                Logger.log('[Screenshot] Captured from stream canvas');
             } else if (hasMediaBunny) {
-                // MediaBunny mode: use videoSink
                 const frame = await this.player.videoSink.getCanvas(this.player.currentTime);
-
                 if (!frame || !frame.canvas) {
                     Logger.error('Failed to capture frame');
                     return;
                 }
-
                 dataUrl = frame.canvas.toDataURL('image/png');
                 timestamp = frame.timestamp;
             } else {
@@ -165,55 +80,9 @@ export class ScreenshotManager {
                 return;
             }
 
-            // Show modal with preview
             this.showModal(dataUrl, timestamp);
         } catch (error) {
             Logger.error('Error capturing frame:', error);
-        }
-    }
-
-    /**
-     * Capture adjacent frame (previous or next)
-     * @param {number} direction - -1 for previous, 1 for next
-     */
-    async captureAdjacentFrame(direction) {
-        if (!this.player.videoSink || !this.player.videoTrack) {
-            return;
-        }
-
-        try {
-            // Calculate frame duration based on frame rate
-            const fps = this.player.frameRate || 30;
-            const frameDuration = 1 / fps;
-
-            // Calculate new timestamp
-            const currentTimestamp = this.screenshotTimestamp || this.player.currentTime;
-            let newTimestamp = currentTimestamp + (direction * frameDuration);
-
-            // Clamp to video duration
-            newTimestamp = Math.max(0, Math.min(this.player.duration, newTimestamp));
-
-            // Get frame at new timestamp
-            const frame = await this.player.videoSink.getCanvas(newTimestamp);
-
-            if (!frame || !frame.canvas) {
-                Logger.error('Failed to capture adjacent frame');
-                return;
-            }
-
-            // Convert canvas to data URL
-            const dataUrl = frame.canvas.toDataURL('image/png');
-
-            // Update modal with new frame (don't close/reopen)
-            this.ui.preview.src = dataUrl;
-            this.screenshotDataUrl = dataUrl;
-            this.screenshotTimestamp = frame.timestamp;
-
-            // Update timestamp display
-            const timeStr = this._formatTime(frame.timestamp);
-            this.ui.timestamp.textContent = `at ${timeStr}`;
-        } catch (error) {
-            Logger.error('Error capturing adjacent frame:', error);
         }
     }
 
@@ -223,52 +92,67 @@ export class ScreenshotManager {
      * @param {number} timestamp - Frame timestamp
      */
     showModal(imageData, timestamp) {
-        if (!this.ui.modal) return;
+        const template = document.getElementById('screenshot-content-template');
+        const footerTemplate = document.getElementById('screenshot-footer-template');
+        if (!template || !footerTemplate) return;
 
-        // Set preview image
+        this.modalInstance = new Modal({
+            maxWidth: '800px',
+            onClose: () => this._onClose()
+        });
+
+        this.modalInstance.setTitle('Screenshot Preview');
+        this.modalInstance.setBody(template.content.cloneNode(true));
+        this.modalInstance.setFooter(footerTemplate.content.cloneNode(true));
+
+        const modal = this.modalInstance.modal;
+
+        // Cache UI elements
+        this.ui.preview = modal.querySelector('#mb-screenshot-preview');
+        this.ui.timestamp = modal.querySelector('#mb-screenshot-timestamp');
+        this.ui.downloadBtn = modal.querySelector('#mb-screenshot-download');
+        this.ui.cancelBtn = modal.querySelector('#mb-screenshot-cancel');
+        this.ui.prevBtn = modal.querySelector('#mb-screenshot-prev');
+        this.ui.nextBtn = modal.querySelector('#mb-screenshot-next');
+
+        // Initial Data
         this.ui.preview.src = imageData;
         this.screenshotDataUrl = imageData;
         this.screenshotTimestamp = timestamp;
+        this.ui.timestamp.textContent = this._formatTime(timestamp);
 
-        // Update timestamp display
-        const timeStr = this._formatTime(timestamp);
-        this.ui.timestamp.textContent = `at ${timeStr}`;
+        // Events
+        this.ui.downloadBtn.addEventListener('click', () => this.download());
+        if (this.ui.cancelBtn) this.ui.cancelBtn.addEventListener('click', () => this.modalInstance.close());
+        this.ui.prevBtn.addEventListener('click', () => this.captureAdjacentFrame(-1));
+        this.ui.nextBtn.addEventListener('click', () => this.captureAdjacentFrame(1));
 
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
+        // Close button in footer
+        const closeBtn = modal.querySelector('.mb-modal-close-btn');
+        if (closeBtn) closeBtn.addEventListener('click', () => this.modalInstance.close());
 
-        // Show modal
-        this.ui.modal.style.display = 'flex';
+        this.modalInstance.open();
 
-        // Attach keyboard listener
+        // Keyboard navigation
         this._keydownHandler = this._handleKeydown.bind(this);
         document.addEventListener('keydown', this._keydownHandler);
     }
 
     /**
-     * Close screenshot modal
+     * Internal close handler
+     * @private
      */
-    closeModal() {
-        if (!this.ui.modal) return;
-
-        // Hide modal
-        this.ui.modal.style.display = 'none';
-
-        // Restore body scroll
-        document.body.style.overflow = '';
-
-        // Detach keyboard listener
+    _onClose() {
         if (this._keydownHandler) {
             document.removeEventListener('keydown', this._keydownHandler);
             this._keydownHandler = null;
         }
 
-        // Clean up
-        this.ui.preview.src = '';
+        // Clean up Large Data
         this.screenshotDataUrl = null;
         this.screenshotTimestamp = null;
 
-        // Resume playback if it was playing before
+        // Resume playback
         if (this.wasPlayingBeforeCapture) {
             this.player.play();
             this.wasPlayingBeforeCapture = false;
@@ -276,53 +160,77 @@ export class ScreenshotManager {
     }
 
     /**
-     * Handle keyboard events for modal navigation
-     * @param {KeyboardEvent} e
-     * @private
+     * Capture adjacent frame
+     * @param {number} direction 
      */
-    _handleKeydown(e) {
-        if (!this.isModalOpen()) return;
+    async captureAdjacentFrame(direction) {
+        if (!this.player.videoSink || !this.player.videoTrack) return;
 
-        switch (e.key) {
-            case 'ArrowLeft':
-                e.preventDefault();
-                e.stopPropagation();
-                this.captureAdjacentFrame(-1);
-                break;
-            case 'ArrowRight':
-                e.preventDefault();
-                e.stopPropagation();
-                this.captureAdjacentFrame(1);
-                break;
-            case 'Escape':
-                e.preventDefault();
-                e.stopPropagation();
-                this.closeModal();
-                break;
+        try {
+            const fps = this.player.frameRate || 30;
+            const frameDuration = 1 / fps;
+            const currentTimestamp = this.screenshotTimestamp || this.player.currentTime;
+            let newTimestamp = Math.max(0, Math.min(this.player.duration, currentTimestamp + (direction * frameDuration)));
+
+            const frame = await this.player.videoSink.getCanvas(newTimestamp);
+            if (!frame || !frame.canvas) return;
+
+            const dataUrl = frame.canvas.toDataURL('image/png');
+            this.ui.preview.src = dataUrl;
+            this.screenshotDataUrl = dataUrl;
+            this.screenshotTimestamp = frame.timestamp;
+            this.ui.timestamp.textContent = this._formatTime(frame.timestamp);
+        } catch (error) {
+            Logger.error('Error capturing adjacent frame:', error);
         }
     }
 
     /**
-     * Download screenshot as PNG file
+     * Download screenshot
+     */
+    /**
+     * Download screenshot
      */
     download() {
-        if (!this.screenshotDataUrl) return;
+        if (!this.screenshotDataUrl || !this.ui.downloadBtn) return;
 
         try {
-            // Generate filename with timestamp
             const timestamp = Math.floor(this.screenshotTimestamp || this.player.currentTime);
             const filename = `screenshot-${timestamp}s.png`;
 
-            // Use reusable download anchor from HTML
-            const link = document.getElementById('mb-download-link');
-            link.href = this.screenshotDataUrl;
-            link.download = filename;
-            link.click();
+            // Update anchor attributes for direct download
+            this.ui.downloadBtn.href = this.screenshotDataUrl;
+            this.ui.downloadBtn.download = filename;
 
-            // Close modal
-            this.closeModal();
+            Logger.log('Screenshot download triggered:', filename);
+
+            // Optional: Close modal after download start
+            // this.modalInstance.close();
         } catch (error) {
             Logger.error('Error downloading screenshot:', error);
+        }
+    }
+
+    /**
+     * Keyboard navigation handler
+     * @private
+     */
+    _handleKeydown(e) {
+        if (!this.modalInstance) return;
+
+        switch (e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                this.captureAdjacentFrame(-1);
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                this.captureAdjacentFrame(1);
+                break;
+            case 'Escape':
+                e.preventDefault();
+                this.modalInstance.close();
+                break;
         }
     }
 
@@ -331,18 +239,15 @@ export class ScreenshotManager {
      * @returns {boolean}
      */
     isModalOpen() {
-        return this.ui.modal && this.ui.modal.style.display !== 'none';
+        return !!this.modalInstance;
     }
 
     /**
      * Format time in MM:SS format
-     * @param {number} seconds
-     * @returns {string}
-     * @private
      */
     _formatTime(seconds) {
         const m = Math.floor(seconds / 60);
         const s = Math.floor(seconds % 60);
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
+        return `${m}:${s.toString().padStart(2, '0')}`;
     }
 }
