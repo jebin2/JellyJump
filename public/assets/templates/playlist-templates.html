@@ -1434,16 +1434,15 @@
             <div class="text-xs font-bold uppercase text-secondary tracking-wider mb-sm">Playback Direction</div>
             <div class="radio-group flex gap-md">
                 <label class="radio-option">
-                    <input type="radio" name="direction" value="forward" checked>
-                    <span class="radio-custom"></span>
+                    <input type="radio" name="direction" value="forward" checked class="hidden">
                     <div class="radio-label">
                         <span class="format-name">Forward</span>
                         <span class="format-desc">Normal Playback</span>
                     </div>
                 </label>
                 <label class="radio-option">
-                    <input type="radio" name="direction" value="reverse">
-                    <span class="radio-custom"></span>
+                    <input type="radio" name="direction" value="reverse" class="hidden">
+
                     <div class="radio-label">
                         <span class="format-name">Reverse</span>
                         <span class="format-desc">Backwards Playback</span>
@@ -1457,8 +1456,8 @@
             <div class="text-xs text-secondary font-mono mb-sm">AUDIO OPTIONS</div>
             <label class="checkbox-option mb-sm">
                 <input type="checkbox" name="includeAudio" id="reverse-include-audio" checked>
-                <span class="checkbox-custom"></span>
-                <span class="checkbox-label">Include reversed audio</span>
+
+                <span class="checkbox-label text-sm">Include Audio</span>
             </label>
         </div>
 
@@ -1534,68 +1533,62 @@
 
 <!-- Remove Background Content Template -->
 <template id="remove-bg-content-template">
-    <div class="remove-bg-container flex flex-col gap-md">
-        <!-- Left Column: Video Preview -->
-        <div class="preview-column flex flex-col gap-sm">
-            <div class="preview-header flex-between items-center mb-xs">
-                <button id="pick-color-btn" class="btn jellyjump-btn-small" title="Pick Color">
+    <!-- Left Panel: Video Player -->
+    <div class="modal-video-panel">
+        <div id="remove-bg-player-container" class="bg-black rounded overflow-hidden relative">
+        </div>
+    </div>
+
+    <!-- Right Panel: Controls -->
+    <div class="modal-controls-panel">
+        <!-- Tools Section -->
+        <div class="tools-section mb-md p-sm bg-tertiary rounded flex-between items-center">
+            <span class="text-xs text-secondary font-bold">TOOLS</span>
+            <div class="flex gap-md items-center">
+                <button id="pick-color-btn" class="btn jellyjump-btn-small" title="Pick Color from Video">
                     <svg width="16" height="16" fill="currentColor">
                         <use href="assets/icons/sprite.svg?v=2#icon-eyedropper"></use>
                     </svg>
                 </button>
+                <div class="w-px h-4 bg-border"></div>
                 <label class="checkbox-option flex items-center cursor-pointer select-none">
                     <input type="checkbox" id="live-preview-toggle" checked>
-                    <span class="checkbox-custom"></span>
-                    <span class="checkbox-label text-xs text-secondary">Live Preview</span>
+
+                    <span class="checkbox-label text-xs text-secondary ml-xs">Live Preview</span>
                 </label>
             </div>
-
-            <!-- Reduced size container -->
-            <div class="w-full flex justify-center bg-black rounded overflow-hidden border border-border">
-                <div id="remove-bg-player-container" class="w-full relative h300pximpl">
-                    <!-- CorePlayer will be injected here -->
-                </div>
-            </div>
-
-
         </div>
 
-        <!-- Controls Section -->
-        <div class="controls-column flex flex-col gap-md">
-            <!-- Color Picker Section -->
-            <div class="color-picker-section">
-                <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
+        <!-- Color Picker Section -->
+        <div class="color-picker-section">
+            <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
+            <div class="selected-colors-list flex flex-col gap-xs mb-sm bg-tertiary p-sm rounded border border-border"
+                style="min-height: 100px; max-height: 200px; overflow-y: auto;">
+                <div class="empty-state text-xs text-muted text-center py-md">
+                    No colors selected.
+                </div>
+            </div>
+        </div>
 
-                <div class="selected-colors-list flex flex-col gap-xs mb-sm bg-tertiary p-sm rounded border border-border"
-                    style="min-height: 100px; max-height: 200px; overflow-y: auto;">
-                    <!-- Colors injected here -->
-                    <div class="empty-state text-xs text-muted text-center py-md">
-                        No colors selected.
+        <!-- Background Options -->
+        <div class="bg-options-section mt-auto">
+            <div class="section-title text-sm font-bold text-secondary mb-sm">BACKGROUND</div>
+            <div class="flex flex-col gap-sm">
+                <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                    <input type="radio" name="bg-type" value="transparent" checked>
+
+                    <span class="text-sm">Transparent</span>
+                </label>
+                <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                    <input type="radio" name="bg-type" value="custom">
+
+                    <span class="text-sm">Custom Color</span>
+                    <div class="flex items-center gap-xs ml-auto">
+                        <input type="color" id="custom-bg-color" value="#ffffff"
+                            class="w-8 h-8 p-0 border-0 rounded cursor-pointer" disabled>
                     </div>
-                </div>
+                </label>
             </div>
-
-            <!-- Background Options -->
-            <div class="bg-options-section">
-                <div class="section-title text-sm font-bold text-secondary mb-sm">BACKGROUND</div>
-                <div class="flex gap-sm">
-                    <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
-                        <input type="radio" name="bg-type" value="transparent" checked>
-                        <span class="radio-custom"></span>
-                        <span class="text-sm">Transparent</span>
-                    </label>
-                    <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
-                        <input type="radio" name="bg-type" value="custom">
-                        <span class="radio-custom"></span>
-                        <span class="text-sm">Custom Color</span>
-                        <div class="flex items-center gap-xs ml-auto">
-                            <input type="color" id="custom-bg-color" value="#ffffff"
-                                class="w-8 h-8 p-0 border-0 rounded cursor-pointer" disabled>
-                        </div>
-                    </label>
-                </div>
-            </div>
-
         </div>
     </div>
 </template>

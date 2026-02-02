@@ -20,7 +20,7 @@ export class RemoveBackgroundMenu {
             return;
         }
 
-        const modal = new Modal({ maxWidth: '600px' });
+        const modal = new Modal({ splitLayout: true });
         modal.setTitle('Remove Background');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));

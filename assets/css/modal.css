@@ -483,6 +483,7 @@
     flex-direction: column;
     gap: var(--space-md, 16px);
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: var(--space-xs, 4px);
 }
 
