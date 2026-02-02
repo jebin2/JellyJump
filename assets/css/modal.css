@@ -208,6 +208,68 @@
     border-color: var(--accent-primary);
 }
 
+/* Custom Dropdown Adjustments */
+.jellyjump-menu {
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-primary) var(--bg-secondary);
+}
+
+.jellyjump-menu::-webkit-scrollbar {
+    width: 6px;
+}
+
+.jellyjump-menu::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.jellyjump-menu::-webkit-scrollbar-thumb {
+    background-color: var(--accent-primary);
+    border-radius: 3px;
+}
+
+.dropdown-chevron {
+    display: none;
+    /* Removed in favor of CSS arrow */
+}
+
+.mb-select.jellyjump-menu-btn::after {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid var(--accent-primary);
+    /* Use accent color for visibility */
+    transition: transform 0.2s;
+    margin-left: 10px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.mb-select.jellyjump-menu-btn.is-open::after {
+    transform: rotate(180deg);
+}
+
+.mb-select.jellyjump-menu-btn {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 120px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+
+/* Layout Utilities */
+.flex-start {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 10px;
+}
+
 /* Animations */
 @keyframes fadeIn {
     from {

@@ -3,6 +3,7 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
+import { CustomDropdown } from '../../utils/CustomDropdown.js';
 
 /**
  * Convert Menu Handler
@@ -25,7 +26,7 @@ export class ConvertMenu {
         }
 
         const modal = new Modal({ maxWidth: '500px' });
-        modal.setTitle('Convert & Optimize Video');
+        modal.setTitle('Convert & Compress Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
 
@@ -40,6 +41,15 @@ export class ConvertMenu {
         const errorMessage = modalContent.querySelector('.error-message');
         const inputs = modalContent.querySelectorAll('input');
 
+        // Format Dropdown
+        const formatBtn = modalContent.querySelector('#conversion-format-btn');
+        const formatMenu = modalContent.querySelector('#conversion-format-menu');
+        const formatDropdown = CustomDropdown.init({
+            button: formatBtn,
+            menu: formatMenu,
+            initialValue: 'keep'
+        });
+
         // Quality Elements
         const qualitySlider = modalContent.querySelector('.quality-slider');
         const qualityValue = modalContent.querySelector('.quality-value');
@@ -48,21 +58,21 @@ export class ConvertMenu {
         // UI Logic: Handle Quality Slider
         const updateQualityLabel = () => {
             const val = parseInt(qualitySlider.value);
-            let label = "Medium (60%)";
-            let reduction = "~40% smaller";
+            let labelType = "Medium";
+            let reduction = `~${100 - val}% smaller`;
 
             if (val === 100) {
-                label = "Original (100%)";
+                labelType = "Original";
                 reduction = "No size reduction";
-            } else if (val === 80) {
-                label = "High (80%)";
-                reduction = "~20% smaller";
-            } else if (val === 40) {
-                label = "Low (40%)";
-                reduction = "~60% smaller";
+            } else if (val >= 65) {
+                labelType = "High";
+            } else if (val >= 30) {
+                labelType = "Medium";
+            } else {
+                labelType = "Low";
             }
 
-            qualityValue.textContent = label;
+            qualityValue.textContent = `${labelType} (${val}%)`;
             estimatedReduction.textContent = reduction;
         };
 
@@ -80,7 +90,7 @@ export class ConvertMenu {
 
         // Convert Handler
         convertBtn.addEventListener('click', async () => {
-            const format = modalContent.querySelector('input[name="format"]:checked').value;
+            const format = formatDropdown.getValue();
             const quality = parseInt(qualitySlider.value);
 
             // Validation: No Op check
@@ -93,6 +103,7 @@ export class ConvertMenu {
             // UI Updates
             inputs.forEach(input => input.disabled = true);
             qualitySlider.disabled = true;
+            formatDropdown.setDisabled(true);
             convertBtn.disabled = true;
             modal.closeBtn.disabled = true;
             progressSection.classList.remove('hidden');
@@ -123,6 +134,7 @@ export class ConvertMenu {
                     }
                 });
                 qualitySlider.disabled = false;
+                formatDropdown.setDisabled(false);
                 convertBtn.disabled = false;
                 modal.closeBtn.disabled = false;
 
@@ -139,6 +151,7 @@ export class ConvertMenu {
                     }
                 });
                 qualitySlider.disabled = false;
+                formatDropdown.setDisabled(false);
                 convertBtn.disabled = false;
                 modal.closeBtn.disabled = false;
             }

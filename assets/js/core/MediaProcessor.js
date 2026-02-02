@@ -11,32 +11,35 @@ export class MediaProcessor {
      * Calculate target bitrate based on quality and resolution
      * @param {number|string} quality - 0-100 or 'high'/'medium'/'low'
      * @param {number} pixelCount - Width * Height
+     * @param {number} [sourceBitrate] - Optional actual bitrate of the source
      * @returns {number} Bitrate in bits per second
      */
-    static _getBitrate(quality, pixelCount) {
+    static _getBitrate(quality, pixelCount, sourceBitrate = 0) {
         let q = 80;
         if (typeof quality === 'number') {
             q = quality;
         } else if (quality === 'high') {
-            q = 90;
+            q = 100;
         } else if (quality === 'medium') {
             q = 60;
         } else if (quality === 'low') {
             q = 30;
         }
 
-        // Base bitrate for 720p (approx 0.9M pixels)
-        const basePixels = 1280 * 720;
-        const baseBitrate = 2500000; // 2.5 Mbps
+        let targetBitrate;
+        if (sourceBitrate > 0) {
+            // If we have source bitrate, 100% quality means matching the original bitrate
+            targetBitrate = sourceBitrate * (q / 100);
+        } else {
+            // Fallback: resolution-based scaling (4.0 Mbps for 720p reference)
+            const basePixels = 1280 * 720;
+            const standardBitrate = 4000000;
+            const pixelFactor = pixelCount > 0 ? pixelCount / basePixels : 1;
+            targetBitrate = standardBitrate * pixelFactor * (q / 100);
+        }
 
-        // Scale by pixel count
-        const pixelFactor = pixelCount > 0 ? pixelCount / basePixels : 1;
-
-        // Calculate target
-        let targetBitrate = baseBitrate * pixelFactor * (q / 80);
-
-        // Clamp limits (500 Kbps - 50 Mbps)
-        return Math.floor(Math.max(500000, Math.min(50000000, targetBitrate)));
+        // Return target bitrate exactly as calculated by the quality percentage
+        return Math.floor(targetBitrate);
     }
 
     /**
@@ -95,12 +98,26 @@ export class MediaProcessor {
             const originalWidth = videoTrack.displayWidth || videoTrack.codedWidth;
             const originalHeight = videoTrack.displayHeight || videoTrack.codedHeight;
 
+            // Get original bitrate to make quality settings "respective to video"
+            let originalBitrate = 0;
+            try {
+                const stats = await videoTrack.computePacketStats(50);
+                originalBitrate = stats.averageBitrate;
+                Logger.log(`[MediaProcessor] Source analysis: ${originalWidth}x${originalHeight}, ${(originalBitrate / 1000000).toFixed(2)} Mbps`);
+            } catch (e) {
+                Logger.warn('[MediaProcessor] Could not compute original bitrate, using resolution-based defaults.');
+            }
+
             // Configure Output Format
             let outputFormat;
             if (format === 'gif') {
                 return this.createGif({ source, trim, onProgress });
             } else if (format === 'webm') {
                 outputFormat = new MediaBunny.WebMOutputFormat();
+            } else if (format === 'mov') {
+                outputFormat = new MediaBunny.MovOutputFormat();
+            } else if (format === 'mkv') {
+                outputFormat = new MediaBunny.MkvOutputFormat();
             } else {
                 outputFormat = new MediaBunny.Mp4OutputFormat();
             }
@@ -112,8 +129,8 @@ export class MediaProcessor {
 
             // Configure Video Options
             const videoConfig = {
-                codec: format === 'webm' ? 'vp9' : 'avc', // VP9 for WebM (alpha support), AVC for MP4
-                bitrate: this._getBitrate(quality, originalWidth * originalHeight),
+                codec: (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc', // VP9 for WebM/MKV, AVC for MP4/MOV
+                bitrate: this._getBitrate(quality, originalWidth * originalHeight, originalBitrate),
                 forceTranscode: true // Ensure quality settings are applied
             };
 
