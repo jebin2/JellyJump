@@ -62,10 +62,38 @@
     overflow: hidden;
 }
 
+.hero-video {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 100%;
+    min-height: 100%;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    /* Maintain aspect ratio for the 9:16 video, but ensure it covers */
+    /* Since we want it contained/blended, let's try to center it and let black bg fill rest if needed */
+    /* Update: User said "render properly in the center it will blend" */
+    height: 100%;
+    /* Fit height */
+    width: auto;
+    /* Auto width */
+    object-fit: contain;
+    /* Ensure full video is visible */
+    z-index: 1;
+    opacity: 0.6;
+    /* Dim the video slightly to make text readable */
+    mix-blend-mode: screen;
+    /* specific blend for black background video on dark bg */
+}
+
 .hero-content {
     text-align: center;
     max-width: 900px;
     z-index: 10;
+    position: relative;
+    /* Ensure it stays above video */
 }
 
 .hero-title {
@@ -89,10 +117,65 @@
 }
 
 .hero-actions {
-    display: flex;
-    gap: var(--space-lg);
-    justify-content: center;
     align-items: center;
+    transition: transform 2s ease-in-out;
+}
+
+/* Video Loaded Animation States */
+.hero.video-loaded .hero-title,
+.hero.video-loaded .hero-subtitle {
+    opacity: 0;
+    transition: opacity 1.5s ease-out;
+    pointer-events: none;
+    /* Prevent interaction with invisible text */
+}
+
+.hero.video-loaded .hero-actions {
+    transform: translateY(32vh);
+    /* Push to bottom (adjusted for missing text) */
+}
+
+/* Ensure content is positioned correctly for animation */
+.hero-content {
+    text-align: center;
+    max-width: 900px;
+    z-index: 10;
+    position: relative;
+    /* Ensure height doesn't collapse when items fade */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 50vh;
+}
+
+/* 
+   Video Overlay Trigger 
+   Usage: Transparent clickable area over the video content.
+   Adjust top/left/width/height to match the video's button.
+*/
+.video-overlay-trigger {
+    position: absolute;
+    z-index: 20;
+
+    /* Default Positioning - ADJUST THESE VALUES */
+    top: 55.5%;
+    left: 50%;
+    width: 260px;
+    height: 60px;
+    transform: translate(-50%, -50%);
+    /* Centered by default */
+
+    /* DEBUG STYLES - Remove border when positioned correctly */
+    /* border: 2px dashed #ff0000;
+    background-color: rgba(255, 0, 0, 0.2); */
+    cursor: pointer;
+
+    /* Only show when video is actively showcasing */
+    display: none;
+}
+
+.hero.video-loaded .video-overlay-trigger {
+    display: block;
 }
 
 /* Large buttons for hero */

@@ -76,12 +76,21 @@
     <main>
         <!-- Hero Section -->
         <section id="hero" class="hero">
+            <!-- <video class="hero-video" autoplay muted loop playsinline>
+                <source src="JellyJumpActionAd.mp4" type="video/mp4">
+            </video> -->
+            <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="poster.webp">
+                <source src="homepage.mp4" type="video/mp4">
+            </video>
+
+            <!-- Overlay Trigger for "Play" button in video -->
+            <a href="player.html" class="video-overlay-trigger" aria-label="Launch Player"></a>
             <div class="container hero-content">
-                <h1 class="hero-title">
+                <h1 class="hero-title hidden">
                     PLAY. EDIT. CREATE.<br>
                     <span class="text-accent">YOUR VIDEOS.</span>
                 </h1>
-                <p class="hero-subtitle">Powerful video tools. Brutally simple.</p>
+                <p class="hero-subtitle hidden">Powerful video tools. Brutally simple.</p>
                 <div class="hero-actions">
                     <a href="player.html" class="btn btn-primary btn-lg">LAUNCH PLAYER</a>
                 </div>
