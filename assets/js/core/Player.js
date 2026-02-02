@@ -16,6 +16,7 @@ import { StreamDetector } from '../utils/StreamDetector.js';
 import { AudioVisualizer } from '../player/AudioVisualizer.js';
 import { Logger } from '../utils/Logger.js';
 import { ThumbnailGenerator } from '../player/ThumbnailGenerator.js';
+import { CustomDropdown } from '../utils/CustomDropdown.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -852,18 +853,13 @@ export class CorePlayer {
 
         // Speed (only if enabled)
         if (this.config.controls.speed && this.ui.speedBtn) {
-            this.ui.speedBtn.addEventListener('click', () => {
-                this.ui.speedMenu.classList.toggle('visible');
-                this.ui.speedBtn.setAttribute('aria-expanded', this.ui.speedMenu.classList.contains('visible'));
-            });
-
-            this.ui.speedMenu.addEventListener('click', (e) => {
-                const item = e.target.closest('.jellyjump-menu-item');
-                if (!item) return;
-
-                const speed = parseFloat(item.dataset.value);
-                this.setPlaybackRate(speed);
-                this.ui.speedMenu.classList.remove('visible');
+            CustomDropdown.init({
+                button: this.ui.speedBtn,
+                menu: this.ui.speedMenu,
+                initialValue: String(this.playbackRate),
+                onChange: (value) => {
+                    this.setPlaybackRate(parseFloat(value));
+                }
             });
         }
 

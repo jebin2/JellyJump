@@ -50,7 +50,7 @@
         </div>
         <div class="playlist-menu-item" data-action="download-manage" role="menuitem">
             <span class="menu-icon">🎬</span>
-            <span class="menu-label">Download/Manage Tracks</span>
+            <span class="menu-label">Download Tracks</span>
         </div>
         <!-- <div class="menu-divider"></div> -->
         <div class="playlist-menu-item" data-action="trim" role="menuitem">
@@ -509,6 +509,28 @@
     </div>
 </template>
 
+<!-- Track Management Footer Template -->
+<template id="track-management-footer-template">
+    <div class="track-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="track-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono text-primary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <button class="btn mb-modal-close-btn jellyjump-btn-secondary" title="Close"
+                aria-label="Close">Close</button>
+        </div>
+    </div>
+</template>
+
 <template id="track-card-template">
     <div class="track-card border border-border rounded p-sm bg-secondary hover:bg-tertiary transition-colors">
         <div class="flex justify-between items-start gap-md">
@@ -534,7 +556,7 @@
                         <div class="jellyjump-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x</div>
                         <div class="jellyjump-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x</div>
                         <div class="jellyjump-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
-                        <div class="jellyjump-menu-item active" data-value="1" role="menuitem" tabindex="0">Normal</div>
+                        <div class="jellyjump-menu-item active" data-value="1" role="menuitem" tabindex="0">1x</div>
                         <div class="jellyjump-menu-item" data-value="1.25" role="menuitem" tabindex="0">1.25x</div>
                         <div class="jellyjump-menu-item" data-value="1.5" role="menuitem" tabindex="0">1.5x</div>
                         <div class="jellyjump-menu-item" data-value="1.75" role="menuitem" tabindex="0">1.75x</div>

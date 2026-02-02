@@ -3,7 +3,7 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
-import { SpeedDropdown } from '../../utils/SpeedDropdown.js';
+import { CustomDropdown } from '../../utils/CustomDropdown.js';
 
 /**
  * Track Manager Menu Handler
@@ -17,17 +17,23 @@ export class TrackManagerMenu {
      */
     static async init(item, playlist) {
         const template = document.getElementById('track-management-content-template');
-        if (!template) return;
+        const footerTemplate = document.getElementById('track-management-footer-template');
+        if (!template || !footerTemplate) return;
 
         const modal = new Modal({ maxWidth: '700px' });
         modal.setTitle('Video & Audio Tracks');
         modal.setBody(template.content.cloneNode(true));
+        modal.setFooter(footerTemplate.content.cloneNode(true));
 
         const modalContent = modal.modal;
 
         // Populate Source Info
         const sourceFilename = modalContent.querySelector('.source-filename');
         sourceFilename.textContent = `Source: ${item.title}`;
+
+        // Close button in footer
+        const closeBtn = modal.querySelector('.mb-modal-close-btn');
+        if (closeBtn) closeBtn.addEventListener('click', () => modal.close());
 
         modal.open();
 
@@ -46,7 +52,7 @@ export class TrackManagerMenu {
                 audio: item.audioTracks || []
             };
 
-            this.renderTracks(tracks, item, modalContent, playlist);
+            this.renderTracks(tracks, item, modalContent, playlist, modal);
         } catch (e) {
             Logger.error('Failed to load tracks:', e);
 
@@ -77,17 +83,18 @@ export class TrackManagerMenu {
      * Render tracks in the modal
      * @param {Object} tracks 
      * @param {Object} item 
-     * @param {HTMLElement} modal 
+     * @param {HTMLElement} modalContent 
      * @param {Playlist} playlist
+     * @param {Modal} modalInstance
      * @private
      */
-    static renderTracks(tracks, item, modal, playlist) {
-        const videoList = modal.querySelector('.video-track-list');
-        const audioList = modal.querySelector('.audio-track-list');
-        const videoCount = modal.querySelector('.video-tracks-section .track-count');
-        const audioCount = modal.querySelector('.audio-tracks-section .track-count');
-        const noVideoMsg = modal.querySelector('.video-tracks-section .no-tracks-message');
-        const noAudioMsg = modal.querySelector('.audio-tracks-section .no-tracks-message');
+    static renderTracks(tracks, item, modalContent, playlist, modalInstance) {
+        const videoList = modalContent.querySelector('.video-track-list');
+        const audioList = modalContent.querySelector('.audio-track-list');
+        const videoCount = modalContent.querySelector('.video-tracks-section .track-count');
+        const audioCount = modalContent.querySelector('.audio-tracks-section .track-count');
+        const noVideoMsg = modalContent.querySelector('.video-tracks-section .no-tracks-message');
+        const noAudioMsg = modalContent.querySelector('.audio-tracks-section .no-tracks-message');
 
         videoCount.textContent = tracks.video.length;
         audioCount.textContent = tracks.audio.length;
@@ -117,14 +124,14 @@ export class TrackManagerMenu {
                 // Events
                 const downloadBtn = el.querySelector('.download-track-btn');
                 const addToPlaylistBtn = el.querySelector('.add-to-playlist-btn');
-                const progressContainer = el.querySelector('.progress-container');
 
-                // Speed dropdown (using common utility)
+                // Speed dropdown (using custom dropdown utility)
                 const speedBtn = el.querySelector('[data-speed-btn]');
                 const speedMenu = el.querySelector('[data-speed-menu]');
-                const speedDropdown = SpeedDropdown.init({
+                const speedDropdown = CustomDropdown.init({
                     button: speedBtn,
-                    menu: speedMenu
+                    menu: speedMenu,
+                    initialValue: '1'
                 });
 
                 // Determine format based on codec
@@ -143,13 +150,24 @@ export class TrackManagerMenu {
                 }
 
                 downloadBtn.addEventListener('click', () => {
-                    this.extractTrack(playlist.items.indexOf(item), i, type, format, false, speedDropdown.getCurrentSpeed(), progressContainer, downloadBtn, addToPlaylistBtn, speedDropdown, playlist);
+                    this.extractTrack({
+                        index: playlist.items.indexOf(item),
+                        trackIndex: i,
+                        trackType: type,
+                        format: format,
+                        addToPlaylist: false,
+                        speed: parseFloat(speedDropdown.getValue()),
+                        modalInstance,
+                        speedDropdown,
+                        playlist
+                    });
                 });
 
                 addToPlaylistBtn.addEventListener('click', () => {
-                    // Duplicate Check
+                    const speed = parseFloat(speedDropdown.getValue());
                     const ext = format;
-                    const newFilename = `${item.title.replace(/\.[^/.]+$/, "")}-${type}-track${i + 1}.${ext}`;
+                    const speedSuffix = speed !== 1 ? `-${speed}x` : '';
+                    const newFilename = `${item.title.replace(/\.[^/.]+$/, "")}-${type}-track${i + 1}${speedSuffix}.${ext}`;
 
                     const exists = playlist.items.some(it => it.title === newFilename);
                     if (exists) {
@@ -157,7 +175,17 @@ export class TrackManagerMenu {
                         return;
                     }
 
-                    this.extractTrack(playlist.items.indexOf(item), i, type, format, true, speedDropdown.getCurrentSpeed(), progressContainer, downloadBtn, addToPlaylistBtn, speedDropdown, playlist);
+                    this.extractTrack({
+                        index: playlist.items.indexOf(item),
+                        trackIndex: i,
+                        trackType: type,
+                        format: format,
+                        addToPlaylist: true,
+                        speed: parseFloat(speedDropdown.getValue()),
+                        modalInstance,
+                        speedDropdown,
+                        playlist
+                    });
                 });
 
                 trackList.appendChild(el);
@@ -170,27 +198,29 @@ export class TrackManagerMenu {
 
     /**
      * Extract track
-     * @param {number} index 
-     * @param {number} trackIndex 
-     * @param {string} trackType 
-     * @param {string} format
-     * @param {boolean} addToPlaylist 
-     * @param {number} speed - Playback speed multiplier (0.25 to 2)
-     * @param {HTMLElement} progressContainer 
-     * @param {HTMLElement} downloadBtn 
-     * @param {HTMLElement} addToPlaylistBtn
-     * @param {Object} speedDropdown - SpeedDropdown controller
-     * @param {Playlist} playlist
+     * @param {Object} options
      * @private
      */
-    static async extractTrack(index, trackIndex, trackType, format, addToPlaylist, speed, progressContainer, downloadBtn, addToPlaylistBtn, speedDropdown, playlist) {
+    static async extractTrack({ index, trackIndex, trackType, format, addToPlaylist, speed, modalInstance, speedDropdown, playlist }) {
         const item = playlist.items[index];
+        const modal = modalInstance.modal;
 
-        // UI State
-        downloadBtn.classList.add('hidden');
-        addToPlaylistBtn.classList.add('hidden');
-        progressContainer.classList.remove('hidden');
-        speedDropdown.setDisabled(true);
+        // UI Elements from Footer
+        const progressSection = modal.querySelector('.progress-section');
+        const progressPercentage = modal.querySelector('.progress-percentage');
+        const progressStatus = modal.querySelector('.progress-status');
+        const successMessage = modal.querySelector('.success-message');
+        const errorMessage = modal.querySelector('.error-message');
+
+        // Disable UI
+        modal.querySelectorAll('button').forEach(btn => btn.disabled = true);
+        if (speedDropdown) speedDropdown.setDisabled(true);
+
+        progressSection.classList.remove('hidden');
+        errorMessage.classList.add('hidden');
+        successMessage.classList.add('hidden');
+        progressPercentage.textContent = '0%';
+        progressStatus.textContent = 'Extracting...';
 
         try {
             // Get source with caching
@@ -203,37 +233,46 @@ export class TrackManagerMenu {
                 format,
                 speed,
                 onProgress: (p) => {
-                    // Optional: Update progress text
+                    const percent = Math.round(p * 100) + '%';
+                    progressPercentage.textContent = percent;
                 }
             });
 
-            this.handleExtractionSuccess(blob, item, trackType, trackIndex, format, addToPlaylist, playlist);
+            this.handleExtractionSuccess({
+                blob,
+                originalItem: item,
+                trackType,
+                trackIndex,
+                format,
+                addToPlaylist,
+                speed,
+                playlist,
+                modal
+            });
         } catch (e) {
             Logger.error('Extraction failed:', e);
-            alert(`Extraction failed: ${e.message}`);
+            errorMessage.textContent = `Extraction failed: ${e.message}`;
+            errorMessage.classList.remove('hidden');
+            progressSection.classList.add('hidden');
         } finally {
-            downloadBtn.classList.remove('hidden');
-            addToPlaylistBtn.classList.remove('hidden');
-            progressContainer.classList.add('hidden');
-            speedDropdown.setDisabled(false);
+            modal.querySelectorAll('button').forEach(btn => btn.disabled = false);
+            if (speedDropdown) speedDropdown.setDisabled(false);
         }
     }
 
     /**
      * Handle extraction success
-     * @param {Blob} blob 
-     * @param {Object} originalItem 
-     * @param {string} trackType 
-     * @param {number} trackIndex 
-     * @param {string} format
-     * @param {boolean} addToPlaylist 
-     * @param {Playlist} playlist
+     * @param {Object} options
      * @private
      */
-    static handleExtractionSuccess(blob, originalItem, trackType, trackIndex, format, addToPlaylist, playlist) {
+    static handleExtractionSuccess({ blob, originalItem, trackType, trackIndex, format, addToPlaylist, speed, playlist, modal }) {
         const ext = format;
-        const newFilename = `${originalItem.title.replace(/\.[^/.]+$/, "")}-${trackType}-track${trackIndex + 1}.${ext}`;
+        const speedSuffix = speed !== 1 ? `-${speed}x` : '';
+        const newFilename = `${originalItem.title.replace(/\.[^/.]+$/, "")}-${trackType}-track${trackIndex + 1}${speedSuffix}.${ext}`;
         const url = URL.createObjectURL(blob);
+
+        const progressSection = modal.querySelector('.progress-section');
+        const successMessage = modal.querySelector('.success-message');
 
         if (addToPlaylist) {
             const newItem = {
@@ -243,6 +282,9 @@ export class TrackManagerMenu {
                 file: new File([blob], newFilename, { type: blob.type }),
                 duration: originalItem.duration,
                 type: trackType === 'video' ? 'video' : 'audio',
+                path: (originalItem.path || originalItem.title).includes('/') ?
+                    (originalItem.path.split('/').slice(0, -1).join('/') + '/' + newFilename) :
+                    (originalItem.title + '/' + newFilename),
                 isAudioOnly: trackType === 'audio'
             };
 
@@ -252,6 +294,10 @@ export class TrackManagerMenu {
 
             // Re-render playlist
             playlist.render();
+
+            // Success feedback
+            successMessage.classList.remove('hidden');
+            progressSection.classList.add('hidden');
 
             // Scroll to new item
             setTimeout(() => {
@@ -266,6 +312,9 @@ export class TrackManagerMenu {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+
+            // Hide progress
+            progressSection.classList.add('hidden');
         }
     }
 }

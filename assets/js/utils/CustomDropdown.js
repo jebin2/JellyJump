@@ -26,11 +26,18 @@ export class CustomDropdown {
                     const text = labelSpan.textContent.split('\n')[0].trim();
 
                     // Preserve icon if exists
-                    const buttonTextSpan = button.querySelector('span');
+                    const buttonTextSpan = button.querySelector('span:not(.mb-select-arrow)');
                     if (buttonTextSpan) {
                         buttonTextSpan.textContent = text;
                     } else {
-                        button.textContent = text;
+                        // Check if it's a simple button where children might be just text node + arrow
+                        // We want to replace only the text part
+                        const textNode = Array.from(button.childNodes).find(node => node.nodeType === 3); // Text node
+                        if (textNode) {
+                            textNode.textContent = text;
+                        } else {
+                            button.textContent = text;
+                        }
                     }
                 }
             });
