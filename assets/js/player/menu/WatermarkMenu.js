@@ -46,8 +46,8 @@ export class WatermarkMenu {
 
         // Inject Watermark Specific Content into Box
         const previewContainer = document.createElement('div');
-        previewContainer.className = 'watermark-content-preview w-full h-full flex items-center justify-center overflow-hidden';
-        previewContainer.style.cssText = 'font-family: sans-serif; font-weight: bold; color: rgba(255,255,255,0.8); text-shadow: 1px 1px 2px black; pointer-events: none;';
+        previewContainer.className = 'watermark-content-preview';
+        previewContainer.style.cssText = 'width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; font-family:sans-serif; font-weight:bold; color:rgba(255,255,255,0.8); text-shadow:1px 1px 2px black; pointer-events:none;';
 
         const textSpan = document.createElement('span');
         textSpan.className = 'text-content';
@@ -161,14 +161,23 @@ function updateWatermarkBox(elements, state) {
     const content = type === 'text' ? elements.textPreview : elements.imagePreview;
     content.style.opacity = opacity;
 
-    // Text sizing
+    // Text sizing - scale font to fit within box
     if (type === 'text') {
-        const scale = state.preview.scale;
-        const heightConstraint = state.box.height * scale * 0.8;
+        const scale = state.preview.scale || 1;
+        const boxWidthPx = state.box.width * scale;
+        const boxHeightPx = state.box.height * scale;
         const charCount = Math.max(1, text.length);
-        const widthConstraint = (state.box.width * scale * 0.9) / (charCount * 0.5);
-        let fontSize = Math.max(12, Math.min(heightConstraint, widthConstraint));
+
+        // Font size must fit within box dimensions
+        // Use 0.7 as width ratio (safer than 0.6) to prevent overflow
+        const widthBasedSize = boxWidthPx / (charCount * 0.7);
+        const heightBasedSize = boxHeightPx * 0.8;
+        let fontSize = Math.min(heightBasedSize, widthBasedSize);
+        // Reduce min size slightly to allow fitting in very small boxes
+        fontSize = Math.max(8, Math.min(fontSize, 200));
+
         elements.textPreview.style.fontSize = `${fontSize}px`;
+        elements.textPreview.style.whiteSpace = 'nowrap';
     }
 }
 
