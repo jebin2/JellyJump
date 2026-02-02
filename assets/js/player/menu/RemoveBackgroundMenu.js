@@ -59,10 +59,13 @@ export class RemoveBackgroundMenu {
         const player = await loadVideo('remove-bg-player-container', item, playlist, state);
 
         // Render Callback
-        const renderCallback = (ctx, width, height) => {
+        const renderCallback = (canvas, ctx) => {
             // Check Live Preview toggle
             if (!livePreviewToggle.checked) return;
             if (selectedColors.length === 0) return;
+
+            const width = canvas.width;
+            const height = canvas.height;
 
             const imageData = ctx.getImageData(0, 0, width, height);
 

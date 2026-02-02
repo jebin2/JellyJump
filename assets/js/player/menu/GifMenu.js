@@ -24,7 +24,7 @@ export class GifMenu {
             return;
         }
 
-        const modal = new Modal({ maxWidth: '600px' });
+        const modal = new Modal({ splitLayout: true });
         modal.setTitle('Create GIF');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));

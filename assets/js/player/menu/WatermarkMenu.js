@@ -13,7 +13,8 @@ import {
     showProgress,
     hideProgress,
     showSuccess,
-    setupCleanup
+    setupCleanup,
+    setupEditor
 } from './BoxEditorUtils.js';
 
 /**
@@ -27,7 +28,7 @@ export class WatermarkMenu {
         if (!contentTemplate || !footerTemplate) return;
 
         // Create modal
-        const modal = new Modal({ maxWidth: '650px' });
+        const modal = new Modal({ splitLayout: true });
         modal.setTitle('Add Watermark');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
@@ -35,13 +36,38 @@ export class WatermarkMenu {
 
         const modalContent = modal.modal;
 
+        // === SETUP EDITOR DOM ===
+        const videoPanel = modalContent.querySelector('.modal-video-panel');
+        const editorUI = setupEditor(videoPanel, {
+            type: 'watermark',
+            overlayClass: 'watermark-overlay',
+            boxDataAttr: 'data-watermark-box'
+        });
+
+        // Inject Watermark Specific Content into Box
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'watermark-content-preview w-full h-full flex items-center justify-center overflow-hidden';
+        previewContainer.style.cssText = 'font-family: sans-serif; font-weight: bold; color: rgba(255,255,255,0.8); text-shadow: 1px 1px 2px black; pointer-events: none;';
+
+        const textSpan = document.createElement('span');
+        textSpan.className = 'text-content';
+        textSpan.textContent = 'JellyJump';
+
+        const imgObj = document.createElement('img');
+        imgObj.className = 'image-content hidden w-full h-full object-contain';
+        imgObj.alt = '';
+
+        previewContainer.appendChild(textSpan);
+        previewContainer.appendChild(imgObj);
+        editorUI.box.appendChild(previewContainer);
+
         // Get all elements
         const elements = {
-            playerContainer: modalContent.querySelector('#watermark-player-container'),
-            watermarkBox: modalContent.querySelector('[data-watermark-box]'),
-            overlay: modalContent.querySelector('.watermark-overlay'),
-            textPreview: modalContent.querySelector('.text-content'),
-            imagePreview: modalContent.querySelector('.image-content'),
+            playerContainer: editorUI.playerContainer,
+            watermarkBox: editorUI.box,
+            overlay: editorUI.overlay,
+            textPreview: textSpan,
+            imagePreview: imgObj,
             controls: {
                 typeToggle: modalContent.querySelector('#wm-type-toggle'),
                 textGroup: modalContent.querySelector('.wm-text-input-group'),
@@ -53,7 +79,7 @@ export class WatermarkMenu {
                 opacityValue: modalContent.querySelector('.wm-opacity-value')
             },
             buttons: {
-                apply: modalContent.querySelector('.apply-btn'),
+                apply: modalContent.querySelector('.wm-process-btn'),
                 download: modalContent.querySelector('.download-btn')
             },
             progress: {
@@ -76,10 +102,10 @@ export class WatermarkMenu {
             drag: { active: false, handle: null, startX: 0, startY: 0, startBox: {} }
         };
 
-        const MIN_SIZE = 100;
+        const MIN_SIZE = 40;
 
         // === STEP 1: Load Video ===
-        const player = await loadVideo('watermark-player-container', item, playlist, state);
+        const player = await loadVideo(editorUI.containerId, item, playlist, state);
         if (!player) {
             showError(elements.messages.error, 'Failed to load video');
             return;

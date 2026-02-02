@@ -731,9 +731,11 @@ export class CorePlayer {
                 this._onScrubStart(e);
             });
 
-            // Thumbnail Preview (Hover)
-            this.ui.progressContainer.addEventListener('mousemove', (e) => this._handleThumbnailHover(e));
-            this.ui.progressContainer.addEventListener('mouseleave', () => this._handleThumbnailLeave());
+            // Thumbnail Preview (Hover) - only if enabled
+            if (this.config.controls.thumbnails) {
+                this.ui.progressContainer.addEventListener('mousemove', (e) => this._handleThumbnailHover(e));
+                this.ui.progressContainer.addEventListener('mouseleave', () => this._handleThumbnailLeave());
+            }
         }
 
         // Volume (only if enabled)

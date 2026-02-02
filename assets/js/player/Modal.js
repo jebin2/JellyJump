@@ -7,6 +7,7 @@ export class Modal {
     /**
      * @param {Object} options
      * @param {string} [options.maxWidth] - Custom max-width (e.g. '700px')
+     * @param {boolean} [options.splitLayout] - Use split layout (70% video / 30% controls)
      * @param {Function} [options.onClose] - Callback when modal closes
      */
     constructor(options = {}) {
@@ -40,6 +41,11 @@ export class Modal {
 
         if (this.options.maxWidth) {
             this.modal.style.maxWidth = this.options.maxWidth;
+        }
+
+        // Split layout for video editing modals
+        if (this.options.splitLayout) {
+            this.modal.classList.add('mb-modal-split');
         }
 
         // Close handlers

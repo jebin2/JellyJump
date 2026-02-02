@@ -2648,23 +2648,32 @@ body.fullscreen-active {
 
 .crop-player-container {
     width: 100%;
-    height: 280px;
+    aspect-ratio: 16/9;
     background: #000;
     border-radius: 4px;
     overflow: hidden;
+    position: relative;
 }
 
 .crop-player-container .jellyjump-video-wrapper {
     height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Canvas should maintain video aspect ratio, not stretch */
+.crop-player-container canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .crop-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
+    /* JS controls left/top/width/height */
     pointer-events: none;
     z-index: 10;
-    overflow: hidden;
 }
 
 .crop-box {
@@ -2674,8 +2683,8 @@ body.fullscreen-active {
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
     pointer-events: auto;
     cursor: move;
-    min-width: 40px;
-    min-height: 40px;
+    /* min-width: 40px; not need fix for extending to right
+    min-height: 40px; */
     box-sizing: border-box;
 }
 

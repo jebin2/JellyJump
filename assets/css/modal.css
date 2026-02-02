@@ -409,3 +409,105 @@
 .hidden {
     display: none !important;
 }
+
+/* ================================
+   SPLIT-LAYOUT MODAL (Video Editing)
+   ================================ */
+.mb-modal-split {
+    max-width: 1000px;
+    width: 95%;
+}
+
+.mb-modal-split .mb-modal-body {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: var(--space-md, 16px);
+    padding: var(--space-md, 16px);
+    max-height: 75vh;
+    overflow: hidden;
+}
+
+/* Left Panel: Video Player */
+.mb-modal-split .modal-video-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Ensure direct player containers flex */
+.mb-modal-split .modal-video-panel>.player-container,
+.mb-modal-split .modal-video-panel>[id$="-player-container"] {
+    flex: 1;
+    min-height: 300px;
+}
+
+/* Handle nested structure for Crop/Watermark (preview-container -> wrapper -> player) */
+/* Note: preview-container removed for crop, but might exist for watermark? Updating strictly. */
+/* .mb-modal-split .modal-video-panel .crop-preview-container, */
+.mb-modal-split .modal-video-panel .watermark-preview-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.mb-modal-split .modal-video-panel .crop-preview-wrapper,
+.mb-modal-split .modal-video-panel .watermark-preview-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Contain the crop box shadow */
+}
+
+/* Override fixed height for crop/watermark players in split layout */
+.mb-modal-split .crop-player-container,
+.mb-modal-split .watermark-player-container {
+    height: 100% !important;
+    /* Override the 280px fixed height */
+    flex: 1;
+    width: 100%;
+    max-height: 60vh;
+    background: #000;
+    border-radius: var(--radius-sm, 4px);
+    overflow: hidden;
+}
+
+/* Right Panel: Controls */
+.mb-modal-split .modal-controls-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md, 16px);
+    overflow-y: auto;
+    padding-right: var(--space-xs, 4px);
+}
+
+/* Scrollbar styling for controls panel */
+.mb-modal-split .modal-controls-panel::-webkit-scrollbar {
+    width: 4px;
+}
+
+.mb-modal-split .modal-controls-panel::-webkit-scrollbar-thumb {
+    background: var(--border-light, #333);
+    border-radius: 2px;
+}
+
+/* Responsive: Stack on mobile */
+@media (max-width: 768px) {
+    .mb-modal-split {
+        max-width: 95%;
+    }
+
+    .mb-modal-split .mb-modal-body {
+        grid-template-columns: 1fr;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .mb-modal-split .modal-video-panel .player-container,
+    .mb-modal-split .modal-video-panel [id$="-player-container"] {
+        min-height: 200px;
+        max-height: 40vh;
+    }
+}

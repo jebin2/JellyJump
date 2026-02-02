@@ -3,7 +3,7 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
-import { loadVideo } from './BoxEditorUtils.js';
+import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
 
 /**
  * Trim Menu Handler
@@ -21,12 +21,16 @@ export class TrimMenu {
 
         if (!contentTemplate || !footerTemplate) return;
 
-        const modal = new Modal({ maxWidth: '600px' });
+        const modal = new Modal({ splitLayout: true });
         modal.setTitle('Cut Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
 
         const modalContent = modal.modal;
+
+        // === SETUP EDITOR DOM (Unified) ===
+        const videoPanel = modalContent.querySelector('.modal-video-panel');
+        const editorUI = setupEditor(videoPanel, { type: 'trim', enableOverlay: false });
 
         // Open Modal Immediately
         modal.open();
@@ -99,7 +103,7 @@ export class TrimMenu {
 
         // Load Video
         const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-        const player = await loadVideo('trim-player-container', item, playlist, state);
+        const player = await loadVideo(editorUI.containerId, item, playlist, state);
 
         if (player) {
             // Enable A-B Loop Mode

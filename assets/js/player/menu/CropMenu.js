@@ -5,7 +5,7 @@ import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 import {
     loadVideo,
-    updateOverlay,
+    updateScale,
     setupDragHandlers,
     updateBoxPosition,
     showError,
@@ -13,11 +13,12 @@ import {
     showProgress,
     hideProgress,
     showSuccess,
-    setupCleanup
+    setupCleanup,
+    setupAutoUpdate
 } from './BoxEditorUtils.js';
 
 /**
- * Crop Menu Handler - KISS Flow
+ * Crop Menu Handler - Fresh Implementation
  * Simple, clear flow: Load video -> Setup crop UI -> Drag to crop -> Process
  */
 export class CropMenu {
@@ -27,19 +28,23 @@ export class CropMenu {
         if (!contentTemplate || !footerTemplate) return;
 
         // Create modal
-        const modal = new Modal({ maxWidth: '650px' });
+        const modal = new Modal({ splitLayout: true });
         modal.setTitle('Crop Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
         modal.open();
 
         const modalContent = modal.modal;
+        const playerContainerId = 'crop-player-container';
+        const playerContainer = modalContent.querySelector(`#${playerContainerId}`);
+        const cropWrapper = modalContent.querySelector('.crop-preview-wrapper');
 
-        // Get all elements
+        // Get elements from template (overlay is sibling to player container)
         const elements = {
-            playerContainer: modalContent.querySelector('#crop-player-container'),
-            cropBox: modalContent.querySelector('[data-crop-box]'),
-            cropOverlay: modalContent.querySelector('.crop-overlay'),
+            playerContainer,
+            cropWrapper,
+            cropOverlay: cropWrapper.querySelector('[data-crop-overlay]'),
+            cropBox: cropWrapper.querySelector('[data-crop-box]'),
             inputs: {
                 left: modalContent.querySelector('#crop-left'),
                 top: modalContent.querySelector('#crop-top'),
@@ -61,25 +66,24 @@ export class CropMenu {
             }
         };
 
-        // State - using shared box format
+        // State
         const state = {
             video: { width: 0, height: 0 },
             box: { x: 0, y: 0, width: 0, height: 0 },
-            preview: { scale: 1 },
-            drag: { active: false, handle: null, startX: 0, startY: 0, startBox: {} }
+            preview: { scale: 1, offsetX: 0, offsetY: 0, displayWidth: 0, displayHeight: 0 },
         };
 
-        const MIN_SIZE = 100;
+        const MIN_SIZE = 40;
 
         // === STEP 1: Load Video ===
-        const player = await loadVideo('crop-player-container', item, playlist, state);
+        const player = await loadVideo(playerContainerId, item, playlist, state);
         if (!player) {
             showError(elements.messages.error, 'Failed to load video');
             return;
         }
 
         // === STEP 2: Setup Crop UI ===
-        setupCropUI(elements, state);
+        setupCropUI(elements, state, player);
 
         // === STEP 3: Handle Dragging ===
         const onUpdate = () => {
@@ -101,7 +105,7 @@ export class CropMenu {
 
 // === CROP-SPECIFIC FUNCTIONS ===
 
-function setupCropUI(elements, state) {
+function setupCropUI(elements, state, player) {
     // Initialize box to full video
     state.box = {
         x: 0,
@@ -110,12 +114,23 @@ function setupCropUI(elements, state) {
         height: state.video.height
     };
 
-    // Update overlay after player renders
+    // Update after player renders
     setTimeout(() => {
-        updateOverlay(elements.cropOverlay, elements.playerContainer, state, () => {
-            updateBoxPosition(elements.cropBox, state);
-        });
+        // Calculate scale and offsets
+        updateScale(elements.cropOverlay, state);
+        updateBoxPosition(elements.cropBox, state);
         updateInputs(elements, state);
+
+        // Auto Update on Container Resize
+        if (elements.playerContainer) {
+            const observer = setupAutoUpdate(
+                elements.playerContainer,
+                elements.cropOverlay,
+                state,
+                () => updateBoxPosition(elements.cropBox, state)
+            );
+            if (player) player.updateObserver = observer;
+        }
     }, 200);
 }
 
@@ -139,6 +154,7 @@ function setupInputHandlers(elements, state) {
         state.box.width = Math.min(state.box.width, state.video.width - state.box.x);
         state.box.height = Math.min(state.box.height, state.video.height - state.box.y);
 
+        updateScale(elements.cropOverlay, state);
         updateBoxPosition(elements.cropBox, state);
         updateInputs(elements, state);
     };
