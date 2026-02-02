@@ -43,6 +43,11 @@ async function initializeApp() {
     if (!localStorage.getItem('JellyJumpDB-playlist') && (window.location.href.includes('//localhost:') || window.location.href.includes('//jebin2.github.io/JellyJump/') || window.location.href.includes('//www.voidall.com/JellyJump/'))) {
         playlist.addItems([
             {
+                title: 'Homepage',
+                url: '/homepage.mp4',
+                isLocal: true
+            },
+            {
                 title: 'ForBiggerBlazes',
                 url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
                 isLocal: false
