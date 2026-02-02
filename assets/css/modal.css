@@ -424,6 +424,8 @@
     gap: var(--space-md, 16px);
     padding: var(--space-md, 16px);
     max-height: 75vh;
+    min-height: 74vh;
+    /* Ensure modal is tall enough for video even with few controls */
     overflow: hidden;
 }
 
@@ -462,13 +464,14 @@
 }
 
 /* Override fixed height for crop/watermark players in split layout */
+/* Override fixed height for crop/watermark players in split layout */
 .mb-modal-split .crop-player-container,
 .mb-modal-split .watermark-player-container {
     height: 100% !important;
     /* Override the 280px fixed height */
     flex: 1;
     width: 100%;
-    max-height: 60vh;
+    /* max-height: 60vh; Removed to match GIF player size */
     background: #000;
     border-radius: var(--radius-sm, 4px);
     overflow: hidden;
