@@ -120,7 +120,8 @@
 
     .nav-links.active {
         right: 0;
-        box-shadow: -100px 0 0 rgba(0,0,0,0.5); /* Overlay effect on the left */
+        box-shadow: -100px 0 0 rgba(0, 0, 0, 0.5);
+        /* Overlay effect on the left */
     }
 
     /* Mobile Menu Button */
@@ -147,9 +148,12 @@
         margin-top: -2px;
     }
 
-    .hamburger-inner, .hamburger-inner::before, .hamburger-inner::after {
+    .hamburger-inner,
+    .hamburger-inner::before,
+    .hamburger-inner::after {
         width: 30px;
-        height: 3px; /* Slightly chunkier for brutalism */
+        height: 3px;
+        /* Slightly chunkier for brutalism */
         background-color: var(--text-primary);
         position: absolute;
         transition-property: transform;
@@ -157,7 +161,8 @@
         transition-timing-function: ease;
     }
 
-    .hamburger-inner::before, .hamburger-inner::after {
+    .hamburger-inner::before,
+    .hamburger-inner::after {
         content: "";
         display: block;
     }
@@ -184,7 +189,7 @@
         bottom: 0;
         transform: rotate(-90deg);
     }
-    
+
     .mobile-menu-overlay {
         position: fixed;
         top: 0;
@@ -197,12 +202,12 @@
         visibility: hidden;
         transition: opacity var(--transition-normal);
     }
-    
+
     .mobile-menu-overlay.active {
         opacity: 1;
         visibility: visible;
     }
-    
+
     body.no-scroll {
         overflow: hidden;
     }
@@ -212,6 +217,7 @@
     .mobile-menu-btn {
         display: none;
     }
+
     .mobile-menu-overlay {
         display: none;
     }
@@ -231,7 +237,7 @@
     .btn-lg {
         width: 100%;
     }
-    
+
     .feature-card {
         padding: var(--space-md);
     }
@@ -243,7 +249,12 @@
 .features {
     padding: var(--space-3xl) 0;
     background-color: var(--bg-primary);
-    border-top: var(--border-medium) solid var(--border-dark);
+    /* border-top: var(--border-medium) solid var(--border-dark); */
+    scroll-margin-top: 100px;
+}
+
+.downloads {
+    scroll-margin-top: 100px;
 }
 
 .features-header {
