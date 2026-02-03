@@ -53,6 +53,11 @@ export class MotionDetectionMenu {
         const errorMessage = modalContent.querySelector('.error-message');
 
         targetFilename.textContent = item.title;
+
+        // Hide the Detect button (motion detection auto-starts)
+        const detectBtn = modalContent.querySelector('.detect-btn');
+        if (detectBtn) detectBtn.classList.add('hidden');
+
         modal.open();
 
         let detector = new MotionDetector();

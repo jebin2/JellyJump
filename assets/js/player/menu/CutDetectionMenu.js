@@ -11,7 +11,7 @@ export class CutDetectionMenu {
     }
 
     /**
-     * Called when the menu item is clicked
+     * Called when the menu item is clicked - Single seamless view
      * @param {Object} item - The playlist item object
      */
     async execute(item) {
@@ -23,7 +23,14 @@ export class CutDetectionMenu {
 
         const contentTemplate = document.getElementById('detection-content-template');
         const footerTemplate = document.getElementById('detection-footer-template');
-        if (!contentTemplate || !footerTemplate) return;
+        if (!contentTemplate || !footerTemplate) {
+            Logger.error('CutDetectionMenu: Missing templates');
+            return;
+        }
+
+        let detector = new HardCutDetector();
+        let isCancelled = false;
+        let isDetecting = false;
 
         const modal = new ModalDialog({
             maxWidth: '600px',
@@ -33,159 +40,223 @@ export class CutDetectionMenu {
             }
         });
 
-        modal.setTitle('Hard Cut Detection');
+        modal.setTitle('Scene Detection');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
 
         const modalContent = modal.modal;
 
-        // UI Elements from Content
+        // UI Elements (body)
         const targetFilename = modalContent.querySelector('.target-filename');
-        const statusText = modalContent.querySelector('.status-text');
-        const statusPercent = modalContent.querySelector('.status-percent');
-        const progressBar = modalContent.querySelector('.progress-bar-fill');
+        const sensitivitySection = modalContent.querySelector('.sensitivity-section');
+        const sensitivitySlider = modalContent.querySelector('.sensitivity-slider');
+        const sensitivityValue = modalContent.querySelector('.sensitivity-value');
+        const statusArea = modalContent.querySelector('.detection-status-area');
         const cutsList = modalContent.querySelector('.detected-items-list');
 
-        // UI Elements from Footer
+        // Footer Elements
+        const detectBtn = modalContent.querySelector('.detect-btn');
         const progressSection = modalContent.querySelector('.progress-section');
         const progressPercentage = modalContent.querySelector('.progress-percentage');
         const successMessage = modalContent.querySelector('.success-message');
         const errorMessage = modalContent.querySelector('.error-message');
 
         targetFilename.textContent = item.title;
+
+        // Show sensitivity section (hidden by default), hide status area
+        if (sensitivitySection) sensitivitySection.classList.remove('hidden');
+        if (statusArea) statusArea.classList.add('hidden');
+
+        // Sensitivity slider labels
+        const sensitivityLabels = { 1: 'High', 2: 'Medium', 3: 'Low' };
+        sensitivitySlider.addEventListener('input', () => {
+            sensitivityValue.textContent = sensitivityLabels[sensitivitySlider.value];
+        });
+
+        // Detect button click (button is in footer)
+        detectBtn.addEventListener('click', async () => {
+            if (isDetecting) return;
+            isDetecting = true;
+            detectBtn.disabled = true;
+            detectBtn.textContent = 'Detecting...';
+
+            const sensitivity = parseInt(sensitivitySlider.value);
+            Logger.log('CutDetectionMenu: Starting detection with sensitivity', sensitivity);
+
+            // Show footer progress section
+            progressSection.classList.remove('hidden');
+            const progressStatus = modalContent.querySelector('.progress-status');
+            if (progressStatus) progressStatus.textContent = 'Analyzing...';
+
+            cutsList.innerHTML = '<div class="flex-center flex-col gap-sm h-full text-muted italic py-xl"><div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-6 h-6 animate-spin opacity-50"></div><span class="text-sm">Analyzing video...</span></div>';
+
+            await this.runDetection(item, videoUrl, detector, {
+                sensitivity,
+                adaptiveMode: true
+            }, isCancelled, {
+                statusText: progressStatus, statusPercent: progressPercentage, cutsList,
+                progressSection, successMessage, errorMessage, modalContent
+            });
+
+            isDetecting = false;
+            detectBtn.disabled = false;
+            detectBtn.textContent = 'Re-detect';
+            progressSection.classList.add('hidden');
+        });
+
         modal.open();
+    }
 
-        let detector = new HardCutDetector();
-        let isCancelled = false;
+    /**
+     * Run the actual detection
+     */
+    async runDetection(item, videoUrl, detector, options, isCancelled, ui) {
+        const { statusText, statusPercent, cutsList,
+            progressSection, successMessage, errorMessage, modalContent } = ui;
 
-        // Auto-start detection
-        const runDetection = async () => {
-            statusText.textContent = 'Analyzing video...';
+        if (statusText) statusText.textContent = 'Analyzing video...';
 
-            detector.progressCallback = (progress) => {
-                if (isCancelled) return;
-                const pct = Math.round(progress * 100);
-                statusPercent.textContent = `${pct}%`;
-                progressBar.style.width = `${pct}%`;
-            };
+        detector.progressCallback = (progress) => {
+            if (isCancelled) return;
+            const pct = Math.round(progress * 100);
+            if (statusPercent) statusPercent.textContent = `${pct}%`;
 
-            try {
-                // Get duration
-                let duration = 0;
-                if (this.playlist.player && this.playlist.player.duration) {
-                    duration = this.playlist.player.duration;
-                }
-
-                if (!duration && item.duration) {
-                    if (typeof item.duration === 'number') duration = item.duration;
-                    else if (typeof item.duration === 'string' && item.duration.includes(':')) {
-                        const parts = item.duration.split(':').map(Number);
-                        if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
-                        else if (parts.length === 2) duration = parts[0] * 60 + parts[1];
-                    }
-                }
-
-                const cuts = await detector.detect(videoUrl);
-                if (isCancelled) return;
-
-                statusText.textContent = 'Detection complete!';
-                statusText.classList.add('text-success');
-
-                // Calculate segments
-                const points = [0, ...cuts];
-                const lastCut = cuts.length > 0 ? cuts[cuts.length - 1] : 0;
-                const finalEnd = (duration > lastCut) ? duration : (lastCut > 0 ? lastCut + 10 : 60);
-
-                if (finalEnd > points[points.length - 1]) {
-                    points.push(finalEnd);
-                }
-
-                const segments = [];
-                for (let i = 0; i < points.length - 1; i++) {
-                    segments.push({
-                        start: points[i],
-                        end: points[i + 1],
-                        index: i + 1
-                    });
-                }
-
-                // Render Results
-                cutsList.innerHTML = '';
-
-                if (segments.length === 0) {
-                    cutsList.innerHTML = '<div class="p-4 text-center text-muted italic">No distinct scenes detected.</div>';
+            // Update status text for phases
+            if (statusText) {
+                if (progress < 0.4) {
+                    statusText.textContent = 'Analyzing frames...';
                 } else {
-                    const listHtml = segments.map((seg) => {
-                        const startStr = new Date(seg.start * 1000).toISOString().substr(14, 5);
-                        const endStr = new Date(seg.end * 1000).toISOString().substr(14, 5);
-                        const durationStr = (seg.end - seg.start).toFixed(1) + 's';
-
-                        return `
-                        <div class="segment-item p-sm rounded bg-tertiary flex-between hover:bg-white/5 transition-colors group border border-transparent hover:border-white/10">
-                            <div class="flex flex-col gap-xs flex-1">
-                                <span class="font-bold text-accent text-sm">Segment ${seg.index}</span>
-                                <span class="text-xs text-muted font-mono">${startStr} - ${endStr} (${durationStr})</span>
-                            </div>
-                            <div class="flex gap-sm items-center">
-                                <button class="add-segment-btn btn jellyjump-btn-primary text-xs px-sm py-xs" 
-                                    data-start="${seg.start}" 
-                                    data-end="${seg.end}" 
-                                    data-index="${seg.index}">
-                                    Add Clip
-                                </button>
-                            </div>
-                        </div>`;
-                    }).join('');
-
-                    cutsList.innerHTML = listHtml;
-
-                    const addBtns = cutsList.querySelectorAll('.add-segment-btn');
-                    addBtns.forEach(btn => {
-                        btn.onclick = async (e) => {
-                            e.stopPropagation();
-
-                            if (!progressSection.classList.contains('hidden')) return;
-
-                            // Hide previous messages and show progress
-                            successMessage.classList.add('hidden');
-                            errorMessage.classList.add('hidden');
-                            progressSection.classList.remove('hidden');
-                            addBtns.forEach(b => b.disabled = true);
-
-                            const start = parseFloat(btn.dataset.start);
-                            const end = parseFloat(btn.dataset.end);
-                            const index = parseInt(btn.dataset.index);
-
-                            try {
-                                await this.addSegmentToPlaylist(item, start, end, index, btn, (pct) => {
-                                    progressPercentage.textContent = `${Math.round(pct * 100)}%`;
-                                });
-                                successMessage.classList.remove('hidden');
-                            } catch (err) {
-                                Logger.error('Failed to add segment', err);
-                                errorMessage.textContent = err.message;
-                                errorMessage.classList.remove('hidden');
-                                btn.disabled = false;
-                            } finally {
-                                progressSection.classList.add('hidden');
-                                addBtns.forEach(b => {
-                                    if (!b.classList.contains('bg-success')) b.disabled = false;
-                                });
-                            }
-                        };
-                    });
+                    statusText.textContent = 'Detecting cuts...';
                 }
-
-            } catch (err) {
-                if (isCancelled) return;
-                Logger.error('CutDetectionMenu: Error', err);
-                statusText.textContent = 'Error: ' + err.message;
-                statusText.classList.add('text-danger');
-                cutsList.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
             }
         };
 
-        runDetection();
+        try {
+            // Get duration
+            let duration = 0;
+            if (this.playlist.player && this.playlist.player.duration) {
+                duration = this.playlist.player.duration;
+            }
+
+            if (!duration && item.duration) {
+                if (typeof item.duration === 'number') duration = item.duration;
+                else if (typeof item.duration === 'string' && item.duration.includes(':')) {
+                    const parts = item.duration.split(':').map(Number);
+                    if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                    else if (parts.length === 2) duration = parts[0] * 60 + parts[1];
+                }
+            }
+
+            // Run detection with user options
+            const cuts = await detector.detect(videoUrl, {
+                adaptiveMode: options.adaptiveMode,
+                sensitivity: options.sensitivity
+            });
+
+            if (isCancelled) return;
+
+            // Show statistics if adaptive mode was used
+            const stats = detector.getLastStats();
+            if (stats && options.adaptiveMode) {
+                Logger.log('CutDetectionMenu: Detection stats', stats);
+            }
+
+            statusText.textContent = `Found ${cuts.length} scene changes`;
+            statusText.classList.add('text-success');
+
+            // Calculate segments
+            const points = [0, ...cuts];
+            const lastCut = cuts.length > 0 ? cuts[cuts.length - 1] : 0;
+            const finalEnd = (duration > lastCut) ? duration : (lastCut > 0 ? lastCut + 10 : 60);
+
+            if (finalEnd > points[points.length - 1]) {
+                points.push(finalEnd);
+            }
+
+            const segments = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                segments.push({
+                    start: points[i],
+                    end: points[i + 1],
+                    index: i + 1
+                });
+            }
+
+            // Render Results
+            cutsList.innerHTML = '';
+
+            if (segments.length === 0) {
+                cutsList.innerHTML = '<div class="p-4 text-center text-muted italic">No distinct scenes detected. Try higher sensitivity.</div>';
+            } else {
+                const listHtml = segments.map((seg) => {
+                    const startStr = new Date(seg.start * 1000).toISOString().substr(14, 5);
+                    const endStr = new Date(seg.end * 1000).toISOString().substr(14, 5);
+                    const durationStr = (seg.end - seg.start).toFixed(1) + 's';
+
+                    return `
+                    <div class="segment-item p-sm rounded bg-tertiary flex-between hover:bg-white/5 transition-colors group border border-transparent hover:border-white/10">
+                        <div class="flex flex-col gap-xs flex-1">
+                            <span class="font-bold text-accent text-sm">Segment ${seg.index}</span>
+                            <span class="text-xs text-muted font-mono">${startStr} - ${endStr} (${durationStr})</span>
+                        </div>
+                        <div class="flex gap-sm items-center">
+                            <button class="add-segment-btn btn jellyjump-btn-primary text-xs px-sm py-xs" 
+                                data-start="${seg.start}" 
+                                data-end="${seg.end}" 
+                                data-index="${seg.index}">
+                                Add Clip
+                            </button>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                cutsList.innerHTML = listHtml;
+
+                const addBtns = cutsList.querySelectorAll('.add-segment-btn');
+                addBtns.forEach(btn => {
+                    btn.onclick = async (e) => {
+                        e.stopPropagation();
+
+                        if (!progressSection.classList.contains('hidden')) return;
+
+                        // Hide previous messages and show progress
+                        successMessage.classList.add('hidden');
+                        errorMessage.classList.add('hidden');
+                        progressSection.classList.remove('hidden');
+                        addBtns.forEach(b => b.disabled = true);
+
+                        const start = parseFloat(btn.dataset.start);
+                        const end = parseFloat(btn.dataset.end);
+                        const index = parseInt(btn.dataset.index);
+
+                        try {
+                            await this.addSegmentToPlaylist(item, start, end, index, btn, (pct) => {
+                                const footerPct = modalContent.querySelector('.progress-percentage');
+                                if (footerPct) footerPct.textContent = `${Math.round(pct * 100)}%`;
+                            });
+                            successMessage.classList.remove('hidden');
+                        } catch (err) {
+                            Logger.error('Failed to add segment', err);
+                            errorMessage.textContent = err.message;
+                            errorMessage.classList.remove('hidden');
+                            btn.disabled = false;
+                        } finally {
+                            progressSection.classList.add('hidden');
+                            addBtns.forEach(b => {
+                                if (!b.classList.contains('bg-success')) b.disabled = false;
+                            });
+                        }
+                    };
+                });
+            }
+
+        } catch (err) {
+            if (isCancelled) return;
+            Logger.error('CutDetectionMenu: Error', err);
+            statusText.textContent = 'Error: ' + err.message;
+            statusText.classList.add('text-danger');
+            cutsList.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
+        }
     }
 
     async addSegmentToPlaylist(originalItem, start, end, index, btn, onProgress) {

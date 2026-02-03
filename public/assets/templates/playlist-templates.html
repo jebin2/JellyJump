@@ -552,7 +552,22 @@
             <p class="mb-sm truncate text-secondary text-sm">Target: <strong
                     class="target-filename text-primary">--</strong></p>
 
-            <div class="detection-status-area bg-tertiary/50 p-sm rounded mb-sm">
+            <!-- Sensitivity Slider (for CutDetection - hidden by MotionDetection) -->
+            <div class="quality-section sensitivity-section hidden">
+                <div class="flex-between mb-sm">
+                    <span class="text-secondary text-sm font-mono">SENSITIVITY:</span>
+                    <span class="sensitivity-value text-sm font-bold">Medium</span>
+                </div>
+                <input type="range" class="quality-slider sensitivity-slider" min="1" max="3" step="1" value="2">
+                <div class="flex-between mt-xs text-xs text-secondary">
+                    <span>High</span>
+                    <span>Medium</span>
+                    <span>Low</span>
+                </div>
+            </div>
+
+            <!-- Status Area (for progress display) -->
+            <div class="detection-status-area bg-tertiary/50 p-sm rounded mt-sm">
                 <div class="flex-between mb-xs">
                     <span class="status-text text-sm font-mono text-secondary">Initializing...</span>
                     <span class="status-percent text-sm font-bold text-accent">0%</span>
@@ -568,10 +583,7 @@
         <div
             class="detected-items-list flex-auto overflow-y-auto p-sm space-y-xs min-h-0 bg-secondary/30 mt-sm rounded border border-white/5 custom-scrollbar">
             <div class="flex-center flex-col gap-sm h-full text-muted italic status-placeholder py-xl">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-6 h-6 animate-spin opacity-50">
-                </div>
-                <span class="text-sm">Analyzing media...</span>
+                <span class="text-sm">Adjust sensitivity and click Detect</span>
             </div>
         </div>
     </div>
@@ -599,9 +611,16 @@
         </div>
         <!-- Action Buttons (Right) -->
         <div class="action-buttons flex gap-sm flex-shrink-0">
-            <!-- Redundant close button removed -->
+            <button class="detect-btn btn jellyjump-btn-primary text-sm px-lg">
+                Detect Scenes
+            </button>
         </div>
     </div>
+</template>
+
+<!-- Scene Detection Settings Template (kept for backward compat, but now empty) -->
+<template id="scene-detection-settings-template">
+    <div class="detection-settings"></div>
 </template>
 
 <template id="track-card-template">
