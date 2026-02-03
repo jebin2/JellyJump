@@ -225,14 +225,20 @@ export class CutDetectionMenu {
                         progressSection.classList.remove('hidden');
                         addBtns.forEach(b => b.disabled = true);
 
+                        // Update footer status text
+                        const footerStatus = modalContent.querySelector('.progress-status');
+                        const footerPct = modalContent.querySelector('.progress-percentage');
+                        if (footerStatus) footerStatus.textContent = 'Processing...';
+                        if (footerPct) footerPct.textContent = '0%';
+
                         const start = parseFloat(btn.dataset.start);
                         const end = parseFloat(btn.dataset.end);
                         const index = parseInt(btn.dataset.index);
 
                         try {
                             await this.addSegmentToPlaylist(item, start, end, index, btn, (pct) => {
-                                const footerPct = modalContent.querySelector('.progress-percentage');
                                 if (footerPct) footerPct.textContent = `${Math.round(pct * 100)}%`;
+                                if (footerStatus) footerStatus.textContent = 'Processing...';
                             });
                             successMessage.classList.remove('hidden');
                         } catch (err) {
