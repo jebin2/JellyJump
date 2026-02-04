@@ -33,7 +33,6 @@ export class RemoveBackgroundMenu {
         // Elements
         const playerContainer = modalContent.querySelector('#remove-bg-player-container');
         const selectedColorsList = modalContent.querySelector('.selected-colors-list');
-        const pickColorBtn = modalContent.querySelector('#pick-color-btn');
         const livePreviewToggle = modalContent.querySelector('#live-preview-toggle');
 
         const bgTypeRadios = modalContent.querySelectorAll('input[name="bg-type"]');
@@ -51,8 +50,6 @@ export class RemoveBackgroundMenu {
         // State
         let selectedColors = []; // Array of {r, g, b, tolerance}
         let sourceBlob = null;
-        let isPickingColor = false;
-        let frameOverlay = null; // Overlay image for color picking
 
         // Load Video
         const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
@@ -140,64 +137,6 @@ export class RemoveBackgroundMenu {
                 }, 100);
             }
 
-            // Handle Color Picking with Frame Overlay
-            // Create a frame overlay for stable color picking
-            const createFrameOverlay = () => {
-                // Create overlay image if not exists
-                if (!frameOverlay) {
-                    frameOverlay = document.createElement('img');
-                    frameOverlay.className = 'color-picker-overlay';
-                    frameOverlay.style.cssText = `
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        object-fit: contain;
-                        z-index: 100;
-                        cursor: crosshair;
-                        display: none;
-                        background: #000;
-                    `;
-                    playerContainer.appendChild(frameOverlay);
-
-                    // Click handler for picking color from overlay
-                    frameOverlay.addEventListener('click', (e) => {
-                        if (!isPickingColor) return;
-
-                        // Create a temp canvas to read pixel from the overlay image
-                        const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = player.canvas.width;
-                        tempCanvas.height = player.canvas.height;
-                        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
-                        tempCtx.drawImage(frameOverlay, 0, 0, tempCanvas.width, tempCanvas.height);
-
-                        // Calculate click position relative to image
-                        const rect = frameOverlay.getBoundingClientRect();
-                        const scaleX = tempCanvas.width / rect.width;
-                        const scaleY = tempCanvas.height / rect.height;
-                        const x = Math.floor((e.clientX - rect.left) * scaleX);
-                        const y = Math.floor((e.clientY - rect.top) * scaleY);
-
-                        const pixel = tempCtx.getImageData(x, y, 1, 1).data;
-
-                        // Don't add if transparent
-                        if (pixel[3] === 0) return;
-
-                        addColor({
-                            r: pixel[0],
-                            g: pixel[1],
-                            b: pixel[2]
-                        });
-                        // Don't close - allow picking more colors
-                    });
-                }
-                return frameOverlay;
-            };
-
-            // Create the overlay
-            createFrameOverlay();
-
         } catch (e) {
             Logger.error('Failed to load video:', e);
             errorMessage.textContent = 'Failed to load video: ' + e.message;
@@ -207,40 +146,24 @@ export class RemoveBackgroundMenu {
 
         // --- Event Handlers ---
 
-        function togglePickingMode(enable) {
-            isPickingColor = enable;
-            if (isPickingColor) {
-                pickColorBtn.classList.add('active');
-                pickColorBtn.innerHTML = `
-                    <svg width="16" height="16" fill="currentColor">
-                        <use href="assets/icons/sprite.svg?v=2#icon-check"></use>
-                    </svg>
-                `;
-                player.pause(); // Pause video when picking starts
+        // Direct click-to-pick: clicking on the video picks color
+        playerContainer.style.cursor = 'crosshair';
+        playerContainer.addEventListener('click', (e) => {
+            if (!player || !player.canvas) return;
 
-                // Capture current frame and show overlay
-                if (player.canvas && frameOverlay) {
-                    frameOverlay.src = player.canvas.toDataURL('image/png');
-                    frameOverlay.style.display = 'block';
-                }
-            } else {
-                pickColorBtn.classList.remove('active');
-                pickColorBtn.innerHTML = `
-                    <svg width="16" height="16" fill="currentColor">
-                        <use href="assets/icons/sprite.svg?v=2#icon-eyedropper"></use>
-                    </svg>
-                `;
+            // Read pixel at click position from canvas
+            const rect = player.canvas.getBoundingClientRect();
+            const scaleX = player.canvas.width / rect.width;
+            const scaleY = player.canvas.height / rect.height;
+            const x = Math.floor((e.clientX - rect.left) * scaleX);
+            const y = Math.floor((e.clientY - rect.top) * scaleY);
 
-                // Hide overlay
-                if (frameOverlay) {
-                    frameOverlay.style.display = 'none';
-                }
+            const ctx = player.canvas.getContext('2d', { willReadFrequently: true });
+            const pixel = ctx.getImageData(x, y, 1, 1).data;
+            if (pixel[3] > 0) {
+                addColor({ r: pixel[0], g: pixel[1], b: pixel[2] });
             }
-        }
-
-        pickColorBtn.onclick = () => {
-            togglePickingMode(!isPickingColor);
-        };
+        });
 
         livePreviewToggle.onchange = () => {
             if (!player.isPlaying) player.seek(player.currentTime);
@@ -280,7 +203,7 @@ export class RemoveBackgroundMenu {
             if (selectedColors.length === 0) {
                 selectedColorsList.innerHTML = `
                     <div class="empty-state text-xs text-muted text-center py-md">
-                        No colors selected.
+                        Click on the video to pick colors.
                     </div>
                 `;
                 return;
@@ -404,7 +327,6 @@ export class RemoveBackgroundMenu {
             progressSection.classList.remove('hidden');
 
             // Disable inputs
-            pickColorBtn.disabled = true;
             livePreviewToggle.disabled = true;
             bgTypeRadios.forEach(r => r.disabled = true);
             customBgColorInput.disabled = true;
@@ -424,8 +346,8 @@ export class RemoveBackgroundMenu {
                     },
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
-                        progressBar.style.width = `${pct}%`;
-                        progressText.textContent = `${pct}%`;
+                        if (progressBar) progressBar.style.width = `${pct}%`;
+                        if (progressText) progressText.textContent = `${pct}%`;
 
                         if (progress < 0.1) progressStatus.textContent = "Initializing...";
                         else if (progress < 0.9) progressStatus.textContent = "Removing background...";
@@ -483,7 +405,6 @@ export class RemoveBackgroundMenu {
             } finally {
                 // Re-enable controls
                 processBtn.disabled = false;
-                pickColorBtn.disabled = false;
                 livePreviewToggle.disabled = false;
                 bgTypeRadios.forEach(r => r.disabled = false);
                 if (bgTypeRadios[1].checked) customBgColorInput.disabled = false;
