@@ -162,10 +162,14 @@ export class BlurMenu {
             const scale = state.preview.scale || 1;
             const ox = state.preview.offsetX || 0;
             const oy = state.preview.offsetY || 0;
+            const currentTime = player ? player.currentTime : 0;
 
             state.blurAreas.forEach((area, index) => {
                 // Skip the selected one — it uses the main editorUI.box with handles
                 if (index === state.selectedIndex) return;
+
+                // Only show areas active at the current playback time
+                if (currentTime < area.startTime || currentTime > area.endTime) return;
 
                 const rect = document.createElement('div');
                 rect.className = 'blur-area-rect';
@@ -228,6 +232,25 @@ export class BlurMenu {
         // Show overlay immediately (always visible for drawing)
         showOverlayAlways();
 
+        // === Time-based overlay visibility ===
+        // Show blur controls (box, overlay rects) only during their active time ranges
+        let lastVisibilityCheck = -1;
+        player.addRenderCallback(() => {
+            const currentTime = player ? player.currentTime : 0;
+            if (Math.abs(currentTime - lastVisibilityCheck) < 0.05) return;
+            lastVisibilityCheck = currentTime;
+
+            // Update selected box visibility based on time range
+            if (state.selectedIndex >= 0 && state.selectedIndex < state.blurAreas.length) {
+                const area = state.blurAreas[state.selectedIndex];
+                const inRange = currentTime >= area.startTime && currentTime <= area.endTime;
+                editorUI.box.style.display = inRange ? 'block' : 'none';
+            }
+
+            // Re-render overlay rects (already time-filtered)
+            renderOverlayRects();
+        });
+
         const updateSelection = (index) => {
             state.selectedIndex = index;
             renderList();
@@ -257,10 +280,19 @@ export class BlurMenu {
             // Re-render all area outlines on overlay
             renderOverlayRects();
 
-            // Force a frame update
+            // Seek to area's start if current time is outside its range, else refresh current frame
             if (player && player.duration) {
-                const t = player.currentTime;
-                player.seek(t);
+                if (index >= 0 && index < state.blurAreas.length) {
+                    const area = state.blurAreas[index];
+                    const currentTime = player.currentTime;
+                    if (currentTime < area.startTime || currentTime > area.endTime) {
+                        player.seek(area.startTime);
+                    } else {
+                        player.seek(currentTime);
+                    }
+                } else {
+                    player.seek(player.currentTime);
+                }
             }
         };
 
