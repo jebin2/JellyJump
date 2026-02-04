@@ -55,8 +55,8 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, crop = null, removeBackgroundOptions = null, watermark = null, onProgress }) {
-        Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions, watermark });
+    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, crop = null, removeBackgroundOptions = null, watermark = null, blur = null, onProgress }) {
+        Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions, watermark, blur });
 
         let conversion = null;
         let videoUrl = null;
@@ -106,6 +106,16 @@ export class MediaProcessor {
                 Logger.log(`[MediaProcessor] Source analysis: ${originalWidth}x${originalHeight}, ${(originalBitrate / 1000000).toFixed(2)} Mbps`);
             } catch (e) {
                 Logger.warn('[MediaProcessor] Could not compute original bitrate, using resolution-based defaults.');
+            }
+
+            // Get first timestamp for blur time calculations
+            let firstTimestamp = 0;
+            if (blur) {
+                try {
+                    firstTimestamp = await videoTrack.getFirstTimestamp();
+                } catch (e) {
+                    Logger.warn('[MediaProcessor] Could not get first timestamp for blur:', e);
+                }
             }
 
             // Configure Output Format
@@ -158,7 +168,7 @@ export class MediaProcessor {
 
             videoConfig.process = (sample) => {
                 // If no processing options are active, return sample as-is
-                if (!removeBackgroundOptions && !watermark) {
+                if (!removeBackgroundOptions && !watermark && !blur) {
                     return sample;
                 }
 
@@ -216,6 +226,33 @@ export class MediaProcessor {
                     }
 
                     ctx.restore();
+                }
+
+                // --- 3. Blur Regions ---
+                if (blur && blur.areas && blur.areas.length > 0) {
+                    const currentTime = sample.timestamp - firstTimestamp;
+                    const intensity = blur.intensity || 15;
+
+                    for (const area of blur.areas) {
+                        if (currentTime < area.startTime || currentTime > area.endTime) continue;
+
+                        // Scale from original video dimensions to coded dimensions
+                        const sx = width / originalWidth;
+                        const sy = height / originalHeight;
+
+                        const bx = area.x * sx;
+                        const by = area.y * sy;
+                        const bw = area.width * sx;
+                        const bh = area.height * sy;
+
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(bx, by, bw, bh);
+                        ctx.clip();
+                        ctx.filter = `blur(${intensity}px)`;
+                        ctx.drawImage(canvas, 0, 0, width, height);
+                        ctx.restore();
+                    }
                 }
 
                 return canvas;

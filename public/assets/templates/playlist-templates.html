@@ -81,6 +81,10 @@
             <span class="menu-icon">💧</span>
             <span class="menu-label">Add Watermark</span>
         </div>
+        <div class="playlist-menu-item" data-action="blur" role="menuitem">
+            <span class="menu-icon">🔲</span>
+            <span class="menu-label">Blur Video</span>
+        </div>
         <div class="playlist-menu-item" data-action="record" role="menuitem">
             <span class="menu-icon">🔴</span>
             <span class="menu-label">Record Stream</span>
@@ -1837,6 +1841,120 @@
         </div>
     </div>
 </template>
+<!-- Blur Content Template (Split Layout) -->
+<template id="blur-content-template">
+    <!-- Left Panel: Video Preview with Blur Overlay -->
+    <div class="modal-video-panel">
+        <!-- Built dynamically by BoxEditorUtils.setupEditor() -->
+    </div>
+
+    <!-- Right Panel: Blur Controls -->
+    <div class="modal-controls-panel" style="overflow: hidden;">
+        <button id="add-blur-btn" class="jellyjump-btn-primary w-full" style="flex-shrink: 0;">
+            + Add Blur Area
+        </button>
+
+        <div style="flex-shrink: 0;">
+            <div class="flex-between mb-xs">
+                <label class="text-xs text-secondary font-mono" for="blur-intensity">BLUR INTENSITY</label>
+                <span id="blur-intensity-value" class="text-xs font-bold">15px</span>
+            </div>
+            <input type="range" id="blur-intensity" class="quality-slider w-full" min="1" max="40" value="15">
+        </div>
+
+        <label class="toggle-switch" style="flex-shrink: 0; padding: 4px 0;">
+            <span class="toggle-label label-left">LIVE PREVIEW</span>
+            <input type="checkbox" id="live-preview-toggle" checked>
+            <span class="toggle-slider"></span>
+        </label>
+
+        <label class="text-xs text-secondary font-mono mb-xs block" style="flex-shrink: 0;">BLUR AREAS</label>
+        <div id="blur-areas-list" class="flex flex-col gap-sm" style="flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;">
+            <div class="empty-state text-center py-xl text-muted text-xs italic">No blur areas added. Click "Add Blur Area" or draw on the video.</div>
+        </div>
+    </div>
+</template>
+
+<!-- Blur Footer Template -->
+<template id="blur-footer-template">
+    <div class="blur-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="blur-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary"></div>
+                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Blur applied!</span>
+            </div>
+        </div>
+
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download" download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small process-btn" title="Process Blur" aria-label="Process Blur">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Blur Item Template -->
+<template id="blur-item-template">
+    <div class="blur-item" style="cursor: pointer; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 8px;">
+        <!-- Header: Title + Remove -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span class="blur-item-title text-sm font-bold">Blur Area</span>
+            <button class="remove-blur-btn" style="background: none; border: none; cursor: pointer; padding: 2px 6px; color: var(--danger, #e55); font-size: 13px;">✕</button>
+        </div>
+
+        <!-- Time: Start -->
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <label class="text-xs text-secondary font-mono" style="flex-shrink: 0; width: 32px;">Start</label>
+            <input type="text" class="mb-input font-mono text-center blur-start-time" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 0.85em;" placeholder="0:00.000">
+            <button class="set-current-start jellyjump-btn-small" style="padding: 4px 8px; font-size: 11px; flex-shrink: 0;">Set</button>
+        </div>
+
+        <!-- Time: End -->
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+            <label class="text-xs text-secondary font-mono" style="flex-shrink: 0; width: 32px;">End</label>
+            <input type="text" class="mb-input font-mono text-center blur-end-time" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 0.85em;" placeholder="0:00.000">
+            <button class="set-current-end jellyjump-btn-small" style="padding: 4px 8px; font-size: 11px; flex-shrink: 0;">Set</button>
+        </div>
+
+        <!-- Position & Size: 2x2 grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <div>
+                <label class="text-xs text-secondary font-mono mb-xs block">X</label>
+                <input type="number" class="mb-input font-mono text-center blur-x" style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="0" step="1" value="0">
+            </div>
+            <div>
+                <label class="text-xs text-secondary font-mono mb-xs block">Y</label>
+                <input type="number" class="mb-input font-mono text-center blur-y" style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="0" step="1" value="0">
+            </div>
+            <div>
+                <label class="text-xs text-secondary font-mono mb-xs block">W</label>
+                <input type="number" class="mb-input font-mono text-center blur-width" style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="1" step="1" value="0">
+            </div>
+            <div>
+                <label class="text-xs text-secondary font-mono mb-xs block">H</label>
+                <input type="number" class="mb-input font-mono text-center blur-height" style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="1" step="1" value="0">
+            </div>
+        </div>
+    </div>
+</template>
+
 <!-- Screen Record Options Modal Template -->
 <template id="screen-record-options-modal-template">
     <div class="mb-modal-overlay">

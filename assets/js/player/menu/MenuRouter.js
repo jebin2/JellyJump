@@ -11,6 +11,7 @@ import { RemoveBackgroundMenu } from './RemoveBackgroundMenu.js';
 import { RecordMenu } from './RecordMenu.js';
 import { SpeedReverseMenu } from './SpeedReverseMenu.js';
 import { WatermarkMenu } from './WatermarkMenu.js';
+import { BlurMenu } from './BlurMenu.js';
 
 /**
  * Menu Router
@@ -59,6 +60,9 @@ export class MenuRouter {
                 break;
             case 'watermark':
                 await WatermarkMenu.init(item, playlist);
+                break;
+            case 'blur':
+                await BlurMenu.init(item, playlist);
                 break;
             case 'record':
                 await RecordMenu.init(item, playlist);
