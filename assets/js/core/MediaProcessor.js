@@ -15,7 +15,7 @@ export class MediaProcessor {
      * @returns {number} Bitrate in bits per second
      */
     static _getBitrate(quality, pixelCount, sourceBitrate = 0) {
-        let q = 80;
+        let q = 100;
         if (typeof quality === 'number') {
             q = quality;
         } else if (quality === 'high') {
@@ -138,11 +138,19 @@ export class MediaProcessor {
             });
 
             // Configure Video Options
-            const videoConfig = {
-                codec: (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc', // VP9 for WebM/MKV, AVC for MP4/MOV
-                bitrate: this._getBitrate(quality, originalWidth * originalHeight, originalBitrate),
-                forceTranscode: true // Ensure quality settings are applied
-            };
+            // Only set codec/bitrate when the user explicitly wants lower quality (e.g. convert).
+            // For full-quality ops: leave unset so MediaBunny uses QUALITY_HIGH (quality-based
+            // encoding) which is visually superior to a fixed bitrate target.
+            // Crop/resize/process callback already force transcoding when present.
+            // (MediaBunny docs: "If bitrate is set, transcoding will always happen")
+            const needsBitrateControl = (typeof quality === 'number' && quality < 100) ||
+                (typeof quality === 'string' && quality !== 'high');
+            const videoConfig = {};
+
+            if (needsBitrateControl) {
+                videoConfig.codec = (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc';
+                videoConfig.bitrate = this._getBitrate(quality, originalWidth * originalHeight, originalBitrate);
+            }
 
             // Resolution
             if (resolution) {
@@ -161,102 +169,100 @@ export class MediaProcessor {
                 };
             }
 
-            // Process callback for frame manipulation
-            const useOffscreen = typeof OffscreenCanvas !== 'undefined';
-            let canvas = null;
-            let ctx = null;
+            // Only attach a process callback when frame manipulation is needed.
+            // Without it, MediaBunny can stream-copy video data for lossless trim/remux.
+            if (removeBackgroundOptions || watermark || blur) {
+                const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+                let canvas = null;
+                let ctx = null;
 
-            videoConfig.process = (sample) => {
-                // If no processing options are active, return sample as-is
-                if (!removeBackgroundOptions && !watermark && !blur) {
-                    return sample;
-                }
+                videoConfig.process = (sample) => {
+                    const width = sample.codedWidth;
+                    const height = sample.codedHeight;
 
-                const width = sample.codedWidth;
-                const height = sample.codedHeight;
-
-                if (!canvas || canvas.width !== width || canvas.height !== height) {
-                    if (useOffscreen) {
-                        canvas = new OffscreenCanvas(width, height);
-                    } else {
-                        canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                    }
-                    ctx = canvas.getContext('2d', { willReadFrequently: true });
-                }
-
-                // Draw frame
-                ctx.clearRect(0, 0, width, height);
-                sample.draw(ctx, 0, 0, width, height);
-
-                // --- 1. Background Removal ---
-                if (removeBackgroundOptions) {
-                    const imageData = ctx.getImageData(0, 0, width, height);
-                    const { colors, bgType, bgColor } = removeBackgroundOptions;
-                    MediaProcessor.applyChromaKey(imageData, colors, bgType, bgColor);
-                    ctx.putImageData(imageData, 0, 0);
-                }
-
-                // --- 2. Watermark ---
-                if (watermark) {
-                    ctx.save();
-                    ctx.globalAlpha = watermark.opacity || 1.0;
-
-                    // Determine dimensions & Position
-                    let drawX = 0, drawY = 0;
-                    let wWidth = 0, wHeight = 0;
-
-                    if (watermark.type === 'image' && watermarkImg) {
-                        ctx.drawImage(watermarkImg, watermark.x, watermark.y, watermark.width, watermark.height);
-
-                    } else if (watermark.type === 'text' && watermark.text) {
-                        const fontSize = watermark.fontSize || 24;
-
-                        // Use explicit styles from configuration
-                        ctx.font = watermark.font;
-                        ctx.fillStyle = watermark.fillStyle;
-                        ctx.strokeStyle = watermark.strokeStyle;
-                        ctx.lineWidth = watermark.lineWidth;
-                        ctx.textAlign = watermark.textAlign;
-                        ctx.textBaseline = watermark.textBaseline;
-
-                        ctx.strokeText(watermark.text, watermark.x, watermark.y);
-                        ctx.fillText(watermark.text, watermark.x, watermark.y);
+                    if (!canvas || canvas.width !== width || canvas.height !== height) {
+                        if (useOffscreen) {
+                            canvas = new OffscreenCanvas(width, height);
+                        } else {
+                            canvas = document.createElement('canvas');
+                            canvas.width = width;
+                            canvas.height = height;
+                        }
+                        ctx = canvas.getContext('2d', { willReadFrequently: true });
                     }
 
-                    ctx.restore();
-                }
+                    // Draw frame
+                    ctx.clearRect(0, 0, width, height);
+                    sample.draw(ctx, 0, 0, width, height);
 
-                // --- 3. Blur Regions ---
-                if (blur && blur.areas && blur.areas.length > 0) {
-                    const currentTime = sample.timestamp - firstTimestamp;
-                    const intensity = blur.intensity || 15;
+                    // --- 1. Background Removal ---
+                    if (removeBackgroundOptions) {
+                        const imageData = ctx.getImageData(0, 0, width, height);
+                        const { colors, bgType, bgColor } = removeBackgroundOptions;
+                        MediaProcessor.applyChromaKey(imageData, colors, bgType, bgColor);
+                        ctx.putImageData(imageData, 0, 0);
+                    }
 
-                    for (const area of blur.areas) {
-                        if (currentTime < area.startTime || currentTime > area.endTime) continue;
-
-                        // Scale from original video dimensions to coded dimensions
-                        const sx = width / originalWidth;
-                        const sy = height / originalHeight;
-
-                        const bx = area.x * sx;
-                        const by = area.y * sy;
-                        const bw = area.width * sx;
-                        const bh = area.height * sy;
-
+                    // --- 2. Watermark ---
+                    if (watermark) {
                         ctx.save();
-                        ctx.beginPath();
-                        ctx.rect(bx, by, bw, bh);
-                        ctx.clip();
-                        ctx.filter = `blur(${intensity}px)`;
-                        ctx.drawImage(canvas, 0, 0, width, height);
+                        ctx.globalAlpha = watermark.opacity || 1.0;
+
+                        // Determine dimensions & Position
+                        let drawX = 0, drawY = 0;
+                        let wWidth = 0, wHeight = 0;
+
+                        if (watermark.type === 'image' && watermarkImg) {
+                            ctx.drawImage(watermarkImg, watermark.x, watermark.y, watermark.width, watermark.height);
+
+                        } else if (watermark.type === 'text' && watermark.text) {
+                            const fontSize = watermark.fontSize || 24;
+
+                            // Use explicit styles from configuration
+                            ctx.font = watermark.font;
+                            ctx.fillStyle = watermark.fillStyle;
+                            ctx.strokeStyle = watermark.strokeStyle;
+                            ctx.lineWidth = watermark.lineWidth;
+                            ctx.textAlign = watermark.textAlign;
+                            ctx.textBaseline = watermark.textBaseline;
+
+                            ctx.strokeText(watermark.text, watermark.x, watermark.y);
+                            ctx.fillText(watermark.text, watermark.x, watermark.y);
+                        }
+
                         ctx.restore();
                     }
-                }
 
-                return canvas;
-            };
+                    // --- 3. Blur Regions ---
+                    if (blur && blur.areas && blur.areas.length > 0) {
+                        const currentTime = sample.timestamp - firstTimestamp;
+                        const intensity = blur.intensity || 15;
+
+                        for (const area of blur.areas) {
+                            if (currentTime < area.startTime || currentTime > area.endTime) continue;
+
+                            // Scale from original video dimensions to coded dimensions
+                            const sx = width / originalWidth;
+                            const sy = height / originalHeight;
+
+                            const bx = area.x * sx;
+                            const by = area.y * sy;
+                            const bw = area.width * sx;
+                            const bh = area.height * sy;
+
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.rect(bx, by, bw, bh);
+                            ctx.clip();
+                            ctx.filter = `blur(${intensity}px)`;
+                            ctx.drawImage(canvas, 0, 0, width, height);
+                            ctx.restore();
+                        }
+                    }
+
+                    return canvas;
+                };
+            }
 
             // Initialize Conversion
             const conversionOptions = {
@@ -659,11 +665,11 @@ export class MediaProcessor {
 
                 canvasSource = new MediaBunny.CanvasSource(canvas, {
                     codec: format === 'webm' ? 'vp9' : 'avc',
-                    bitrate: 5000000,
-                    frameRate: outputFps
+                    bitrate: MediaBunny.QUALITY_HIGH,
+                    // frameRate: outputFps
                 });
 
-                output.addVideoTrack(canvasSource, { frameRate: outputFps });
+                output.addVideoTrack(canvasSource);
                 await output.start();
 
                 // Sample frames with speed adjustment
@@ -894,7 +900,6 @@ export class MediaProcessor {
             const videoInfos = [];
             let maxWidth = 0;
             let maxHeight = 0;
-
             for (let i = 0; i < inputs.length; i++) {
                 const input = new MediaBunny.Input({
                     source: new MediaBunny.BlobSource(inputs[i]),
@@ -966,11 +971,11 @@ export class MediaProcessor {
 
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: format === 'webm' ? 'vp9' : 'avc',
-                bitrate: 5000000,
-                frameRate: targetFps
+                bitrate: MediaBunny.QUALITY_HIGH,
+                // frameRate: targetFps
             });
 
-            output.addVideoTrack(canvasSource, { frameRate: targetFps });
+            output.addVideoTrack(canvasSource);
 
             // Setup audio with codec detection
             let audioCodec;
@@ -1376,11 +1381,13 @@ export class MediaProcessor {
             const duration = await videoTrack.computeDuration();
             const firstTimestamp = await videoTrack.getFirstTimestamp();
 
-            // Compute frame rate from metadata
+            // Compute frame rate and source bitrate from metadata
             let sourceFps = 30;
+            let sourceBitrate = 0;
             try {
                 const stats = await videoTrack.computePacketStats();
                 sourceFps = stats.averagePacketRate || 30;
+                sourceBitrate = stats.averageBitrate || 0;
             } catch (e) {
                 Logger.warn("[MediaProcessor] Could not compute frame rate, defaulting to 30fps", e);
             }
@@ -1399,7 +1406,7 @@ export class MediaProcessor {
             const frameDuration = 1 / outputFps;
             const totalOutputFrames = Math.ceil(outputDuration * outputFps);
 
-            Logger.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, ${sourceFps.toFixed(1)}fps`);
+            Logger.log(`[MediaProcessor] Source: ${width}x${height}, ${duration.toFixed(2)}s, ${sourceFps.toFixed(1)}fps, ${(sourceBitrate / 1000000).toFixed(2)} Mbps`);
             Logger.log(`[MediaProcessor] Speed: ${clampedSpeed}x, Output: ${outputDuration.toFixed(2)}s, ${totalOutputFrames} frames`);
 
             // Step 2: Setup Output
@@ -1417,11 +1424,11 @@ export class MediaProcessor {
 
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: 'avc',
-                bitrate: 5000000, // 5 Mbps
-                frameRate: outputFps
+                bitrate: MediaBunny.QUALITY_HIGH,
+                // frameRate: outputFps
             });
 
-            output.addVideoTrack(canvasSource, { frameRate: outputFps });
+            output.addVideoTrack(canvasSource);
 
             // Setup Audio (if requested)
             if (includeAudio) {
@@ -1593,11 +1600,11 @@ export class MediaProcessor {
 
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: 'avc',
-                bitrate: Math.min(8000000, Math.floor(width * height * 2)), // Adaptive bitrate
-                frameRate: outputFps
+                bitrate: MediaBunny.QUALITY_HIGH,
+                // frameRate: outputFps
             });
 
-            output.addVideoTrack(canvasSource, { frameRate: outputFps });
+            output.addVideoTrack(canvasSource);
 
             // Setup Audio (if requested)
             let audioSource = null;
