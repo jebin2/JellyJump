@@ -63,7 +63,6 @@ export class BlurMenu {
 
         // === 2. Elements & State ===
         const elements = {
-            addBlurBtn: modalContent.querySelector('#add-blur-btn'),
             blurList: modalContent.querySelector('#blur-areas-list'),
             blurIntensity: modalContent.querySelector('#blur-intensity'),
             blurIntensityValue: modalContent.querySelector('#blur-intensity-value'),
@@ -220,6 +219,7 @@ export class BlurMenu {
                 inset: 0;
                 pointer-events: auto !important;
                 z-index: 1000;
+                cursor: crosshair;
             `);
             updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
                 if (state.selectedIndex >= 0) {
@@ -476,7 +476,7 @@ export class BlurMenu {
             list.innerHTML = '';
 
             if (state.blurAreas.length === 0) {
-                list.innerHTML = `<div class="empty-state text-center py-xl text-muted text-xs italic">No blur areas added. Click "Add Blur Area" or draw on the video.</div>`;
+                list.innerHTML = `<div class="empty-state text-center py-xl text-muted text-xs italic">No blur areas added. Draw on the video to add a blur area.</div>`;
                 return;
             }
 
@@ -599,29 +599,6 @@ export class BlurMenu {
 
 
         // === 7. Controls ===
-
-        elements.addBlurBtn.onclick = () => {
-            const videoW = state.video.width || 1920;
-            const videoH = state.video.height || 1080;
-            const w = videoW * 0.25;
-            const h = w;
-
-            const offsetW = (Math.random() - 0.5) * (videoW * 0.2);
-            const offsetH = (Math.random() - 0.5) * (videoH * 0.2);
-
-            const x = Math.max(0, Math.min(videoW - w, (videoW - w) / 2 + offsetW));
-            const y = Math.max(0, Math.min(videoH - h, (videoH - h) / 2 + offsetH));
-
-            const newArea = {
-                id: generateId(),
-                x, y, width: w, height: h,
-                startTime: 0,
-                endTime: player.duration || 10
-            };
-
-            state.blurAreas.push(newArea);
-            updateSelection(state.blurAreas.length - 1);
-        };
 
         elements.processBtn.onclick = async () => {
             if (state.blurAreas.length === 0) {
