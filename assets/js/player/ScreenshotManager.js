@@ -98,7 +98,7 @@ export class ScreenshotManager {
         if (!template || !footerTemplate) return;
 
         this.modalInstance = new Modal({
-            maxWidth: '800px',
+            splitLayout: true,
             onClose: () => this._onClose()
         });
 
@@ -170,10 +170,17 @@ export class ScreenshotManager {
         try {
             const fps = this.player.frameRate || 30;
             const frameDuration = 1 / fps;
-            const currentTimestamp = this.screenshotTimestamp || this.player.currentTime;
-            let newTimestamp = Math.max(0, Math.min(this.player.duration, currentTimestamp + (direction * frameDuration)));
+            const currentTimestamp = this.screenshotTimestamp ?? this.player.currentTime;
+            const duration = this.player.duration;
 
-            const frame = await this.player.videoSink.getCanvas(newTimestamp);
+            // Already at boundary
+            if ((direction < 0 && currentTimestamp <= 0) || (direction > 0 && currentTimestamp >= duration)) return;
+
+            // Overshoot slightly for forward seeks since getCanvas returns frame at-or-before timestamp
+            const step = direction > 0 ? frameDuration + 0.001 : frameDuration;
+            const seekTime = Math.max(0, Math.min(duration, currentTimestamp + (direction * step)));
+
+            const frame = await this.player.videoSink.getCanvas(seekTime);
             if (!frame || !frame.canvas) return;
 
             const dataUrl = frame.canvas.toDataURL('image/png');

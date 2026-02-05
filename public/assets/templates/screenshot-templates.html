@@ -12,34 +12,51 @@
 
 <!-- Screenshot Content Template -->
 <template id="screenshot-content-template">
-    <div class="jellyjump-screenshot-content">
-        <div class="source-info mb-md p-sm bg-tertiary rounded flex-between items-center">
-            <div class="flex flex-col">
-                <span class="text-xs text-secondary font-mono">TIMESTAMP</span>
-                <span class="jellyjump-screenshot-timestamp text-sm font-bold text-primary"
+    <!-- Loading State -->
+    <div class="screenshot-loading flex flex-col items-center justify-center p-xl text-muted hidden"
+        style="grid-column: 1 / -1;">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Capturing frame...</span>
+    </div>
+
+    <div class="screenshot-content" style="display: contents;">
+        <!-- Left Panel: Screenshot Preview -->
+        <div class="modal-video-panel">
+            <div class="screenshot-preview-area">
+                <img class="jellyjump-screenshot-preview" id="mb-screenshot-preview"
+                    alt="Screenshot preview" />
+            </div>
+        </div>
+
+        <!-- Right Panel: Controls -->
+        <div class="modal-controls-panel">
+            <!-- Timestamp Display -->
+            <div class="time-card bg-tertiary p-sm rounded">
+                <span class="text-xs text-secondary font-mono block mb-xs">TIMESTAMP</span>
+                <span class="jellyjump-screenshot-timestamp text-primary font-bold text-lg"
                     id="mb-screenshot-timestamp">--:--</span>
             </div>
-            <div class="flex flex-col items-end">
-                <span class="text-xs text-secondary font-mono">FRAME NAVIGATION</span>
-                <div class="flex gap-xs mt-xs">
-                    <button class="btn jellyjump-btn-small" id="mb-screenshot-prev" title="Previous Frame (Left Arrow)">
+
+            <!-- Frame Navigation -->
+            <div class="bg-tertiary p-sm rounded">
+                <span class="text-xs text-secondary font-mono block mb-xs">FRAME NAVIGATION</span>
+                <div class="flex gap-sm mt-sm">
+                    <button class="btn jellyjump-btn-small flex-1" id="mb-screenshot-prev"
+                        title="Previous Frame (Left Arrow)">
                         <svg width="16" height="16" fill="currentColor">
                             <use href="assets/icons/sprite.svg#icon-chevron-left"></use>
                         </svg>
                     </button>
-                    <button class="btn jellyjump-btn-small" id="mb-screenshot-next" title="Next Frame (Right Arrow)">
+                    <button class="btn jellyjump-btn-small flex-1" id="mb-screenshot-next"
+                        title="Next Frame (Right Arrow)">
                         <svg width="16" height="16" fill="currentColor">
                             <use href="assets/icons/sprite.svg#icon-chevron-right"></use>
                         </svg>
                     </button>
                 </div>
+                <span class="text-xs text-secondary font-mono block mt-xs text-center">Use arrow keys (±1 frame)</span>
             </div>
-        </div>
-
-        <div class="jellyjump-screenshot-preview-container bg-black rounded overflow-hidden relative"
-            style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
-            <img class="jellyjump-screenshot-preview max-w-full max-h-full object-contain" id="mb-screenshot-preview"
-                alt="Screenshot preview" />
         </div>
     </div>
 </template>
