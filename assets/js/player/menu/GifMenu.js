@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId, formatDuration, formatTime, formatFileSize } from '../../utils/mediaUtils.js';
+import { generateId, formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 
 /**
@@ -82,12 +82,7 @@ export class GifMenu {
         // Get video duration
         let duration = 0;
         if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
-            const parts = item.duration.split(':').map(Number);
-            if (parts.length === 2) {
-                duration = parts[0] * 60 + parts[1];
-            } else if (parts.length === 3) {
-                duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
-            }
+            duration = parseTime(item.duration);
         }
 
         // Show Content

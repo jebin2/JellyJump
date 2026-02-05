@@ -1,5 +1,6 @@
 import { Logger } from "../utils/Logger.js";
 import { Modal } from "./Modal.js";
+import { formatTime } from "../utils/mediaUtils.js";
 
 /**
  * Screenshot Manager
@@ -119,7 +120,7 @@ export class ScreenshotManager {
         this.ui.preview.src = imageData;
         this.screenshotDataUrl = imageData;
         this.screenshotTimestamp = timestamp;
-        this.ui.timestamp.textContent = this._formatTime(timestamp);
+        this.ui.timestamp.textContent = formatTime(timestamp);
 
         // Events
         this.ui.downloadBtn.addEventListener('click', () => this.download());
@@ -179,7 +180,7 @@ export class ScreenshotManager {
             this.ui.preview.src = dataUrl;
             this.screenshotDataUrl = dataUrl;
             this.screenshotTimestamp = frame.timestamp;
-            this.ui.timestamp.textContent = this._formatTime(frame.timestamp);
+            this.ui.timestamp.textContent = formatTime(frame.timestamp);
         } catch (error) {
             Logger.error('Error capturing adjacent frame:', error);
         }
@@ -242,12 +243,4 @@ export class ScreenshotManager {
         return !!this.modalInstance;
     }
 
-    /**
-     * Format time in MM:SS format
-     */
-    _formatTime(seconds) {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    }
 }

@@ -1,4 +1,5 @@
 import { Logger } from "../utils/Logger.js";
+import { parseTime } from "../utils/mediaUtils.js";
 /**
  * Subtitle Manager
  * Handles parsing and management of WebVTT subtitles.
@@ -48,8 +49,8 @@ export class SubtitleManager {
                 }
 
                 currentCue = {
-                    start: this._parseTime(timeMatch[1]),
-                    end: this._parseTime(timeMatch[2]),
+                    start: parseTime(timeMatch[1]),
+                    end: parseTime(timeMatch[2]),
                     text: ''
                 };
             } else if (currentCue) {
@@ -74,27 +75,6 @@ export class SubtitleManager {
         return this.cues.filter(cue => time >= cue.start && time <= cue.end);
     }
 
-    /**
-     * Parse timestamp string to seconds
-     * @param {string} timeString 
-     * @returns {number} Seconds
-     * @private
-     */
-    _parseTime(timeString) {
-        const parts = timeString.split(':');
-        let seconds = 0;
-
-        if (parts.length === 3) {
-            seconds += parseInt(parts[0]) * 3600;
-            seconds += parseInt(parts[1]) * 60;
-            seconds += parseFloat(parts[2]);
-        } else if (parts.length === 2) {
-            seconds += parseInt(parts[0]) * 60;
-            seconds += parseFloat(parts[1]);
-        }
-
-        return seconds;
-    }
 
     clear() {
         this.cues = [];

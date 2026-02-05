@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId, formatDuration } from '../../utils/mediaUtils.js';
+import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
 
 /**
  * Speed & Reverse Menu Handler
@@ -68,14 +68,9 @@ export class SpeedReverseMenu {
 
         let videoDuration = 0;
         if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
-            const parts = item.duration.split(':').map(Number);
-            if (parts.length === 2) {
-                videoDuration = parts[0] * 60 + parts[1];
-            } else if (parts.length === 3) {
-                videoDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
-            }
+            videoDuration = parseTime(item.duration);
         }
-        sourceDuration.textContent = formatDuration(videoDuration);
+        sourceDuration.textContent = formatTime(videoDuration);
         sourceResolution.textContent = item.videoInfo
             ? `${item.videoInfo.width}×${item.videoInfo.height}`
             : 'Unknown';
@@ -90,7 +85,7 @@ export class SpeedReverseMenu {
 
             // Update Speed Display
             const newDuration = videoDuration / speed;
-            speedDisplay.textContent = `${speed}x (${formatDuration(newDuration)})`;
+            speedDisplay.textContent = `${speed}x (${formatTime(newDuration)})`;
 
             // Update Info / Warnings
             if (isReverse && isLongVideo) {

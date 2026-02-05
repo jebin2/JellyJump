@@ -1,7 +1,7 @@
 import { Modal as ModalDialog } from "../Modal.js";
 import { Logger } from "../../utils/Logger.js";
 import { MotionDetector } from "../MotionDetector.js";
-import { formatDuration, generateId } from "../../utils/mediaUtils.js";
+import { formatTime, generateId } from "../../utils/mediaUtils.js";
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 
@@ -140,9 +140,9 @@ export class MotionDetectionMenu {
                 segmentsList.innerHTML = '<div class="p-4 text-center text-muted italic">No significant motion detected. Try higher sensitivity.</div>';
             } else {
                 const listHtml = results.map((seg, idx) => {
-                    const startStr = new Date(seg.start * 1000).toISOString().substr(14, 5);
-                    const endStr = new Date(seg.end * 1000).toISOString().substr(14, 5);
-                    const durationStr = (seg.end - seg.start).toFixed(1) + 's';
+                    const startStr = formatTime(seg.start);
+                    const endStr = formatTime(seg.end);
+                    const durationStr = formatTime(seg.end - seg.start);
 
                     return `
                     <div class="segment-item p-sm rounded bg-tertiary flex-between hover:bg-white/5 transition-colors group border border-transparent hover:border-white/10">
@@ -248,7 +248,7 @@ export class MotionDetectionMenu {
             title: segmentTitle,
             url: url,
             file: new File([blob], segmentTitle, { type: 'video/mp4' }),
-            duration: formatDuration(end - start),
+            duration: formatTime(end - start),
             type: 'video',
             isLocal: true,
             isNew: true,

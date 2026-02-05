@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { generateId, formatDuration } from '../../utils/mediaUtils.js';
+import { generateId, formatTime } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 
 export class RemoveBackgroundMenu {

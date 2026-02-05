@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId } from '../../utils/mediaUtils.js';
+import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
 
 /**
@@ -55,23 +55,6 @@ export class TrimMenu {
         // Initial State
         trimBtn.disabled = true;
 
-        // Helper Functions
-        const formatTime = (seconds) => {
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = Math.floor(seconds % 60);
-            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} `;
-        };
-
-        const parseTime = (timeStr) => {
-            if (typeof timeStr === 'number') return timeStr;
-            const parts = timeStr.split(':').map(Number);
-            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-            if (parts.length === 2) return parts[0] * 60 + parts[1];
-            return 0;
-        };
-
-
 
         // Ensure metadata
         await playlist._ensureMetadata(item);
@@ -79,12 +62,7 @@ export class TrimMenu {
         // Get Video Duration
         let duration = 0;
         if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
-            const parts = item.duration.split(':').map(Number);
-            if (parts.length === 3) {
-                duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
-            } else if (parts.length === 2) {
-                duration = parts[0] * 60 + parts[1];
-            }
+            duration = parseTime(item.duration);
         }
 
         // Show Content

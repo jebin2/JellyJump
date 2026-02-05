@@ -13,6 +13,7 @@ import { AudioEqualizer } from '../player/AudioEqualizer.js';
 
 import { HLSPlayer } from './HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
+import { formatTime, parseTime } from '../utils/mediaUtils.js';
 import { AudioVisualizer } from '../player/AudioVisualizer.js';
 import { Logger } from '../utils/Logger.js';
 import { ThumbnailGenerator } from '../player/ThumbnailGenerator.js';
@@ -382,7 +383,7 @@ export class CorePlayer {
         this.ui.thumbnailOverlay.style.bottom = `${bottomOffset}px`;
 
         // Update time text
-        this.ui.thumbnailTime.textContent = this._formatTime(time);
+        this.ui.thumbnailTime.textContent = formatTime(time);
 
         // Store for live updates
         this.lastThumbnailHoverTime = time;
@@ -902,7 +903,7 @@ export class CorePlayer {
             this.ui.clearLoopBtn.addEventListener('click', () => this.clearLoopMarkers());
 
             this.ui.loopStartInput.addEventListener('change', (e) => {
-                const time = this._parseTime(e.target.value);
+                const time = parseTime(e.target.value);
                 if (time !== null) {
                     this.loopStart = time;
                     this.loopMode = 'ab';
@@ -911,7 +912,7 @@ export class CorePlayer {
             });
 
             this.ui.loopEndInput.addEventListener('change', (e) => {
-                const time = this._parseTime(e.target.value);
+                const time = parseTime(e.target.value);
                 if (time !== null) {
                     this.loopEnd = time;
                     this.loopMode = 'ab';
@@ -1318,8 +1319,8 @@ export class CorePlayer {
         // Update Panel
         if (this.ui.loopStatus) {
             this.ui.loopStatus.textContent = statusText;
-            this.ui.loopStartInput.value = this.loopStart !== null ? this._formatTime(this.loopStart) : '';
-            this.ui.loopEndInput.value = this.loopEnd !== null ? this._formatTime(this.loopEnd) : '';
+            this.ui.loopStartInput.value = this.loopStart !== null ? formatTime(this.loopStart) : '';
+            this.ui.loopEndInput.value = this.loopEnd !== null ? formatTime(this.loopEnd) : '';
         }
 
         // Update Markers
@@ -4251,16 +4252,11 @@ export class CorePlayer {
     _updateTimeDisplay() {
         if (!this.ui.timeDisplay) return;
 
-        const current = this._formatTime(this.currentTime);
-        const duration = this._formatTime(this.duration);
+        const current = formatTime(this.currentTime);
+        const duration = formatTime(this.duration);
         this.ui.timeDisplay.textContent = `${current} / ${duration}`;
     }
 
-    _formatTime(seconds) {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-    }
 
     _updateFullscreenUI() {
         if (!this.ui.fullscreenBtn) return;

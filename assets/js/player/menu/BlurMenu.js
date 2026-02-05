@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { generateId, formatDuration, parseTime } from '../../utils/mediaUtils.js';
+import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
 import {
     loadVideo,
     setupDragHandlers,
@@ -465,11 +465,6 @@ export class BlurMenu {
             if (hInput) hInput.value = Math.round(area.height);
         };
 
-        // formatDuration(0) returns '--:--' due to !0 check; blur needs 0 to show as 0:00
-        const fmtTime = (sec) => {
-            if (sec === 0 || sec === null || sec === undefined) return '0:00';
-            return formatDuration(sec);
-        };
 
         const renderList = () => {
             const list = elements.blurList;
@@ -496,8 +491,8 @@ export class BlurMenu {
                 // Time inputs
                 const startInput = el.querySelector('.blur-start-time');
                 const endInput = el.querySelector('.blur-end-time');
-                startInput.value = fmtTime(area.startTime);
-                endInput.value = fmtTime(area.endTime);
+                startInput.value = formatTime(area.startTime);
+                endInput.value = formatTime(area.endTime);
 
                 // Position/Size inputs
                 const xInput = el.querySelector('.blur-x');
@@ -534,12 +529,12 @@ export class BlurMenu {
                 el.querySelector('.set-current-start').onclick = (e) => {
                     e.stopPropagation();
                     area.startTime = player.currentTime;
-                    startInput.value = fmtTime(area.startTime);
+                    startInput.value = formatTime(area.startTime);
                 };
                 el.querySelector('.set-current-end').onclick = (e) => {
                     e.stopPropagation();
                     area.endTime = player.currentTime;
-                    endInput.value = fmtTime(area.endTime);
+                    endInput.value = formatTime(area.endTime);
                 };
 
                 // Time input change handlers

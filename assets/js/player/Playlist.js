@@ -10,7 +10,7 @@ import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { FileDropHandler } from '../utils/FileDropHandler.js';
 import { ElectronHelper } from '../utils/ElectronHelper.js';
-import { formatDuration, generateId } from '../utils/mediaUtils.js';
+import { formatTime, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
 import { HLSPlayer } from '../core/HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
@@ -888,7 +888,7 @@ export class Playlist {
             // VOD stream - get actual duration when available
             const checkDuration = () => {
                 if (this.player.duration && this.player.duration > 0) {
-                    video.duration = formatDuration(this.player.duration);
+                    video.duration = formatTime(this.player.duration);
                     this._updateItemUI(video);
                     this._saveState();
                 }
@@ -999,7 +999,7 @@ export class Playlist {
         // Update duration when metadata is available
         const updateDuration = () => {
             if (this.player.duration && this.player.duration > 0) {
-                const newDuration = formatDuration(this.player.duration);
+                const newDuration = formatTime(this.player.duration);
                 if (video.duration !== newDuration) {
                     video.duration = newDuration;
                     this._updateItemUI(video);

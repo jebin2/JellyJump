@@ -4,23 +4,30 @@
  */
 
 /**
- * Format seconds to HH:MM:SS string
+ * Format seconds to time string with millisecond precision
  * @param {number} seconds
- * @returns {string}
+ * @returns {string} e.g. "0:00", "1:05.500", "1:02:03.123"
  */
 export function formatTime(seconds) {
+    if (seconds === null || seconds === undefined || isNaN(seconds)) return '--:--';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const ms = Math.round((seconds % 1) * 1000);
+    const msStr = `.${ms.toString().padStart(3, '0')}`;
+    if (h > 0) {
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}${msStr}`;
+    }
+    return `${m}:${s.toString().padStart(2, '0')}${msStr}`;
 }
 
 /**
  * Parse time string to seconds
- * @param {string} timeStr - Format: HH:MM:SS or MM:SS or SS
+ * @param {string} timeStr - Format: HH:MM:SS.mmm or MM:SS.mmm or SS.mmm
  * @returns {number}
  */
 export function parseTime(timeStr) {
+    if (typeof timeStr === 'number') return timeStr;
     const parts = timeStr.split(':').map(p => parseFloat(p) || 0);
     if (parts.length === 3) {
         return parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -29,18 +36,6 @@ export function parseTime(timeStr) {
     } else {
         return parts[0] || 0;
     }
-}
-
-/**
- * Format duration in seconds to MM:SS string
- * @param {number} seconds
- * @returns {string}
- */
-export function formatDuration(seconds) {
-    if (!seconds || isNaN(seconds)) return '--:--';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 /**

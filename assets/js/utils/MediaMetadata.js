@@ -2,7 +2,7 @@ import { Logger } from "./Logger.js";
 import { MediaBunny } from '../core/MediaBunny.js';
 import { MediaProcessor } from '../core/MediaProcessor.js';
 import { IndexedDBService } from '../player/IndexedDBService.js';
-import { formatDuration } from './mediaUtils.js';
+import { formatTime } from './mediaUtils.js';
 import { ElectronHelper } from './ElectronHelper.js';
 
 // Shared IndexedDB instance for caching remote blobs
@@ -210,7 +210,7 @@ export class MediaMetadata {
 
         // Update duration if missing, placeholder, or loading
         if (!item.duration || item.duration === '--:--' || item.duration === 'Loading...') {
-            item.duration = formatDuration(duration);
+            item.duration = formatTime(duration);
         }
 
         if (onSave) onSave();
@@ -268,16 +268,6 @@ export class MediaMetadata {
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         };
 
-        // Helper: Format Duration
-        const formatDurationFull = (seconds) => {
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = Math.floor(seconds % 60);
-            return [h, m, s]
-                .map(v => v < 10 ? "0" + v : v)
-                .filter((v, i) => v !== "00" || i > 0)
-                .join(":");
-        };
 
         // Helper: Get Codec Name
         const getCodecName = (codec) => {
@@ -290,7 +280,7 @@ export class MediaMetadata {
             format: format ? format.name : 'Unknown',
             mimeType: format ? format.mimeType : blob.type,
             size: formatBytes(blob.size),
-            duration: formatDurationFull(videoTrack ? await videoTrack.computeDuration() : (audioTrack ? await audioTrack.computeDuration() : 0)),
+            duration: formatTime(videoTrack ? await videoTrack.computeDuration() : (audioTrack ? await audioTrack.computeDuration() : 0)),
 
             // Video
             videoCodec: videoTrack ? getCodecName(videoTrack.codec) : 'N/A',
