@@ -62,7 +62,15 @@ export class MediaProcessor {
         let videoUrl = null;
         let input = null;
         let output = null;
-        let watermarkImg = null;
+        // Normalize watermark input to items array
+        let watermarkItems = null;
+        if (watermark) {
+            watermarkItems = (watermark.items && Array.isArray(watermark.items))
+                ? watermark.items
+                : [{ ...watermark, startTime: -Infinity, endTime: Infinity }];
+        }
+
+        const watermarkImages = new Map();
 
         // If removing background, we need to handle it via the process callback
         // and potentially force transcoding to a format that supports alpha (WebM) if transparent
@@ -71,12 +79,17 @@ export class MediaProcessor {
         }
 
         try {
-            // Pre-load watermark image if needed
-            if (watermark && watermark.type === 'image' && watermark.image) {
-                try {
-                    watermarkImg = await createImageBitmap(watermark.image);
-                } catch (e) {
-                    Logger.error('Failed to load watermark image:', e);
+            // Pre-load ALL watermark images
+            if (watermarkItems) {
+                for (const wm of watermarkItems) {
+                    if (wm.type === 'image' && wm.image) {
+                        try {
+                            const img = await createImageBitmap(wm.image);
+                            watermarkImages.set(wm.id || wm, img);
+                        } catch (e) {
+                            Logger.error('Failed to load watermark image:', e);
+                        }
+                    }
                 }
             }
 
@@ -108,9 +121,9 @@ export class MediaProcessor {
                 Logger.warn('[MediaProcessor] Could not compute original bitrate, using resolution-based defaults.');
             }
 
-            // Get first timestamp for blur time calculations
+            // Get first timestamp for blur/watermark time calculations
             let firstTimestamp = 0;
-            if (blur) {
+            if (blur || watermarkItems) {
                 try {
                     firstTimestamp = await videoTrack.getFirstTimestamp();
                 } catch (e) {
@@ -171,7 +184,7 @@ export class MediaProcessor {
 
             // Only attach a process callback when frame manipulation is needed.
             // Without it, MediaBunny can stream-copy video data for lossless trim/remux.
-            if (removeBackgroundOptions || watermark || blur) {
+            if (removeBackgroundOptions || watermarkItems || blur) {
                 const useOffscreen = typeof OffscreenCanvas !== 'undefined';
                 let canvas = null;
                 let ctx = null;
@@ -203,34 +216,34 @@ export class MediaProcessor {
                         ctx.putImageData(imageData, 0, 0);
                     }
 
-                    // --- 2. Watermark ---
-                    if (watermark) {
-                        ctx.save();
-                        ctx.globalAlpha = watermark.opacity || 1.0;
+                    // --- 2. Watermarks ---
+                    if (watermarkItems) {
+                        const currentTimeWm = sample.timestamp - firstTimestamp;
+                        for (const wm of watermarkItems) {
+                            if (currentTimeWm < wm.startTime || currentTimeWm > wm.endTime) continue;
 
-                        // Determine dimensions & Position
-                        let drawX = 0, drawY = 0;
-                        let wWidth = 0, wHeight = 0;
+                            ctx.save();
+                            ctx.globalAlpha = wm.opacity || 1.0;
 
-                        if (watermark.type === 'image' && watermarkImg) {
-                            ctx.drawImage(watermarkImg, watermark.x, watermark.y, watermark.width, watermark.height);
+                            if (wm.type === 'image') {
+                                const img = watermarkImages.get(wm.id || wm);
+                                if (img) {
+                                    ctx.drawImage(img, wm.x, wm.y, wm.width, wm.height);
+                                }
+                            } else if (wm.type === 'text' && wm.text) {
+                                ctx.font = wm.font;
+                                ctx.fillStyle = wm.fillStyle;
+                                ctx.strokeStyle = wm.strokeStyle;
+                                ctx.lineWidth = wm.lineWidth;
+                                ctx.textAlign = wm.textAlign;
+                                ctx.textBaseline = wm.textBaseline;
 
-                        } else if (watermark.type === 'text' && watermark.text) {
-                            const fontSize = watermark.fontSize || 24;
+                                ctx.strokeText(wm.text, wm.x, wm.y);
+                                ctx.fillText(wm.text, wm.x, wm.y);
+                            }
 
-                            // Use explicit styles from configuration
-                            ctx.font = watermark.font;
-                            ctx.fillStyle = watermark.fillStyle;
-                            ctx.strokeStyle = watermark.strokeStyle;
-                            ctx.lineWidth = watermark.lineWidth;
-                            ctx.textAlign = watermark.textAlign;
-                            ctx.textBaseline = watermark.textBaseline;
-
-                            ctx.strokeText(watermark.text, watermark.x, watermark.y);
-                            ctx.fillText(watermark.text, watermark.x, watermark.y);
+                            ctx.restore();
                         }
-
-                        ctx.restore();
                     }
 
                     // --- 3. Blur Regions ---
@@ -309,6 +322,12 @@ export class MediaProcessor {
                     Logger.warn('Error disposing input:', e);
                 }
             }
+
+            // Dispose watermark ImageBitmaps
+            for (const img of watermarkImages.values()) {
+                if (img && typeof img.close === 'function') img.close();
+            }
+            watermarkImages.clear();
 
             conversion = null;
         }
