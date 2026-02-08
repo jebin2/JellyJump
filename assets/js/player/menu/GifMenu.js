@@ -4,6 +4,7 @@ import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
+import { CustomDropdown } from '../../utils/CustomDropdown.js';
 
 /**
  * GIF Menu Handler
@@ -25,7 +26,7 @@ export class GifMenu {
         }
 
         const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Create GIF');
+        modal.setTitle('GIF');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
 
@@ -47,20 +48,35 @@ export class GifMenu {
         const gifLoading = modalContent.querySelector('.gif-loading');
         const gifContent = modalContent.querySelector('.gif-content');
 
+        // Input Elements
+        const startInput = modalContent.querySelector('#gif-start-input');
+        const endInput = modalContent.querySelector('#gif-end-input');
+        const setStartBtn = modalContent.querySelector('#gif-set-start-btn');
+        const setEndBtn = modalContent.querySelector('#gif-set-end-btn');
+
         // Time Display Elements
-        const startDisplay = modalContent.querySelector('.gif-start-time');
-        const endDisplay = modalContent.querySelector('.gif-end-time');
         const durationDisplay = modalContent.querySelector('.gif-duration');
 
-        // Timeline Slider Elements
-        const timelineSlider = modalContent.querySelector('.timeline-slider');
-        const timelineRange = modalContent.querySelector('.timeline-range');
-        const startHandle = modalContent.querySelector('.start-handle');
-        const endHandle = modalContent.querySelector('.end-handle');
-
         const validationError = modalContent.querySelector('.time-validation-error');
-        const fpsSelect = modalContent.querySelector('#gif-fps');
-        const sizeSelect = modalContent.querySelector('#gif-size');
+
+        // FPS Dropdown
+        const fpsBtn = modalContent.querySelector('#gif-fps-btn');
+        const fpsMenu = modalContent.querySelector('#gif-fps-menu');
+        const fpsDropdown = CustomDropdown.init({
+            button: fpsBtn,
+            menu: fpsMenu,
+            initialValue: '15'
+        });
+
+        // Size Dropdown
+        const sizeBtn = modalContent.querySelector('#gif-size-btn');
+        const sizeMenu = modalContent.querySelector('#gif-size-menu');
+        const sizeDropdown = CustomDropdown.init({
+            button: sizeBtn,
+            menu: sizeMenu,
+            initialValue: '480'
+        });
+
         const qualitySlider = modalContent.querySelector('#gif-quality');
         const qualityValue = modalContent.querySelector('#gif-quality-value');
 
@@ -94,8 +110,8 @@ export class GifMenu {
         let endTime = Math.min(duration, 10); // Default 10s or full duration
 
         // Initialize displays
-        startDisplay.textContent = formatTime(startTime);
-        endDisplay.textContent = formatTime(endTime);
+        startInput.value = formatTime(startTime);
+        endInput.value = formatTime(endTime);
         durationDisplay.textContent = formatTime(endTime - startTime);
 
         // Load Video
@@ -111,22 +127,13 @@ export class GifMenu {
 
         // Update UI
         const updateUI = () => {
-            // Update Displays
-            startDisplay.textContent = formatTime(startTime);
-            endDisplay.textContent = formatTime(endTime);
+            // Update Inputs
+            startInput.value = formatTime(startTime);
+            endInput.value = formatTime(endTime);
 
             // Update Duration
             const gifDuration = Math.max(0, endTime - startTime);
             durationDisplay.textContent = formatTime(gifDuration);
-
-            // Update Slider
-            const startPercent = (startTime / duration) * 100;
-            const endPercent = (endTime / duration) * 100;
-
-            startHandle.style.left = `${startPercent}%`;
-            endHandle.style.left = `${endPercent}%`;
-            timelineRange.style.left = `${startPercent}%`;
-            timelineRange.style.width = `${endPercent - startPercent}%`;
 
             // Update Player Loop Points
             if (player) {
@@ -157,38 +164,63 @@ export class GifMenu {
         // Initialize UI
         updateUI();
 
-        // Slider Drag Logic
-        const handleDrag = (e, isStart) => {
-            const rect = timelineSlider.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const percent = Math.max(0, Math.min(1, x / rect.width));
-            const time = percent * duration;
-
-            if (isStart) {
-                if (time < endTime - 1) startTime = time;
-                if (player) player.seek(startTime);
+        // Input Event Listeners
+        startInput.addEventListener('change', () => {
+            const time = parseTime(startInput.value);
+            if (!isNaN(time)) {
+                startTime = Math.min(Math.max(0, time), duration);
+                if (startTime >= endTime) startTime = Math.max(0, endTime - 1);
+                updateUI();
+                if (player) {
+                    player.seek(startTime);
+                    player.loopStart = startTime;
+                }
             } else {
-                if (time > startTime + 1) endTime = time;
-                if (player) player.seek(endTime);
+                updateUI(); // Reset invalid input
             }
-            updateUI();
-        };
+        });
 
-        const initDrag = (handle, isStart) => {
-            handle.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                const onMouseMove = (e) => handleDrag(e, isStart);
-                const onMouseUp = () => {
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                };
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
-        };
+        endInput.addEventListener('change', () => {
+            const time = parseTime(endInput.value);
+            if (!isNaN(time)) {
+                endTime = Math.min(Math.max(0, time), duration);
+                if (endTime <= startTime) endTime = Math.min(duration, startTime + 1);
+                updateUI();
+                if (player) {
+                    player.seek(endTime);
+                    player.loopEnd = endTime;
+                }
+            } else {
+                updateUI(); // Reset invalid input
+            }
+        });
 
-        initDrag(startHandle, true);
-        initDrag(endHandle, false);
+        // Set Button Listeners
+        setStartBtn.addEventListener('click', () => {
+            if (player) {
+                const currentTime = player.currentTime;
+                startTime = Math.min(Math.max(0, currentTime), duration);
+                if (startTime >= endTime) {
+                    // Adjust end time if start overlaps
+                    endTime = Math.min(duration, startTime + 10);
+                }
+                updateUI();
+                player.loopStart = startTime;
+                player.loopEnd = endTime; // Ensure loop remains valid
+            }
+        });
+
+        setEndBtn.addEventListener('click', () => {
+            if (player) {
+                const currentTime = player.currentTime;
+                // Ensure end time is after start time
+                if (currentTime > startTime) {
+                    endTime = Math.min(Math.max(0, currentTime), duration);
+                    updateUI();
+                    player.loopEnd = endTime;
+                }
+            }
+        });
 
         qualitySlider.addEventListener('input', () => {
             const value = parseInt(qualitySlider.value);
@@ -200,13 +232,13 @@ export class GifMenu {
         createBtn.addEventListener('click', async () => {
             const start = startTime;
             const end = endTime;
-            const fps = parseInt(fpsSelect.value);
-            const sizePreset = sizeSelect.value;
+            const fps = parseInt(fpsDropdown.getValue());
+            const sizePreset = sizeDropdown.getValue();
             const quality = parseInt(qualitySlider.value);
 
             // Disable inputs
-            fpsSelect.disabled = true;
-            sizeSelect.disabled = true;
+            fpsDropdown.setDisabled(true);
+            sizeDropdown.setDisabled(true);
             qualitySlider.disabled = true;
             createBtn.disabled = true;
             modal.closeBtn.disabled = true;
@@ -310,8 +342,8 @@ export class GifMenu {
                 modal.closeBtn.disabled = false;
 
                 // Re-enable  inputs
-                fpsSelect.disabled = false;
-                sizeSelect.disabled = false;
+                fpsDropdown.setDisabled(false);
+                sizeDropdown.setDisabled(false);
                 qualitySlider.disabled = false;
                 createBtn.disabled = false;
 
@@ -322,8 +354,8 @@ export class GifMenu {
                 progressSection.classList.add('hidden');
 
                 // Re-enable inputs
-                fpsSelect.disabled = false;
-                sizeSelect.disabled = false;
+                fpsDropdown.setDisabled(false);
+                sizeDropdown.setDisabled(false);
                 qualitySlider.disabled = false;
                 createBtn.disabled = false;
                 modal.closeBtn.disabled = false;

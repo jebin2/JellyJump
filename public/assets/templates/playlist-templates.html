@@ -978,35 +978,28 @@
 
         <!-- Right Panel: Controls -->
         <div class="modal-controls-panel">
-            <!-- Timeline Slider -->
-            <div class="timeline-slider-container select-none">
-                <label class="text-xs text-secondary font-mono mb-xs block">SELECT RANGE</label>
-                <div class="timeline-slider relative h-12 bg-tertiary rounded cursor-pointer">
-                    <div class="timeline-track absolute inset-0 rounded overflow-hidden"></div>
-                    <div
-                        class="timeline-range absolute top-0 bottom-0 bg-primary opacity-30 pointer-events-none timeline-range-initial">
-                    </div>
-                    <div class="timeline-handle start-handle absolute top-0 bottom-0 w-4 bg-accent cursor-ew-resize z-10 -ml-2 rounded-full border-2 border-white shadow-md timeline-handle-start"
-                        tabindex="0" role="slider" aria-label="Start time"></div>
-                    <div class="timeline-handle end-handle absolute top-0 bottom-0 w-4 bg-accent cursor-ew-resize z-10 -ml-2 rounded-full border-2 border-white shadow-md timeline-handle-end"
-                        tabindex="0" role="slider" aria-label="End time"></div>
+            <!-- Input Fields -->
+            <div class="input-group mb-md">
+                <label class="text-xs text-secondary font-mono mb-xs block">START TIME</label>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="text" id="gif-start-input" class="mb-input font-mono text-center" style="flex: 1;"
+                        placeholder="0:00.000">
+                    <button id="gif-set-start-btn" class="jellyjump-btn-small" style="flex-shrink: 0;">Set</button>
                 </div>
             </div>
 
-            <!-- Time Display -->
-            <div class="time-cards grid gap-sm" style="grid-template-columns: 1fr 1fr 1fr;">
-                <div class="time-card bg-tertiary p-xs rounded text-center">
-                    <span class="text-[10px] text-secondary font-mono block">START</span>
-                    <span class="gif-start-time text-primary font-bold text-sm">00:00:00</span>
+            <div class="input-group mb-md">
+                <label class="text-xs text-secondary font-mono mb-xs block">END TIME</label>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <input type="text" id="gif-end-input" class="mb-input font-mono text-center" style="flex: 1;"
+                        placeholder="0:00.000">
+                    <button id="gif-set-end-btn" class="jellyjump-btn-small" style="flex-shrink: 0;">Set</button>
                 </div>
-                <div class="time-card bg-tertiary p-xs rounded text-center">
-                    <span class="text-[10px] text-secondary font-mono block">DURATION</span>
-                    <span class="gif-duration text-accent font-bold text-sm">00:00:00</span>
-                </div>
-                <div class="time-card bg-tertiary p-xs rounded text-center">
-                    <span class="text-[10px] text-secondary font-mono block">END</span>
-                    <span class="gif-end-time text-primary font-bold text-sm">00:00:00</span>
-                </div>
+            </div>
+
+            <div class="duration-display bg-tertiary p-sm rounded border border-border mt-auto mb-md">
+                <span class="text-xs text-secondary font-mono block mb-xs">DURATION</span>
+                <span class="gif-duration text-accent font-bold text-lg">00:00:00</span>
             </div>
 
             <!-- Validation Error -->
@@ -1019,23 +1012,51 @@
                 <!-- Frame Rate -->
                 <div class="setting-group mb-sm">
                     <label class="text-xs font-bold mb-xs block">Frame Rate</label>
-                    <select class="mb-select w-full" id="gif-fps">
-                        <option value="5">5 FPS (Smallest)</option>
-                        <option value="10">10 FPS (Smooth)</option>
-                        <option value="15" selected>15 FPS (Recommended)</option>
-                        <option value="20">20 FPS (Very smooth)</option>
-                    </select>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full" id="gif-fps-btn" aria-haspopup="true"
+                            aria-expanded="false">
+                            <span>15 FPS (Recommended)</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="gif-fps-menu" role="menu">
+                            <div class="jellyjump-menu-item" data-value="5" role="menuitem">
+                                <span class="menu-label text-sm">5 FPS (Smallest)</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="10" role="menuitem">
+                                <span class="menu-label text-sm">10 FPS (Smooth)</span>
+                            </div>
+                            <div class="jellyjump-menu-item active" data-value="15" role="menuitem">
+                                <span class="menu-label text-sm font-bold">15 FPS (Recommended)</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="20" role="menuitem">
+                                <span class="menu-label text-sm">20 FPS (Very smooth)</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Size -->
                 <div class="setting-group mb-sm">
                     <label class="text-xs font-bold mb-xs block">Size</label>
-                    <select class="mb-select w-full" id="gif-size">
-                        <option value="original">Original Size</option>
-                        <option value="720">720p</option>
-                        <option value="480" selected>480p</option>
-                        <option value="360">360p</option>
-                    </select>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full" id="gif-size-btn" aria-haspopup="true"
+                            aria-expanded="false">
+                            <span>480p</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="gif-size-menu" role="menu">
+                            <div class="jellyjump-menu-item" data-value="original" role="menuitem">
+                                <span class="menu-label text-sm">Original Size</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="720" role="menuitem">
+                                <span class="menu-label text-sm">720p</span>
+                            </div>
+                            <div class="jellyjump-menu-item active" data-value="480" role="menuitem">
+                                <span class="menu-label text-sm font-bold">480p</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="360" role="menuitem">
+                                <span class="menu-label text-sm">360p</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Quality -->
