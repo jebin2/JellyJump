@@ -201,12 +201,20 @@ export class InfoMenu {
                 artist: null,
                 album: null,
                 date: null,
-                comment: null
+                comment: null,
+                genre: null,
+                track: null,
+                encoder: null
             };
+            let coverArtUrl = null;
             let frameCount = 'N/A';
             let audioBitrate = 'N/A';
             let colorSpace = 'N/A';
             let hasHDR = item.videoInfo ? item.videoInfo.hasHDR : false;
+            let videoCodecParam = 'N/A';
+            let audioCodecParam = 'N/A';
+            let videoCanDecode = 'N/A';
+            let audioCanDecode = 'N/A';
 
             // Fetch extended metadata using MediaBunny directly
             try {
@@ -232,6 +240,22 @@ export class InfoMenu {
                         metaTags.album = tags.album || null;
                         metaTags.date = tags.date || null;
                         metaTags.comment = tags.comment || null;
+                        metaTags.genre = tags.genre || null;
+                        metaTags.track = tags.track || null;
+                        metaTags.encoder = tags.encoder || tags.raw?.ENCODER || tags.raw?.encoder || null;
+
+                        // Cover art
+                        if (tags.images && tags.images.length > 0) {
+                            try {
+                                const coverImage = tags.images[0];
+                                if (coverImage.data) {
+                                    const blob = new Blob([coverImage.data], { type: coverImage.mimeType || 'image/jpeg' });
+                                    coverArtUrl = URL.createObjectURL(blob);
+                                }
+                            } catch (e) {
+                                Logger.warn('Failed to extract cover art:', e);
+                            }
+                        }
                     }
 
                     // Get video track extended info
@@ -269,6 +293,21 @@ export class InfoMenu {
                         } catch (e) {
                             // Use cached value
                         }
+
+                        // Codec parameter string
+                        try {
+                            videoCodecParam = await videoTrack.getCodecParameterString() || 'N/A';
+                        } catch (e) {
+                            Logger.warn('Failed to get video codec param:', e);
+                        }
+
+                        // Decode support check
+                        try {
+                            const canDecode = await videoTrack.canDecode();
+                            videoCanDecode = canDecode ? '✅ Supported' : '❌ Not Supported';
+                        } catch (e) {
+                            videoCanDecode = '❓ Unknown';
+                        }
                     }
 
                     // Get audio track extended info
@@ -281,6 +320,21 @@ export class InfoMenu {
                             }
                         } catch (e) {
                             Logger.warn('Failed to compute audio packet stats:', e);
+                        }
+
+                        // Codec parameter string
+                        try {
+                            audioCodecParam = await audioTrack.getCodecParameterString() || 'N/A';
+                        } catch (e) {
+                            Logger.warn('Failed to get audio codec param:', e);
+                        }
+
+                        // Decode support check
+                        try {
+                            const canDecode = await audioTrack.canDecode();
+                            audioCanDecode = canDecode ? '✅ Supported' : '❌ Not Supported';
+                        } catch (e) {
+                            audioCanDecode = '❓ Unknown';
                         }
                     }
                 } finally {
@@ -306,6 +360,10 @@ export class InfoMenu {
                 metaAlbum: metaTags.album || '—',
                 metaDate: metaTags.date || '—',
                 metaComment: metaTags.comment || '—',
+                metaGenre: metaTags.genre || '—',
+                metaTrack: metaTags.track || '—',
+                metaEncoder: metaTags.encoder || '—',
+                coverArt: coverArtUrl,
 
                 // Video from cached data + extended
                 videoCodec: item.videoInfo ? item.videoInfo.codec.toUpperCase() : 'N/A',
@@ -319,6 +377,8 @@ export class InfoMenu {
                 rotation: item.videoInfo ? `${item.videoInfo.rotation}°` : 'N/A',
                 hdr: hasHDR ? 'Yes' : 'No',
                 colorSpace: colorSpace,
+                videoCodecParam: videoCodecParam,
+                videoCanDecode: videoCanDecode,
                 videoTrackCount: videoTrackCount,
 
                 // Audio from cached data + extended
@@ -328,6 +388,8 @@ export class InfoMenu {
                 sampleRate: item.audioInfo ? `${(item.audioInfo.sampleRate / 1000).toFixed(1)} kHz` : 'N/A',
                 audioBitrate: audioBitrate,
                 language: item.audioInfo ? (item.audioInfo.languageCode === 'und' ? 'Undetermined' : item.audioInfo.languageCode) : 'N/A',
+                audioCodecParam: audioCodecParam,
+                audioCanDecode: audioCanDecode,
                 audioTrackCount: audioTrackCount
             };
 
@@ -355,12 +417,12 @@ export class InfoMenu {
             modal.body.dataset.rawInfo = JSON.stringify(metadata);
 
             // Show metadata section if at least one tag exists
-            const hasAnyMeta = metaTags.title || metaTags.artist || metaTags.album || metaTags.date || metaTags.comment;
+            const hasAnyMeta = metaTags.title || metaTags.artist || metaTags.album || metaTags.date || metaTags.comment || metaTags.genre || metaTags.track || metaTags.encoder || coverArtUrl;
             const metaSection = modalContent.querySelector('[data-section="metadata"]');
             if (metaSection && hasAnyMeta) {
                 metaSection.classList.remove('hidden');
                 // Hide individual rows if their value is empty
-                ['metaTitle', 'metaArtist', 'metaAlbum', 'metaDate', 'metaComment'].forEach(key => {
+                ['metaTitle', 'metaArtist', 'metaAlbum', 'metaDate', 'metaComment', 'metaGenre', 'metaTrack', 'metaEncoder'].forEach(key => {
                     const row = metaSection.querySelector(`[data-row="${key}"]`);
                     if (row) {
                         const value = metadata[key];
@@ -369,6 +431,17 @@ export class InfoMenu {
                         }
                     }
                 });
+
+                // Handle cover art display
+                if (coverArtUrl) {
+                    const coverRow = metaSection.querySelector('[data-row="coverArt"]');
+                    const coverImg = metaSection.querySelector('[data-key="coverArt"]');
+                    if (coverRow && coverImg) {
+                        coverRow.classList.remove('hidden');
+                        coverImg.src = coverArtUrl;
+                        coverImg.style.display = 'block';
+                    }
+                }
             }
 
         } catch (e) {
