@@ -735,7 +735,7 @@ export class ScreenRecorderMenu {
     }
 
     static _updateButtonState(isRecording) {
-        const btn = document.getElementById('mb-screen-record');
+        const btn = document.getElementById('mb-tools');
         if (!btn) return;
 
         if (isRecording) {
@@ -750,10 +750,10 @@ export class ScreenRecorderMenu {
             btn.classList.remove('recording-active');
             btn.innerHTML = `
                 <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-record"></use>
+                    <use href="assets/icons/sprite.svg#icon-sliders"></use>
                 </svg>
             `;
-            btn.title = "Record Screen";
+            btn.title = "Tools";
         }
     }
 

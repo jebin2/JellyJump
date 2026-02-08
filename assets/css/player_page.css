@@ -755,6 +755,78 @@
 }
 
 /* -----------------------------------------
+   Tools Modal
+   ----------------------------------------- */
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.tools-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px 16px;
+    background: var(--bg-tertiary);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: var(--text-primary);
+}
+
+.tools-tile:hover {
+    background: rgba(var(--accent-primary-rgb), 0.15);
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.tools-tile:active {
+    transform: translateY(0);
+}
+
+.tools-tile-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(var(--accent-primary-rgb), 0.2);
+    color: var(--accent-primary);
+}
+
+.tools-tile-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.tools-tile:hover .tools-tile-label {
+    color: var(--text-primary);
+}
+
+/* Recording active state for tools button */
+#mb-tools.recording-active {
+    background: var(--error-color, #ff4444);
+    color: white;
+    animation: pulse-recording 1s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* -----------------------------------------
    Accessibility: Reduced Motion
    ----------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
@@ -763,6 +835,10 @@
     }
 
     .sidebar-collapse-btn {
+        transition: none;
+    }
+
+    .tools-tile {
         transition: none;
     }
 }

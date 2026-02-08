@@ -226,16 +226,13 @@ export class Playlist {
         // Attach events
         const addFilesBtn = header.querySelector('#mb-add-files');
         const addFolderBtn = header.querySelector('#mb-add-folder');
-        const screenRecordBtn = header.querySelector('#mb-screen-record');
+        const toolsBtn = header.querySelector('#mb-tools');
         const clearBtn = header.querySelector('#mb-clear-playlist');
         const searchInput = header.querySelector('#mb-playlist-search-input');
         const searchClearBtn = header.querySelector('#mb-playlist-search-clear');
 
-        if (screenRecordBtn) {
-            screenRecordBtn.addEventListener('click', async () => {
-                const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
-                ScreenRecorderMenu.showOptions(this);
-            });
+        if (toolsBtn) {
+            this._setupToolsButton(toolsBtn);
         }
 
         if (searchInput) {
@@ -2290,7 +2287,6 @@ export class Playlist {
 
         const input = modalContent.querySelector('#url-input');
         const addBtn = modalContent.querySelector('.mb-modal-add');
-        const cancelBtn = modalContent.querySelector('.mb-modal-cancel');
         const errorDiv = modalContent.querySelector('.mb-modal-error');
         const loadingDiv = modalContent.querySelector('.mb-modal-loading');
 
@@ -2314,7 +2310,6 @@ export class Playlist {
             // Show loading
             input.disabled = true;
             addBtn.disabled = true;
-            cancelBtn.disabled = true;
             modal.closeBtn.disabled = true;
             loadingDiv.style.display = 'flex';
             errorDiv.style.display = 'none';
@@ -2327,16 +2322,12 @@ export class Playlist {
                 // Show error
                 input.disabled = false;
                 addBtn.disabled = false;
-                cancelBtn.disabled = false;
                 modal.closeBtn.disabled = false;
                 loadingDiv.style.display = 'none';
                 errorDiv.textContent = error.message;
                 errorDiv.style.display = 'block';
             }
         });
-
-        // Handle Close/Cancel
-        cancelBtn.addEventListener('click', () => modal.close());
 
         // Handle Enter key
         input.addEventListener('keydown', (e) => {
@@ -2822,6 +2813,71 @@ export class Playlist {
                 if (menu.parentNode) menu.parentNode.removeChild(menu);
             }, 200); // Wait for transition
         });
+    }
+
+    /**
+     * Setup Tools button and modal
+     * @param {HTMLElement} toolsBtn
+     * @private
+     */
+    _setupToolsButton(toolsBtn) {
+        const showToolsModal = async () => {
+            const { Modal } = await import('./Modal.js');
+
+            const modal = new Modal({ maxWidth: '320px' });
+            modal.setTitle('Tools');
+
+            // Create tools grid content
+            const content = document.createElement('div');
+            content.className = 'tools-grid';
+            content.innerHTML = `
+                <button class="tools-tile" data-action="screen-record" title="Record Screen/Webcam">
+                    <div class="tools-tile-icon">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-record"></use>
+                        </svg>
+                    </div>
+                    <span class="tools-tile-label">Screen Record</span>
+                </button>
+                <button class="tools-tile" data-action="merge" title="Merge Videos">
+                    <div class="tools-tile-icon">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-copy"></use>
+                        </svg>
+                    </div>
+                    <span class="tools-tile-label">Merge Videos</span>
+                </button>
+            `;
+
+            modal.setBody(content);
+            // No footer needed
+
+            // Handle tile clicks
+            content.querySelectorAll('.tools-tile').forEach(tile => {
+                tile.addEventListener('click', async (e) => {
+                    const action = tile.dataset.action;
+                    modal.close();
+
+                    if (action === 'screen-record') {
+                        const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
+                        ScreenRecorderMenu.showOptions(this);
+                    } else if (action === 'merge') {
+                        const { MergeMenu } = await import('./menu/MergeMenu.js');
+                        MergeMenu.init(null, this);
+                    }
+                });
+            });
+
+            modal.open();
+        };
+
+        toolsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showToolsModal();
+        });
+
+        // Store reference for recording state updates
+        this._toolsBtn = toolsBtn;
     }
 
     /**

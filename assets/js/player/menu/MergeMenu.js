@@ -15,8 +15,6 @@ export class MergeMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const initialIndex = playlist.items.indexOf(item);
-
         const contentTemplate = document.getElementById('merge-modal-content-template');
         const footerTemplate = document.getElementById('merge-modal-footer-template');
         const itemTemplate = document.getElementById('merge-item-template');
@@ -105,15 +103,45 @@ export class MergeMenu {
             await detectMaxResolution();
         };
 
+        // Helper: Check if item is a valid video (not a stream/live)
+        const isValidVideo = (item) => {
+            // Exclude streams and live content
+            if (item.isStream || item.isLive) return false;
+            if (item.url && (item.url.includes('.m3u8') || item.url.includes('/hls/'))) return false;
+
+            // Exclude audio files
+            if (item.isAudio) return false;
+
+            // Check by type/mimeType/fileType properties
+            const itemType = item.type || item.mimeType || item.fileType || '';
+            if (itemType.startsWith('video')) return true;  // handles 'video' and 'video/mp4'
+            if (itemType.startsWith('audio')) return false;
+
+            // Check by file extension
+            const filename = item.title || item.path || item.url || '';
+            const videoExtensions = /\.(mp4|webm|mov|avi|mkv|m4v|flv|wmv|ogv)$/i;
+            const audioExtensions = /\.(mp3|wav|flac|aac|ogg|m4a|opus|wma)$/i;
+
+            if (videoExtensions.test(filename)) return true;
+            if (audioExtensions.test(filename)) return false;
+
+            // Check by file object
+            if (item.file && item.file.type) {
+                if (item.file.type.startsWith('video')) return true;
+                if (item.file.type.startsWith('audio')) return false;
+            }
+
+            // If no stream/audio markers and no clear audio extension, assume it's a video
+            // This catches items without type info like remotely loaded videos
+            return true;
+        };
+
         // Helper: Render Available Videos
         const renderAvailable = () => {
             availableList.innerHTML = '';
 
-            // Filter video items only (exclude streams)
-            const videoItems = playlist.items.filter(item => {
-                const isStream = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/hls/')));
-                return (!item.type || item.type.startsWith('video/')) && !isStream;
-            });
+            // Filter video items only (exclude streams/live)
+            const videoItems = playlist.items.filter(isValidVideo);
 
             if (videoItems.length === 0) {
                 availableList.innerHTML = '<div class="empty-state text-center p-md text-muted text-sm italic">No videos available</div>';
@@ -125,8 +153,11 @@ export class MergeMenu {
                 el.querySelector('.remove-item-btn').remove();
 
                 const titleEl = el.querySelector('.item-title');
-                titleEl.textContent = item.title;
-                titleEl.title = item.title;
+                // Show path if item is in a folder, otherwise just title
+                const displayPath = item.path || item.title;
+                const hasFolder = displayPath && displayPath.includes('/');
+                titleEl.textContent = hasFolder ? displayPath : item.title;
+                titleEl.title = displayPath || item.title;
                 el.querySelector('.item-dur').textContent = item.duration || '--:--';
 
                 const isSelected = selectedVideos.includes(item);
@@ -216,22 +247,7 @@ export class MergeMenu {
             });
         };
 
-        // Initial Selection
-        // Initial Selection
-        if (typeof initialIndex === 'number') {
-            const checkAndAdd = (idx) => {
-                const item = playlist.items[idx];
-                if (item) {
-                    const isRestricted = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/hls/')));
-                    if ((!item.type || item.type.startsWith('video/')) && !isRestricted) {
-                        selectedVideos.push(item);
-                    }
-                }
-            }
-
-            checkAndAdd(initialIndex);
-            checkAndAdd(initialIndex + 1);
-        }
+        // No default selection - user must select videos manually
 
         modal.open();
         renderAvailable();
@@ -320,6 +336,10 @@ export class MergeMenu {
 
                 // Add to Playlist
                 if (addToPlaylist) {
+                    const firstSelected = selectedVideos[0];
+                    const basePath = firstSelected?.path || firstSelected?.title || '';
+                    const parentPath = basePath.includes('/') ? basePath.substring(0, basePath.lastIndexOf('/')) : '';
+
                     const newItem = {
                         title: filename,
                         url: url,
@@ -328,7 +348,7 @@ export class MergeMenu {
                         isLocal: true,
                         file: new File([mergedBlob], filename, { type: 'video/mp4' }),
                         id: generateId(),
-                        path: (item.path || item.title) + '/' + filename
+                        path: parentPath ? `${parentPath}/${filename}` : filename
                     };
 
                     const lastIndex = playlist.items.indexOf(selectedVideos[selectedVideos.length - 1]);
