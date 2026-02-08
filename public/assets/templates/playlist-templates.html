@@ -1122,246 +1122,257 @@
         <div class="loading-spinner mb-md"></div>
         <div class="text-secondary">Loading video information...</div>
     </div>
-    <div class="info-modal-content flex flex-col gap-md hidden">
+    <div class="info-modal-content hidden">
         <!-- File Properties -->
         <div class="info-section">
-            <h3 class="text-accent text-sm font-bold uppercase mb-sm border-b border-dark pb-xs">File Properties</h3>
-            <div class="info-grid grid grid-cols-2 gap-x-md gap-y-sm text-sm">
-                <div class="text-secondary">Source</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value truncate max-w-[200px]" data-key="source" title="">Local File</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="source">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-file"></use>
+                </svg>
+                <h3 class="info-section-title">File Properties</h3>
+            </div>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Source</span>
+                    <div class="info-value-group">
+                        <span class="info-value truncate" data-key="source" title="" style="max-width: 220px;">Local
+                            File</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="source">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Filename</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="filename">video.mp4</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="filename">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Filename</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="filename">video.mp4</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="filename">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Format</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="format">MP4</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="format">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Format</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="format">MP4</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="format">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">MIME Type</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="mimeType">video/mp4</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="mimeType">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">MIME Type</span>
+                    <div class="info-value-group">
+                        <span class="info-value font-mono text-xs" data-key="mimeType">video/mp4</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="mimeType">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Size</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="size">12.5 MB</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="size">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Size</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="size">12.5 MB</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="size">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Duration</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="duration">--:--:--</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="duration">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Duration</span>
+                    <div class="info-value-group">
+                        <span class="info-value font-mono" data-key="duration">--:--:--</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="duration">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Video Stream -->
         <div class="info-section">
-            <h3 class="text-accent text-sm font-bold uppercase mb-sm border-b border-dark pb-xs">Video Stream</h3>
-            <div class="info-grid grid grid-cols-2 gap-x-md gap-y-sm text-sm">
-                <div class="text-secondary">Codec</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="videoCodec">H.264</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="videoCodec">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-video"></use>
+                </svg>
+                <h3 class="info-section-title">Video Stream</h3>
+            </div>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Codec</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="videoCodec">H.264</span>
+                        <span class="info-value-sub font-mono text-xs text-muted"
+                            data-key="videoCodecString">avc1.4d401f</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="videoCodec">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Codec String</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="videoCodecString">avc1.4d401f</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="videoCodecString">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Resolution</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="resolution">1920x1080</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="resolution">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Resolution</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="resolution">1920x1080</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="resolution">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Coded Resolution</span>
+                    <div class="info-value-group">
+                        <span class="info-value text-muted" data-key="codedResolution">1920x1088</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="codedResolution">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Coded Resolution</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="codedResolution">1920x1088</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="codedResolution">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Frame Rate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="fps">30 fps</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="fps">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Frame Rate</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="fps">30 fps</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="fps">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Bitrate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="videoBitrate">5.2 Mbps</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="videoBitrate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Bitrate</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="videoBitrate">5.2 Mbps</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="videoBitrate">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Rotation</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="rotation">0°</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="rotation">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Rotation</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="rotation">0°</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="rotation">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="text-secondary">HDR</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="hdr">No</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="hdr">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">HDR</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="hdr">No</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="hdr">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Audio Stream -->
         <div class="info-section">
-            <h3 class="text-accent text-sm font-bold uppercase mb-sm border-b border-dark pb-xs">Audio Stream</h3>
-            <div class="info-grid grid grid-cols-2 gap-x-md gap-y-sm text-sm">
-                <div class="text-secondary">Codec</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="audioCodec">AAC</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="audioCodec">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-headphones"></use>
+                </svg>
+                <h3 class="info-section-title">Audio Stream</h3>
+            </div>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Codec</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="audioCodec">AAC</span>
+                        <span class="info-value-sub font-mono text-xs text-muted"
+                            data-key="audioCodecString">mp4a.40.2</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="audioCodec">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Codec String</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="audioCodecString">mp4a.40.2</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="audioCodecString">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Channels</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="channels">Stereo (2)</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="channels">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Channels</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="channels">Stereo (2)</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="channels">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Sample Rate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="sampleRate">48 kHz</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="sampleRate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-
-                <div class="text-secondary">Sample Rate</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="sampleRate">48 kHz</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="sampleRate">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="text-secondary">Language</div>
-                <div class="text-primary font-bold text-right flex items-center justify-end gap-xs group">
-                    <span class="info-value" data-key="language">English (eng)</span>
-                    <button class="copy-btn btn-icon-small opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copy" data-copy="language">
-                        <svg width="12" height="12" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </button>
+                <div class="info-row">
+                    <span class="info-label">Language</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="language">English (eng)</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="language">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-
     </div>
 </template>
 
 <!-- Info Footer Template -->
 <template id="info-footer-template">
-    <div class="flex justify-end w-full">
-        <button class="btn jellyjump-btn-secondary copy-all-btn flex items-center gap-xs" title="Copy All Info">
-            <svg width="16" height="16" fill="currentColor">
-                <use href="assets/icons/sprite.svg#icon-copy"></use>
-            </svg>
-            <span>Copy All</span>
-        </button>
+    <div class="info-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="info-footer-status flex-1">
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Copied to clipboard</span>
+            </div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <button class="btn jellyjump-btn-small copy-all-btn" title="Copy All Info" aria-label="Copy All Info">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-copy"></use>
+                </svg>
+            </button>
+        </div>
     </div>
 </template>
 

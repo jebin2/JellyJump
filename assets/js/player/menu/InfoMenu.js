@@ -214,6 +214,19 @@ export class InfoMenu {
 
         // Event Listeners
 
+        // Helper to show footer success message
+        const showCopySuccess = (message = 'Copied to clipboard') => {
+            const successEl = modalContent.querySelector('.success-message');
+            if (successEl) {
+                successEl.querySelector('span').textContent = message;
+                successEl.classList.remove('hidden');
+                // Auto-hide after 2 seconds
+                setTimeout(() => {
+                    successEl.classList.add('hidden');
+                }, 2000);
+            }
+        };
+
         // Copy Single Value
         copyBtns.forEach(btn => {
             btn.addEventListener('click', async () => {
@@ -221,7 +234,7 @@ export class InfoMenu {
                 if (value) {
                     try {
                         await navigator.clipboard.writeText(value);
-                        playlist._showToast('Copied to clipboard!');
+                        showCopySuccess('Copied to clipboard');
                     } catch (err) {
                         Logger.error('Failed to copy:', err);
                     }
@@ -260,7 +273,7 @@ Sample Rate: ${metadata.sampleRate}
 Language: ${metadata.language}
 `;
                     await navigator.clipboard.writeText(text);
-                    playlist._showToast('All info copied to clipboard!');
+                    showCopySuccess('All info copied');
                 } catch (err) {
                     Logger.error('Failed to copy all:', err);
                 }

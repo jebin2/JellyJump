@@ -488,8 +488,8 @@
 }
 
 /* Player containers fill available space, can shrink */
-.mb-modal-split .modal-video-panel > .player-container,
-.mb-modal-split .modal-video-panel > [id$="-player-container"] {
+.mb-modal-split .modal-video-panel>.player-container,
+.mb-modal-split .modal-video-panel>[id$="-player-container"] {
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -558,4 +558,116 @@
         grid-row: unset;
         padding: 8px var(--space-md, 16px);
     }
+}
+
+/* ================================
+   INFO MODAL STYLES
+   Styles for the Video Information modal
+   ================================ */
+
+.info-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md, 16px);
+}
+
+.info-section {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm, 4px);
+    padding: var(--space-sm, 8px) var(--space-md, 16px);
+}
+
+.info-section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm, 8px);
+    padding-bottom: var(--space-xs, 4px);
+    margin-bottom: var(--space-sm, 8px);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.info-section-header svg {
+    color: var(--accent-primary);
+    flex-shrink: 0;
+}
+
+.info-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-primary);
+    margin: 0;
+}
+
+.info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-xs, 4px) var(--space-sm, 8px);
+    margin: 0 calc(-1 * var(--space-sm, 8px));
+    border-radius: var(--radius-sm, 4px);
+    transition: background-color 0.15s ease;
+}
+
+.info-row:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.info-label {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    flex-shrink: 0;
+}
+
+.info-value-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs, 4px);
+    justify-content: flex-end;
+}
+
+.info-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.8125rem;
+}
+
+.info-value-sub {
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+}
+
+.info-copy-btn {
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease;
+    background: none;
+    border: none;
+    padding: 4px;
+    margin: -4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.info-row:hover .info-copy-btn,
+.info-value-group:hover .info-copy-btn {
+    opacity: 1;
+}
+
+.info-copy-btn:hover {
+    color: var(--accent-primary);
+}
+
+/* Info Footer */
+.info-footer-container {
+    min-height: 32px;
 }
