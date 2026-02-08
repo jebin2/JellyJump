@@ -1202,6 +1202,73 @@
             </div>
         </div>
 
+        <!-- Metadata Tags (hidden if no metadata) -->
+        <div class="info-section info-section-metadata hidden" data-section="metadata">
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-tag"></use>
+                </svg>
+                <h3 class="info-section-title">Metadata Tags</h3>
+            </div>
+            <div class="info-grid">
+                <div class="info-row" data-row="metaTitle">
+                    <span class="info-label">Title</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaTitle">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaTitle">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaArtist">
+                    <span class="info-label">Artist</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaArtist">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaArtist">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaAlbum">
+                    <span class="info-label">Album</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaAlbum">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaAlbum">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaDate">
+                    <span class="info-label">Date</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaDate">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaDate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaComment">
+                    <span class="info-label">Comment</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaComment">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaComment">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Video Stream -->
         <div class="info-section">
             <div class="info-section-header">
@@ -1209,6 +1276,7 @@
                     <use href="assets/icons/sprite.svg#icon-video"></use>
                 </svg>
                 <h3 class="info-section-title">Video Stream</h3>
+                <span class="info-track-count text-muted text-xs" data-key="videoTrackCount"></span>
             </div>
             <div class="info-grid">
                 <div class="info-row">
@@ -1236,6 +1304,17 @@
                     </div>
                 </div>
                 <div class="info-row">
+                    <span class="info-label">Aspect Ratio</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="aspectRatio">16:9</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="aspectRatio">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
                     <span class="info-label">Coded Resolution</span>
                     <div class="info-value-group">
                         <span class="info-value text-muted" data-key="codedResolution">1920x1088</span>
@@ -1251,6 +1330,17 @@
                     <div class="info-value-group">
                         <span class="info-value" data-key="fps">30 fps</span>
                         <button class="info-copy-btn copy-btn" title="Copy" data-copy="fps">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Frame Count</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="frameCount">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="frameCount">
                             <svg width="12" height="12" fill="currentColor">
                                 <use href="assets/icons/sprite.svg#icon-copy"></use>
                             </svg>
@@ -1290,6 +1380,17 @@
                         </button>
                     </div>
                 </div>
+                <div class="info-row">
+                    <span class="info-label">Color Space</span>
+                    <div class="info-value-group">
+                        <span class="info-value text-muted" data-key="colorSpace">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="colorSpace">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1300,6 +1401,7 @@
                     <use href="assets/icons/sprite.svg#icon-headphones"></use>
                 </svg>
                 <h3 class="info-section-title">Audio Stream</h3>
+                <span class="info-track-count text-muted text-xs" data-key="audioTrackCount"></span>
             </div>
             <div class="info-grid">
                 <div class="info-row">
@@ -1331,6 +1433,17 @@
                     <div class="info-value-group">
                         <span class="info-value" data-key="sampleRate">48 kHz</span>
                         <button class="info-copy-btn copy-btn" title="Copy" data-copy="sampleRate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Bitrate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="audioBitrate">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="audioBitrate">
                             <svg width="12" height="12" fill="currentColor">
                                 <use href="assets/icons/sprite.svg#icon-copy"></use>
                             </svg>

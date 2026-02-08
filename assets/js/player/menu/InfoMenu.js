@@ -1,6 +1,8 @@
 import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaMetadata } from '../../utils/MediaMetadata.js';
 
 /**
  * Info Menu Handler
@@ -61,22 +63,35 @@ export class InfoMenu {
                     size: 'N/A',
                     duration: 'LIVE',
 
+                    // Metadata Tags
+                    metaTitle: 'N/A',
+                    metaArtist: 'N/A',
+                    metaAlbum: 'N/A',
+                    metaDate: 'N/A',
+                    metaComment: 'N/A',
+
                     // Video
                     videoCodec: videoCodec,
                     videoCodecString: 'N/A',
                     resolution: resolution,
+                    aspectRatio: 'N/A',
                     codedResolution: 'N/A',
                     fps: 'N/A',
+                    frameCount: 'N/A',
                     videoBitrate: 'N/A',
                     rotation: 'N/A',
                     hdr: 'N/A',
+                    colorSpace: 'N/A',
+                    videoTrackCount: '',
 
                     // Audio
                     audioCodec: 'N/A',
                     audioCodecString: 'N/A',
                     channels: 'N/A',
                     sampleRate: 'N/A',
-                    language: 'N/A'
+                    audioBitrate: 'N/A',
+                    language: 'N/A',
+                    audioTrackCount: ''
                 };
 
                 // Hide loading, show content
@@ -156,6 +171,127 @@ export class InfoMenu {
             // Determine source text
             const sourceText = item.isLocal ? 'Local File' : (item.url || 'Unknown');
 
+            // Calculate aspect ratio from video dimensions
+            const calculateAspectRatio = (width, height) => {
+                if (!width || !height) return 'N/A';
+                const gcd = (a, b) => b ? gcd(b, a % b) : a;
+                const divisor = gcd(width, height);
+                const ratioW = width / divisor;
+                const ratioH = height / divisor;
+                // Check for common ratios
+                const decimal = width / height;
+                if (Math.abs(decimal - 16 / 9) < 0.01) return '16:9';
+                if (Math.abs(decimal - 4 / 3) < 0.01) return '4:3';
+                if (Math.abs(decimal - 21 / 9) < 0.01) return '21:9';
+                if (Math.abs(decimal - 9 / 16) < 0.01) return '9:16';
+                if (Math.abs(decimal - 1) < 0.01) return '1:1';
+                return `${ratioW}:${ratioH}`;
+            };
+
+            const aspectRatio = item.videoInfo ?
+                calculateAspectRatio(item.videoInfo.width, item.videoInfo.height) : 'N/A';
+
+            // Get track counts
+            const videoTrackCount = item.videoTracks ? `(${item.videoTracks.length} track${item.videoTracks.length !== 1 ? 's' : ''})` : '';
+            const audioTrackCount = item.audioTracks ? `(${item.audioTracks.length} track${item.audioTracks.length !== 1 ? 's' : ''})` : '';
+
+            // Extended metadata: initialize defaults
+            let metaTags = {
+                title: null,
+                artist: null,
+                album: null,
+                date: null,
+                comment: null
+            };
+            let frameCount = 'N/A';
+            let audioBitrate = 'N/A';
+            let colorSpace = 'N/A';
+            let hasHDR = item.videoInfo ? item.videoInfo.hasHDR : false;
+
+            // Fetch extended metadata using MediaBunny directly
+            try {
+                const blobUrl = await MediaMetadata.getProcessedSourceURL(item);
+                let inputSource;
+                if (typeof blobUrl === 'string') {
+                    inputSource = new MediaBunny.UrlSource(blobUrl);
+                } else {
+                    inputSource = new MediaBunny.BlobSource(blobUrl);
+                }
+
+                const input = new MediaBunny.Input({
+                    source: inputSource,
+                    formats: MediaBunny.ALL_FORMATS
+                });
+
+                try {
+                    // Get metadata tags
+                    const tags = await input.getMetadataTags();
+                    if (tags) {
+                        metaTags.title = tags.title || null;
+                        metaTags.artist = tags.artist || null;
+                        metaTags.album = tags.album || null;
+                        metaTags.date = tags.date || null;
+                        metaTags.comment = tags.comment || null;
+                    }
+
+                    // Get video track extended info
+                    const videoTrack = await input.getPrimaryVideoTrack();
+                    if (videoTrack) {
+                        // Frame count and color space from packet stats scan
+                        try {
+                            const stats = await videoTrack.computePacketStats();
+                            if (stats && stats.packetCount) {
+                                frameCount = stats.packetCount.toLocaleString();
+                            }
+                        } catch (e) {
+                            Logger.warn('Failed to compute video packet stats:', e);
+                        }
+
+                        // Color space
+                        try {
+                            const cs = await videoTrack.getColorSpace();
+                            if (cs) {
+                                const parts = [];
+                                if (cs.primaries) parts.push(cs.primaries);
+                                if (cs.matrix) parts.push(cs.matrix);
+                                if (cs.transfer) parts.push(cs.transfer);
+                                if (parts.length > 0) {
+                                    colorSpace = parts.join(' / ');
+                                }
+                            }
+                        } catch (e) {
+                            Logger.warn('Failed to get color space:', e);
+                        }
+
+                        // HDR check (potentially more accurate than cached)
+                        try {
+                            hasHDR = await videoTrack.hasHighDynamicRange();
+                        } catch (e) {
+                            // Use cached value
+                        }
+                    }
+
+                    // Get audio track extended info
+                    const audioTrack = await input.getPrimaryAudioTrack();
+                    if (audioTrack) {
+                        try {
+                            const audioStats = await audioTrack.computePacketStats();
+                            if (audioStats && audioStats.averageBitrate) {
+                                audioBitrate = `${Math.round(audioStats.averageBitrate / 1000)} kbps`;
+                            }
+                        } catch (e) {
+                            Logger.warn('Failed to compute audio packet stats:', e);
+                        }
+                    }
+                } finally {
+                    if (input && typeof input.dispose === 'function') {
+                        try { input.dispose(); } catch (e) { /* ignore */ }
+                    }
+                }
+            } catch (e) {
+                Logger.warn('Failed to fetch extended metadata:', e);
+            }
+
             const metadata = {
                 source: sourceText,
                 filename: item.title,
@@ -164,22 +300,35 @@ export class InfoMenu {
                 size: fileSize,
                 duration: item.duration || 'Unknown',
 
-                // Video from cached data
+                // Metadata Tags
+                metaTitle: metaTags.title || '—',
+                metaArtist: metaTags.artist || '—',
+                metaAlbum: metaTags.album || '—',
+                metaDate: metaTags.date || '—',
+                metaComment: metaTags.comment || '—',
+
+                // Video from cached data + extended
                 videoCodec: item.videoInfo ? item.videoInfo.codec.toUpperCase() : 'N/A',
                 videoCodecString: item.videoInfo ? item.videoInfo.codec : 'N/A',
                 resolution: item.videoInfo ? `${item.videoInfo.width}x${item.videoInfo.height}` : 'N/A',
+                aspectRatio: aspectRatio,
                 codedResolution: item.videoInfo ? `${item.videoInfo.codedWidth}x${item.videoInfo.codedHeight}` : 'N/A',
                 fps: fps,
+                frameCount: frameCount,
                 videoBitrate: bitrate,
                 rotation: item.videoInfo ? `${item.videoInfo.rotation}°` : 'N/A',
-                hdr: item.videoInfo ? (item.videoInfo.hasHDR ? 'Yes' : 'No') : 'N/A',
+                hdr: hasHDR ? 'Yes' : 'No',
+                colorSpace: colorSpace,
+                videoTrackCount: videoTrackCount,
 
-                // Audio from cached data
+                // Audio from cached data + extended
                 audioCodec: item.audioInfo ? item.audioInfo.codec.toUpperCase() : 'N/A',
                 audioCodecString: item.audioInfo ? item.audioInfo.codec : 'N/A',
                 channels: item.audioInfo ? (item.audioInfo.channels === 2 ? 'Stereo (2)' : `${item.audioInfo.channels} Channels`) : 'N/A',
                 sampleRate: item.audioInfo ? `${(item.audioInfo.sampleRate / 1000).toFixed(1)} kHz` : 'N/A',
-                language: item.audioInfo ? (item.audioInfo.languageCode === 'und' ? 'Undetermined' : item.audioInfo.languageCode) : 'N/A'
+                audioBitrate: audioBitrate,
+                language: item.audioInfo ? (item.audioInfo.languageCode === 'und' ? 'Undetermined' : item.audioInfo.languageCode) : 'N/A',
+                audioTrackCount: audioTrackCount
             };
 
             // Hide loading, show content
@@ -204,6 +353,23 @@ export class InfoMenu {
 
             // Store raw metadata for "Copy All"
             modal.body.dataset.rawInfo = JSON.stringify(metadata);
+
+            // Show metadata section if at least one tag exists
+            const hasAnyMeta = metaTags.title || metaTags.artist || metaTags.album || metaTags.date || metaTags.comment;
+            const metaSection = modalContent.querySelector('[data-section="metadata"]');
+            if (metaSection && hasAnyMeta) {
+                metaSection.classList.remove('hidden');
+                // Hide individual rows if their value is empty
+                ['metaTitle', 'metaArtist', 'metaAlbum', 'metaDate', 'metaComment'].forEach(key => {
+                    const row = metaSection.querySelector(`[data-row="${key}"]`);
+                    if (row) {
+                        const value = metadata[key];
+                        if (!value || value === '—') {
+                            row.classList.add('hidden');
+                        }
+                    }
+                });
+            }
 
         } catch (e) {
             Logger.error('Failed to load video info:', e);
@@ -264,13 +430,26 @@ Frame Rate: ${metadata.fps}
 Bitrate: ${metadata.videoBitrate}
 Rotation: ${metadata.rotation}
 HDR: ${metadata.hdr}
+Color Space: ${metadata.colorSpace}
+Frame Count: ${metadata.frameCount}
+${metadata.videoTrackCount ? `Tracks: ${metadata.videoTrackCount}` : ''}
+${metadata.metaTitle && metadata.metaTitle !== '—' ? `
+Metadata Tags
+-------------
+Title: ${metadata.metaTitle}
+Artist: ${metadata.metaArtist}
+Album: ${metadata.metaAlbum}
+Date: ${metadata.metaDate}
+Comment: ${metadata.metaComment}` : ''}
 
 Audio Stream
 ------------
 Codec: ${metadata.audioCodec} (${metadata.audioCodecString})
 Channels: ${metadata.channels}
 Sample Rate: ${metadata.sampleRate}
+Bitrate: ${metadata.audioBitrate}
 Language: ${metadata.language}
+${metadata.audioTrackCount ? `Tracks: ${metadata.audioTrackCount}` : ''}
 `;
                     await navigator.clipboard.writeText(text);
                     showCopySuccess('All info copied');
