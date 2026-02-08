@@ -147,25 +147,41 @@
             <button class="jellyjump-close-btn" aria-label="Close Loop Panel">×</button>
         </div>
         <div class="loop-panel-content">
-            <div class="loop-status">Mode: <span id="mb-loop-status">Off</span></div>
-            <div class="loop-inputs">
-                <div class="input-group">
-                    <label for="mb-loop-start">Start (A)</label>
-                    <div class="input-row">
-                        <input type="text" id="mb-loop-start" placeholder="M:SS.000" class="jellyjump-input">
-                        <button class="jellyjump-btn-small" id="mb-set-a-btn">Set</button>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label for="mb-loop-end">End (B)</label>
-                    <div class="input-row">
-                        <input type="text" id="mb-loop-end" placeholder="M:SS.000" class="jellyjump-input">
-                        <button class="jellyjump-btn-small" id="mb-set-b-btn">Set</button>
-                    </div>
-                </div>
+            <div class="loop-mode-options">
+                <label class="loop-radio-option">
+                    <input type="radio" name="loop-mode" value="off" checked>
+                    <span class="radio-label">Off</span>
+                </label>
+                <label class="loop-radio-option">
+                    <input type="radio" name="loop-mode" value="one">
+                    <span class="radio-label">Current Video</span>
+                </label>
+                <label class="loop-radio-option">
+                    <input type="radio" name="loop-mode" value="playlist">
+                    <span class="radio-label">Playlist</span>
+                </label>
             </div>
-            <div class="loop-actions">
-                <button class="jellyjump-btn-text" id="mb-clear-loop-btn">Clear Markers</button>
+            <div class="loop-ab-section" style="display: none;">
+                <div class="loop-ab-header">A-B Loop Region</div>
+                <div class="loop-inputs">
+                    <div class="input-group">
+                        <label for="mb-loop-start">Start (A)</label>
+                        <div class="input-row">
+                            <input type="text" id="mb-loop-start" placeholder="0:00.000" class="jellyjump-input">
+                            <button class="jellyjump-btn-small" id="mb-set-a-btn">Set</button>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="mb-loop-end">End (B)</label>
+                        <div class="input-row">
+                            <input type="text" id="mb-loop-end" placeholder="0:00.000" class="jellyjump-input">
+                            <button class="jellyjump-btn-small" id="mb-set-b-btn">Set</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="loop-actions">
+                    <button class="jellyjump-btn-text" id="mb-clear-loop-btn">Clear A-B</button>
+                </div>
             </div>
         </div>
     </div>

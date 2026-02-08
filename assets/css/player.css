@@ -648,15 +648,77 @@ button:focus-visible {
     color: var(--text-primary);
 }
 
-.loop-status {
+.loop-mode-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin-bottom: 15px;
-    color: var(--text-secondary);
-    font-size: 12px;
 }
 
-.loop-status span {
-    color: var(--text-primary);
+.loop-radio-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.loop-radio-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.loop-radio-option input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-secondary);
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.loop-radio-option input[type="radio"]:checked {
+    border-color: var(--accent-primary);
+}
+
+.loop-radio-option input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+}
+
+.loop-radio-option .radio-label {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.loop-radio-option:has(input:checked) .radio-label {
+    color: var(--accent-primary);
     font-weight: bold;
+}
+
+.loop-ab-section {
+    border-top: 1px solid var(--border-dark);
+    padding-top: 12px;
+    margin-top: 5px;
+}
+
+.loop-ab-header {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .input-group {

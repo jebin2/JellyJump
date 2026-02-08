@@ -590,7 +590,8 @@ export class CorePlayer {
             this.ui.loopPanel = this.container.querySelector('.jellyjump-loop-panel');
             this.ui.loopStartInput = this.container.querySelector('#mb-loop-start');
             this.ui.loopEndInput = this.container.querySelector('#mb-loop-end');
-            this.ui.loopStatus = this.container.querySelector('#mb-loop-status');
+            this.ui.loopModeRadios = this.container.querySelectorAll('input[name="loop-mode"]');
+            this.ui.loopAbSection = this.container.querySelector('.loop-ab-section');
             this.ui.setABtn = this.container.querySelector('#mb-set-a-btn');
             this.ui.setBBtn = this.container.querySelector('#mb-set-b-btn');
             this.ui.clearLoopBtn = this.container.querySelector('#mb-clear-loop-btn');
@@ -879,43 +880,43 @@ export class CorePlayer {
 
         // Loop Control (only if loop enabled)
         if (this.config.controls.loop) {
-            this.toggleLoopMode();
-            this.ui.loopBtn.addEventListener('click', () => {
-                if (this.loopMode === 'off') {
-                    this.loopMode = 'one';
-                } else if (this.loopMode === 'one') {
-                    this.loopMode = 'playlist';
-                } else {
-                    this.loopMode = 'off';
-                }
-                this._updateLoopUI();
-            });
-            // Context menu to open loop panel
-            this.ui.loopBtn.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                this.toggleLoopPanel();
-            });
+            this._updateLoopUI();
+
+            // Click to toggle loop panel
+            this.ui.loopBtn.addEventListener('click', () => this.toggleLoopPanel());
 
             // Loop Panel Events
             this.ui.closeLoopPanelBtn.addEventListener('click', () => this.toggleLoopPanel());
+
+            // Radio button mode selection
+            this.ui.loopModeRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    this.loopMode = e.target.value;
+                    // Show A-B section only for 'one' mode
+                    if (this.ui.loopAbSection) {
+                        this.ui.loopAbSection.style.display = this.loopMode === 'one' ? 'block' : 'none';
+                    }
+                    this._updateLoopUI();
+                });
+            });
+
+            // A-B Loop Events
             this.ui.setABtn.addEventListener('click', () => this.setLoopStart());
             this.ui.setBBtn.addEventListener('click', () => this.setLoopEnd());
             this.ui.clearLoopBtn.addEventListener('click', () => this.clearLoopMarkers());
 
             this.ui.loopStartInput.addEventListener('change', (e) => {
                 const time = parseTime(e.target.value);
-                if (time !== null) {
+                if (time !== null && this.loopMode === 'one') {
                     this.loopStart = time;
-                    this.loopMode = 'ab';
                     this._updateLoopUI();
                 }
             });
 
             this.ui.loopEndInput.addEventListener('change', (e) => {
                 const time = parseTime(e.target.value);
-                if (time !== null) {
+                if (time !== null && this.loopMode === 'one') {
                     this.loopEnd = time;
-                    this.loopMode = 'ab';
                     this._updateLoopUI();
                 }
             });
@@ -1252,7 +1253,10 @@ export class CorePlayer {
         if (this.loopEnd !== null && this.loopStart >= this.loopEnd) {
             this.loopEnd = null; // Reset end if start is after it
         }
-        this.loopMode = 'ab'; // Auto-enable A-B mode
+        // Keep in 'one' mode (A-B is a feature within Current Video mode)
+        if (this.loopMode !== 'one') {
+            this.loopMode = 'one';
+        }
         this._updateLoopUI();
         Logger.log('Loop Start set:', this.loopStart);
     }
@@ -1267,7 +1271,10 @@ export class CorePlayer {
             return;
         }
         this.loopEnd = this.currentTime;
-        this.loopMode = 'ab'; // Auto-enable A-B mode
+        // Keep in 'one' mode (A-B is a feature within Current Video mode)
+        if (this.loopMode !== 'one') {
+            this.loopMode = 'one';
+        }
         this._updateLoopUI();
         Logger.log('Loop End set:', this.loopEnd);
     }
@@ -1289,37 +1296,48 @@ export class CorePlayer {
     }
 
     _updateLoopUI() {
-        // Update Button
+        // Update Button Icon & Color
         const btn = this.ui.loopBtn;
         const use = btn.querySelector('use');
-        let statusText = 'Off';
+        const hasAbLoop = this.loopStart !== null && this.loopEnd !== null;
 
         if (this.loopMode === 'off') {
             btn.style.color = '';
             btn.setAttribute('aria-label', 'Loop Mode: Off');
             use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop');
-            statusText = 'Off';
         } else if (this.loopMode === 'playlist') {
             btn.style.color = 'var(--accent-primary)';
             btn.setAttribute('aria-label', 'Loop Mode: Playlist');
             use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-playlist');
-            statusText = 'Playlist';
         } else if (this.loopMode === 'one') {
             btn.style.color = 'var(--accent-primary)';
-            btn.setAttribute('aria-label', 'Loop Mode: One');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-one');
-            statusText = 'Current Video';
-        } else if (this.loopMode === 'ab') {
-            btn.style.color = 'var(--accent-primary)';
-            btn.setAttribute('aria-label', 'Loop Mode: A-B');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-ab');
-            statusText = 'A-B Loop';
+            // Show A-B icon if A-B markers are set, otherwise show loop-one
+            if (hasAbLoop) {
+                btn.setAttribute('aria-label', 'Loop Mode: A-B');
+                use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-ab');
+            } else {
+                btn.setAttribute('aria-label', 'Loop Mode: One');
+                use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-one');
+            }
         }
 
-        // Update Panel
-        if (this.ui.loopStatus) {
-            this.ui.loopStatus.textContent = statusText;
+        // Update Radio Buttons
+        if (this.ui.loopModeRadios) {
+            this.ui.loopModeRadios.forEach(radio => {
+                radio.checked = radio.value === this.loopMode;
+            });
+        }
+
+        // Show/Hide A-B Section
+        if (this.ui.loopAbSection) {
+            this.ui.loopAbSection.style.display = this.loopMode === 'one' ? 'block' : 'none';
+        }
+
+        // Update A-B Inputs
+        if (this.ui.loopStartInput) {
             this.ui.loopStartInput.value = this.loopStart !== null ? formatTime(this.loopStart) : '';
+        }
+        if (this.ui.loopEndInput) {
             this.ui.loopEndInput.value = this.loopEnd !== null ? formatTime(this.loopEnd) : '';
         }
 
@@ -3904,8 +3922,8 @@ export class CorePlayer {
                     }
                 }
 
-                // Check Loop A-B
-                if (this.loopMode === 'ab' && this.loopStart !== null && this.loopEnd !== null) {
+                // Check Loop A-B (within Current Video mode)
+                if (this.loopMode === 'one' && this.loopStart !== null && this.loopEnd !== null) {
                     if (playbackTime >= this.loopEnd) {
                         this._seekTo(this.loopStart);
                         return;
