@@ -99,7 +99,7 @@ export class ScreenRecorderMenu {
 
         // Attach Checkbox Listeners
         preferTabCheckbox.addEventListener('change', updateVisibility);
-        enableFacecamCheckbox.addEventListener('change', updateVisibility);
+        // Note: enableFacecamCheckbox listener is added below with camera permission check
 
         // Mic Selector Elements (Screen tab)
         const captureAudioCheckbox = modalOverlay.querySelector('#capture-audio');
@@ -111,26 +111,49 @@ export class ScreenRecorderMenu {
         const webcamMicSelectorContainer = modalOverlay.querySelector('#webcam-mic-selector-container');
         const webcamMicDeviceSelect = modalOverlay.querySelector('#webcam-mic-device-select');
 
-        // Helper to populate mic dropdown
-        const populateMicDropdown = async (selectElement) => {
+        // Helper to check mic permission and populate dropdown
+        const checkMicPermission = async (selectElement, selectorContainer, checkbox) => {
             try {
-                await navigator.mediaDevices.getUserMedia({ audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Stop the stream immediately - we just needed permission
+                stream.getTracks().forEach(track => track.stop());
+
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const audioInputs = devices.filter(d => d.kind === 'audioinput');
 
                 selectElement.innerHTML = audioInputs.map(d =>
                     `<option value="${d.deviceId}">${d.label || 'Microphone ' + (audioInputs.indexOf(d) + 1)}</option>`
                 ).join('');
+                selectorContainer.style.display = 'block';
+                return true;
             } catch (err) {
-                selectElement.innerHTML = '<option value="">Mic access denied</option>';
+                // Uncheck the checkbox since permission was denied
+                if (checkbox) checkbox.checked = false;
+                selectorContainer.style.display = 'none';
+                alert('Microphone access denied. Please allow microphone access in your browser settings and try again.');
+                return false;
+            }
+        };
+
+        // Helper to check camera permission
+        const checkCameraPermission = async (checkbox) => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // Stop the stream immediately - we just needed permission
+                stream.getTracks().forEach(track => track.stop());
+                return true;
+            } catch (err) {
+                // Uncheck the checkbox since permission was denied
+                if (checkbox) checkbox.checked = false;
+                alert('Camera access denied. Please allow camera access in your browser settings and try again.');
+                return false;
             }
         };
 
         // Screen tab mic checkbox logic
         captureAudioCheckbox.addEventListener('change', async () => {
             if (captureAudioCheckbox.checked) {
-                micSelectorContainer.style.display = 'block';
-                await populateMicDropdown(micDeviceSelect);
+                await checkMicPermission(micDeviceSelect, micSelectorContainer, captureAudioCheckbox);
             } else {
                 micSelectorContainer.style.display = 'none';
             }
@@ -140,13 +163,27 @@ export class ScreenRecorderMenu {
         if (webcamCaptureAudioCheckbox) {
             webcamCaptureAudioCheckbox.addEventListener('change', async () => {
                 if (webcamCaptureAudioCheckbox.checked) {
-                    webcamMicSelectorContainer.style.display = 'block';
-                    await populateMicDropdown(webcamMicDeviceSelect);
+                    await checkMicPermission(webcamMicDeviceSelect, webcamMicSelectorContainer, webcamCaptureAudioCheckbox);
                 } else {
                     webcamMicSelectorContainer.style.display = 'none';
                 }
             });
         }
+
+        // Facecam checkbox - request camera permission immediately
+        enableFacecamCheckbox.addEventListener('change', async () => {
+            if (enableFacecamCheckbox.checked) {
+                // Uncheck immediately while requesting permission
+                enableFacecamCheckbox.checked = false;
+                const hasPermission = await checkCameraPermission(null); // Don't pass checkbox since we handle it manually
+                if (hasPermission) {
+                    enableFacecamCheckbox.checked = true;
+                    updateVisibility();
+                }
+            } else {
+                updateVisibility();
+            }
+        });
 
         // Initial State
         preferTabCheckbox.checked = false;
