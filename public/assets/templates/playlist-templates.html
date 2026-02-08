@@ -1936,3 +1936,75 @@
         </div>
     </div>
 </template>
+
+<!-- Rotate Content Template -->
+<template id="rotate-content-template">
+    <!-- Left Panel: Video Preview -->
+    <div class="modal-video-panel">
+        <!-- Built dynamically by BoxEditorUtils.setupEditor() -->
+    </div>
+
+    <!-- Right Panel: Rotate Controls -->
+    <div class="modal-controls-panel" style="overflow: hidden;">
+        <div class="rotate-controls flex flex-col gap-md p-md">
+            <!-- Rotation -->
+            <div class="control-group">
+                <label class="text-xs text-secondary font-mono mb-sm block">ROTATION</label>
+                <div class="flex gap-sm">
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="rotate-left" title="Rotate Left (-90°)">
+                        <svg width="24" height="24" fill="currentColor" style="transform: scaleX(-1);">
+                            <use href="assets/icons/sprite.svg#icon-rotate-cw"></use>
+                        </svg>
+                        <span class="text-xs">-90°</span>
+                    </button>
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="rotate-right" title="Rotate Right (+90°)">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-rotate-cw"></use>
+                        </svg>
+                        <span class="text-xs">+90°</span>
+                    </button>
+                </div>
+                <div class="text-center mt-sm">
+                    <span class="text-xs text-secondary">Current: </span>
+                    <span class="rotation-value text-sm font-bold text-primary">0°</span>
+                </div>
+            </div>
+
+            <div class="w-full h-px bg-border my-sm"></div>
+
+            <!-- Flip -->
+            <div class="control-group">
+                <label class="text-xs text-secondary font-mono mb-sm block">FLIP</label>
+                <div class="flex gap-sm">
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="flip-h" title="Flip Horizontal">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-flip-h"></use>
+                        </svg>
+                        <span class="text-xs">Horizontal</span>
+                    </button>
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="flip-v" title="Flip Vertical">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-flip-v"></use>
+                        </svg>
+                        <span class="text-xs">Vertical</span>
+                    </button>
+                </div>
+                <div class="text-center mt-sm">
+                    <span class="text-xs text-secondary">State: </span>
+                    <span class="flip-value text-sm font-bold text-primary">None</span>
+                </div>
+            </div>
+
+            <div class="w-full h-px bg-border my-sm"></div>
+
+            <!-- Reset -->
+            <button class="jellyjump-btn-secondary w-full py-sm" data-action="reset">
+                Reset All
+            </button>
+        </div>
+    </div>
+</template>

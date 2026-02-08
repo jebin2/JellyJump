@@ -55,7 +55,7 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, crop = null, removeBackgroundOptions = null, watermark = null, blur = null, onProgress }) {
+    static async process({ source, format = 'mp4', quality = 'high', resolution = null, trim = null, crop = null, removeBackgroundOptions = null, watermark = null, blur = null, rotate = 0, flip = null, onProgress }) {
         Logger.log('[MediaProcessor] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions, watermark, blur });
 
         let conversion = null;
@@ -110,13 +110,14 @@ export class MediaProcessor {
 
             const originalWidth = videoTrack.displayWidth || videoTrack.codedWidth;
             const originalHeight = videoTrack.displayHeight || videoTrack.codedHeight;
+            const nativeRotation = videoTrack.rotation || 0;
 
             // Get original bitrate to make quality settings "respective to video"
             let originalBitrate = 0;
             try {
                 const stats = await videoTrack.computePacketStats(50);
                 originalBitrate = stats.averageBitrate;
-                Logger.log(`[MediaProcessor] Source analysis: ${originalWidth}x${originalHeight}, ${(originalBitrate / 1000000).toFixed(2)} Mbps`);
+                Logger.log(`[MediaProcessor] Source analysis: ${originalWidth}x${originalHeight} (Rot: ${nativeRotation}°), ${(originalBitrate / 1000000).toFixed(2)} Mbps`);
             } catch (e) {
                 Logger.warn('[MediaProcessor] Could not compute original bitrate, using resolution-based defaults.');
             }
@@ -151,11 +152,6 @@ export class MediaProcessor {
             });
 
             // Configure Video Options
-            // Only set codec/bitrate when the user explicitly wants lower quality (e.g. convert).
-            // For full-quality ops: leave unset so MediaBunny uses QUALITY_HIGH (quality-based
-            // encoding) which is visually superior to a fixed bitrate target.
-            // Crop/resize/process callback already force transcoding when present.
-            // (MediaBunny docs: "If bitrate is set, transcoding will always happen")
             const needsBitrateControl = (typeof quality === 'number' && quality < 100) ||
                 (typeof quality === 'string' && quality !== 'high');
             const videoConfig = {};
@@ -165,11 +161,21 @@ export class MediaProcessor {
                 videoConfig.bitrate = this._getBitrate(quality, originalWidth * originalHeight, originalBitrate);
             }
 
-            // Resolution
+            // Resolution / Rotation dimensions
+            // Only set codec/bitrate when the user explicitly wants lower quality (e.g. convert).
+            // For full-quality ops: leave unset so MediaBunny uses QUALITY_HIGH (quality-based
+            // encoding) which is visually superior to a fixed bitrate target.
+            // Crop/resize/process callback already force transcoding when present.
+            // (MediaBunny docs: "If bitrate is set, transcoding will always happen")
             if (resolution) {
                 videoConfig.width = resolution.width;
                 videoConfig.height = resolution.height;
-                videoConfig.fit = 'fill'; // Use fill as requested
+                videoConfig.fit = 'fill';
+            } else if (rotate && Math.abs(rotate) % 180 === 90) {
+                // If user rotates 90/270, swap the current display dimensions
+                videoConfig.width = originalHeight;
+                videoConfig.height = originalWidth;
+                videoConfig.fit = 'fill';
             }
 
             // Crop
@@ -184,7 +190,8 @@ export class MediaProcessor {
 
             // Only attach a process callback when frame manipulation is needed.
             // Without it, MediaBunny can stream-copy video data for lossless trim/remux.
-            if (removeBackgroundOptions || watermarkItems || blur) {
+            const needsRotation = rotate || flip || nativeRotation !== 0;
+            if (removeBackgroundOptions || watermarkItems || blur || needsRotation) {
                 const useOffscreen = typeof OffscreenCanvas !== 'undefined';
                 let canvas = null;
                 let ctx = null;
@@ -193,20 +200,58 @@ export class MediaProcessor {
                     const width = sample.codedWidth;
                     const height = sample.codedHeight;
 
-                    if (!canvas || canvas.width !== width || canvas.height !== height) {
+                    // When rotation/flip is active, use configured output dimensions.
+                    // Otherwise use coded dimensions to preserve existing behavior.
+                    const outputWidth = needsRotation ? (videoConfig.width || width) : width;
+                    const outputHeight = needsRotation ? (videoConfig.height || height) : height;
+
+                    if (!canvas || canvas.width !== outputWidth || canvas.height !== outputHeight) {
                         if (useOffscreen) {
-                            canvas = new OffscreenCanvas(width, height);
+                            canvas = new OffscreenCanvas(outputWidth, outputHeight);
                         } else {
                             canvas = document.createElement('canvas');
-                            canvas.width = width;
-                            canvas.height = height;
+                            canvas.width = outputWidth;
+                            canvas.height = outputHeight;
                         }
                         ctx = canvas.getContext('2d', { willReadFrequently: true });
                     }
 
-                    // Draw frame
-                    ctx.clearRect(0, 0, width, height);
-                    sample.draw(ctx, 0, 0, width, height);
+                    ctx.clearRect(0, 0, outputWidth, outputHeight);
+
+                    if (needsRotation) {
+                        // Apply rotation/flip transforms
+                        ctx.save();
+                        ctx.translate(outputWidth / 2, outputHeight / 2);
+
+                        if (rotate) {
+                            ctx.rotate((rotate * Math.PI) / 180);
+                        }
+
+                        if (flip) {
+                            ctx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
+                        }
+
+                        if (nativeRotation) {
+                            ctx.rotate((nativeRotation * Math.PI) / 180);
+                        }
+
+                        // Draw raw video centered — swap draw dims if native rotation is 90/270
+                        let drawWidth, drawHeight;
+                        if (Math.abs(nativeRotation) % 180 === 90) {
+                            drawWidth = originalHeight;
+                            drawHeight = originalWidth;
+                        } else {
+                            drawWidth = originalWidth;
+                            drawHeight = originalHeight;
+                        }
+
+                        sample.draw(ctx, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                        ctx.restore();
+                    } else {
+                        // No rotation — draw frame directly (preserves existing behavior)
+                        ctx.clearRect(0, 0, width, height);
+                        sample.draw(ctx, 0, 0, width, height);
+                    }
 
                     // --- 1. Background Removal ---
                     if (removeBackgroundOptions) {

@@ -2681,6 +2681,7 @@ export class Playlist {
             { action: 'reverse', icon: 'icon-speed', label: 'Speed' },
             { action: 'remove-bg', icon: 'icon-eyedropper', label: 'Remove BG' },
             { action: 'watermark', icon: 'icon-watermark', label: 'Watermark' },
+            { action: 'rotate', icon: 'icon-rotate-cw', label: 'Rotate' },
             { action: 'blur', icon: 'icon-blur', label: 'Blur' },
             { action: 'detect-cuts', icon: 'icon-scenes', label: 'Scenes' },
             { action: 'detect-motion', icon: 'icon-motion', label: 'Motion' },

@@ -94,5 +94,10 @@ export const FOOTER_CONFIGS = {
         actionClass: 'wm-process-btn',
         icon: 'icon-droplet',
         title: 'Add Watermark'
+    },
+    rotate: {
+        actionClass: 'rotate-process-btn',
+        icon: 'icon-rotate-cw',
+        title: 'Apply Rotation'
     }
 };
