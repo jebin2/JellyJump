@@ -2677,13 +2677,13 @@ export class Playlist {
             { action: 'trim', icon: 'icon-scissors', label: 'Cut' },
             { action: 'resize', icon: 'icon-maximize', label: 'Resize' },
             { action: 'crop', icon: 'icon-crop', label: 'Crop' },
-            { action: 'create-gif', icon: 'icon-camera', label: 'GIF' },
-            { action: 'reverse', icon: 'icon-sliders', label: 'Speed' },
+            { action: 'create-gif', icon: 'icon-gif', label: 'GIF' },
+            { action: 'reverse', icon: 'icon-speed', label: 'Speed' },
             { action: 'remove-bg', icon: 'icon-eyedropper', label: 'Remove BG' },
-            { action: 'watermark', icon: 'icon-target', label: 'Watermark' },
-            { action: 'blur', icon: 'icon-equalizer', label: 'Blur' },
-            { action: 'detect-cuts', icon: 'icon-scissors', label: 'Scenes' },
-            { action: 'detect-motion', icon: 'icon-target', label: 'Motion' },
+            { action: 'watermark', icon: 'icon-watermark', label: 'Watermark' },
+            { action: 'blur', icon: 'icon-blur', label: 'Blur' },
+            { action: 'detect-cuts', icon: 'icon-scenes', label: 'Scenes' },
+            { action: 'detect-motion', icon: 'icon-motion', label: 'Motion' },
             { action: 'info', icon: 'icon-info', label: 'Info' }
         ];
 
