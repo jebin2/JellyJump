@@ -75,17 +75,38 @@ export class CustomDropdown {
                     left = window.innerWidth - menuWidth - 10;
                 }
 
+                // Temporarily show menu to measure its height
+                menu.style.visibility = 'hidden';
+                menu.style.display = 'flex';
+                const menuHeight = menu.offsetHeight;
+                menu.style.display = '';
+                menu.style.visibility = '';
+
+                // Calculate available space above and below
+                const spaceBelow = window.innerHeight - rect.bottom - 20;
+                const spaceAbove = rect.top - 20;
+
+                // Decide direction: open upward if more space above OR not enough space below
+                const openUpward = spaceAbove > spaceBelow || (menuHeight > spaceBelow && menuHeight <= spaceAbove);
+
                 menu.style.position = 'fixed';
-                menu.style.top = `${rect.bottom + 4}px`;
                 menu.style.left = `${left}px`;
                 menu.style.width = `${menuWidth}px`;
                 menu.style.zIndex = '21000'; // Above modal (20000)
-                menu.style.bottom = 'auto'; // Force pop down
-                menu.style.right = 'auto';
 
-                // Calculate max height based on available space below
-                const availableHeight = window.innerHeight - rect.bottom - 20;
-                menu.style.maxHeight = `${Math.max(150, availableHeight)}px`;
+                if (openUpward) {
+                    // Position above the button
+                    menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+                    menu.style.top = 'auto';
+                    menu.style.maxHeight = `${Math.max(150, spaceAbove)}px`;
+                } else {
+                    // Position below the button
+                    menu.style.top = `${rect.bottom + 4}px`;
+                    menu.style.bottom = 'auto';
+                    menu.style.maxHeight = `${Math.max(150, spaceBelow)}px`;
+                }
+
+                menu.style.right = 'auto';
                 menu.style.overflowY = 'auto';
 
                 menu.classList.add('visible');

@@ -65,41 +65,20 @@
                     <div class="jellyjump-menu" id="mb-audio-menu" role="menu"></div>
                 </div>
 
-                <!-- Subtitle Menu -->
-                <div class="jellyjump-menu-btn control--hidden" data-control="captions">
-                    <button class="jellyjump-btn" id="mb-cc-btn" aria-label="Subtitles" aria-haspopup="true"
-                        aria-expanded="false">
-                        <svg width="24" height="24" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-cc"></use>
-                        </svg>
-                    </button>
-                    <div class="jellyjump-menu" id="mb-cc-menu" role="menu">
-                        <div class="jellyjump-menu-item active" data-value="off" role="menuitem" tabindex="0">Off</div>
-                        <div class="jellyjump-menu-item" id="mb-upload-cc" role="menuitem" tabindex="0">
-                            <span>Upload Subtitle</span>
-                            <input type="file" id="mb-cc-input" accept=".vtt,.srt,.txt" style="display: none;">
-                        </div>
-                    </div>
-                </div>
+                <!-- Subtitle Button -->
+                <button class="jellyjump-btn control--hidden" id="mb-cc-btn" aria-label="Subtitles"
+                    data-control="captions" title="Subtitles">
+                    <svg width="24" height="24" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-cc"></use>
+                    </svg>
+                </button>
 
-                <!-- Speed Menu -->
-                <div class="jellyjump-menu-btn control--hidden" id="mb-speed-container" data-control="speed">
-                    <button class="jellyjump-btn" id="mb-speed-btn" aria-label="Playback Speed" aria-haspopup="true"
-                        aria-expanded="false"
-                        style="font-size: 0.8rem; font-weight: bold; width: auto; padding: 0 8px;">
-                        1x
-                    </button>
-                    <div class="jellyjump-menu" id="mb-speed-menu" role="menu">
-                        <div class="jellyjump-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x</div>
-                        <div class="jellyjump-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x</div>
-                        <div class="jellyjump-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
-                        <div class="jellyjump-menu-item" data-value="1" role="menuitem" tabindex="0">1x</div>
-                        <div class="jellyjump-menu-item" data-value="1.25" role="menuitem" tabindex="0">1.25x</div>
-                        <div class="jellyjump-menu-item" data-value="1.5" role="menuitem" tabindex="0">1.5x</div>
-                        <div class="jellyjump-menu-item" data-value="1.75" role="menuitem" tabindex="0">1.75x</div>
-                        <div class="jellyjump-menu-item" data-value="2" role="menuitem" tabindex="0">2x</div>
-                    </div>
-                </div>
+                <!-- Speed Button -->
+                <button class="jellyjump-btn control--hidden" id="mb-speed-btn" aria-label="Playback Speed"
+                    data-control="speed" title="Playback Speed"
+                    style="font-size: 0.8rem; font-weight: bold; width: auto; padding: 0 8px;">
+                    1x
+                </button>
 
                 <button class="jellyjump-btn control--hidden" id="mb-filters-btn" aria-label="Video Filters"
                     data-control="filters" title="Video Filters">
@@ -236,14 +215,68 @@
     </div>
 </template>
 
+<!-- Speed Panel Template -->
+<template id="player-speed-panel-template">
+    <div class="jellyjump-panel jellyjump-speed-panel" style="display: none;">
+        <div class="jellyjump-panel-header">
+            <span>Speed</span>
+            <button class="jellyjump-close-btn" aria-label="Close">×</button>
+        </div>
+        <div class="jellyjump-panel-content">
+            <div class="speed-slider-group">
+                <div class="speed-slider-header">
+                    <span>Playback Speed</span>
+                    <span class="speed-value" id="mb-speed-value">1.0x</span>
+                </div>
+                <input type="range" id="mb-speed-slider" min="0.25" max="2" step="0.25" value="1" class="speed-slider">
+                <div class="speed-slider-labels">
+                    <span>0.25x</span>
+                    <span>2x</span>
+                </div>
+            </div>
+            <div class="speed-actions">
+                <button class="jellyjump-btn-text" id="mb-reset-speed-btn">Reset to 1x</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Subtitle Panel Template -->
+<template id="player-subtitle-panel-template">
+    <div class="jellyjump-panel jellyjump-subtitle-panel" style="display: none;">
+        <div class="jellyjump-panel-header">
+            <span>Subtitles</span>
+            <button class="jellyjump-close-btn" aria-label="Close">×</button>
+        </div>
+        <div class="jellyjump-panel-content">
+            <div class="subtitle-options">
+                <label class="subtitle-radio-option">
+                    <input type="radio" name="subtitle-track" value="off" checked>
+                    <span class="radio-label">Off</span>
+                </label>
+                <!-- Dynamic subtitle tracks will be added here -->
+            </div>
+            <div class="subtitle-actions">
+                <label class="subtitle-upload-btn">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-plus"></use>
+                    </svg>
+                    <span>Upload Subtitle</span>
+                    <input type="file" id="mb-cc-input" accept=".vtt,.srt,.txt" style="display: none;">
+                </label>
+            </div>
+        </div>
+    </div>
+</template>
+
 <!-- Audio/EQ Panel Template -->
 <template id="player-audio-panel-template">
-    <div class="jellyjump-eq-panel" style="display: none;">
-        <div class="eq-panel-header">
+    <div class="jellyjump-panel jellyjump-eq-panel" style="display: none;">
+        <div class="jellyjump-panel-header">
             <span>Audio Settings</span>
             <button class="jellyjump-close-btn" aria-label="Close Audio Panel">×</button>
         </div>
-        <div class="eq-panel-content">
+        <div class="jellyjump-panel-content">
             <!-- Volume Control Section -->
             <div class="audio-volume-section">
                 <div class="volume-row">

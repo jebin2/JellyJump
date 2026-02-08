@@ -17,7 +17,6 @@ import { formatTime, parseTime } from '../utils/mediaUtils.js';
 import { AudioVisualizer } from '../player/AudioVisualizer.js';
 import { Logger } from '../utils/Logger.js';
 import { ThumbnailGenerator } from '../player/ThumbnailGenerator.js';
-import { CustomDropdown } from '../utils/CustomDropdown.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -181,12 +180,18 @@ export class CorePlayer {
             fullscreenBtn: null,
             loader: null,
             ccBtn: null,
-            ccMenu: null,
-            ccMenu: null,
+            ccPanel: null,
+            ccInput: null,
+            closeCcPanelBtn: null,
+            subtitleOptions: null,
             audioBtn: null,
             audioMenu: null,
             speedBtn: null,
-            speedMenu: null,
+            speedPanel: null,
+            speedSlider: null,
+            speedValue: null,
+            resetSpeedBtn: null,
+            closeSpeedPanelBtn: null,
             loopBtn: null,
             loopMarkerA: null,
             loopMarkerB: null,
@@ -569,17 +574,35 @@ export class CorePlayer {
         }
 
         if (this.config.controls.captions) {
+            // Clone subtitle panel template
+            const subtitlePanelTemplate = document.getElementById('player-subtitle-panel-template');
+            if (subtitlePanelTemplate) {
+                this.container.appendChild(subtitlePanelTemplate.content.cloneNode(true));
+            }
+
             this.ui.ccBtn = this.container.querySelector('#mb-cc-btn');
-            this.ui.ccMenu = this.container.querySelector('#mb-cc-menu');
+            this.ui.ccPanel = this.container.querySelector('.jellyjump-subtitle-panel');
             this.ui.ccInput = this.container.querySelector('#mb-cc-input');
+            this.ui.closeCcPanelBtn = this.container.querySelector('.jellyjump-subtitle-panel .jellyjump-close-btn');
+            this.ui.subtitleOptions = this.container.querySelector('.subtitle-options');
             this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
             this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
             this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
         }
 
         if (this.config.controls.speed) {
+            // Clone speed panel template
+            const speedPanelTemplate = document.getElementById('player-speed-panel-template');
+            if (speedPanelTemplate) {
+                this.container.appendChild(speedPanelTemplate.content.cloneNode(true));
+            }
+
             this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
-            this.ui.speedMenu = this.container.querySelector('#mb-speed-menu');
+            this.ui.speedPanel = this.container.querySelector('.jellyjump-speed-panel');
+            this.ui.speedSlider = this.container.querySelector('#mb-speed-slider');
+            this.ui.speedValue = this.container.querySelector('#mb-speed-value');
+            this.ui.resetSpeedBtn = this.container.querySelector('#mb-reset-speed-btn');
+            this.ui.closeSpeedPanelBtn = this.container.querySelector('.jellyjump-speed-panel .jellyjump-close-btn');
         }
 
         if (this.config.controls.loop) {
@@ -806,36 +829,30 @@ export class CorePlayer {
         }
 
         // Subtitles (only if captions enabled)
-        if (this.config.controls.captions && this.ui.ccBtn) {
-            this.ui.ccBtn.addEventListener('click', () => {
-                this.ui.ccMenu.classList.toggle('visible');
-                this.ui.ccBtn.setAttribute('aria-expanded', this.ui.ccMenu.classList.contains('visible'));
-            });
+        if (this.config.controls.captions && this.ui.ccBtn && this.ui.ccPanel) {
+            // Toggle subtitle panel
+            this.ui.ccBtn.addEventListener('click', () => this.toggleSubtitlePanel());
+            this.ui.closeCcPanelBtn.addEventListener('click', () => this.toggleSubtitlePanel());
 
-            this.ui.ccMenu.addEventListener('click', (e) => {
-                const item = e.target.closest('.jellyjump-menu-item');
-                if (!item) return;
-
-                if (item.id === 'mb-upload-cc') {
-                    this.ui.ccInput.click();
-                } else {
-                    const value = item.dataset.value;
+            // Radio button selection
+            this.ui.subtitleOptions.addEventListener('change', (e) => {
+                if (e.target.type === 'radio') {
+                    const value = e.target.value;
                     if (value === 'off') {
                         this.isSubtitlesEnabled = false;
                     } else {
-                        // Handle track selection if multiple tracks supported
+                        this._switchSubtitleTrack(value);
                     }
                     this._updateSubtitleMenu();
-                    this.ui.ccMenu.classList.remove('visible');
                 }
             });
 
+            // File upload
             this.ui.ccInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const url = URL.createObjectURL(file);
                     this.loadSubtitle(url);
-                    this.ui.ccMenu.classList.remove('visible');
                 }
             });
 
@@ -855,16 +872,33 @@ export class CorePlayer {
             });
         }
 
-        // Speed (only if enabled)
-        if (this.config.controls.speed && this.ui.speedBtn) {
-            CustomDropdown.init({
-                button: this.ui.speedBtn,
-                menu: this.ui.speedMenu,
-                initialValue: String(this.playbackRate),
-                onChange: (value) => {
-                    this.setPlaybackRate(parseFloat(value));
-                }
+        // Speed Panel (only if enabled)
+        if (this.config.controls.speed && this.ui.speedBtn && this.ui.speedPanel) {
+            // Toggle speed panel
+            this.ui.speedBtn.addEventListener('click', () => this.toggleSpeedPanel());
+            this.ui.closeSpeedPanelBtn.addEventListener('click', () => this.toggleSpeedPanel());
+
+            // Speed slider
+            this.ui.speedSlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.ui.speedValue.textContent = `${value.toFixed(2)}x`;
             });
+
+            this.ui.speedSlider.addEventListener('change', (e) => {
+                const value = parseFloat(e.target.value);
+                this.setPlaybackRate(value);
+            });
+
+            // Reset speed button
+            this.ui.resetSpeedBtn.addEventListener('click', () => {
+                this.setPlaybackRate(1);
+                this.ui.speedSlider.value = 1;
+                this.ui.speedValue.textContent = '1.00x';
+            });
+
+            // Initialize slider with current speed
+            this.ui.speedSlider.value = this.playbackRate;
+            this.ui.speedValue.textContent = `${this.playbackRate.toFixed(2)}x`;
         }
 
         // Fullscreen Change Events (only if fullscreen enabled)
@@ -1069,15 +1103,18 @@ export class CorePlayer {
     }
 
     _handleDocumentClick(e) {
-        // Only check elements that exist
-        if (this.ui.ccBtn && this.ui.ccMenu && !this.ui.ccBtn.contains(e.target) && !this.ui.ccMenu.contains(e.target)) {
-            this.ui.ccMenu.classList.remove('visible');
+        // Hide subtitle panel when clicking outside
+        if (this.ui.ccPanel && this.ui.ccBtn &&
+            !this.ui.ccBtn.contains(e.target) && !this.ui.ccPanel.contains(e.target)) {
+            this.ui.ccPanel.style.display = 'none';
         }
         if (this.ui.audioBtn && this.ui.audioMenu && !this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
             this.ui.audioMenu.classList.remove('visible');
         }
-        if (this.ui.speedBtn && this.ui.speedMenu && !this.ui.speedBtn.contains(e.target) && !this.ui.speedMenu.contains(e.target)) {
-            this.ui.speedMenu.classList.remove('visible');
+        // Hide speed panel when clicking outside
+        if (this.ui.speedPanel && this.ui.speedBtn &&
+            !this.ui.speedBtn.contains(e.target) && !this.ui.speedPanel.contains(e.target)) {
+            this.ui.speedPanel.style.display = 'none';
         }
         // Hide filter panel when clicking outside
         if (this.ui.filterPanel && this.ui.filtersBtn &&
@@ -1089,27 +1126,31 @@ export class CorePlayer {
             !this.ui.audioSettingsBtn.contains(e.target) && !this.ui.audioPanel.contains(e.target)) {
             this.ui.audioPanel.style.display = 'none';
         }
+        // Hide Loop panel when clicking outside
+        if (this.ui.loopPanel && this.ui.loopBtn &&
+            !this.ui.loopBtn.contains(e.target) && !this.ui.loopPanel.contains(e.target)) {
+            this.ui.loopPanel.style.display = 'none';
+        }
     }
 
     _updateSpeedMenu() {
         // Skip if speed control is disabled
-        if (!this.ui.speedMenu || !this.ui.speedBtn) return;
+        if (!this.ui.speedBtn) return;
 
-        const items = this.ui.speedMenu.querySelectorAll('.jellyjump-menu-item');
-        items.forEach(item => {
-            const speed = parseFloat(item.dataset.value);
-            if (speed === this.playbackRate) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
-
+        // Update button text
         this.ui.speedBtn.textContent = this.playbackRate === 1 ? '1x' : `${this.playbackRate}x`;
         if (this.playbackRate !== 1) {
             this.ui.speedBtn.style.color = 'var(--accent-primary)';
         } else {
             this.ui.speedBtn.style.color = '';
+        }
+
+        // Update slider and value display if panel exists
+        if (this.ui.speedSlider) {
+            this.ui.speedSlider.value = this.playbackRate;
+        }
+        if (this.ui.speedValue) {
+            this.ui.speedValue.textContent = `${this.playbackRate.toFixed(2)}x`;
         }
     }
 
@@ -1145,6 +1186,32 @@ export class CorePlayer {
         this.ui.filterPanel.style.display = isVisible ? 'none' : 'block';
         if (!isVisible) {
             this._syncFilterSliders(); // Ensure sliders match current state
+        }
+    }
+
+    /**
+     * Toggle speed panel visibility
+     */
+    toggleSpeedPanel() {
+        if (!this.ui.speedPanel) return;
+        const isVisible = this.ui.speedPanel.style.display !== 'none';
+        this.ui.speedPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            // Sync slider with current speed
+            this.ui.speedSlider.value = this.playbackRate;
+            this.ui.speedValue.textContent = `${this.playbackRate.toFixed(2)}x`;
+        }
+    }
+
+    /**
+     * Toggle subtitle panel visibility
+     */
+    toggleSubtitlePanel() {
+        if (!this.ui.ccPanel) return;
+        const isVisible = this.ui.ccPanel.style.display !== 'none';
+        this.ui.ccPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            this._updateSubtitleMenu();
         }
     }
 
@@ -1400,49 +1467,33 @@ export class CorePlayer {
 
     _updateSubtitleMenu() {
         // Skip if captions control is disabled
-        if (!this.ui.ccMenu || !this.ui.ccBtn) return;
+        if (!this.ui.subtitleOptions || !this.ui.ccBtn) return;
 
-        // Remove old custom track items (keep Off and Upload)
-        const oldCustomItems = this.ui.ccMenu.querySelectorAll('[data-value^="custom-"]');
-        oldCustomItems.forEach(item => item.remove());
+        // Remove old custom track radio options (keep Off)
+        const oldCustomOptions = this.ui.subtitleOptions.querySelectorAll('[data-track-id]');
+        oldCustomOptions.forEach(item => item.remove());
 
-        // Clear active states
-        this.ui.ccMenu.querySelectorAll('.jellyjump-menu-item').forEach(item => {
-            item.classList.remove('active');
-        });
-
-        // Add menu items for each subtitle track
-        const uploadItem = this.ui.ccMenu.querySelector('#mb-upload-cc');
+        // Add radio options for each subtitle track
         this.subtitleTracks.forEach(track => {
-            const trackItem = document.createElement('div');
-            trackItem.className = 'jellyjump-menu-item';
-            trackItem.setAttribute('data-value', track.id);
-            trackItem.setAttribute('role', 'menuitem');
-            trackItem.setAttribute('tabindex', '0');
-            trackItem.textContent = track.name;
-
-            // Insert before upload button
-            if (uploadItem) {
-                this.ui.ccMenu.insertBefore(trackItem, uploadItem);
-            } else {
-                this.ui.ccMenu.appendChild(trackItem);
-            }
-
-            // Add click handler
-            trackItem.addEventListener('click', () => {
-                this._switchSubtitleTrack(track.id);
-                this.ui.ccMenu.classList.remove('visible');
-            });
+            const label = document.createElement('label');
+            label.className = 'subtitle-radio-option';
+            label.setAttribute('data-track-id', track.id);
+            label.innerHTML = `
+                <input type="radio" name="subtitle-track" value="${track.id}">
+                <span class="radio-label">${track.name}</span>
+            `;
+            this.ui.subtitleOptions.appendChild(label);
         });
 
-        // Update active states
+        // Update radio button states
+        const offRadio = this.ui.subtitleOptions.querySelector('input[value="off"]');
         if (!this.isSubtitlesEnabled) {
-            this.ui.ccMenu.querySelector('[data-value="off"]').classList.add('active');
+            if (offRadio) offRadio.checked = true;
             this.ui.ccBtn.classList.remove('active');
         } else {
-            const activeItem = this.ui.ccMenu.querySelector(`[data-value="${this.activeSubtitleTrackId}"]`);
-            if (activeItem) {
-                activeItem.classList.add('active');
+            const activeRadio = this.ui.subtitleOptions.querySelector(`input[value="${this.activeSubtitleTrackId}"]`);
+            if (activeRadio) {
+                activeRadio.checked = true;
             }
             this.ui.ccBtn.classList.add('active');
         }
