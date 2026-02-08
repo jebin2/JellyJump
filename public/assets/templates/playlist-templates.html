@@ -152,35 +152,7 @@
 </template>
 
 <!-- Conversion Footer Template -->
-<template id="conversion-footer-template">
-    <div class="conversion-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="conversion-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
-                </div>
-                <span class="progress-status text-sm font-mono">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm"></div>
-            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
-        </div>
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small convert-btn" title="Convert" aria-label="Convert">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-convert"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
+
 
 <!-- Folder Header Template -->
 <template id="playlist-folder-header-template">
@@ -354,41 +326,7 @@
 </template>
 
 <!-- Trim Footer Template -->
-<template id="trim-footer-template">
-    <div class="trim-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="trim-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Added to playlist</span>
-            </div>
-        </div>
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small trim-btn" title="Trim" aria-label="Trim">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-scissors"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
+
 
 <!-- Track Management Modal Template -->
 <template id="track-management-modal-template">
@@ -678,41 +616,7 @@
 </template>
 
 <!-- Resize Footer Template -->
-<template id="resize-footer-template">
-    <div class="resize-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="resize-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Added to playlist</span>
-            </div>
-        </div>
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-maximize"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
+
 
 <!-- Crop Content Template -->
 <template id="crop-content-template">
@@ -772,41 +676,7 @@
 </template>
 
 <!-- Crop Footer Template -->
-<template id="crop-footer-template">
-    <div class="crop-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="crop-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Added to playlist</span>
-            </div>
-        </div>
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small crop-btn" title="Crop" aria-label="Crop">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-crop"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
+
 
 <!-- Merge Modal Content Template -->
 <template id="merge-modal-content-template">
@@ -952,41 +822,7 @@
     </div>
 </template>
 
-<template id="resize-footer-template">
-    <div class="resize-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="resize-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Added to playlist</span>
-            </div>
-        </div>
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small resize-btn" title="Resize" aria-label="Resize">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-maximize"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
+
 
 <!-- GIF Creation Content Template -->
 <template id="gif-content-template">
@@ -1118,41 +954,7 @@
 </template>
 
 <!-- GIF Footer Template -->
-<template id="gif-footer-template">
-    <div class="gif-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="gif-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Added to playlist</span>
-            </div>
-        </div>
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download GIF"
-                aria-label="Download GIF" download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small create-gif-btn" title="Create GIF" aria-label="Create GIF">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-gif"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
+
 
 <template id="info-content-template">
     <div class="info-loading flex flex-col items-center justify-center py-xl">
@@ -1680,43 +1482,7 @@
 </template>
 
 <!-- Reverse Footer Template -->
-<template id="reverse-footer-template">
-    <div class="reverse-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="reverse-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Success!</span>
-            </div>
-        </div>
 
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-
-            <button class="btn jellyjump-btn-small reverse-btn" title="Start" aria-label="Start">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-speed"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
 
 <!-- Remove Background Content Template -->
 <template id="remove-bg-content-template">
@@ -1775,42 +1541,7 @@
 </template>
 
 <!-- Remove Background Footer Template -->
-<template id="remove-bg-footer-template">
-    <div class="remove-bg-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="remove-bg-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Added to playlist</span>
-            </div>
-        </div>
 
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small process-btn" title="Process Video">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-eyedropper"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
 
 <!-- Color Item Template -->
 <template id="color-item-template">
@@ -1855,42 +1586,7 @@
 <!-- Speed Menu Templates -->
 
 
-<template id="speed-footer-template">
-    <div class="speed-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="speed-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Success!</span>
-            </div>
-        </div>
 
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small speed-process-btn" title="Change Speed" aria-label="Change Speed">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-speed"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
 
 <!-- Watermark Content Template -->
 <template id="watermark-content-template">
@@ -1916,42 +1612,7 @@
 </template>
 
 <!-- Watermark Footer Template -->
-<template id="watermark-footer-template">
-    <div class="watermark-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="watermark-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Watermark added!</span>
-            </div>
-        </div>
 
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small wm-process-btn" title="Apply Watermark" aria-label="Apply Watermark">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-watermark"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
 
 <!-- Watermark Item Template -->
 <template id="watermark-item-template">
@@ -2078,42 +1739,7 @@
 </template>
 
 <!-- Blur Footer Template -->
-<template id="blur-footer-template">
-    <div class="blur-footer-container flex-between items-center w-full gap-md">
-        <!-- Status Area (Left) -->
-        <div class="blur-footer-status flex-1">
-            <div class="progress-section hidden flex items-center gap-sm">
-                <div
-                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
-                </div>
-                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
-                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
-            </div>
-            <div class="error-message hidden text-danger text-sm font-bold"></div>
-            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
-                <svg width="14" height="14" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-check"></use>
-                </svg>
-                <span>Blur applied!</span>
-            </div>
-        </div>
 
-        <!-- Action Buttons (Right) -->
-        <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
-                download>
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-download"></use>
-                </svg>
-            </a>
-            <button class="btn jellyjump-btn-small process-btn" title="Process Blur" aria-label="Process Blur">
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-blur"></use>
-                </svg>
-            </button>
-        </div>
-    </div>
-</template>
 
 <!-- Blur Item Template -->
 <template id="blur-item-template">
