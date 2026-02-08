@@ -61,6 +61,14 @@ export class CutDetectionMenu {
         const successMessage = modalContent.querySelector('.success-message');
         const errorMessage = modalContent.querySelector('.error-message');
 
+        // Update Detect Button Icon (Scenes)
+        if (detectBtn) {
+            const useEl = detectBtn.querySelector('use');
+            if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-scenes');
+            detectBtn.title = "Detect Scenes";
+            detectBtn.setAttribute('aria-label', "Detect Scenes");
+        }
+
         targetFilename.textContent = item.title;
 
         // Show sensitivity section (hidden by default), hide status area
@@ -78,7 +86,7 @@ export class CutDetectionMenu {
             if (isDetecting) return;
             isDetecting = true;
             detectBtn.disabled = true;
-            detectBtn.textContent = 'Detecting...';
+            // detectBtn.textContent = 'Detecting...'; // Don't change icon button text
 
             const sensitivity = parseInt(sensitivitySlider.value);
             Logger.log('CutDetectionMenu: Starting detection with sensitivity', sensitivity);
@@ -100,7 +108,7 @@ export class CutDetectionMenu {
 
             isDetecting = false;
             detectBtn.disabled = false;
-            detectBtn.textContent = 'Re-detect';
+            // detectBtn.textContent = 'Detect Scenes'; 
             progressSection.classList.add('hidden');
         });
 
@@ -200,11 +208,12 @@ export class CutDetectionMenu {
                             <span class="text-xs text-muted font-mono">${startStr} - ${endStr} (${durationStr})</span>
                         </div>
                         <div class="flex gap-sm items-center">
-                            <button class="add-segment-btn btn jellyjump-btn-primary text-xs px-sm py-xs" 
+                            <button class="add-segment-btn btn jellyjump-btn-small flex items-center justify-center p-sm" 
                                 data-start="${seg.start}" 
                                 data-end="${seg.end}" 
-                                data-index="${seg.index}">
-                                Add Clip
+                                data-index="${seg.index}"
+                                title="Add Clip">
+                                <svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-plus"></use></svg>
                             </button>
                         </div>
                     </div>`;
@@ -306,7 +315,10 @@ export class CutDetectionMenu {
         this.playlist.addItem(newItem);
 
         // Feedback
-        btn.textContent = '✓ Added';
-        btn.classList.add('bg-success', 'border-success');
+        const useEl = btn.querySelector('use');
+        if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-check');
+        btn.classList.add('text-success');
+        btn.classList.remove('jellyjump-btn-small'); // Optional: remove style if needed, or keep for checkmark
+        btn.title = "Added";
     }
 }

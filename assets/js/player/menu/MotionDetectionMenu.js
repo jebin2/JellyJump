@@ -66,7 +66,12 @@ export class MotionDetectionMenu {
         // Show sensitivity section, hide status area initially
         if (sensitivitySection) sensitivitySection.classList.remove('hidden');
         if (statusArea) statusArea.classList.add('hidden');
-        if (detectBtn) detectBtn.textContent = 'Detect Motion';
+        if (detectBtn) {
+            const useEl = detectBtn.querySelector('use');
+            if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-motion');
+            detectBtn.title = "Detect Motion";
+            detectBtn.setAttribute('aria-label', "Detect Motion");
+        }
 
         // Sensitivity slider labels (for motion: High=more sensitive, Low=less)
         const sensitivityLabels = { 1: 'High', 2: 'Medium', 3: 'Low' };
@@ -77,12 +82,11 @@ export class MotionDetectionMenu {
             sensitivityValue.textContent = sensitivityLabels[sensitivitySlider.value];
         });
 
-        // Detect button click
         detectBtn.addEventListener('click', async () => {
             if (isDetecting) return;
             isDetecting = true;
             detectBtn.disabled = true;
-            detectBtn.textContent = '...';
+            // detectBtn.textContent = '...';
 
             const sensitivity = parseInt(sensitivitySlider.value);
             const threshold = sensitivityToThreshold[sensitivity];
@@ -101,7 +105,7 @@ export class MotionDetectionMenu {
 
             isDetecting = false;
             detectBtn.disabled = false;
-            detectBtn.textContent = 'Re-detect';
+            // detectBtn.textContent = 'Re-detect';
             progressSection.classList.add('hidden');
         });
 
@@ -154,12 +158,15 @@ export class MotionDetectionMenu {
                             </div>
                         </div>
                         <div class="flex gap-sm items-center">
-                            <button class="add-segment-btn btn jellyjump-btn-primary text-xs px-sm py-xs" 
+                        <div class="flex gap-sm items-center">
+                            <button class="add-segment-btn btn jellyjump-btn-small flex items-center justify-center p-sm" 
                                 data-start="${seg.start}" 
                                 data-end="${seg.end}" 
-                                data-index="${idx + 1}">
-                                Add Clip
+                                data-index="${idx + 1}"
+                                title="Add Clip">
+                                <svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-plus"></use></svg>
                             </button>
+                        </div>
                         </div>
                     </div>`;
                 }).join('');
@@ -259,7 +266,10 @@ export class MotionDetectionMenu {
         this.playlist.addItem(newItem);
 
         // Feedback
-        btn.textContent = '✓ Added';
-        btn.classList.add('bg-success', 'border-success');
+        const useEl = btn.querySelector('use');
+        if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-check');
+        btn.classList.add('text-success');
+        btn.classList.remove('jellyjump-btn-small');
+        btn.title = "Added";
     }
 }
