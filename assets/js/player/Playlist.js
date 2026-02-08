@@ -2670,26 +2670,26 @@ export class Playlist {
         const displayTitle = item.title.length > 30 ? item.title.substring(0, 30) + '...' : item.title;
         modal.setTitle(`Tools: ${displayTitle}`);
 
-        // Define menu items
+        // Define menu items with SVG icons
         const videoTools = [
-            { action: 'convert', icon: '🔄', label: 'Convert' },
-            { action: 'download-manage', icon: '🎬', label: 'Tracks' },
-            { action: 'trim', icon: '✂️', label: 'Cut' },
-            { action: 'resize', icon: '📐', label: 'Resize' },
-            { action: 'crop', icon: '🖼️', label: 'Crop' },
-            { action: 'create-gif', icon: '🎞️', label: 'GIF' },
-            { action: 'reverse', icon: '⏪', label: 'Speed' },
-            { action: 'remove-bg', icon: '🎨', label: 'Remove BG' },
-            { action: 'watermark', icon: '💧', label: 'Watermark' },
-            { action: 'blur', icon: '🔲', label: 'Blur' },
-            { action: 'detect-cuts', icon: '🎬', label: 'Scenes' },
-            { action: 'detect-motion', icon: '🏃', label: 'Motion' },
-            { action: 'info', icon: 'ℹ️', label: 'Info' }
+            { action: 'convert', icon: 'icon-convert', label: 'Convert' },
+            { action: 'download-manage', icon: 'icon-download', label: 'Tracks' },
+            { action: 'trim', icon: 'icon-scissors', label: 'Cut' },
+            { action: 'resize', icon: 'icon-maximize', label: 'Resize' },
+            { action: 'crop', icon: 'icon-crop', label: 'Crop' },
+            { action: 'create-gif', icon: 'icon-camera', label: 'GIF' },
+            { action: 'reverse', icon: 'icon-sliders', label: 'Speed' },
+            { action: 'remove-bg', icon: 'icon-eyedropper', label: 'Remove BG' },
+            { action: 'watermark', icon: 'icon-target', label: 'Watermark' },
+            { action: 'blur', icon: 'icon-equalizer', label: 'Blur' },
+            { action: 'detect-cuts', icon: 'icon-scissors', label: 'Scenes' },
+            { action: 'detect-motion', icon: 'icon-target', label: 'Motion' },
+            { action: 'info', icon: 'icon-info', label: 'Info' }
         ];
 
         const streamTools = [
-            { action: 'record', icon: RecordMenu.isRecording ? '⏹️' : '🔴', label: RecordMenu.isRecording ? 'Stop Rec' : 'Record' },
-            { action: 'info', icon: 'ℹ️', label: 'Info' }
+            { action: 'record', icon: 'icon-record', label: RecordMenu.isRecording ? 'Stop Rec' : 'Record' },
+            { action: 'info', icon: 'icon-info', label: 'Info' }
         ];
 
         const tools = isRestricted ? streamTools : videoTools;
@@ -2699,7 +2699,11 @@ export class Playlist {
         content.className = 'tools-grid tools-grid-3';
         content.innerHTML = tools.map(tool => `
             <button class="tools-tile tools-tile-sm" data-action="${tool.action}" title="${tool.label}">
-                <div class="tools-tile-icon tools-tile-icon-emoji">${tool.icon}</div>
+                <div class="tools-tile-icon">
+                    <svg width="20" height="20" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#${tool.icon}"></use>
+                    </svg>
+                </div>
                 <span class="tools-tile-label">${tool.label}</span>
             </button>
         `).join('');

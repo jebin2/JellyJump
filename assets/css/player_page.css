@@ -842,17 +842,6 @@
     font-size: 0.7rem;
 }
 
-/* Emoji icons for per-item tools */
-.tools-tile-icon-emoji {
-    width: 36px;
-    height: 36px;
-    font-size: 1.4rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-}
-
 /* Recording active state for tools button */
 #mb-tools.recording-active {
     background: var(--error-color, #ff4444);
