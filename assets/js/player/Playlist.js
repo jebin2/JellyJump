@@ -92,20 +92,6 @@ export class Playlist {
         // Load saved playlist
         this._loadSavedPlaylist();
 
-        // Global click listener to close menus
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.playlist-context-menu') && !e.target.closest('.playlist-settings-btn')) {
-                this._closeAllMenus();
-            }
-        });
-
-        // Global ESC listener
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this._closeAllMenus();
-            }
-        });
-
         // Setup player error callback to mark broken streams
         if (this.player) {
             this.player.onStreamError = (videoId, error) => {
@@ -2652,20 +2638,12 @@ export class Playlist {
 
     /**
      * Toggle settings menu for an item
-     * @param {number} index 
-     * @param {HTMLElement} buttonEl 
+     * @param {number} index
+     * @param {HTMLElement} buttonEl
      * @private
      */
     _toggleSettingsMenu(index, buttonEl) {
-        // Check if this menu is already open
-        const existingMenu = document.querySelector('.playlist-context-menu');
-        const isSameMenu = existingMenu && existingMenu.dataset.index == index;
-
-        this._closeAllMenus();
-
-        if (!isSameMenu) {
-            this._createSettingsMenu(index, buttonEl);
-        }
+        this._createSettingsMenu(index, buttonEl);
     }
 
     /**
@@ -2739,20 +2717,6 @@ export class Playlist {
         });
 
         modal.open();
-    }
-
-    /**
-     * Close all open context menus
-     * @private
-     */
-    _closeAllMenus() {
-        const menus = document.querySelectorAll('.playlist-context-menu');
-        menus.forEach(menu => {
-            menu.classList.remove('visible');
-            setTimeout(() => {
-                if (menu.parentNode) menu.parentNode.removeChild(menu);
-            }, 200); // Wait for transition
-        });
     }
 
     /**
