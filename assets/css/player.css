@@ -610,30 +610,38 @@ button:focus-visible {
 }
 
 /* -----------------------------------------
-   Loop Panel
+   Base Panel Styles (shared by loop, filter, etc.)
    ----------------------------------------- */
-.jellyjump-loop-panel {
+.jellyjump-panel {
     position: absolute;
     bottom: 70px;
     right: 10px;
-    width: 250px;
+    width: 260px;
     background-color: rgba(10, 10, 10, 0.95);
     border: 2px solid var(--accent-primary);
+    border-radius: 8px;
     padding: 15px;
     z-index: 20;
     box-shadow: var(--shadow-md) var(--accent-primary);
     font-family: var(--font-mono);
 }
 
-.loop-panel-header {
+.jellyjump-panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
     border-bottom: 1px solid var(--border-dark);
-    padding-bottom: 5px;
+    padding-bottom: 8px;
     color: var(--accent-primary);
     font-weight: bold;
+    font-size: 14px;
+}
+
+.jellyjump-panel-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .jellyjump-close-btn {
@@ -642,10 +650,27 @@ button:focus-visible {
     color: var(--text-secondary);
     font-size: 20px;
     cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
 }
 
 .jellyjump-close-btn:hover {
     color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* -----------------------------------------
+   Loop Panel
+   ----------------------------------------- */
+.jellyjump-loop-panel {
+    /* Uses base .jellyjump-panel styles */
 }
 
 .loop-mode-options {
@@ -781,35 +806,8 @@ button:focus-visible {
    Filter Panel
    ----------------------------------------- */
 .jellyjump-filter-panel {
-    position: absolute;
-    bottom: 70px;
-    right: 10px;
-    width: 280px;
-    background-color: rgba(10, 10, 10, 0.95);
-    border: 2px solid var(--accent-primary);
-    padding: 15px;
-    z-index: 20;
-    box-shadow: var(--shadow-md) var(--accent-primary);
-    font-family: var(--font-mono);
-    border-radius: 8px;
-}
-
-.filter-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    border-bottom: 1px solid var(--border-dark);
-    padding-bottom: 8px;
-    color: var(--accent-primary);
-    font-weight: bold;
-    font-size: 14px;
-}
-
-.filter-panel-content {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+    /* Uses base .jellyjump-panel styles */
+    width: 280px; /* Slightly wider for sliders */
 }
 
 .filter-sliders {
