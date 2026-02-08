@@ -11,6 +11,7 @@ import {
     setupCleanup,
     updateOverlay
 } from './BoxEditorUtils.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 export class BlurMenu {
     /**
@@ -20,10 +21,9 @@ export class BlurMenu {
      */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('blur-content-template');
-        const footerTemplate = document.getElementById('blur-footer-template');
         const itemTemplate = document.getElementById('blur-item-template');
 
-        if (!contentTemplate || !footerTemplate || !itemTemplate) {
+        if (!contentTemplate || !itemTemplate) {
             Logger.error('Blur modal templates not found!');
             return;
         }
@@ -32,7 +32,7 @@ export class BlurMenu {
         modal.setTitle('Blur Video');
 
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.blur));
 
         const modalContent = modal.modal;
         modal.open();

@@ -3,6 +3,7 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
  * Speed & Reverse Menu Handler
@@ -16,17 +17,16 @@ export class SpeedReverseMenu {
      */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('reverse-content-template');
-        const footerTemplate = document.getElementById('reverse-footer-template');
 
-        if (!contentTemplate || !footerTemplate) {
-            Logger.error('Speed/Reverse modal templates not found!');
+        if (!contentTemplate) {
+            Logger.error('Speed/Reverse content template not found!');
             return;
         }
 
         const modal = new Modal({ maxWidth: '500px' });
         modal.setTitle('Playback Speed & Direction');
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.reverse));
 
         const modalContent = modal.modal;
 

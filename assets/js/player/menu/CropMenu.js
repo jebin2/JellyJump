@@ -16,6 +16,7 @@ import {
     setupCleanup,
     setupAutoUpdate
 } from './BoxEditorUtils.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
  * Crop Menu Handler - Fresh Implementation
@@ -24,14 +25,13 @@ import {
 export class CropMenu {
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('crop-content-template');
-        const footerTemplate = document.getElementById('crop-footer-template');
-        if (!contentTemplate || !footerTemplate) return;
+        if (!contentTemplate) return;
 
         // Create modal
         const modal = new Modal({ splitLayout: true });
         modal.setTitle('Crop Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.crop));
         modal.open();
 
         const modalContent = modal.modal;

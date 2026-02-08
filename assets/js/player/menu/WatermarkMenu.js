@@ -11,6 +11,7 @@ import {
     setupCleanup,
     updateOverlay
 } from './BoxEditorUtils.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
  * Watermark Menu Handler - Multi-watermark with time ranges
@@ -19,10 +20,9 @@ import {
 export class WatermarkMenu {
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('watermark-content-template');
-        const footerTemplate = document.getElementById('watermark-footer-template');
         const itemTemplate = document.getElementById('watermark-item-template');
 
-        if (!contentTemplate || !footerTemplate || !itemTemplate) {
+        if (!contentTemplate || !itemTemplate) {
             Logger.error('Watermark modal templates not found!');
             return;
         }
@@ -31,7 +31,7 @@ export class WatermarkMenu {
         modal.setTitle('Add Watermark');
 
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.watermark));
 
         const modalContent = modal.modal;
         modal.open();

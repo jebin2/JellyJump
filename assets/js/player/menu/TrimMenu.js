@@ -4,6 +4,7 @@ import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
  * Trim Menu Handler
@@ -17,14 +18,13 @@ export class TrimMenu {
      */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('trim-content-template');
-        const footerTemplate = document.getElementById('trim-footer-template');
 
-        if (!contentTemplate || !footerTemplate) return;
+        if (!contentTemplate) return;
 
         const modal = new Modal({ splitLayout: true });
         modal.setTitle('Cut Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.trim));
 
         const modalContent = modal.modal;
 

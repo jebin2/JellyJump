@@ -5,6 +5,7 @@ import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId, formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
  * GIF Menu Handler
@@ -18,17 +19,16 @@ export class GifMenu {
      */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('gif-content-template');
-        const footerTemplate = document.getElementById('gif-footer-template');
 
-        if (!contentTemplate || !footerTemplate) {
-            Logger.error('GIF modal templates not found!');
+        if (!contentTemplate) {
+            Logger.error('GIF content template not found!');
             return;
         }
 
         const modal = new Modal({ splitLayout: true });
         modal.setTitle('GIF');
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.gif));
 
         const modalContent = modal.modal;
 

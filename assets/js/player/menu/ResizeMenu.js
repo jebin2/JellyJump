@@ -3,6 +3,7 @@ import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
  * Resize Menu Handler  
@@ -16,14 +17,13 @@ export class ResizeMenu {
      */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('resize-content-template');
-        const footerTemplate = document.getElementById('resize-footer-template');
 
-        if (!contentTemplate || !footerTemplate) return;
+        if (!contentTemplate) return;
 
         const modal = new Modal({ maxWidth: '550px' });
         modal.setTitle('Resize Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.resize));
 
         const modalContent = modal.modal;
 

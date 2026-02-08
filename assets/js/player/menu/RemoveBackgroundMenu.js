@@ -4,6 +4,7 @@ import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { generateId, formatTime } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 export class RemoveBackgroundMenu {
     /**
@@ -13,17 +14,16 @@ export class RemoveBackgroundMenu {
      */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('remove-bg-content-template');
-        const footerTemplate = document.getElementById('remove-bg-footer-template');
 
-        if (!contentTemplate || !footerTemplate) {
-            Logger.error('Remove Background modal templates not found!');
+        if (!contentTemplate) {
+            Logger.error('Remove Background content template not found!');
             return;
         }
 
         const modal = new Modal({ splitLayout: true });
         modal.setTitle('Remove Background');
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.removeBg));
 
         const modalContent = modal.modal;
 

@@ -55,6 +55,43 @@
     </div>
 </template>
 
+<!-- Common Process Footer Template - Configurable via FooterHelper.js -->
+<template id="common-process-footer-template">
+    <div class="process-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="process-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small primary-action-btn" title="" aria-label="">
+                <svg width="16" height="16" fill="currentColor">
+                    <use class="action-icon-use" href=""></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
 
 <!-- Conversion Content Template -->
 <template id="conversion-content-template">

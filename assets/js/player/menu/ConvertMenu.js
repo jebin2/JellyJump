@@ -4,6 +4,7 @@ import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { generateId } from '../../utils/mediaUtils.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
  * Convert Menu Handler
@@ -17,18 +18,17 @@ export class ConvertMenu {
      */
     static async init(item, playlist) {
         const contentTemplate = document.getElementById('conversion-content-template');
-        const footerTemplate = document.getElementById('conversion-footer-template');
 
         Logger.log('Opening Conversion Modal');
-        if (!contentTemplate || !footerTemplate) {
-            Logger.error('Conversion modal templates not found!');
+        if (!contentTemplate) {
+            Logger.error('Conversion content template not found!');
             return;
         }
 
         const modal = new Modal({ maxWidth: '500px' });
         modal.setTitle('Convert & Compress Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
+        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.convert));
 
         const modalContent = modal.modal;
 
