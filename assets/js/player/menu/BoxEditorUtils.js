@@ -72,6 +72,11 @@ export async function loadVideo(containerId, item, playlist, state) {
     } catch (e) {
         Logger.error('[BoxEditor] Video load failed:', e);
         return null;
+    } finally {
+        if (player) {
+            player.pause();
+            player.seek(0);
+        }
     }
 }
 

@@ -38,13 +38,11 @@ export class TrimMenu {
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
         const trimContent = modalContent.querySelector('.trim-content');
-        const startDisplay = modalContent.querySelector('.trim-start-time');
-        const endDisplay = modalContent.querySelector('.trim-end-time');
+        const startInput = modalContent.querySelector('#trim-start-input');
+        const endInput = modalContent.querySelector('#trim-end-input');
+        const setStartBtn = modalContent.querySelector('#trim-set-start-btn');
+        const setEndBtn = modalContent.querySelector('#trim-set-end-btn');
         const durationDisplay = modalContent.querySelector('.trim-duration');
-        const timelineSlider = modalContent.querySelector('.timeline-slider');
-        const timelineRange = modalContent.querySelector('.timeline-range');
-        const startHandle = modalContent.querySelector('.start-handle');
-        const endHandle = modalContent.querySelector('.end-handle');
         const trimBtn = modalContent.querySelector('.trim-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
@@ -65,14 +63,11 @@ export class TrimMenu {
             duration = parseTime(item.duration);
         }
 
-        // Show Content
-        trimLoading.classList.add('hidden');
-        trimContent.classList.remove('hidden');
-        trimBtn.disabled = false;
+
 
         // Initialize displays
-        startDisplay.textContent = formatTime(0);
-        endDisplay.textContent = formatTime(duration);
+        startInput.value = formatTime(0);
+        endInput.value = formatTime(duration);
         durationDisplay.textContent = formatTime(duration);
 
         // State
@@ -90,24 +85,22 @@ export class TrimMenu {
             player.loopEnd = endTime;
         }
 
+        // Show Content
+        trimLoading.classList.add('hidden');
+        trimContent.classList.remove('hidden');
+        trimBtn.disabled = false;
+
         // Update UI
         const updateUI = () => {
             // Update Displays
-            startDisplay.textContent = formatTime(startTime);
-            endDisplay.textContent = formatTime(endTime);
+            if (document.activeElement !== startInput) startInput.value = formatTime(startTime);
+            if (document.activeElement !== endInput) endInput.value = formatTime(endTime);
 
             // Update Duration
             const trimDuration = Math.max(0, endTime - startTime);
             durationDisplay.textContent = formatTime(trimDuration);
 
-            // Update Slider
-            const startPercent = (startTime / duration) * 100;
-            const endPercent = (endTime / duration) * 100;
 
-            startHandle.style.left = `${startPercent}% `;
-            endHandle.style.left = `${endPercent}% `;
-            timelineRange.style.left = `${startPercent}% `;
-            timelineRange.style.width = `${endPercent - startPercent}% `;
 
             // Update Player Loop Points
             if (player) {
@@ -133,40 +126,41 @@ export class TrimMenu {
         updateUI();
 
         // Input Handlers
-
-
-        // Slider Drag Logic
-        const handleDrag = (e, isStart) => {
-            const rect = timelineSlider.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const percent = Math.max(0, Math.min(1, x / rect.width));
-            const time = percent * duration;
-
-            if (isStart) {
-                if (time < endTime - 1) startTime = time;
+        startInput.onchange = (e) => {
+            const val = parseTime(e.target.value);
+            if (val !== null) {
+                startTime = Math.max(0, Math.min(val, duration));
+                updateUI();
                 if (player) player.seek(startTime);
             } else {
-                if (time > startTime + 1) endTime = time;
-                if (player) player.seek(endTime);
+                updateUI(); // Reset on invalid
             }
-            updateUI();
         };
 
-        const initDrag = (handle, isStart) => {
-            handle.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                const onMouseMove = (e) => handleDrag(e, isStart);
-                const onMouseUp = () => {
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                };
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
+        endInput.onchange = (e) => {
+            const val = parseTime(e.target.value);
+            if (val !== null) {
+                endTime = Math.max(0, Math.min(val, duration));
+                updateUI();
+                if (player) player.seek(endTime);
+            } else {
+                updateUI(); // Reset on invalid
+            }
         };
 
-        initDrag(startHandle, true);
-        initDrag(endHandle, false);
+        setStartBtn.onclick = () => {
+            if (player) {
+                startTime = player.currentTime;
+                updateUI();
+            }
+        };
+
+        setEndBtn.onclick = () => {
+            if (player) {
+                endTime = player.currentTime;
+                updateUI();
+            }
+        };
 
         // Cleanup on close
         const originalClose = modal.close.bind(modal);
