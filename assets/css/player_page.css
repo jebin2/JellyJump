@@ -821,6 +821,38 @@
     border-color: var(--error-color, #ff4444);
 }
 
+/* 3-column grid for per-item tools */
+.tools-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+/* Smaller tiles for per-item tools */
+.tools-tile-sm {
+    padding: 14px 10px;
+    gap: 6px;
+}
+
+.tools-tile-sm .tools-tile-icon {
+    width: 36px;
+    height: 36px;
+}
+
+.tools-tile-sm .tools-tile-label {
+    font-size: 0.7rem;
+}
+
+/* Emoji icons for per-item tools */
+.tools-tile-icon-emoji {
+    width: 36px;
+    height: 36px;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+}
+
 /* Recording active state for tools button */
 #mb-tools.recording-active {
     background: var(--error-color, #ff4444);

@@ -2669,129 +2669,76 @@ export class Playlist {
     }
 
     /**
-     * Create and show settings menu
-     * @param {number} index 
-     * @param {HTMLElement} buttonEl 
+     * Create and show settings menu as a tile-based modal
+     * @param {number} index
+     * @param {HTMLElement} buttonEl
      * @private
      */
-    _createSettingsMenu(index, buttonEl) {
-        const template = document.getElementById('playlist-settings-menu-template');
-        if (!template) return;
-
-        const clone = template.content.cloneNode(true);
-        const menu = clone.querySelector('.playlist-context-menu');
-        menu.dataset.index = index;
-
-        // Conditional Logic
+    async _createSettingsMenu(index, buttonEl) {
         const item = this.items[index];
         if (!item) {
             console.error('[Playlist] Item not found for index:', index);
             return;
         }
+
+        const { Modal } = await import('./Modal.js');
+
         // Treat streams, IPTV, and live content as restricted (limited menu options)
         const isRestricted = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/live/') || item.url.includes('/hls/')));
 
-        menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
-            const action = menuItem.dataset.action;
+        const modal = new Modal({ maxWidth: '480px' });
 
-            if (isRestricted) {
-                // Live Stream: Show ONLY Record and Info
-                if (action === 'info' || action === 'record') {
-                    menuItem.style.display = 'flex'; // Ensure it's visible
+        // Truncate title if too long
+        const displayTitle = item.title.length > 30 ? item.title.substring(0, 30) + '...' : item.title;
+        modal.setTitle(`Tools: ${displayTitle}`);
 
-                    // Update Record Item UI based on state
-                    if (action === 'record') {
-                        if (RecordMenu.isRecording) {
-                            menuItem.querySelector('.menu-label').textContent = 'Stop Recording';
-                            menuItem.querySelector('.menu-icon').textContent = '⏹️';
-                            menuItem.classList.add('text-red-500');
-                        } else {
-                            menuItem.querySelector('.menu-label').textContent = 'Record Stream...';
-                            menuItem.querySelector('.menu-icon').textContent = '🔴';
-                            menuItem.classList.remove('text-red-500');
-                        }
-                    }
-                } else {
-                    menuItem.style.display = 'none';
-                }
-            } else {
-                // Local File or Remote VOD: Show ALL except Record
-                if (action === 'record') {
-                    menuItem.style.display = 'none';
-                } else {
-                    menuItem.style.display = 'flex'; // Ensure it's visible
-                }
-            }
-        });
+        // Define menu items
+        const videoTools = [
+            { action: 'convert', icon: '🔄', label: 'Convert' },
+            { action: 'download-manage', icon: '🎬', label: 'Tracks' },
+            { action: 'trim', icon: '✂️', label: 'Cut' },
+            { action: 'resize', icon: '📐', label: 'Resize' },
+            { action: 'crop', icon: '🖼️', label: 'Crop' },
+            { action: 'create-gif', icon: '🎞️', label: 'GIF' },
+            { action: 'reverse', icon: '⏪', label: 'Speed' },
+            { action: 'remove-bg', icon: '🎨', label: 'Remove BG' },
+            { action: 'watermark', icon: '💧', label: 'Watermark' },
+            { action: 'blur', icon: '🔲', label: 'Blur' },
+            { action: 'detect-cuts', icon: '🎬', label: 'Scenes' },
+            { action: 'detect-motion', icon: '🏃', label: 'Motion' },
+            { action: 'info', icon: 'ℹ️', label: 'Info' }
+        ];
 
-        // Hide dividers for Live/Streams since we only have 2 items
-        if (isRestricted) {
-            menu.querySelectorAll('.menu-divider').forEach(divider => {
-                divider.style.display = 'none';
-            });
-        } else {
-            // Ensure dividers are visible for VOD
-            menu.querySelectorAll('.menu-divider').forEach(divider => {
-                divider.style.display = 'block';
-            });
-        }
+        const streamTools = [
+            { action: 'record', icon: RecordMenu.isRecording ? '⏹️' : '🔴', label: RecordMenu.isRecording ? 'Stop Rec' : 'Record' },
+            { action: 'info', icon: 'ℹ️', label: 'Info' }
+        ];
 
-        // Attach Event Listeners
-        menu.querySelectorAll('.playlist-menu-item').forEach(menuItem => {
-            menuItem.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (menuItem.classList.contains('disabled')) return;
+        const tools = isRestricted ? streamTools : videoTools;
 
-                const action = menuItem.dataset.action;
+        // Create tools grid content
+        const content = document.createElement('div');
+        content.className = 'tools-grid tools-grid-3';
+        content.innerHTML = tools.map(tool => `
+            <button class="tools-tile tools-tile-sm" data-action="${tool.action}" title="${tool.label}">
+                <div class="tools-tile-icon tools-tile-icon-emoji">${tool.icon}</div>
+                <span class="tools-tile-label">${tool.label}</span>
+            </button>
+        `).join('');
+
+        modal.setBody(content);
+
+        // Handle tile clicks
+        content.querySelectorAll('.tools-tile').forEach(tile => {
+            tile.addEventListener('click', (e) => {
+                const action = tile.dataset.action;
+                modal.close();
                 MenuRouter.init(action, index, this);
-                this._closeAllMenus();
                 this.player.pause();
             });
         });
 
-        document.body.appendChild(menu);
-
-        // Position the menu
-        this._positionSettingsMenu(menu, buttonEl);
-
-        // Show with animation
-        requestAnimationFrame(() => {
-            menu.classList.add('visible');
-        });
-    }
-
-    /**
-     * Position the settings menu intelligently
-     * @param {HTMLElement} menu 
-     * @param {HTMLElement} button 
-     * @private
-     */
-    _positionSettingsMenu(menu, button) {
-        const rect = button.getBoundingClientRect();
-        const menuRect = menu.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-
-        let top = rect.bottom + 5;
-        let left = rect.right - menuRect.width; // Align right edge by default
-
-        // Check vertical overflow (bottom)
-        if (top + menuRect.height > viewportHeight - 10) {
-            // Position above
-            top = rect.top - menuRect.height - 5;
-        }
-
-        // Check vertical overflow (top) - ensure menu doesn't go above viewport
-        if (top < 10) {
-            top = 10;
-        }
-
-        // Check horizontal overflow (left side)
-        if (left < 10) {
-            left = rect.left; // Align left edge
-        }
-
-        menu.style.top = `${top}px`;
-        menu.style.left = `${left}px`;
+        modal.open();
     }
 
     /**
