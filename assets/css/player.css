@@ -515,9 +515,7 @@ button:focus-visible {
 }
 
 .playlist-settings-btn:hover {
-    color: var(--primary-color);
-    background: rgba(255, 255, 255, 0.1);
-    transform: scale(1.1);
+    color: var(--accent-primary);
 }
 
 .menu-divider {
