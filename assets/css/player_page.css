@@ -810,6 +810,17 @@
     color: var(--text-primary);
 }
 
+/* Danger variant for destructive actions */
+.tools-tile-danger .tools-tile-icon {
+    background: rgba(255, 68, 68, 0.2);
+    color: var(--error-color, #ff4444);
+}
+
+.tools-tile-danger:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: var(--error-color, #ff4444);
+}
+
 /* Recording active state for tools button */
 #mb-tools.recording-active {
     background: var(--error-color, #ff4444);

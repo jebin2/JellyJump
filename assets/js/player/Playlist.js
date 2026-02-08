@@ -227,7 +227,6 @@ export class Playlist {
         const addFilesBtn = header.querySelector('#mb-add-files');
         const addFolderBtn = header.querySelector('#mb-add-folder');
         const toolsBtn = header.querySelector('#mb-tools');
-        const clearBtn = header.querySelector('#mb-clear-playlist');
         const searchInput = header.querySelector('#mb-playlist-search-input');
         const searchClearBtn = header.querySelector('#mb-playlist-search-clear');
 
@@ -303,12 +302,6 @@ export class Playlist {
         if (addFolderBtn) {
             addFolderBtn.addEventListener('click', () => {
                 document.getElementById('mb-folder-input').click();
-            });
-        }
-
-        if (clearBtn) {
-            clearBtn.addEventListener('click', () => {
-                this.clear();
             });
         }
 
@@ -2847,6 +2840,14 @@ export class Playlist {
                     </div>
                     <span class="tools-tile-label">Merge Videos</span>
                 </button>
+                <button class="tools-tile tools-tile-danger" data-action="reset" title="Reset App">
+                    <div class="tools-tile-icon">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-trash"></use>
+                        </svg>
+                    </div>
+                    <span class="tools-tile-label">Reset App</span>
+                </button>
             `;
 
             modal.setBody(content);
@@ -2864,6 +2865,28 @@ export class Playlist {
                     } else if (action === 'merge') {
                         const { MergeMenu } = await import('./menu/MergeMenu.js');
                         MergeMenu.init(null, this);
+                    } else if (action === 'reset') {
+                        if (confirm('Reset the app? This will clear all data and reload.')) {
+                            try {
+                                // Delete the entire IndexedDB database
+                                await new Promise((resolve, reject) => {
+                                    const request = indexedDB.deleteDatabase('JellyJumpDB');
+                                    request.onsuccess = () => resolve();
+                                    request.onerror = () => reject(request.error);
+                                    request.onblocked = () => resolve(); // Still proceed if blocked
+                                });
+
+                                // Clear all localStorage
+                                localStorage.clear();
+
+                                // Reload the page
+                                window.location.reload();
+                            } catch (err) {
+                                Logger.error('Reset failed:', err);
+                                // Still reload even if clearing fails
+                                window.location.reload();
+                            }
+                        }
                     }
                 });
             });
