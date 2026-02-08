@@ -2004,9 +2004,9 @@
                             <label class="checkbox-option flex items-center mt-sm cursor-pointer">
                                 <input type="checkbox" id="disable-echo-cancel" class="mr-sm">
                                 <div>
-                                    <span class="block text-xs text-primary">Capture speaker audio</span>
-                                    <span class="block text-xs text-secondary">Disable echo cancellation to record audio
-                                        from speakers</span>
+                                    <span class="block text-xs text-primary">Include system audio</span>
+                                    <span class="block text-xs text-secondary">Record audio playing through speakers
+                                        (music, videos). Use headphones to avoid echo.</span>
                                 </div>
                             </label>
 
@@ -2077,11 +2077,11 @@
                     <!-- Microphone Option for Webcam -->
                     <div class="text-left mt-md">
                         <label class="checkbox-option flex items-center mb-sm cursor-pointer justify-center">
-                            <input type="checkbox" id="webcam-capture-audio" class="mr-sm" checked>
+                            <input type="checkbox" id="webcam-capture-audio" class="mr-sm">
                             <span class="block text-sm font-bold text-primary">Record Microphone</span>
                         </label>
 
-                        <div id="webcam-mic-selector-container" class="mb-md px-lg">
+                        <div id="webcam-mic-selector-container" class="mb-md px-lg" style="display: none;">
                             <select id="webcam-mic-device-select" class="mb-select w-full">
                                 <option value="">Loading microphones...</option>
                             </select>

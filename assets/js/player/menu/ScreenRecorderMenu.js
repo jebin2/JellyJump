@@ -146,8 +146,6 @@ export class ScreenRecorderMenu {
                     webcamMicSelectorContainer.style.display = 'none';
                 }
             });
-            // Auto-populate on load since checkbox is checked by default
-            populateMicDropdown(webcamMicDeviceSelect);
         }
 
         // Initial State
