@@ -362,6 +362,12 @@ export class GifMenu {
             }
         });
 
+        // Register dropdown cleanup
+        modal.onCleanup(() => {
+            fpsDropdown.destroy();
+            sizeDropdown.destroy();
+        });
+
         // Cleanup on close
         const originalClose = modal.close.bind(modal);
         modal.close = () => {

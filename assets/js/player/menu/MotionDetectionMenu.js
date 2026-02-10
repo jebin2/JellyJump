@@ -33,7 +33,10 @@ export class MotionDetectionMenu {
             maxWidth: '600px',
             onClose: () => {
                 isCancelled = true;
-                if (detector) detector.cancel();
+                if (detector) {
+                    detector.cancel();
+                    detector = null;
+                }
             }
         });
 

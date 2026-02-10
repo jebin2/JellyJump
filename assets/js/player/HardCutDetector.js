@@ -18,6 +18,7 @@ export class HardCutDetector {
         this.isDetecting = false;
         this.progressCallback = null; // (progress: number) => void
         this.lastStats = null; // Store statistics from last detection
+        this._input = null; // Track for cleanup
     }
 
     /**
@@ -56,18 +57,21 @@ export class HardCutDetector {
         });
 
         try {
+            // Dispose previous Input if re-running detection
+            this._disposeInput();
+
             // 1. Setup Input
             const source = (resource instanceof File || resource instanceof Blob)
                 ? new BlobSource(resource)
                 : new UrlSource(resource);
 
-            const input = new Input({
+            this._input = new Input({
                 formats: ALL_FORMATS,
                 source,
             });
 
             // 2. Get Video Track
-            const videoTrack = await input.getPrimaryVideoTrack();
+            const videoTrack = await this._input.getPrimaryVideoTrack();
             if (!videoTrack) {
                 Logger.warn('[HardCutDetector] No video track found');
                 return [];
@@ -105,6 +109,7 @@ export class HardCutDetector {
             return [];
         } finally {
             this.isDetecting = false;
+            this._disposeInput();
         }
     }
 
@@ -420,5 +425,21 @@ export class HardCutDetector {
 
     cancel() {
         this.isDetecting = false;
+        this._disposeInput();
+    }
+
+    /**
+     * Dispose the MediaBunny Input to release decoded video memory.
+     * @private
+     */
+    _disposeInput() {
+        if (this._input && typeof this._input.dispose === 'function') {
+            try {
+                this._input.dispose();
+            } catch (e) {
+                Logger.warn('[HardCutDetector] Error disposing input:', e);
+            }
+        }
+        this._input = null;
     }
 }

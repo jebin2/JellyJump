@@ -12,6 +12,7 @@ export class ThumbnailGenerator {
         this.isGenerating = false;
         this.progressCallback = null;
         this.generationInterval = 1;
+        this._input = null; // Track for cleanup
     }
 
     /**
@@ -49,13 +50,16 @@ export class ThumbnailGenerator {
                 ? new BlobSource(resource)
                 : new UrlSource(resource);
 
-            const input = new Input({
+            // Dispose previous Input if re-generating
+            this._disposeInput();
+
+            this._input = new Input({
                 formats: ALL_FORMATS,
                 source,
             });
 
             // 2. Get Video Track
-            const videoTrack = await input.getPrimaryVideoTrack();
+            const videoTrack = await this._input.getPrimaryVideoTrack();
             if (!videoTrack) {
                 Logger.warn('[Thumbnails] No video track found');
                 return;
@@ -132,11 +136,13 @@ export class ThumbnailGenerator {
             }
         } finally {
             this.isGenerating = false;
+            this._disposeInput();
         }
     }
 
     cancel() {
         this.isGenerating = false;
+        this._disposeInput();
         this._revokeThumbnails();
         this.thumbnails = [];
     }
@@ -149,6 +155,19 @@ export class ThumbnailGenerator {
 
     destroy() {
         this.cancel();
+    }
+
+    /**
+     * Dispose the MediaBunny Input to release decoded video memory.
+     * @private
+     */
+    _disposeInput() {
+        if (this._input && typeof this._input.dispose === 'function') {
+            try {
+                this._input.dispose();
+            } catch (e) { /* ignore */ }
+        }
+        this._input = null;
     }
 
     /**

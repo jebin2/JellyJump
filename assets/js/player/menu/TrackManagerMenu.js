@@ -103,6 +103,7 @@ export class TrackManagerMenu {
         if (tracks.audio.length === 0) noAudioMsg.classList.remove('hidden');
 
         const cardTemplate = document.getElementById('track-card-template');
+        const dropdowns = [];
 
         const renderList = (list, trackList, type) => {
             list.forEach((track, i) => {
@@ -133,6 +134,7 @@ export class TrackManagerMenu {
                     menu: speedMenu,
                     initialValue: '1'
                 });
+                dropdowns.push(speedDropdown);
 
                 // Determine format based on codec
                 let format = 'mp4';
@@ -194,6 +196,11 @@ export class TrackManagerMenu {
 
         renderList(tracks.video, videoList, 'video');
         renderList(tracks.audio, audioList, 'audio');
+
+        // Register dropdown cleanup on modal close
+        modal.onCleanup(() => {
+            dropdowns.forEach(d => d.destroy());
+        });
     }
 
     /**

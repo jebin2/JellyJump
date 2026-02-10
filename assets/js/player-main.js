@@ -1,6 +1,4 @@
 // Player page entry point
-// Imports that were previously separate <script> tags
-import './lib/gif.js';
 import './pull-to-refresh.js';
 
 // Load templates first, then initialize player
@@ -34,7 +32,7 @@ async function initializeApp() {
     });
 
     // Initialize Playlist (which will initialize SidebarToggle internally)
-    const playlist = new Playlist(
+    const playlist = window.playlist = new Playlist(
         document.querySelector('.playlist-content'),
         player
     );
@@ -80,8 +78,13 @@ window.addEventListener('pageshow', function (event) {
 // CRITICAL: Cleanup on page hide to prevent memory accumulation
 // pagehide replaces the deprecated unload event
 window.addEventListener('pagehide', function () {
-    console.log('[Player] pagehide - destroying player');
-    // Destroy player if it exists (closes MediaBunny resources, audio context, etc.)
+    console.log('[Player] pagehide - destroying player and playlist');
+    // Destroy playlist first (clears intervals, event listeners, blob URLs)
+    if (window.playlist && typeof window.playlist.destroy === 'function') {
+        window.playlist.destroy();
+        window.playlist = null;
+    }
+    // Destroy player (closes MediaBunny resources, audio context, etc.)
     if (window.player && typeof window.player.destroy === 'function') {
         window.player.destroy();
         window.player = null;

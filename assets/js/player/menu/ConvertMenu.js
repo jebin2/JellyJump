@@ -79,6 +79,9 @@ export class ConvertMenu {
         qualitySlider.addEventListener('input', updateQualityLabel);
         updateQualityLabel();
 
+        // Register dropdown cleanup
+        modal.onCleanup(() => formatDropdown.destroy());
+
         // Prevent closing during conversion
         const originalClose = modal.close.bind(modal);
         modal.close = () => {

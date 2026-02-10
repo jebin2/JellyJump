@@ -202,18 +202,26 @@ export class MediaMetadata {
         // Use helper to get source (with caching for remote URLs)
         const blobUrl = await MediaMetadata.getProcessedSourceURL(item, onSave);
 
-        const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(blobUrl);
-        item.videoInfo = videoInfo;
-        item.audioInfo = audioInfo;
-        item.videoTracks = videoTracks;
-        item.audioTracks = audioTracks;
+        try {
+            const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(blobUrl);
+            item.videoInfo = videoInfo;
+            item.audioInfo = audioInfo;
+            item.videoTracks = videoTracks;
+            item.audioTracks = audioTracks;
 
-        // Update duration if missing, placeholder, or loading
-        if (!item.duration || item.duration === '--:--' || item.duration === 'Loading...') {
-            item.duration = formatTime(duration);
+            // Update duration if missing, placeholder, or loading
+            if (!item.duration || item.duration === '--:--' || item.duration === 'Loading...') {
+                item.duration = formatTime(duration);
+            }
+
+            if (onSave) onSave();
+        } catch (e) {
+            Logger.warn('[MediaMetadata] Failed to extract metadata for', item.title, ':', e.message);
+            if (!item.duration || item.duration === 'Loading...') {
+                item.duration = '--:--';
+            }
+            item._metadataError = e.message;
         }
-
-        if (onSave) onSave();
     }
 
     /**

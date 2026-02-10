@@ -1,22 +1,9 @@
 import { Logger } from "../../utils/Logger.js";
-import { ConvertMenu } from './ConvertMenu.js';
-import { TrimMenu } from './TrimMenu.js';
-import { ResizeMenu } from './ResizeMenu.js';
-import { CropMenu } from './CropMenu.js';
-import { GifMenu } from './GifMenu.js';
-import { InfoMenu } from './InfoMenu.js';
-import { MergeMenu } from './MergeMenu.js';
-import { TrackManagerMenu } from './TrackManagerMenu.js';
-import { RemoveBackgroundMenu } from './RemoveBackgroundMenu.js';
-import { RecordMenu } from './RecordMenu.js';
-import { SpeedReverseMenu } from './SpeedReverseMenu.js';
-import { WatermarkMenu } from './WatermarkMenu.js';
-import { BlurMenu } from './BlurMenu.js';
-import { RotateMenu } from './RotateMenu.js';
 
 /**
  * Menu Router
- * Central router that delegates menu actions to specific menu handlers
+ * Central router that delegates menu actions to specific menu handlers.
+ * All menus are lazy-loaded on first use to reduce initial page memory.
  */
 export class MenuRouter {
     /**
@@ -35,61 +22,98 @@ export class MenuRouter {
 
         Logger.log(`MenuRouter: Routing action "${action}" for item "${item.title}"`);
 
+        try {
         switch (action) {
-            case 'convert':
+            case 'convert': {
+                const { ConvertMenu } = await import('./ConvertMenu.js');
                 await ConvertMenu.init(item, playlist);
                 break;
-            case 'trim':
+            }
+            case 'trim': {
+                const { TrimMenu } = await import('./TrimMenu.js');
                 await TrimMenu.init(item, playlist);
                 break;
-            case 'resize':
+            }
+            case 'resize': {
+                const { ResizeMenu } = await import('./ResizeMenu.js');
                 await ResizeMenu.init(item, playlist);
                 break;
-            case 'crop':
+            }
+            case 'crop': {
+                const { CropMenu } = await import('./CropMenu.js');
                 await CropMenu.init(item, playlist);
                 break;
-            case 'create-gif':
+            }
+            case 'create-gif': {
+                const { GifMenu } = await import('./GifMenu.js');
                 await GifMenu.init(item, playlist);
                 break;
+            }
             case 'reverse':
-            case 'speed':
+            case 'speed': {
                 // Both routed to unified menu
+                const { SpeedReverseMenu } = await import('./SpeedReverseMenu.js');
                 await SpeedReverseMenu.init(item, playlist);
                 break;
-            case 'remove-bg':
+            }
+            case 'remove-bg': {
+                const { RemoveBackgroundMenu } = await import('./RemoveBackgroundMenu.js');
                 await RemoveBackgroundMenu.init(item, playlist);
                 break;
-            case 'watermark':
+            }
+            case 'watermark': {
+                const { WatermarkMenu } = await import('./WatermarkMenu.js');
                 await WatermarkMenu.init(item, playlist);
                 break;
-            case 'blur':
+            }
+            case 'blur': {
+                const { BlurMenu } = await import('./BlurMenu.js');
                 await BlurMenu.init(item, playlist);
                 break;
-            case 'rotate':
+            }
+            case 'rotate': {
+                const { RotateMenu } = await import('./RotateMenu.js');
                 await RotateMenu.init(item, playlist);
                 break;
-            case 'record':
+            }
+            case 'record': {
+                const { RecordMenu } = await import('./RecordMenu.js');
                 await RecordMenu.init(item, playlist);
                 break;
-            case 'info':
+            }
+            case 'info': {
+                const { InfoMenu } = await import('./InfoMenu.js');
                 await InfoMenu.init(item, playlist);
                 break;
-            case 'merge':
+            }
+            case 'merge': {
+                const { MergeMenu } = await import('./MergeMenu.js');
                 await MergeMenu.init(item, playlist);
                 break;
-            case 'download-manage':
+            }
+            case 'download-manage': {
+                const { TrackManagerMenu } = await import('./TrackManagerMenu.js');
                 await TrackManagerMenu.init(item, playlist);
                 break;
-            case 'detect-cuts':
+            }
+            case 'detect-cuts': {
                 const { CutDetectionMenu } = await import('./CutDetectionMenu.js');
                 new CutDetectionMenu(playlist).execute(item);
                 break;
-            case 'detect-motion':
+            }
+            case 'detect-motion': {
                 const { MotionDetectionMenu } = await import('./MotionDetectionMenu.js');
                 new MotionDetectionMenu(playlist).execute(item);
                 break;
+            }
             default:
                 Logger.warn(`MenuRouter: Unknown action "${action}"`);
+        }
+        } catch (err) {
+            Logger.error(`MenuRouter: Error in "${action}" for "${item.title}":`, err);
+            if (playlist._showToast) {
+                playlist._showToast(`Failed to open ${action}: ${err.message}`, 'error');
+            }
         }
     }
 }

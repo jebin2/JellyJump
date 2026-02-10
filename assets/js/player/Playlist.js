@@ -49,7 +49,7 @@ export class Playlist {
         // this._initSortable(); // Not implemented yet
 
         // Start periodic state saving (every 1 second)
-        setInterval(() => {
+        this._progressIntervalId = setInterval(() => {
             if (this.player && this.player.isPlaying) {
                 this._savePlaybackProgress();
             }
@@ -67,18 +67,13 @@ export class Playlist {
         // TODO: Add player.on('ended', () => this.playNext()) if CorePlayer supports events
 
         // Save state on beforeunload (works for most cases)
-        window.addEventListener('beforeunload', () => {
+        this._beforeUnloadHandler = () => {
             Logger.log('[Playlist] beforeunload - saving state');
             this._saveState();
             Logger.log('[Playlist] beforeunload - revoking blob URLs');
-            // Revoke all blob URLs to help browser release memory
-            for (const item of this.items) {
-                if (item.url && item.url.startsWith('blob:')) {
-                    URL.revokeObjectURL(item.url);
-                    item.url = null;
-                }
-            }
-        });
+            this._revokeAllBlobUrls();
+        };
+        window.addEventListener('beforeunload', this._beforeUnloadHandler);
 
         // Keyboard Shortcuts
         this._initKeyboardShortcuts();
@@ -142,7 +137,7 @@ export class Playlist {
      * @private
      */
     _initKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
+        this._keydownHandler = (e) => {
             // Ignore if typing in input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -176,7 +171,8 @@ export class Playlist {
                 const fileInput = document.getElementById('mb-file-input');
                 if (fileInput) fileInput.click();
             }
-        });
+        };
+        document.addEventListener('keydown', this._keydownHandler);
     }
 
     _createHeader() {
@@ -1069,6 +1065,12 @@ export class Playlist {
     removeItem(index) {
         if (index < 0 || index >= this.items.length) return;
 
+        // Revoke blob URL to free memory
+        const removedItem = this.items[index];
+        if (removedItem && removedItem.url && removedItem.url.startsWith('blob:')) {
+            URL.revokeObjectURL(removedItem.url);
+        }
+
         // If removing the currently playing item, stop playback
         const wasActive = index === this.activeIndex;
 
@@ -1141,6 +1143,11 @@ export class Playlist {
             indicesToRemove.sort((a, b) => b - a);
 
             indicesToRemove.forEach(idx => {
+                // Revoke blob URL to free memory
+                const item = this.items[idx];
+                if (item && item.url && item.url.startsWith('blob:')) {
+                    URL.revokeObjectURL(item.url);
+                }
                 this.items.splice(idx, 1);
             });
 
@@ -1198,7 +1205,10 @@ export class Playlist {
             // 1. Reset Player State
             this.player.reset();
 
-            // 2. Clear Playlist Data
+            // 2. Revoke all blob URLs before clearing
+            this._revokeAllBlobUrls();
+
+            // 3. Clear Playlist Data
             this.items = [];
             this.activeIndex = -1;
 
@@ -1211,6 +1221,51 @@ export class Playlist {
 
             Logger.log('Application state reset successfully');
         }
+    }
+
+    /**
+     * Revoke all blob URLs to free memory
+     * @private
+     */
+    _revokeAllBlobUrls() {
+        for (const item of this.items) {
+            if (item.url && item.url.startsWith('blob:')) {
+                URL.revokeObjectURL(item.url);
+                item.url = null;
+            }
+        }
+    }
+
+    /**
+     * Destroy the playlist and release all resources
+     */
+    destroy() {
+        // Clear the progress-save interval
+        if (this._progressIntervalId) {
+            clearInterval(this._progressIntervalId);
+            this._progressIntervalId = null;
+        }
+
+        // Remove global event listeners
+        if (this._beforeUnloadHandler) {
+            window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+            this._beforeUnloadHandler = null;
+        }
+        if (this._keydownHandler) {
+            document.removeEventListener('keydown', this._keydownHandler);
+            this._keydownHandler = null;
+        }
+
+        // Destroy FileDropHandler
+        if (this.fileDropHandler) {
+            this.fileDropHandler.destroy();
+            this.fileDropHandler = null;
+        }
+
+        // Revoke all blob URLs
+        this._revokeAllBlobUrls();
+
+        Logger.log('[Playlist] destroyed');
     }
 
     /**

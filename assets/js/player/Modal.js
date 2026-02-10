@@ -19,6 +19,7 @@ export class Modal {
         this.closeBtn = null;
         this.body = null;
         this.footer = null;
+        this._cleanupCallbacks = [];
 
         this._init();
     }
@@ -113,15 +114,41 @@ export class Modal {
     }
 
     /**
+     * Register a cleanup callback to run when the modal closes.
+     * Use this to destroy dropdowns, disconnect observers, remove listeners, etc.
+     * @param {Function} callback
+     */
+    onCleanup(callback) {
+        if (typeof callback === 'function') {
+            this._cleanupCallbacks.push(callback);
+        }
+    }
+
+    /**
      * Close the modal
      */
     close() {
+        // Run registered cleanup callbacks
+        for (const cb of this._cleanupCallbacks) {
+            try { cb(); } catch (e) { Logger.warn('Modal cleanup error:', e); }
+        }
+        this._cleanupCallbacks.length = 0;
+
         if (this.overlay && this.overlay.parentNode) {
             this.overlay.parentNode.removeChild(this.overlay);
         }
         if (this.options.onClose) {
             this.options.onClose();
         }
+
+        // Null out references to help GC
+        this.overlay = null;
+        this.modal = null;
+        this.header = null;
+        this.title = null;
+        this.closeBtn = null;
+        this.body = null;
+        this.footer = null;
     }
 
     /**

@@ -11,10 +11,8 @@ import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
 
-import { HLSPlayer } from './HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { formatTime, parseTime } from '../utils/mediaUtils.js';
-import { AudioVisualizer } from '../player/AudioVisualizer.js';
 import { Logger } from '../utils/Logger.js';
 import { ThumbnailGenerator } from '../player/ThumbnailGenerator.js';
 
@@ -496,12 +494,14 @@ export class CorePlayer {
         // Set initial volume
         this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
 
-        // Initialize AudioVisualizer (taps into gainNode for analysis)
+        // Lazy-load AudioVisualizer (taps into gainNode for analysis)
         if (!this.audioVisualizer && this.canvas) {
-            this.audioVisualizer = new AudioVisualizer(this.canvas);
-            // Connect gainNode -> analyser (parallel path for visualization)
-            // Analyser doesn't need to connect to destination since gainNode already does
-            this.audioVisualizer.connect(this.audioContext, this.gainNode);
+            import('../player/AudioVisualizer.js').then(({ AudioVisualizer }) => {
+                if (!this.audioVisualizer && this.canvas && this.audioContext && this.gainNode) {
+                    this.audioVisualizer = new AudioVisualizer(this.canvas);
+                    this.audioVisualizer.connect(this.audioContext, this.gainNode);
+                }
+            });
         }
 
         this.isInitialized = true;
@@ -1797,7 +1797,7 @@ export class CorePlayer {
     /**
      * Reset the player state and unload media
      */
-    reset() {
+    async reset() {
         this.pause();
 
         // Clean up HLS streams
@@ -1821,14 +1821,19 @@ export class CorePlayer {
 
         this._cleanupThumbnails();
 
-        // Clean up iterators BEFORE disposing resources to prevent orphaned VideoSamples
-        if (this.videoFrameIterator) {
-            this.videoFrameIterator.return().catch(() => { });
-        }
-        // Wait for any pending audio iterator cleanup from pause()
-        // Note: audioBufferIterator is already cleaned up in pause()
+        // Await iterator cleanup BEFORE disposing resources to prevent orphaned VideoFrames
+        try {
+            if (this.videoFrameIterator) {
+                await this.videoFrameIterator.return();
+            }
+        } catch (e) { /* ignore */ }
+        try {
+            if (this.audioBufferIterator) {
+                await this.audioBufferIterator.return();
+            }
+        } catch (e) { /* ignore */ }
 
-        // Dispose MediaBunny resources
+        // Dispose MediaBunny resources (safe now that iterators are closed)
         this._disposeMediaBunnyResources();
 
         this.videoTrack = null;
@@ -1841,7 +1846,7 @@ export class CorePlayer {
         // Update UI
         this._updateTimeDisplay();
         this._updateProgress();
-        this.ui.loader.style.display = 'none';
+        if (this.ui?.loader) this.ui.loader.style.display = 'none';
 
         // Reset Audio Context if needed
         if (this.audioContext) {
@@ -2083,7 +2088,7 @@ export class CorePlayer {
             this._isMediaReady = false;
             // Stop any current playback and clean up MediaBunny resources
             this.pause(false);
-            this._cleanupMediaBunny();
+            await this._cleanupMediaBunny();
 
             this.isStreamMode = true;
             this.isWebcamMode = false; // Regular HLS is not a webcam
@@ -2101,9 +2106,15 @@ export class CorePlayer {
             // Show stream video, hide canvas
             this._showStreamVideo();
 
+            // Lazy-load HLSPlayer (defers 1.3MB hls.js until an HLS stream is played)
+            if (!this._HLSPlayerClass) {
+                const { HLSPlayer } = await import('./HLSPlayer.js');
+                this._HLSPlayerClass = HLSPlayer;
+            }
+
             // Initialize HLS player
             if (!this.hlsPlayer) {
-                this.hlsPlayer = new HLSPlayer(this.streamVideo, { withCredentials: this.config.withCredentials });
+                this.hlsPlayer = new this._HLSPlayerClass(this.streamVideo, { withCredentials: this.config.withCredentials });
 
                 // Setup event handlers
                 this.hlsPlayer.onManifestParsed = (data) => {
@@ -2119,7 +2130,7 @@ export class CorePlayer {
                     Logger.warn('[Stream] HLS error:', error);
                     // Only show fatal/network errors if NOT recoverable
                     if (error.fatal || error.type === 'networkError') {
-                        const errorDetails = HLSPlayer.getErrorDetails(error);
+                        const errorDetails = this._HLSPlayerClass.getErrorDetails(error);
                         if (!errorDetails.recoverable) {
                             this._showStreamError(errorDetails);
                             // Notify playlist to mark stream as broken
@@ -2177,13 +2188,17 @@ export class CorePlayer {
             this._setLoading(false);
 
             // Show error overlay for load failures
-            const errorDetails = HLSPlayer.getErrorDetails({
-                type: 'networkError',
-                details: error.message || 'manifestLoadError',
-                error: error,
-                url: url
-            });
-            this._showStreamError(errorDetails);
+            if (this._HLSPlayerClass) {
+                const errorDetails = this._HLSPlayerClass.getErrorDetails({
+                    type: 'networkError',
+                    details: error.message || 'manifestLoadError',
+                    error: error,
+                    url: url
+                });
+                this._showStreamError(errorDetails);
+            } else {
+                this._showStreamError({ message: error.message || 'Failed to load stream' });
+            }
 
             // Don't throw, just handle it in UI
             // this.isStreamMode = false; // Keep stream mode so retry works
@@ -2513,7 +2528,7 @@ export class CorePlayer {
         this._isMediaReady = false;
         // Stop current playback and cleanup MediaBunny resources
         this.pause(false);
-        this._cleanupMediaBunny();
+        await this._cleanupMediaBunny();
 
         // 1. Setup Preview (Existing CorePlayer Logic)
         this._createStreamVideo();
@@ -3177,18 +3192,23 @@ export class CorePlayer {
      * Clean up MediaBunny resources when switching to stream mode
      * @private
      */
-    _cleanupMediaBunny() {
-        // Reset iterators
-        if (this.videoFrameIterator) {
-            this.videoFrameIterator.return().catch(() => { });
-            this.videoFrameIterator = null;
-        }
-        if (this.audioBufferIterator) {
-            this.audioBufferIterator.return().catch(() => { });
-            this.audioBufferIterator = null;
-        }
+    async _cleanupMediaBunny() {
+        // Await iterator cleanup before disposing resources
+        try {
+            if (this.videoFrameIterator) {
+                await this.videoFrameIterator.return();
+            }
+        } catch (e) { /* ignore */ }
+        this.videoFrameIterator = null;
 
-        // Dispose sinks and input
+        try {
+            if (this.audioBufferIterator) {
+                await this.audioBufferIterator.return();
+            }
+        } catch (e) { /* ignore */ }
+        this.audioBufferIterator = null;
+
+        // Dispose sinks and input (safe now that iterators are closed)
         this._disposeMediaBunnyResources();
 
         this.videoTrack = null;
@@ -4548,9 +4568,9 @@ export class CorePlayer {
     /**
      * Destroy the player and clean up all resources
      */
-    destroy() {
+    async destroy() {
         // Full reset (stops playback, disposes MediaBunny resources)
-        this.reset();
+        await this.reset();
 
         // Clean up audio context
         if (this.audioContext) {
@@ -4565,6 +4585,7 @@ export class CorePlayer {
             document.removeEventListener('mozfullscreenchange', this._handlers.fullscreen);
             document.removeEventListener('MSFullscreenChange', this._handlers.fullscreen);
         }
+        document.removeEventListener('visibilitychange', this._handlers.visibilitychange);
         document.removeEventListener('click', this._handlers.click);
         if (this.config.controls.keyboard) {
             document.removeEventListener('keydown', this._handlers.keydown);

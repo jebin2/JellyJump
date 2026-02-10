@@ -11,6 +11,7 @@ export class MotionDetector {
     constructor() {
         this.isDetecting = false;
         this.progressCallback = null; // (progress: number) => void
+        this._input = null; // Track for cleanup
     }
 
     /**
@@ -42,18 +43,21 @@ export class MotionDetector {
         Logger.log('[MotionDetector] Starting detection...', { threshold, interval });
 
         try {
+            // Dispose previous Input if re-running detection
+            this._disposeInput();
+
             // 1. Setup Input
             const source = (resource instanceof File || resource instanceof Blob)
                 ? new BlobSource(resource)
                 : new UrlSource(resource);
 
-            const input = new Input({
+            this._input = new Input({
                 formats: ALL_FORMATS,
                 source,
             });
 
             // 2. Get Video Track
-            const videoTrack = await input.getPrimaryVideoTrack();
+            const videoTrack = await this._input.getPrimaryVideoTrack();
             if (!videoTrack) {
                 Logger.warn('[MotionDetector] No video track found');
                 return [];
@@ -163,7 +167,28 @@ export class MotionDetector {
             return [];
         } finally {
             this.isDetecting = false;
+            this._disposeInput();
         }
+    }
+
+    cancel() {
+        this.isDetecting = false;
+        this._disposeInput();
+    }
+
+    /**
+     * Dispose the MediaBunny Input to release decoded video memory.
+     * @private
+     */
+    _disposeInput() {
+        if (this._input && typeof this._input.dispose === 'function') {
+            try {
+                this._input.dispose();
+            } catch (e) {
+                Logger.warn('[MotionDetector] Error disposing input:', e);
+            }
+        }
+        this._input = null;
     }
 
     _calculateFrameDifference(data1, data2) {
