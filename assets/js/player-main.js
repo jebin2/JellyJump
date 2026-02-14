@@ -41,14 +41,9 @@ async function initializeApp() {
     if (!localStorage.getItem('JellyJumpDB-playlist') && (window.location.href.includes('//localhost:') || window.location.href.includes('//jebin2.github.io/JellyJump/') || window.location.href.includes('//www.voidall.com/JellyJump/'))) {
         playlist.addItems([
             {
-                title: 'Homepage',
+                title: 'Sample Video',
                 url: window.location.href.includes('//localhost:') ? '/homepage.mp4' : '/JellyJump/homepage.mp4',
                 isLocal: true
-            },
-            {
-                title: 'ForBiggerBlazes',
-                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-                isLocal: false
             }, {
                 url: "https://30a-tv.com/feeds/720p/63.m3u8",
                 title: "30A Ridiculous IP TV",
