@@ -2,7 +2,6 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId } from '../../utils/mediaUtils.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
@@ -196,7 +195,11 @@ export class ResizeMenu {
                 // Configure Download
                 const ext = 'mp4';
                 const filename = item.title.replace(/\.[^/.]+$/, "") + `-${targetW}x${targetH}.${ext}`;
-                const url = URL.createObjectURL(blob);
+
+                // Always add to Playlist
+                const { url } = playlist.insertProcessedItem(item, blob, filename, {
+                    type: `video/${ext}`,
+                });
 
                 downloadBtn.href = url;
                 downloadBtn.download = filename;
@@ -207,24 +210,6 @@ export class ResizeMenu {
                 resizeBtn.classList.remove('hidden');
                 progressStatus.textContent = 'Processing...';
                 progressText.textContent = '0%';
-
-                // Always add to Playlist
-                const newItem = {
-                    id: generateId(),
-                    title: filename,
-                    url: url,
-                    file: new File([blob], filename, { type: `video/${ext}` }),
-                    duration: item.duration,
-                    type: 'video',
-                    isLocal: true,
-                    isNew: true,
-                    path: (item.path || item.title) + '/' + filename
-                };
-
-                const insertIndex = playlist.items.indexOf(item) + 1;
-                playlist.items.splice(insertIndex, 0, newItem);
-                playlist.render();
-                playlist._saveState();
 
                 modal.closeBtn.disabled = false;
 

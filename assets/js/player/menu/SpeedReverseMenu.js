@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
+import { formatTime, parseTime } from '../../utils/mediaUtils.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
@@ -205,7 +205,14 @@ export class SpeedReverseMenu {
                     const speedTag = isReverse ? `reversed-${speed}x` : (speed < 1 ? `slow-${speed}x` : `fast-${speed}x`);
                     // @ts-ignore
                     const filename = `${item.title.replace(/\.[^.]+$/, '')}-${speedTag}.mp4`;
-                    const url = URL.createObjectURL(outputBlob);
+
+                    // Add to playlist
+                    const { item: newItem, url } = playlist.insertProcessedItem(item, outputBlob, filename, {
+                        duration: null,
+                        mediaType: 'video/mp4',
+                        extra: { thumbnail: item.thumbnail },
+                    });
+                    await playlist._ensureMetadata(newItem);
 
                     // Download Button
                     if (downloadBtn) {
@@ -221,29 +228,6 @@ export class SpeedReverseMenu {
                         downloadBtn.disabled = false;
                         downloadBtn.classList.remove('hidden');
                     }
-
-                    // Add to playlist
-                    const newItem = {
-                        title: filename,
-                        url: url,
-                        duration: null,
-                        thumbnail: item.thumbnail,
-                        isLocal: true,
-                        file: new File([outputBlob], filename, { type: 'video/mp4' }),
-                        id: generateId(),
-                        type: 'video/mp4',
-                        path: (item.path || item.title) + '/' + filename
-                    };
-
-                    const sourceIndex = playlist.items.indexOf(item);
-                    if (sourceIndex !== -1) {
-                        playlist.items.splice(sourceIndex + 1, 0, newItem);
-                    } else {
-                        playlist.items.push(newItem);
-                    }
-                    await playlist._ensureMetadata(newItem);
-                    playlist._saveState();
-                    playlist.render();
 
                 } catch (e) {
                     Logger.error('Processing failed:', e);

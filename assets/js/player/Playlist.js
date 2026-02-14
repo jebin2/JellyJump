@@ -1001,6 +1001,48 @@ export class Playlist {
     }
 
     /**
+     * Insert a processed result into the playlist after its source item.
+     * Centralizes the pattern used by menus after processing (convert, trim, encrypt, etc.)
+     * @param {Object} sourceItem - The original playlist item that was processed
+     * @param {Blob} blob - The result blob
+     * @param {string} filename - Display name / download filename
+     * @param {Object} [options]
+     * @param {string} [options.type] - File MIME type override (default: blob.type || 'video/mp4')
+     * @param {string} [options.mediaType] - Playlist type field ('video', 'audio', 'image/gif', etc.)
+     * @param {string|null} [options.duration] - Duration string; null to skip (caller may _ensureMetadata)
+     * @param {Object} [options.extra] - Additional fields merged into the item
+     * @returns {{ item: Object, url: string }}
+     */
+    insertProcessedItem(sourceItem, blob, filename, options = {}) {
+        const url = URL.createObjectURL(blob);
+        const mimeType = options.type || blob.type || 'video/mp4';
+        const newItem = {
+            id: generateId(),
+            title: filename,
+            url,
+            file: new File([blob], filename, { type: mimeType }),
+            duration: options.duration !== undefined ? options.duration : sourceItem.duration,
+            type: options.mediaType || 'video',
+            isLocal: true,
+            isNew: true,
+            path: (sourceItem.path || sourceItem.title) + '/' + filename,
+            ...options.extra,
+        };
+
+        const index = this.items.indexOf(sourceItem);
+        if (index !== -1) {
+            this.items.splice(index + 1, 0, newItem);
+        } else {
+            this.items.push(newItem);
+        }
+
+        this.render();
+        this._saveState();
+
+        return { item: newItem, url };
+    }
+
+    /**
      * Add multiple videos
      * @param {Array} videos 
      * @param {boolean} autoplay - Whether to auto-play the first item (default: true)

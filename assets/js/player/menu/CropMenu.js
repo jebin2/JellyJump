@@ -2,7 +2,6 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId } from '../../utils/mediaUtils.js';
 import {
     loadVideo,
     updateScale,
@@ -202,28 +201,13 @@ function setupCropButton(elements, state, item, playlist, modal) {
             // Success
             hideProgress(elements.progress);
             const filename = item.title.replace(/\.[^/.]+$/, "") + `-crop-${width}x${height}.mp4`;
-            const url = URL.createObjectURL(blob);
+
+            // Add to playlist
+            const { url } = playlist.insertProcessedItem(item, blob, filename);
 
             elements.buttons.download.href = url;
             elements.buttons.download.download = filename;
             elements.buttons.download.classList.remove('hidden');
-
-            // Add to playlist
-            const newItem = {
-                id: generateId(),
-                title: filename,
-                url: url,
-                file: new File([blob], filename, { type: 'video/mp4' }),
-                duration: item.duration,
-                type: 'video',
-                isLocal: true,
-                isNew: true,
-                path: (item.path || item.title) + '/' + filename
-            };
-
-            playlist.items.splice(playlist.items.indexOf(item) + 1, 0, newItem);
-            playlist.render();
-            playlist._saveState();
 
             showSuccess(elements.messages.success, 'Added to playlist');
             elements.buttons.crop.disabled = false;

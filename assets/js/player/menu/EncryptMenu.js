@@ -2,7 +2,6 @@ import { Logger } from '../../utils/Logger.js';
 import { Modal } from '../Modal.js';
 import { CryptoHelper } from '../../utils/CryptoHelper.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId } from '../../utils/mediaUtils.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
 /**
@@ -132,29 +131,15 @@ export class EncryptMenu {
                 // Build result filename
                 const suffix = currentMode === 'encrypt' ? '-encrypted' : '-decrypted';
                 const newFilename = item.title.replace(/\.[^/.]+$/, '') + suffix + '.mp4';
-                const url = URL.createObjectURL(resultBlob);
+
+                // Add to playlist
+                const { url } = playlist.insertProcessedItem(item, resultBlob, newFilename);
 
                 // Update download button
                 if (downloadBtn) {
                     downloadBtn.href = url;
                     downloadBtn.download = newFilename;
                 }
-
-                // Add to playlist
-                const newItem = {
-                    title: newFilename,
-                    url: url,
-                    file: new File([resultBlob], newFilename, { type: resultBlob.type }),
-                    duration: item.duration,
-                    type: 'video',
-                    path: (item.path || item.title) + '/' + newFilename,
-                    id: generateId()
-                };
-
-                const index = playlist.items.indexOf(item);
-                playlist.items.splice(index + 1, 0, newItem);
-                playlist.render();
-                playlist._saveState();
 
                 // Success UI
                 successMessage.classList.remove('hidden');

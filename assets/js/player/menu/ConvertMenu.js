@@ -2,7 +2,6 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId } from '../../utils/mediaUtils.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
@@ -220,31 +219,12 @@ export class ConvertMenu {
      */
     static _handleConversionSuccess(blob, originalItem, format, playlist, downloadBtn) {
         const newFilename = originalItem.title.replace(/\.[^/.]+$/, "") + `-converted.${format}`;
-        const url = URL.createObjectURL(blob);
+        const { url } = playlist.insertProcessedItem(originalItem, blob, newFilename);
 
         // Update Download Button
         if (downloadBtn) {
             downloadBtn.href = url;
             downloadBtn.download = newFilename;
         }
-
-        // Always add to playlist
-        const newItem = {
-            title: newFilename,
-            url: url,
-            file: new File([blob], newFilename, { type: blob.type }),
-            duration: originalItem.duration,
-            type: 'video',
-            path: (originalItem.path || originalItem.title) + '/' + newFilename,
-            id: generateId()
-        };
-
-        // Insert after original item
-        const index = playlist.items.indexOf(originalItem);
-        playlist.items.splice(index + 1, 0, newItem);
-
-        // Re-render playlist
-        playlist.render();
-        playlist._saveState();
     }
 }

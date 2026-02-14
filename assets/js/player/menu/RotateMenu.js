@@ -2,7 +2,6 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from "../Modal.js";
 import { createProcessFooter, FOOTER_CONFIGS } from "../../utils/FooterHelper.js";
 import { MediaProcessor } from "../../core/MediaProcessor.js";
-import { generateId } from '../../utils/mediaUtils.js';
 import {
     loadVideo,
     setupEditor,
@@ -172,21 +171,7 @@ export class RotateMenu {
                 successMsg.classList.remove('hidden');
 
                 // Add to playlist (under source item as subfolder)
-                const url = URL.createObjectURL(resultBlob);
-                const newItem = {
-                    id: generateId(),
-                    title: newName,
-                    url: url,
-                    file: new File([resultBlob], newName, { type: resultBlob.type }),
-                    duration: item.duration,
-                    type: 'video',
-                    isLocal: true,
-                    isNew: true,
-                    path: (item.path || item.title) + '/' + newName
-                };
-                playlist.items.splice(playlist.items.indexOf(item) + 1, 0, newItem);
-                playlist.render();
-                playlist._saveState();
+                playlist.insertProcessedItem(item, resultBlob, newName);
 
                 isProcessing = false;
 

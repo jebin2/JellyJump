@@ -748,25 +748,14 @@ export class WatermarkMenu {
                 elements.progress.section.classList.add('hidden');
 
                 const filename = item.title.replace(/\.[^/.]+$/, '') + `-watermarked.${format}`;
-                const url = URL.createObjectURL(blob);
+
+                const { url } = playlist.insertProcessedItem(item, blob, filename, {
+                    type: `video/${format}`,
+                });
+
                 elements.downloadBtn.href = url;
                 elements.downloadBtn.download = filename;
                 elements.downloadBtn.classList.remove('hidden');
-
-                const newItem = {
-                    id: generateId(),
-                    title: filename,
-                    url: url,
-                    file: new File([blob], filename, { type: `video/${format}` }),
-                    duration: item.duration,
-                    type: 'video',
-                    isLocal: true,
-                    isNew: true,
-                    path: (item.path || item.title) + '/' + filename
-                };
-                playlist.items.splice(playlist.items.indexOf(item) + 1, 0, newItem);
-                playlist.render();
-                playlist._saveState();
 
             } catch (e) {
                 Logger.error('Watermark processing failed:', e);

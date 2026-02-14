@@ -632,25 +632,12 @@ export class BlurMenu {
                 elements.progress.section.classList.add('hidden');
 
                 const filename = item.title.replace(/\.[^/.]+$/, '') + '-blurred.mp4';
-                const url = URL.createObjectURL(processedBlob);
+
+                const { url } = playlist.insertProcessedItem(item, processedBlob, filename);
+
                 elements.downloadBtn.href = url;
                 elements.downloadBtn.download = filename;
                 elements.downloadBtn.classList.remove('hidden');
-
-                const newItem = {
-                    id: generateId(),
-                    title: filename,
-                    url: url,
-                    file: new File([processedBlob], filename, { type: 'video/mp4' }),
-                    duration: item.duration,
-                    type: 'video',
-                    isLocal: true,
-                    isNew: true,
-                    path: (item.path || item.title) + '/' + filename
-                };
-                playlist.items.splice(playlist.items.indexOf(item) + 1, 0, newItem);
-                playlist.render();
-                playlist._saveState();
 
             } catch (e) {
                 Logger.error('Blur processing failed:', e);

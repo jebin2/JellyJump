@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { generateId, formatTime } from '../../utils/mediaUtils.js';
+import { formatTime } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
 
@@ -363,7 +363,14 @@ export class RemoveBackgroundMenu {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                 const ext = bgType === 'transparent' ? 'webm' : 'mp4';
                 const filename = `${item.title.replace(/\.[^.]+$/, '')}-nobg.${ext}`;
-                const url = URL.createObjectURL(processedBlob);
+
+                // Add to playlist
+                const { item: newItem, url } = playlist.insertProcessedItem(item, processedBlob, filename, {
+                    type: `video/${ext}`,
+                    mediaType: `video/${ext}`,
+                    duration: null,
+                    extra: { thumbnail: item.thumbnail },
+                });
 
                 downloadBtn.href = url;
                 downloadBtn.download = filename;
@@ -373,29 +380,7 @@ export class RemoveBackgroundMenu {
                     e.stopPropagation(); // Allow default download action
                 };
 
-                // Add to playlist
-                const newItem = {
-                    title: filename,
-                    url: url,
-                    duration: null, // Let metadata fetcher populate this
-                    thumbnail: item.thumbnail, // Use original thumbnail for now
-                    isLocal: true,
-                    file: new File([processedBlob], filename, { type: `video/${ext}` }),
-                    id: generateId(),
-                    type: `video/${ext}`,
-                    path: (item.path || item.title) + '/' + filename
-                };
-
-                const sourceIndex = playlist.items.indexOf(item);
-                if (sourceIndex !== -1) {
-                    playlist.items.splice(sourceIndex + 1, 0, newItem);
-                } else {
-                    playlist.items.push(newItem);
-                }
                 await playlist._ensureMetadata(newItem);
-
-                playlist._saveState();
-                playlist.render();
 
             } catch (e) {
                 Logger.error('Processing failed:', e);

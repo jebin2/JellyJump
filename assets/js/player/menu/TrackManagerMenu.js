@@ -2,7 +2,6 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId } from '../../utils/mediaUtils.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
 
 /**
@@ -277,31 +276,23 @@ export class TrackManagerMenu {
         const ext = format;
         const speedSuffix = speed !== 1 ? `-${speed}x` : '';
         const newFilename = `${originalItem.title.replace(/\.[^/.]+$/, "")}-${trackType}-track${trackIndex + 1}${speedSuffix}.${ext}`;
-        const url = URL.createObjectURL(blob);
 
         const progressSection = modal.querySelector('.progress-section');
         const successMessage = modal.querySelector('.success-message');
 
         if (addToPlaylist) {
-            const newItem = {
-                id: generateId(),
-                title: newFilename,
-                url: url,
-                file: new File([blob], newFilename, { type: blob.type }),
-                duration: originalItem.duration,
-                type: trackType === 'video' ? 'video' : 'audio',
-                path: (originalItem.path || originalItem.title).includes('/') ?
-                    (originalItem.path.split('/').slice(0, -1).join('/') + '/' + newFilename) :
-                    (originalItem.title + '/' + newFilename),
-                isAudioOnly: trackType === 'audio'
-            };
+            const customPath = (originalItem.path || originalItem.title).includes('/')
+                ? (originalItem.path.split('/').slice(0, -1).join('/') + '/' + newFilename)
+                : (originalItem.title + '/' + newFilename);
 
-            // Insert after original item
             const index = playlist.items.indexOf(originalItem);
-            playlist.items.splice(index + 1, 0, newItem);
-
-            // Re-render playlist
-            playlist.render();
+            playlist.insertProcessedItem(originalItem, blob, newFilename, {
+                mediaType: trackType === 'video' ? 'video' : 'audio',
+                extra: {
+                    path: customPath,
+                    isAudioOnly: trackType === 'audio',
+                },
+            });
 
             // Success feedback
             successMessage.classList.remove('hidden');
@@ -314,6 +305,7 @@ export class TrackManagerMenu {
             }, 100);
         } else {
             // Trigger Download
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = newFilename;

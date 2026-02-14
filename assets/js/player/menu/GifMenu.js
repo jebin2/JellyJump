@@ -2,7 +2,7 @@ import { Logger } from "../../utils/Logger.js";
 import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId, formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
+import { formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
@@ -317,27 +317,12 @@ export class GifMenu {
                 downloadBtn.classList.remove('hidden');
 
                 // Always add to playlist
-                const newItem = {
-                    title: filename,
-                    url: previewUrl,
-                    duration: formatTime(end - start),
-                    thumbnail: previewUrl,
-                    isLocal: true,
-                    file: new File([gifBlob], filename, { type: 'image/gif' }),
-                    id: generateId(),
+                playlist.insertProcessedItem(item, gifBlob, filename, {
                     type: 'image/gif',
-                    path: (item.path || item.title) + '/' + filename
-                };
-
-                const sourceIndex = playlist.items.indexOf(item);
-                if (sourceIndex !== -1) {
-                    playlist.items.splice(sourceIndex + 1, 0, newItem);
-                } else {
-                    playlist.items.push(newItem);
-                }
-
-                playlist._saveState();
-                playlist.render();
+                    mediaType: 'image/gif',
+                    duration: formatTime(end - start),
+                    extra: { url: previewUrl, thumbnail: previewUrl },
+                });
 
                 modal.closeBtn.disabled = false;
 
