@@ -198,7 +198,7 @@ export class TrackManagerMenu {
         renderList(tracks.audio, audioList, 'audio');
 
         // Register dropdown cleanup on modal close
-        modal.onCleanup(() => {
+        modalInstance.onCleanup(() => {
             dropdowns.forEach(d => d.destroy());
         });
     }
