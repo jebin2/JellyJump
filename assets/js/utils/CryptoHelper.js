@@ -210,9 +210,10 @@ export class CryptoHelper {
             const counter = CryptoHelper._buildCounter(iv, absoluteOffset);
 
             // Encrypt zeros to get the keystream
+            // length: 32 = NIST standard 96-bit nonce + 32-bit counter (supports up to 64GB)
             const zeros = new Uint8Array(chunkSize);
             const keystreamBuf = await crypto.subtle.encrypt(
-                { name: 'AES-CTR', counter, length: 128 },
+                { name: 'AES-CTR', counter, length: 32 },
                 key,
                 zeros
             );
@@ -236,21 +237,20 @@ export class CryptoHelper {
 
     /**
      * Build a 16-byte AES-CTR counter value for a given byte offset.
-     * The IV occupies the first 8 bytes; the remaining 8 bytes hold
-     * the block counter (offset / 16).
-     * @param {Uint8Array} iv - Original 16-byte IV
+     * Uses NIST standard layout: 96-bit nonce (12 bytes of IV) + 32-bit block counter.
+     * Supports files up to 2^32 blocks * 16 bytes = 64GB.
+     * @param {Uint8Array} iv - Original 16-byte IV (first 12 bytes used as nonce)
      * @param {number} byteOffset - Byte position in the keystream
      * @returns {Uint8Array} 16-byte counter
      */
     static _buildCounter(iv, byteOffset) {
         const counter = new Uint8Array(16);
-        counter.set(iv.subarray(0, 8), 0);
+        // 96-bit nonce from first 12 bytes of IV
+        counter.set(iv.subarray(0, 12), 0);
 
-        // Block index = byteOffset / 16
+        // 32-bit block counter in bytes 12-15
         const blockIndex = Math.floor(byteOffset / 16);
         const view = new DataView(counter.buffer);
-        // Store as big-endian 64-bit in bytes 8-15
-        view.setUint32(8, Math.floor(blockIndex / 0x100000000));
         view.setUint32(12, blockIndex >>> 0);
 
         return counter;
