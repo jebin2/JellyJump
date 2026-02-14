@@ -106,6 +106,11 @@ export class MenuRouter {
                 new MotionDetectionMenu(playlist).execute(item);
                 break;
             }
+            case 'encrypt': {
+                const { EncryptMenu } = await import('./EncryptMenu.js');
+                await EncryptMenu.init(item, playlist);
+                break;
+            }
             default:
                 Logger.warn(`MenuRouter: Unknown action "${action}"`);
         }

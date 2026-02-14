@@ -99,5 +99,10 @@ export const FOOTER_CONFIGS = {
         actionClass: 'rotate-process-btn',
         icon: 'icon-rotate-cw',
         title: 'Apply Rotation'
+    },
+    encrypt: {
+        actionClass: 'encrypt-btn',
+        icon: 'icon-lock',
+        title: 'Encrypt'
     }
 };

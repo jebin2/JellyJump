@@ -2740,6 +2740,7 @@ export class Playlist {
             { action: 'blur', icon: 'icon-blur', label: 'Blur' },
             { action: 'detect-cuts', icon: 'icon-scenes', label: 'Scenes' },
             { action: 'detect-motion', icon: 'icon-motion', label: 'Motion' },
+            { action: 'encrypt', icon: 'icon-lock', label: 'Encrypt' },
             { action: 'info', icon: 'icon-info', label: 'Info' }
         ];
 

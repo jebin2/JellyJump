@@ -2008,3 +2008,51 @@
         </div>
     </div>
 </template>
+
+<!-- Encrypt/Decrypt Content Template -->
+<template id="encrypt-content-template">
+    <!-- Mode Selection -->
+    <div class="encrypt-mode-section mb-lg">
+        <div class="text-secondary text-sm font-mono mb-sm">MODE:</div>
+        <div class="flex gap-sm">
+            <label class="jellyjump-btn-secondary flex-1 py-sm text-center cursor-pointer encrypt-mode-label">
+                <input type="radio" name="encrypt-mode" value="encrypt" checked class="hidden">
+                <svg width="16" height="16" fill="currentColor" class="inline-block mr-xs"
+                    style="vertical-align: -2px;">
+                    <use href="assets/icons/sprite.svg#icon-lock"></use>
+                </svg>
+                Encrypt
+            </label>
+            <label class="jellyjump-btn-secondary flex-1 py-sm text-center cursor-pointer encrypt-mode-label">
+                <input type="radio" name="encrypt-mode" value="decrypt" class="hidden">
+                <svg width="16" height="16" fill="currentColor" class="inline-block mr-xs"
+                    style="vertical-align: -2px;">
+                    <use href="assets/icons/sprite.svg#icon-lock"></use>
+                </svg>
+                Decrypt
+            </label>
+        </div>
+    </div>
+
+    <!-- Password Input -->
+    <div class="encrypt-password-section mb-md">
+        <label class="text-secondary text-sm font-mono mb-sm block">PASSWORD:</label>
+        <input type="password" class="encrypt-password jellyjump-input w-full" placeholder="Enter password"
+            autocomplete="off">
+    </div>
+
+    <!-- Confirm Password (encrypt only) -->
+    <div class="encrypt-confirm-section mb-md">
+        <label class="text-secondary text-sm font-mono mb-sm block">CONFIRM PASSWORD:</label>
+        <input type="password" class="encrypt-confirm jellyjump-input w-full" placeholder="Confirm password"
+            autocomplete="off">
+    </div>
+
+    <!-- Info -->
+    <div class="encrypt-info text-xs text-secondary">
+        <p class="encrypt-info-text">Encrypts the video's media data with a password. The file remains a valid MP4 but
+            plays as corrupted noise. Only the correct password can restore the original.</p>
+        <p class="encrypt-info-text mt-xs" style="opacity: 0.7;">MP4/MOV files only. No password recovery - remember
+            your password.</p>
+    </div>
+</template>
