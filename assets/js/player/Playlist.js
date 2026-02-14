@@ -1020,6 +1020,7 @@ export class Playlist {
             id: generateId(),
             title: filename,
             url,
+            blob_url: url,
             file: new File([blob], filename, { type: mimeType }),
             duration: options.duration !== undefined ? options.duration : sourceItem.duration,
             type: options.mediaType || 'video',
