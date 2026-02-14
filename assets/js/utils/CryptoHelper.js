@@ -6,8 +6,9 @@ import { Logger } from './Logger.js';
  * Encrypted file format (JJC2):
  *   [Placeholder MP4 video — playable, shows encryption message]
  *   [Encrypted original file bytes — AES-CTR XOR of entire blob]
- *   [Trailer: salt(16) + iv(16) + hmac(32) + placeholderSize(4 bytes, uint32 BE) + "JJC2"(4 bytes)]
- *   = 72 bytes trailer
+ *   [Metadata JSON — cleartext: original filename, MIME type, password hint]
+ *   [Fixed trailer: salt(16) + iv(16) + hmac(32) + placeholderSize(4) + metadataSize(4) + "JJC2"(4)]
+ *   = 76 bytes fixed trailer
  *
  * Security:
  *   - AES-256-CTR provides confidentiality (streaming, no quality loss)
@@ -20,19 +21,24 @@ export class CryptoHelper {
     static SALT_SIZE = 16;
     static IV_SIZE = 16;
     static HMAC_SIZE = 32;
-    static TRAILER_SIZE = 72; // salt(16) + iv(16) + hmac(32) + placeholderSize(4) + magic(4)
+    static FIXED_TRAILER_SIZE = 76; // salt(16) + iv(16) + hmac(32) + placeholderSize(4) + metadataSize(4) + magic(4)
     static CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB
     static PBKDF2_ITERATIONS = 100_000;
 
     /**
      * Encrypt a file blob.
-     * Output: [placeholder MP4] + [AES-CTR encrypted original] + [72-byte trailer]
+     * Output: [placeholder MP4] + [encrypted data] + [metadata JSON] + [76-byte trailer]
      * @param {Blob} blob - Source file
      * @param {string} password
-     * @param {Function} [onProgress] - (0..1)
+     * @param {Object} [options]
+     * @param {string} [options.filename] - Original filename to preserve
+     * @param {string} [options.mimeType] - Original MIME type to preserve
+     * @param {string} [options.hint] - Password hint (cleartext)
+     * @param {Function} [options.onProgress] - (0..1)
      * @returns {Promise<Blob>}
      */
-    static async encrypt(blob, password, onProgress) {
+    static async encrypt(blob, password, options = {}) {
+        const { filename, mimeType, hint, onProgress } = options;
         const fileSize = blob.size;
         Logger.log(`[CryptoHelper] ENCRYPT start — fileSize: ${fileSize} bytes`);
 
@@ -75,27 +81,40 @@ export class CryptoHelper {
             }
         }
 
-        // Step 4: Compute HMAC-SHA256 over ciphertext (streaming)
+        // Step 4: Compute HMAC-SHA256 over ciphertext
         Logger.log(`[CryptoHelper] Computing HMAC over ciphertext...`);
         const ciphertextBlob = new Blob(ciphertextParts);
         const hmac = await CryptoHelper._computeHmac(hmacKey, ciphertextBlob);
         Logger.log(`[CryptoHelper] HMAC computed: ${CryptoHelper._hexPrefix(hmac)}`);
 
-        if (onProgress) onProgress(1);
+        if (onProgress) onProgress(0.9);
 
-        // Step 5: Build trailer: salt(16) + iv(16) + hmac(32) + placeholderSize(4, uint32 BE) + magic(4)
-        const trailer = new Uint8Array(CryptoHelper.TRAILER_SIZE);
+        // Step 5: Build metadata JSON
+        const metadata = {};
+        if (filename) metadata.name = filename;
+        if (mimeType) metadata.type = mimeType;
+        if (hint) metadata.hint = hint;
+        const metadataBytes = new TextEncoder().encode(JSON.stringify(metadata));
+        const metadataSize = metadataBytes.length;
+        Logger.log(`[CryptoHelper] Metadata: ${metadataSize} bytes — ${JSON.stringify(metadata)}`);
+
+        // Step 6: Build fixed trailer
+        const trailer = new Uint8Array(CryptoHelper.FIXED_TRAILER_SIZE);
         let off = 0;
         trailer.set(salt, off); off += CryptoHelper.SALT_SIZE;
         trailer.set(iv, off); off += CryptoHelper.IV_SIZE;
         trailer.set(hmac, off); off += CryptoHelper.HMAC_SIZE;
-        new DataView(trailer.buffer).setUint32(off, placeholderSize, false); off += 4;
+        const dv = new DataView(trailer.buffer);
+        dv.setUint32(off, placeholderSize, false); off += 4;
+        dv.setUint32(off, metadataSize, false); off += 4;
         trailer.set(new TextEncoder().encode(CryptoHelper.MAGIC), off);
 
-        // Assemble: placeholder + ciphertext + trailer
-        const parts = [placeholderBlob, ...ciphertextParts, new Blob([trailer])];
+        if (onProgress) onProgress(1);
+
+        // Assemble: placeholder + ciphertext + metadata + trailer
+        const parts = [placeholderBlob, ...ciphertextParts, new Blob([metadataBytes]), new Blob([trailer])];
         const outputBlob = new Blob(parts, { type: 'video/mp4' });
-        const expectedSize = placeholderSize + fileSize + CryptoHelper.TRAILER_SIZE;
+        const expectedSize = placeholderSize + fileSize + metadataSize + CryptoHelper.FIXED_TRAILER_SIZE;
         Logger.log(`[CryptoHelper] ENCRYPT done — output: ${outputBlob.size} bytes, expected: ${expectedSize}, match: ${outputBlob.size === expectedSize}`);
 
         return outputBlob;
@@ -107,44 +126,59 @@ export class CryptoHelper {
      * @param {Blob} blob - Encrypted file
      * @param {string} password
      * @param {Function} [onProgress] - (0..1)
-     * @returns {Promise<Blob>}
+     * @returns {Promise<{blob: Blob, metadata: Object}>} Decrypted blob and metadata
      */
     static async decrypt(blob, password, onProgress) {
         const fileSize = blob.size;
         Logger.log(`[CryptoHelper] DECRYPT start — fileSize: ${fileSize} bytes`);
 
-        if (fileSize < CryptoHelper.TRAILER_SIZE) {
+        if (fileSize < CryptoHelper.FIXED_TRAILER_SIZE) {
             throw new Error('File too small to contain encryption data.');
         }
 
-        // Read 72-byte trailer
-        const trailerBlob = blob.slice(fileSize - CryptoHelper.TRAILER_SIZE, fileSize);
+        // Read fixed trailer
+        const trailerBlob = blob.slice(fileSize - CryptoHelper.FIXED_TRAILER_SIZE, fileSize);
         const trailerBuf = await trailerBlob.arrayBuffer();
         const trailerData = new Uint8Array(trailerBuf);
 
         // Verify magic
-        const magicOffset = CryptoHelper.TRAILER_SIZE - 4;
+        const magicOffset = CryptoHelper.FIXED_TRAILER_SIZE - 4;
         const magic = new TextDecoder().decode(trailerData.slice(magicOffset, magicOffset + 4));
         if (magic !== CryptoHelper.MAGIC) {
             throw new Error('This file does not appear to be encrypted (missing JJC2 marker).');
         }
         Logger.log(`[CryptoHelper] Trailer verified — magic: ${magic}`);
 
-        // Parse trailer fields
+        // Parse fixed trailer fields
         let off = 0;
         const salt = trailerData.slice(off, off + CryptoHelper.SALT_SIZE); off += CryptoHelper.SALT_SIZE;
         const iv = trailerData.slice(off, off + CryptoHelper.IV_SIZE); off += CryptoHelper.IV_SIZE;
         const storedHmac = trailerData.slice(off, off + CryptoHelper.HMAC_SIZE); off += CryptoHelper.HMAC_SIZE;
-        const placeholderSize = new DataView(trailerBuf).getUint32(off, false);
-        Logger.log(`[CryptoHelper] placeholderSize: ${placeholderSize}`);
+        const dv = new DataView(trailerBuf);
+        const placeholderSize = dv.getUint32(off, false); off += 4;
+        const metadataSize = dv.getUint32(off, false);
+        Logger.log(`[CryptoHelper] placeholderSize: ${placeholderSize}, metadataSize: ${metadataSize}`);
+
+        // Read metadata JSON
+        const metadataStart = fileSize - CryptoHelper.FIXED_TRAILER_SIZE - metadataSize;
+        let metadata = {};
+        if (metadataSize > 0) {
+            const metaBuf = await blob.slice(metadataStart, metadataStart + metadataSize).arrayBuffer();
+            try {
+                metadata = JSON.parse(new TextDecoder().decode(metaBuf));
+            } catch (e) {
+                Logger.warn(`[CryptoHelper] Failed to parse metadata JSON: ${e.message}`);
+            }
+        }
+        Logger.log(`[CryptoHelper] Metadata: ${JSON.stringify(metadata)}`);
 
         // Derive keys
         const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
         Logger.log(`[CryptoHelper] Keys derived (PBKDF2, ${CryptoHelper.PBKDF2_ITERATIONS} iterations)`);
 
-        // Encrypted data region
+        // Encrypted data region (between placeholder and metadata)
         const encryptedStart = placeholderSize;
-        const encryptedEnd = fileSize - CryptoHelper.TRAILER_SIZE;
+        const encryptedEnd = metadataStart;
         const encryptedSize = encryptedEnd - encryptedStart;
         Logger.log(`[CryptoHelper] Encrypted data: file[${encryptedStart}..${encryptedEnd}) = ${encryptedSize} bytes`);
 
@@ -152,7 +186,7 @@ export class CryptoHelper {
             throw new Error('No encrypted data found in file.');
         }
 
-        // Step 1: Verify HMAC before decrypting (streaming)
+        // Step 1: Verify HMAC before decrypting
         Logger.log(`[CryptoHelper] Verifying HMAC...`);
         const ciphertextBlob = blob.slice(encryptedStart, encryptedEnd);
         const computedHmac = await CryptoHelper._computeHmac(hmacKey, ciphertextBlob);
@@ -189,10 +223,41 @@ export class CryptoHelper {
             }
         }
 
-        const outputBlob = new Blob(parts, { type: 'video/mp4' });
+        const outputType = metadata.type || 'video/mp4';
+        const outputBlob = new Blob(parts, { type: outputType });
         Logger.log(`[CryptoHelper] DECRYPT done — output: ${outputBlob.size} bytes, expected: ${encryptedSize}, match: ${outputBlob.size === encryptedSize}`);
 
-        return outputBlob;
+        return { blob: outputBlob, metadata };
+    }
+
+    /**
+     * Read metadata from an encrypted file without decrypting.
+     * Useful for showing password hint before asking for password.
+     * @param {Blob} blob - Encrypted file
+     * @returns {Promise<Object|null>} Metadata object or null if not a JJC2 file
+     */
+    static async readMetadata(blob) {
+        const fileSize = blob.size;
+        if (fileSize < CryptoHelper.FIXED_TRAILER_SIZE) return null;
+
+        const trailerBuf = await blob.slice(fileSize - CryptoHelper.FIXED_TRAILER_SIZE, fileSize).arrayBuffer();
+        const trailerData = new Uint8Array(trailerBuf);
+
+        const magicOffset = CryptoHelper.FIXED_TRAILER_SIZE - 4;
+        const magic = new TextDecoder().decode(trailerData.slice(magicOffset, magicOffset + 4));
+        if (magic !== CryptoHelper.MAGIC) return null;
+
+        const dv = new DataView(trailerBuf);
+        const metadataSize = dv.getUint32(CryptoHelper.SALT_SIZE + CryptoHelper.IV_SIZE + CryptoHelper.HMAC_SIZE + 4, false);
+        if (metadataSize === 0) return {};
+
+        const metadataStart = fileSize - CryptoHelper.FIXED_TRAILER_SIZE - metadataSize;
+        const metaBuf = await blob.slice(metadataStart, metadataStart + metadataSize).arrayBuffer();
+        try {
+            return JSON.parse(new TextDecoder().decode(metaBuf));
+        } catch {
+            return {};
+        }
     }
 
     /**
@@ -202,8 +267,6 @@ export class CryptoHelper {
      * @returns {Promise<Uint8Array>} 32-byte HMAC
      */
     static async _computeHmac(hmacKey, blob) {
-        // WebCrypto sign() requires a single buffer, but we can build it from chunks
-        // For streaming HMAC we use SubtleCrypto's sign with assembled data
         const size = blob.size;
         let offset = 0;
         const chunks = [];
@@ -219,7 +282,6 @@ export class CryptoHelper {
             }
         }
 
-        // Concatenate into single buffer for HMAC
         const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
         const data = new Uint8Array(totalLen);
         let pos = 0;
@@ -308,29 +370,24 @@ export class CryptoHelper {
      * @param {number} h - Canvas height
      */
     static _drawEncryptionMessage(ctx, w, h) {
-        // Dark background
         ctx.fillStyle = '#0f0f1a';
         ctx.fillRect(0, 0, w, h);
 
-        // Red accent border (inner)
         const borderWidth = 3;
         ctx.strokeStyle = '#e94560';
         ctx.lineWidth = borderWidth;
         ctx.strokeRect(borderWidth / 2, borderWidth / 2, w - borderWidth, h - borderWidth);
 
-        // Lock icon
         ctx.font = '48px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#e94560';
         ctx.fillText('\u{1F512}', w / 2, h / 2 - 50);
 
-        // Main text
         ctx.font = 'bold 24px sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.fillText('This video is encrypted', w / 2, h / 2 + 10);
 
-        // URL
         ctx.font = '18px sans-serif';
         ctx.fillStyle = '#888888';
         ctx.fillText('voidall.com/JellyJump', w / 2, h / 2 + 50);
@@ -359,15 +416,13 @@ export class CryptoHelper {
         );
 
         const allBytes = new Uint8Array(bits);
-        const aesKeyBytes = allBytes.slice(0, 32);
-        const hmacKeyBytes = allBytes.slice(32, 64);
 
         const aesKey = await crypto.subtle.importKey(
-            'raw', aesKeyBytes, { name: 'AES-CTR' }, false, ['encrypt']
+            'raw', allBytes.slice(0, 32), { name: 'AES-CTR' }, false, ['encrypt']
         );
 
         const hmacKey = await crypto.subtle.importKey(
-            'raw', hmacKeyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+            'raw', allBytes.slice(32, 64), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
         );
 
         return { aesKey, hmacKey };
@@ -375,8 +430,6 @@ export class CryptoHelper {
 
     /**
      * XOR a region within a buffer with AES-CTR keystream.
-     * Handles unaligned stream offsets by generating from the aligned block
-     * boundary and skipping the leading bytes.
      * @param {Uint8Array} chunkData - The buffer (modified in place)
      * @param {number} localOffset - Start offset within the buffer
      * @param {number} size - Number of bytes to XOR
@@ -389,7 +442,6 @@ export class CryptoHelper {
         const counter = CryptoHelper._buildCounter(iv, streamOffset - remainder);
 
         const zeros = new Uint8Array(size + remainder);
-        // length: 32 = NIST standard 96-bit nonce + 32-bit counter (supports up to 64GB)
         const keystreamBuf = await crypto.subtle.encrypt(
             { name: 'AES-CTR', counter, length: 32 },
             key,

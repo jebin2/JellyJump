@@ -6,7 +6,7 @@ import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js
 
 /**
  * Encrypt Menu Handler
- * Encrypts or decrypts files using a playable placeholder + AES-CTR format.
+ * Encrypts or decrypts files using a playable placeholder + AES-CTR + HMAC format.
  */
 export class EncryptMenu {
     /**
@@ -42,25 +42,41 @@ export class EncryptMenu {
         const passwordInput = modalContent.querySelector('.encrypt-password');
         const confirmInput = modalContent.querySelector('.encrypt-confirm');
         const confirmSection = modalContent.querySelector('.encrypt-confirm-section');
+        const hintInput = modalContent.querySelector('.encrypt-hint');
+        const hintSection = modalContent.querySelector('.encrypt-hint-section');
+        const hintDisplay = modalContent.querySelector('.encrypt-hint-display');
+        const hintValue = modalContent.querySelector('.encrypt-hint-value');
         const infoText = modalContent.querySelector('.encrypt-info-text');
 
         const actionIconUse = modalContent.querySelector('.action-icon-use');
 
         let currentMode = 'encrypt';
+        let fileMetadata = null;
 
         const updateModeUI = () => {
             if (currentMode === 'encrypt') {
                 confirmSection.classList.remove('hidden');
+                hintSection.classList.remove('hidden');
+                hintDisplay.classList.add('hidden');
                 encryptBtn.title = 'Encrypt';
                 encryptBtn.setAttribute('aria-label', 'Encrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock');
                 infoText.textContent = 'Encrypts the file with a password. The output plays a short "encrypted" message in external players (VLC, etc). Only the correct password can restore the original.';
             } else {
                 confirmSection.classList.add('hidden');
+                hintSection.classList.add('hidden');
                 encryptBtn.title = 'Decrypt';
                 encryptBtn.setAttribute('aria-label', 'Decrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock-open');
-                infoText.textContent = 'Decrypts a previously encrypted file. Enter the same password used to encrypt it. A wrong password will produce garbage output without any error.';
+                infoText.textContent = 'Decrypts a previously encrypted file. Enter the same password used to encrypt it.';
+
+                // Show hint if available from file metadata
+                if (fileMetadata && fileMetadata.hint) {
+                    hintValue.textContent = fileMetadata.hint;
+                    hintDisplay.classList.remove('hidden');
+                } else {
+                    hintDisplay.classList.add('hidden');
+                }
             }
         };
 
@@ -69,6 +85,17 @@ export class EncryptMenu {
             updateModeUI();
             errorMessage.classList.add('hidden');
         });
+
+        // Try to read metadata from the file (for hint display in decrypt mode)
+        try {
+            const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+            fileMetadata = await CryptoHelper.readMetadata(source);
+            if (fileMetadata) {
+                Logger.log(`[EncryptMenu] File metadata: ${JSON.stringify(fileMetadata)}`);
+            }
+        } catch (e) {
+            Logger.log(`[EncryptMenu] Could not read metadata: ${e.message}`);
+        }
 
         updateModeUI();
 
@@ -94,6 +121,7 @@ export class EncryptMenu {
             modal.closeBtn.disabled = true;
             passwordInput.disabled = true;
             confirmInput.disabled = true;
+            hintInput.disabled = true;
             toggleCheckbox.disabled = true;
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
@@ -107,16 +135,22 @@ export class EncryptMenu {
                     progressPercentage.textContent = Math.round(progress * 100) + '%';
                 };
 
-                let resultBlob;
-                if (currentMode === 'encrypt') {
-                    resultBlob = await CryptoHelper.encrypt(source, password, onProgress);
-                } else {
-                    resultBlob = await CryptoHelper.decrypt(source, password, onProgress);
-                }
+                let resultBlob, newFilename;
 
-                // Build result filename
-                const suffix = currentMode === 'encrypt' ? '-encrypted' : '-decrypted';
-                const newFilename = item.title.replace(/\.[^/.]+$/, '') + suffix + '.mp4';
+                if (currentMode === 'encrypt') {
+                    resultBlob = await CryptoHelper.encrypt(source, password, {
+                        filename: item.title,
+                        mimeType: source.type || item.type || 'video/mp4',
+                        hint: hintInput.value.trim() || undefined,
+                        onProgress,
+                    });
+                    newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
+                } else {
+                    const result = await CryptoHelper.decrypt(source, password, onProgress);
+                    resultBlob = result.blob;
+                    // Restore original filename from metadata, or fall back
+                    newFilename = result.metadata.name || (item.title.replace(/\.[^/.]+$/, '') + '-decrypted.mp4');
+                }
 
                 // Add to playlist
                 const { url } = playlist.insertProcessedItem(item, resultBlob, newFilename);
@@ -145,6 +179,7 @@ export class EncryptMenu {
             modal.closeBtn.disabled = false;
             passwordInput.disabled = false;
             confirmInput.disabled = false;
+            hintInput.disabled = false;
             toggleCheckbox.disabled = false;
         });
 
