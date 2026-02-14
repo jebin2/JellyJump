@@ -1,29 +1,32 @@
 import { Logger } from './Logger.js';
 
 /**
- * CryptoHelper - Encrypts/decrypts files using a playable placeholder + AES-CTR format.
+ * CryptoHelper - Encrypts/decrypts files using a playable placeholder + AES-CTR + HMAC format.
  *
  * Encrypted file format (JJC2):
  *   [Placeholder MP4 video — playable, shows encryption message]
  *   [Encrypted original file bytes — AES-CTR XOR of entire blob]
- *   [Trailer: salt(16) + iv(16) + placeholderSize(4 bytes, uint32 BE) + "JJC2"(4 bytes)]
- *   = 40 bytes trailer
+ *   [Trailer: salt(16) + iv(16) + hmac(32) + placeholderSize(4 bytes, uint32 BE) + "JJC2"(4 bytes)]
+ *   = 72 bytes trailer
  *
- * External players see and play the placeholder video.
- * JellyJump reads the trailer, extracts + decrypts the original file.
- * Zero quality loss — the original file bytes are preserved exactly.
+ * Security:
+ *   - AES-256-CTR provides confidentiality (streaming, no quality loss)
+ *   - HMAC-SHA256 provides integrity (tamper detection, verified before decryption)
+ *   - PBKDF2 derives 512 bits: first 256 for AES, second 256 for HMAC
+ *   - Wrong password or tampered ciphertext → rejected before any decryption
  */
 export class CryptoHelper {
     static MAGIC = 'JJC2';
     static SALT_SIZE = 16;
     static IV_SIZE = 16;
-    static TRAILER_SIZE = 40; // salt(16) + iv(16) + placeholderSize(4) + magic(4)
+    static HMAC_SIZE = 32;
+    static TRAILER_SIZE = 72; // salt(16) + iv(16) + hmac(32) + placeholderSize(4) + magic(4)
     static CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB
     static PBKDF2_ITERATIONS = 100_000;
 
     /**
      * Encrypt a file blob.
-     * Output: [placeholder MP4] + [AES-CTR encrypted original] + [40-byte trailer]
+     * Output: [placeholder MP4] + [AES-CTR encrypted original] + [72-byte trailer]
      * @param {Blob} blob - Source file
      * @param {string} password
      * @param {Function} [onProgress] - (0..1)
@@ -39,14 +42,14 @@ export class CryptoHelper {
         const placeholderSize = placeholderBlob.size;
         Logger.log(`[CryptoHelper] Placeholder generated: ${placeholderSize} bytes`);
 
-        // Step 2: Derive key
+        // Step 2: Derive keys (AES + HMAC)
         const salt = crypto.getRandomValues(new Uint8Array(CryptoHelper.SALT_SIZE));
         const iv = crypto.getRandomValues(new Uint8Array(CryptoHelper.IV_SIZE));
-        const key = await CryptoHelper.deriveKey(password, salt);
-        Logger.log(`[CryptoHelper] Key derived (PBKDF2, ${CryptoHelper.PBKDF2_ITERATIONS} iterations)`);
+        const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
+        Logger.log(`[CryptoHelper] Keys derived (PBKDF2, ${CryptoHelper.PBKDF2_ITERATIONS} iterations)`);
 
         // Step 3: Encrypt entire original file with AES-CTR (streaming chunks)
-        const parts = [placeholderBlob];
+        const ciphertextParts = [];
         let fileOffset = 0;
         let chunkIndex = 0;
 
@@ -58,28 +61,39 @@ export class CryptoHelper {
 
             Logger.log(`[CryptoHelper] Chunk ${chunkIndex}: file[${fileOffset}..${chunkEnd}) = ${chunkEnd - fileOffset} bytes`);
 
-            await CryptoHelper._xorRegion(chunkData, 0, chunkData.length, key, iv, fileOffset);
+            await CryptoHelper._xorRegion(chunkData, 0, chunkData.length, aesKey, iv, fileOffset);
 
-            parts.push(new Blob([chunkData]));
+            ciphertextParts.push(new Blob([chunkData]));
             fileOffset = chunkEnd;
             chunkIndex++;
 
-            if (onProgress) onProgress(Math.min(fileOffset / fileSize, 1));
+            // Progress: 0-80% for encryption, 80-100% for HMAC
+            if (onProgress) onProgress(Math.min(fileOffset / fileSize, 1) * 0.8);
 
             if (fileOffset < fileSize) {
                 await new Promise(r => setTimeout(r, 0));
             }
         }
 
-        // Step 4: Append trailer: salt(16) + iv(16) + placeholderSize(4, uint32 BE) + magic(4)
-        const trailer = new Uint8Array(CryptoHelper.TRAILER_SIZE);
-        trailer.set(salt, 0);
-        trailer.set(iv, CryptoHelper.SALT_SIZE);
-        const trailerView = new DataView(trailer.buffer);
-        trailerView.setUint32(CryptoHelper.SALT_SIZE + CryptoHelper.IV_SIZE, placeholderSize, false);
-        trailer.set(new TextEncoder().encode(CryptoHelper.MAGIC), CryptoHelper.SALT_SIZE + CryptoHelper.IV_SIZE + 4);
-        parts.push(new Blob([trailer]));
+        // Step 4: Compute HMAC-SHA256 over ciphertext (streaming)
+        Logger.log(`[CryptoHelper] Computing HMAC over ciphertext...`);
+        const ciphertextBlob = new Blob(ciphertextParts);
+        const hmac = await CryptoHelper._computeHmac(hmacKey, ciphertextBlob);
+        Logger.log(`[CryptoHelper] HMAC computed: ${CryptoHelper._hexPrefix(hmac)}`);
 
+        if (onProgress) onProgress(1);
+
+        // Step 5: Build trailer: salt(16) + iv(16) + hmac(32) + placeholderSize(4, uint32 BE) + magic(4)
+        const trailer = new Uint8Array(CryptoHelper.TRAILER_SIZE);
+        let off = 0;
+        trailer.set(salt, off); off += CryptoHelper.SALT_SIZE;
+        trailer.set(iv, off); off += CryptoHelper.IV_SIZE;
+        trailer.set(hmac, off); off += CryptoHelper.HMAC_SIZE;
+        new DataView(trailer.buffer).setUint32(off, placeholderSize, false); off += 4;
+        trailer.set(new TextEncoder().encode(CryptoHelper.MAGIC), off);
+
+        // Assemble: placeholder + ciphertext + trailer
+        const parts = [placeholderBlob, ...ciphertextParts, new Blob([trailer])];
         const outputBlob = new Blob(parts, { type: 'video/mp4' });
         const expectedSize = placeholderSize + fileSize + CryptoHelper.TRAILER_SIZE;
         Logger.log(`[CryptoHelper] ENCRYPT done — output: ${outputBlob.size} bytes, expected: ${expectedSize}, match: ${outputBlob.size === expectedSize}`);
@@ -89,7 +103,7 @@ export class CryptoHelper {
 
     /**
      * Decrypt a JJC2 encrypted file.
-     * Reads trailer, extracts encrypted data after placeholder, XOR decrypts.
+     * Verifies HMAC integrity before decrypting.
      * @param {Blob} blob - Encrypted file
      * @param {string} password
      * @param {Function} [onProgress] - (0..1)
@@ -103,29 +117,32 @@ export class CryptoHelper {
             throw new Error('File too small to contain encryption data.');
         }
 
-        // Read 40-byte trailer
+        // Read 72-byte trailer
         const trailerBlob = blob.slice(fileSize - CryptoHelper.TRAILER_SIZE, fileSize);
         const trailerBuf = await trailerBlob.arrayBuffer();
         const trailerData = new Uint8Array(trailerBuf);
 
         // Verify magic
-        const magicOffset = CryptoHelper.SALT_SIZE + CryptoHelper.IV_SIZE + 4;
+        const magicOffset = CryptoHelper.TRAILER_SIZE - 4;
         const magic = new TextDecoder().decode(trailerData.slice(magicOffset, magicOffset + 4));
         if (magic !== CryptoHelper.MAGIC) {
             throw new Error('This file does not appear to be encrypted (missing JJC2 marker).');
         }
         Logger.log(`[CryptoHelper] Trailer verified — magic: ${magic}`);
 
-        const salt = trailerData.slice(0, CryptoHelper.SALT_SIZE);
-        const iv = trailerData.slice(CryptoHelper.SALT_SIZE, CryptoHelper.SALT_SIZE + CryptoHelper.IV_SIZE);
-        const trailerView = new DataView(trailerBuf);
-        const placeholderSize = trailerView.getUint32(CryptoHelper.SALT_SIZE + CryptoHelper.IV_SIZE, false);
+        // Parse trailer fields
+        let off = 0;
+        const salt = trailerData.slice(off, off + CryptoHelper.SALT_SIZE); off += CryptoHelper.SALT_SIZE;
+        const iv = trailerData.slice(off, off + CryptoHelper.IV_SIZE); off += CryptoHelper.IV_SIZE;
+        const storedHmac = trailerData.slice(off, off + CryptoHelper.HMAC_SIZE); off += CryptoHelper.HMAC_SIZE;
+        const placeholderSize = new DataView(trailerBuf).getUint32(off, false);
         Logger.log(`[CryptoHelper] placeholderSize: ${placeholderSize}`);
 
-        const key = await CryptoHelper.deriveKey(password, salt);
-        Logger.log(`[CryptoHelper] Key derived (PBKDF2, ${CryptoHelper.PBKDF2_ITERATIONS} iterations)`);
+        // Derive keys
+        const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
+        Logger.log(`[CryptoHelper] Keys derived (PBKDF2, ${CryptoHelper.PBKDF2_ITERATIONS} iterations)`);
 
-        // Encrypted data is between placeholder and trailer
+        // Encrypted data region
         const encryptedStart = placeholderSize;
         const encryptedEnd = fileSize - CryptoHelper.TRAILER_SIZE;
         const encryptedSize = encryptedEnd - encryptedStart;
@@ -135,7 +152,18 @@ export class CryptoHelper {
             throw new Error('No encrypted data found in file.');
         }
 
-        // Stream decrypt in chunks
+        // Step 1: Verify HMAC before decrypting (streaming)
+        Logger.log(`[CryptoHelper] Verifying HMAC...`);
+        const ciphertextBlob = blob.slice(encryptedStart, encryptedEnd);
+        const computedHmac = await CryptoHelper._computeHmac(hmacKey, ciphertextBlob);
+
+        if (!CryptoHelper._constantTimeEqual(storedHmac, computedHmac)) {
+            Logger.error(`[CryptoHelper] HMAC mismatch — stored: ${CryptoHelper._hexPrefix(storedHmac)}, computed: ${CryptoHelper._hexPrefix(computedHmac)}`);
+            throw new Error('Integrity check failed. The file has been tampered with or the password is incorrect.');
+        }
+        Logger.log(`[CryptoHelper] HMAC verified — integrity OK`);
+
+        // Step 2: Stream decrypt in chunks
         const parts = [];
         let offset = 0;
         let chunkIndex = 0;
@@ -148,7 +176,7 @@ export class CryptoHelper {
 
             Logger.log(`[CryptoHelper] Chunk ${chunkIndex}: encrypted[${offset}..${chunkEnd}) = ${chunkEnd - offset} bytes`);
 
-            await CryptoHelper._xorRegion(chunkData, 0, chunkData.length, key, iv, offset);
+            await CryptoHelper._xorRegion(chunkData, 0, chunkData.length, aesKey, iv, offset);
 
             parts.push(new Blob([chunkData]));
             offset = chunkEnd;
@@ -165,6 +193,67 @@ export class CryptoHelper {
         Logger.log(`[CryptoHelper] DECRYPT done — output: ${outputBlob.size} bytes, expected: ${encryptedSize}, match: ${outputBlob.size === encryptedSize}`);
 
         return outputBlob;
+    }
+
+    /**
+     * Compute HMAC-SHA256 over a blob, streaming in chunks.
+     * @param {CryptoKey} hmacKey
+     * @param {Blob} blob
+     * @returns {Promise<Uint8Array>} 32-byte HMAC
+     */
+    static async _computeHmac(hmacKey, blob) {
+        // WebCrypto sign() requires a single buffer, but we can build it from chunks
+        // For streaming HMAC we use SubtleCrypto's sign with assembled data
+        const size = blob.size;
+        let offset = 0;
+        const chunks = [];
+
+        while (offset < size) {
+            const end = Math.min(offset + CryptoHelper.CHUNK_SIZE, size);
+            const chunkBuf = await blob.slice(offset, end).arrayBuffer();
+            chunks.push(new Uint8Array(chunkBuf));
+            offset = end;
+
+            if (offset < size) {
+                await new Promise(r => setTimeout(r, 0));
+            }
+        }
+
+        // Concatenate into single buffer for HMAC
+        const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+        const data = new Uint8Array(totalLen);
+        let pos = 0;
+        for (const chunk of chunks) {
+            data.set(chunk, pos);
+            pos += chunk.length;
+        }
+
+        const sig = await crypto.subtle.sign('HMAC', hmacKey, data);
+        return new Uint8Array(sig);
+    }
+
+    /**
+     * Constant-time comparison of two Uint8Arrays.
+     * @param {Uint8Array} a
+     * @param {Uint8Array} b
+     * @returns {boolean}
+     */
+    static _constantTimeEqual(a, b) {
+        if (a.length !== b.length) return false;
+        let diff = 0;
+        for (let i = 0; i < a.length; i++) {
+            diff |= a[i] ^ b[i];
+        }
+        return diff === 0;
+    }
+
+    /**
+     * Return first 8 hex chars of a Uint8Array for logging.
+     * @param {Uint8Array} arr
+     * @returns {string}
+     */
+    static _hexPrefix(arr) {
+        return [...arr.slice(0, 4)].map(b => b.toString(16).padStart(2, '0')).join('') + '...';
     }
 
     /**
@@ -248,12 +337,13 @@ export class CryptoHelper {
     }
 
     /**
-     * Derive an AES-256 key from password + salt via PBKDF2.
+     * Derive AES-256-CTR key and HMAC-SHA256 key from password + salt via PBKDF2.
+     * Derives 512 bits: first 256 for AES, second 256 for HMAC.
      * @param {string} password
      * @param {Uint8Array} salt
-     * @returns {Promise<CryptoKey>}
+     * @returns {Promise<{aesKey: CryptoKey, hmacKey: CryptoKey}>}
      */
-    static async deriveKey(password, salt) {
+    static async deriveKeys(password, salt) {
         const keyMaterial = await crypto.subtle.importKey(
             'raw',
             new TextEncoder().encode(password),
@@ -265,12 +355,22 @@ export class CryptoHelper {
         const bits = await crypto.subtle.deriveBits(
             { name: 'PBKDF2', salt, iterations: CryptoHelper.PBKDF2_ITERATIONS, hash: 'SHA-256' },
             keyMaterial,
-            256
+            512
         );
 
-        return crypto.subtle.importKey(
-            'raw', bits, { name: 'AES-CTR' }, false, ['encrypt']
+        const allBytes = new Uint8Array(bits);
+        const aesKeyBytes = allBytes.slice(0, 32);
+        const hmacKeyBytes = allBytes.slice(32, 64);
+
+        const aesKey = await crypto.subtle.importKey(
+            'raw', aesKeyBytes, { name: 'AES-CTR' }, false, ['encrypt']
         );
+
+        const hmacKey = await crypto.subtle.importKey(
+            'raw', hmacKeyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        );
+
+        return { aesKey, hmacKey };
     }
 
     /**
