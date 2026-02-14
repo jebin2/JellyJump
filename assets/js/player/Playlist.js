@@ -1128,7 +1128,7 @@ export class Playlist {
         const indicesToRemove = [];
         this.items.forEach((item, idx) => {
             const itemPath = item.path || '';
-            if (itemPath === folderPath || itemPath.startsWith(folderPath + '/')) {
+            if (itemPath.startsWith(folderPath + '/')) {
                 indicesToRemove.push(idx);
             }
         });
@@ -1189,6 +1189,7 @@ export class Playlist {
         if (folderEl) {
             folderEl.remove();
         }
+
 
         // 4. Stop playback if active was removed
         if (wasActiveRemoved) {
