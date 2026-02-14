@@ -47,6 +47,8 @@ export class EncryptMenu {
         const confirmSection = modalContent.querySelector('.encrypt-confirm-section');
         const infoText = modalContent.querySelector('.encrypt-info-text');
 
+        const actionIconUse = modalContent.querySelector('.action-icon-use');
+
         let currentMode = 'encrypt';
 
         // Mode toggle styling
@@ -64,11 +66,13 @@ export class EncryptMenu {
                 confirmSection.classList.remove('hidden');
                 encryptBtn.title = 'Encrypt';
                 encryptBtn.setAttribute('aria-label', 'Encrypt');
+                if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock');
                 infoText.textContent = 'Encrypts the video\'s media data with a password. The file remains a valid MP4 but plays as corrupted noise. Only the correct password can restore the original.';
             } else {
                 confirmSection.classList.add('hidden');
                 encryptBtn.title = 'Decrypt';
                 encryptBtn.setAttribute('aria-label', 'Decrypt');
+                if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock-open');
                 infoText.textContent = 'Decrypts a previously encrypted video. Enter the same password used to encrypt it. A wrong password will produce garbage output without any error.';
             }
         };

@@ -103,6 +103,6 @@ export const FOOTER_CONFIGS = {
     encrypt: {
         actionClass: 'encrypt-btn',
         icon: 'icon-lock',
-        title: 'Encrypt'
+        title: 'Encrypt/Decrypt'
     }
 };
