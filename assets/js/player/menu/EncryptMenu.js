@@ -66,7 +66,7 @@ export class EncryptMenu {
                 encryptBtn.title = 'Encrypt';
                 encryptBtn.setAttribute('aria-label', 'Encrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock');
-                infoText.textContent = 'Encrypts the video\'s media data with a password. The file remains a valid MP4 but plays as corrupted noise. Only the correct password can restore the original.';
+                infoText.textContent = 'Encrypts the file with a password. The output plays a short "encrypted" message in external players (VLC, etc). Only the correct password can restore the original.';
             } else {
                 confirmSection.classList.add('hidden');
                 encryptBtn.title = 'Decrypt';
