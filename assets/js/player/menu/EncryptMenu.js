@@ -6,8 +6,7 @@ import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js
 
 /**
  * Encrypt Menu Handler
- * Encrypts or decrypts MP4 video files by XOR'ing the mdat box data
- * with a password-derived keystream.
+ * Encrypts or decrypts files using a playable placeholder + AES-CTR format.
  */
 export class EncryptMenu {
     /**
@@ -25,7 +24,7 @@ export class EncryptMenu {
         }
 
         const modal = new Modal({ maxWidth: '500px' });
-        modal.setTitle('Encrypt / Decrypt Video');
+        modal.setTitle('Encrypt / Decrypt');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(createProcessFooter(FOOTER_CONFIGS.encrypt));
 
@@ -39,8 +38,7 @@ export class EncryptMenu {
         const successMessage = modalContent.querySelector('.success-message');
         const errorMessage = modalContent.querySelector('.error-message');
 
-        const modeRadios = modalContent.querySelectorAll('input[name="encrypt-mode"]');
-        const modeLabels = modalContent.querySelectorAll('.encrypt-mode-label');
+        const toggleCheckbox = modalContent.querySelector('.encrypt-mode-checkbox');
         const passwordInput = modalContent.querySelector('.encrypt-password');
         const confirmInput = modalContent.querySelector('.encrypt-confirm');
         const confirmSection = modalContent.querySelector('.encrypt-confirm-section');
@@ -50,17 +48,7 @@ export class EncryptMenu {
 
         let currentMode = 'encrypt';
 
-        // Mode toggle styling
         const updateModeUI = () => {
-            modeLabels.forEach(label => {
-                const radio = label.querySelector('input');
-                if (radio.checked) {
-                    label.classList.add('active');
-                } else {
-                    label.classList.remove('active');
-                }
-            });
-
             if (currentMode === 'encrypt') {
                 confirmSection.classList.remove('hidden');
                 encryptBtn.title = 'Encrypt';
@@ -72,16 +60,14 @@ export class EncryptMenu {
                 encryptBtn.title = 'Decrypt';
                 encryptBtn.setAttribute('aria-label', 'Decrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock-open');
-                infoText.textContent = 'Decrypts a previously encrypted video. Enter the same password used to encrypt it. A wrong password will produce garbage output without any error.';
+                infoText.textContent = 'Decrypts a previously encrypted file. Enter the same password used to encrypt it. A wrong password will produce garbage output without any error.';
             }
         };
 
-        modeRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                currentMode = radio.value;
-                updateModeUI();
-                errorMessage.classList.add('hidden');
-            });
+        toggleCheckbox.addEventListener('change', () => {
+            currentMode = toggleCheckbox.checked ? 'decrypt' : 'encrypt';
+            updateModeUI();
+            errorMessage.classList.add('hidden');
         });
 
         updateModeUI();
@@ -108,7 +94,7 @@ export class EncryptMenu {
             modal.closeBtn.disabled = true;
             passwordInput.disabled = true;
             confirmInput.disabled = true;
-            modeRadios.forEach(r => r.disabled = true);
+            toggleCheckbox.disabled = true;
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
             downloadBtn.classList.add('hidden');
@@ -159,7 +145,7 @@ export class EncryptMenu {
             modal.closeBtn.disabled = false;
             passwordInput.disabled = false;
             confirmInput.disabled = false;
-            modeRadios.forEach(r => r.disabled = false);
+            toggleCheckbox.disabled = false;
         });
 
         modal.open();

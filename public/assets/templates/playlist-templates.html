@@ -2011,27 +2011,14 @@
 
 <!-- Encrypt/Decrypt Content Template -->
 <template id="encrypt-content-template">
-    <!-- Mode Selection -->
+    <!-- Mode Toggle -->
     <div class="encrypt-mode-section mb-lg">
-        <div class="text-secondary text-sm font-mono mb-sm">MODE:</div>
-        <div class="flex gap-sm">
-            <label class="jellyjump-btn-secondary flex-1 py-sm text-center cursor-pointer encrypt-mode-label">
-                <input type="radio" name="encrypt-mode" value="encrypt" checked class="hidden">
-                <svg width="16" height="16" fill="currentColor" class="inline-block mr-xs"
-                    style="vertical-align: -2px;">
-                    <use href="assets/icons/sprite.svg#icon-lock"></use>
-                </svg>
-                Encrypt
-            </label>
-            <label class="jellyjump-btn-secondary flex-1 py-sm text-center cursor-pointer encrypt-mode-label">
-                <input type="radio" name="encrypt-mode" value="decrypt" class="hidden">
-                <svg width="16" height="16" fill="currentColor" class="inline-block mr-xs"
-                    style="vertical-align: -2px;">
-                    <use href="assets/icons/sprite.svg#icon-lock-open"></use>
-                </svg>
-                Decrypt
-            </label>
-        </div>
+        <label class="toggle-switch encrypt-mode-toggle">
+            <span class="toggle-label label-left">Encrypt</span>
+            <input type="checkbox" class="encrypt-mode-checkbox">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label label-right">Decrypt</span>
+        </label>
     </div>
 
     <!-- Password Input -->
