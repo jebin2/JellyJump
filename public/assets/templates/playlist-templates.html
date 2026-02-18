@@ -536,20 +536,10 @@
 </template>
 
 <template id="track-card-template">
-    <div class="track-card border border-border rounded p-sm bg-secondary hover:bg-tertiary transition-colors">
-        <div class="flex justify-between items-start gap-md">
-            <div class="track-info flex-1">
-                <div class="track-title font-bold text-md mb-xs">Track #<span class="track-index">1</span></div>
-                <div class="track-metadata text-sm text-muted grid gap-xs">
-                    <div class="meta-item"><span class="meta-label font-semibold">Codec:</span> <span
-                            class="meta-codec font-mono"></span></div>
-                    <div class="meta-item"><span class="meta-label font-semibold">Details:</span> <span
-                            class="meta-details"></span></div>
-                    <div class="meta-item"><span class="meta-label font-semibold">Language:</span> <span
-                            class="meta-language"></span></div>
-                </div>
-            </div>
-            <div class="track-actions flex flex-col gap-sm items-end shrink-0">
+    <div class="track-card tool-card">
+        <div class="tool-card-header">
+            <span class="track-title tool-card-title">Track #<span class="track-index">1</span></span>
+            <div class="track-actions flex gap-xs items-center">
                 <!-- Speed Menu -->
                 <div class="jellyjump-menu-btn mb-speed-dropdown-container">
                     <button class="btn jellyjump-btn-small mb-speed-dropdown-btn" data-speed-btn aria-label="Speed"
@@ -567,25 +557,36 @@
                         <div class="jellyjump-menu-item" data-value="2" role="menuitem" tabindex="0">2x</div>
                     </div>
                 </div>
-                <button class="btn jellyjump-btn-small download-track-btn flex items-center gap-xs"
-                    title="Download Track">
+                <button class="btn jellyjump-btn-small download-track-btn" title="Download Track">
                     <svg width="16" height="16" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-download"></use>
                     </svg>
                 </button>
-                <button class="btn jellyjump-btn-small add-to-playlist-btn flex items-center gap-xs"
-                    title="Add to Playlist">
+                <button class="btn jellyjump-btn-small add-to-playlist-btn" title="Add to Playlist">
                     <svg width="16" height="16" fill="currentColor">
                         <use href="assets/icons/sprite.svg#icon-plus"></use>
                     </svg>
                 </button>
-                <div class="progress-container hidden flex items-center gap-xs text-primary">
-                    <div
-                        class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
-                    </div>
-                    <span class="text-xs font-bold">Extracting...</span>
-                </div>
             </div>
+        </div>
+        <div class="tool-card-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="tool-card-input">
+                <label>Codec</label>
+                <span class="meta-codec meta-details text-sm">—</span>
+            </div>
+            <div class="tool-card-input">
+                <label>Details</label>
+                <span class="meta-details text-sm">—</span>
+            </div>
+            <div class="tool-card-input">
+                <label>Language</label>
+                <span class="meta-language text-sm">—</span>
+            </div>
+        </div>
+        <div class="progress-container hidden flex items-center gap-xs text-primary mt-xs">
+            <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+            </div>
+            <span class="text-xs font-bold">Extracting...</span>
         </div>
     </div>
 </template><!-- Resize Content Template -->

@@ -1840,14 +1840,11 @@ body.fullscreen-active {
 }
 
 .track-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color, #444);
-    transition: border-color 0.2s, background-color 0.2s;
+    transition: border-color 0.2s;
 }
 
 .track-card:hover {
     border-color: var(--accent-primary);
-    background: var(--bg-tertiary);
 }
 
 .track-index {
@@ -1857,13 +1854,6 @@ body.fullscreen-active {
 .meta-label {
     color: var(--text-secondary);
     margin-right: 4px;
-}
-
-.meta-codec {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-size: 0.9em;
 }
 
 /* Audio Playlist Item Styling */
