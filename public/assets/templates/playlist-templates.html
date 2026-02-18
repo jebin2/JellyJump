@@ -325,6 +325,35 @@
     </div>
 </template>
 
+<!-- MultiCut Content Template -->
+<template id="multicut-content-template">
+    <div class="multicut-loading flex flex-col items-center justify-center p-xl text-muted"
+        style="grid-column: 1 / -1;">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Loading video info...</span>
+    </div>
+
+    <div class="multicut-content hidden" style="display: contents;">
+        <div class="modal-video-panel">
+            <div id="multicut-player-container" class="aspect-video bg-black rounded overflow-hidden relative">
+            </div>
+        </div>
+
+        <div class="modal-controls-panel">
+            <button id="multicut-add-clip-btn" class="jellyjump-btn-large w-full mb-md">+ Add Segments</button>
+
+            <div class="duration-display bg-tertiary p-sm rounded border border-border mb-md">
+                <span class="text-xs text-secondary font-mono block mb-xs">REMAINING DURATION</span>
+                <span class="multicut-total-duration text-accent font-bold text-lg">00:00:00</span>
+            </div>
+
+            <div id="multicut-clips-list" class="clips-list flex flex-col gap-sm" style="overflow-y: auto;">
+            </div>
+        </div>
+    </div>
+</template>
+
 <!-- Trim Footer Template -->
 
 
@@ -2038,8 +2067,8 @@
     <!-- Password Hint (encrypt only) -->
     <div class="encrypt-hint-section mb-md">
         <label class="text-secondary text-sm font-mono mb-sm block">HINT (optional):</label>
-        <input type="text" class="encrypt-hint jellyjump-input w-full" placeholder="Password hint"
-            autocomplete="off" maxlength="200">
+        <input type="text" class="encrypt-hint jellyjump-input w-full" placeholder="Password hint" autocomplete="off"
+            maxlength="200">
     </div>
 
     <!-- Hint Display (decrypt only, shown if hint exists) -->

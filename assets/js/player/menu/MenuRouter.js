@@ -34,6 +34,11 @@ export class MenuRouter {
                 await TrimMenu.init(item, playlist);
                 break;
             }
+            case 'multicut': {
+                const { MultiCutMenu } = await import('./MultiCutMenu.js');
+                await MultiCutMenu.init(item, playlist);
+                break;
+            }
             case 'resize': {
                 const { ResizeMenu } = await import('./ResizeMenu.js');
                 await ResizeMenu.init(item, playlist);

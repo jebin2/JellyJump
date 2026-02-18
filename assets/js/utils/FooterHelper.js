@@ -104,5 +104,10 @@ export const FOOTER_CONFIGS = {
         actionClass: 'encrypt-btn',
         icon: 'icon-lock',
         title: 'Encrypt/Decrypt'
+    },
+    multicut: {
+        actionClass: 'multicut-btn',
+        icon: 'icon-scissors',
+        title: 'Remove Clips'
     }
 };

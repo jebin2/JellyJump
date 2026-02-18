@@ -164,6 +164,8 @@ export class CorePlayer {
         // Render Callbacks
         this.afterFrameRenderCallbacks = [];
 
+
+
         // UI Elements
         this.ui = {
             controls: null,
@@ -1100,6 +1102,41 @@ export class CorePlayer {
         if (this.config.controls.keyboard) {
             document.addEventListener('keydown', this._handlers.keydown);
         }
+
+        // Initialize Event Emitter
+        this._events = {};
+    }
+
+    /**
+     * Subscribe to an event
+     * @param {string} event - Event name
+     * @param {Function} callback - Callback function
+     */
+    on(event, callback) {
+        if (!this._events[event]) {
+            this._events[event] = [];
+        }
+        this._events[event].push(callback);
+    }
+
+    /**
+     * Unsubscribe from an event
+     * @param {string} event - Event name
+     * @param {Function} callback - Callback function to remove
+         */
+    off(event, callback) {
+        if (!this._events[event]) return;
+        this._events[event] = this._events[event].filter(cb => cb !== callback);
+    }
+
+    /**
+     * Trigger an event
+     * @param {string} event - Event name
+     * @param {Object} [data] - Data to pass to callbacks
+     */
+    trigger(event, data = {}) {
+        if (!this._events[event]) return;
+        this._events[event].forEach(callback => callback(data));
     }
 
     _handleDocumentClick(e) {
@@ -2301,6 +2338,9 @@ export class CorePlayer {
                         currentTime: this.currentTime
                     }, '*');
                 }
+
+                // Trigger internal event
+                this.trigger('timeupdate', { currentTime: this.currentTime });
 
                 this.duration = this.streamVideo.duration || 0;
                 this._updateTimeDisplay();
@@ -3977,6 +4017,9 @@ export class CorePlayer {
                 const playbackTime = this._getPlaybackTime();
                 this.currentTime = playbackTime; // Update internal time for UI
 
+                // Trigger timeupdate event
+                this.trigger('timeupdate', { currentTime: this.currentTime });
+
                 if (playbackTime >= this.duration) {
                     if (this.loopMode === 'one') {
                         this._seekTo(0);
@@ -4571,6 +4614,9 @@ export class CorePlayer {
     async destroy() {
         // Full reset (stops playback, disposes MediaBunny resources)
         await this.reset();
+
+        // Clear events
+        this._events = {};
 
         // Clean up audio context
         if (this.audioContext) {

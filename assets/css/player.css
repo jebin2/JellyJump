@@ -797,6 +797,25 @@ button:focus-visible {
     color: #000;
 }
 
+.jellyjump-btn-large {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.jellyjump-btn-large:hover {
+    background: var(--accent-primary);
+    color: #000;
+}
+
 .loop-actions {
     margin-top: 15px;
     text-align: center;
@@ -807,7 +826,8 @@ button:focus-visible {
    ----------------------------------------- */
 .jellyjump-filter-panel {
     /* Uses base .jellyjump-panel styles */
-    width: 280px; /* Slightly wider for sliders */
+    width: 280px;
+    /* Slightly wider for sliders */
 }
 
 .filter-sliders {
@@ -1043,7 +1063,7 @@ button:focus-visible {
     color: var(--text-primary);
 }
 
-.subtitle-radio-option input[type="radio"]:checked + .radio-label {
+.subtitle-radio-option input[type="radio"]:checked+.radio-label {
     color: var(--accent-primary);
     font-weight: bold;
 }
@@ -1910,6 +1930,82 @@ body.fullscreen-active {
 .trim-duration {
     font-family: monospace;
     font-size: 1.2em;
+}
+
+/* MultiCut Clips List */
+.multicut-clip-item {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+}
+
+.clip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xs);
+}
+
+.clip-number {
+    font-weight: bold;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.clip-remove-btn {
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.clip-remove-btn:hover {
+    opacity: 0.8;
+}
+
+.clip-times {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.clip-time-input {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.clip-time-input label {
+    font-size: 0.7em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.clip-time-input input {
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 0.85em;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+.clip-time-input .jellyjump-btn-small {
+    padding: 2px 6px;
+    font-size: 0.7em;
+    margin-top: 2px;
+}
+
+.clip-duration {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    font-family: monospace;
 }
 
 /* Timeline Slider */

@@ -2853,6 +2853,7 @@ export class Playlist {
             { action: 'convert', icon: 'icon-convert', label: 'Convert' },
             { action: 'download-manage', icon: 'icon-download', label: 'Tracks' },
             { action: 'trim', icon: 'icon-scissors', label: 'Cut' },
+            { action: 'multicut', icon: 'icon-scissors', label: 'Multi-Cut' },
             { action: 'resize', icon: 'icon-maximize', label: 'Resize' },
             { action: 'crop', icon: 'icon-crop', label: 'Crop' },
             { action: 'create-gif', icon: 'icon-gif', label: 'GIF' },
