@@ -14,6 +14,10 @@ echo "Downloading mediabunny-mp3-encoder.js..."
 curl -L "https://cdn.jsdelivr.net/npm/@mediabunny/mp3-encoder@latest/+esm" \
      -o "$OUT/mediabunny-mp3-encoder.js"
 
+echo "Downloading mediabunny-ac3.js..."
+curl -L "https://cdn.jsdelivr.net/npm/@mediabunny/ac3@latest/+esm" \
+     -o "$OUT/mediabunny-ac3.js"
+
 echo "Downloading gif.js..."
 curl -L "https://cdn.jsdelivr.net/npm/gif.js@latest/+esm" \
      -o "$OUT/gif.js"
