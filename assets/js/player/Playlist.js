@@ -615,9 +615,15 @@ export class Playlist {
      * @param {FileList} files 
      */
     handleFiles(files) {
-        // Accept both video and audio files
-        const mediaFiles = Array.from(files).filter(file =>
+        const fileArray = Array.from(files);
+
+        // 1. Separate Media and Subtitle files
+        const mediaFiles = fileArray.filter(file =>
             file.type.startsWith('video/') || file.type.startsWith('audio/')
+        );
+
+        const subtitleFiles = fileArray.filter(file =>
+            file.name.toLowerCase().endsWith('.vtt') || file.name.toLowerCase().endsWith('.srt')
         );
 
         if (mediaFiles.length === 0) {
@@ -635,6 +641,9 @@ export class Playlist {
 
             const isAudio = file.type.startsWith('audio/');
 
+            // Generate ID first
+            const id = generateId();
+
             const item = {
                 title: file.name,
                 url: URL.createObjectURL(file),
@@ -648,7 +657,7 @@ export class Playlist {
                 fileType: file.type,      // Cache type for InfoMenu
                 mimeType: file.type,      // Store MIME type for blob creation
                 path: path,
-                id: generateId() // Add unique ID for persistence
+                id: id // Add unique ID for persistence
             };
 
             // Electron: Store absolute file path for direct disk access
@@ -656,6 +665,20 @@ export class Playlist {
             if (file.path) {
                 item.localPath = file.path;
                 Logger.log('[Electron] Storing localPath for:', file.name, '->', file.path);
+            }
+
+            // Check for matching subtitle
+            // Helper to get basename without extension
+            const getBasename = (name) => name.substring(0, name.lastIndexOf('.'));
+            const mediaBasename = getBasename(file.name);
+
+            const matchingSubtitle = subtitleFiles.find(subFile =>
+                getBasename(subFile.name) === mediaBasename
+            );
+
+            if (matchingSubtitle) {
+                item.subtitleFile = matchingSubtitle;
+                Logger.log(`[Playlist] Auto-detected subtitle for ${file.name}: ${matchingSubtitle.name}`);
             }
 
             return item;
@@ -677,11 +700,23 @@ export class Playlist {
 
         const videoExtensions = ['mp4', 'mkv', 'avi', 'webm', 'mov', 'm4v', 'wmv', 'flv'];
         const audioExtensions = ['mp3', 'flac', 'aac', 'ogg', 'wav', 'm4a', 'opus', 'wma'];
-        const allExtensions = [...videoExtensions, ...audioExtensions];
+        const subtitleExtensions = ['vtt', 'srt']; // Add subtitle extensions
+        const allExtensions = [...videoExtensions, ...audioExtensions, ...subtitleExtensions]; // Include subtitles in initial filter
 
-        const mediaFiles = files.filter(file => {
+        // Filter valid files first
+        const validFiles = files.filter(file => {
             const ext = file.name.split('.').pop().toLowerCase();
             return allExtensions.includes(ext);
+        });
+
+        const mediaFiles = validFiles.filter(file => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            return videoExtensions.includes(ext) || audioExtensions.includes(ext);
+        });
+
+        const subtitleFiles = validFiles.filter(file => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            return subtitleExtensions.includes(ext);
         });
 
         if (mediaFiles.length === 0) {
@@ -714,7 +749,7 @@ export class Playlist {
             const mimeType = mimeTypes[ext] || 'video/mp4';
             const isAudio = ext && audioExtensions.includes(ext);
 
-            return {
+            const item = {
                 title: file.name,
                 url: '', // Will be created on-demand from localPath
                 duration: 'Loading...',
@@ -730,6 +765,22 @@ export class Playlist {
                 localPath: file.path, // The absolute path for disk access
                 id: generateId()
             };
+
+            // Check for matching subtitle
+            const getBasename = (name) => name.substring(0, name.lastIndexOf('.'));
+            const mediaBasename = getBasename(file.name);
+
+            const matchingSubtitle = subtitleFiles.find(subFile =>
+                getBasename(subFile.name) === mediaBasename
+            );
+
+            if (matchingSubtitle) {
+                // For Electron, we store the path to allow direct loading or conversion if needed
+                item.subtitlePath = matchingSubtitle.path;
+                Logger.log(`[Playlist] Auto-detected subtitle for ${file.name}: ${matchingSubtitle.name} (${matchingSubtitle.path})`);
+            }
+
+            return item;
         });
 
 
@@ -1275,7 +1326,11 @@ export class Playlist {
         for (const item of this.items) {
             if (item.url && item.url.startsWith('blob:')) {
                 URL.revokeObjectURL(item.url);
-                item.url = null;
+                // item.url = null; // Don't nullify, might be needed for reload? Actually destruct avoids reload
+            }
+            if (item.subtitleUrl && item.subtitleUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(item.subtitleUrl);
+                item.subtitleUrl = null;
             }
         }
     }
@@ -1510,6 +1565,30 @@ export class Playlist {
 
             // Load video with saved subtitles (if any) - pass isAudio for audio files
             await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null, { isAudio: video.isAudio });
+
+            // [NEW] Auto-load matched subtitle file/path
+            if (video.subtitleFile || video.subtitlePath) {
+                try {
+                    let subUrl = '';
+                    if (video.subtitleFile) {
+                        // Create Blob URL for File object
+                        // Revoke previous if exists to avoid leaks
+                        if (video.subtitleUrl) URL.revokeObjectURL(video.subtitleUrl);
+                        video.subtitleUrl = URL.createObjectURL(video.subtitleFile);
+                        subUrl = video.subtitleUrl;
+                    } else if (video.subtitlePath) {
+                        // Use path directly (Electron)
+                        subUrl = video.subtitlePath;
+                    }
+
+                    if (subUrl) {
+                        Logger.log(`[Playlist] Loading auto-detected subtitle: ${subUrl}`);
+                        await this.player.loadSubtitle(subUrl);
+                    }
+                } catch (e) {
+                    Logger.error('[Playlist] Failed to load auto-detected subtitle:', e);
+                }
+            }
 
             // Update item metadata (duration and thumbnail) after video loads
             this._updateLocalItemMetadata(video, index);
