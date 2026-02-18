@@ -512,7 +512,7 @@ export class WatermarkMenu {
                 // Click to select
                 const root = el.querySelector('.watermark-item') || el.firstElementChild;
                 root.onclick = (e) => {
-                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('.toggle-switch') || e.target.tagName === 'LABEL') return;
                     updateSelection(index);
                 };
 
