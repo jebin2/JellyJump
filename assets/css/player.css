@@ -3116,9 +3116,9 @@ body.fullscreen-active {
     position: relative;
     width: 36px;
     height: 18px;
-    background-color: var(--bg-tertiary);
+    background-color: var(--border-dark);
     border-radius: 9px;
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border-dark);
     transition: all 0.2s ease;
 }
 
@@ -3403,6 +3403,15 @@ body.fullscreen-active {
 .recording-active svg {
     fill: var(--accent-danger);
     stroke: var(--accent-danger);
+}
+
+.wm-item-color {
+    height: 40px;
+    padding: 0;
+    border: 4px solid var(--border-dark);
+    cursor: pointer;
+    background: transparent;
+    flex-shrink: 0;
 }
 
 @keyframes pulse-recording {
