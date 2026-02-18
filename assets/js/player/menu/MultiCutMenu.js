@@ -62,28 +62,28 @@ export class MultiCutMenu {
 
         const renderClips = () => {
             clipsList.innerHTML = clips.map((clip, index) => `
-                <div class="multicut-clip-item ${index === currentClipIndex ? 'active' : ''}" data-index="${index}">
-                    <div class="clip-header">
-                        <span class="clip-number">Segment ${index + 1}</span>
-                        <button class="clip-remove-btn" data-index="${index}">&times;</button>
+                <div class="tool-card ${index === currentClipIndex ? 'active' : ''}" data-index="${index}">
+                    <div class="tool-card-header">
+                        <span class="tool-card-title">Segment ${index + 1}</span>
+                        <button class="tool-card-remove" data-index="${index}">&times;</button>
                     </div>
-                    <div class="clip-times">
-                        <div class="clip-time-input">
+                    <div class="tool-card-times">
+                        <div class="tool-card-input">
                             <label>Start</label>
                             <input type="text" class="clip-start-input font-mono" data-index="${index}" value="${formatTime(clip.start)}">
-                            <button class="clip-set-start-btn" data-index="${index}">Set</button>
+                            <button class="clip-set-start-btn jellyjump-btn-small" data-index="${index}">Set</button>
                         </div>
-                        <div class="clip-time-input">
+                        <div class="tool-card-input">
                             <label>End</label>
                             <input type="text" class="clip-end-input font-mono" data-index="${index}" value="${formatTime(clip.end)}">
-                            <button class="clip-set-end-btn" data-index="${index}">Set</button>
+                            <button class="clip-set-end-btn jellyjump-btn-small" data-index="${index}">Set</button>
                         </div>
                     </div>
-                    <div class="clip-duration">Duration: ${formatTime(clip.end - clip.start)}</div>
+                    <div class="tool-card-info">Duration: ${formatTime(clip.end - clip.start)}</div>
                 </div>
             `).join('');
 
-            clipsList.querySelectorAll('.clip-remove-btn').forEach(btn => {
+            clipsList.querySelectorAll('.tool-card-remove').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const idx = parseInt(e.target.dataset.index);
                     clips.splice(idx, 1);
@@ -141,7 +141,7 @@ export class MultiCutMenu {
                 });
             });
 
-            clipsList.querySelectorAll('.multicut-clip-item').forEach(item => {
+            clipsList.querySelectorAll('.tool-card').forEach(item => {
                 item.addEventListener('click', (e) => {
                     if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
                     const idx = parseInt(item.dataset.index);

@@ -93,7 +93,7 @@ export const FOOTER_CONFIGS = {
     watermark: {
         actionClass: 'wm-process-btn',
         icon: 'icon-droplet',
-        title: 'Add Watermark'
+        title: 'Watermark'
     },
     rotate: {
         actionClass: 'rotate-process-btn',

@@ -296,30 +296,20 @@
 
         <!-- Right Panel: Inputs -->
         <div class="modal-controls-panel">
-            <!-- Start Time Input -->
-            <div class="input-group mb-md">
-                <label class="text-xs text-secondary font-mono mb-xs block">START TIME</label>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <input type="text" id="trim-start-input" class="mb-input font-mono text-center" style="flex: 1;"
-                        placeholder="0:00.000">
-                    <button id="trim-set-start-btn" class="jellyjump-btn-small" style="flex-shrink: 0;">Set</button>
+            <div class="tool-card">
+                <div class="tool-card-times">
+                    <div class="tool-card-input">
+                        <label>Start</label>
+                        <input type="text" id="trim-start-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="trim-set-start-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
+                    <div class="tool-card-input">
+                        <label>End</label>
+                        <input type="text" id="trim-end-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="trim-set-end-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
                 </div>
-            </div>
-
-            <!-- End Time Input -->
-            <div class="input-group mb-md">
-                <label class="text-xs text-secondary font-mono mb-xs block">END TIME</label>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <input type="text" id="trim-end-input" class="mb-input font-mono text-center" style="flex: 1;"
-                        placeholder="0:00.000">
-                    <button id="trim-set-end-btn" class="jellyjump-btn-small" style="flex-shrink: 0;">Set</button>
-                </div>
-            </div>
-
-            <!-- Duration Display -->
-            <div class="duration-display bg-tertiary p-sm rounded border border-border mt-auto">
-                <span class="text-xs text-secondary font-mono block mb-xs">DURATION</span>
-                <span class="trim-duration text-accent font-bold text-lg">00:00:00</span>
+                <div class="tool-card-info">Duration: <span class="trim-duration">00:00:00</span></div>
             </div>
         </div>
     </div>
@@ -348,7 +338,7 @@
                 <span class="multicut-total-duration text-accent font-bold text-lg">00:00:00</span>
             </div>
 
-            <div id="multicut-clips-list" class="clips-list flex flex-col gap-sm" style="overflow-y: auto;">
+            <div id="multicut-clips-list" class="tool-cards-list">
             </div>
         </div>
     </div>
@@ -612,24 +602,29 @@
     </div>
 
     <!-- Dimension Inputs -->
-    <div class="dimension-inputs-container mb-lg">
-        <div class="input-group time-input-group">
-            <label for="resize-width" class="text-xs text-secondary font-mono mb-xs block">WIDTH (px)</label>
-            <input type="number" id="resize-width" class="mb-input font-mono text-center time-input-field"
-                placeholder="1920" min="128" max="7680" step="2">
+    <div class="tool-card mb-lg">
+        <div class="tool-card-header">
+            <span class="tool-card-title">Dimensions</span>
         </div>
-        <div class="aspect-lock-container flex flex-col items-center justify-end">
-            <button class="aspect-lock-btn btn jellyjump-btn-primary p-xs rounded aspect-lock-btn-container"
-                title="Lock Aspect Ratio" aria-pressed="true">
-                <svg width="20" height="20" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-link"></use>
-                </svg>
-            </button>
-        </div>
-        <div class="input-group time-input-group">
-            <label for="resize-height" class="text-xs text-secondary font-mono mb-xs block">HEIGHT (px)</label>
-            <input type="number" id="resize-height" class="mb-input font-mono text-center time-input-field"
-                placeholder="1080" min="128" max="7680" step="2">
+        <div class="dimension-inputs-container">
+            <div class="tool-card-input">
+                <label for="resize-width">WIDTH (px)</label>
+                <input type="number" id="resize-width" class="mb-input font-mono text-center" placeholder="1920"
+                    min="128" max="7680" step="2">
+            </div>
+            <div class="aspect-lock-container flex flex-col items-center justify-end">
+                <button class="aspect-lock-btn btn jellyjump-btn-primary p-xs rounded aspect-lock-btn-container"
+                    title="Lock Aspect Ratio" aria-pressed="true">
+                    <svg width="20" height="20" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-link"></use>
+                    </svg>
+                </button>
+            </div>
+            <div class="tool-card-input">
+                <label for="resize-height">HEIGHT (px)</label>
+                <input type="number" id="resize-height" class="mb-input font-mono text-center" placeholder="1080"
+                    min="128" max="7680" step="2">
+            </div>
         </div>
     </div>
 
@@ -673,33 +668,41 @@
 
     <!-- Right Panel: Crop Coordinates -->
     <div class="modal-controls-panel">
-        <label class="text-xs text-secondary font-mono mb-xs block">CROP POSITION</label>
-        <div class="crop-coords-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="input-group">
-                <label for="crop-left" class="text-xs text-secondary font-mono mb-xs block">LEFT (px)</label>
-                <input type="number" id="crop-left" class="mb-input font-mono text-center" min="0" step="1" value="0">
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-card-title">Crop Position</span>
             </div>
-            <div class="input-group">
-                <label for="crop-top" class="text-xs text-secondary font-mono mb-xs block">TOP (px)</label>
-                <input type="number" id="crop-top" class="mb-input font-mono text-center" min="0" step="1" value="0">
-            </div>
-        </div>
-
-        <label class="text-xs text-secondary font-mono mb-xs block mt-md">CROP SIZE</label>
-        <div class="crop-coords-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="input-group">
-                <label for="crop-width" class="text-xs text-secondary font-mono mb-xs block">WIDTH (px)</label>
-                <input type="number" id="crop-width" class="mb-input font-mono text-center" min="64" step="2" value="0">
-            </div>
-            <div class="input-group">
-                <label for="crop-height" class="text-xs text-secondary font-mono mb-xs block">HEIGHT (px)</label>
-                <input type="number" id="crop-height" class="mb-input font-mono text-center" min="64" step="2"
-                    value="0">
+            <div class="crop-coords-grid tool-card-grid">
+                <div class="tool-card-input">
+                    <label for="crop-left">LEFT (px)</label>
+                    <input type="number" id="crop-left" class="mb-input font-mono text-center" min="0" step="1"
+                        value="0">
+                </div>
+                <div class="tool-card-input">
+                    <label for="crop-top">TOP (px)</label>
+                    <input type="number" id="crop-top" class="mb-input font-mono text-center" min="0" step="1"
+                        value="0">
+                </div>
             </div>
         </div>
 
-        <div class="crop-info bg-tertiary p-sm rounded mt-auto">
-            <span class="text-xs text-secondary">Drag the corners to adjust the crop area</span>
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-card-title">Crop Size</span>
+            </div>
+            <div class="crop-coords-grid tool-card-grid">
+                <div class="tool-card-input">
+                    <label for="crop-width">WIDTH (px)</label>
+                    <input type="number" id="crop-width" class="mb-input font-mono text-center" min="64" step="2"
+                        value="0">
+                </div>
+                <div class="tool-card-input">
+                    <label for="crop-height">HEIGHT (px)</label>
+                    <input type="number" id="crop-height" class="mb-input font-mono text-center" min="64" step="2"
+                        value="0">
+                </div>
+            </div>
+            <div class="tool-card-info">Drag the corners to adjust the crop area</div>
         </div>
     </div>
 </template>
@@ -882,28 +885,20 @@
 
         <!-- Right Panel: Controls -->
         <div class="modal-controls-panel">
-            <!-- Input Fields -->
-            <div class="input-group mb-md">
-                <label class="text-xs text-secondary font-mono mb-xs block">START TIME</label>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <input type="text" id="gif-start-input" class="mb-input font-mono text-center" style="flex: 1;"
-                        placeholder="0:00.000">
-                    <button id="gif-set-start-btn" class="jellyjump-btn-small" style="flex-shrink: 0;">Set</button>
+            <div class="tool-card mb-md">
+                <div class="tool-card-times">
+                    <div class="tool-card-input">
+                        <label>Start</label>
+                        <input type="text" id="gif-start-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="gif-set-start-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
+                    <div class="tool-card-input">
+                        <label>End</label>
+                        <input type="text" id="gif-end-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="gif-set-end-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
                 </div>
-            </div>
-
-            <div class="input-group mb-md">
-                <label class="text-xs text-secondary font-mono mb-xs block">END TIME</label>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <input type="text" id="gif-end-input" class="mb-input font-mono text-center" style="flex: 1;"
-                        placeholder="0:00.000">
-                    <button id="gif-set-end-btn" class="jellyjump-btn-small" style="flex-shrink: 0;">Set</button>
-                </div>
-            </div>
-
-            <div class="duration-display bg-tertiary p-sm rounded border border-border mt-auto mb-md">
-                <span class="text-xs text-secondary font-mono block mb-xs">DURATION</span>
-                <span class="gif-duration text-accent font-bold text-lg">00:00:00</span>
+                <div class="tool-card-info">Duration: <span class="gif-duration">00:00:00</span></div>
             </div>
 
             <!-- Validation Error -->
@@ -1535,19 +1530,8 @@
             </div>
         </div>
 
-        <!-- Color Picker Section -->
-        <div class="color-picker-section">
-            <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
-            <div class="selected-colors-list flex flex-col gap-xs mb-sm bg-tertiary p-sm rounded border border-border"
-                style="min-height: 100px; max-height: 200px; overflow-y: auto;">
-                <div class="empty-state text-xs text-muted text-center py-md">
-                    Click on the video to pick colors.
-                </div>
-            </div>
-        </div>
-
         <!-- Background Options -->
-        <div class="bg-options-section mt-auto">
+        <div class="bg-options-section">
             <div class="section-title text-sm font-bold text-secondary mb-sm">BACKGROUND</div>
             <div class="flex flex-col gap-sm">
                 <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
@@ -1566,6 +1550,17 @@
                 </label>
             </div>
         </div>
+
+        <!-- Color Picker Section -->
+        <div class="color-picker-section" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
+            <div class="selected-colors-list tool-cards-list mb-sm bg-tertiary p-sm rounded border border-border"
+                style="min-height: 0; flex: 1;">
+                <div class="empty-state text-xs text-muted text-center py-md">
+                    Click on the video to pick colors.
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -1574,13 +1569,13 @@
 
 <!-- Color Item Template -->
 <template id="color-item-template">
-    <div class="playlist-item color-item flex gap-md p-sm h-auto items-center">
+    <div class="tool-card color-item flex gap-md items-center">
         <!-- Left: Color Info -->
         <div class="flex flex-col items-center gap-xs min-w-[60px]">
-            <div class="playlist-thumbnail color-swatch border border-border shadow-sm flex-shrink-0 mb-0"
+            <div class="color-swatch border border-border shadow-sm flex-shrink-0 mb-0"
                 style="width: 32px; height: 32px;"></div>
-            <div class="playlist-title color-hex font-mono text-xs font-bold">#000000</div>
-            <button class="playlist-remove-btn remove-color-btn p-xs hover:text-danger transition-colors"
+            <div class="color-hex font-mono text-xs font-bold">#000000</div>
+            <button class="tool-card-remove remove-color-btn p-xs hover:text-danger transition-colors"
                 title="Remove color">
                 <svg width="14" height="14" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-trash"></use>
@@ -1591,19 +1586,19 @@
         <!-- Right: Sliders -->
         <div class="flex-1 grid gap-sm w-full">
             <div class="flex items-center gap-sm text-xs text-secondary">
-                <span class="font-mono shrink-0 text-right" style="width: 70px;">Sim</span>
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Sim</span>
                 <input type="range" class="quality-slider similarity-slider flex-1" min="0" max="100" value="40"
                     onclick="event.stopPropagation()">
                 <span class="similarity-value font-mono w-8 text-right text-primary">0.40</span>
             </div>
             <div class="flex items-center gap-sm text-xs text-secondary">
-                <span class="font-mono shrink-0 text-right" style="width: 70px;">Smooth</span>
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Smooth</span>
                 <input type="range" class="quality-slider smoothness-slider flex-1" min="0" max="100" value="8"
                     onclick="event.stopPropagation()">
                 <span class="smoothness-value font-mono w-8 text-right text-primary">0.08</span>
             </div>
             <div class="flex items-center gap-sm text-xs text-secondary">
-                <span class="font-mono shrink-0 text-right" style="width: 70px;">Spill</span>
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Spill</span>
                 <input type="range" class="quality-slider spill-slider flex-1" min="0" max="100" value="10"
                     onclick="event.stopPropagation()">
                 <span class="spill-value font-mono w-8 text-right text-primary">0.10</span>
@@ -1624,7 +1619,7 @@
     </div>
 
     <!-- Right Panel: Watermark Controls -->
-    <div class="modal-controls-panel" style="overflow: hidden;">
+    <div class="modal-controls-panel">
         <label class="toggle-switch" style="flex-shrink: 0; padding: 4px 0;">
             <span class="toggle-label label-left">LIVE PREVIEW</span>
             <input type="checkbox" id="wm-live-preview-toggle" checked>
@@ -1632,8 +1627,7 @@
         </label>
 
         <label class="text-xs text-secondary font-mono mb-xs block" style="flex-shrink: 0;">WATERMARK AREAS</label>
-        <div id="watermark-areas-list" class="flex flex-col gap-sm"
-            style="flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;">
+        <div id="watermark-areas-list" class="tool-cards-list">
             <div class="empty-state text-center py-xl text-muted text-xs italic">No watermarks added. Draw on the video
                 to add a watermark.</div>
         </div>
@@ -1645,31 +1639,25 @@
 
 <!-- Watermark Item Template -->
 <template id="watermark-item-template">
-    <div class="watermark-item"
-        style="cursor: pointer; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 8px;">
+    <div class="watermark-item tool-card" style="cursor: pointer;">
         <!-- Header: Title + Remove -->
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span class="wm-item-title text-sm font-bold">Watermark</span>
-            <button class="remove-wm-btn"
-                style="background: none; border: none; cursor: pointer; padding: 2px 6px; color: var(--danger, #e55); font-size: 13px;">✕</button>
+        <div class="tool-card-header">
+            <span class="wm-item-title tool-card-title">Watermark</span>
+            <button class="remove-wm-btn tool-card-remove">✕</button>
         </div>
 
-        <!-- Time: Start -->
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <label class="text-xs text-secondary font-mono" style="flex-shrink: 0; width: 32px;">Start</label>
-            <input type="text" class="mb-input font-mono text-center wm-start-time"
-                style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 0.85em;" placeholder="0:00.000">
-            <button class="set-current-start jellyjump-btn-small"
-                style="padding: 4px 8px; font-size: 11px; flex-shrink: 0;">Set</button>
-        </div>
-
-        <!-- Time: End -->
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
-            <label class="text-xs text-secondary font-mono" style="flex-shrink: 0; width: 32px;">End</label>
-            <input type="text" class="mb-input font-mono text-center wm-end-time"
-                style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 0.85em;" placeholder="0:00.000">
-            <button class="set-current-end jellyjump-btn-small"
-                style="padding: 4px 8px; font-size: 11px; flex-shrink: 0;">Set</button>
+        <!-- Time: Start / End -->
+        <div class="tool-card-times">
+            <div class="tool-card-input">
+                <label>Start</label>
+                <input type="text" class="mb-input font-mono wm-start-time" placeholder="0:00.000">
+                <button class="set-current-start jellyjump-btn-small">Set</button>
+            </div>
+            <div class="tool-card-input">
+                <label>End</label>
+                <input type="text" class="mb-input font-mono wm-end-time" placeholder="0:00.000">
+                <button class="set-current-end jellyjump-btn-small">Set</button>
+            </div>
         </div>
 
         <!-- Type Toggle -->
@@ -1684,10 +1672,8 @@
 
         <!-- Text Controls -->
         <div class="wm-item-text-group" style="margin-bottom: 8px;">
-            <div style="display: flex; gap: 6px; align-items: center;">
-                <input type="text" class="mb-input wm-item-text"
-                    style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 0.85em;" placeholder="Watermark text"
-                    value="Watermark">
+            <div class="tool-card-times">
+                <input type="text" class="mb-input wm-item-text" placeholder="Watermark text" value="Watermark">
                 <input type="color" class="wm-item-color"
                     style="width: 36px; height: 30px; padding: 0; border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; background: transparent; flex-shrink: 0;"
                     value="#ffffff">
@@ -1711,26 +1697,22 @@
         </div>
 
         <!-- Position & Size: 2x2 grid -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">X</label>
-                <input type="number" class="mb-input font-mono text-center wm-x"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="0" step="1" value="0">
+        <div class="tool-card-grid">
+            <div class="tool-card-input">
+                <label>X</label>
+                <input type="number" class="mb-input font-mono text-center wm-x" min="0" step="1" value="0">
             </div>
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">Y</label>
-                <input type="number" class="mb-input font-mono text-center wm-y"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="0" step="1" value="0">
+            <div class="tool-card-input">
+                <label>Y</label>
+                <input type="number" class="mb-input font-mono text-center wm-y" min="0" step="1" value="0">
             </div>
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">W</label>
-                <input type="number" class="mb-input font-mono text-center wm-width"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="1" step="1" value="0">
+            <div class="tool-card-input">
+                <label>W</label>
+                <input type="number" class="mb-input font-mono text-center wm-width" min="1" step="1" value="0">
             </div>
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">H</label>
-                <input type="number" class="mb-input font-mono text-center wm-height"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="1" step="1" value="0">
+            <div class="tool-card-input">
+                <label>H</label>
+                <input type="number" class="mb-input font-mono text-center wm-height" min="1" step="1" value="0">
             </div>
         </div>
     </div>
@@ -1743,7 +1725,7 @@
     </div>
 
     <!-- Right Panel: Blur Controls -->
-    <div class="modal-controls-panel" style="overflow: hidden;">
+    <div class="modal-controls-panel">
         <div style="flex-shrink: 0;">
             <div class="flex-between mb-xs">
                 <label class="text-xs text-secondary font-mono" for="blur-intensity">BLUR INTENSITY</label>
@@ -1759,8 +1741,7 @@
         </label>
 
         <label class="text-xs text-secondary font-mono mb-xs block" style="flex-shrink: 0;">BLUR AREAS</label>
-        <div id="blur-areas-list" class="flex flex-col gap-sm"
-            style="flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;">
+        <div id="blur-areas-list" class="tool-cards-list">
             <div class="empty-state text-center py-xl text-muted text-xs italic">No blur areas added. Draw on the video
                 to add a blur area.</div>
         </div>
@@ -1772,54 +1753,44 @@
 
 <!-- Blur Item Template -->
 <template id="blur-item-template">
-    <div class="blur-item"
-        style="cursor: pointer; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 8px;">
+    <div class="blur-item tool-card" style="cursor: pointer;">
         <!-- Header: Title + Remove -->
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span class="blur-item-title text-sm font-bold">Blur Area</span>
-            <button class="remove-blur-btn"
-                style="background: none; border: none; cursor: pointer; padding: 2px 6px; color: var(--danger, #e55); font-size: 13px;">✕</button>
+        <div class="tool-card-header">
+            <span class="blur-item-title tool-card-title">Blur Area</span>
+            <button class="remove-blur-btn tool-card-remove">✕</button>
         </div>
 
-        <!-- Time: Start -->
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <label class="text-xs text-secondary font-mono" style="flex-shrink: 0; width: 32px;">Start</label>
-            <input type="text" class="mb-input font-mono text-center blur-start-time"
-                style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 0.85em;" placeholder="0:00.000">
-            <button class="set-current-start jellyjump-btn-small"
-                style="padding: 4px 8px; font-size: 11px; flex-shrink: 0;">Set</button>
-        </div>
-
-        <!-- Time: End -->
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
-            <label class="text-xs text-secondary font-mono" style="flex-shrink: 0; width: 32px;">End</label>
-            <input type="text" class="mb-input font-mono text-center blur-end-time"
-                style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 0.85em;" placeholder="0:00.000">
-            <button class="set-current-end jellyjump-btn-small"
-                style="padding: 4px 8px; font-size: 11px; flex-shrink: 0;">Set</button>
+        <!-- Time: Start / End -->
+        <div class="tool-card-times">
+            <div class="tool-card-input">
+                <label>Start</label>
+                <input type="text" class="mb-input font-mono blur-start-time" placeholder="0:00.000">
+                <button class="set-current-start jellyjump-btn-small">Set</button>
+            </div>
+            <div class="tool-card-input">
+                <label>End</label>
+                <input type="text" class="mb-input font-mono blur-end-time" placeholder="0:00.000">
+                <button class="set-current-end jellyjump-btn-small">Set</button>
+            </div>
         </div>
 
         <!-- Position & Size: 2x2 grid -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">X</label>
-                <input type="number" class="mb-input font-mono text-center blur-x"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="0" step="1" value="0">
+        <div class="tool-card-grid">
+            <div class="tool-card-input">
+                <label>X</label>
+                <input type="number" class="mb-input font-mono text-center blur-x" min="0" step="1" value="0">
             </div>
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">Y</label>
-                <input type="number" class="mb-input font-mono text-center blur-y"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="0" step="1" value="0">
+            <div class="tool-card-input">
+                <label>Y</label>
+                <input type="number" class="mb-input font-mono text-center blur-y" min="0" step="1" value="0">
             </div>
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">W</label>
-                <input type="number" class="mb-input font-mono text-center blur-width"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="1" step="1" value="0">
+            <div class="tool-card-input">
+                <label>W</label>
+                <input type="number" class="mb-input font-mono text-center blur-width" min="1" step="1" value="0">
             </div>
-            <div>
-                <label class="text-xs text-secondary font-mono mb-xs block">H</label>
-                <input type="number" class="mb-input font-mono text-center blur-height"
-                    style="width: 100%; padding: 6px 4px; font-size: 0.85em;" min="1" step="1" value="0">
+            <div class="tool-card-input">
+                <label>H</label>
+                <input type="number" class="mb-input font-mono text-center blur-height" min="1" step="1" value="0">
             </div>
         </div>
     </div>
@@ -1974,7 +1945,7 @@
     </div>
 
     <!-- Right Panel: Rotate Controls -->
-    <div class="modal-controls-panel" style="overflow: hidden;">
+    <div class="modal-controls-panel">
         <div class="rotate-controls flex flex-col gap-md p-md">
             <!-- Rotation -->
             <div class="control-group">

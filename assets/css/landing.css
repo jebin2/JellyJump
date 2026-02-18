@@ -332,7 +332,6 @@
 .features {
     padding: var(--space-3xl) 0;
     background-color: var(--bg-primary);
-    /* border-top: var(--border-medium) solid var(--border-dark); */
     scroll-margin-top: 100px;
 }
 

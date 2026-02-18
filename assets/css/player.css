@@ -1364,7 +1364,7 @@ button:focus-visible {
 
 .jellyjump-help-title {
     margin-top: 0;
-    border-bottom: 1px solid var(--border-dark, #333);
+    border-bottom: 1px solid var(--border-dark);
     padding-bottom: 15px;
     margin-bottom: 20px;
     text-transform: uppercase;
@@ -1402,7 +1402,7 @@ button:focus-visible {
     border-radius: 4px;
     font-family: monospace;
     margin-right: 5px;
-    border: 1px solid var(--border-dark, #555);
+    border: 1px solid var(--border-dark);
 }
 
 .jellyjump-close-help {
@@ -1772,13 +1772,12 @@ body.fullscreen-active {
     background: var(--bg-primary);
     padding: 15px;
     border-radius: 6px;
-    border: 1px solid var(--border-color, #444);
 }
 
 .quality-slider {
     width: 100%;
     height: 6px;
-    background: var(--bg-tertiary);
+    background: var(--border-dark);
     border-radius: 3px;
     outline: none;
     appearance: none;
@@ -1789,6 +1788,7 @@ body.fullscreen-active {
     -webkit-appearance: none;
     width: 18px;
     height: 18px;
+    margin-top: -6px;
     background: var(--accent-primary);
     border-radius: 50%;
     cursor: pointer;
@@ -1932,28 +1932,28 @@ body.fullscreen-active {
     font-size: 1.2em;
 }
 
-/* MultiCut Clips List */
-.multicut-clip-item {
+/* Tool Card Shared Classes */
+.tool-card {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-sm);
     padding: var(--space-sm);
 }
 
-.clip-header {
+.tool-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--space-xs);
 }
 
-.clip-number {
+.tool-card-title {
     font-weight: bold;
     font-size: 0.85em;
     color: var(--text-secondary);
 }
 
-.clip-remove-btn {
+.tool-card-remove {
     background: none;
     border: none;
     color: var(--color-danger);
@@ -1963,30 +1963,30 @@ body.fullscreen-active {
     line-height: 1;
 }
 
-.clip-remove-btn:hover {
+.tool-card-remove:hover {
     opacity: 0.8;
 }
 
-.clip-times {
+.tool-card-times {
     display: flex;
     gap: var(--space-sm);
     margin-bottom: var(--space-xs);
 }
 
-.clip-time-input {
+.tool-card-input {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 10px;
 }
 
-.clip-time-input label {
+.tool-card-input label {
     font-size: 0.7em;
     color: var(--text-muted);
     text-transform: uppercase;
 }
 
-.clip-time-input input {
+.tool-card-input input {
     width: 100%;
     padding: 4px 6px;
     font-size: 0.85em;
@@ -1996,16 +1996,32 @@ body.fullscreen-active {
     color: var(--text-primary);
 }
 
-.clip-time-input .jellyjump-btn-small {
+.tool-card-input .jellyjump-btn-small {
     padding: 2px 6px;
     font-size: 0.7em;
     margin-top: 2px;
 }
 
-.clip-duration {
+.tool-card-info {
     font-size: 0.8em;
     color: var(--text-secondary);
     font-family: monospace;
+}
+
+.tool-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.tool-cards-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
 }
 
 /* Timeline Slider */
@@ -3024,17 +3040,30 @@ body.fullscreen-active {
     height: 6px;
     -webkit-appearance: none;
     appearance: none;
-    background: var(--bg-tertiary);
+    background: var(--border-dark);
     border-radius: 3px;
     outline: none;
     cursor: pointer;
-    border: 1px solid var(--border-light);
+    border: none;
+}
+
+.quality-slider::-webkit-slider-runnable-track {
+    height: 6px;
+    background: var(--border-dark);
+    border-radius: 3px;
+}
+
+.quality-slider::-moz-range-track {
+    height: 6px;
+    background: var(--border-dark);
+    border-radius: 3px;
 }
 
 .quality-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 14px;
     height: 14px;
+    margin-top: -4px;
     background: var(--accent-primary);
     border-radius: 50%;
     cursor: pointer;

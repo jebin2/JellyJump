@@ -22,7 +22,7 @@ export class TrimMenu {
         if (!contentTemplate) return;
 
         const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Cut Video');
+        modal.setTitle('Clip Video');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(createProcessFooter(FOOTER_CONFIGS.trim));
 

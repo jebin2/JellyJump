@@ -29,7 +29,7 @@ export class BlurMenu {
         }
 
         const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Blur Video');
+        modal.setTitle('Blur');
 
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(createProcessFooter(FOOTER_CONFIGS.blur));

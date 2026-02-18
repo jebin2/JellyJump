@@ -38,7 +38,7 @@ export class RemoveBackgroundMenu {
         const bgTypeRadios = modalContent.querySelectorAll('input[name="bg-type"]');
         const customBgColorInput = modalContent.querySelector('#custom-bg-color');
 
-        const processBtn = modalContent.querySelector('.process-btn');
+        const processBtn = modalContent.querySelector('.removebg-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
         const progressBar = modalContent.querySelector('.progress-bar-fill');

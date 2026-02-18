@@ -28,7 +28,7 @@ export class WatermarkMenu {
         }
 
         const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Add Watermark');
+        modal.setTitle('Watermark');
 
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(createProcessFooter(FOOTER_CONFIGS.watermark));
