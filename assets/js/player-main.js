@@ -45,6 +45,10 @@ async function initializeApp() {
                 url: window.location.href.includes('//localhost:') ? '/homepage.mp4' : '/JellyJump/homepage.mp4',
                 isLocal: true
             }, {
+                title: 'Serene',
+                url: window.location.href.includes('//localhost:') ? '/serene.mp4' : '/JellyJump/serene.mp4',
+                isLocal: true
+            }, {
                 url: "https://30a-tv.com/feeds/720p/63.m3u8",
                 title: "30A Ridiculous IP TV",
                 isStream: true
