@@ -48,6 +48,17 @@ export class AudioVisualizer {
         this.trees = [];
         this.publicChairs = [];
         this.balloons = [];
+        this.woman = {
+            x: -50,
+            y: 0,
+            width: 0,
+            height: 0,
+            speed: 1.5,
+            state: "walking_to_balloon", // "walking_to_balloon", "taking_balloon", "walking_away", "waiting"
+            frame: 0,
+            hasBalloon: false,
+            waitTimer: 0
+        };
         this.lightningBolts = [];
         this.sceneWidth = 0;
         this.sceneHeight = 0;
@@ -313,6 +324,18 @@ export class AudioVisualizer {
         this.trees = [];
         this.publicChairs = [];
         this.balloons = [];
+        this.woman = {
+            ...this.woman,
+            x: -width * 0.1,
+            y: height * 0.9, // Ground level
+            width: width * 0.05,
+            height: height * 0.18,
+            speed: width * 0.0012,
+            state: "walking_to_balloon",
+            frame: 0,
+            hasBalloon: false,
+            waitTimer: 0
+        };
 
         const cloudCount = 9;
         for (let i = 0; i < cloudCount; i++) {
@@ -677,7 +700,201 @@ export class AudioVisualizer {
         }
 
         for (const balloon of this.balloons) {
-            this._drawBalloon(balloon, flashLift);
+            // Only draw if balloon is not with the woman or has been reset
+            if (!this.woman.hasBalloon) {
+                this._drawBalloon(balloon, flashLift);
+            }
+        }
+
+        this._drawWoman(width, height, flashLift);
+    }
+
+    _drawWoman(width, height, flashLift) {
+        const ctx = this.ctx;
+        const w = this.woman;
+        const groundY = height * 0.9;
+        const color = `rgba(6, 8, 12, ${0.98 - flashLift * 0.15})`;
+
+        // State Machine Logic
+        if (w.state === "walking_to_balloon") {
+            const targetX = width * this.sceneComposition.chairXRatio - w.width * 1.5;
+            if (w.x < targetX) {
+                w.x += w.speed;
+                w.frame += 0.08;
+            } else {
+                w.state = "taking_balloon";
+                w.waitTimer = 60;
+            }
+        } else if (w.state === "taking_balloon") {
+            w.waitTimer--;
+            if (w.waitTimer <= 0) {
+                w.hasBalloon = true;
+                w.state = "walking_away";
+            }
+        } else if (w.state === "walking_away") {
+            w.x += w.speed;
+            w.frame += 0.08;
+            if (w.x > width + w.width * 2) {
+                w.state = "waiting";
+                w.waitTimer = 180;
+                w.hasBalloon = false;
+            }
+        } else if (w.state === "waiting") {
+            w.waitTimer--;
+            if (w.waitTimer <= 0) {
+                w.x = -w.width * 2;
+                w.state = "walking_to_balloon";
+            }
+        }
+
+        // Draw Woman Silhouette
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.translate(w.x, w.y);
+
+        const t = w.frame * 2.5;
+        const walk = Math.sin(t);
+        const bob = Math.abs(Math.cos(t)) * 2.5;
+        const sway = Math.sin(t) * 1.5;
+        
+        ctx.translate(0, -bob);
+
+        // 1. Legs (Anatomical Slender Slacks/Shorts)
+        const hipY = -w.height * 0.42;
+        const legWidth = w.width * 0.22;
+        
+        const drawLeg = (side, cycle) => {
+            const angle = cycle * 0.35;
+            const kneeAngle = Math.max(0, -cycle * 0.4);
+            
+            ctx.save();
+            ctx.translate(sway + side * 2.5, hipY);
+            ctx.rotate(angle);
+            
+            // Upper leg
+            ctx.beginPath();
+            ctx.roundRect(-legWidth/2, 0, legWidth, w.height * 0.22, 4);
+            ctx.fill();
+            
+            // Lower leg
+            ctx.translate(0, w.height * 0.2);
+            ctx.rotate(kneeAngle);
+            ctx.beginPath();
+            ctx.roundRect(-legWidth/2.5, 0, legWidth/1.2, w.height * 0.22, 3);
+            ctx.fill();
+            
+            // Foot
+            ctx.translate(0, w.height * 0.2);
+            ctx.beginPath();
+            ctx.ellipse(2, 0, legWidth * 0.8, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        };
+
+        drawLeg(-1, walk);  // Back leg
+        drawLeg(1, -walk); // Front leg
+
+        // 2. Torso (Curvy silhouette)
+        ctx.beginPath();
+        // Start at Hips
+        ctx.moveTo(sway - w.width * 0.3, hipY);
+        // Left side up to shoulder
+        ctx.bezierCurveTo(
+            sway - w.width * 0.15, -w.height * 0.6,
+            -w.width * 0.35, -w.height * 0.75,
+            -w.width * 0.4, -w.height * 0.85
+        );
+        // Shoulder line
+        ctx.lineTo(w.width * 0.4, -w.height * 0.85);
+        // Right side down to hips
+        ctx.bezierCurveTo(
+            w.width * 0.35, -w.height * 0.75,
+            sway + w.width * 0.15, -w.height * 0.6,
+            sway + w.width * 0.3, hipY
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        // 3. Neck & Head
+        ctx.beginPath();
+        ctx.ellipse(0, -w.height * 0.88, w.width * 0.1, 4, 0, 0, Math.PI * 2); // Neck
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(2, -w.height * 0.96, w.width * 0.22, 0, Math.PI * 2); // Head
+        ctx.fill();
+
+        // Ponytail
+        ctx.beginPath();
+        ctx.moveTo(-w.width * 0.1, -w.height * 0.98);
+        ctx.quadraticCurveTo(-w.width * 0.5, -w.height * 0.9, -w.width * 0.4, -w.height * 0.75);
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 4. Umbrella (Held over head)
+        ctx.save();
+        const umbX = -w.width * 0.45;
+        const umbY = -w.height * 0.8;
+        ctx.translate(umbX, umbY);
+        
+        // Shaft
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -w.height * 0.5);
+        ctx.stroke();
+        
+        // Canopy
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(0, -w.height * 0.5, w.width * 1.6, Math.PI, 0);
+        ctx.fill();
+        // Scallops
+        ctx.beginPath();
+        const sc = 6;
+        const sW = (w.width * 3.2) / sc;
+        ctx.moveTo(-w.width * 1.6, -w.height * 0.5);
+        for(let i=0; i<sc; i++) {
+            ctx.quadraticCurveTo(
+                -w.width * 1.6 + (i+0.5)*sW, -w.height * 0.47,
+                -w.width * 1.6 + (i+1)*sW, -w.height * 0.5
+            );
+        }
+        ctx.fill();
+        ctx.restore();
+
+        // 5. Arms
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        
+        // Umbrella arm
+        ctx.beginPath();
+        ctx.moveTo(-w.width * 0.15, -w.height * 0.8);
+        ctx.lineTo(umbX, umbY);
+        ctx.stroke();
+        
+        // Action arm (Balloon or swing)
+        const armCycle = Math.sin(t + Math.PI);
+        ctx.beginPath();
+        ctx.moveTo(w.width * 0.15, -w.height * 0.8);
+        if (w.hasBalloon) {
+            ctx.lineTo(w.width * 0.6, -w.height * 0.95);
+        } else {
+            ctx.lineTo(w.width * 0.4 + armCycle * 5, -w.height * 0.6);
+        }
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Draw held balloon
+        if (w.hasBalloon) {
+            const bx = w.x + w.width * 0.6;
+            const by = w.y - bob - w.height * 0.95;
+            const balloon = this.balloons[0];
+            if (balloon) {
+                this._drawBalloon({...balloon, tieX: bx, tieY: by, stringLen: balloon.stringLen * 0.7}, flashLift);
+            }
         }
     }
 
