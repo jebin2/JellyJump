@@ -46,6 +46,7 @@ export class AudioVisualizer {
         this.clouds = [];
         this.trees = [];
         this.publicChairs = [];
+        this.balloons = [];
         this.lightningBolts = [];
         this.sceneWidth = 0;
         this.sceneHeight = 0;
@@ -93,6 +94,7 @@ export class AudioVisualizer {
         this.clouds.length = 0;
         this.trees.length = 0;
         this.publicChairs.length = 0;
+        this.balloons.length = 0;
         this.lightningBolts.length = 0;
         this.sceneWidth = 0;
         this.sceneHeight = 0;
@@ -126,6 +128,7 @@ export class AudioVisualizer {
         this.clouds.length = 0;
         this.trees.length = 0;
         this.publicChairs.length = 0;
+        this.balloons.length = 0;
         this.lightningBolts.length = 0;
 
         Logger.log("[AudioVisualizer] Disconnected");
@@ -219,6 +222,7 @@ export class AudioVisualizer {
 
         this.beatPulse *= 0.9;
         this.flashAlpha *= 0.84;
+        this.simTime += 0.015;
     }
 
     _updateSimulatedFeatures() {
@@ -303,6 +307,7 @@ export class AudioVisualizer {
         this.clouds = [];
         this.trees = [];
         this.publicChairs = [];
+        this.balloons = [];
 
         const cloudCount = 9;
         for (let i = 0; i < cloudCount; i++) {
@@ -357,6 +362,19 @@ export class AudioVisualizer {
             w: width * this.sceneComposition.chairWidthRatio,
             h: height * this.sceneComposition.chairHeightRatio
         });
+
+        // Add a red balloon tied to the chair
+        for (const chair of this.publicChairs) {
+            this.balloons.push({
+                tieX: chair.x - chair.w * 0.4,
+                tieY: chair.y - chair.h * 0.74,
+                width: chair.w * 0.18,
+                height: chair.h * 0.28,
+                stringLen: chair.h * 1.4,
+                hue: 0, // Red
+                seed: Math.random() * Math.PI * 2
+            });
+        }
     }
 
     _drawSky(width, height, duskHue, stormHue) {
@@ -651,6 +669,10 @@ export class AudioVisualizer {
         for (const chair of this.publicChairs) {
             this._drawPublicChair(chair, groundY, flashLift);
         }
+
+        for (const balloon of this.balloons) {
+            this._drawBalloon(balloon, flashLift);
+        }
     }
 
     _drawPublicChair(chair, groundY, flashLift) {
@@ -679,6 +701,72 @@ export class AudioVisualizer {
         ctx.moveTo(x + w * 0.4, y - h * 0.25);
         ctx.lineTo(x + w * 0.45, groundY);
         ctx.stroke();
+    }
+
+    _drawBalloon(balloon, flashLift) {
+        const ctx = this.ctx;
+        const time = this.simTime;
+        const t = time + balloon.seed;
+
+        // Float motion (oscillation)
+        const swayX = Math.sin(t * 0.8) * 9;
+        const swayY = Math.cos(t * 0.6) * 6;
+        const floatY = -balloon.stringLen + Math.sin(t * 0.5) * 5;
+
+        const bx = balloon.tieX + swayX;
+        const by = balloon.tieY + floatY + swayY;
+
+        // Draw the string
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(180, 210, 255, ${0.34 - flashLift * 0.1})`;
+        ctx.lineWidth = 1;
+        ctx.moveTo(balloon.tieX, balloon.tieY);
+        // Slightly curved string towards the balloon
+        ctx.quadraticCurveTo(
+            balloon.tieX + swayX * 0.5,
+            balloon.tieY + floatY * 0.5,
+            bx, by + balloon.height * 0.5
+        );
+        ctx.stroke();
+
+        // Draw the balloon body
+        const grad = ctx.createRadialGradient(
+            bx - balloon.width * 0.2,
+            by - balloon.height * 0.2,
+            balloon.width * 0.1,
+            bx, by,
+            balloon.width * 0.8
+        );
+        const alpha = 0.8 - flashLift * 0.2;
+        grad.addColorStop(0, `hsla(${balloon.hue}, 90%, 65%, ${alpha})`);
+        grad.addColorStop(1, `hsla(${balloon.hue}, 100%, 30%, ${alpha})`);
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(bx, by, balloon.width, balloon.height, swayX * 0.01, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Highlight
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.4 - flashLift * 0.1})`;
+        ctx.beginPath();
+        ctx.ellipse(
+            bx - balloon.width * 0.3,
+            by - balloon.height * 0.3,
+            balloon.width * 0.2,
+            balloon.height * 0.2,
+            Math.PI * 0.25 + swayX * 0.01,
+            0, Math.PI * 2
+        );
+        ctx.fill();
+
+        // Knot at the bottom
+        ctx.fillStyle = `hsla(${balloon.hue}, 100%, 25%, ${alpha})`;
+        ctx.beginPath();
+        ctx.moveTo(bx, by + balloon.height);
+        ctx.lineTo(bx - 3, by + balloon.height + 4);
+        ctx.lineTo(bx + 3, by + balloon.height + 4);
+        ctx.closePath();
+        ctx.fill();
     }
 
     _drawSpectrumBars(width, height, rainHue) {
