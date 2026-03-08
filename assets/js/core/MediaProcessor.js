@@ -1987,7 +1987,7 @@ export class MediaProcessor {
      * @param {Object} options
      * @param {Blob[]|File[]} options.imageBlobs - Ordered list of image files
      * @param {number[]} options.imageDurations - Duration in seconds for each image
-     * @param {string} [options.transition='cut'] - 'cut'|'crossfade'|'slide-left'|'slide-right'|'zoom'
+     * @param {string} [options.transition='cut'] - 'cut'|'crossfade'|'slide-left'|'slide-right'|'slide-up'|'slide-down'|'fade-to-black'|'wipe-left'|'wipe-right'|'zoom'|'zoom-out'|'flip'
      * @param {number} [options.transitionDuration=0.5] - Transition duration in seconds
      * @param {Blob|File|null} [options.audioBlob] - Optional background music
      * @param {boolean} [options.audioLoop=true] - Loop audio to fill video duration
@@ -2111,17 +2111,86 @@ export class MediaProcessor {
                         break;
                     }
                     case 'slide-left':
-                    case 'slide-right': {
-                        // dir: -1 = slide left (A exits left, B enters right), +1 = slide right
-                        const dir = transType === 'slide-left' ? -1 : 1;
+                    case 'slide-right':
+                    case 'slide-up':
+                    case 'slide-down': {
+                        const isH = transType === 'slide-left' || transType === 'slide-right';
+                        const dir = (transType === 'slide-left' || transType === 'slide-up') ? -1 : 1;
+                        const span = isH ? w : h;
                         ctx.save();
                         ctx.beginPath();
                         ctx.rect(0, 0, w, h);
                         ctx.clip();
                         ctx.fillStyle = '#000000';
                         ctx.fillRect(0, 0, w, h);
-                        ctx.drawImage(bmA, rectA.dx + dir * progress * w, rectA.dy, rectA.dw, rectA.dh);
-                        ctx.drawImage(bmB, rectB.dx - dir * (1 - progress) * w, rectB.dy, rectB.dw, rectB.dh);
+                        const aOff = dir * progress * span;
+                        const bOff = -dir * (1 - progress) * span;
+                        if (isH) {
+                            ctx.drawImage(bmA, rectA.dx + aOff, rectA.dy, rectA.dw, rectA.dh);
+                            ctx.drawImage(bmB, rectB.dx + bOff, rectB.dy, rectB.dw, rectB.dh);
+                        } else {
+                            ctx.drawImage(bmA, rectA.dx, rectA.dy + aOff, rectA.dw, rectA.dh);
+                            ctx.drawImage(bmB, rectB.dx, rectB.dy + bOff, rectB.dw, rectB.dh);
+                        }
+                        ctx.restore();
+                        break;
+                    }
+                    case 'fade-to-black': {
+                        // Two-phase: A fades to black (0→0.5), B fades from black (0.5→1)
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(0, 0, w, h);
+                        if (progress < 0.5) {
+                            ctx.globalAlpha = 1 - progress * 2;
+                            ctx.drawImage(bmA, rectA.dx, rectA.dy, rectA.dw, rectA.dh);
+                        } else {
+                            ctx.globalAlpha = (progress - 0.5) * 2;
+                            ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                        }
+                        ctx.globalAlpha = 1;
+                        break;
+                    }
+                    case 'wipe-left':
+                    case 'wipe-right': {
+                        // A stays; B revealed behind an expanding edge
+                        drawImageCentered(ctx, bmA, w, h);
+                        ctx.save();
+                        ctx.beginPath();
+                        if (transType === 'wipe-left') {
+                            ctx.rect(0, 0, progress * w, h);
+                        } else {
+                            ctx.rect((1 - progress) * w, 0, progress * w, h);
+                        }
+                        ctx.clip();
+                        ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                        ctx.restore();
+                        break;
+                    }
+                    case 'zoom-out': {
+                        // A shrinks to nothing; B fades in at 1.0x
+                        const shrink = 1 - progress;
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(0, 0, w, h);
+                        ctx.globalAlpha = shrink;
+                        ctx.drawImage(bmA,
+                            rectA.dx + rectA.dw * progress / 2,
+                            rectA.dy + rectA.dh * progress / 2,
+                            rectA.dw * shrink, rectA.dh * shrink);
+                        ctx.globalAlpha = progress;
+                        ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                        ctx.globalAlpha = 1;
+                        break;
+                    }
+                    case 'flip': {
+                        // Horizontal flip: A narrows to nothing (0→0.5), B widens from nothing (0.5→1)
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(0, 0, w, h);
+                        const scaleX = progress < 0.5 ? 1 - 2 * progress : 2 * progress - 1;
+                        const { dx, dy, dw, dh } = progress < 0.5 ? rectA : rectB;
+                        ctx.save();
+                        ctx.translate(w / 2, h / 2);
+                        ctx.scale(scaleX, 1);
+                        ctx.translate(-w / 2, -h / 2);
+                        ctx.drawImage(progress < 0.5 ? bmA : bmB, dx, dy, dw, dh);
                         ctx.restore();
                         break;
                     }
