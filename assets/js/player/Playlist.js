@@ -1073,15 +1073,15 @@ export class Playlist {
             url,
             blob_url: url,
             file: new File([blob], filename, { type: mimeType }),
-            duration: options.duration !== undefined ? options.duration : sourceItem.duration,
+            duration: options.duration !== undefined ? options.duration : (sourceItem ? sourceItem.duration : null),
             type: options.mediaType || 'video',
             isLocal: true,
             isNew: true,
-            path: (sourceItem.path || sourceItem.title) + '/' + filename,
+            path: sourceItem ? (sourceItem.path || sourceItem.title) + '/' + filename : filename,
             ...options.extra,
         };
 
-        const index = this.items.indexOf(sourceItem);
+        const index = sourceItem ? this.items.indexOf(sourceItem) : -1;
         if (index !== -1) {
             this.items.splice(index + 1, 0, newItem);
         } else {
@@ -1420,6 +1420,7 @@ export class Playlist {
                     Logger.log(`Releasing memory for: ${prevItem.title}`);
                     URL.revokeObjectURL(prevItem.url);
                     prevItem.url = null;
+                    prevItem.blob_url = null; // Ensure on-demand reload triggers on revisit
                     prevItem.file = null; // Release Blob
                 }
             }
@@ -2936,6 +2937,14 @@ export class Playlist {
                     </div>
                     <span class="tools-tile-label">Merge Videos</span>
                 </button>
+                <button class="tools-tile" data-action="slideshow" title="Images to Video">
+                    <div class="tools-tile-icon">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-image"></use>
+                        </svg>
+                    </div>
+                    <span class="tools-tile-label">Slideshow</span>
+                </button>
                 <button class="tools-tile tools-tile-danger" data-action="reset" title="Reset App">
                     <div class="tools-tile-icon">
                         <svg width="24" height="24" fill="currentColor">
@@ -2961,6 +2970,9 @@ export class Playlist {
                     } else if (action === 'merge') {
                         const { MergeMenu } = await import('./menu/MergeMenu.js');
                         MergeMenu.init(null, this);
+                    } else if (action === 'slideshow') {
+                        const { SlideshowMenu } = await import('./menu/SlideshowMenu.js');
+                        SlideshowMenu.init(this);
                     } else if (action === 'reset') {
                         if (confirm('Reset the app? This will clear all data and reload.')) {
                             try {

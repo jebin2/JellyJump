@@ -2054,3 +2054,162 @@
         <p class="encrypt-info-text mt-xs" style="opacity: 0.7;">No password recovery - remember your password.</p>
     </div>
 </template>
+
+<!-- Slideshow Content Template -->
+<template id="slideshow-content-template">
+    <div class="slideshow-container">
+
+        <!-- Dropzone -->
+        <div class="slideshow-dropzone" role="button" tabindex="0" aria-label="Upload images">
+            <svg width="32" height="32" fill="currentColor" style="opacity:0.5; margin-bottom:8px;">
+                <use href="assets/icons/sprite.svg#icon-image"></use>
+            </svg>
+            <p class="text-sm text-secondary">Drag &amp; drop images here or <span class="slideshow-browse-link" style="color:var(--accent-primary);cursor:pointer;text-decoration:underline;">browse</span></p>
+            <p class="text-xs text-muted mt-xs">PNG, JPG, GIF, WebP, BMP — add multiple at once</p>
+            <input type="file" class="slideshow-file-input" accept="image/*" multiple style="display:none;">
+        </div>
+
+        <!-- Image List -->
+        <div class="slideshow-image-list hidden">
+            <div class="slideshow-list-header flex-between mb-xs">
+                <span class="text-xs text-secondary font-mono">IMAGES <span class="slideshow-count text-accent font-bold">0</span></span>
+                <button class="slideshow-add-more-btn jellyjump-btn-small" title="Add more images">
+                    <svg width="14" height="14" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-plus"></use>
+                    </svg>
+                    <span>Add More</span>
+                </button>
+            </div>
+            <!-- Table header -->
+            <div class="slideshow-table-header slideshow-row-grid text-xs text-muted font-mono px-xs py-xs">
+                <span></span><!-- drag -->
+                <span></span><!-- thumb -->
+                <span>FILE</span>
+                <span class="text-center">DURATION</span>
+                <span></span><!-- remove -->
+            </div>
+            <div class="slideshow-items-list"></div>
+        </div>
+
+        <!-- Settings -->
+        <div class="slideshow-settings mt-md">
+            <label class="text-xs text-secondary font-mono mb-sm block">TRANSITION</label>
+
+            <div class="slideshow-transition-row flex gap-md items-start mb-sm flex-wrap">
+                <!-- Transition type -->
+                <div class="setting-group" style="flex:2; min-width:130px;">
+                    <label class="text-xs font-bold mb-xs block">Type</label>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full slideshow-transition-btn" id="slideshow-transition-btn"
+                            aria-haspopup="true" aria-expanded="false">
+                            <span>Cut</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="slideshow-transition-menu" role="menu">
+                            <div class="jellyjump-menu-item active" data-value="cut" role="menuitem">
+                                <span class="menu-label text-sm font-bold">Cut</span>
+                                <span class="text-xs text-secondary ml-auto">Instant</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="crossfade" role="menuitem">
+                                <span class="menu-label text-sm">Crossfade</span>
+                                <span class="text-xs text-secondary ml-auto">Blend</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="slide-left" role="menuitem">
+                                <span class="menu-label text-sm">Slide Left</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="slide-right" role="menuitem">
+                                <span class="menu-label text-sm">Slide Right</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="zoom" role="menuitem">
+                                <span class="menu-label text-sm">Zoom</span>
+                                <span class="text-xs text-secondary ml-auto">Ken Burns</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transition duration -->
+                <div class="slideshow-transition-duration-wrap setting-group" style="flex:3; min-width:150px; display:none;">
+                    <div class="flex-between mb-xs">
+                        <label class="text-xs font-bold">Duration</label>
+                        <span class="slideshow-trans-dur-val text-xs font-bold text-accent">0.5s</span>
+                    </div>
+                    <input type="range" class="quality-slider slideshow-trans-dur-slider w-full" min="0.3" max="2.0" step="0.1" value="0.5">
+                    <div class="flex-between mt-xs text-xs text-secondary">
+                        <span>0.3s</span>
+                        <span>1.0s</span>
+                        <span>2.0s</span>
+                    </div>
+                </div>
+
+                <!-- Output FPS -->
+                <div class="setting-group" style="flex:2; min-width:120px;">
+                    <label class="text-xs font-bold mb-xs block">Output FPS</label>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full slideshow-fps-btn" id="slideshow-fps-btn"
+                            aria-haspopup="true" aria-expanded="false">
+                            <span>30 fps</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="slideshow-fps-menu" role="menu">
+                            <div class="jellyjump-menu-item" data-value="24" role="menuitem">
+                                <span class="menu-label text-sm">24 fps</span>
+                                <span class="text-xs text-secondary ml-auto">Cinematic</span>
+                            </div>
+                            <div class="jellyjump-menu-item active" data-value="30" role="menuitem">
+                                <span class="menu-label text-sm font-bold">30 fps</span>
+                                <span class="text-xs text-secondary ml-auto">Standard</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="60" role="menuitem">
+                                <span class="menu-label text-sm">60 fps</span>
+                                <span class="text-xs text-secondary ml-auto">Smooth</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Music -->
+            <label class="text-xs text-secondary font-mono mb-sm block mt-md">BACKGROUND MUSIC <span class="text-muted font-normal">(optional)</span></label>
+            <div class="slideshow-music-row flex gap-sm items-center flex-wrap">
+                <label class="jellyjump-btn-small cursor-pointer flex-shrink-0 flex items-center gap-xs">
+                    <svg width="14" height="14" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-audio"></use>
+                    </svg>
+                    <span>Choose File</span>
+                    <input type="file" class="slideshow-music-input" accept="audio/*" style="display:none;">
+                </label>
+                <span class="slideshow-music-name text-sm text-muted flex-1 truncate" style="min-width:0;">No file selected</span>
+                <button class="slideshow-music-clear jellyjump-btn-small hidden" title="Remove music">
+                    <svg width="14" height="14" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-close"></use>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Slideshow Image Item Template -->
+<template id="slideshow-image-item-template">
+    <div class="slideshow-item slideshow-row-grid items-center px-xs py-xs rounded border border-transparent" draggable="true">
+        <!-- Drag handle -->
+        <div class="slideshow-item-drag text-muted" style="cursor:grab; user-select:none; font-size:16px; text-align:center; line-height:1;">&#8597;</div>
+        <!-- Thumbnail -->
+        <div style="width:52px;height:48px;background:#000;border-radius:3px;overflow:hidden;">
+            <img style="width:100%;height:100%;object-fit:cover;" alt="">
+        </div>
+        <!-- Filename -->
+        <div class="slideshow-item-name text-sm truncate" style="min-width:0;"></div>
+        <!-- Duration -->
+        <div class="flex items-center justify-center gap-xs">
+            <input type="text" class="slideshow-item-duration font-mono" value="3" placeholder="3">
+            <span class="text-xs text-secondary flex-shrink-0">s</span>
+        </div>
+        <!-- Remove -->
+        <button class="slideshow-item-remove text-muted" title="Remove"
+            style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center;justify-content:center;border-radius:3px;width:100%;">
+            <svg width="14" height="14" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-close"></use>
+            </svg>
+        </button>
+    </div>
+</template>

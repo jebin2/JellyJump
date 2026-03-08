@@ -109,5 +109,10 @@ export const FOOTER_CONFIGS = {
         actionClass: 'multicut-btn',
         icon: 'icon-scissors',
         title: 'Remove Clips'
+    },
+    slideshow: {
+        actionClass: 'slideshow-btn',
+        icon: 'icon-image',
+        title: 'Create Video'
     }
 };
