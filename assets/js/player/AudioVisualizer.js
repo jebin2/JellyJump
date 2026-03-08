@@ -312,7 +312,8 @@ export class AudioVisualizer {
                 w: 140 + Math.random() * 220,
                 h: 35 + Math.random() * 50,
                 speed: 0.12 + Math.random() * 0.3,
-                depth: 0.35 + Math.random() * 0.65
+                depth: 0.35 + Math.random() * 0.65,
+                puffSeed: Math.random() * Math.PI * 2
             });
         }
 
@@ -446,23 +447,60 @@ export class AudioVisualizer {
     _drawClouds(width, height, stormHue) {
         const ctx = this.ctx;
         const wind = this.windOffset * 0.02 + (this.midLevel - 0.35) * 0.22;
+        const flashLift = Math.min(0.32, this.flashAlpha * 0.6);
 
         for (const cloud of this.clouds) {
             cloud.x += cloud.speed + wind * cloud.depth;
             if (cloud.x > width + cloud.w) cloud.x = -cloud.w;
             if (cloud.x < -cloud.w) cloud.x = width + cloud.w;
 
-            const alpha = 0.12 + cloud.depth * 0.22 + this.rmsLevel * 0.06;
-            ctx.fillStyle = `hsla(${stormHue}, 22%, ${17 + cloud.depth * 10}%, ${alpha})`;
+            const driftWave = Math.sin(this.simTime * 0.35 + cloud.puffSeed) * 0.5 + 0.5;
+            const toneLift = driftWave * 4 + flashLift * 14;
+            const cloudLightness = 12 + cloud.depth * 9 + toneLift;
+            const alpha = 0.1 + cloud.depth * 0.2 + this.rmsLevel * 0.05 + flashLift * 0.14;
 
+            // Main mass with internal gradient gives volume.
+            const bodyGrad = ctx.createRadialGradient(
+                cloud.x - cloud.w * 0.14,
+                cloud.y - cloud.h * 0.16,
+                cloud.h * 0.1,
+                cloud.x,
+                cloud.y + cloud.h * 0.05,
+                cloud.w * 0.62
+            );
+            bodyGrad.addColorStop(0, `hsla(${stormHue - 6}, 24%, ${cloudLightness + 4}%, ${alpha + flashLift * 0.08})`);
+            bodyGrad.addColorStop(1, `hsla(${stormHue + 4}, 20%, ${cloudLightness - 6}%, ${Math.max(0.06, alpha - 0.08)})`);
+            ctx.fillStyle = bodyGrad;
             ctx.beginPath();
-            ctx.ellipse(cloud.x, cloud.y, cloud.w * 0.52, cloud.h * 0.6, 0, 0, Math.PI * 2);
+            ctx.ellipse(cloud.x, cloud.y, cloud.w * 0.56, cloud.h * 0.62, 0, 0, Math.PI * 2);
             ctx.fill();
+
+            // Sub masses for irregular storm shape.
+            const puffOffsets = [
+                { ox: -0.34, oy: 0.12, sx: 0.32, sy: 0.46 },
+                { ox: -0.1, oy: -0.18, sx: 0.36, sy: 0.5 },
+                { ox: 0.24, oy: -0.08, sx: 0.38, sy: 0.5 },
+                { ox: 0.43, oy: 0.13, sx: 0.28, sy: 0.4 }
+            ];
+            for (const puff of puffOffsets) {
+                ctx.fillStyle = `hsla(${stormHue - 2}, 22%, ${cloudLightness - 2 + Math.random() * 2}%, ${alpha * 0.9})`;
+                ctx.beginPath();
+                ctx.ellipse(
+                    cloud.x + cloud.w * puff.ox,
+                    cloud.y + cloud.h * puff.oy,
+                    cloud.w * puff.sx,
+                    cloud.h * puff.sy,
+                    0,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+
+            // Subtle underside shadow to avoid flat cloud shapes.
+            ctx.fillStyle = `rgba(10, 16, 24, ${0.1 + cloud.depth * 0.12})`;
             ctx.beginPath();
-            ctx.ellipse(cloud.x - cloud.w * 0.28, cloud.y + 6, cloud.w * 0.36, cloud.h * 0.46, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(cloud.x + cloud.w * 0.26, cloud.y + 8, cloud.w * 0.4, cloud.h * 0.44, 0, 0, Math.PI * 2);
+            ctx.ellipse(cloud.x + cloud.w * 0.02, cloud.y + cloud.h * 0.24, cloud.w * 0.46, cloud.h * 0.26, 0, 0, Math.PI * 2);
             ctx.fill();
         }
     }
