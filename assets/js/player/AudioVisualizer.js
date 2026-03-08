@@ -712,188 +712,303 @@ export class AudioVisualizer {
     _drawWoman(width, height, flashLift) {
         const ctx = this.ctx;
         const w = this.woman;
-        const groundY = height * 0.9;
-        const color = `rgba(6, 8, 12, ${0.98 - flashLift * 0.15})`;
+        const color = `rgba(6, 8, 12, ${0.97 - flashLift * 0.14})`;
 
-        // State Machine Logic
+        // === STATE MACHINE ===
+        // frameStep: derived from the no-foot-sliding condition at mid-stance.
+        // At phase=0, d(ankleX)/dphase = 0.42*(thighLen + 0.48*shinLen) ≈ H×0.162
+        // No sliding → speed = H×0.162 × 2.5 × frameStep → frameStep = speed/(H×0.405)
+        const frameStep = w.speed / (w.height * 0.405);
         if (w.state === "walking_to_balloon") {
-            const targetX = width * this.sceneComposition.chairXRatio - w.width * 1.5;
-            if (w.x < targetX) {
-                w.x += w.speed;
-                w.frame += 0.08;
-            } else {
-                w.state = "taking_balloon";
-                w.waitTimer = 60;
-            }
+            const targetX = width * this.sceneComposition.chairXRatio - w.height * 0.6;
+            if (w.x < targetX) { w.x += w.speed; w.frame += frameStep; }
+            else { w.state = "taking_balloon"; w.waitTimer = 70; }
         } else if (w.state === "taking_balloon") {
-            w.waitTimer--;
-            if (w.waitTimer <= 0) {
-                w.hasBalloon = true;
-                w.state = "walking_away";
-            }
+            if (--w.waitTimer <= 0) { w.hasBalloon = true; w.state = "walking_away"; }
         } else if (w.state === "walking_away") {
-            w.x += w.speed;
-            w.frame += 0.08;
-            if (w.x > width + w.width * 2) {
-                w.state = "waiting";
-                w.waitTimer = 180;
-                w.hasBalloon = false;
-            }
+            w.x += w.speed; w.frame += frameStep;
+            if (w.x > width + w.height) { w.state = "waiting"; w.waitTimer = 180; w.hasBalloon = false; }
         } else if (w.state === "waiting") {
-            w.waitTimer--;
-            if (w.waitTimer <= 0) {
-                w.x = -w.width * 2;
-                w.state = "walking_to_balloon";
-            }
+            if (--w.waitTimer <= 0) { w.x = -w.height; w.state = "walking_to_balloon"; }
         }
 
-        // Draw Woman Silhouette
+        const isWalking = w.state === "walking_to_balloon" || w.state === "walking_away";
+        const t = w.frame * 2.5;
+        const walkCycle = Math.sin(t);
+        // Body bobs up once per step (2x per stride) — |sin(t)| gives that frequency
+        const bob = isWalking ? Math.abs(Math.sin(t)) * 2.5 : 0;
+
+        // Proportional measurements — all relative to figure height H
+        const H = w.height;
+        const hipY      = -H * 0.51;
+        const waistY    = -H * 0.63;
+        const shoulderY = -H * 0.82;
+        const headCY    = -H * 0.93;
+        const headR     =  H * 0.075;
+        const thighLen  =  H * 0.27;
+        const shinLen   =  H * 0.24;
+        const footLen   =  H * 0.08;
+        const hipHW     =  H * 0.052;   // hip half-width
+        const shoulderHW =  H * 0.115;  // shoulder half-width
+        const waistHW   =  H * 0.065;   // waist half-width
+
+        // Right hand position in local coords (tracked for balloon placement)
+        let rHandLX = shoulderHW + H * 0.12;
+        let rHandLY = shoulderY - H * 0.08;
+
         ctx.save();
         ctx.fillStyle = color;
         ctx.strokeStyle = color;
-        ctx.translate(w.x, w.y);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.translate(w.x, w.y - bob);
 
-        const t = w.frame * 2.5;
-        const walk = Math.sin(t);
-        const bob = Math.abs(Math.cos(t)) * 2.5;
-        const sway = Math.sin(t) * 1.5;
-        
-        ctx.translate(0, -bob);
+        // --- 2-segment leg using forward kinematics ---
+        // Both legs share one hip pivot at center (correct for side-view silhouette).
+        // phase: -1 = fully back (stance/push-off), 0 = straight down, +1 = forward (swing)
+        const drawLeg = (phase) => {
+            const thighA = phase * 0.42;
+            let shinA;
+            if (phase >= 0) {
+                // Swing: knee bends via sin-curve — peaks at mid-swing, straight at heel-strike
+                // Cap kneeBend so ankle doesn't cross behind the knee at mid-swing
+                const kneeBend = Math.sin(phase * Math.PI) * 0.72;
+                shinA = thighA - kneeBend;
+            } else {
+                // Stance/push-off: ankle stays more under the hip than the knee does
+                shinA = thighA * 0.46;
+            }
 
-        // 1. Legs (Anatomical Slender Slacks/Shorts)
-        const hipY = -w.height * 0.42;
-        const legWidth = w.width * 0.22;
-        
-        const drawLeg = (side, cycle) => {
-            const angle = cycle * 0.35;
-            const kneeAngle = Math.max(0, -cycle * 0.4);
-            
-            ctx.save();
-            ctx.translate(sway + side * 2.5, hipY);
-            ctx.rotate(angle);
-            
-            // Upper leg
+            // Joint positions
+            const kx = Math.sin(thighA) * thighLen;          // hip at x=0
+            const ky = hipY + Math.cos(thighA) * thighLen;   // downward from hipY
+            const ax = kx + Math.sin(shinA) * shinLen;
+            const ay = ky + Math.cos(shinA) * shinLen;
+
+            // Foot direction: flat during stance; toe lifts slightly at heel-strike
+            const heelLift = phase > 0.65 ? (phase - 0.65) / 0.35 * 0.28 : 0;
+            const fx = ax + Math.cos(heelLift) * footLen;
+            const fy = ay - Math.sin(heelLift) * footLen;
+
+            // Thigh
+            ctx.lineWidth = H * 0.044;
             ctx.beginPath();
-            ctx.roundRect(-legWidth/2, 0, legWidth, w.height * 0.22, 4);
-            ctx.fill();
-            
-            // Lower leg
-            ctx.translate(0, w.height * 0.2);
-            ctx.rotate(kneeAngle);
+            ctx.moveTo(0, hipY);
+            ctx.lineTo(kx, ky);
+            ctx.stroke();
+
+            // Shin
+            ctx.lineWidth = H * 0.034;
             ctx.beginPath();
-            ctx.roundRect(-legWidth/2.5, 0, legWidth/1.2, w.height * 0.22, 3);
-            ctx.fill();
-            
+            ctx.moveTo(kx, ky);
+            ctx.lineTo(ax, ay);
+            ctx.stroke();
+
             // Foot
-            ctx.translate(0, w.height * 0.2);
+            ctx.lineWidth = H * 0.030;
             ctx.beginPath();
-            ctx.ellipse(2, 0, legWidth * 0.8, 3, 0, 0, Math.PI * 2);
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(fx, fy);
+            ctx.stroke();
+
+            // Knee cap — small dot makes the bend joint clearly visible
+            ctx.beginPath();
+            ctx.arc(kx, ky, H * 0.020, 0, Math.PI * 2);
             ctx.fill();
-            
-            ctx.restore();
         };
 
-        drawLeg(-1, walk);  // Back leg
-        drawLeg(1, -walk); // Front leg
+        // Back leg drawn first (behind skirt)
+        drawLeg(-walkCycle);
 
-        // 2. Torso (Curvy silhouette)
+        // === SKIRT (covers hip joint, flows with stride) ===
+        const skirtHemY = hipY + H * 0.21;
+        const hemFlare  = H * 0.165 + (isWalking ? Math.abs(walkCycle) * H * 0.024 : 0);
+        const skirtSway = isWalking ? walkCycle * H * 0.013 : 0;
+
         ctx.beginPath();
-        // Start at Hips
-        ctx.moveTo(sway - w.width * 0.3, hipY);
-        // Left side up to shoulder
+        ctx.moveTo(-hipHW * 1.85 + skirtSway * 0.4, hipY - H * 0.012);
         ctx.bezierCurveTo(
-            sway - w.width * 0.15, -w.height * 0.6,
-            -w.width * 0.35, -w.height * 0.75,
-            -w.width * 0.4, -w.height * 0.85
+            -hipHW * 2.4 + skirtSway * 0.3,  hipY + H * 0.065,
+            -hemFlare * 1.1 + skirtSway * 0.15, skirtHemY - H * 0.018,
+            -hemFlare * 0.62 + skirtSway * 0.1, skirtHemY
         );
-        // Shoulder line
-        ctx.lineTo(w.width * 0.4, -w.height * 0.85);
-        // Right side down to hips
+        ctx.lineTo(hemFlare * 0.62 + skirtSway * 0.1, skirtHemY);
         ctx.bezierCurveTo(
-            w.width * 0.35, -w.height * 0.75,
-            sway + w.width * 0.15, -w.height * 0.6,
-            sway + w.width * 0.3, hipY
+            hemFlare * 1.1 + skirtSway * 0.15, skirtHemY - H * 0.018,
+            hipHW * 2.4 + skirtSway * 0.3,  hipY + H * 0.065,
+            hipHW * 1.85 + skirtSway * 0.4, hipY - H * 0.012
         );
         ctx.closePath();
         ctx.fill();
 
-        // 3. Neck & Head
+        // Front leg (drawn over skirt hem)
+        drawLeg(walkCycle);
+
+        // === TORSO — hourglass silhouette ===
+        const torsoBobX = isWalking ? walkCycle * H * 0.007 : 0;
         ctx.beginPath();
-        ctx.ellipse(0, -w.height * 0.88, w.width * 0.1, 4, 0, 0, Math.PI * 2); // Neck
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(2, -w.height * 0.96, w.width * 0.22, 0, Math.PI * 2); // Head
+        ctx.moveTo(-hipHW * 1.6 + torsoBobX, hipY);
+        ctx.bezierCurveTo(
+            -hipHW * 1.85 + torsoBobX, hipY - H * 0.04,
+            -waistHW * 1.1, waistY + H * 0.022,
+            -waistHW, waistY
+        );
+        ctx.bezierCurveTo(
+            -waistHW, waistY - H * 0.018,
+            -shoulderHW, shoulderY + H * 0.038,
+            -shoulderHW, shoulderY
+        );
+        ctx.lineTo(shoulderHW, shoulderY);
+        ctx.bezierCurveTo(
+            shoulderHW, shoulderY + H * 0.038,
+            waistHW, waistY - H * 0.018,
+            waistHW, waistY
+        );
+        ctx.bezierCurveTo(
+            waistHW * 1.1, waistY + H * 0.022,
+            hipHW * 1.85 + torsoBobX, hipY - H * 0.04,
+            hipHW * 1.6 + torsoBobX, hipY
+        );
+        ctx.closePath();
         ctx.fill();
 
-        // Ponytail
+        // === NECK ===
+        ctx.lineWidth = H * 0.038;
         ctx.beginPath();
-        ctx.moveTo(-w.width * 0.1, -w.height * 0.98);
-        ctx.quadraticCurveTo(-w.width * 0.5, -w.height * 0.9, -w.width * 0.4, -w.height * 0.75);
-        ctx.lineWidth = 2.5;
+        ctx.moveTo(0, shoulderY);
+        ctx.lineTo(0, headCY + headR * 0.9);
         ctx.stroke();
 
-        // 4. Umbrella (Held over head)
+        // === HEAD ===
+        ctx.beginPath();
+        ctx.arc(0, headCY, headR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // === HAIR — upswept bun + side strand ===
+        // Bun atop head
+        ctx.beginPath();
+        ctx.arc(headR * 0.05, headCY - headR * 0.78, headR * 0.46, 0, Math.PI * 2);
+        ctx.fill();
+        // Side strand flowing back
+        ctx.lineWidth = headR * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(-headR * 0.52, headCY - headR * 0.38);
+        ctx.quadraticCurveTo(-headR * 1.05, headCY + headR * 0.28, -headR * 0.55, headCY + headR * 0.86);
+        ctx.stroke();
+
+        // === LEFT ARM — holds umbrella (raised, elbow out to the side) ===
+        const lShX = -shoulderHW;
+        // Elbow points outward-back at roughly shoulder height
+        const uElbX = lShX - H * 0.11;
+        const uElbY = shoulderY + H * 0.005;
+        // Forearm rises from elbow up to grip the shaft above head
+        const uHandX = lShX - H * 0.02;
+        const uHandY = -H * 0.955;
+
+        ctx.lineWidth = H * 0.038;
+        ctx.beginPath();
+        ctx.moveTo(lShX, shoulderY);
+        ctx.lineTo(uElbX, uElbY);
+        ctx.stroke();
+        ctx.lineWidth = H * 0.030;
+        ctx.beginPath();
+        ctx.moveTo(uElbX, uElbY);
+        ctx.lineTo(uHandX, uHandY);
+        ctx.stroke();
+
+        // === RIGHT ARM — natural counter-swing (or raised for balloon) ===
+        const rShX = shoulderHW;
+        const armSwing = isWalking ? -walkCycle * 0.36 : 0;
+        const upperArmL = H * 0.185;
+        const foreArmL  = H * 0.155;
+
+        const rElbX = rShX + Math.sin(armSwing) * upperArmL;
+        const rElbY = shoulderY + Math.cos(armSwing) * upperArmL * 0.44;
+
+        if (w.hasBalloon) {
+            rHandLX = rShX + H * 0.14;
+            rHandLY = shoulderY - H * 0.18;
+        } else {
+            const foreA = armSwing * 0.5;
+            rHandLX = rElbX + Math.sin(foreA) * foreArmL;
+            rHandLY = rElbY + Math.cos(foreA) * foreArmL * 0.62;
+        }
+
+        ctx.lineWidth = H * 0.038;
+        ctx.beginPath();
+        ctx.moveTo(rShX, shoulderY);
+        ctx.lineTo(rElbX, rElbY);
+        ctx.stroke();
+        ctx.lineWidth = H * 0.030;
+        ctx.beginPath();
+        ctx.moveTo(rElbX, rElbY);
+        ctx.lineTo(rHandLX, rHandLY);
+        ctx.stroke();
+
+        // === UMBRELLA ===
         ctx.save();
-        const umbX = -w.width * 0.45;
-        const umbY = -w.height * 0.8;
-        ctx.translate(umbX, umbY);
-        
+        ctx.translate(uHandX, uHandY);
+
+        const umbR = H * 0.265;
+
+        // Crook handle at bottom
+        ctx.lineWidth = H * 0.018;
+        ctx.beginPath();
+        ctx.arc(H * 0.02, H * 0.018, H * 0.02, Math.PI * 0.5, Math.PI * 1.5, true);
+        ctx.stroke();
+
         // Shaft
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = H * 0.016;
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.lineTo(0, -w.height * 0.5);
+        ctx.lineTo(0, -H * 0.18);
         ctx.stroke();
-        
+
         // Canopy
-        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(0, -w.height * 0.5, w.width * 1.6, Math.PI, 0);
+        ctx.arc(0, -H * 0.18, umbR, Math.PI, 0);
         ctx.fill();
-        // Scallops
+
+        // Rib lines
+        ctx.lineWidth = H * 0.009;
+        for (let i = 0; i <= 6; i++) {
+            const ra = Math.PI + (i / 6) * Math.PI;
+            ctx.beginPath();
+            ctx.moveTo(0, -H * 0.18);
+            ctx.lineTo(Math.cos(ra) * umbR, -H * 0.18 + Math.sin(ra) * umbR * 0.22);
+            ctx.stroke();
+        }
+
+        // Scalloped hem
+        const numSc = 8;
+        const scW = (umbR * 2) / numSc;
         ctx.beginPath();
-        const sc = 6;
-        const sW = (w.width * 3.2) / sc;
-        ctx.moveTo(-w.width * 1.6, -w.height * 0.5);
-        for(let i=0; i<sc; i++) {
+        ctx.moveTo(-umbR, -H * 0.18);
+        for (let i = 0; i < numSc; i++) {
             ctx.quadraticCurveTo(
-                -w.width * 1.6 + (i+0.5)*sW, -w.height * 0.47,
-                -w.width * 1.6 + (i+1)*sW, -w.height * 0.5
+                -umbR + (i + 0.5) * scW, -H * 0.18 + umbR * 0.14,
+                -umbR + (i + 1) * scW,   -H * 0.18
             );
         }
         ctx.fill();
-        ctx.restore();
 
-        // 5. Arms
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        
-        // Umbrella arm
+        // Tip spike at right edge
+        ctx.lineWidth = H * 0.013;
         ctx.beginPath();
-        ctx.moveTo(-w.width * 0.15, -w.height * 0.8);
-        ctx.lineTo(umbX, umbY);
-        ctx.stroke();
-        
-        // Action arm (Balloon or swing)
-        const armCycle = Math.sin(t + Math.PI);
-        ctx.beginPath();
-        ctx.moveTo(w.width * 0.15, -w.height * 0.8);
-        if (w.hasBalloon) {
-            ctx.lineTo(w.width * 0.6, -w.height * 0.95);
-        } else {
-            ctx.lineTo(w.width * 0.4 + armCycle * 5, -w.height * 0.6);
-        }
+        ctx.moveTo(umbR, -H * 0.18);
+        ctx.lineTo(umbR + H * 0.018, -H * 0.18 - H * 0.014);
         ctx.stroke();
 
         ctx.restore();
+        ctx.restore();
 
-        // Draw held balloon
+        // === HELD BALLOON — absolute canvas coordinates ===
         if (w.hasBalloon) {
-            const bx = w.x + w.width * 0.6;
-            const by = w.y - bob - w.height * 0.95;
+            const bx = w.x + rHandLX;
+            const by = w.y - bob + rHandLY;
             const balloon = this.balloons[0];
             if (balloon) {
-                this._drawBalloon({...balloon, tieX: bx, tieY: by, stringLen: balloon.stringLen * 0.7}, flashLift);
+                this._drawBalloon({ ...balloon, tieX: bx, tieY: by, stringLen: balloon.stringLen * 0.6 }, flashLift);
             }
         }
     }
