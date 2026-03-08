@@ -58,7 +58,7 @@ export class SlideshowMenu {
         const startLabel = modalContent.querySelector('.slideshow-audio-start-label');
         const endLabel = modalContent.querySelector('.slideshow-audio-end-label');
         const audioPlayBtn = modalContent.querySelector('.slideshow-audio-play');
-        const playLabel = modalContent.querySelector('.slideshow-play-label');
+        const playIcon = modalContent.querySelector('.slideshow-play-icon');
 
         const processBtn = modalContent.querySelector('.slideshow-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
@@ -218,7 +218,7 @@ export class SlideshowMenu {
                 try { previewNode.stop(); } catch (_) {}
                 previewNode = null;
             }
-            playLabel.textContent = 'Preview';
+            playIcon.setAttribute('href', 'assets/icons/sprite.svg#icon-play');
         };
 
         audioStartSlider.addEventListener('input', () => {
@@ -254,10 +254,10 @@ export class SlideshowMenu {
                 previewNode.buffer = audioBuffer;
                 previewNode.connect(previewCtx.destination);
                 previewNode.start(0, start, end - start);
-                playLabel.textContent = 'Stop';
+                playIcon.setAttribute('href', 'assets/icons/sprite.svg#icon-pause');
                 previewNode.onended = () => {
                     previewNode = null;
-                    playLabel.textContent = 'Preview';
+                    playIcon.setAttribute('href', 'assets/icons/sprite.svg#icon-play');
                 };
             } catch (e) {
                 Logger.warn('[SlideshowMenu] Audio preview failed:', e);
