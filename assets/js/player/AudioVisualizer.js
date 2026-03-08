@@ -37,6 +37,7 @@ export class AudioVisualizer {
         this.beatCooldownMs = 120;
         this.beatPulse = 0;
         this.flashAlpha = 0;
+        this.frameCounter = 0;
 
         this.currentPitchHz = 0;
         this.pitchSmoothedHz = 0;
@@ -208,7 +209,11 @@ export class AudioVisualizer {
             this.lastBeatAt = now;
         }
 
-        this.currentPitchHz = this._estimatePitchHz(this.timeData, this.analyser.context.sampleRate);
+        this.frameCounter++;
+        if (this.frameCounter % 3 === 0) {
+            this.currentPitchHz = this._estimatePitchHz(this.timeData, this.analyser.context.sampleRate);
+        }
+
         if (this.currentPitchHz > 0) {
             if (this.pitchSmoothedHz === 0) {
                 this.pitchSmoothedHz = this.currentPitchHz;
@@ -541,6 +546,10 @@ export class AudioVisualizer {
         const rainBoost = 1 + this.bassLevel * 1.9 + this.rmsLevel * 0.8;
         const wind = (this.windOffset + (this.midLevel - 0.45) * 26) * 0.08;
 
+        ctx.beginPath();
+        ctx.strokeStyle = `hsla(${rainHue}, 90%, 74%, 0.35)`;
+        ctx.lineWidth = 1.2;
+
         for (const drop of this.raindrops) {
             drop.y += drop.speed * rainBoost;
             drop.x += wind * drop.drift;
@@ -557,13 +566,10 @@ export class AudioVisualizer {
             if (drop.x < -20) drop.x = width + 20;
             if (drop.x > width + 20) drop.x = -20;
 
-            ctx.beginPath();
-            ctx.strokeStyle = `hsla(${rainHue}, 90%, 74%, ${drop.alpha})`;
-            ctx.lineWidth = drop.thick;
             ctx.moveTo(drop.x, drop.y);
             ctx.lineTo(drop.x + wind * 0.35, drop.y + drop.len);
-            ctx.stroke();
         }
+        ctx.stroke();
     }
 
     _drawStormMist(width, height, rainHue) {
