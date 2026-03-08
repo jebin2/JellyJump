@@ -1,625 +1,454 @@
 import { Logger } from "../utils/Logger.js";
+
 /**
- * Audio Visualizer Component
- * Renders rain effect visualization that responds to audio
+ * Audio visualizer tuned for beat response.
+ * Features:
+ * - Adaptive beat detection (low-end energy + spectral flux)
+ * - Pitch estimation via autocorrelation
+ * - Mirrored spectrum bars + waveform + beat pulse flashes
  */
 export class AudioVisualizer {
     constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+        this.ctx = canvas.getContext("2d");
+
         this.analyser = null;
-        this.dataArray = null;
+        this.freqData = null;
+        this.timeData = null;
+
         this.animationId = null;
         this.isRunning = false;
+        this.simulatedMode = false;
+        this.simTime = 0;
 
-        // Rain particles
-        this.raindrops = [];
-        this.maxRaindrops = 200;
+        this.barCount = 64;
+        this.barPeaks = new Float32Array(this.barCount);
 
-        // Audio sensitivity
-        this.smoothing = 0.8;
         this.bassLevel = 0;
         this.midLevel = 0;
         this.highLevel = 0;
+        this.rmsLevel = 0;
+        this.fluxLevel = 0;
 
-        // Simulated mode (fallback when audio analysis fails)
-        this.simulatedMode = false;
-        this.simulatedTime = 0;
+        this.prevSpectrum = null;
+        this.energyHistory = [];
+        this.fluxHistory = [];
+        this.lastBeatAt = 0;
+        this.beatCooldownMs = 120;
+        this.beatPulse = 0;
+        this.flashAlpha = 0;
 
-        // Lightning flash effect
-        this.lightningAlpha = 0;
-        this.lastBassLevel = 0;
-        this.lightningThreshold = 0.7; // Bass level to trigger lightning
+        this.currentPitchHz = 0;
+        this.pitchSmoothedHz = 0;
 
-        // Clouds and trees
-        this.clouds = [];
-        this.trees = [];
-        this.cloudsInitialized = false;
+        this.pulseRings = [];
 
-        Logger.log('[AudioVisualizer] Created for canvas:', canvas.width, 'x', canvas.height);
+        Logger.log("[AudioVisualizer] Created");
     }
 
-    /**
-     * Connect to an audio context and source
-     * @param {AudioContext} audioContext
-     * @param {AudioNode} source - The audio node to analyze (e.g., gainNode)
-     */
     connect(audioContext, source) {
-        // Create analyser node
         this.analyser = audioContext.createAnalyser();
-        this.analyser.fftSize = 256;
-        this.analyser.smoothingTimeConstant = this.smoothing;
+        this.analyser.fftSize = 2048;
+        this.analyser.smoothingTimeConstant = 0.65;
+        this.analyser.minDecibels = -100;
+        this.analyser.maxDecibels = -10;
 
-        // Connect source -> analyser (for frequency analysis only)
-        // Audio already flows via source -> destination, so analyser just taps in
         source.connect(this.analyser);
 
-        // Create data array for frequency data
-        const bufferLength = this.analyser.frequencyBinCount;
-        this.dataArray = new Uint8Array(bufferLength);
+        const freqLen = this.analyser.frequencyBinCount;
+        this.freqData = new Uint8Array(freqLen);
+        this.timeData = new Float32Array(this.analyser.fftSize);
+        this.prevSpectrum = new Float32Array(freqLen);
 
-        // Initialize raindrops in layers
-        this._initRaindrops();
-
-        // Initialize ripple array
-        this.ripples = [];
-
-        Logger.log('[AudioVisualizer] Connected - Rain mode with depth layers');
+        Logger.log("[AudioVisualizer] Connected");
     }
 
-    /**
-     * Initialize raindrop particles in 3 depth layers
-     * @private
-     */
-    _initRaindrops() {
-        this.raindrops = [];
-
-        // Create 3 layers: background (slow/faint), middle, foreground (fast/bright)
-        const layers = [
-            { count: 60, speedMult: 0.5, opacityMult: 0.4, thicknessMult: 0.6 },  // Background
-            { count: 80, speedMult: 1.0, opacityMult: 0.7, thicknessMult: 1.0 },  // Middle
-            { count: 60, speedMult: 1.5, opacityMult: 1.0, thicknessMult: 1.3 }   // Foreground
-        ];
-
-        layers.forEach((layer, layerIndex) => {
-            for (let i = 0; i < layer.count; i++) {
-                this.raindrops.push(this._createRaindrop(layer, layerIndex));
-            }
-        });
-    }
-
-    /**
-     * Create a single raindrop with layer properties
-     * @param {Object} layer - Layer multipliers
-     * @param {number} layerIndex - Layer index (0=back, 2=front)
-     * @private
-     */
-    _createRaindrop(layer = {}, layerIndex = 1) {
-        const speedMult = layer.speedMult || 1;
-        const opacityMult = layer.opacityMult || 1;
-        const thicknessMult = layer.thicknessMult || 1;
-
-        return {
-            x: Math.random() * this.canvas.width,
-            y: Math.random() * this.canvas.height - this.canvas.height,
-            speed: (2 + Math.random() * 3) * speedMult,
-            length: (10 + Math.random() * 20) * (0.7 + layerIndex * 0.15),
-            opacity: (0.2 + Math.random() * 0.5) * opacityMult,
-            thickness: (1 + Math.random() * 2) * thicknessMult,
-            layer: layerIndex
-        };
-    }
-
-    /**
-     * Start visualization (works with or without audio analyser)
-     */
     start() {
         if (this.isRunning) return;
 
-        // Set mode based on analyser availability
-        if (!this.analyser) {
-            this.simulatedMode = true;
-            Logger.log('[AudioVisualizer] Starting in simulated mode (no analyser)');
-        } else {
-            this.simulatedMode = false;
-            Logger.log('[AudioVisualizer] Starting with audio analyser');
-        }
-
+        this.simulatedMode = !this.analyser;
         this.isRunning = true;
-        this._initRaindrops();
+        this.lastBeatAt = 0;
+        this.energyHistory.length = 0;
+        this.fluxHistory.length = 0;
+        this.pulseRings.length = 0;
+        this.barPeaks.fill(0);
+
         this._animate();
-        Logger.log('[AudioVisualizer] Started');
+        Logger.log(`[AudioVisualizer] Started (${this.simulatedMode ? "simulated" : "audio"})`);
     }
 
-    /**
-     * Stop visualization
-     */
     stop() {
         this.isRunning = false;
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
-        Logger.log('[AudioVisualizer] Stopped');
+        Logger.log("[AudioVisualizer] Stopped");
     }
 
-    /**
-     * Animation loop
-     * @private
-     */
-    _animate() {
-        if (!this.isRunning) return;
-
-        this.animationId = requestAnimationFrame(() => this._animate());
-        this._updateAudioLevels();
-        this._draw();
-    }
-
-    /**
-     * Update audio levels from frequency data (or simulate)
-     * @private
-     */
-    _updateAudioLevels() {
-        if (this.simulatedMode || !this.analyser) {
-            // Simulated pulsing effect
-            this.simulatedTime += 0.05;
-            const pulse = (Math.sin(this.simulatedTime) + 1) / 2;
-            const pulse2 = (Math.sin(this.simulatedTime * 1.5) + 1) / 2;
-            const pulse3 = (Math.sin(this.simulatedTime * 2.2) + 1) / 2;
-
-            this.bassLevel = 0.3 + pulse * 0.5;
-            this.midLevel = 0.2 + pulse2 * 0.4;
-            this.highLevel = 0.1 + pulse3 * 0.3;
-            return;
-        }
-
-        this.analyser.getByteFrequencyData(this.dataArray);
-
-        // Calculate bass (low frequencies), mid, and high levels
-        const len = this.dataArray.length;
-        let bass = 0, mid = 0, high = 0;
-
-        const bassEnd = Math.floor(len * 0.15);
-        const midEnd = Math.floor(len * 0.5);
-
-        for (let i = 0; i < len; i++) {
-            if (i < bassEnd) {
-                bass += this.dataArray[i];
-            } else if (i < midEnd) {
-                mid += this.dataArray[i];
-            } else {
-                high += this.dataArray[i];
-            }
-        }
-
-        // Normalize to 0-1 range
-        this.bassLevel = (bass / (bassEnd * 255)) * 1.5; // Boost bass
-        this.midLevel = (mid / ((midEnd - bassEnd) * 255));
-        this.highLevel = (high / ((len - midEnd) * 255));
-    }
-
-    /**
-     * Draw rain effect
-     * @private
-     */
-    _draw() {
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-
-        // Detect bass hit (sudden increase in bass)
-        const bassHit = this.bassLevel > this.lightningThreshold &&
-            this.bassLevel > this.lastBassLevel + 0.2;
-        this.lastBassLevel = this.bassLevel;
-
-        // Trigger lightning on bass hit
-        if (bassHit) {
-            this.lightningAlpha = 0.8 + Math.random() * 0.2;
-        }
-
-        // Dark gradient background (stormy sky)
-        const bgGradient = this.ctx.createLinearGradient(0, 0, 0, height);
-        bgGradient.addColorStop(0, '#050510');
-        bgGradient.addColorStop(0.4, '#0a0a1a');
-        bgGradient.addColorStop(1, '#151525');
-        this.ctx.fillStyle = bgGradient;
-        this.ctx.fillRect(0, 0, width, height);
-
-        // Initialize clouds and trees if not done
-        if (!this.cloudsInitialized || this.clouds.length === 0) {
-            this._initCloudsAndTrees(width, height);
-        }
-
-        // Draw and update clouds (behind rain)
-        this._drawClouds(width, height);
-
-        // Draw trees silhouette (behind rain but in front of ground)
-        this._drawTrees(width, height);
-
-        // Speed multiplier based on bass
-        const speedMultiplier = 1 + this.bassLevel * 4;
-
-        // Rain intensity based on overall volume
-        const overallLevel = (this.bassLevel + this.midLevel + this.highLevel) / 3;
-        const activeDrops = this.raindrops.length;
-
-        // Update and draw raindrops by layer (back to front)
-        for (let i = 0; i < activeDrops; i++) {
-            const drop = this.raindrops[i];
-
-            // Move raindrop down (layer affects speed)
-            drop.y += drop.speed * speedMultiplier;
-
-            // Add slight horizontal movement based on mid frequencies
-            drop.x += (this.midLevel - 0.5) * 2 * (drop.layer === 2 ? 1.5 : 1);
-
-            // Reset raindrop if it goes off screen - create ripple
-            if (drop.y > height) {
-                // Create ripple at impact point (only for middle and foreground)
-                if (drop.layer >= 1 && Math.random() > 0.5) {
-                    this.ripples.push({
-                        x: drop.x,
-                        y: height - 5,
-                        radius: 2,
-                        maxRadius: 15 + Math.random() * 10,
-                        opacity: 0.6 + overallLevel * 0.3
-                    });
-                }
-
-                drop.y = -drop.length;
-                drop.x = Math.random() * width;
-            }
-
-            // Wrap horizontal
-            if (drop.x < 0) drop.x = width;
-            if (drop.x > width) drop.x = 0;
-
-            // Draw raindrop
-            this._drawRaindrop(drop, overallLevel);
-        }
-
-        // Update and draw ripples
-        this._updateAndDrawRipples();
-
-        // Draw subtle ground reflection/splash
-        this._drawGroundEffect(overallLevel);
-
-        // Draw lightning flash overlay
-        if (this.lightningAlpha > 0) {
-            this._drawLightning(width, height);
-            this.lightningAlpha *= 0.85; // Fade out quickly
-            if (this.lightningAlpha < 0.05) this.lightningAlpha = 0;
-        }
-    }
-
-    /**
-     * Draw a single raindrop
-     * @private
-     */
-    _drawRaindrop(drop, intensity) {
-        // Color based on intensity (blue to cyan)
-        const hue = 200 + intensity * 40;
-        const alpha = drop.opacity * (0.5 + intensity * 0.5);
-
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${alpha})`;
-        this.ctx.lineWidth = drop.thickness;
-        this.ctx.lineCap = 'round';
-
-        this.ctx.moveTo(drop.x, drop.y);
-        this.ctx.lineTo(drop.x, drop.y + drop.length);
-        this.ctx.stroke();
-    }
-
-    /**
-     * Update and draw puddle ripples
-     * @private
-     */
-    _updateAndDrawRipples() {
-        const height = this.canvas.height;
-
-        // Process ripples
-        for (let i = this.ripples.length - 1; i >= 0; i--) {
-            const ripple = this.ripples[i];
-
-            // Expand ripple
-            ripple.radius += 0.8;
-            ripple.opacity *= 0.92;
-
-            // Remove if too faded or too large
-            if (ripple.opacity < 0.05 || ripple.radius > ripple.maxRadius) {
-                this.ripples.splice(i, 1);
-                continue;
-            }
-
-            // Draw ripple as ellipse (perspective effect)
-            this.ctx.beginPath();
-            this.ctx.ellipse(
-                ripple.x,
-                ripple.y,
-                ripple.radius,
-                ripple.radius * 0.3, // Flatten for perspective
-                0, 0, Math.PI * 2
-            );
-            this.ctx.strokeStyle = `rgba(150, 200, 255, ${ripple.opacity})`;
-            this.ctx.lineWidth = 1.5;
-            this.ctx.stroke();
-        }
-
-        // Limit max ripples for performance
-        if (this.ripples.length > 50) {
-            this.ripples = this.ripples.slice(-50);
-        }
-    }
-
-    /**
-     * Initialize clouds and trees
-     * @private
-     */
-    _initCloudsAndTrees(width, height) {
-        // Create clouds
-        this.clouds = [];
-        const cloudCount = 8 + Math.floor(Math.random() * 5);
-        for (let i = 0; i < cloudCount; i++) {
-            this.clouds.push({
-                x: Math.random() * width * 1.5 - width * 0.25,
-                y: Math.random() * height * 0.25,
-                width: 100 + Math.random() * 150,
-                height: 30 + Math.random() * 40,
-                speed: 0.2 + Math.random() * 0.3,
-                opacity: 0.3 + Math.random() * 0.3
-            });
-        }
-
-        // Create tree silhouettes
-        this.trees = [];
-        const treeCount = 12 + Math.floor(Math.random() * 8);
-        for (let i = 0; i < treeCount; i++) {
-            this.trees.push({
-                x: (i / treeCount) * width + (Math.random() - 0.5) * 80,
-                height: 60 + Math.random() * 100,
-                width: 20 + Math.random() * 30,
-                type: Math.random() > 0.5 ? 'pine' : 'round'
-            });
-        }
-
-        this.cloudsInitialized = true;
-    }
-
-    /**
-     * Draw and update clouds
-     * @private
-     */
-    _drawClouds(width, height) {
-        for (const cloud of this.clouds) {
-            // Move cloud slowly
-            cloud.x += cloud.speed * (1 + this.midLevel * 0.5);
-
-            // Wrap around
-            if (cloud.x > width + cloud.width) {
-                cloud.x = -cloud.width;
-            }
-
-            // Draw cloud as layered ellipses
-            this.ctx.fillStyle = `rgba(30, 35, 50, ${cloud.opacity})`;
-
-            // Main body
-            this.ctx.beginPath();
-            this.ctx.ellipse(cloud.x, cloud.y, cloud.width / 2, cloud.height / 2, 0, 0, Math.PI * 2);
-            this.ctx.fill();
-
-            // Left bump
-            this.ctx.beginPath();
-            this.ctx.ellipse(cloud.x - cloud.width * 0.3, cloud.y + 5, cloud.width * 0.3, cloud.height * 0.4, 0, 0, Math.PI * 2);
-            this.ctx.fill();
-
-            // Right bump
-            this.ctx.beginPath();
-            this.ctx.ellipse(cloud.x + cloud.width * 0.25, cloud.y + 8, cloud.width * 0.35, cloud.height * 0.35, 0, 0, Math.PI * 2);
-            this.ctx.fill();
-        }
-    }
-
-    /**
-     * Draw tree silhouettes
-     * @private
-     */
-    _drawTrees(width, height) {
-        const groundY = height - 5;
-
-        for (const tree of this.trees) {
-            this.ctx.fillStyle = 'rgba(10, 12, 20, 0.9)';
-
-            if (tree.type === 'pine') {
-                // Pine tree (triangle shape)
-                this.ctx.beginPath();
-                this.ctx.moveTo(tree.x, groundY - tree.height);
-                this.ctx.lineTo(tree.x - tree.width / 2, groundY);
-                this.ctx.lineTo(tree.x + tree.width / 2, groundY);
-                this.ctx.closePath();
-                this.ctx.fill();
-
-                // Second layer (smaller)
-                this.ctx.beginPath();
-                this.ctx.moveTo(tree.x, groundY - tree.height * 1.1);
-                this.ctx.lineTo(tree.x - tree.width * 0.35, groundY - tree.height * 0.4);
-                this.ctx.lineTo(tree.x + tree.width * 0.35, groundY - tree.height * 0.4);
-                this.ctx.closePath();
-                this.ctx.fill();
-            } else {
-                // Round tree (trunk + circle canopy)
-                // Trunk
-                const trunkWidth = tree.width * 0.2;
-                this.ctx.fillRect(tree.x - trunkWidth / 2, groundY - tree.height * 0.4, trunkWidth, tree.height * 0.4);
-
-                // Canopy
-                this.ctx.beginPath();
-                this.ctx.arc(tree.x, groundY - tree.height * 0.6, tree.width * 0.4, 0, Math.PI * 2);
-                this.ctx.fill();
-            }
-        }
-    }
-
-    /**
-     * Draw ground reflection effect
-     * @private
-     */
-    _drawGroundEffect(intensity) {
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-
-        // Subtle glow at bottom
-        const glowHeight = 60 + intensity * 40;
-        const glowGradient = this.ctx.createLinearGradient(0, height, 0, height - glowHeight);
-        glowGradient.addColorStop(0, `rgba(50, 150, 255, ${0.1 + intensity * 0.2})`);
-        glowGradient.addColorStop(1, 'transparent');
-
-        this.ctx.fillStyle = glowGradient;
-        this.ctx.fillRect(0, height - glowHeight, width, glowHeight);
-
-        // Random splash particles
-        if (intensity > 0.3) {
-            const splashCount = Math.floor(intensity * 10);
-            for (let i = 0; i < splashCount; i++) {
-                const x = Math.random() * width;
-                const y = height - 5 - Math.random() * 15;
-                const size = 1 + Math.random() * 2;
-
-                this.ctx.beginPath();
-                this.ctx.arc(x, y, size, 0, Math.PI * 2);
-                this.ctx.fillStyle = `rgba(100, 200, 255, ${0.2 + intensity * 0.3})`;
-                this.ctx.fill();
-            }
-        }
-    }
-
-    /**
-     * Draw lightning flash effect
-     * @private
-     */
-    _drawLightning(width, height) {
-        // Full screen flash with gradient
-        const flashGradient = this.ctx.createRadialGradient(
-            width / 2, height / 3, 0,
-            width / 2, height / 3, Math.max(width, height)
-        );
-        flashGradient.addColorStop(0, `rgba(255, 255, 255, ${this.lightningAlpha})`);
-        flashGradient.addColorStop(0.3, `rgba(200, 220, 255, ${this.lightningAlpha * 0.7})`);
-        flashGradient.addColorStop(1, `rgba(100, 150, 255, ${this.lightningAlpha * 0.2})`);
-
-        this.ctx.fillStyle = flashGradient;
-        this.ctx.fillRect(0, 0, width, height);
-
-        // Draw lightning bolt (optional, adds visual interest)
-        if (this.lightningAlpha > 0.5) {
-            this._drawLightningBolt(width, height);
-        }
-    }
-
-    /**
-     * Draw a jagged lightning bolt
-     * @private
-     */
-    _drawLightningBolt(width, height) {
-        const startX = width * (0.3 + Math.random() * 0.4);
-        const startY = 0;
-        const endY = height * 0.6;
-
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = `rgba(255, 255, 255, ${this.lightningAlpha})`;
-        this.ctx.lineWidth = 2 + Math.random() * 2;
-        this.ctx.lineCap = 'round';
-        this.ctx.lineJoin = 'round';
-
-        let x = startX;
-        let y = startY;
-        this.ctx.moveTo(x, y);
-
-        const segments = 8 + Math.floor(Math.random() * 5);
-        const segmentHeight = endY / segments;
-
-        for (let i = 0; i < segments; i++) {
-            x += (Math.random() - 0.5) * 60;
-            y += segmentHeight;
-            this.ctx.lineTo(x, y);
-
-            // Occasional branch
-            if (Math.random() > 0.7) {
-                const branchX = x + (Math.random() - 0.5) * 80;
-                const branchY = y + segmentHeight * 0.5;
-                this.ctx.moveTo(x, y);
-                this.ctx.lineTo(branchX, branchY);
-                this.ctx.moveTo(x, y);
-            }
-        }
-
-        this.ctx.stroke();
-
-        // Glow effect
-        this.ctx.shadowColor = 'rgba(150, 200, 255, 0.8)';
-        this.ctx.shadowBlur = 20;
-        this.ctx.stroke();
-        this.ctx.shadowBlur = 0;
-    }
-
-    /**
-     * Disconnect and cleanup
-     */
     disconnect() {
         this.stop();
         if (this.analyser) {
             this.analyser.disconnect();
             this.analyser = null;
         }
-        this.dataArray = null;
-        this.raindrops = [];
-        Logger.log('[AudioVisualizer] Disconnected');
+
+        this.freqData = null;
+        this.timeData = null;
+        this.prevSpectrum = null;
+        this.pulseRings.length = 0;
+
+        Logger.log("[AudioVisualizer] Disconnected");
     }
 
-    /**
-     * Clear the canvas with a static rain background
-     */
+    _animate() {
+        if (!this.isRunning) return;
+
+        this.animationId = requestAnimationFrame(() => this._animate());
+        this._updateAudioFeatures();
+        this._drawFrame();
+    }
+
+    _updateAudioFeatures() {
+        if (this.simulatedMode || !this.analyser || !this.freqData || !this.timeData) {
+            this._updateSimulatedFeatures();
+            return;
+        }
+
+        this.analyser.getByteFrequencyData(this.freqData);
+        this.analyser.getFloatTimeDomainData(this.timeData);
+
+        const len = this.freqData.length;
+        const nyquist = this.analyser.context.sampleRate / 2;
+        const hzPerBin = nyquist / len;
+
+        const bassEnd = Math.max(1, Math.floor(180 / hzPerBin));
+        const midEnd = Math.max(bassEnd + 1, Math.floor(2200 / hzPerBin));
+
+        let bass = 0;
+        let mid = 0;
+        let high = 0;
+        let lowEnergy = 0;
+
+        for (let i = 0; i < len; i++) {
+            const n = this.freqData[i] / 255;
+            if (i < bassEnd) {
+                bass += n;
+                lowEnergy += n * n;
+            } else if (i < midEnd) {
+                mid += n;
+            } else {
+                high += n;
+            }
+        }
+
+        this.bassLevel = bass / bassEnd;
+        this.midLevel = mid / (midEnd - bassEnd);
+        this.highLevel = high / Math.max(1, len - midEnd);
+
+        let sumSq = 0;
+        for (let i = 0; i < this.timeData.length; i++) {
+            const v = this.timeData[i];
+            sumSq += v * v;
+        }
+        this.rmsLevel = Math.min(1, Math.sqrt(sumSq / this.timeData.length) * 2.2);
+
+        let flux = 0;
+        for (let i = 0; i < len; i++) {
+            const current = this.freqData[i] / 255;
+            const delta = current - this.prevSpectrum[i];
+            if (delta > 0) flux += delta;
+            this.prevSpectrum[i] = current;
+        }
+        this.fluxLevel = flux / len;
+
+        const now = performance.now();
+        const beat = this._detectBeat(lowEnergy / bassEnd, this.fluxLevel, now);
+        if (beat) {
+            this.beatPulse = 1;
+            this.flashAlpha = 0.65;
+            this._spawnPulseRing();
+            this.lastBeatAt = now;
+        }
+
+        this.currentPitchHz = this._estimatePitchHz(this.timeData, this.analyser.context.sampleRate);
+        if (this.currentPitchHz > 0) {
+            if (this.pitchSmoothedHz === 0) {
+                this.pitchSmoothedHz = this.currentPitchHz;
+            } else {
+                this.pitchSmoothedHz = this.pitchSmoothedHz * 0.8 + this.currentPitchHz * 0.2;
+            }
+        } else {
+            this.pitchSmoothedHz *= 0.98;
+            if (this.pitchSmoothedHz < 30) this.pitchSmoothedHz = 0;
+        }
+
+        this.beatPulse *= 0.9;
+        this.flashAlpha *= 0.84;
+    }
+
+    _updateSimulatedFeatures() {
+        this.simTime += 0.03;
+
+        const beatWave = (Math.sin(this.simTime * 1.7) + 1) * 0.5;
+        const midWave = (Math.sin(this.simTime * 2.5 + 0.7) + 1) * 0.5;
+        const highWave = (Math.sin(this.simTime * 4.2 + 1.8) + 1) * 0.5;
+
+        this.bassLevel = 0.2 + beatWave * 0.6;
+        this.midLevel = 0.15 + midWave * 0.55;
+        this.highLevel = 0.1 + highWave * 0.5;
+        this.rmsLevel = (this.bassLevel + this.midLevel + this.highLevel) / 3;
+        this.fluxLevel = 0.06 + Math.abs(Math.sin(this.simTime * 3.4)) * 0.08;
+
+        if (Math.sin(this.simTime * 1.7) > 0.98) {
+            this.beatPulse = 1;
+            this.flashAlpha = 0.45;
+            this._spawnPulseRing();
+        }
+
+        const note = 130 + Math.sin(this.simTime * 0.9) * 90 + Math.sin(this.simTime * 0.27) * 45;
+        this.pitchSmoothedHz = Math.max(60, note);
+
+        this.beatPulse *= 0.9;
+        this.flashAlpha *= 0.86;
+    }
+
+    _detectBeat(lowEnergy, flux, now) {
+        this.energyHistory.push(lowEnergy);
+        this.fluxHistory.push(flux);
+
+        if (this.energyHistory.length > 45) this.energyHistory.shift();
+        if (this.fluxHistory.length > 45) this.fluxHistory.shift();
+
+        const energyAvg = this._avg(this.energyHistory);
+        const fluxAvg = this._avg(this.fluxHistory);
+
+        const energyPeak = lowEnergy > energyAvg * 1.25 + 0.01;
+        const fluxPeak = flux > fluxAvg * 1.35 + 0.002;
+        const cooldownDone = now - this.lastBeatAt >= this.beatCooldownMs;
+
+        return cooldownDone && ((energyPeak && fluxPeak) || (this.bassLevel > 0.72 && fluxPeak));
+    }
+
+    _drawFrame() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        const ctx = this.ctx;
+
+        const pitch = this.pitchSmoothedHz || 180;
+        const pitchNorm = Math.max(0, Math.min(1, (pitch - 70) / 700));
+
+        const baseHue = 200 + pitchNorm * 120;
+        const accentHue = (baseHue + 55) % 360;
+
+        const bg = ctx.createLinearGradient(0, 0, 0, height);
+        bg.addColorStop(0, `hsl(${(baseHue + 300) % 360}, 45%, 7%)`);
+        bg.addColorStop(0.5, `hsl(${baseHue}, 50%, 9%)`);
+        bg.addColorStop(1, `hsl(${accentHue}, 55%, 8%)`);
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, width, height);
+
+        this._drawBeatGlow(width, height, baseHue);
+        this._drawSpectrumBars(width, height, baseHue, accentHue);
+        this._drawWaveform(width, height, accentHue);
+        this._drawPulseRings(width, height, accentHue);
+        this._drawPitchLabel(width, height);
+        this._drawFlash(width, height);
+    }
+
+    _drawBeatGlow(width, height, hue) {
+        const intensity = this.rmsLevel * 0.35 + this.beatPulse * 0.65;
+        const radius = Math.min(width, height) * (0.24 + intensity * 0.4);
+        const grad = this.ctx.createRadialGradient(width / 2, height * 0.58, 0, width / 2, height * 0.58, radius);
+
+        grad.addColorStop(0, `hsla(${hue}, 90%, 64%, ${0.18 + intensity * 0.25})`);
+        grad.addColorStop(0.6, `hsla(${(hue + 25) % 360}, 95%, 56%, ${0.08 + intensity * 0.12})`);
+        grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+        this.ctx.fillStyle = grad;
+        this.ctx.fillRect(0, 0, width, height);
+    }
+
+    _drawSpectrumBars(width, height, hueA, hueB) {
+        const ctx = this.ctx;
+        const top = height * 0.22;
+        const maxH = height * 0.48;
+        const centerX = width / 2;
+        const half = this.barCount / 2;
+        const gap = Math.max(2, width / this.barCount * 0.16);
+        const barW = Math.max(2, width / this.barCount - gap);
+
+        for (let i = 0; i < this.barCount; i++) {
+            const spectrumIndex = Math.floor((i / this.barCount) * (this.freqData ? this.freqData.length : 128));
+            const raw = this.freqData ? this.freqData[spectrumIndex] / 255 : (0.25 + 0.75 * Math.abs(Math.sin(this.simTime + i * 0.16)));
+            const eased = Math.pow(raw, 1.25);
+            const barH = Math.max(2, eased * maxH * (0.65 + this.rmsLevel * 0.9));
+
+            this.barPeaks[i] = Math.max(this.barPeaks[i] * 0.92, barH);
+
+            const distance = Math.abs(i - half) / half;
+            const x = i < half
+                ? centerX - (half - i) * (barW + gap)
+                : centerX + (i - half) * (barW + gap);
+            const y = top + (maxH - barH);
+
+            const h = hueA + (hueB - hueA) * (1 - distance);
+            ctx.fillStyle = `hsla(${h}, 95%, ${52 + raw * 26}%, ${0.35 + raw * 0.55})`;
+            ctx.fillRect(x, y, barW, barH);
+
+            const peakY = top + (maxH - this.barPeaks[i]);
+            ctx.fillStyle = `hsla(${h}, 100%, 78%, 0.9)`;
+            ctx.fillRect(x, peakY, barW, 2);
+        }
+    }
+
+    _drawWaveform(width, height, hue) {
+        const ctx = this.ctx;
+        const centerY = height * 0.82;
+        const amplitude = height * (0.08 + this.rmsLevel * 0.12 + this.beatPulse * 0.08);
+
+        ctx.beginPath();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = `hsla(${hue}, 100%, 72%, 0.85)`;
+
+        const points = 220;
+        for (let i = 0; i < points; i++) {
+            const t = i / (points - 1);
+            const x = t * width;
+
+            let sample = 0;
+            if (this.timeData) {
+                const idx = Math.min(this.timeData.length - 1, Math.floor(t * this.timeData.length));
+                sample = this.timeData[idx];
+            } else {
+                sample = Math.sin(this.simTime * 2.4 + t * Math.PI * 8) * 0.5;
+            }
+
+            const y = centerY + sample * amplitude;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+
+        ctx.stroke();
+    }
+
+    _drawPulseRings(width, height, hue) {
+        const cx = width / 2;
+        const cy = height * 0.58;
+
+        for (let i = this.pulseRings.length - 1; i >= 0; i--) {
+            const ring = this.pulseRings[i];
+            ring.radius += ring.speed;
+            ring.alpha *= 0.95;
+
+            if (ring.alpha < 0.02) {
+                this.pulseRings.splice(i, 1);
+                continue;
+            }
+
+            this.ctx.beginPath();
+            this.ctx.ellipse(cx, cy, ring.radius, ring.radius * 0.48, 0, 0, Math.PI * 2);
+            this.ctx.lineWidth = ring.width;
+            this.ctx.strokeStyle = `hsla(${hue}, 95%, 74%, ${ring.alpha})`;
+            this.ctx.stroke();
+        }
+    }
+
+    _drawFlash(width, height) {
+        if (this.flashAlpha <= 0.01) return;
+
+        const g = this.ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height));
+        g.addColorStop(0, `rgba(255, 255, 255, ${this.flashAlpha * 0.35})`);
+        g.addColorStop(0.35, `rgba(195, 225, 255, ${this.flashAlpha * 0.25})`);
+        g.addColorStop(1, "rgba(120, 180, 255, 0)");
+
+        this.ctx.fillStyle = g;
+        this.ctx.fillRect(0, 0, width, height);
+    }
+
+    _drawPitchLabel(width, height) {
+        const pitch = this.pitchSmoothedHz;
+        if (!pitch || pitch < 40) return;
+
+        this.ctx.font = "12px monospace";
+        this.ctx.fillStyle = "rgba(220, 240, 255, 0.75)";
+        this.ctx.textAlign = "right";
+        this.ctx.fillText(`${Math.round(pitch)} Hz`, width - 14, height - 14);
+    }
+
+    _spawnPulseRing() {
+        this.pulseRings.push({
+            radius: Math.max(24, Math.min(this.canvas.width, this.canvas.height) * 0.08),
+            speed: 4 + this.bassLevel * 9,
+            alpha: 0.5 + this.bassLevel * 0.35,
+            width: 1.5 + this.rmsLevel * 2.5
+        });
+
+        if (this.pulseRings.length > 8) {
+            this.pulseRings.shift();
+        }
+    }
+
+    _estimatePitchHz(timeData, sampleRate) {
+        const size = timeData.length;
+        if (!size) return 0;
+
+        let rms = 0;
+        for (let i = 0; i < size; i++) rms += timeData[i] * timeData[i];
+        rms = Math.sqrt(rms / size);
+        if (rms < 0.015) return 0;
+
+        let bestOffset = -1;
+        let bestCorr = 0;
+
+        const minHz = 70;
+        const maxHz = 900;
+        const minOffset = Math.floor(sampleRate / maxHz);
+        const maxOffset = Math.floor(sampleRate / minHz);
+
+        for (let offset = minOffset; offset <= maxOffset; offset++) {
+            let corr = 0;
+            for (let i = 0; i < size - offset; i++) {
+                corr += timeData[i] * timeData[i + offset];
+            }
+
+            corr /= (size - offset);
+            if (corr > bestCorr) {
+                bestCorr = corr;
+                bestOffset = offset;
+            }
+        }
+
+        if (bestOffset === -1 || bestCorr < 0.01) return 0;
+        return sampleRate / bestOffset;
+    }
+
+    _avg(arr) {
+        if (!arr.length) return 0;
+        let sum = 0;
+        for (let i = 0; i < arr.length; i++) sum += arr[i];
+        return sum / arr.length;
+    }
+
     drawStaticBackground() {
         const width = this.canvas.width;
         const height = this.canvas.height;
 
-        // Dark gradient background
-        const bgGradient = this.ctx.createRadialGradient(
-            width / 2, height / 2, 0,
-            width / 2, height / 2, Math.max(width, height) / 2
-        );
-        bgGradient.addColorStop(0, '#1a1a2e');
-        bgGradient.addColorStop(1, '#0a0a12');
-        this.ctx.fillStyle = bgGradient;
+        const bg = this.ctx.createLinearGradient(0, 0, 0, height);
+        bg.addColorStop(0, "#0b1020");
+        bg.addColorStop(1, "#09070f");
+        this.ctx.fillStyle = bg;
         this.ctx.fillRect(0, 0, width, height);
 
-        // Draw static raindrops
-        for (let i = 0; i < 50; i++) {
-            const x = Math.random() * width;
-            const y = Math.random() * height;
-            const length = 10 + Math.random() * 15;
+        this.ctx.fillStyle = "rgba(120, 170, 255, 0.4)";
+        this.ctx.font = `${Math.max(30, Math.min(width, height) * 0.15)}px sans-serif`;
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "middle";
+        this.ctx.fillText("♫", width / 2, height / 2 - 8);
 
-            this.ctx.beginPath();
-            this.ctx.strokeStyle = `rgba(100, 180, 255, ${0.1 + Math.random() * 0.2})`;
-            this.ctx.lineWidth = 1;
-            this.ctx.moveTo(x, y);
-            this.ctx.lineTo(x, y + length);
-            this.ctx.stroke();
-        }
-
-        // Draw music note icon
-        this.ctx.save();
-        this.ctx.translate(width / 2, height / 2 - 20);
-        this.ctx.fillStyle = 'rgba(100, 200, 255, 0.6)';
-        this.ctx.font = `${Math.min(width, height) / 4}px Arial`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        this.ctx.fillText('♪', 0, 0);
-        this.ctx.restore();
-
-        // Draw "Press Play" text
-        this.ctx.fillStyle = 'rgba(150, 200, 255, 0.5)';
-        this.ctx.font = '14px sans-serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('Press play to start', width / 2, height / 2 + 50);
+        this.ctx.font = "14px sans-serif";
+        this.ctx.fillStyle = "rgba(190, 215, 255, 0.58)";
+        this.ctx.fillText("Press play to start visualization", width / 2, height / 2 + 36);
     }
 }
