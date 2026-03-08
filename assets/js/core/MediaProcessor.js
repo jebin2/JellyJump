@@ -1991,6 +1991,8 @@ export class MediaProcessor {
      * @param {number} [options.transitionDuration=0.5] - Transition duration in seconds
      * @param {Blob|File|null} [options.audioBlob] - Optional background music
      * @param {boolean} [options.audioLoop=true] - Loop audio to fill video duration
+     * @param {number} [options.audioStartTime=0] - Trim start in seconds
+     * @param {number} [options.audioEndTime] - Trim end in seconds (defaults to full duration)
      * @param {number} [options.fps=30] - Output frame rate
      * @param {Function} [options.onProgress] - Progress callback (0-1)
      * @returns {Promise<Blob>}
@@ -2002,6 +2004,8 @@ export class MediaProcessor {
         transitionDuration = 0.5,
         audioBlob = null,
         audioLoop = true,
+        audioStartTime = 0,
+        audioEndTime = null,
         fps = 30,
         onProgress
     }) {
@@ -2272,13 +2276,16 @@ export class MediaProcessor {
                     const numChannels = audioBuffer.numberOfChannels;
                     const trackDur = audioBuffer.duration;
 
-                    if (trackDur > 0) {
+                    const trimStart = Math.max(0, audioStartTime);
+                    const trimEnd = Math.min(audioEndTime !== null ? audioEndTime : trackDur, trackDur);
+
+                    if (trimEnd > trimStart) {
                         let outputTs = 0;
-                        let passStart = 0; // offset into audioBuffer in seconds
+                        let passStart = trimStart;
 
                         while (outputTs < totalDuration) {
                             const remaining = totalDuration - outputTs;
-                            const chunkDur = Math.min(trackDur - passStart, remaining);
+                            const chunkDur = Math.min(trimEnd - passStart, remaining);
                             if (chunkDur <= 0) break;
 
                             const startSample = Math.floor(passStart * sampleRate);
@@ -2304,10 +2311,10 @@ export class MediaProcessor {
                             outputTs += chunkDur;
                             passStart += chunkDur;
 
-                            // Start next loop pass
-                            if (passStart >= trackDur) {
+                            // Loop back to trim start
+                            if (passStart >= trimEnd) {
                                 if (!audioLoop) break;
-                                passStart = 0;
+                                passStart = trimStart;
                             }
                         }
                     }

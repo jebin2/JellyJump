@@ -50,6 +50,15 @@ export class SlideshowMenu {
         const musicInput = modalContent.querySelector('.slideshow-music-input');
         const musicName = modalContent.querySelector('.slideshow-music-name');
         const musicClear = modalContent.querySelector('.slideshow-music-clear');
+        const audioTrimSection = modalContent.querySelector('.slideshow-audio-trim');
+        const audioStartSlider = modalContent.querySelector('.slideshow-audio-start');
+        const audioEndSlider = modalContent.querySelector('.slideshow-audio-end');
+        const rangeFill = modalContent.querySelector('.slideshow-range-fill');
+        const trimTimes = modalContent.querySelector('.slideshow-trim-times');
+        const startLabel = modalContent.querySelector('.slideshow-audio-start-label');
+        const endLabel = modalContent.querySelector('.slideshow-audio-end-label');
+        const audioPlayBtn = modalContent.querySelector('.slideshow-audio-play');
+        const playLabel = modalContent.querySelector('.slideshow-play-label');
 
         const processBtn = modalContent.querySelector('.slideshow-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
@@ -62,6 +71,9 @@ export class SlideshowMenu {
         // --- State ---
         const images = []; // { file, objectUrl, name }
         let musicFile = null;
+        let audioDuration = 0;
+        let previewNode = null;
+        let previewCtx = null;
         let dragSrcIndex = null;
         const objectUrls = [];
 
@@ -184,19 +196,108 @@ export class SlideshowMenu {
 
         addMoreBtn.addEventListener('click', () => fileInput.click());
 
+        // --- Audio trim helpers ---
+        const fmtTime = (s) => {
+            const m = Math.floor(s / 60);
+            return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+        };
+
+        const updateTrimUI = () => {
+            const start = parseFloat(audioStartSlider.value);
+            const end = parseFloat(audioEndSlider.value);
+            const max = audioDuration || 1;
+            rangeFill.style.left = `${(start / max) * 100}%`;
+            rangeFill.style.width = `${((end - start) / max) * 100}%`;
+            startLabel.textContent = fmtTime(start);
+            endLabel.textContent = fmtTime(end);
+            trimTimes.textContent = `${fmtTime(start)} – ${fmtTime(end)}`;
+        };
+
+        const stopPreview = () => {
+            if (previewNode) {
+                try { previewNode.stop(); } catch (_) {}
+                previewNode = null;
+            }
+            playLabel.textContent = 'Preview';
+        };
+
+        audioStartSlider.addEventListener('input', () => {
+            const start = parseFloat(audioStartSlider.value);
+            const end = parseFloat(audioEndSlider.value);
+            if (start >= end) audioEndSlider.value = Math.min(start + 0.1, audioDuration);
+            updateTrimUI();
+            stopPreview();
+        });
+
+        audioEndSlider.addEventListener('input', () => {
+            const start = parseFloat(audioStartSlider.value);
+            const end = parseFloat(audioEndSlider.value);
+            if (end <= start) audioStartSlider.value = Math.max(end - 0.1, 0);
+            updateTrimUI();
+            stopPreview();
+        });
+
+        audioPlayBtn.addEventListener('click', async () => {
+            if (previewNode) {
+                stopPreview();
+                return;
+            }
+            if (!musicFile) return;
+            try {
+                previewCtx = previewCtx || new AudioContext();
+                if (previewCtx.state === 'suspended') await previewCtx.resume();
+                const arrayBuffer = await musicFile.arrayBuffer();
+                const audioBuffer = await previewCtx.decodeAudioData(arrayBuffer);
+                const start = parseFloat(audioStartSlider.value);
+                const end = parseFloat(audioEndSlider.value);
+                previewNode = previewCtx.createBufferSource();
+                previewNode.buffer = audioBuffer;
+                previewNode.connect(previewCtx.destination);
+                previewNode.start(0, start, end - start);
+                playLabel.textContent = 'Stop';
+                previewNode.onended = () => {
+                    previewNode = null;
+                    playLabel.textContent = 'Preview';
+                };
+            } catch (e) {
+                Logger.warn('[SlideshowMenu] Audio preview failed:', e);
+            }
+        });
+
         // --- Music ---
-        musicInput.addEventListener('change', () => {
-            if (musicInput.files.length) {
-                musicFile = musicInput.files[0];
-                musicName.textContent = musicFile.name;
-                musicClear.classList.remove('hidden');
+        musicInput.addEventListener('change', async () => {
+            if (!musicInput.files.length) return;
+            musicFile = musicInput.files[0];
+            musicName.textContent = musicFile.name;
+            musicClear.classList.remove('hidden');
+            stopPreview();
+
+            // Decode to get duration, then show trim UI
+            try {
+                const ctx = new AudioContext();
+                const buf = await ctx.decodeAudioData(await musicFile.arrayBuffer());
+                audioDuration = buf.duration;
+                await ctx.close();
+                const max = audioDuration.toFixed(2);
+                audioStartSlider.max = max;
+                audioEndSlider.max = max;
+                audioStartSlider.value = 0;
+                audioEndSlider.value = max;
+                updateTrimUI();
+                audioTrimSection.classList.remove('hidden');
+            } catch (e) {
+                Logger.warn('[SlideshowMenu] Could not decode audio for trim:', e);
+                audioTrimSection.classList.add('hidden');
             }
         });
         musicClear.addEventListener('click', () => {
             musicFile = null;
+            audioDuration = 0;
             musicInput.value = '';
             musicName.textContent = 'No file selected';
             musicClear.classList.add('hidden');
+            audioTrimSection.classList.add('hidden');
+            stopPreview();
         });
 
         // --- Open Modal ---
@@ -222,6 +323,10 @@ export class SlideshowMenu {
                 const transitionDuration = parseFloat(transDurSlider.value) || 0.5;
                 const fps = parseInt(fpsDropdown.getValue(), 10) || 30;
                 const audioBlob = musicFile || null;
+                const audioStartTime = audioBlob ? parseFloat(audioStartSlider.value) : 0;
+                const audioEndTime = audioBlob ? parseFloat(audioEndSlider.value) : null;
+
+                stopPreview();
 
                 // Disable UI
                 processBtn.disabled = true;
@@ -254,6 +359,8 @@ export class SlideshowMenu {
                         transitionDuration,
                         audioBlob,
                         audioLoop: true,
+                        audioStartTime,
+                        audioEndTime,
                         fps,
                         onProgress
                     });
@@ -301,6 +408,8 @@ export class SlideshowMenu {
         modal.onCleanup(() => {
             transitionDropdown.destroy();
             fpsDropdown.destroy();
+            stopPreview();
+            if (previewCtx) { previewCtx.close().catch(() => {}); previewCtx = null; }
             for (const url of objectUrls) {
                 try { URL.revokeObjectURL(url); } catch (_) { /* ignore */ }
             }

@@ -2206,6 +2206,32 @@
                     </svg>
                 </button>
             </div>
+            <!-- Audio trim (shown after file selected) -->
+            <div class="slideshow-audio-trim hidden mt-sm">
+                <div class="flex-between mb-xs">
+                    <label class="text-xs text-secondary font-mono">TRIM</label>
+                    <div class="flex items-center gap-sm">
+                        <span class="slideshow-trim-times text-xs font-bold text-accent"></span>
+                        <button class="slideshow-audio-play jellyjump-btn-small flex items-center gap-xs" title="Preview selection">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-play"></use>
+                            </svg>
+                            <span class="slideshow-play-label">Preview</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="slideshow-dual-range">
+                    <div class="slideshow-range-track">
+                        <div class="slideshow-range-fill"></div>
+                    </div>
+                    <input type="range" class="slideshow-audio-start" min="0" step="0.01" value="0">
+                    <input type="range" class="slideshow-audio-end" min="0" step="0.01" value="0">
+                </div>
+                <div class="flex-between text-xs text-secondary mt-xs">
+                    <span class="slideshow-audio-start-label">0:00</span>
+                    <span class="slideshow-audio-end-label">0:00</span>
+                </div>
+            </div>
         </div>
     </div>
 </template>
