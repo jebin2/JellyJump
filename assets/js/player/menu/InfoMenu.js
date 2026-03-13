@@ -215,6 +215,7 @@ export class InfoMenu {
             let audioCodecParam = 'N/A';
             let videoCanDecode = 'N/A';
             let audioCanDecode = 'N/A';
+            let pixelAspectRatio = 'N/A';
 
             // Fetch extended metadata using MediaBunny directly
             try {
@@ -308,6 +309,20 @@ export class InfoMenu {
                         } catch (e) {
                             videoCanDecode = '❓ Unknown';
                         }
+
+                        // Pixel Aspect Ratio (SAR) — new in mediabunny v1.35
+                        try {
+                            const par = videoTrack.pixelAspectRatio;
+                            if (par) {
+                                if (par.numerator === 1 && par.denominator === 1) {
+                                    pixelAspectRatio = '1:1 (Square Pixels)';
+                                } else {
+                                    pixelAspectRatio = `${par.numerator}:${par.denominator}`;
+                                }
+                            }
+                        } catch (e) {
+                            Logger.warn('Failed to get pixel aspect ratio:', e);
+                        }
                     }
 
                     // Get audio track extended info
@@ -370,6 +385,7 @@ export class InfoMenu {
                 videoCodecString: item.videoInfo ? item.videoInfo.codec : 'N/A',
                 resolution: item.videoInfo ? `${item.videoInfo.width}x${item.videoInfo.height}` : 'N/A',
                 aspectRatio: aspectRatio,
+                pixelAspectRatio: pixelAspectRatio,
                 codedResolution: item.videoInfo ? `${item.videoInfo.codedWidth}x${item.videoInfo.codedHeight}` : 'N/A',
                 fps: fps,
                 frameCount: frameCount,
@@ -499,6 +515,7 @@ Video Stream
 ------------
 Codec: ${metadata.videoCodec} (${metadata.videoCodecString})
 Resolution: ${metadata.resolution} (Coded: ${metadata.codedResolution})
+Pixel Aspect Ratio: ${metadata.pixelAspectRatio}
 Frame Rate: ${metadata.fps}
 Bitrate: ${metadata.videoBitrate}
 Rotation: ${metadata.rotation}
