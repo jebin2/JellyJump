@@ -314,10 +314,10 @@ export class InfoMenu {
                         try {
                             const par = videoTrack.pixelAspectRatio;
                             if (par) {
-                                if (par.numerator === 1 && par.denominator === 1) {
+                                if (par.num === 1 && par.den === 1) {
                                     pixelAspectRatio = '1:1 (Square Pixels)';
                                 } else {
-                                    pixelAspectRatio = `${par.numerator}:${par.denominator}`;
+                                    pixelAspectRatio = `${par.num}:${par.den}`;
                                 }
                             }
                         } catch (e) {
