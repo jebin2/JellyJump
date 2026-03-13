@@ -1,7 +1,7 @@
 import { Logger } from "../../utils/Logger.js";
 
 /**
- * Screen Recorder Menu Handler
+ * Recorder Menu Handler
  * Handles recording of the screen/window/tab with Multi-Mode Facecam support.
  */
 export class ScreenRecorderMenu {
@@ -437,6 +437,7 @@ export class ScreenRecorderMenu {
 
             const audioTracks = combinedStream.getAudioTracks();
             this._updateButtonState(true);
+            playlist.setRecordingState(true);
             const audioStatus = captureAudio ? (audioTracks.length > 0 ? '🎤 Mic ON' : '⚠️ No mic') : '🔇 No Audio';
             playlist._showToast(`Recording started (${audioStatus})`, 'info');
 
@@ -714,6 +715,7 @@ export class ScreenRecorderMenu {
 
             this.isRecording = false;
             this._updateButtonState(false);
+            playlist.setRecordingState(false);
             playlist._showToast('Processing recording...', 'info');
         }
     }
@@ -735,6 +737,7 @@ export class ScreenRecorderMenu {
             this.stream = null;
             this._stopFacecam();
             this._updateButtonState(false);
+            playlist.setRecordingState(false);
         }
     }
 

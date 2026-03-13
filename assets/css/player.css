@@ -518,6 +518,12 @@ button:focus-visible {
     color: var(--accent-primary);
 }
 
+.playlist-item.recording-item .playlist-settings-btn,
+.playlist-item.recording-item .playlist-download-btn,
+.playlist-item.recording-item .playlist-remove-btn {
+    display: none;
+}
+
 .menu-divider {
     height: 1px;
     background: var(--border-light);

@@ -2246,6 +2246,18 @@ export class Playlist {
     }
 
     /**
+     * Mark/unmark the active playlist item as recording to hide its action buttons.
+     * Called by ScreenRecorderMenu during screen (non-webcam) recording.
+     * @param {boolean} isRecording
+     */
+    setRecordingState(isRecording) {
+        const activeEl = this.container.querySelector('.playlist-item.active');
+        if (activeEl) {
+            activeEl.classList.toggle('recording-item', isRecording);
+        }
+    }
+
+    /**
      * Sanitize filename for download
      * @param {string} filename - Original filename
      * @returns {string} Sanitized filename
@@ -2367,6 +2379,7 @@ export class Playlist {
         if (item.needsReload) itemEl.classList.add('needs-reload');
         if (item.error) itemEl.classList.add('error');
         if (item.isBroken) itemEl.classList.add('playlist-item--broken');
+        if (item.isWebcam) itemEl.classList.add('recording-item');
 
         // Thumbnail
         if (item.thumbnail) {
@@ -2927,7 +2940,7 @@ export class Playlist {
                             <use href="assets/icons/sprite.svg#icon-record"></use>
                         </svg>
                     </div>
-                    <span class="tools-tile-label">Screen Record</span>
+                    <span class="tools-tile-label">Record</span>
                 </button>
                 <button class="tools-tile" data-action="merge" title="Merge Videos">
                     <div class="tools-tile-icon">
@@ -3002,8 +3015,13 @@ export class Playlist {
             modal.open();
         };
 
-        toolsBtn.addEventListener('click', (e) => {
+        toolsBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
+            if (toolsBtn.classList.contains('recording-active')) {
+                const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
+                ScreenRecorderMenu.stopRecording(this);
+                return;
+            }
             showToolsModal();
         });
 

@@ -844,15 +844,17 @@
 
 /* Recording active state for tools button */
 #mb-tools.recording-active {
-    background: var(--error-color, #ff4444);
     color: white;
     animation: pulse-recording 1s ease-in-out infinite;
 }
 
 @keyframes pulse-recording {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.7;
     }
@@ -982,7 +984,7 @@
     background: var(--accent-primary);
     cursor: pointer;
     border: 2px solid var(--bg-primary);
-    box-shadow: 0 0 3px rgba(0,0,0,0.4);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
 }
 
 .slideshow-dual-range input[type="range"]::-moz-range-thumb {
@@ -993,7 +995,7 @@
     background: var(--accent-primary);
     cursor: pointer;
     border: 2px solid var(--bg-primary);
-    box-shadow: 0 0 3px rgba(0,0,0,0.4);
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
 }
 
 /* -----------------------------------------
