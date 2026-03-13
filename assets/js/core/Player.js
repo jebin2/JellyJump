@@ -4171,12 +4171,13 @@ export class CorePlayer {
                 this.queuedAudioNodes.add(audioSource);
                 audioSource.onended = () => this.queuedAudioNodes.delete(audioSource);
 
-                // If we're more than a second ahead of the current playback time, let's slow down the loop until time has
-                // passed.
-                if (timestamp - this._getPlaybackTime() >= 1) {
+                // Throttle the decode loop so we don't buffer more than 3s ahead of playback.
+                // Keep a 3s ceiling so that when the wait exits (~2s remaining buffer) there is
+                // still enough runway for the next `for await` sample fetch (network + decode).
+                if (timestamp - this._getPlaybackTime() >= 3) {
                     await new Promise((resolve) => {
                         const id = setInterval(() => {
-                            if (!this.isPlaying || timestamp - this._getPlaybackTime() < 1) {
+                            if (!this.isPlaying || timestamp - this._getPlaybackTime() < 2) {
                                 clearInterval(id);
                                 resolve();
                             }
