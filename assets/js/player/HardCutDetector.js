@@ -1,7 +1,7 @@
 import { Logger } from "../utils/Logger.js";
 import { MediaBunny } from "../core/MediaBunny.js";
 
-const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink } = MediaBunny;
+const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink, EncodedPacketSink } = MediaBunny;
 
 /**
  * Detects hard cuts (scene changes) in a video using histogram-based comparison.
@@ -83,7 +83,19 @@ export class HardCutDetector {
             }
 
             // 3. Generate timestamps
-            const startTimestamp = await videoTrack.getFirstTimestamp();
+            // Use first keyframe timestamp for accurate seek start — getFirstTimestamp() may
+            // return a non-keyframe PTS; getFirstKeyPacket() guarantees an I-frame boundary.
+            let startTimestamp = await videoTrack.getFirstTimestamp();
+            try {
+                const encodedSink = new EncodedPacketSink(videoTrack);
+                const firstKeyPacket = await encodedSink.getFirstKeyPacket();
+                if (firstKeyPacket) {
+                    startTimestamp = firstKeyPacket.timestamp;
+                    Logger.log(`[HardCutDetector] First keyframe at ${startTimestamp.toFixed(4)}s`);
+                }
+            } catch (e) {
+                Logger.warn('[HardCutDetector] getFirstKeyPacket failed, falling back to getFirstTimestamp():', e);
+            }
             const duration = await videoTrack.computeDuration();
             const endTimestamp = startTimestamp + duration;
 
