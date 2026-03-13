@@ -197,11 +197,14 @@ export class MediaProcessor {
                 let ctx = null;
 
                 videoConfig.process = (sample) => {
-                    const width = sample.codedWidth;
-                    const height = sample.codedHeight;
+                    // Use squarePixelWidth/Height (SAR-corrected display dimensions) so that
+                    // non-square pixel videos (anamorphic) produce correctly-sized output and
+                    // watermark/blur coordinates map accurately. Falls back to codedWidth/Height.
+                    const width = sample.squarePixelWidth || sample.codedWidth;
+                    const height = sample.squarePixelHeight || sample.codedHeight;
 
                     // When rotation/flip is active, use configured output dimensions.
-                    // Otherwise use coded dimensions to preserve existing behavior.
+                    // Otherwise use SAR-corrected display dimensions.
                     const outputWidth = needsRotation ? (videoConfig.width || width) : width;
                     const outputHeight = needsRotation ? (videoConfig.height || height) : height;
 
@@ -299,7 +302,7 @@ export class MediaProcessor {
                         for (const area of blur.areas) {
                             if (currentTime < area.startTime || currentTime > area.endTime) continue;
 
-                            // Scale from original video dimensions to coded dimensions
+                            // Scale from original video display dimensions to canvas dimensions
                             const sx = width / originalWidth;
                             const sy = height / originalHeight;
 
