@@ -1,5 +1,19 @@
 <!-- Core Player Templates -->
 
+<!-- Modal Shell Template (used by all Modal instances across player and embed) -->
+<template id="modal-shell-template">
+    <div class="mb-modal-overlay">
+        <div class="mb-modal" role="dialog" aria-modal="true">
+            <div class="mb-modal-header">
+                <h3 class="mb-modal-title"></h3>
+                <button class="mb-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="mb-modal-body mb-modal-body-scrollable"></div>
+            <div class="mb-modal-footer hidden"></div>
+        </div>
+    </div>
+</template>
+
 <!-- Video Canvas Template -->
 <template id="player-canvas-template">
     <div class="jellyjump-video-wrapper">
