@@ -1017,7 +1017,7 @@ export class MediaProcessor {
                     outputFormat = new MediaBunny.WebMOutputFormat();
                     break;
                 case 'mov':
-                    outputFormat = new MediaBunny.QuickTimeOutputFormat();
+                    outputFormat = new MediaBunny.MovOutputFormat();
                     break;
                 default:
                     throw new Error(`Unsupported format: ${format}`);
