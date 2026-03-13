@@ -382,6 +382,129 @@ export class MediaProcessor {
     }
 
     /**
+     * Lossless trim using packet-level APIs — no re-encoding.
+     * Snaps trim start to the nearest keyframe at or before the requested start time.
+     * @param {Object} options
+     * @param {Blob|File|string} options.source
+     * @param {{ start: number, end: number }} options.trim - In seconds
+     * @param {Function} [options.onProgress]
+     * @returns {Promise<Blob>} MP4 blob
+     */
+    static _shortVideoCodec(fullCodec = '') {
+        const c = fullCodec.toLowerCase();
+        if (c.startsWith('avc')) return 'avc';
+        if (c.startsWith('hev') || c.startsWith('hvc')) return 'hevc';
+        if (c.startsWith('vp09') || c.startsWith('vp9')) return 'vp9';
+        if (c.startsWith('av01') || c.startsWith('av1')) return 'av1';
+        if (c.startsWith('vp08') || c.startsWith('vp8')) return 'vp8';
+        return fullCodec; // pass through, let MediaBunny error with a useful message
+    }
+
+    static _shortAudioCodec(fullCodec = '') {
+        const c = fullCodec.toLowerCase();
+        if (c.startsWith('mp4a') || c === 'aac') return 'aac';
+        if (c === 'opus') return 'opus';
+        if (c === 'mp3' || c.startsWith('mp3') || c === '.mp3') return 'mp3';
+        if (c === 'flac') return 'flac';
+        if (c === 'ac-3' || c === 'ac3') return 'ac3';
+        return fullCodec;
+    }
+
+    static async losslessTrim({ source, trim, onProgress }) {
+        Logger.log('[MediaProcessor] Starting lossless trim...', trim);
+
+        let input = null;
+        try {
+            const inputSource = typeof source === 'string'
+                ? new MediaBunny.UrlSource(source)
+                : new MediaBunny.BlobSource(source);
+
+            input = new MediaBunny.Input({ source: inputSource, formats: MediaBunny.ALL_FORMATS });
+
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error('No video track found');
+
+            const audioTracks = await input.getAudioTracks();
+            const audioTrack = audioTracks[0] ?? null;
+
+            const { start: trimStart, end: trimEnd } = trim;
+            const duration = trimEnd - trimStart;
+
+            // Find the keyframe at or before trimStart
+            const videoSink = new MediaBunny.EncodedPacketSink(videoTrack);
+            let startKeyPacket = await videoSink.getKeyPacket(trimStart);
+            if (!startKeyPacket) startKeyPacket = await videoSink.getFirstKeyPacket();
+            if (!startKeyPacket) throw new Error('No keyframe found in video');
+
+            const startOffset = startKeyPacket.timestamp;
+
+            const videoDecoderConfig = await videoTrack.getDecoderConfig();
+            if (!videoDecoderConfig) throw new Error('Could not get video decoder config');
+
+            // Build output
+            const target = new MediaBunny.BufferTarget();
+            const output = new MediaBunny.Output({
+                format: new MediaBunny.Mp4OutputFormat(),
+                target
+            });
+
+            const videoPacketSource = new MediaBunny.EncodedVideoPacketSource(MediaProcessor._shortVideoCodec(videoDecoderConfig.codec));
+            output.addVideoTrack(videoPacketSource);
+
+            let audioPacketSource = null;
+            let audioDecoderConfig = null;
+            if (audioTrack) {
+                audioDecoderConfig = await audioTrack.getDecoderConfig();
+                if (audioDecoderConfig) {
+                    audioPacketSource = new MediaBunny.EncodedAudioPacketSource(MediaProcessor._shortAudioCodec(audioDecoderConfig.codec));
+                    output.addAudioTrack(audioPacketSource);
+                }
+            }
+
+            await output.start();
+
+            // Write video packets (shifted so startOffset → 0)
+            let firstVideo = true;
+            for await (const packet of videoSink.packets(startKeyPacket)) {
+                if (packet.timestamp >= trimEnd) break;
+                const shiftedTs = packet.timestamp - startOffset;
+                const shifted = packet.clone({ timestamp: shiftedTs });
+                await videoPacketSource.add(shifted, firstVideo ? { decoderConfig: videoDecoderConfig } : undefined);
+                firstVideo = false;
+                onProgress?.(Math.min((shiftedTs / duration) * 0.85, 0.85));
+            }
+            videoPacketSource.close();
+
+            // Write audio packets
+            if (audioTrack && audioPacketSource && audioDecoderConfig) {
+                const audioSink = new MediaBunny.EncodedPacketSink(audioTrack);
+                const audioStartPacket = await audioSink.getPacket(startOffset) ?? await audioSink.getFirstPacket();
+                if (audioStartPacket) {
+                    let firstAudio = true;
+                    for await (const packet of audioSink.packets(audioStartPacket)) {
+                        if (packet.timestamp >= trimEnd) break;
+                        const shiftedTs = packet.timestamp - startOffset;
+                        if (shiftedTs < 0) continue;
+                        const shifted = packet.clone({ timestamp: shiftedTs });
+                        await audioPacketSource.add(shifted, firstAudio ? { decoderConfig: audioDecoderConfig } : undefined);
+                        firstAudio = false;
+                    }
+                }
+                audioPacketSource.close();
+            }
+
+            await output.finalize();
+            onProgress?.(1);
+
+            return new Blob([target.buffer], { type: 'video/mp4' });
+        } finally {
+            if (input && typeof input.dispose === 'function') {
+                try { input.dispose(); } catch (e) { Logger.warn('losslessTrim: dispose error', e); }
+            }
+        }
+    }
+
+    /**
      * Get video packet statistics
      * @param {Blob|File} source
      * @param {number} count - Number of packets to analyze

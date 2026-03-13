@@ -43,6 +43,7 @@ export class TrimMenu {
         const setStartBtn = modalContent.querySelector('#trim-set-start-btn');
         const setEndBtn = modalContent.querySelector('#trim-set-end-btn');
         const durationDisplay = modalContent.querySelector('.trim-duration');
+        const losslessToggle = modalContent.querySelector('#trim-lossless-toggle');
         const trimBtn = modalContent.querySelector('.trim-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
         const progressSection = modalContent.querySelector('.progress-section');
@@ -177,6 +178,7 @@ export class TrimMenu {
             modalContent.classList.add('processing');
             trimBtn.disabled = true;
             modal.closeBtn.disabled = true;
+            if (losslessToggle) losslessToggle.disabled = true;
             // Hide previous messages and show progress
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
@@ -187,19 +189,13 @@ export class TrimMenu {
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
                 // Trim
-                const blob = await MediaProcessor.process({
-                    source: source,
-                    format: 'mp4',
-                    quality: 100,
-                    trim: {
-                        start: startTime,
-                        end: endTime
-                    },
-                    onProgress: (progress) => {
-                        const percent = Math.round(progress * 100);
-                        progressPercentage.textContent = `${percent}%`;
-                    }
-                });
+                const trimOpts = { start: startTime, end: endTime };
+                const onProgress = (progress) => {
+                    progressPercentage.textContent = `${Math.round(progress * 100)}%`;
+                };
+                const blob = losslessToggle?.checked
+                    ? await MediaProcessor.losslessTrim({ source, trim: trimOpts, onProgress })
+                    : await MediaProcessor.process({ source, format: 'mp4', quality: 100, trim: trimOpts, onProgress });
 
                 // Success
                 progressSection.classList.add('hidden');
@@ -227,6 +223,7 @@ export class TrimMenu {
                 errorMessage.classList.remove('hidden');
                 trimBtn.disabled = false;
                 modal.closeBtn.disabled = false;
+                if (losslessToggle) losslessToggle.disabled = false;
                 progressSection.classList.add('hidden');
             }
         });
