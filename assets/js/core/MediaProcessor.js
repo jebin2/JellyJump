@@ -563,8 +563,9 @@ export class MediaProcessor {
         // Clamp speed to valid range
         const clampedSpeed = Math.max(0.25, Math.min(2, speed));
 
-        // If speed is 1, use fast stream copy; otherwise re-encode with time-stretch
-        if (clampedSpeed === 1) {
+        // FLAC requires re-encoding (lossless, incompatible with stream copy from other codecs)
+        // For all other formats at speed=1, use fast stream copy
+        if (clampedSpeed === 1 && format !== 'flac') {
             return this._extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress });
         } else {
             return this._extractTrackWithSpeed({ source, trackIndex, trackType, format, speed: clampedSpeed, onProgress });
@@ -596,6 +597,9 @@ export class MediaProcessor {
                 break;
             case 'wav':
                 outputFormat = new MediaBunny.WavOutputFormat();
+                break;
+            case 'flac':
+                outputFormat = new MediaBunny.FlacOutputFormat();
                 break;
             default:
                 throw new Error(`Unsupported format: ${format}`);
@@ -798,6 +802,9 @@ export class MediaProcessor {
                     case 'wav':
                         outputFormat = new MediaBunny.WavOutputFormat();
                         break;
+                    case 'flac':
+                        outputFormat = new MediaBunny.FlacOutputFormat();
+                        break;
                     default:
                         outputFormat = new MediaBunny.Mp4OutputFormat();
                 }
@@ -807,15 +814,16 @@ export class MediaProcessor {
                     target: new MediaBunny.BufferTarget()
                 });
 
-                const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus', 'mp3']);
+                const codecList = format === 'flac' ? ['flac'] : ['aac', 'opus', 'mp3'];
+                const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(codecList);
                 if (supportedCodecs.length === 0) {
                     throw new Error('No supported audio codecs found');
                 }
 
-                audioSource = new MediaBunny.AudioSampleSource({
-                    codec: supportedCodecs[0],
-                    bitrate: 128000
-                });
+                const audioSourceConfig = format === 'flac'
+                    ? { codec: supportedCodecs[0] }
+                    : { codec: supportedCodecs[0], bitrate: 128000 };
+                audioSource = new MediaBunny.AudioSampleSource(audioSourceConfig);
                 output.addAudioTrack(audioSource);
                 await output.start();
 

@@ -185,19 +185,30 @@ export class ConvertMenu {
             targetFormat = ext;
 
             // Fallback if format not supported
-            if (!['mp4', 'webm', 'mov'].includes(targetFormat)) {
+            if (!['mp4', 'webm', 'mov', 'flac'].includes(targetFormat)) {
                 Logger.warn(`Format ${targetFormat} not explicitly supported, defaulting to MP4.`);
                 targetFormat = 'mp4';
             }
         }
 
         try {
-            const resultBlob = await MediaProcessor.process({
-                source: source,
-                format: targetFormat,
-                quality: quality,
-                onProgress: onProgress
-            });
+            let resultBlob;
+            if (targetFormat === 'flac') {
+                resultBlob = await MediaProcessor.extractTrack({
+                    source: source,
+                    trackIndex: 0,
+                    trackType: 'audio',
+                    format: 'flac',
+                    onProgress: onProgress
+                });
+            } else {
+                resultBlob = await MediaProcessor.process({
+                    source: source,
+                    format: targetFormat,
+                    quality: quality,
+                    onProgress: onProgress
+                });
+            }
 
             // Handle Success (always add to playlist)
             ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
