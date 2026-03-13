@@ -143,6 +143,8 @@ export class TrackManagerMenu {
                         format = 'mp3';
                     } else if (codec.includes('aac') || codec.includes('mp4a')) {
                         format = 'm4a';
+                    } else if (codec.includes('flac')) {
+                        format = 'flac';
                     } else if (codec.includes('pcm') || codec === '') {
                         format = 'wav';
                     } else {

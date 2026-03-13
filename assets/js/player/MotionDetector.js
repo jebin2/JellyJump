@@ -1,7 +1,7 @@
 import { Logger } from "../utils/Logger.js";
 import { MediaBunny } from "../core/MediaBunny.js";
 
-const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink } = MediaBunny;
+const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink, EncodedPacketSink } = MediaBunny;
 
 /**
  * Detects motion in a video by comparing frame differences over time.
@@ -71,7 +71,14 @@ export class MotionDetector {
             const sink = new CanvasSink(videoTrack, { width: processingWidth });
 
             // 4. Generate timestamps
-            const startTimestamp = await videoTrack.getFirstTimestamp();
+            let startTimestamp = await videoTrack.getFirstTimestamp();
+            try {
+                const encodedSink = new EncodedPacketSink(videoTrack);
+                const firstKeyPacket = await encodedSink.getFirstKeyPacket();
+                if (firstKeyPacket) startTimestamp = firstKeyPacket.timestamp;
+            } catch (e) {
+                Logger.warn('[MotionDetector] getFirstKeyPacket failed, using getFirstTimestamp():', e);
+            }
             const duration = await videoTrack.computeDuration();
             const endTimestamp = startTimestamp + duration;
 

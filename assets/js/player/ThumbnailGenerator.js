@@ -1,7 +1,7 @@
 import { Logger } from "../utils/Logger.js";
 import { MediaBunny } from "../core/MediaBunny.js";
 
-const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink } = MediaBunny;
+const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink, EncodedPacketSink } = MediaBunny;
 
 /**
  * Generates thumbnails for a video using Mediabunny.
@@ -80,7 +80,14 @@ export class ThumbnailGenerator {
 
             // 4. Calculate timestamps
             // Use track's actual start time and duration if available
-            const startTimestamp = await videoTrack.getFirstTimestamp();
+            let startTimestamp = await videoTrack.getFirstTimestamp();
+            try {
+                const encodedSink = new EncodedPacketSink(videoTrack);
+                const firstKeyPacket = await encodedSink.getFirstKeyPacket();
+                if (firstKeyPacket) startTimestamp = firstKeyPacket.timestamp;
+            } catch (e) {
+                Logger.warn('[ThumbnailGenerator] getFirstKeyPacket failed, using getFirstTimestamp():', e);
+            }
             const trackDuration = await videoTrack.computeDuration();
 
             // Generate timestamps

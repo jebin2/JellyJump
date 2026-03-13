@@ -22,6 +22,10 @@ echo "Downloading mediabunny-flac-encoder.js..."
 curl -L "https://cdn.jsdelivr.net/npm/@mediabunny/flac-encoder@latest/+esm" \
      -o "$OUT/mediabunny-flac-encoder.js"
 
+echo "Downloading mediabunny-aac-encoder.js..."
+curl -L "https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@latest/+esm" \
+     -o "$OUT/mediabunny-aac-encoder.js"
+
 echo "Downloading gif.js..."
 curl -L "https://cdn.jsdelivr.net/npm/gif.js@latest/+esm" \
      -o "$OUT/gif.js"
