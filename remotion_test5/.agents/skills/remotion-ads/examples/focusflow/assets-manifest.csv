@@ -1,0 +1,17 @@
+path,type,category,name,description,tags,width,height,transparent,mood,usage_notes
+# Example Asset Manifest for FocusFlow Demo
+# This shows what assets you would need for the ad
+#
+icons/brain-scattered.png,icon,decorative,Brain Scattered,Brain icon with scattered particles showing distraction,brain distraction scattered hook,256,256,true,negative,Use in hook scene to represent distraction
+icons/brain-focused.png,icon,decorative,Brain Focused,Brain icon with focused beam showing clarity,brain focus clarity solution,256,256,true,positive,Use in solution scene to represent focus
+icons/bell.png,icon,decorative,Notification Bell,Bell icon representing notifications,notification bell alert problem,128,128,true,negative,Use in problem list
+icons/phone.png,icon,decorative,Phone Icon,Smartphone icon representing social media,phone social-media distraction problem,128,128,true,negative,Use in problem list
+icons/clock.png,icon,decorative,Clock Icon,Clock icon representing time lost,clock time lost problem,128,128,true,negative,Use in problem list
+icons/focus-target.png,icon,decorative,Focus Target,Target/crosshair icon representing focus,target focus aim solution,256,256,true,positive,Use in solution scene
+icons/checkmark.png,icon,decorative,Checkmark,Green checkmark for feature list,check success feature,128,128,true,positive,Use in feature lists
+transparent/focusflow-logo.png,2d,logo,FocusFlow Logo,Main brand logo white on transparent,logo brand focusflow,400,120,true,neutral,Use in CTA scene
+transparent/focusflow-logo-dark.png,2d,logo,FocusFlow Logo Dark,Main brand logo dark version,logo brand focusflow dark,400,120,true,neutral,Use on light backgrounds
+backgrounds/dark-gradient.png,background,background,Dark Gradient,Dark indigo to slate gradient,background dark gradient hook,1080,1920,false,serious,Use for hook scene
+backgrounds/dark-serious.png,background,background,Dark Serious,Dark slate solid with subtle grain,background dark problem,1080,1920,false,serious,Use for problem scene
+backgrounds/brand-gradient.png,background,background,Brand Gradient,Indigo to purple brand gradient,background brand solution,1080,1920,false,positive,Use for solution scene
+backgrounds/light-brand.png,background,background,Light Brand,Light background with brand accent,background light cta,1080,1920,false,friendly,Use for CTA scene

@@ -1,0 +1,19 @@
+{
+  "url": "https://www.voidall.com/JellyJump/",
+  "capturedAt": "2026-01-29T05:00:45.686Z",
+  "darkMode": false,
+  "files": [
+    {
+      "device": "desktop",
+      "type": "screenshot",
+      "file": "desktop.png",
+      "path": "public/brand/scraped/screenshots/www-voidall-com/desktop.png",
+      "size": 32424,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      }
+    }
+  ],
+  "totalSize": 32424
+}

@@ -1,0 +1,50 @@
+{
+  "name": "remotion-ads",
+  "version": "1.0.0",
+  "description": "Instagram Reels & Carousel ad creation skill for Claude Code with Remotion",
+  "author": "jebin2",
+  "license": "MIT",
+  "keywords": [
+    "remotion",
+    "instagram",
+    "reels",
+    "tiktok",
+    "video-ads",
+    "carousel",
+    "claude-code",
+    "skill"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jebin2/remotion-ads"
+  },
+  "scripts": {
+    "setup": "node tools/setup.js",
+    "validate": "node tools/validate.js",
+    "scan-assets": "node tools/scan-assets.js",
+    "generate-voiceover": "node tools/generate.js"
+  },
+  "bin": {
+    "remotion-ads-setup": "tools/setup.js",
+    "remotion-ads-validate": "tools/validate.js",
+    "remotion-ads-scan": "tools/scan-assets.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "skill": {
+    "name": "remotion-ads",
+    "displayName": "Remotion Ads",
+    "description": "Create Instagram Reels & Carousel ads with Remotion",
+    "category": "video",
+    "platforms": [
+      "instagram",
+      "tiktok",
+      "youtube"
+    ],
+    "postInstall": "Run 'node .claude/skills/remotion-ads/tools/setup.js' to initialize your project"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.0"
+  }
+}

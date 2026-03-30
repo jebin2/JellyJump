@@ -1,0 +1,457 @@
+{
+  "$schema": "Scene structure templates for different ad formats",
+
+  "problem-solution": {
+    "name": "Problem → Solution",
+    "description": "Classic ad format: Hook with pain point, amplify problem, present solution, call to action.",
+    "scenes": 4,
+    "totalDuration": "15-30s",
+    "structure": [
+      {
+        "id": "hook",
+        "name": "Hook",
+        "purpose": "Grab attention with relatable pain point",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "dramatic",
+        "elements": ["attention-grabbing question or statement", "icon or visual", "empathetic subtitle"],
+        "background": "dark gradient",
+        "example": "Tired of [problem]?"
+      },
+      {
+        "id": "problem",
+        "name": "Problem",
+        "purpose": "Amplify the pain point with specifics",
+        "durationPercent": 30,
+        "durationRange": "3-5s",
+        "voiceCharacter": "narrator",
+        "elements": ["problem list (2-3 items)", "icons for each point", "building frustration"],
+        "background": "serious tone gradient",
+        "example": "You've tried everything... Nothing works... It's frustrating."
+      },
+      {
+        "id": "solution",
+        "name": "Solution",
+        "purpose": "Introduce product as the answer",
+        "durationPercent": 30,
+        "durationRange": "3-5s",
+        "voiceCharacter": "expert",
+        "elements": ["product name/visual", "key benefits (2-3)", "reassuring message"],
+        "background": "positive brand gradient",
+        "example": "Introducing [Product]. Finally, a solution that [benefit]."
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Drive action with clear next step",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "calm",
+        "elements": ["logo", "trust signals", "CTA button", "link in bio"],
+        "background": "light/brand background",
+        "example": "Try [Product] free today. Link in bio."
+      }
+    ],
+    "bestFor": ["Product launches", "SaaS", "Consumer products", "Services"]
+  },
+
+  "testimonial": {
+    "name": "Testimonial / Social Proof",
+    "description": "Lead with customer success story to build trust and credibility.",
+    "scenes": 4,
+    "totalDuration": "15-30s",
+    "structure": [
+      {
+        "id": "hook",
+        "name": "Hook",
+        "purpose": "Tease transformation or result",
+        "durationPercent": 15,
+        "durationRange": "2-3s",
+        "voiceCharacter": "dramatic",
+        "elements": ["bold result statement", "before/after hint", "curiosity builder"],
+        "background": "attention-grabbing",
+        "example": "She went from [before] to [after] in just [time]."
+      },
+      {
+        "id": "testimonial",
+        "name": "Testimonial",
+        "purpose": "Share customer story and experience",
+        "durationPercent": 40,
+        "durationRange": "5-8s",
+        "voiceCharacter": "conversational",
+        "elements": ["customer quote", "customer photo/name", "specific results", "emotional journey"],
+        "background": "warm, personal",
+        "example": "\"I was struggling with [problem]. Then I found [Product]. Now I [result].\""
+      },
+      {
+        "id": "benefits",
+        "name": "Benefits",
+        "purpose": "Highlight why product worked",
+        "durationPercent": 25,
+        "durationRange": "3-5s",
+        "voiceCharacter": "expert",
+        "elements": ["key features that enabled result", "unique differentiators", "more social proof"],
+        "background": "brand gradient",
+        "example": "What makes [Product] different: [benefit 1], [benefit 2], [benefit 3]."
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Invite viewer to get same results",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "calm",
+        "elements": ["logo", "rating/reviews count", "CTA button", "urgency if applicable"],
+        "background": "light background",
+        "example": "Join 10,000+ happy customers. Start your journey today."
+      }
+    ],
+    "bestFor": ["E-commerce", "Fitness", "Courses", "Services", "Apps with results"]
+  },
+
+  "listicle": {
+    "name": "Listicle / Tips",
+    "description": "Educational format with multiple valuable points to engage viewers.",
+    "scenes": 5,
+    "totalDuration": "30-60s",
+    "structure": [
+      {
+        "id": "hook",
+        "name": "Hook",
+        "purpose": "Promise value with number",
+        "durationPercent": 12,
+        "durationRange": "2-4s",
+        "voiceCharacter": "dramatic",
+        "elements": ["number promise", "topic teaser", "why they should watch"],
+        "background": "bold gradient",
+        "example": "5 things nobody tells you about [topic]"
+      },
+      {
+        "id": "point1",
+        "name": "Point 1",
+        "purpose": "First (often most important) point",
+        "durationPercent": 22,
+        "durationRange": "4-8s",
+        "voiceCharacter": "expert",
+        "elements": ["point number", "headline", "brief explanation", "visual"],
+        "background": "themed background",
+        "example": "#1: [Point with explanation]"
+      },
+      {
+        "id": "point2",
+        "name": "Point 2",
+        "purpose": "Second valuable point",
+        "durationPercent": 22,
+        "durationRange": "4-8s",
+        "voiceCharacter": "narrator",
+        "elements": ["point number", "headline", "brief explanation", "visual"],
+        "background": "themed background",
+        "example": "#2: [Point with explanation]"
+      },
+      {
+        "id": "point3",
+        "name": "Point 3",
+        "purpose": "Third point (can add more)",
+        "durationPercent": 22,
+        "durationRange": "4-8s",
+        "voiceCharacter": "narrator",
+        "elements": ["point number", "headline", "brief explanation", "visual"],
+        "background": "themed background",
+        "example": "#3: [Point with explanation]"
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Connect tips to product/action",
+        "durationPercent": 22,
+        "durationRange": "3-5s",
+        "voiceCharacter": "salesperson",
+        "elements": ["summary/bonus tip", "product connection", "CTA", "follow prompt"],
+        "background": "brand background",
+        "example": "Want all 10 tips? Follow for more + link in bio for free guide."
+      }
+    ],
+    "bestFor": ["Education", "How-to content", "Thought leadership", "Value-first marketing"]
+  },
+
+  "before-after": {
+    "name": "Before → After",
+    "description": "Transformation-focused format showing clear improvement.",
+    "scenes": 4,
+    "totalDuration": "15-30s",
+    "structure": [
+      {
+        "id": "before",
+        "name": "Before",
+        "purpose": "Show the problem state",
+        "durationPercent": 30,
+        "durationRange": "3-6s",
+        "voiceCharacter": "narrator",
+        "elements": ["before state visual", "pain point description", "relatable frustration"],
+        "background": "muted, problem-focused",
+        "example": "Before: [describe problem state with specifics]"
+      },
+      {
+        "id": "transition",
+        "name": "Transition",
+        "purpose": "Bridge between states",
+        "durationPercent": 15,
+        "durationRange": "2-3s",
+        "voiceCharacter": "dramatic",
+        "elements": ["product reveal", "transformation moment", "anticipation builder"],
+        "background": "transition effect",
+        "example": "Then everything changed with [Product]..."
+      },
+      {
+        "id": "after",
+        "name": "After",
+        "purpose": "Show the transformed state",
+        "durationPercent": 35,
+        "durationRange": "4-7s",
+        "voiceCharacter": "expert",
+        "elements": ["after state visual", "key improvements", "emotional payoff"],
+        "background": "bright, positive",
+        "example": "After: [describe improved state with specifics]"
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Invite viewer to transform too",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "calm",
+        "elements": ["logo", "transformation promise", "CTA button", "link"],
+        "background": "brand background",
+        "example": "Your transformation starts today. Link in bio."
+      }
+    ],
+    "bestFor": ["Fitness", "Beauty", "Home improvement", "Software", "Any visual transformation"]
+  },
+
+  "educational": {
+    "name": "Educational / How-To",
+    "description": "Value-first format that teaches something useful while positioning product.",
+    "scenes": 4,
+    "totalDuration": "30-60s",
+    "structure": [
+      {
+        "id": "question",
+        "name": "Question/Hook",
+        "purpose": "Pose question viewers want answered",
+        "durationPercent": 15,
+        "durationRange": "3-5s",
+        "voiceCharacter": "dramatic",
+        "elements": ["intriguing question", "relevance hook", "promise of answer"],
+        "background": "curiosity-building",
+        "example": "Ever wondered why [topic]? Here's what nobody tells you..."
+      },
+      {
+        "id": "explanation",
+        "name": "Explanation",
+        "purpose": "Provide valuable educational content",
+        "durationPercent": 40,
+        "durationRange": "8-15s",
+        "voiceCharacter": "expert",
+        "elements": ["clear explanation", "visual aids", "step-by-step if applicable"],
+        "background": "educational, clean",
+        "example": "The reason is [explanation with supporting visuals]"
+      },
+      {
+        "id": "demo",
+        "name": "Demo/Application",
+        "purpose": "Show practical application (product tie-in)",
+        "durationPercent": 30,
+        "durationRange": "6-10s",
+        "voiceCharacter": "narrator",
+        "elements": ["practical demonstration", "product integration", "results shown"],
+        "background": "demo-focused",
+        "example": "Here's how you can apply this with [Product]..."
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Connect learning to action",
+        "durationPercent": 15,
+        "durationRange": "3-5s",
+        "voiceCharacter": "conversational",
+        "elements": ["value recap", "product CTA", "follow for more"],
+        "background": "brand background",
+        "example": "Learn more secrets like this - follow + link in bio."
+      }
+    ],
+    "bestFor": ["Thought leadership", "B2B", "Courses", "Complex products", "Building authority"]
+  },
+
+  "announcement": {
+    "name": "Announcement / Launch",
+    "description": "Build excitement for new product, feature, or event.",
+    "scenes": 4,
+    "totalDuration": "15-30s",
+    "structure": [
+      {
+        "id": "teaser",
+        "name": "Teaser",
+        "purpose": "Build anticipation",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "dramatic",
+        "elements": ["mystery/anticipation", "hint at what's coming", "brand recognition"],
+        "background": "suspenseful",
+        "example": "Something big is coming..."
+      },
+      {
+        "id": "reveal",
+        "name": "Reveal",
+        "purpose": "Unveil the announcement",
+        "durationPercent": 35,
+        "durationRange": "4-7s",
+        "voiceCharacter": "salesperson",
+        "elements": ["big reveal moment", "product/feature showcase", "key headline"],
+        "background": "impactful, brand-focused",
+        "example": "Introducing [Product/Feature] - [one-line value prop]"
+      },
+      {
+        "id": "highlights",
+        "name": "Highlights",
+        "purpose": "Key benefits/features",
+        "durationPercent": 25,
+        "durationRange": "3-5s",
+        "voiceCharacter": "expert",
+        "elements": ["2-3 key highlights", "quick feature showcase", "why it matters"],
+        "background": "feature-focused",
+        "example": "[Feature 1], [Feature 2], [Feature 3]"
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Drive immediate action",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "calm",
+        "elements": ["availability info", "urgency/scarcity if applicable", "CTA", "date/link"],
+        "background": "brand background",
+        "example": "Available now. Be first - link in bio."
+      }
+    ],
+    "bestFor": ["Product launches", "Feature releases", "Events", "Sales", "Partnerships"]
+  },
+
+  "comparison": {
+    "name": "Us vs Them / Comparison",
+    "description": "Position product against alternatives or competitors.",
+    "scenes": 4,
+    "totalDuration": "15-30s",
+    "structure": [
+      {
+        "id": "setup",
+        "name": "Setup",
+        "purpose": "Establish comparison context",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "narrator",
+        "elements": ["comparison premise", "common alternatives mentioned", "viewer's dilemma"],
+        "background": "neutral setup",
+        "example": "Choosing between [Option A] and [Option B]?"
+      },
+      {
+        "id": "them",
+        "name": "The Alternative",
+        "purpose": "Show limitations of alternatives",
+        "durationPercent": 25,
+        "durationRange": "3-5s",
+        "voiceCharacter": "narrator",
+        "elements": ["alternative approach", "its limitations", "frustrations"],
+        "background": "muted, showing problems",
+        "example": "Traditional [alternatives] mean [limitation 1], [limitation 2]..."
+      },
+      {
+        "id": "us",
+        "name": "Our Solution",
+        "purpose": "Show how we're better",
+        "durationPercent": 35,
+        "durationRange": "4-7s",
+        "voiceCharacter": "expert",
+        "elements": ["our approach", "key differentiators", "clear advantages"],
+        "background": "positive, brand-focused",
+        "example": "With [Product], you get [advantage 1], [advantage 2], [advantage 3]."
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Make the choice clear",
+        "durationPercent": 20,
+        "durationRange": "2-4s",
+        "voiceCharacter": "calm",
+        "elements": ["choice summary", "risk reducer", "CTA button"],
+        "background": "brand background",
+        "example": "The smart choice is clear. Try [Product] free."
+      }
+    ],
+    "bestFor": ["Competitive markets", "Switching campaigns", "Feature differentiation", "B2B"]
+  },
+
+  "story": {
+    "name": "Mini Story / Narrative",
+    "description": "Short narrative arc that emotionally connects with viewers.",
+    "scenes": 5,
+    "totalDuration": "30-60s",
+    "structure": [
+      {
+        "id": "setup",
+        "name": "Setup",
+        "purpose": "Introduce character/situation",
+        "durationPercent": 15,
+        "durationRange": "3-5s",
+        "voiceCharacter": "narrator",
+        "elements": ["character introduction", "relatable situation", "setting the scene"],
+        "background": "story setting",
+        "example": "Meet Sarah. She's a busy mom who..."
+      },
+      {
+        "id": "conflict",
+        "name": "Conflict",
+        "purpose": "Present the challenge",
+        "durationPercent": 20,
+        "durationRange": "4-8s",
+        "voiceCharacter": "dramatic",
+        "elements": ["the problem arises", "emotional stakes", "failed attempts"],
+        "background": "tension building",
+        "example": "But she was struggling with [problem]. She tried everything..."
+      },
+      {
+        "id": "discovery",
+        "name": "Discovery",
+        "purpose": "Find the solution",
+        "durationPercent": 20,
+        "durationRange": "4-8s",
+        "voiceCharacter": "narrator",
+        "elements": ["discovering product", "hope emerges", "decision moment"],
+        "background": "turning point",
+        "example": "Then she discovered [Product]..."
+      },
+      {
+        "id": "resolution",
+        "name": "Resolution",
+        "purpose": "Show happy ending",
+        "durationPercent": 30,
+        "durationRange": "6-12s",
+        "voiceCharacter": "conversational",
+        "elements": ["transformation shown", "emotional payoff", "new life state"],
+        "background": "positive, bright",
+        "example": "Now Sarah [happy outcome]. She finally [emotional benefit]."
+      },
+      {
+        "id": "cta",
+        "name": "Call to Action",
+        "purpose": "Invite viewer into story",
+        "durationPercent": 15,
+        "durationRange": "3-5s",
+        "voiceCharacter": "calm",
+        "elements": ["story connection", "your turn message", "CTA"],
+        "background": "brand background",
+        "example": "Your story could be next. Start today."
+      }
+    ],
+    "bestFor": ["Brand building", "Emotional products", "Lifestyle brands", "Non-profit", "Healthcare"]
+  }
+}

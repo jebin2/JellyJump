@@ -1,0 +1,67 @@
+{
+  "url": "https://www.voidall.com/JellyJump/",
+  "scrapedAt": "2026-01-29T05:00:40.103Z",
+  "pagesVisited": 5,
+  "metadata": {
+    "title": "JellyJump Player - Video Player",
+    "description": "A modern, dark neobrutalism video player and editor for the web.",
+    "ogImage": "https://jebin2.github.io/JellyJump/assets/icons/jelly_jump_logo.png"
+  },
+  "colors": {
+    "primary": "#00ff88",
+    "secondary": "#b0b0b0",
+    "all": [
+      {
+        "color": "#00ff88",
+        "count": 304
+      },
+      {
+        "color": "#b0b0b0",
+        "count": 44
+      },
+      {
+        "color": "#2a2a2a",
+        "count": 23
+      },
+      {
+        "color": "#00FF88",
+        "count": 15
+      },
+      {
+        "color": "#0a0a0a",
+        "count": 9
+      },
+      {
+        "color": "#0A0A0A",
+        "count": 5
+      },
+      {
+        "color": "#1A1A1A",
+        "count": 5
+      },
+      {
+        "color": "#2A2A2A",
+        "count": 5
+      },
+      {
+        "color": "#FF00FF",
+        "count": 5
+      },
+      {
+        "color": "#00D4FF",
+        "count": 5
+      }
+    ]
+  },
+  "fonts": [
+    "Space Grotesk",
+    "Space Mono",
+    "monospace"
+  ],
+  "assets": {
+    "logo": 2,
+    "images": 3,
+    "videos": 0,
+    "fonts": 4
+  }
+}

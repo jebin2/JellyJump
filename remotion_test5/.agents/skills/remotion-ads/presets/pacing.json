@@ -1,0 +1,239 @@
+{
+  "$schema": "Pacing presets for video timing and rhythm",
+
+  "slow": {
+    "name": "Slow / Relaxed",
+    "description": "Calm, contemplative pace. Best for luxury, wellness, meditation, or high-end brands.",
+    "wordsPerSecond": 2.0,
+    "pauseBetweenSentences": 0.8,
+    "sceneHoldTime": 1.5,
+
+    "transitions": {
+      "type": "crossfade",
+      "duration": 0.8,
+      "easing": "easeInOut"
+    },
+
+    "textAnimation": {
+      "entranceDelay": 0.4,
+      "staggerDelay": 0.25,
+      "holdAfterEntrance": 0.5
+    },
+
+    "spring": {
+      "damping": 25,
+      "stiffness": 60,
+      "mass": 1.2
+    },
+
+    "voiceover": {
+      "character": "calm",
+      "stability": 0.8,
+      "similarity": 0.85,
+      "style": 0.05
+    },
+
+    "music": {
+      "bpmRange": [60, 90],
+      "mood": ["calm", "ambient", "peaceful", "elegant"]
+    },
+
+    "bestFor": [
+      "Luxury brands",
+      "Wellness/spa",
+      "Meditation apps",
+      "High-end products",
+      "Real estate",
+      "Financial services"
+    ]
+  },
+
+  "medium": {
+    "name": "Medium / Balanced",
+    "description": "Professional, balanced pace. Works for most brands and content types.",
+    "wordsPerSecond": 2.8,
+    "pauseBetweenSentences": 0.5,
+    "sceneHoldTime": 0.8,
+
+    "transitions": {
+      "type": "fade",
+      "duration": 0.4,
+      "easing": "easeOut"
+    },
+
+    "textAnimation": {
+      "entranceDelay": 0.2,
+      "staggerDelay": 0.15,
+      "holdAfterEntrance": 0.3
+    },
+
+    "spring": {
+      "damping": 15,
+      "stiffness": 100,
+      "mass": 1
+    },
+
+    "voiceover": {
+      "character": "narrator",
+      "stability": 0.65,
+      "similarity": 0.8,
+      "style": 0.15
+    },
+
+    "music": {
+      "bpmRange": [90, 120],
+      "mood": ["corporate", "uplifting", "professional", "warm"]
+    },
+
+    "bestFor": [
+      "SaaS products",
+      "E-commerce",
+      "Professional services",
+      "Education",
+      "Healthcare",
+      "Most B2B"
+    ]
+  },
+
+  "fast": {
+    "name": "Fast / Energetic",
+    "description": "High-energy, dynamic pace. Best for youth brands, tech, gaming, or sales-driven content.",
+    "wordsPerSecond": 3.5,
+    "pauseBetweenSentences": 0.25,
+    "sceneHoldTime": 0.4,
+
+    "transitions": {
+      "type": "cut",
+      "duration": 0.15,
+      "easing": "linear"
+    },
+
+    "textAnimation": {
+      "entranceDelay": 0.08,
+      "staggerDelay": 0.06,
+      "holdAfterEntrance": 0.15
+    },
+
+    "spring": {
+      "damping": 8,
+      "stiffness": 200,
+      "mass": 0.8
+    },
+
+    "voiceover": {
+      "character": "salesperson",
+      "stability": 0.4,
+      "similarity": 0.75,
+      "style": 0.35
+    },
+
+    "music": {
+      "bpmRange": [120, 150],
+      "mood": ["energetic", "upbeat", "exciting", "driving"]
+    },
+
+    "bestFor": [
+      "Gaming",
+      "Youth brands",
+      "Fast food",
+      "Sales/promotions",
+      "Tech startups",
+      "Fitness",
+      "Entertainment"
+    ]
+  },
+
+  "dramatic": {
+    "name": "Dramatic / Cinematic",
+    "description": "Building tension with varied pacing. Best for storytelling and emotional content.",
+    "wordsPerSecond": 2.3,
+    "pauseBetweenSentences": 0.7,
+    "sceneHoldTime": 1.2,
+
+    "transitions": {
+      "type": "fade-to-black",
+      "duration": 0.6,
+      "easing": "easeInOut"
+    },
+
+    "textAnimation": {
+      "entranceDelay": 0.35,
+      "staggerDelay": 0.2,
+      "holdAfterEntrance": 0.6
+    },
+
+    "spring": {
+      "damping": 18,
+      "stiffness": 80,
+      "mass": 1.5
+    },
+
+    "voiceover": {
+      "character": "dramatic",
+      "stability": 0.35,
+      "similarity": 0.75,
+      "style": 0.5
+    },
+
+    "music": {
+      "bpmRange": [70, 110],
+      "mood": ["cinematic", "dramatic", "emotional", "epic"]
+    },
+
+    "bestFor": [
+      "Brand stories",
+      "Testimonials",
+      "Charity/nonprofit",
+      "Movie trailers",
+      "Launch announcements",
+      "Emotional appeals"
+    ]
+  },
+
+  "snappy": {
+    "name": "Snappy / Punchy",
+    "description": "Quick cuts with impact. Best for TikTok-style content and attention-grabbing hooks.",
+    "wordsPerSecond": 4.0,
+    "pauseBetweenSentences": 0.15,
+    "sceneHoldTime": 0.25,
+
+    "transitions": {
+      "type": "cut",
+      "duration": 0.05,
+      "easing": "linear"
+    },
+
+    "textAnimation": {
+      "entranceDelay": 0.05,
+      "staggerDelay": 0.03,
+      "holdAfterEntrance": 0.1
+    },
+
+    "spring": {
+      "damping": 5,
+      "stiffness": 300,
+      "mass": 0.5
+    },
+
+    "voiceover": {
+      "character": "dramatic",
+      "stability": 0.3,
+      "similarity": 0.7,
+      "style": 0.45
+    },
+
+    "music": {
+      "bpmRange": [130, 180],
+      "mood": ["hype", "intense", "trap", "electronic"]
+    },
+
+    "bestFor": [
+      "TikTok native",
+      "Meme content",
+      "Flash sales",
+      "Hooks/teasers",
+      "Gaming clips",
+      "Youth marketing"
+    ]
+  }
+}
