@@ -4,6 +4,7 @@ import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { ZipHelper } from '../../utils/ZipHelper.js';
 
 /**
  * Convert Menu Handler
@@ -80,6 +81,7 @@ export class ConvertMenu {
 
         // Register dropdown cleanup
         modal.onCleanup(() => formatDropdown.destroy());
+        modal.onCleanup(() => { if (downloadBtn._hlsObjectUrl) URL.revokeObjectURL(downloadBtn._hlsObjectUrl); });
 
         // Prevent closing during conversion
         const originalClose = modal.close.bind(modal);
@@ -192,26 +194,31 @@ export class ConvertMenu {
         }
 
         try {
-            let resultBlob;
-            if (targetFormat === 'flac') {
-                resultBlob = await MediaProcessor.extractTrack({
+            if (targetFormat === 'hls') {
+                const hlsFiles = await MediaProcessor.processHls({
+                    source,
+                    quality,
+                    onProgress,
+                });
+                ConvertMenu._handleHlsSuccess(hlsFiles, item, downloadBtn);
+            } else if (targetFormat === 'flac') {
+                const resultBlob = await MediaProcessor.extractTrack({
                     source: source,
                     trackIndex: 0,
                     trackType: 'audio',
                     format: 'flac',
                     onProgress: onProgress
                 });
+                ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
             } else {
-                resultBlob = await MediaProcessor.process({
+                const resultBlob = await MediaProcessor.process({
                     source: source,
                     format: targetFormat,
                     quality: quality,
                     onProgress: onProgress
                 });
+                ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
             }
-
-            // Handle Success (always add to playlist)
-            ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
         } catch (error) {
             Logger.error("Conversion failed:", error);
             throw error;
@@ -236,6 +243,20 @@ export class ConvertMenu {
         if (downloadBtn) {
             downloadBtn.href = url;
             downloadBtn.download = newFilename;
+        }
+    }
+
+    static _handleHlsSuccess(hlsFiles, originalItem, downloadBtn) {
+        if (downloadBtn?._hlsObjectUrl) URL.revokeObjectURL(downloadBtn._hlsObjectUrl);
+
+        const zipBlob = new Blob([ZipHelper.build(hlsFiles)], { type: 'application/zip' });
+        const url = URL.createObjectURL(zipBlob);
+        const filename = originalItem.title.replace(/\.[^/.]+$/, '') + '-hls.zip';
+
+        if (downloadBtn) {
+            downloadBtn._hlsObjectUrl = url;
+            downloadBtn.href = url;
+            downloadBtn.download = filename;
         }
     }
 }

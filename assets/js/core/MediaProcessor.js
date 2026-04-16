@@ -93,16 +93,7 @@ export class MediaProcessor {
                 }
             }
 
-            let inputSource;
-            if (typeof source === 'string') {
-                inputSource = new MediaBunny.UrlSource(source);
-            } else {
-                inputSource = new MediaBunny.BlobSource(source);
-            }
-            input = new MediaBunny.Input({
-                source: inputSource,
-                formats: MediaBunny.ALL_FORMATS
-            });
+            input = MediaProcessor._createInput(source);
 
             // Get video track to determine dimensions if needed
             const videoTrack = await input.getPrimaryVideoTrack();
@@ -390,6 +381,13 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>} MP4 blob
      */
+    static _createInput(source) {
+        const inputSource = typeof source === 'string'
+            ? new MediaBunny.UrlSource(source)
+            : new MediaBunny.BlobSource(source);
+        return new MediaBunny.Input({ source: inputSource, formats: MediaBunny.ALL_FORMATS });
+    }
+
     static _shortVideoCodec(fullCodec = '') {
         const c = fullCodec.toLowerCase();
         if (c.startsWith('avc')) return 'avc';
@@ -415,11 +413,7 @@ export class MediaProcessor {
 
         let input = null;
         try {
-            const inputSource = typeof source === 'string'
-                ? new MediaBunny.UrlSource(source)
-                : new MediaBunny.BlobSource(source);
-
-            input = new MediaBunny.Input({ source: inputSource, formats: MediaBunny.ALL_FORMATS });
+            input = MediaProcessor._createInput(source);
 
             const videoTrack = await input.getPrimaryVideoTrack();
             if (!videoTrack) throw new Error('No video track found');
@@ -587,17 +581,7 @@ export class MediaProcessor {
      * @returns {Promise<{videoInfo: Object|null, audioInfo: Object|null, duration: number, videoTracks: Array, audioTracks: Array}>}
      */
     static async getMetadata(source) {
-        let inputSource;
-        if (typeof source === 'string') {
-            inputSource = new MediaBunny.UrlSource(source);
-        } else {
-            inputSource = new MediaBunny.BlobSource(source);
-        }
-
-        const input = new MediaBunny.Input({
-            source: inputSource,
-            formats: MediaBunny.ALL_FORMATS
-        });
+        const input = MediaProcessor._createInput(source);
 
         try {
             const { video, audio } = await this._getTrackDetails(input);
@@ -794,6 +778,80 @@ export class MediaProcessor {
                 } catch (e) {
                     Logger.warn('Error disposing input in extractTrack:', e);
                 }
+            }
+        }
+    }
+
+    /**
+     * Convert a video to HLS format.
+     * Returns a Map<string, ArrayBuffer> of all files: master.m3u8, playlist-N.m3u8, segment-N-M.ts
+     * @param {Object} options
+     * @param {Blob|File|string} options.source
+     * @param {number} [options.quality] - 1-100, 100 = original bitrate
+     * @param {Function} [options.onProgress]
+     * @returns {Promise<Map<string, ArrayBuffer>>}
+     */
+    static async processHls({ source, quality = 100, onProgress }) {
+        Logger.log('[MediaProcessor] Starting HLS conversion...');
+
+        let input = null;
+        let output = null;
+        let conversion = null;
+        const writtenFiles = new Map();
+
+        try {
+            input = MediaProcessor._createInput(source);
+
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error('No video track found');
+
+            output = new MediaBunny.Output({
+                format: new MediaBunny.HlsOutputFormat({
+                    segmentFormat: new MediaBunny.MpegTsOutputFormat(),
+                    targetDuration: 6,
+                }),
+                target: new MediaBunny.PathedTarget(
+                    'master.m3u8',
+                    ({ path }) => {
+                        const target = new MediaBunny.BufferTarget();
+                        target.on('finalized', () => {
+                            writtenFiles.set(path, target.buffer);
+                        });
+                        return target;
+                    },
+                ),
+            });
+
+            const videoConfig = {};
+            if (quality < 100) {
+                const originalWidth = videoTrack.displayWidth || videoTrack.codedWidth;
+                const originalHeight = videoTrack.displayHeight || videoTrack.codedHeight;
+                let originalBitrate = 0;
+                try {
+                    const stats = await videoTrack.computePacketStats(50);
+                    originalBitrate = stats.averageBitrate;
+                } catch (e) {
+                    Logger.warn('[MediaProcessor] Could not compute original bitrate for HLS.');
+                }
+                videoConfig.codec = 'avc';
+                videoConfig.bitrate = MediaProcessor._getBitrate(quality, originalWidth * originalHeight, originalBitrate);
+            }
+
+            conversion = await MediaBunny.Conversion.init({ input, output, video: videoConfig });
+            if (onProgress) conversion.onProgress = onProgress;
+            await conversion.execute();
+
+            Logger.log(`[MediaProcessor] HLS done — ${writtenFiles.size} files`);
+            return writtenFiles;
+        } finally {
+            if (conversion && typeof conversion.dispose === 'function') {
+                try { conversion.dispose(); } catch (e) { Logger.warn('Error disposing HLS conversion:', e); }
+            }
+            if (output && typeof output.dispose === 'function') {
+                try { output.dispose(); } catch (e) { Logger.warn('Error disposing HLS output:', e); }
+            }
+            if (input && typeof input.dispose === 'function') {
+                try { input.dispose(); } catch (e) { Logger.warn('Error disposing HLS input:', e); }
             }
         }
     }
