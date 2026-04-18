@@ -3175,18 +3175,16 @@ export class CorePlayer {
         if (!this.isPlaying) return;
 
         if (document.hidden) {
-            // Tab is now hidden - let audio continue playing
+            // Tab is now hidden - remember state but don't pause (audio continues)
             this._wasHiddenWhilePlaying = true;
             Logger.log(`[Visibility] Tab hidden at playback time: ${this._getPlaybackTime().toFixed(2)}s`);
         } else if (this._wasHiddenWhilePlaying) {
-            // Tab is now visible again - restart video from current live edge
+            // Tab is now visible again - start from live edge (audio will resync via throttle)
             this._setLoading(true);
             if (this.isLive && this.videoTrack) {
-                // Get current live edge timestamp (go back extra far to avoid audio overlap)
                 const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                const refreshInterval = await this.videoTrack.getLiveRefreshInterval() ?? 7;
                 const newLiveStart = currentLiveEdge ?? 0;
-                Logger.log(`[Visibility:Visible:Live] Current live edge: ${currentLiveEdge?.toFixed(3)}, starting from: ${newLiveStart.toFixed(3)}`);
+                Logger.log(`[Visibility:Visible:Live] Starting from live edge: ${newLiveStart.toFixed(3)}`);
                 this._liveStartTimestamp = newLiveStart;
                 this._startLiveVideoLoop();
             } else if (this.isLive) {
