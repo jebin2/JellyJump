@@ -90,6 +90,17 @@ export class Playlist {
         if (this.player) {
             this.player.onStreamError = (videoId, error) => {
                 this.markItemBroken(videoId, error);
+
+                // Show error modal for CORS/fetch errors
+                const isCorsError = error?.includes?.('CORS') || error?.includes?.('fetch');
+                if (isCorsError) {
+                    ConfirmModal.alert({
+                        title: 'Playback Error',
+                        message: 'Unable to load stream. Player.pause() called\n\nThis may be a network or CORS issue.',
+                        confirmText: 'OK',
+                        icon: '❌'
+                    });
+                }
             };
         }
     }
@@ -1458,8 +1469,25 @@ export class Playlist {
             // Handle streams (HLS/Live) - load directly without MediaMetadata processing
             if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {
                 video.isStream = true; // Mark for metadata prefetch skip
-                // For streams, use autoplay directly - user clicked to play
-                await this.player.load(video.url, autoplay, video.id, null);
+
+                // INSTANT FEEDBACK: Show LIVE badge immediately before load succeeds
+                let showLiveImmediately = video.isLive || video.url?.includes('.m3u8');
+                if (showLiveImmediately) {
+                    this.player.isLive = true;
+                    this.player._updateStreamUI?.();
+                }
+
+                try {
+                    // For streams, use autoplay directly - user clicked to play
+                    await this.player.load(video.url, autoplay, video.id, null);
+                } catch (e) {
+                    // Hide LIVE badge on failure
+                    if (showLiveImmediately) {
+                        this.player.isLive = false;
+                        this.player._updateStreamUI?.();
+                    }
+                    throw e;
+                }
 
                 // Update item metadata after stream loads
                 this._updateStreamItemMetadata(video, index);
