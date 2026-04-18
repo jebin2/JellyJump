@@ -56,7 +56,7 @@ export class RecordMenu {
 
             // Capture Audio from Video Element
             let audioStream;
-            const videoEl = playlist.player.video || (playlist.player.hlsPlayer && playlist.player.hlsPlayer.video);
+            const videoEl = playlist.player.video || playlist.player.streamVideo;
 
             if (videoEl) {
                 // Try standard captureStream, fallback to mozCaptureStream

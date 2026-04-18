@@ -12,7 +12,6 @@ import { FileDropHandler } from '../utils/FileDropHandler.js';
 import { ElectronHelper } from '../utils/ElectronHelper.js';
 import { formatTime, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
-import { HLSPlayer } from '../core/HLSPlayer.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
@@ -3183,11 +3182,16 @@ export class Playlist {
     async _checkStreamAccessibility(url) {
         const streamType = StreamDetector.detect(url);
 
-        // For HLS streams, use HLSPlayer.validate() for accurate checking
+        // For HLS streams, do a simple HEAD/GET fetch to check manifest accessibility
         if (streamType === StreamDetector.TYPE_HLS) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
             try {
-                return await HLSPlayer.validate(url, 5000);
+                const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
+                clearTimeout(timeoutId);
+                return response.ok;
             } catch {
+                clearTimeout(timeoutId);
                 return false;
             }
         }

@@ -11,7 +11,9 @@ export default defineConfig({
 
     resolve: {
         alias: {
+            'mediabunny': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/mediabunny@1.42.0-beta.3/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
+            '/npm/mediabunny@1.42.0-beta.4/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/mediabunny@1.40.1/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/worker_threads/+esm': resolve(__dirname, 'assets/js/lib/worker-threads-stub.js'),
         }

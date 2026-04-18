@@ -382,10 +382,10 @@ export class MediaProcessor {
      * @returns {Promise<Blob>} MP4 blob
      */
     static _createInput(source) {
-        const inputSource = typeof source === 'string'
-            ? new MediaBunny.UrlSource(source)
-            : new MediaBunny.BlobSource(source);
-        return new MediaBunny.Input({ source: inputSource, formats: MediaBunny.ALL_FORMATS });
+        if (typeof source === 'string') {
+            return MediaBunny.createInputFrom(source, [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS]);
+        }
+        return new MediaBunny.Input({ source: new MediaBunny.BlobSource(source), formats: MediaBunny.ALL_FORMATS });
     }
 
     static _shortVideoCodec(fullCodec = '') {
