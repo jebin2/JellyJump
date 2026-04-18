@@ -1171,10 +1171,9 @@ export class CorePlayer {
             !this.ui.loopBtn.contains(e.target) && !this.ui.loopPanel.contains(e.target)) {
             this.ui.loopPanel.style.display = 'none';
         }
-        // Restore audio if muted for autoplay (user is now interacting)
-        Logger.log(`[Autoplay:click] _wasMutedForAutoplay=${this._wasMutedForAutoplay}, gainNode=${!!this.gainNode}, muted=${this.config.muted}`);
-        if (this._wasMutedForAutoplay && this.gainNode) {
-            Logger.log('[Autoplay] User interaction detected, restoring audio...');
+        // Restore audio if muted for autoplay on proper user interaction (not during loading)
+        if (this._wasMutedForAutoplay && this.gainNode && !this._isLoading) {
+            Logger.log('[Autoplay] User interaction restoring audio...');
             this.config.muted = false;
             this.gainNode.gain.value = this.config.volume;
             this._wasMutedForAutoplay = false;
@@ -3181,6 +3180,7 @@ export class CorePlayer {
             Logger.log(`[Visibility] Tab hidden at playback time: ${this._getPlaybackTime().toFixed(2)}s`);
         } else if (this._wasHiddenWhilePlaying) {
             // Tab is now visible again - restart video from current live edge
+            this._setLoading(true);
             if (this.isLive && this.videoTrack) {
                 // Get current live edge timestamp (go back extra far to avoid audio overlap)
                 const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
