@@ -3179,16 +3179,12 @@ export class CorePlayer {
             this._wasHiddenWhilePlaying = true;
             Logger.log(`[Visibility] Tab hidden at playback time: ${this._getPlaybackTime().toFixed(2)}s`);
         } else if (this._wasHiddenWhilePlaying) {
-            // Tab is now visible again - fetch audio position first before video loads
-            // Audio has been playing while tab was hidden, so get its current position
-            const audioPositionWhenHidden = this._liveAnchorContent + (this.audioContext.currentTime - this._liveAnchorWall);
+            // Tab is now visible again - use live edge (audio throttle will keep sync)
             this._setLoading(true);
             if (this.isLive && this.videoTrack) {
                 const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                // Use audio position (not live edge) to prevent huge catch-up
-                const newLiveStart = Math.min(audioPositionWhenHidden, currentLiveEdge ?? 0);
-                Logger.log(`[Visibility:Visible:Live] Audio was at ${audioPositionWhenHidden?.toFixed(3)}, live edge ${currentLiveEdge?.toFixed(3)}, starting from ${newLiveStart.toFixed(3)}`);
-                this._liveStartTimestamp = newLiveStart;
+                this._liveStartTimestamp = currentLiveEdge ?? 0;
+                Logger.log(`[Visibility:Visible:Live] Live edge ${currentLiveEdge?.toFixed(3)}`);
                 this._startLiveVideoLoop();
             } else if (this.isLive) {
                 // Fallback: just restart
@@ -3534,7 +3530,10 @@ export class CorePlayer {
      * @private
      */
     async _startLiveVideoLoop() {
-        if (!this.videoSink) return;
+        if (!this.videoSink) {
+            Logger.warn('[Live:Video] No videoSink - cannot start');
+            return;
+        }
 
         this.asyncId++;
         const asyncId = this.asyncId;
@@ -3552,6 +3551,7 @@ export class CorePlayer {
         this.audioBufferIterator = null;
 
         this._setLoading(true);
+        this._isFetchingLiveFrame = true;
 
         // Always use live start timestamp for live streams (never resume from saved position)
         const resumePosition = this._liveStartTimestamp;
@@ -3612,9 +3612,14 @@ export class CorePlayer {
         // position, so identical timestamps in both tracks map to the same AudioContext time.
         // Add 100ms buffer to account for network jitter and processing time
         if (this.audioContext) {
-            anchorWall = this.audioContext.currentTime + 0.15;
-            anchorContent = firstVideoFrame.timestamp;
-            
+            // On seamless deep resync, use the pre-computed wall time so new audio/video
+            // starts exactly when the old audio queue drains — no silence, no overlap.
+            const wallOverride = this._liveAnchorWallOverride;
+            this._liveAnchorWallOverride = null;
+            anchorWall = wallOverride ?? (this.audioContext.currentTime + 0.15);
+            // Use _liveStartTimestamp as anchorContent - this is the common origin for both tracks
+            anchorContent = this._liveStartTimestamp;
+
             // Store anchor for pause/resume calculation
             this._liveAnchorWall = anchorWall;
             this._liveAnchorContent = anchorContent;
@@ -3643,6 +3648,7 @@ export class CorePlayer {
             this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
         }
         this._setLoading(false);
+        this._isFetchingLiveFrame = false;
         this._isMediaReady = true;
         if (this.isPlaying) this._resumeRecordingSmartPause?.();
         Logger.log(`[Live:Video] First frame drawn — audioCtx=${this.audioContext?.currentTime?.toFixed(3)}`);
@@ -3658,28 +3664,8 @@ export class CorePlayer {
         let totalLateMs = 0;
         const fallbackFrameDurationMs = 1000 / (this.frameRate || 30);
 
-        // Show a loading spinner if the iterator stops yielding for > 1.5s mid-stream
-        // (e.g. network error retries, waiting at live edge). Hide it when frame arrives.
-        let freezeTimerHandle = null;
-        const startFreezeTimer = () => {
-            if (freezeTimerHandle) clearTimeout(freezeTimerHandle);
-            freezeTimerHandle = setTimeout(() => {
-                freezeTimerHandle = null;
-                if (this.asyncId === asyncId && this.isPlaying) {
-                    this._setLoading(true);
-                    Logger.warn(`[Live:Video] Mid-stream buffering — no frame for >1.5s`);
-                }
-            }, 1500);
-        };
-        const cancelFreezeTimer = () => {
-            if (freezeTimerHandle) { clearTimeout(freezeTimerHandle); freezeTimerHandle = null; }
-            this._setLoading(false);
-        };
-        startFreezeTimer(); // arm for the first frame of the loop
-
         try {
             for await (const frame of myIterator) {
-                cancelFreezeTimer(); // frame arrived — clear any buffering indicator
                 frameCount++;
 
                 if (this.asyncId !== asyncId || !this.isLive || !this.isPlaying) {
@@ -3699,54 +3685,18 @@ export class CorePlayer {
                     targetWall = anchorWall + (frame.timestamp - anchorContent);
                     const behindSec = this.audioContext.currentTime - targetWall;
 
-                    // Hysteresis catch-up: enter skip mode at SKIP_ENTER_SEC, exit at SKIP_EXIT_SEC.
-                    // Streams without range request support download full HLS segments, causing
-                    // 1-2s stalls at segment boundaries. SKIP_ENTER=2.5s absorbs minor stalls
-                    // while capping A/V desync; SKIP_EXIT=2.0s exits once latency recovers.
-                    const SKIP_ENTER_SEC = 2.5;
-                    const SKIP_EXIT_SEC = 2.0;
-
-                    if (!isCatchingUp && behindSec > SKIP_ENTER_SEC) {
-                        isCatchingUp = true;
-                        skippedFrames = 0;
-                        Logger.log(`[Live:Video] Entering catch-up at frame ${frameCount} — ${(behindSec * 1000).toFixed(0)}ms behind`);
-                    }
-
-                    if (isCatchingUp) {
-                        if (behindSec > SKIP_EXIT_SEC) {
-                            skippedFrames++;
-
-                            // Deep recovery: restart from live edge when stuck >6s behind.
-                            // Only check every 30 skips — skip loop self-corrects on each segment
-                            // delivery; a one-off segment stall won't grow past 6s on its own.
-                            if (skippedFrames % 30 === 0 && behindSec > 6.0) {
-                                Logger.warn(`[Live:Video] Deep recovery: ${behindSec.toFixed(1)}s behind — restarting from live edge`);
-                                cancelFreezeTimer();
-                                this.queuedAudioNodes.forEach(node => { try { node.stop(); } catch (e) {} });
-                                this.queuedAudioNodes.clear();
-                                try {
-                                    const [currentDur, liveRefreshInterval] = await Promise.all([
-                                        this.videoTrack.getDurationFromMetadata({ skipLiveWait: true }),
-                                        this.videoTrack.getLiveRefreshInterval(),
-                                    ]);
-                                    this._liveStartTimestamp = currentDur ?? 0;
-                                    Logger.log(`[Live:Video] New liveStartTs=${this._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}`);
-                                } catch (e) {
-                                    Logger.warn(`[Live:Video] Failed to get live edge: ${e.message} — estimating`);
-                                    this._liveStartTimestamp = anchorContent;
-                                }
-                                this._startLiveVideoLoop();
-                                return;
-                            }
-
-                            if (skippedFrames === 1 || skippedFrames % 30 === 0) {
-                                Logger.log(`[Live:Video] Skipping frame ${frameCount} — ${(behindSec * 1000).toFixed(0)}ms behind (skip #${skippedFrames}), target=${targetWall.toFixed(3)}, audioCtx=${this.audioContext.currentTime.toFixed(3)}`);
-                            }
-                            continue;
-                        } else {
-                            isCatchingUp = false;
-                            Logger.log(`[Live:Video] Caught up at frame ${frameCount} after skipping ${skippedFrames} frames — now ${(behindSec * 1000).toFixed(0)}ms behind`);
-                            skippedFrames = 0;
+                    // Skip stale frames after buffering stalls. For live streams, skipping is
+                    // preferable to fast-forwarding backlogged frames (which causes visible A/V desync).
+                    // SKIP_ENTER=0.3s: any real stall exceeds this; normal RAF jitter stays <20ms.
+                    if (behindSec > 0.5) {
+                        Logger.warn(`[Live:Video] Deep resync: ${behindSec.toFixed(1)}s behind audio — jumping to live edge`);
+                        this._setLoading(true); // Show loader immediately
+                        if (this.videoTrack) {
+                            const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+                            this._liveStartTimestamp = currentLiveEdge ?? 0;
+                            Logger.log(`[Live:Video] Jumping to live edge: ${this._liveStartTimestamp.toFixed(3)}`);
+                            this._startLiveVideoLoop();
+                            return;
                         }
                     }
 
@@ -3791,13 +3741,11 @@ export class CorePlayer {
 
                 lastDrawMs = drawMs;
                 lastFrameDrawMs = drawMs;
-                startFreezeTimer(); // re-arm: show spinner if next frame takes > 1.5s
             }
             Logger.log(`[Live:Video] Loop exited normally — total=${frameCount}, drawn=${drawnFrames}, skipped=${frameCount - drawnFrames}`);
         } catch (e) {
             Logger.warn(`[Live:Video] Loop error after ${frameCount} frames: ${e.message}`);
         } finally {
-            cancelFreezeTimer();
             this._setLoading(false);
         }
     }
@@ -3951,6 +3899,7 @@ export class CorePlayer {
 
             audioSource.start(startAt);
             nextAudioTime = startAt + buffer.duration / this.playbackRate;
+            this._liveNextAudioTime = nextAudioTime;
 
             this.queuedAudioNodes.add(audioSource);
             audioSource.onended = () => this.queuedAudioNodes.delete(audioSource);
@@ -3973,16 +3922,15 @@ export class CorePlayer {
                     Logger.log(`[Live:Audio] ${sampleCount} samples — ts=${timestamp.toFixed(3)}, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, buffer=${((nextAudioTime - this.audioContext.currentTime) * 1000).toFixed(0)}ms`);
                 }
 
-// Live mode: throttle to keep audio from getting too far ahead of video
-                // Audio should stay within 1s of video position to prevent desync
-                // For live streams, compute video content time from audio context using anchor
+// Live mode: throttle to keep audio close to video position
+                // For live streams, audio should stay ~300ms ahead to allow video to catch up
                 if (isLiveMode && this.audioContext && anchorWall && anchorContent) {
                     const videoContentTime = anchorContent + (this.audioContext.currentTime - anchorWall);
                     const audioContentTime = anchorContent + (nextAudioTime - anchorWall);
                     const audioAheadMs = (audioContentTime - videoContentTime) * 1000;
-                    if (audioAheadMs > 1000) {
-                        const waitMs = audioAheadMs - 1000;
-                        if (sampleCount % 50 === 0) {
+                    if (audioAheadMs > 300) {
+                        const waitMs = audioAheadMs - 300;
+                        if (sampleCount % 200 === 0) {
                             Logger.log(`[Live:Audio] Audio ${audioAheadMs.toFixed(0)}ms ahead — throttling ${waitMs.toFixed(0)}ms`);
                         }
                         await new Promise(r => setTimeout(r, waitMs));
@@ -4215,19 +4163,17 @@ export class CorePlayer {
      */
     _setLoading(isLoading) {
         this.isLoading = isLoading;
+        if (!this.ui.loader) return;
 
-        if (this.ui.loader) {
-            if (isLoading) {
-                this.ui.loader.classList.add('visible');
-                // Force hide play overlay when loading
-                if (this.ui.playOverlay) {
-                    this.ui.playOverlay.style.display = 'none';
-                }
-            } else {
-                this.ui.loader.classList.remove('visible');
-                // Don't update play/pause UI here - loading state is independent
-                // The play/pause button state should only change when user toggles play/pause
+        if (isLoading) {
+            this.ui.loader.style.display = 'block';
+            this.ui.loader.classList.add('visible');
+            if (this.ui.playOverlay) {
+                this.ui.playOverlay.style.display = 'none';
             }
+        } else {
+            this.ui.loader.style.display = 'none';
+            this.ui.loader.classList.remove('visible');
         }
     }
 

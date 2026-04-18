@@ -554,13 +554,13 @@ button:focus-visible {
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    display: none;
+    display: none !important;
     pointer-events: none;
     z-index: 5;
 }
 
 .jellyjump-loader.visible {
-    display: block;
+    display: block !important;
 }
 
 @keyframes spin {
