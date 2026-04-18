@@ -1172,12 +1172,13 @@ export class CorePlayer {
             this.ui.loopPanel.style.display = 'none';
         }
         // Restore audio if muted for autoplay (user is now interacting)
+        Logger.log(`[Autoplay:click] _wasMutedForAutoplay=${this._wasMutedForAutoplay}, gainNode=${!!this.gainNode}, muted=${this.config.muted}`);
         if (this._wasMutedForAutoplay && this.gainNode) {
             Logger.log('[Autoplay] User interaction detected, restoring audio...');
             this.config.muted = false;
-            this.gainNode.gain.value = this._volume ?? 1;
+            this.gainNode.gain.value = this.config.volume;
             this._wasMutedForAutoplay = false;
-            if (this.ui.muteBtn) this._updateVolumeUI();
+            this._updateVolumeUI();
         }
     }
 
@@ -1640,9 +1641,9 @@ export class CorePlayer {
                 if (this._wasMutedForAutoplay && this.gainNode) {
                     Logger.log('[Autoplay] Keyboard play, restoring audio...');
                     this.config.muted = false;
-                    this.gainNode.gain.value = this._volume ?? 1;
+                    this.gainNode.gain.value = this.config.volume;
                     this._wasMutedForAutoplay = false;
-                    if (this.ui.muteBtn) this._updateVolumeUI();
+                    this._updateVolumeUI();
                 }
                 this.togglePlay();
                 break;
@@ -3211,9 +3212,9 @@ export class CorePlayer {
         if (this._wasMutedForAutoplay && this.gainNode) {
             Logger.log('[Autoplay] Play button pressed, restoring audio...');
             this.config.muted = false;
-            this.gainNode.gain.value = this._volume ?? 1;
+            this.gainNode.gain.value = this.config.volume;
             this._wasMutedForAutoplay = false;
-            if (this.ui.muteBtn) this._updateVolumeUI();
+            this._updateVolumeUI();
         }
 
         // If no video loaded (neither file nor stream), try to request play from playlist
@@ -3327,11 +3328,11 @@ export class CorePlayer {
         } catch (e) {
             Logger.warn('[Play] AudioContext blocked/failed:', e);
 
-            // "Plain and simple" logic: If audio fails, force mute and PLAY anyway.
+            // Audio autoplay blocked - always track this and mute if needed
+            Logger.log('[Play] Auto-muting due to audio block...');
+            this._wasMutedForAutoplay = true;
             if (!this.config.muted) {
-                Logger.log('[Play] Auto-muting due to audio block...');
                 this.config.muted = true;
-                this._wasMutedForAutoplay = true;
                 // CRITICAL: Also set gainNode to 0 so audio is actually silenced
                 if (this.gainNode) {
                     this.gainNode.gain.value = 0;
@@ -4363,6 +4364,7 @@ export class CorePlayer {
         }
 
         // Update main audio button state
+        Logger.log(`[VolumeUI] isMuted=${this.isMuted}, volume=${this.volume}, config.muted=${this.config.muted}, gainValue=${this.gainNode?.gain?.value}, audioSettingsBtn=${!!this.ui.audioSettingsBtn}, muteBtn=${!!this.ui.muteBtn}`);
         this._updateAudioButtonState();
     }
 

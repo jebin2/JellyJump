@@ -2915,7 +2915,7 @@ export class Playlist {
                 if (this.player._wasMutedForAutoplay && this.player.gainNode) {
                     Logger.log('[Autoplay] Tools menu opened, restoring audio...');
                     this.player.config.muted = false;
-                    this.player.gainNode.gain.value = this.player._volume ?? 1;
+                    this.player.gainNode.gain.value = this.player.config.volume;
                     this.player._wasMutedForAutoplay = false;
                     if (this.player.ui?.muteBtn) this.player._updateVolumeUI();
                 }
