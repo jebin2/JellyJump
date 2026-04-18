@@ -3179,12 +3179,15 @@ export class CorePlayer {
             this._wasHiddenWhilePlaying = true;
             Logger.log(`[Visibility] Tab hidden at playback time: ${this._getPlaybackTime().toFixed(2)}s`);
         } else if (this._wasHiddenWhilePlaying) {
-            // Tab is now visible again - start from live edge (audio will resync via throttle)
+            // Tab is now visible again - fetch audio position first before video loads
+            // Audio has been playing while tab was hidden, so get its current position
+            const audioPositionWhenHidden = this._liveAnchorContent + (this.audioContext.currentTime - this._liveAnchorWall);
             this._setLoading(true);
             if (this.isLive && this.videoTrack) {
                 const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                const newLiveStart = currentLiveEdge ?? 0;
-                Logger.log(`[Visibility:Visible:Live] Starting from live edge: ${newLiveStart.toFixed(3)}`);
+                // Use audio position (not live edge) to prevent huge catch-up
+                const newLiveStart = Math.min(audioPositionWhenHidden, currentLiveEdge ?? 0);
+                Logger.log(`[Visibility:Visible:Live] Audio was at ${audioPositionWhenHidden?.toFixed(3)}, live edge ${currentLiveEdge?.toFixed(3)}, starting from ${newLiveStart.toFixed(3)}`);
                 this._liveStartTimestamp = newLiveStart;
                 this._startLiveVideoLoop();
             } else if (this.isLive) {
