@@ -222,6 +222,9 @@ export class CorePlayer {
         this.isWebcamMode = false;
         this.isLive = false;
         this._liveStartTimestamp = null;
+        this._lastLivePosition = null;
+        this._liveAnchorWall = null;
+        this._liveAnchorContent = null;
         this._liveAvSyncPaused = false;
         this._liveAvSyncMonitor = null;
         this.streamRenderLoopId = null;
@@ -2052,6 +2055,8 @@ export class CorePlayer {
                         this.videoTrack.getLiveRefreshInterval(),
                     ]);
                     const interval = refreshInterval ?? 6;
+                    // Clear saved position - new load starts from live edge
+                    this._lastLivePosition = null;
                     this._liveStartTimestamp = (currentDur ?? 0) - 2 * interval;
                     Logger.log(`[Live:Load] liveStartTs=${this._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${interval}s`);
                     this.duration = 0;
@@ -3139,7 +3144,13 @@ export class CorePlayer {
      * When visible again, instantly seek video to current audio position.
      * @private
      */
-    _handleVisibilityChange() {
+    /**
+     * Handle tab visibility changes.
+     * When the tab is hidden, requestAnimationFrame stops but audio continues.
+     * When visible again, restart video from current live edge (not where user left).
+     * @private
+     */
+    async _handleVisibilityChange() {
         // Skip for stream mode - native video element handles this
         if (this.isStreamMode) return;
 
@@ -3147,21 +3158,31 @@ export class CorePlayer {
         if (!this.isPlaying) return;
 
         if (document.hidden) {
-            // Tab is now hidden - audio continues playing
-            // Just mark that we were hidden so we can handle the return
+            // Tab is now hidden - let audio continue playing
             this._wasHiddenWhilePlaying = true;
             Logger.log(`[Visibility] Tab hidden at playback time: ${this._getPlaybackTime().toFixed(2)}s`);
         } else if (this._wasHiddenWhilePlaying) {
-            // Tab is now visible again - instantly jump video to current audio position
-            const currentTime = this._getPlaybackTime();
-            Logger.log(`[Visibility] Tab visible, instantly syncing video to: ${currentTime.toFixed(2)}s`);
+            // Tab is now visible again - restart video from current live edge
+            if (this.isLive && this.videoTrack) {
+                // Get current live edge timestamp
+                const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+                const refreshInterval = await this.videoTrack.getLiveRefreshInterval() ?? 7;
+                const newLiveStart = (currentLiveEdge ?? 0) - 2 * refreshInterval;
+                Logger.log(`[Visibility:Visible:Live] Current live edge: ${currentLiveEdge?.toFixed(3)}, starting from: ${newLiveStart.toFixed(3)}`);
+                this._liveStartTimestamp = newLiveStart;
+                this._startLiveVideoLoop();
+            } else if (this.isLive) {
+                // Fallback: just restart
+                this._startLiveVideoLoop();
+            } else {
+                // For VOD: restart video from where audio is
+                const currentTime = this._getPlaybackTime();
+                Logger.log(`[Visibility] Tab visible, syncing video to: ${currentTime.toFixed(2)}s`);
+                this._startVideoIterator();
+            }
 
             // Clear the flag
             this._wasHiddenWhilePlaying = false;
-
-            // Restart video iterator from current position to instantly show the correct frame
-            // This skips all intermediate frames and jumps directly to where audio is
-            this._startVideoIterator();
         }
     }
 
@@ -3397,6 +3418,13 @@ export class CorePlayer {
 
         // File-based playback (MediaBunny)
         const calculatedTime = this._getPlaybackTime();
+
+        // For live streams, save the current position for resume
+        if (this.isLive && this.audioContext && this._liveAnchorWall && this._liveAnchorContent) {
+            this._lastLivePosition = this._liveAnchorContent + (this.audioContext.currentTime - this._liveAnchorWall);
+            Logger.log(`[Pause:Live] Saved position: ${this._lastLivePosition?.toFixed(3)}`);
+        }
+
         // Sanity check: If calculated time is 0 but we were playing at a later time (e.g. > 1s), use the UI time.
         // This prevents the "progress bar goes to initial" bug if clocks desync on pause.
         if (calculatedTime < 0.1 && this.currentTime > 1.0) {
@@ -3482,12 +3510,15 @@ export class CorePlayer {
 
         this._setLoading(true);
 
+        // Use saved position if available (for pause/resume), otherwise use live start
+        const resumePosition = this._lastLivePosition ?? this._liveStartTimestamp;
+        
         // Start both iterators from the same timestamp so they cover the same content.
         // Then race them: wait for BOTH first frames in parallel so that neither can
         // race ahead of the other. The anchor is set when the slower one (video) arrives,
         // preventing audio from pre-scheduling seconds of content before video is ready.
         const fetchStart = performance.now();
-        this.videoFrameIterator = this.videoSink.canvases(this._liveStartTimestamp ?? undefined);
+        this.videoFrameIterator = this.videoSink.canvases(resumePosition ?? undefined);
 
         let anchorWall = null;
         let anchorContent = null;
@@ -3495,9 +3526,10 @@ export class CorePlayer {
         let firstVideoFrame = null;
 
         const hasAudio = !!(this.audioSink && this.audioContext);
+        
         if (hasAudio) {
-            this.audioBufferIterator = this.audioSink.samples(this._liveStartTimestamp ?? 0);
-            Logger.log(`[Live] Fetching first video+audio frames in parallel from ts=${this._liveStartTimestamp?.toFixed(3)}`);
+            this.audioBufferIterator = this.audioSink.samples(resumePosition ?? 0);
+            Logger.log(`[Live] Fetching first video+audio frames in parallel from ts=${resumePosition?.toFixed(3)}`);
 
             // Both .next() calls run concurrently — video and audio segments fetch in parallel
             const [videoResult, audioResult] = await Promise.all([
@@ -3539,6 +3571,11 @@ export class CorePlayer {
         if (this.audioContext) {
             anchorWall = this.audioContext.currentTime + 0.15;
             anchorContent = firstVideoFrame.timestamp;
+            
+            // Store anchor for pause/resume calculation
+            this._liveAnchorWall = anchorWall;
+            this._liveAnchorContent = anchorContent;
+            
             Logger.log(`[Live] Anchor set — anchorWall=${anchorWall.toFixed(3)}, anchorContent=${anchorContent.toFixed(3)}, audioTs=${prefetchedAudioSample?.timestamp?.toFixed(3)}, audioCtxState=${this.audioContext.state}`);
         }
 
@@ -4145,8 +4182,8 @@ export class CorePlayer {
                 }
             } else {
                 this.ui.loader.classList.remove('visible');
-                // Restore play overlay logic
-                this._updatePlayPauseUI();
+                // Don't update play/pause UI here - loading state is independent
+                // The play/pause button state should only change when user toggles play/pause
             }
         }
     }
