@@ -2911,6 +2911,14 @@ export class Playlist {
                 modal.close();
                 MenuRouter.init(action, index, this);
                 this.player.pause();
+                // Restore audio if muted for autoplay (user is now interacting)
+                if (this.player._wasMutedForAutoplay && this.player.gainNode) {
+                    Logger.log('[Autoplay] Tools menu opened, restoring audio...');
+                    this.player.config.muted = false;
+                    this.player.gainNode.gain.value = this.player._volume ?? 1;
+                    this.player._wasMutedForAutoplay = false;
+                    if (this.player.ui?.muteBtn) this.player._updateVolumeUI();
+                }
             });
         });
 
