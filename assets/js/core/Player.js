@@ -2057,7 +2057,7 @@ export class CorePlayer {
                     const interval = refreshInterval ?? 6;
                     // Clear saved position - new load starts from live edge
                     this._lastLivePosition = null;
-                    this._liveStartTimestamp = (currentDur ?? 0) - 2 * interval;
+                    this._liveStartTimestamp = currentDur ?? 0;
                     Logger.log(`[Live:Load] liveStartTs=${this._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${interval}s`);
                     this.duration = 0;
                 } else {
@@ -3164,10 +3164,10 @@ export class CorePlayer {
         } else if (this._wasHiddenWhilePlaying) {
             // Tab is now visible again - restart video from current live edge
             if (this.isLive && this.videoTrack) {
-                // Get current live edge timestamp
+                // Get current live edge timestamp (go back extra far to avoid audio overlap)
                 const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
                 const refreshInterval = await this.videoTrack.getLiveRefreshInterval() ?? 7;
-                const newLiveStart = (currentLiveEdge ?? 0) - 2 * refreshInterval;
+                const newLiveStart = currentLiveEdge ?? 0;
                 Logger.log(`[Visibility:Visible:Live] Current live edge: ${currentLiveEdge?.toFixed(3)}, starting from: ${newLiveStart.toFixed(3)}`);
                 this._liveStartTimestamp = newLiveStart;
                 this._startLiveVideoLoop();
@@ -3315,6 +3315,24 @@ export class CorePlayer {
         }
 
         if (this.isLive) {
+            // Fetch current live edge before starting playback
+            Logger.log(`[Play:Live] isLive=${this.isLive}, videoTrack=${!!this.videoTrack}, audioContext=${!!this.audioContext}, audioCtxTime=${this.audioContext?.currentTime?.toFixed(3)}`);
+            if (this.videoTrack) {
+                try {
+                    const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+                    const refreshInterval = await this.videoTrack.getLiveRefreshInterval() ?? 7;
+                    this._liveStartTimestamp = currentLiveEdge ?? 0;
+                    Logger.log(`[Play:Live] Current live edge: ${currentLiveEdge?.toFixed(3)}, starting from: ${this._liveStartTimestamp.toFixed(3)}`);
+                } catch (e) {
+                    Logger.warn(`[Play:Live] Failed to get duration, using fallback`);
+                    // Fallback: use audio context time as proxy for live position
+                    if (this.audioContext) {
+                        this._liveStartTimestamp = Date.now() / 1000 - 5; // Approximate, fallback to ~5s ago
+                    }
+                }
+            } else {
+                Logger.warn(`[Play:Live] No videoTrack, using existing _liveStartTimestamp`);
+            }
             // Live HLS: async for-await loop driven by MediaBunny's segment delivery
             this._startLiveVideoLoop();
         } else if (this.duration > 0 && this._getPlaybackTime() >= this.duration - 0.1) {
@@ -3419,11 +3437,7 @@ export class CorePlayer {
         // File-based playback (MediaBunny)
         const calculatedTime = this._getPlaybackTime();
 
-        // For live streams, save the current position for resume
-        if (this.isLive && this.audioContext && this._liveAnchorWall && this._liveAnchorContent) {
-            this._lastLivePosition = this._liveAnchorContent + (this.audioContext.currentTime - this._liveAnchorWall);
-            Logger.log(`[Pause:Live] Saved position: ${this._lastLivePosition?.toFixed(3)}`);
-        }
+        
 
         // Sanity check: If calculated time is 0 but we were playing at a later time (e.g. > 1s), use the UI time.
         // This prevents the "progress bar goes to initial" bug if clocks desync on pause.
@@ -3510,8 +3524,8 @@ export class CorePlayer {
 
         this._setLoading(true);
 
-        // Use saved position if available (for pause/resume), otherwise use live start
-        const resumePosition = this._lastLivePosition ?? this._liveStartTimestamp;
+        // Always use live start timestamp for live streams (never resume from saved position)
+        const resumePosition = this._liveStartTimestamp;
         
         // Start both iterators from the same timestamp so they cover the same content.
         // Then race them: wait for BOTH first frames in parallel so that neither can
@@ -3686,11 +3700,11 @@ export class CorePlayer {
                                         this.videoTrack.getDurationFromMetadata({ skipLiveWait: true }),
                                         this.videoTrack.getLiveRefreshInterval(),
                                     ]);
-                                    this._liveStartTimestamp = (currentDur ?? 0) - 1 * (liveRefreshInterval ?? 6);
+                                    this._liveStartTimestamp = currentDur ?? 0;
                                     Logger.log(`[Live:Video] New liveStartTs=${this._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}`);
                                 } catch (e) {
                                     Logger.warn(`[Live:Video] Failed to get live edge: ${e.message} — estimating`);
-                                    this._liveStartTimestamp = anchorContent + (this.audioContext.currentTime - anchorWall) - 6;
+                                    this._liveStartTimestamp = anchorContent;
                                 }
                                 this._startLiveVideoLoop();
                                 return;
