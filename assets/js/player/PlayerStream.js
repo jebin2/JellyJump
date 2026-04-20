@@ -743,7 +743,7 @@ export class PlayerStream {
         if (player.audioContext) {
             const wallOverride = this._liveAnchorWallOverride;
             this._liveAnchorWallOverride = null;
-            anchorWall = wallOverride ?? (player.audioContext.currentTime + 0.15);
+            anchorWall = wallOverride ?? (player.audioContext.currentTime + 0.15); // 150ms ahead to absorb first-frame decode jitter
             anchorContent = this._liveStartTimestamp;
             this._liveAnchorWall = anchorWall;
             this._liveAnchorContent = anchorContent;
@@ -822,7 +822,7 @@ export class PlayerStream {
                     await new Promise(r => {
                         const check = () => {
                             if (player.asyncId !== asyncId || !player.isPlaying) { r(); return; }
-                            if (player.audioContext.currentTime >= targetWall - 0.002) { r(); return; }
+                            if (player.audioContext.currentTime >= targetWall - 0.002) { r(); return; } // 2ms early-draw tolerance
                             requestAnimationFrame(check);
                         };
                         requestAnimationFrame(check);

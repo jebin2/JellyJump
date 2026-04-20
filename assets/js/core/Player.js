@@ -146,7 +146,6 @@ export class CorePlayer {
         this.queuedAudioNodes = new Set();
         this.asyncId = 0;
         this.playbackTimeAtStart = 0;
-        this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
 
         // Thumbnail Generator (only if enabled)
@@ -203,7 +202,6 @@ export class CorePlayer {
             loopMarkerB: null,
             loopRegion: null,
             loopPanel: null,
-            loopStartInput: null,
             loopStartInput: null,
             loopEndInput: null,
             playOverlay: null,
@@ -1174,7 +1172,7 @@ export class CorePlayer {
         if (this.isMuted || this.volume === 0) {
             iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
             this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings (Muted)');
-            // this.ui.audioSettingsBtn.style.color = 'var(--accent-warning)'; // Removed to use default/theme color
+            this.ui.audioSettingsBtn.style.color = '';
         } else {
             iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
             this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings');
@@ -1595,14 +1593,6 @@ export class CorePlayer {
      */
     async loadSubtitle(url) { return this.subtitles.loadSubtitle(url); }
 
-    /**
-     * Render a specific frame
-     * @param {number} timestamp
-     * @param {boolean} updateTime - Whether to update the player's current time from the frame
-     */
-    /**
-     * Iterates over the video frame iterator until it finds a video frame in the future.
-     */
     async _updateNextFrame() {
         const currentAsyncId = this.asyncId;
 
