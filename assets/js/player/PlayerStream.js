@@ -803,7 +803,8 @@ export class PlayerStream {
                     targetWall = anchorWall + (frame.timestamp - anchorContent);
                     const behindSec = player.audioContext.currentTime - targetWall;
 
-                    if (behindSec > 0.5) {
+                    if (behindSec > 3.0) {
+                        // Genuine deep stall (tab backgrounded, network outage) — jump to live edge
                         Logger.warn(`[Live:Video] Deep resync: ${behindSec.toFixed(1)}s behind audio — jumping to live edge`);
                         player._setLoading(true);
                         if (player.videoTrack) {
@@ -814,6 +815,9 @@ export class PlayerStream {
                             return;
                         }
                     }
+                    // Minor drift (segment fetch latency): targetWall is in the past, so the
+                    // timing await below resolves immediately and frames draw at full speed
+                    // until video catches up to audio — no intervention needed.
 
                     await new Promise(r => {
                         const check = () => {
