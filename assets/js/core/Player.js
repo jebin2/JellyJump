@@ -13,6 +13,7 @@ import { AudioEqualizer } from '../player/AudioEqualizer.js';
 import { PlayerStream } from '../player/PlayerStream.js';
 import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
+import { PlayerLoopControl } from '../player/PlayerLoopControl.js';
 
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { formatTime, parseTime } from '../utils/mediaUtils.js';
@@ -243,6 +244,7 @@ export class CorePlayer {
         this.stream = new PlayerStream(this);
         this.keyboard = new PlayerKeyboard(this);
         this.subtitles = new PlayerSubtitles(this);
+        this.loop = new PlayerLoopControl(this);
         this._init();
     }
 
@@ -1165,25 +1167,8 @@ export class CorePlayer {
     /**
      * Toggle Loop Mode: Off -> Playlist -> One -> Off
      */
-    toggleLoopMode() {
-        // If we were in A-B, this cycle exits it.
-        // If we want to clear A-B markers when leaving A-B mode via button:
-        if (this.loopStart !== null || this.loopEnd !== null) {
-            // Optional: Keep markers but disable A-B? Or clear?
-            // Let's clear for simplicity if user cycles modes.
-            this.loopStart = null;
-            this.loopEnd = null;
-        }
-        this._updateLoopUI();
-    }
-
-    toggleLoopPanel() {
-        const isVisible = this.ui.loopPanel.style.display !== 'none';
-        this.ui.loopPanel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) {
-            this._updateLoopUI(); // Ensure inputs are synced
-        }
-    }
+    toggleLoopMode() { this.loop.toggleLoopMode(); }
+    toggleLoopPanel() { this.loop.toggleLoopPanel(); }
 
     /**
      * Toggle video filters panel visibility
@@ -1323,126 +1308,11 @@ export class CorePlayer {
         }
     }
 
-    setLoopStart() {
-        this.loopStart = this.currentTime;
-        if (this.loopEnd !== null && this.loopStart >= this.loopEnd) {
-            this.loopEnd = null; // Reset end if start is after it
-        }
-        // Keep in 'one' mode (A-B is a feature within Current Video mode)
-        if (this.loopMode !== 'one') {
-            this.loopMode = 'one';
-        }
-        this._updateLoopUI();
-        Logger.log('Loop Start set:', this.loopStart);
-    }
-
-    setLoopEnd() {
-        if (this.loopStart === null) {
-            this.setLoopStart(); // If no start, set start instead
-            return;
-        }
-        if (this.currentTime <= this.loopStart) {
-            Logger.warn('Loop End must be after Loop Start');
-            return;
-        }
-        this.loopEnd = this.currentTime;
-        // Keep in 'one' mode (A-B is a feature within Current Video mode)
-        if (this.loopMode !== 'one') {
-            this.loopMode = 'one';
-        }
-        this._updateLoopUI();
-        Logger.log('Loop End set:', this.loopEnd);
-    }
-
-    clearLoopMarkers() {
-        this.loopStart = null;
-        this.loopEnd = null;
-        // Keep mode as is, or switch to off? 
-        // Requirement says "Keeps A-B loop mode active but prompts for new markers"
-        // But if markers are null, A-B loop effectively does nothing.
-        this._updateLoopUI();
-    }
-
-    resetLoop() {
-        this.loopStart = null;
-        this.loopEnd = null;
-        this.loopMode = 'off';
-        this._updateLoopUI();
-    }
-
-    _updateLoopUI() {
-        // Update Button Icon & Color
-        const btn = this.ui.loopBtn;
-        const use = btn.querySelector('use');
-        const hasAbLoop = this.loopStart !== null && this.loopEnd !== null;
-
-        if (this.loopMode === 'off') {
-            btn.style.color = '';
-            btn.setAttribute('aria-label', 'Loop Mode: Off');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop');
-        } else if (this.loopMode === 'playlist') {
-            btn.style.color = 'var(--accent-primary)';
-            btn.setAttribute('aria-label', 'Loop Mode: Playlist');
-            use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-playlist');
-        } else if (this.loopMode === 'one') {
-            btn.style.color = 'var(--accent-primary)';
-            // Show A-B icon if A-B markers are set, otherwise show loop-one
-            if (hasAbLoop) {
-                btn.setAttribute('aria-label', 'Loop Mode: A-B');
-                use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-ab');
-            } else {
-                btn.setAttribute('aria-label', 'Loop Mode: One');
-                use.setAttribute('href', 'assets/icons/sprite.svg#icon-loop-one');
-            }
-        }
-
-        // Update Radio Buttons
-        if (this.ui.loopModeRadios) {
-            this.ui.loopModeRadios.forEach(radio => {
-                radio.checked = radio.value === this.loopMode;
-            });
-        }
-
-        // Show/Hide A-B Section
-        if (this.ui.loopAbSection) {
-            this.ui.loopAbSection.style.display = this.loopMode === 'one' ? 'block' : 'none';
-        }
-
-        // Update A-B Inputs
-        if (this.ui.loopStartInput) {
-            this.ui.loopStartInput.value = this.loopStart !== null ? formatTime(this.loopStart) : '';
-        }
-        if (this.ui.loopEndInput) {
-            this.ui.loopEndInput.value = this.loopEnd !== null ? formatTime(this.loopEnd) : '';
-        }
-
-        // Update Markers
-        if (this.duration > 0) {
-            if (this.loopStart !== null) {
-                this.ui.loopMarkerA.style.display = 'block';
-                this.ui.loopMarkerA.style.left = `${(this.loopStart / this.duration) * 100}%`;
-            } else {
-                this.ui.loopMarkerA.style.display = 'none';
-            }
-
-            if (this.loopEnd !== null) {
-                this.ui.loopMarkerB.style.display = 'block';
-                this.ui.loopMarkerB.style.left = `${(this.loopEnd / this.duration) * 100}%`;
-            } else {
-                this.ui.loopMarkerB.style.display = 'none';
-            }
-
-            if (this.loopStart !== null && this.loopEnd !== null) {
-                this.ui.loopRegion.style.display = 'block';
-                const startPct = (this.loopStart / this.duration) * 100;
-                const endPct = (this.loopEnd / this.duration) * 100;
-                this.ui.loopRegion.style.left = `${startPct}%`;
-                this.ui.loopRegion.style.width = `${endPct - startPct}%`;
-            } else {
-                this.ui.loopRegion.style.display = 'none';
-            }
-        }
-    }
+    setLoopStart() { this.loop.setLoopStart(); }
+    setLoopEnd() { this.loop.setLoopEnd(); }
+    clearLoopMarkers() { this.loop.clearLoopMarkers(); }
+    resetLoop() { this.loop.resetLoop(); }
+    _updateLoopUI() { this.loop.updateLoopUI(); }
 
     /**
      * Set playback rate
