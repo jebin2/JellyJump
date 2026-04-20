@@ -11,6 +11,7 @@ import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
 import { PlayerStream } from '../player/PlayerStream.js';
+import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { formatTime, parseTime } from '../utils/mediaUtils.js';
@@ -239,6 +240,7 @@ export class CorePlayer {
         }
 
         this.stream = new PlayerStream(this);
+        this.keyboard = new PlayerKeyboard(this);
         this._init();
     }
 
@@ -1578,180 +1580,8 @@ export class CorePlayer {
      * @param {KeyboardEvent} e 
      * @private
      */
-    _handleKeyboard(e) {
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-        if (e.ctrlKey || e.altKey || e.metaKey) return;
-
-        // Block player keyboard controls if screenshot modal is open
-        if (this.screenshotManager && this.screenshotManager.isModalOpen()) return;
-
-        const key = e.key.toLowerCase();
-
-        switch (key) {
-            // Playback Controls
-            case ' ':
-            case 'k':
-                e.preventDefault();
-                // Restore audio if muted for autoplay (user is now interacting)
-                if (this._wasMutedForAutoplay && this.gainNode) {
-                    Logger.log('[Autoplay] Keyboard play, restoring audio...');
-                    this.config.muted = false;
-                    this.gainNode.gain.value = this.config.volume;
-                    this._wasMutedForAutoplay = false;
-                    this._updateVolumeUI();
-                }
-                this.togglePlay();
-                break;
-            case 'j':
-                e.preventDefault();
-                this._seekTo(Math.max(0, this.currentTime - 10));
-                break;
-            case 'l':
-                if (e.shiftKey) {
-                    e.preventDefault();
-                    this.clearLoopMarkers();
-                } else {
-                    e.preventDefault();
-                    this._seekTo(Math.min(this.duration, this.currentTime + 10));
-                }
-                break;
-            case 'arrowleft':
-                e.preventDefault();
-                this._seekTo(Math.max(0, this.currentTime - 5));
-                break;
-            case 'arrowright':
-                e.preventDefault();
-                this._seekTo(Math.min(this.duration, this.currentTime + 5));
-                break;
-            case 'home':
-                e.preventDefault();
-                this._seekTo(0);
-                break;
-            case 'end':
-                e.preventDefault();
-                this._seekTo(this.duration);
-                break;
-
-            // Number Keys - Seek to percentage
-            case '0': case '1': case '2': case '3': case '4':
-            case '5': case '6': case '7': case '8': case '9':
-                e.preventDefault();
-                const percent = parseInt(key) / 10;
-                this._seekTo(this.duration * percent);
-                break;
-
-            // Audio Controls
-            case 'arrowup':
-                e.preventDefault();
-                this.setVolume(this.config.volume + 0.1);
-                break;
-            case 'arrowdown':
-                e.preventDefault();
-                this.setVolume(this.config.volume - 0.1);
-                break;
-            case 'm':
-                e.preventDefault();
-                this.toggleMute();
-                break;
-
-            // Display Controls
-            case 'f':
-                e.preventDefault();
-                this.toggleFullscreen();
-                break;
-            case 'c':
-                e.preventDefault();
-                this.isSubtitlesEnabled = !this.isSubtitlesEnabled;
-                this._updateSubtitleMenu();
-                break;
-            case 'escape':
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else if (this.ui.helpOverlay.style.display !== 'none') {
-                    this._toggleHelp();
-                }
-                break;
-
-            // Help
-            case '?':
-                e.preventDefault();
-                this._toggleHelp();
-                break;
-
-            // Screenshot
-            case 's':
-                e.preventDefault();
-                if (this.screenshotManager) {
-                    this.screenshotManager.capture();
-                }
-                break;
-
-            // Navigation (Player Mode)
-            case 'n':
-                if (e.shiftKey && this.config.mode === 'player') {
-                    e.preventDefault();
-                    if (!this.ui.nextBtn.disabled && this.onNext) {
-                        this.onNext();
-                    }
-                }
-                break;
-            case 'p':
-                if (e.shiftKey && this.config.mode === 'player') {
-                    e.preventDefault();
-                    if (!this.ui.prevBtn.disabled && this.onPrevious) {
-                        this.onPrevious();
-                    }
-                }
-                break;
-            case '<':
-                if (e.shiftKey) {
-                    e.preventDefault();
-                    this._cycleSpeed(-1);
-                }
-                break;
-            case '>':
-                if (e.shiftKey) {
-                    e.preventDefault();
-                    this._cycleSpeed(1);
-                }
-                break;
-
-            // Editor Mode Controls
-            case ',':
-                if (this.config.mode === 'editor') {
-                    e.preventDefault();
-                    this._stepFrame(-1);
-                }
-                break;
-            case '.':
-                if (this.config.mode === 'editor') {
-                    e.preventDefault();
-                    this._stepFrame(1);
-                }
-                break;
-            case 'i':
-                e.preventDefault();
-                this.setLoopStart();
-                break;
-            case 'o':
-                e.preventDefault();
-                this.setLoopEnd();
-                break;
-            case 'r':
-                e.preventDefault();
-                this.resetLoop();
-                break;
-        }
-    }
-
-    /**
-     * Toggle help overlay
-     * @private
-     */
-    _toggleHelp() {
-        const isVisible = this.ui.helpOverlay.style.display !== 'none';
-        this.ui.helpOverlay.style.display = isVisible ? 'none' : 'flex';
-    }
+    _handleKeyboard(e) { this.keyboard.handleKeyboard(e); }
+    _toggleHelp() { this.keyboard.toggleHelp(); }
 
     _cycleSpeed(direction) {
         const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
