@@ -15,6 +15,7 @@ import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
 import { PlayerLoopControl } from '../player/PlayerLoopControl.js';
 import { PlayerThumbnails } from '../player/PlayerThumbnails.js';
+import { PlayerControlBar } from '../player/PlayerControlBar.js';
 
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { formatTime, parseTime } from '../utils/mediaUtils.js';
@@ -247,6 +248,7 @@ export class CorePlayer {
         this.subtitles = new PlayerSubtitles(this);
         this.loop = new PlayerLoopControl(this);
         this.thumbnails = new PlayerThumbnails(this);
+        this.controlBar = new PlayerControlBar(this);
         this._init();
     }
 
@@ -2611,138 +2613,13 @@ export class CorePlayer {
      * Load control bar mode from localStorage
      * @private
      */
-    _loadControlBarMode() {
-        try {
-            const savedMode = localStorage.getItem('controlBarMode');
-            if (savedMode === 'fixed' || savedMode === 'overlay') {
-                this.controlBarMode = savedMode;
-            }
-        } catch (e) {
-            Logger.warn('Failed to load control bar mode:', e);
-        }
-        this._applyControlBarMode();
-    }
-
-    /**
-     * Save control bar mode to localStorage
-     * @private
-     */
-    _saveControlBarMode() {
-        try {
-            localStorage.setItem('controlBarMode', this.controlBarMode);
-        } catch (e) {
-            Logger.warn('Failed to save control bar mode:', e);
-        }
-    }
-
-    /**
-     * Toggle between overlay and fixed control bar modes
-     */
-    toggleControlBarMode() {
-        this.controlBarMode = this.controlBarMode === 'overlay' ? 'fixed' : 'overlay';
-        this._applyControlBarMode();
-        this._saveControlBarMode();
-    }
-
-    /**
-     * Apply the current control bar mode
-     * @private
-     */
-    _applyControlBarMode() {
-        // Remove both classes
-        this.container.classList.remove('mode-overlay', 'mode-fixed');
-
-        // Add current mode class
-        this.container.classList.add(`mode-${this.controlBarMode}`);
-
-        // Update button aria-label and aria-pressed (only if button exists)
-        if (this.ui.modeToggleBtn) {
-            const isFixed = this.controlBarMode === 'fixed';
-            this.ui.modeToggleBtn.setAttribute('aria-label', isFixed ? 'Unpin controls' : 'Pin controls');
-            this.ui.modeToggleBtn.setAttribute('aria-pressed', isFixed.toString());
-            this.ui.modeToggleBtn.setAttribute('title', isFixed ? 'Unpin controls' : 'Pin controls');
-        }
-
-        // Handle auto-hide
-        if (this.controlBarMode === 'overlay') {
-            // Show controls initially
-            this.ui.controls.classList.add('visible');
-            this._startAutoHideTimer();
-        } else {
-            this._clearAutoHideTimer();
-            this.ui.controls.classList.add('visible');
-        }
-
-        // Resize canvas to fill container in audio mode when pin changes
-        if (this.isAudioMode) {
-            const containerRect = this.container.getBoundingClientRect();
-            this.canvas.width = containerRect.width || 1280;
-            this.canvas.height = containerRect.height || 720;
-
-            // Redraw static background if not playing
-            if (!this.isPlaying && this.audioVisualizer) {
-                this.audioVisualizer.drawStaticBackground();
-            }
-        }
-    }
-
-    /**
-     * Handle mouse movement for auto-hide
-     * @private
-     */
-    _handleMouseMove(e) {
-        if (this.controlBarMode !== 'overlay') return;
-
-        // Show controls (Rule 2 & 3)
-        this.ui.controls.classList.add('visible');
-
-        // Reset timer
-        this._clearAutoHideTimer();
-
-        // Don't auto-hide if paused
-        if (!this.isPlaying) return;
-
-        // Check if mouse is over controls (using coordinates for reliability)
-        const controlsRect = this.ui.controls.getBoundingClientRect();
-        const isOverControls = e.clientY >= controlsRect.top &&
-            e.clientY <= controlsRect.bottom &&
-            e.clientX >= controlsRect.left &&
-            e.clientX <= controlsRect.right;
-
-        // Only start auto-hide timer if NOT over controls (Rule 1 & 3)
-        if (!isOverControls) {
-            this._startAutoHideTimer();
-        }
-    }
-
-    /**
-     * Start auto-hide timer (3 seconds)
-     * @private
-     */
-    _startAutoHideTimer() {
-        if (this.controlBarMode !== 'overlay') return;
-        if (!this.isPlaying) return; // Don't hide when paused
-
-        this._clearAutoHideTimer();
-        this.autoHideTimer = setTimeout(() => {
-            this.ui.controls.classList.remove('visible');
-            // Also hide cursor
-            this.container.classList.add('hide-cursor');
-        }, 3000);
-    }
-
-    /**
-     * Clear auto-hide timer
-     * @private
-     */
-    _clearAutoHideTimer() {
-        if (this.autoHideTimer) {
-            clearTimeout(this.autoHideTimer);
-            this.autoHideTimer = null;
-        }
-        // Show cursor when timer is cleared
-        this.container.classList.remove('hide-cursor');
-    }
+    _loadControlBarMode() { this.controlBar.loadMode(); }
+    _saveControlBarMode() { this.controlBar.saveMode(); }
+    toggleControlBarMode() { this.controlBar.toggleMode(); }
+    _applyControlBarMode() { this.controlBar.applyMode(); }
+    _handleMouseMove(e) { this.controlBar.handleMouseMove(e); }
+    _startAutoHideTimer() { this.controlBar.startAutoHideTimer(); }
+    _clearAutoHideTimer() { this.controlBar.clearAutoHideTimer(); }
     /**
      * Set controls configuration
      * @param {Object} config - Configuration object with boolean flags for each control
