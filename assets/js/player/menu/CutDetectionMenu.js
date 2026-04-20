@@ -6,15 +6,7 @@ import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 
 export class CutDetectionMenu {
-    constructor(playlist) {
-        this.playlist = playlist;
-    }
-
-    /**
-     * Called when the menu item is clicked - Single seamless view
-     * @param {Object} item - The playlist item object
-     */
-    async execute(item) {
+    static async init(item, playlist) {
         const videoUrl = item?.blob_url || item?.url;
         if (!item || !videoUrl) {
             Logger.warn('CutDetectionMenu: No valid item or URL provided');
@@ -101,7 +93,7 @@ export class CutDetectionMenu {
 
             cutsList.innerHTML = '<div class="flex-center flex-col gap-sm h-full text-muted italic py-xl"><div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-6 h-6 animate-spin opacity-50"></div><span class="text-sm">Analyzing video...</span></div>';
 
-            await this.runDetection(item, videoUrl, detector, {
+            await CutDetectionMenu.runDetection(item, videoUrl, detector, playlist, {
                 sensitivity,
                 adaptiveMode: true
             }, isCancelled, {
@@ -118,10 +110,7 @@ export class CutDetectionMenu {
         modal.open();
     }
 
-    /**
-     * Run the actual detection
-     */
-    async runDetection(item, videoUrl, detector, options, isCancelled, ui) {
+    static async runDetection(item, videoUrl, detector, playlist, options, isCancelled, ui) {
         const { statusText, statusPercent, cutsList,
             progressSection, successMessage, errorMessage, modalContent } = ui;
 
@@ -145,8 +134,8 @@ export class CutDetectionMenu {
         try {
             // Get duration
             let duration = 0;
-            if (this.playlist.player && this.playlist.player.duration) {
-                duration = this.playlist.player.duration;
+            if (playlist.player && playlist.player.duration) {
+                duration = playlist.player.duration;
             }
 
             if (!duration && item.duration) {
@@ -248,7 +237,7 @@ export class CutDetectionMenu {
                         const index = parseInt(btn.dataset.index);
 
                         try {
-                            await this.addSegmentToPlaylist(item, start, end, index, btn, (pct) => {
+                            await CutDetectionMenu.addSegmentToPlaylist(item, start, end, index, btn, playlist, (pct) => {
                                 if (footerPct) footerPct.textContent = `${Math.round(pct * 100)}%`;
                                 if (footerStatus) footerStatus.textContent = 'Processing...';
                             });
@@ -277,11 +266,11 @@ export class CutDetectionMenu {
         }
     }
 
-    async addSegmentToPlaylist(originalItem, start, end, index, btn, onProgress) {
+    static async addSegmentToPlaylist(originalItem, start, end, index, btn, playlist, onProgress) {
         Logger.log(`Trimming segment ${index}: ${start} -> ${end}`);
 
         // 1. Get Source
-        const source = await MediaMetadata.getSourceBlob(originalItem, () => this.playlist._saveState());
+        const source = await MediaMetadata.getSourceBlob(originalItem, () => playlist._saveState());
 
         // 2. Process (Trim)
         const blob = await MediaProcessor.process({
@@ -315,7 +304,7 @@ export class CutDetectionMenu {
         };
 
         // 4. Add to Playlist
-        this.playlist.addItem(newItem);
+        playlist.addItem(newItem);
 
         // Feedback
         const useEl = btn.querySelector('use');

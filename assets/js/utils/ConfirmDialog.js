@@ -1,9 +1,9 @@
 import { Logger } from "./Logger.js";
 /**
- * Modal Utility
- * Reusable modal dialog component that matches the unified .mb-modal system.
+ * ConfirmDialog — static utility for confirm/alert dialogs.
+ * Distinct from player/Modal.js which is instance-based for menu overlays.
  */
-export class Modal {
+export class ConfirmDialog {
     // Lock to prevent multiple modals from showing at once
     static _isOpen = false;
 

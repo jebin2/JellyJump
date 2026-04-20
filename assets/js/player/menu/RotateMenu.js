@@ -1,6 +1,5 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from "../Modal.js";
-import { createProcessFooter, FOOTER_CONFIGS } from "../../utils/FooterHelper.js";
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 import { MediaProcessor } from "../../core/MediaProcessor.js";
 import {
     loadVideo,
@@ -17,22 +16,8 @@ export class RotateMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('rotate-content-template');
-        if (!contentTemplate) {
-            Logger.error('Rotate template not found');
-            return;
-        }
-
-        const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Rotate & Flip');
-
-        const content = contentTemplate.content.cloneNode(true);
-        modal.setBody(content);
-
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.rotate));
-
-        const modalContent = modal.modal;
-        modal.open();
+        const { modal, content: modalContent } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate);
+        if (!modal) return;
 
         // === Setup Editor DOM (Left Panel) ===
         const videoPanel = modalContent.querySelector('.modal-video-panel');

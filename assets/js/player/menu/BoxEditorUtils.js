@@ -323,6 +323,99 @@ export function setupDragHandlers(overlay, box, state, minSize, onUpdate) {
     };
 }
 
+/**
+ * Setup draw-on-overlay mouse handlers (shared by BlurMenu, WatermarkMenu)
+ * @param {HTMLElement} overlay
+ * @param {Object} state - must have state.preview.{offsetX,offsetY,scale} and state.video.{width,height}
+ * @param {Object} options
+ * @param {string} options.excludeBoxSelector - selector for the draggable box (skip draw on it)
+ * @param {string} options.excludeRectSelector - selector for existing area rects (skip draw on them)
+ * @param {number} options.minSize - minimum draw size in video coords
+ * @param {function(x,y,w,h):void} options.onDraw - called when a valid rect is drawn
+ * @returns {function} cleanup — removes all three document listeners
+ */
+export function setupOverlayDraw(overlay, state, { excludeBoxSelector, excludeRectSelector, minSize, onDraw }) {
+    const getVideoPos = (e) => {
+        const rect = overlay.getBoundingClientRect();
+        const ox = state.preview.offsetX || 0;
+        const oy = state.preview.offsetY || 0;
+        const scale = state.preview.scale || 1;
+        return {
+            x: (e.clientX - rect.left - ox) / scale,
+            y: (e.clientY - rect.top - oy) / scale
+        };
+    };
+
+    let drawState = null;
+    let drawPreview = null;
+
+    const onMouseDown = (e) => {
+        if (e.target.classList.contains('crop-handle')) return;
+        if (excludeBoxSelector && e.target.closest(excludeBoxSelector)) return;
+        if (excludeRectSelector && e.target.closest(excludeRectSelector)) return;
+        if (e.target === drawPreview) return;
+
+        e.preventDefault();
+        const pos = getVideoPos(e);
+        drawState = { startX: pos.x, startY: pos.y };
+
+        drawPreview = document.createElement('div');
+        drawPreview.style.cssText = `
+            position: absolute;
+            border: 2px dashed rgba(100, 180, 255, 0.9);
+            background: rgba(100, 180, 255, 0.15);
+            pointer-events: none;
+            z-index: 999;
+        `;
+        overlay.appendChild(drawPreview);
+    };
+
+    const onMouseMove = (e) => {
+        if (!drawState || !drawPreview) return;
+        const pos = getVideoPos(e);
+        const scale = state.preview.scale || 1;
+        const ox = state.preview.offsetX || 0;
+        const oy = state.preview.offsetY || 0;
+        const clampedX = Math.max(0, Math.min(pos.x, state.video.width));
+        const clampedY = Math.max(0, Math.min(pos.y, state.video.height));
+        const x = Math.min(drawState.startX, clampedX);
+        const y = Math.min(drawState.startY, clampedY);
+        const w = Math.abs(clampedX - drawState.startX);
+        const h = Math.abs(clampedY - drawState.startY);
+        drawPreview.style.left = `${ox + x * scale}px`;
+        drawPreview.style.top = `${oy + y * scale}px`;
+        drawPreview.style.width = `${w * scale}px`;
+        drawPreview.style.height = `${h * scale}px`;
+    };
+
+    const onMouseUp = (e) => {
+        if (!drawState) return;
+        const pos = getVideoPos(e);
+        const clampedX = Math.max(0, Math.min(pos.x, state.video.width));
+        const clampedY = Math.max(0, Math.min(pos.y, state.video.height));
+        const x = Math.min(drawState.startX, clampedX);
+        const y = Math.min(drawState.startY, clampedY);
+        const w = Math.abs(clampedX - drawState.startX);
+        const h = Math.abs(clampedY - drawState.startY);
+
+        if (drawPreview && drawPreview.parentNode) drawPreview.parentNode.removeChild(drawPreview);
+        drawPreview = null;
+        drawState = null;
+
+        if (w >= minSize && h >= minSize) onDraw(x, y, w, h);
+    };
+
+    overlay.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+        overlay.removeEventListener('mousedown', onMouseDown);
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    };
+}
+
 // === UI Helpers ===
 export function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
 export function hideMessage(el) { el.classList.add('hidden'); }

@@ -1,10 +1,9 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { formatTime } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 export class RemoveBackgroundMenu {
     /**
@@ -13,22 +12,8 @@ export class RemoveBackgroundMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('remove-bg-content-template');
-
-        if (!contentTemplate) {
-            Logger.error('Remove Background content template not found!');
-            return;
-        }
-
-        const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Remove Background');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.removeBg));
-
-        const modalContent = modal.modal;
-
-        // Open Modal
-        modal.open();
+        const { modal, content: modalContent } = openProcessMenu('Remove Background', 'remove-bg-content-template', FOOTER_CONFIGS.removeBg);
+        if (!modal) return;
 
         // Elements
         const playerContainer = modalContent.querySelector('#remove-bg-player-container');

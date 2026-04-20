@@ -1,8 +1,7 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * Resize Menu Handler  
@@ -15,16 +14,8 @@ export class ResizeMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('resize-content-template');
-
-        if (!contentTemplate) return;
-
-        const modal = new Modal({ maxWidth: '550px' });
-        modal.setTitle('Resize Video');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.resize));
-
-        const modalContent = modal.modal;
+        const { modal, content: modalContent } = openProcessMenu('Resize Video', 'resize-content-template', FOOTER_CONFIGS.resize, { maxWidth: '550px' });
+        if (!modal) return;
 
         // Elements
         const resolutionDisplay = modalContent.querySelector('.current-resolution');
@@ -42,8 +33,6 @@ export class ResizeMenu {
         const progressText = modalContent.querySelector('.progress-percentage');
         const errorDisplay = modalContent.querySelector('.error-message');
         const successDisplay = modalContent.querySelector('.success-message');
-
-        modal.open();
 
         // State
         let originalWidth = 0;

@@ -1,17 +1,17 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
 import {
     loadVideo,
     setupDragHandlers,
+    setupOverlayDraw,
     updateBoxPosition,
     setupEditor,
     setupCleanup,
     updateOverlay
 } from './BoxEditorUtils.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 export class BlurMenu {
     /**
@@ -20,22 +20,14 @@ export class BlurMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('blur-content-template');
         const itemTemplate = document.getElementById('blur-item-template');
-
-        if (!contentTemplate || !itemTemplate) {
+        const { modal, content: modalContent } = openProcessMenu('Blur', 'blur-content-template', FOOTER_CONFIGS.blur);
+        if (!modal) return;
+        if (!itemTemplate) {
             Logger.error('Blur modal templates not found!');
+            modal.close();
             return;
         }
-
-        const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Blur');
-
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.blur));
-
-        const modalContent = modal.modal;
-        modal.open();
 
         // Used for drag/resize calculations
         const MIN_SIZE = 20;
@@ -327,114 +319,21 @@ export class BlurMenu {
 
         // === 5b. Drawing Rectangles on Overlay ===
 
-        const getVideoPos = (e) => {
-            const rect = editorUI.overlay.getBoundingClientRect();
-            const ox = state.preview.offsetX || 0;
-            const oy = state.preview.offsetY || 0;
-            const scale = state.preview.scale || 1;
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            return {
-                x: (mouseX - ox) / scale,
-                y: (mouseY - oy) / scale
-            };
-        };
-
-        let drawState = null;
-        let drawPreview = null;
-
-        const overlayDrawMouseDown = (e) => {
-            // Only trigger drawing if clicking on empty overlay area
-            const isHandle = e.target.classList.contains('crop-handle');
-            const isBox = e.target.closest('[data-blur-box]');
-            const isAreaRect = e.target.closest('.blur-area-rect');
-            if (isHandle || isBox || isAreaRect) return;
-
-            // Also don't start drawing on the draw preview itself
-            if (e.target === drawPreview) return;
-
-            e.preventDefault();
-            const pos = getVideoPos(e);
-
-            drawState = {
-                startX: pos.x,
-                startY: pos.y
-            };
-
-            // Create draw preview div
-            drawPreview = document.createElement('div');
-            drawPreview.style.cssText = `
-                position: absolute;
-                border: 2px dashed rgba(100, 180, 255, 0.9);
-                background: rgba(100, 180, 255, 0.15);
-                pointer-events: none;
-                z-index: 999;
-            `;
-            editorUI.overlay.appendChild(drawPreview);
-        };
-
-        const overlayDrawMouseMove = (e) => {
-            if (!drawState || !drawPreview) return;
-
-            const pos = getVideoPos(e);
-            const scale = state.preview.scale || 1;
-            const ox = state.preview.offsetX || 0;
-            const oy = state.preview.offsetY || 0;
-
-            // Clamp to video bounds
-            const clampedX = Math.max(0, Math.min(pos.x, state.video.width));
-            const clampedY = Math.max(0, Math.min(pos.y, state.video.height));
-
-            const x = Math.min(drawState.startX, clampedX);
-            const y = Math.min(drawState.startY, clampedY);
-            const w = Math.abs(clampedX - drawState.startX);
-            const h = Math.abs(clampedY - drawState.startY);
-
-            // Convert to overlay pixel coords for the preview div
-            drawPreview.style.left = `${ox + x * scale}px`;
-            drawPreview.style.top = `${oy + y * scale}px`;
-            drawPreview.style.width = `${w * scale}px`;
-            drawPreview.style.height = `${h * scale}px`;
-        };
-
-        const overlayDrawMouseUp = (e) => {
-            if (!drawState) return;
-
-            const pos = getVideoPos(e);
-
-            // Clamp to video bounds
-            const clampedX = Math.max(0, Math.min(pos.x, state.video.width));
-            const clampedY = Math.max(0, Math.min(pos.y, state.video.height));
-
-            const x = Math.min(drawState.startX, clampedX);
-            const y = Math.min(drawState.startY, clampedY);
-            const w = Math.abs(clampedX - drawState.startX);
-            const h = Math.abs(clampedY - drawState.startY);
-
-            // Clean up preview
-            if (drawPreview && drawPreview.parentNode) {
-                drawPreview.parentNode.removeChild(drawPreview);
+        const cleanupOverlayDraw = setupOverlayDraw(editorUI.overlay, state, {
+            excludeBoxSelector: '[data-blur-box]',
+            excludeRectSelector: '.blur-area-rect',
+            minSize: MIN_SIZE,
+            onDraw: (x, y, w, h) => {
+                const newArea = {
+                    id: generateId(),
+                    x, y, width: w, height: h,
+                    startTime: 0,
+                    endTime: player.duration || 10
+                };
+                state.blurAreas.push(newArea);
+                updateSelection(state.blurAreas.length - 1);
             }
-            drawPreview = null;
-            drawState = null;
-
-            // Only create area if the drawn rect is large enough
-            if (w < MIN_SIZE || h < MIN_SIZE) return;
-
-            const newArea = {
-                id: generateId(),
-                x, y, width: w, height: h,
-                startTime: 0,
-                endTime: player.duration || 10
-            };
-
-            state.blurAreas.push(newArea);
-            updateSelection(state.blurAreas.length - 1);
-        };
-
-        editorUI.overlay.addEventListener('mousedown', overlayDrawMouseDown);
-        document.addEventListener('mousemove', overlayDrawMouseMove);
-        document.addEventListener('mouseup', overlayDrawMouseUp);
+        });
 
 
         // Toggle Live Preview ON by default
@@ -653,11 +552,9 @@ export class BlurMenu {
         // === 8. Cleanup ===
         const originalCleanup = setupCleanup(modal, player, cleanupDrag);
 
-        // Additional cleanup for drawing listeners
         const originalClose = modal.close.bind(modal);
         modal.close = () => {
-            document.removeEventListener('mousemove', overlayDrawMouseMove);
-            document.removeEventListener('mouseup', overlayDrawMouseUp);
+            cleanupOverlayDraw();
             resizeObserver.disconnect();
             originalClose();
         };

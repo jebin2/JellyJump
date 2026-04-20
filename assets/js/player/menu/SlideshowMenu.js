@@ -1,8 +1,7 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * Slideshow Menu Handler
@@ -14,20 +13,14 @@ export class SlideshowMenu {
      * @param {Object} playlist - Playlist instance
      */
     static async init(playlist) {
-        const contentTemplate = document.getElementById('slideshow-content-template');
         const itemTemplate = document.getElementById('slideshow-image-item-template');
-
-        if (!contentTemplate || !itemTemplate) {
+        const { modal, content: modalContent } = openProcessMenu('Images to Video', 'slideshow-content-template', FOOTER_CONFIGS.slideshow, { maxWidth: '760px' });
+        if (!modal) return;
+        if (!itemTemplate) {
             Logger.error('SlideshowMenu: templates not found');
+            modal.close();
             return;
         }
-
-        const modal = new Modal({ maxWidth: '760px' });
-        modal.setTitle('Images to Video');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.slideshow));
-
-        const modalContent = modal.modal;
 
         // --- Elements ---
         const dropzone = modalContent.querySelector('.slideshow-dropzone');
@@ -299,9 +292,6 @@ export class SlideshowMenu {
             audioTrimSection.classList.add('hidden');
             stopPreview();
         });
-
-        // --- Open Modal ---
-        modal.open();
 
         // --- Process Handler ---
         if (processBtn) {

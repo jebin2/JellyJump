@@ -1,8 +1,8 @@
 import { Logger } from "../utils/Logger.js";
 import { IndexedDBService } from './IndexedDBService.js';
 import { CorePlayer } from '../core/Player.js';
-import { Modal as ConfirmModal } from '../utils/Modal.js'; // Static confirm/alert dialogs
-import { Modal as DialogModal } from './Modal.js';         // Instance-based custom dialogs
+import { ConfirmDialog } from '../utils/ConfirmDialog.js';
+import { Modal as DialogModal } from './Modal.js';
 import { MenuRouter } from './menu/MenuRouter.js';
 import { RecordMenu } from './menu/RecordMenu.js';
 import { ScreenRecorderMenu } from './menu/ScreenRecorderMenu.js';
@@ -13,6 +13,7 @@ import { ElectronHelper } from '../utils/ElectronHelper.js';
 import { formatTime, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
+import { PlaylistRenderer } from './PlaylistRenderer.js';
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
@@ -54,6 +55,8 @@ export class Playlist {
             }
         }, 1000);
 
+        this.renderer = new PlaylistRenderer(this);
+
         // Initialize UI
         this._createHeader();
         this._createListContainer();
@@ -94,7 +97,7 @@ export class Playlist {
                 // Show error modal for CORS/fetch errors
                 const isCorsError = error?.includes?.('CORS') || error?.includes?.('fetch');
                 if (isCorsError) {
-                    ConfirmModal.alert({
+                    ConfirmDialog.alert({
                         title: 'Playback Error',
                         message: 'Unable to load stream. Player.pause() called\n\nThis may be a network or CORS issue.',
                         confirmText: 'OK',
@@ -123,7 +126,7 @@ export class Playlist {
         this.player.setPlayCallback(() => {
             if (this.items.length > 0 && this.activeIndex === -1) {
                 // Playlist has items but none selected - show message
-                ConfirmModal.alert({
+                ConfirmDialog.alert({
                     title: 'No Video Selected',
                     message: 'Please select a video from the playlist to play.',
                     confirmText: 'OK',
@@ -131,7 +134,7 @@ export class Playlist {
                 });
             } else if (this.items.length === 0) {
                 // Playlist is empty - show message
-                ConfirmModal.alert({
+                ConfirmDialog.alert({
                     title: 'Playlist Empty',
                     message: 'Add videos to the playlist using the upload button or paste a URL.',
                     confirmText: 'OK',
@@ -870,37 +873,7 @@ export class Playlist {
 
 
     _updateItemUI(item) {
-        // Find the element
-        const index = this.items.indexOf(item);
-        if (index === -1) return;
-
-        const el = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
-        if (el) {
-            // Update overlay
-            let overlay = el.querySelector('.playlist-thumbnail-overlay');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.className = 'playlist-thumbnail-overlay';
-                const thumbEl = el.querySelector('.playlist-thumbnail');
-                if (thumbEl) thumbEl.appendChild(overlay);
-            }
-            if (overlay) overlay.textContent = item.duration;
-
-            // Update thumbnail if available - use background-image on div
-            const thumbEl = el.querySelector('.playlist-thumbnail');
-            if (thumbEl && item.thumbnail) {
-                thumbEl.style.backgroundImage = `url(${item.thumbnail})`;
-                thumbEl.style.backgroundSize = 'cover';
-                thumbEl.style.backgroundPosition = 'center';
-
-                // Hide placeholder/img, keep overlay
-                Array.from(thumbEl.children).forEach(child => {
-                    if (!child.classList.contains('playlist-thumbnail-overlay')) {
-                        child.style.display = 'none';
-                    }
-                });
-            }
-        }
+        this.renderer.updateItemUI(item);
     }
 
     /**
@@ -1635,377 +1608,10 @@ export class Playlist {
         }
     }
 
-    /**
-     * Render the playlist using Lazy Drawers (Nested Infinite Scroll)
-     */
     render() {
-        const sidebar = this.container.closest('.playlist-section');
-
-        if (this.isLoading) {
-            if (sidebar) sidebar.classList.add('hidden');
-            return;
-        } else {
-            if (sidebar) sidebar.classList.remove('hidden');
-        }
-
-        if (this.items.length === 0) {
-            this.container.innerHTML = '';
-            const template = document.getElementById('playlist-empty-template');
-            const clone = template.content.cloneNode(true);
-            this.container.appendChild(clone);
-            return;
-        }
-
-        // 1. Build Tree
-        const tree = this._buildTree(this.items);
-
-        // 2. Setup Root Container
-        this.container.innerHTML = '';
-        this.container.scrollTop = 0;
-        this.container.style.overflowY = 'auto';
-        this.container.style.overflowX = 'hidden';
-
-        // 3. Render Root Level (Lazy)
-        if (this.searchQuery) {
-            this._renderSearchResults(this.searchQuery);
-        } else {
-            this._setupInfiniteScroll(this.container, tree);
-        }
-
-        this._updateUI();
+        this.renderer.render();
     }
 
-    _renderSearchResults(query) {
-        // Filter items and include their original index for proper selection
-        const filtered = this.items
-            .map((item, index) => ({ ...item, originalIndex: index }))
-            .filter(item => item.title.toLowerCase().includes(query));
-
-        if (filtered.length === 0) {
-            const emptyDiv = document.createElement('div');
-            emptyDiv.className = 'playlist-placeholder';
-            emptyDiv.textContent = 'No matches found';
-            this.container.appendChild(emptyDiv);
-            return;
-        }
-
-        // Treat as a flat list node
-        const resultsNode = { allContent: filtered.map(item => ({ type: 'item', data: item })) };
-        this._setupInfiniteScroll(this.container, resultsNode);
-    }
-
-    /**
-     * Setup Infinite Scroll for a container (Root or Folder)
-     * @param {HTMLElement} container 
-     * @param {Object} node (Must have .allContent prepared)
-     */
-    _setupInfiniteScroll(container, node) {
-        container.dataset.renderedCount = '0';
-        // Cleanup old listener if any? (DOM replacement handles it)
-
-        // Scroll Listener
-        container.addEventListener('scroll', () => {
-            const scrollTop = container.scrollTop;
-            const scrollHeight = container.scrollHeight;
-            const clientHeight = container.clientHeight;
-
-            if (scrollTop + clientHeight >= scrollHeight - 100) { // Threshold
-                this._renderBatch(container, node);
-            }
-        }, { passive: true });
-
-        // Initial Render
-        this._renderBatch(container, node);
-    }
-
-    /**
-     * Render next batch of items into container
-     */
-    _renderBatch(container, node) {
-        if (!node.allContent) return;
-
-        const BATCH_SIZE = 50;
-        const currentCount = parseInt(container.dataset.renderedCount || '0');
-        const total = node.allContent.length;
-
-        if (currentCount >= total) return;
-
-        const nextBatch = node.allContent.slice(currentCount, currentCount + BATCH_SIZE);
-
-        const fragment = document.createDocumentFragment();
-        nextBatch.forEach(entry => {
-            if (entry.type === 'folder') {
-                fragment.appendChild(this._createFolderElement(entry.data));
-            } else {
-                fragment.appendChild(this._createPlaylistItemElement(entry.data));
-            }
-        });
-
-        container.appendChild(fragment);
-        container.dataset.renderedCount = (currentCount + nextBatch.length).toString();
-    }
-
-    /**
-     * Build hierarchical tree from items and prepare allContent for infinite scroll
-     * @param {Array} items 
-     */
-    _buildTree(items) {
-        const root = { name: 'root', children: {}, items: [] };
-
-        items.forEach((item, index) => {
-            const path = item.path || item.title || 'Unknown';
-            const parts = path.split('/');
-
-            if (parts.length === 1) {
-                root.items.push({ ...item, originalIndex: index });
-                return;
-            }
-
-            let current = root;
-            for (let i = 0; i < parts.length - 1; i++) {
-                const folderName = parts[i];
-                if (!current.children[folderName]) {
-                    current.children[folderName] = {
-                        name: folderName,
-                        path: parts.slice(0, i + 1).join('/'),
-                        children: {},
-                        items: []
-                    };
-                }
-                current = current.children[folderName];
-            }
-            current.items.push({ ...item, originalIndex: index });
-        });
-
-        // Tag M3U
-        this._tagM3UFolders(root);
-
-        // Finalize: Prepare 'allContent' array for every node
-        const finalizeNode = (node) => {
-            const childrenFolders = Object.values(node.children)
-                .sort((a, b) => a.name.localeCompare(b.name));
-
-            // Recurse first
-            childrenFolders.forEach(finalizeNode);
-
-            const folderEntries = childrenFolders.map(f => ({ type: 'folder', data: f }));
-            const itemEntries = node.items.map(i => ({ type: 'item', data: i }));
-
-            node.allContent = [...folderEntries, ...itemEntries];
-        };
-
-        finalizeNode(root);
-        return root;
-    }
-
-    /**
-     * Recursively identify folders that belong to an M3U playlist
-     * @param {Object} node 
-     * @returns {string|null} m3uSource if consistent, null otherwise
-     */
-    _tagM3UFolders(node) {
-        let commonSource = undefined; // undefined means not set yet
-
-        // Check Items
-        for (const item of node.items) {
-            if (!item.m3uSource) {
-                commonSource = null;
-                break;
-            }
-            if (commonSource === undefined) {
-                commonSource = item.m3uSource;
-            } else if (commonSource !== item.m3uSource) {
-                commonSource = null;
-                break;
-            }
-        }
-
-        // Check Children Folders
-        if (commonSource !== null) {
-            for (const child of Object.values(node.children)) {
-                const childSource = this._tagM3UFolders(child);
-                if (childSource === null) {
-                    commonSource = null;
-                } else {
-                    if (commonSource === undefined) {
-                        commonSource = childSource;
-                    } else if (commonSource !== childSource) {
-                        commonSource = null;
-                    }
-                }
-            }
-        } else {
-            // Even if parent is mixed, we must process children
-            for (const child of Object.values(node.children)) {
-                this._tagM3UFolders(child);
-            }
-        }
-
-        // Tag the node
-        if (commonSource && commonSource !== undefined) {
-            node.m3uSource = commonSource;
-        }
-
-        return commonSource === undefined ? null : commonSource;
-    }
-
-    /**
-     * Simplified Folder Element for Virtual List
-     * No recursive children rendering needed
-     */
-    /**
-     * Create Folder Element (Lazy Drawer)
-     */
-    _createFolderElement(folderData) {
-        const template = document.getElementById('playlist-folder-header-template');
-        // Handle template missing case if needed
-        const clone = template.content.cloneNode(true);
-        const header = clone.querySelector('.playlist-folder-header');
-
-        // Setup Header
-        const toggle = header.querySelector('.playlist-toggle');
-        const folderName = header.querySelector('.folder-name');
-        const removeBtn = header.querySelector('.folder-remove-btn');
-
-        // M3U Sync
-        if (folderData.m3uSource) {
-            const syncBtn = document.createElement('button');
-            syncBtn.className = 'playlist-action-btn folder-sync-btn';
-            syncBtn.title = 'Sync M3U Playlist';
-            syncBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-loop"></use></svg>';
-            syncBtn.onclick = (e) => {
-                e.stopPropagation();
-                this._syncM3UPlaylist(folderData.path, folderData.m3uSource);
-            };
-            // Insert before remove btn
-            header.insertBefore(syncBtn, removeBtn);
-
-            // Validate Streams Button
-            const validateBtn = document.createElement('button');
-            validateBtn.className = 'playlist-action-btn folder-validate-btn';
-            validateBtn.title = 'Validate Streams';
-            validateBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-search"></use></svg>';
-            validateBtn.onclick = (e) => {
-                e.stopPropagation();
-                this._validateStreams(folderData.path, folderData.m3uSource);
-            };
-            header.insertBefore(validateBtn, removeBtn);
-            removeBtn.style.marginLeft = '5px';
-        }
-
-        // Expanded State
-        const isExpanded = this.expandedFolders.has(folderData.path);
-        if (isExpanded) {
-            toggle.classList.add('expanded');
-        }
-
-        // Folder Title Layout (Name + Count)
-        const count = folderData.totalCount !== undefined ? folderData.totalCount : (folderData.allContent ? folderData.allContent.length : 0);
-
-        // Clear existing content
-        folderName.innerHTML = '';
-
-        // 1. Name Span (Flexible, Truncates)
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = folderData.name;
-        nameSpan.style.overflow = 'hidden';
-        nameSpan.style.textOverflow = 'ellipsis';
-        nameSpan.style.whiteSpace = 'nowrap';
-        // nameSpan.style.flex = '1'; handled by parent flex? No, need to set here if parent is flex.
-        // But folderName is the container now? No, folderName IS the element from template.
-        // We should treat folderName as the container.
-        folderName.style.display = 'flex';
-        folderName.style.flex = '1';
-        folderName.style.minWidth = '0';
-        folderName.style.alignItems = 'center';
-        folderName.appendChild(nameSpan);
-
-        // 2. Count Span (Fixed)
-        if (count > 0) {
-            const countSpan = document.createElement('span');
-            countSpan.textContent = `(${count})`;
-            countSpan.style.opacity = '0.7';
-            countSpan.style.fontSize = '0.9em';
-            countSpan.style.marginLeft = '6px';
-            countSpan.style.whiteSpace = 'nowrap';
-            countSpan.style.flexShrink = '0'; // Don't shrink
-            folderName.appendChild(countSpan);
-        }
-
-        const info = header.querySelector('.playlist-folder-info');
-        info.style.flex = '1';
-        info.style.display = 'flex';
-        info.style.alignItems = 'center';
-        info.style.minWidth = '0';
-        info.style.gap = '8px';
-
-        removeBtn.setAttribute('aria-label', `Remove folder ${folderData.name}`);
-
-        // Create Children Drawer
-        const childrenContainer = document.createElement('div');
-        childrenContainer.className = 'playlist-children custom-scroll';
-        if (!isExpanded) {
-            childrenContainer.classList.add('hidden');
-        }
-
-        // Wrapper
-        const wrapper = document.createElement('div');
-        wrapper.className = 'playlist-folder';
-        wrapper.dataset.path = folderData.path; // For lookup
-        wrapper.appendChild(header);
-        wrapper.appendChild(childrenContainer);
-
-        // Toggle Logic
-        const toggleDrawer = () => {
-            const hidden = childrenContainer.classList.contains('hidden');
-            if (hidden) {
-                childrenContainer.classList.remove('hidden');
-                toggle.classList.add('expanded');
-                this.expandedFolders.add(folderData.path);
-
-                // Trigger Lazy Load
-                if (!childrenContainer.dataset.renderedCount) {
-                    this._setupInfiniteScroll(childrenContainer, folderData);
-                }
-            } else {
-                childrenContainer.classList.add('hidden');
-                toggle.classList.remove('expanded');
-                this.expandedFolders.delete(folderData.path);
-            }
-        };
-
-        header.onclick = (e) => {
-            e.stopPropagation();
-            toggleDrawer();
-        };
-
-        info.onclick = (e) => {
-            e.stopPropagation();
-            toggleDrawer(); // Override template default
-        };
-
-        removeBtn.onclick = (e) => {
-            e.stopPropagation();
-            // Direct remove without confirmation as requested
-            this.removeFolder(folderData.path);
-        };
-
-        // Initialize children if already expanded
-        if (isExpanded) {
-            setTimeout(() => {
-                if (!childrenContainer.dataset.renderedCount && childrenContainer.isConnected) {
-                    this._setupInfiniteScroll(childrenContainer, folderData);
-                }
-            }, 0);
-        }
-
-        return wrapper;
-    }
-
-    /**
-     * Proxy to toggle folder via DOM lookup
-     * Maintains compatibility with external calls
-     */
     _toggleFolder(path) {
         // Find wrapper
         const wrappers = this.container.querySelectorAll('.playlist-folder');
@@ -2057,219 +1663,8 @@ export class Playlist {
         }
     }
 
-    /**
-     * Count total items in a folder (recursively)
-     * @param {Object} folder
-     * @returns {number}
-     * @private
-     */
-    _countFolderChildren(folder) {
-        let count = folder.items?.length || 0;
-        if (folder.children) {
-            for (const child of Object.values(folder.children)) {
-                count += this._countFolderChildren(child);
-            }
-        }
-        return count;
-    }
-
-    /**
-     * Create folder header HTML
-     * @param {Object} folder
-     * @param {boolean} isExpanded
-     * @param {number} itemCount - Total items in folder
-     * @returns {HTMLElement}
-     * @private
-     */
-    _createFolderHeader(folder, isExpanded, itemCount = 0) {
-        const template = document.getElementById('playlist-folder-header-template');
-        const clone = template.content.cloneNode(true);
-
-        const header = clone.querySelector('.playlist-folder-header');
-        const toggle = header.querySelector('.playlist-toggle');
-        const folderName = header.querySelector('.folder-name');
-        const removeBtn = header.querySelector('.folder-remove-btn');
-
-        // Add Sync Button if M3U Source
-        if (folder.m3uSource) {
-            const syncBtn = document.createElement('button');
-            syncBtn.className = 'playlist-action-btn folder-sync-btn';
-            syncBtn.title = 'Sync Playlist';
-            syncBtn.ariaLabel = 'Sync Playlist from Source';
-            // Use icon-loop as closest match to sync/refresh
-            syncBtn.innerHTML = `
-                <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-loop"></use>
-                </svg>
-            `;
-            syncBtn.onclick = (e) => {
-                e.stopPropagation();
-                this._syncM3UPlaylist(folder.name, folder.m3uSource);
-            };
-            // Insert before remove button
-            removeBtn.parentNode.insertBefore(syncBtn, removeBtn);
-
-            // Add margin to remove button for spacing
-            removeBtn.style.marginLeft = '5px';
-        }
-
-        if (isExpanded) {
-            toggle.classList.add('expanded');
-        }
-
-        folderName.innerHTML = folderData.totalCount > 0 ? `${folderData.name} <span style="opacity:0.7; font-size:0.9em">(${folderData.totalCount})</span>` : folderData.name;
-
-        // Add ellipsis style
-        folderName.style.whiteSpace = 'nowrap';
-        folderName.style.overflow = 'hidden';
-        folderName.style.textOverflow = 'ellipsis';
-        folderName.style.flex = '1'; /* Take remaining width */
-        folderName.style.minWidth = '0';
-        folderName.style.display = 'block';
-
-        removeBtn.setAttribute('aria-label', `Remove folder ${folderData.name}`);
-
-        // Click to Toggle
-        const info = header.querySelector('.playlist-folder-info');
-
-        // Fix Flexbox for Ellipsis
-        info.style.flex = '1';
-        info.style.display = 'flex';
-        info.style.alignItems = 'center';
-        info.style.minWidth = '0'; // Crucial for truncation
-        info.style.gap = '8px';
-
-        info.onclick = (e) => {
-            e.stopPropagation();
-            this._toggleFolder(folderData.path);
-        };
-
-        // Wrap in div (virtual item)
-        const wrapper = document.createElement('div');
-        wrapper.className = 'playlist-folder';
-        wrapper.appendChild(header);
-
-        // Indentation
-        // Use 30px per depth level for VERY clear hierarchy
-        if (folderData.depth > 0) {
-            header.style.paddingLeft = `${(folderData.depth * 30) + 10}px`;
-        }
-
-        return wrapper;
-    }
-
-    // Methods _attachFolderEvents and _renderLazyFolderContent removed (superseded by Virtual Scrolling)
-
-    /**
-     * Create playlist item element with events
-     * @param {Object} item
-     * @returns {HTMLElement}
-     * @private
-     */
-    _createPlaylistItemElement(item) {
-        const fragment = this._createItemHTML(item, item.originalIndex);
-        const itemEl = fragment.querySelector('.playlist-item');
-
-        // Removed manual indentation logic (handled by CSS .playlist-children padding)
-
-        // Force Ellipsis on Title
-        const titleEl = itemEl.querySelector('.playlist-title');
-        if (titleEl) {
-            titleEl.style.whiteSpace = 'nowrap';
-            titleEl.style.overflow = 'hidden';
-            titleEl.style.textOverflow = 'ellipsis';
-            titleEl.style.display = 'block';
-            titleEl.style.maxWidth = '100%';
-        }
-
-        // Ensure flex container handles min-width for truncation
-        const infoEl = itemEl.querySelector('.playlist-info');
-        if (infoEl) {
-            infoEl.style.minWidth = '0'; // HTML5 Flexbox hack for truncation
-        }
-
-        this._attachItemEvents(itemEl);
-        return itemEl;
-    }
-
-    /**
-     * Attach event listeners to playlist item
-     * @param {HTMLElement} itemEl
-     * @private
-     */
-    _attachItemEvents(itemEl) {
-        // Helper to get current index by ID (handles stale cached indices in folders)
-        const getCurrentIndex = () => {
-            const id = itemEl.dataset.id;
-            if (id) {
-                const index = this.items.findIndex(i => i.id === id);
-                if (index !== -1) return index;
-            }
-            // Fallback to data-index if ID lookup fails
-            return parseInt(itemEl.dataset.index);
-        };
-
-        // Click to play
-        itemEl.addEventListener('click', (e) => {
-            if (e.target.closest('.playlist-remove-btn') || e.target.closest('.playlist-download-btn')) return;
-            this.selectItem(getCurrentIndex());
-        });
-
-        // Download button
-        const downloadBtn = itemEl.querySelector('.playlist-download-btn');
-        if (downloadBtn) {
-            downloadBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this._downloadItem(getCurrentIndex());
-            });
-        }
-
-        // Remove button
-        const removeBtn = itemEl.querySelector('.playlist-remove-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.removeItem(getCurrentIndex());
-            });
-        }
-
-        // Settings button
-        const settingsBtn = itemEl.querySelector('.playlist-settings-btn');
-        if (settingsBtn) {
-            settingsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this._toggleSettingsMenu(getCurrentIndex(), settingsBtn);
-            });
-        }
-    }
-
-    /**
-     * Update active state in UI
-     * @private
-     */
     _updateUI() {
-        // Clear previous active
-        const prevActive = this.container.querySelector('.playlist-item.active');
-        if (prevActive) prevActive.classList.remove('active');
-
-        if (this.activeIndex === -1) return;
-
-        // Try to find and highlight the active element
-        let activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
-
-        if (activeEl) {
-            activeEl.classList.add('active');
-        } else {
-            // Element not in DOM - likely in collapsed folder or not yet virtualized
-            // Use scrollToPlaying() to expand parents and render the item
-            this.scrollToPlaying().then(() => {
-                // Re-query after scroll/expansion and highlight
-                activeEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
-                if (activeEl) {
-                    activeEl.classList.add('active');
-                }
-            });
-        }
+        this.renderer.updateUI();
     }
 
     /**
@@ -2382,72 +1777,6 @@ export class Playlist {
                 downloadBtn.appendChild(downloadIcon);
             }
         }
-    }
-
-    /**
-     * Create HTML for a playlist item
-     * @private
-     */
-    _createItemHTML(item, index) {
-        const template = document.getElementById('playlist-item-template');
-        const clone = template.content.cloneNode(true);
-
-        const itemEl = clone.querySelector('.playlist-item');
-        const thumbnail = itemEl.querySelector('.playlist-thumbnail');
-        const title = itemEl.querySelector('.playlist-title');
-        const duration = itemEl.querySelector('.playlist-duration');
-
-        // Set attributes
-        itemEl.dataset.index = index;
-        itemEl.dataset.id = item.id; // Store ID for reliable lookup after deletions
-        itemEl.setAttribute('aria-label', `Play ${item.title || 'Unknown Video'}`);
-
-        // Status classes
-        if (item.needsReload) itemEl.classList.add('needs-reload');
-        if (item.error) itemEl.classList.add('error');
-        if (item.isBroken) itemEl.classList.add('playlist-item--broken');
-        if (item.isWebcam) itemEl.classList.add('recording-item');
-
-        // Thumbnail
-        if (item.thumbnail) {
-            thumbnail.style.backgroundImage = `url(${item.thumbnail})`;
-            thumbnail.style.backgroundSize = 'cover';
-            thumbnail.style.backgroundPosition = 'center';
-        } else {
-            const placeholderTemplate = document.getElementById('video-placeholder-template');
-            const placeholderClone = placeholderTemplate.content.cloneNode(true);
-            thumbnail.appendChild(placeholderClone);
-        }
-
-        // Add Duration Overlay
-        const durationOverlay = document.createElement('div');
-        durationOverlay.className = 'playlist-thumbnail-overlay';
-        durationOverlay.textContent = item.duration || '--:--';
-        thumbnail.appendChild(durationOverlay);
-
-        // Title Sanitization
-        let titleText = item.title || 'Unknown Video';
-        // Remove extension
-        titleText = titleText.replace(/\.[^/.]+$/, "");
-        // Replace underscores/hyphens with spaces
-        titleText = titleText.replace(/[_-]/g, " ");
-        // Capitalize words
-        titleText = titleText.replace(/\b\w/g, l => l.toUpperCase());
-
-        title.textContent = titleText;
-        title.setAttribute('title', titleText);
-
-        // Status text
-        if (item.needsReload) {
-            const statusTemplate = document.getElementById('missing-file-status-template');
-            const statusSpan = statusTemplate.content.cloneNode(true);
-            title.appendChild(statusSpan);
-        }
-
-        // Duration (hidden by CSS)
-        if (duration) duration.style.display = 'none';
-
-        return clone;
     }
 
     /**

@@ -103,12 +103,12 @@ export class MenuRouter {
             }
             case 'detect-cuts': {
                 const { CutDetectionMenu } = await import('./CutDetectionMenu.js');
-                new CutDetectionMenu(playlist).execute(item);
+                await CutDetectionMenu.init(item, playlist);
                 break;
             }
             case 'detect-motion': {
                 const { MotionDetectionMenu } = await import('./MotionDetectionMenu.js');
-                new MotionDetectionMenu(playlist).execute(item);
+                await MotionDetectionMenu.init(item, playlist);
                 break;
             }
             case 'encrypt': {

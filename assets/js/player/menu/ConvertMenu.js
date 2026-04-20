@@ -1,9 +1,8 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 import { ZipHelper } from '../../utils/ZipHelper.js';
 
 /**
@@ -17,20 +16,9 @@ export class ConvertMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('conversion-content-template');
-
         Logger.log('Opening Conversion Modal');
-        if (!contentTemplate) {
-            Logger.error('Conversion content template not found!');
-            return;
-        }
-
-        const modal = new Modal({ maxWidth: '500px' });
-        modal.setTitle('Convert & Compress Video');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.convert));
-
-        const modalContent = modal.modal;
+        const { modal, content: modalContent } = openProcessMenu('Convert & Compress Video', 'conversion-content-template', FOOTER_CONFIGS.convert, { maxWidth: '500px' });
+        if (!modal) return;
 
         // Elements
         const convertBtn = modalContent.querySelector('.convert-btn');
@@ -161,8 +149,6 @@ export class ConvertMenu {
                 modal.closeBtn.disabled = false;
             }
         });
-
-        modal.open();
     }
 
     /**

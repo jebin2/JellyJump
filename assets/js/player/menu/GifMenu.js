@@ -1,11 +1,10 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../utils/CustomDropdown.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * GIF Menu Handler
@@ -18,22 +17,8 @@ export class GifMenu {
      * @param {Playlist} playlist - Playlist instance  
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('gif-content-template');
-
-        if (!contentTemplate) {
-            Logger.error('GIF content template not found!');
-            return;
-        }
-
-        const modal = new Modal({ splitLayout: true });
-        modal.setTitle('GIF');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.gif));
-
-        const modalContent = modal.modal;
-
-        // Open Modal
-        modal.open();
+        const { modal, content: modalContent } = openProcessMenu('GIF', 'gif-content-template', FOOTER_CONFIGS.gif);
+        if (!modal) return;
 
         // ---------------------------------------------------------
         // Disable Outside Click Close

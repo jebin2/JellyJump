@@ -1,8 +1,7 @@
 import { Logger } from '../../utils/Logger.js';
-import { Modal } from '../Modal.js';
 import { CryptoHelper } from '../../utils/CryptoHelper.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * Encrypt Menu Handler
@@ -15,20 +14,9 @@ export class EncryptMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('encrypt-content-template');
-
         Logger.log('Opening Encrypt Modal');
-        if (!contentTemplate) {
-            Logger.error('Encrypt content template not found!');
-            return;
-        }
-
-        const modal = new Modal({ maxWidth: '500px' });
-        modal.setTitle('Encrypt / Decrypt');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.encrypt));
-
-        const modalContent = modal.modal;
+        const { modal, content: modalContent } = openProcessMenu('Encrypt / Decrypt', 'encrypt-content-template', FOOTER_CONFIGS.encrypt, { maxWidth: '500px' });
+        if (!modal) return;
 
         // Elements
         const encryptBtn = modalContent.querySelector('.encrypt-btn');
@@ -183,6 +171,5 @@ export class EncryptMenu {
             toggleCheckbox.disabled = false;
         });
 
-        modal.open();
     }
 }

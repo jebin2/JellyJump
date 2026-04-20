@@ -1,5 +1,4 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import {
@@ -15,7 +14,7 @@ import {
     setupCleanup,
     setupAutoUpdate
 } from './BoxEditorUtils.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * Crop Menu Handler - Fresh Implementation
@@ -23,17 +22,8 @@ import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js
  */
 export class CropMenu {
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('crop-content-template');
-        if (!contentTemplate) return;
-
-        // Create modal
-        const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Crop Video');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.crop));
-        modal.open();
-
-        const modalContent = modal.modal;
+        const { modal, content: modalContent } = openProcessMenu('Crop Video', 'crop-content-template', FOOTER_CONFIGS.crop);
+        if (!modal) return;
         const playerContainerId = 'crop-player-container';
         const playerContainer = modalContent.querySelector(`#${playerContainerId}`);
         const cropWrapper = modalContent.querySelector('.crop-preview-wrapper');

@@ -10,6 +10,7 @@ import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
+import { PlayerStream } from '../player/PlayerStream.js';
 
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { formatTime, parseTime } from '../utils/mediaUtils.js';
@@ -216,19 +217,8 @@ export class CorePlayer {
         this.currentVideoId = null;
         this.sourceUrl = null;
 
-        // Stream / Webcam playback
-        this.streamVideo = null;
-        this.isStreamMode = false;
-        this.isWebcamMode = false;
-        this.isLive = false;
-        this._liveStartTimestamp = null;
-        this._lastLivePosition = null;
-        this._liveAnchorWall = null;
-        this._liveAnchorContent = null;
-        this._liveAvSyncPaused = false;
-        this._liveAvSyncMonitor = null;
-        this._wasMutedForAutoplay = false;
-        this.streamRenderLoopId = null;
+        // Stream / Webcam playback — state owned by PlayerStream (created below)
+        this.stream = null; // initialized after all base state is set
 
         // Audio-only playback
         this.audioVisualizer = null;
@@ -248,8 +238,25 @@ export class CorePlayer {
             this._handlers.keydown = (e) => this._handleKeyboard(e);
         }
 
+        this.stream = new PlayerStream(this);
         this._init();
     }
+
+    // ─── Stream state proxies (state lives in PlayerStream) ──────────────────────
+    get isStreamMode() { return this.stream.isStreamMode; }
+    set isStreamMode(v) { this.stream.isStreamMode = v; }
+    get isLive() { return this.stream.isLive; }
+    set isLive(v) { this.stream.isLive = v; }
+    get streamVideo() { return this.stream.streamVideo; }
+    set streamVideo(v) { this.stream.streamVideo = v; }
+    get isWebcamMode() { return this.stream.isWebcamMode; }
+    set isWebcamMode(v) { this.stream.isWebcamMode = v; }
+    get _liveStartTimestamp() { return this.stream._liveStartTimestamp; }
+    set _liveStartTimestamp(v) { this.stream._liveStartTimestamp = v; }
+    get _wasMutedForAutoplay() { return this.stream._wasMutedForAutoplay; }
+    set _wasMutedForAutoplay(v) { this.stream._wasMutedForAutoplay = v; }
+    get _isMediaReady() { return this.stream._isMediaReady; }
+    set _isMediaReady(v) { this.stream._isMediaReady = v; }
 
     /**
      * Initialize the player
@@ -518,187 +525,136 @@ export class CorePlayer {
      * @private
      */
     _createControls() {
-        // Loader
-        const loaderTemplate = document.getElementById('player-loader-template');
-        this.container.appendChild(loaderTemplate.content.cloneNode(true));
-        this.ui.loader = this.container.querySelector('.jellyjump-loader');
+        const mount = (id) => {
+            const t = document.getElementById(id);
+            if (t) this.container.appendChild(t.content.cloneNode(true));
+        };
+        const q = (sel) => this.container.querySelector(sel);
 
-        // Controls
-        const controlsTemplate = document.getElementById('player-controls-template');
-        this.container.appendChild(controlsTemplate.content.cloneNode(true));
+        mount('player-loader-template');
+        this.ui.loader = q('.jellyjump-loader');
 
-        // Loop Panel (only if loop control is enabled)
-        if (this.config.controls.loop) {
-            const loopPanelTemplate = document.getElementById('player-loop-panel-template');
-            this.container.appendChild(loopPanelTemplate.content.cloneNode(true));
-        }
+        mount('player-controls-template');
+        if (this.config.controls.loop) mount('player-loop-panel-template');
 
-        // Initialize Screenshot Manager UI (must be after controls, before caching)
-        if (this.screenshotManager) {
-            this.screenshotManager.init();
-        }
+        if (this.screenshotManager) this.screenshotManager.init();
 
-        // Cache control container and play overlay
-        this.ui.controls = this.container.querySelector('.jellyjump-controls');
-        this.ui.playOverlay = this.container.querySelector('.jellyjump-play-overlay');
-        this.ui.bezelOverlay = this.container.querySelector('.jellyjump-bezel-overlay');
+        this.ui.controls = q('.jellyjump-controls');
+        this.ui.playOverlay = q('.jellyjump-play-overlay');
+        this.ui.bezelOverlay = q('.jellyjump-bezel-overlay');
 
-        // Hide play overlay if disabled in config
         if (!this.config.controls.playOverlay && this.ui.playOverlay) {
             this.ui.playOverlay.style.display = 'none';
         }
 
-        // Cache elements only if their control is enabled
-        // Visibility is handled by data-control attributes (hidden by default in HTML)
-        if (this.config.controls.playPause) {
-            this.ui.playBtn = this.container.querySelector('#mb-play-btn');
-        }
-
+        if (this.config.controls.playPause) this.ui.playBtn = q('#mb-play-btn');
         if (this.config.controls.navigation) {
-            this.ui.prevBtn = this.container.querySelector('#mb-prev-btn');
-            this.ui.nextBtn = this.container.querySelector('#mb-next-btn');
+            this.ui.prevBtn = q('#mb-prev-btn');
+            this.ui.nextBtn = q('#mb-next-btn');
         }
-
         if (this.config.controls.progress) {
-            this.ui.progressContainer = this.container.querySelector('.jellyjump-progress-container');
-            this.ui.progressBar = this.container.querySelector('.jellyjump-progress-bar');
+            this.ui.progressContainer = q('.jellyjump-progress-container');
+            this.ui.progressBar = q('.jellyjump-progress-bar');
         }
+        if (this.config.controls.time) this.ui.timeDisplay = q('#mb-time-display');
+        if (this.config.controls.fullscreen) this.ui.fullscreenBtn = q('#mb-fullscreen-btn');
+        if (this.config.controls.modeToggle) this.ui.modeToggleBtn = q('#mb-mode-toggle-btn');
 
-        if (this.config.controls.time) {
-            this.ui.timeDisplay = this.container.querySelector('#mb-time-display');
-        }
+        if (this.config.controls.captions) this._initCaptionsPanel();
+        if (this.config.controls.speed) this._initSpeedPanel();
+        if (this.config.controls.loop) this._initLoopPanel();
+        if (this.config.controls.filters) this._initFiltersPanel();
+        if (this.config.controls.equalizer) this._initEqualizerPanel();
 
-
-
-        if (this.config.controls.fullscreen) {
-            this.ui.fullscreenBtn = this.container.querySelector('#mb-fullscreen-btn');
-        }
-
-        if (this.config.controls.modeToggle) {
-            this.ui.modeToggleBtn = this.container.querySelector('#mb-mode-toggle-btn');
-        }
-
-        if (this.config.controls.captions) {
-            // Clone subtitle panel template
-            const subtitlePanelTemplate = document.getElementById('player-subtitle-panel-template');
-            if (subtitlePanelTemplate) {
-                this.container.appendChild(subtitlePanelTemplate.content.cloneNode(true));
-            }
-
-            this.ui.ccBtn = this.container.querySelector('#mb-cc-btn');
-            this.ui.ccPanel = this.container.querySelector('.jellyjump-subtitle-panel');
-            this.ui.ccInput = this.container.querySelector('#mb-cc-input');
-            this.ui.closeCcPanelBtn = this.container.querySelector('.jellyjump-subtitle-panel .jellyjump-close-btn');
-            this.ui.subtitleOptions = this.container.querySelector('.subtitle-options');
-            this.ui.audioContainer = this.container.querySelector('#mb-audio-container');
-            this.ui.audioBtn = this.container.querySelector('#mb-audio-btn');
-            this.ui.audioMenu = this.container.querySelector('#mb-audio-menu');
-        }
-
-        if (this.config.controls.speed) {
-            // Clone speed panel template
-            const speedPanelTemplate = document.getElementById('player-speed-panel-template');
-            if (speedPanelTemplate) {
-                this.container.appendChild(speedPanelTemplate.content.cloneNode(true));
-            }
-
-            this.ui.speedBtn = this.container.querySelector('#mb-speed-btn');
-            this.ui.speedPanel = this.container.querySelector('.jellyjump-speed-panel');
-            this.ui.speedSlider = this.container.querySelector('#mb-speed-slider');
-            this.ui.speedValue = this.container.querySelector('#mb-speed-value');
-            this.ui.resetSpeedBtn = this.container.querySelector('#mb-reset-speed-btn');
-            this.ui.closeSpeedPanelBtn = this.container.querySelector('.jellyjump-speed-panel .jellyjump-close-btn');
-        }
-
-        if (this.config.controls.loop) {
-            this.ui.loopBtn = this.container.querySelector('#mb-loop-btn');
-            this.ui.loopMarkerA = this.container.querySelector('.jellyjump-marker.marker-a');
-            this.ui.loopMarkerB = this.container.querySelector('.jellyjump-marker.marker-b');
-            this.ui.loopRegion = this.container.querySelector('.jellyjump-loop-region');
-            this.ui.loopPanel = this.container.querySelector('.jellyjump-loop-panel');
-            this.ui.loopStartInput = this.container.querySelector('#mb-loop-start');
-            this.ui.loopEndInput = this.container.querySelector('#mb-loop-end');
-            this.ui.loopModeRadios = this.container.querySelectorAll('input[name="loop-mode"]');
-            this.ui.loopAbSection = this.container.querySelector('.loop-ab-section');
-            this.ui.setABtn = this.container.querySelector('#mb-set-a-btn');
-            this.ui.setBBtn = this.container.querySelector('#mb-set-b-btn');
-            this.ui.clearLoopBtn = this.container.querySelector('#mb-clear-loop-btn');
-            this.ui.closeLoopPanelBtn = this.container.querySelector('.jellyjump-loop-panel .jellyjump-close-btn');
-        }
-
-        // Filter Panel (only if filters control is enabled)
-        if (this.config.controls.filters) {
-            const filterPanelTemplate = document.getElementById('player-filter-panel-template');
-            if (filterPanelTemplate) {
-                this.container.appendChild(filterPanelTemplate.content.cloneNode(true));
-            }
-
-            this.ui.filtersBtn = this.container.querySelector('#mb-filters-btn');
-            this.ui.filterPanel = this.container.querySelector('.jellyjump-filter-panel');
-            this.ui.brightnessSlider = this.container.querySelector('#mb-filter-brightness');
-            this.ui.contrastSlider = this.container.querySelector('#mb-filter-contrast');
-            this.ui.saturationSlider = this.container.querySelector('#mb-filter-saturation');
-            this.ui.brightnessValue = this.container.querySelector('#mb-brightness-value');
-            this.ui.contrastValue = this.container.querySelector('#mb-contrast-value');
-            this.ui.saturationValue = this.container.querySelector('#mb-saturation-value');
-            this.ui.resetFiltersBtn = this.container.querySelector('#mb-reset-filters-btn');
-            this.ui.closeFilterPanelBtn = this.container.querySelector('.jellyjump-filter-panel .jellyjump-close-btn');
-
-            // Initialize VideoFilters
-            this.videoFilters = new VideoFilters(this.canvas);
-        }
-
-        // Equalizer Panel (only if equalizer control is enabled)
-        if (this.config.controls.equalizer) {
-            const audioPanelTemplate = document.getElementById('player-audio-panel-template');
-            if (audioPanelTemplate) {
-                this.container.appendChild(audioPanelTemplate.content.cloneNode(true));
-            }
-
-            this.ui.audioSettingsBtn = this.container.querySelector('#mb-audio-settings-btn');
-            this.ui.audioPanel = this.container.querySelector('.jellyjump-eq-panel');
-
-            // Panel Volume Controls
-            this.ui.panelMuteBtn = this.container.querySelector('#mb-panel-mute-btn');
-            this.ui.panelVolumeSlider = this.container.querySelector('#mb-panel-volume-slider');
-            this.ui.panelVolumeValue = this.container.querySelector('#mb-panel-volume-value');
-
-            // EQ Controls
-            this.ui.eqBassSlider = this.container.querySelector('#mb-eq-bass');
-            this.ui.eqMidSlider = this.container.querySelector('#mb-eq-mid');
-            this.ui.eqTrebleSlider = this.container.querySelector('#mb-eq-treble');
-            this.ui.eqBassValue = this.container.querySelector('#mb-bass-value');
-            this.ui.eqMidValue = this.container.querySelector('#mb-mid-value');
-            this.ui.eqTrebleValue = this.container.querySelector('#mb-treble-value');
-            this.ui.resetEqBtn = this.container.querySelector('#mb-reset-eq-btn');
-            this.ui.closeAudioPanelBtn = this.container.querySelector('.jellyjump-eq-panel .jellyjump-close-btn');
-
-            // Hide EQ sections if volumeOnly mode is enabled (show only volume slider)
-            if (this.config.controls.volumeOnly) {
-                const divider = this.ui.audioPanel.querySelector('.eq-section-divider');
-                const eqSliders = this.ui.audioPanel.querySelector('.eq-sliders');
-                const eqPresets = this.ui.audioPanel.querySelector('.eq-presets');
-                const eqActions = this.ui.audioPanel.querySelector('.eq-actions');
-
-                if (divider) divider.style.display = 'none';
-                if (eqSliders) eqSliders.style.display = 'none';
-                if (eqPresets) eqPresets.style.display = 'none';
-                if (eqActions) eqActions.style.display = 'none';
-            }
-        }
-
-        // Create Stream Error Overlay
         this._createErrorOverlay();
-
-        // Create Thumbnail Overlay
         this._createThumbnailOverlay();
-
-        // Apply visibility based on config (removes control--hidden class for enabled controls)
         this._applyControlVisibility();
+        if (this.config.controls.speed) this._updateSpeedMenu();
+    }
 
-        // Only update speed menu if speed is enabled
-        if (this.config.controls.speed) {
-            this._updateSpeedMenu();
+    _initCaptionsPanel() {
+        const t = document.getElementById('player-subtitle-panel-template');
+        if (t) this.container.appendChild(t.content.cloneNode(true));
+        const q = (sel) => this.container.querySelector(sel);
+        this.ui.ccBtn = q('#mb-cc-btn');
+        this.ui.ccPanel = q('.jellyjump-subtitle-panel');
+        this.ui.ccInput = q('#mb-cc-input');
+        this.ui.closeCcPanelBtn = q('.jellyjump-subtitle-panel .jellyjump-close-btn');
+        this.ui.subtitleOptions = q('.subtitle-options');
+        this.ui.audioContainer = q('#mb-audio-container');
+        this.ui.audioBtn = q('#mb-audio-btn');
+        this.ui.audioMenu = q('#mb-audio-menu');
+    }
+
+    _initSpeedPanel() {
+        const t = document.getElementById('player-speed-panel-template');
+        if (t) this.container.appendChild(t.content.cloneNode(true));
+        const q = (sel) => this.container.querySelector(sel);
+        this.ui.speedBtn = q('#mb-speed-btn');
+        this.ui.speedPanel = q('.jellyjump-speed-panel');
+        this.ui.speedSlider = q('#mb-speed-slider');
+        this.ui.speedValue = q('#mb-speed-value');
+        this.ui.resetSpeedBtn = q('#mb-reset-speed-btn');
+        this.ui.closeSpeedPanelBtn = q('.jellyjump-speed-panel .jellyjump-close-btn');
+    }
+
+    _initLoopPanel() {
+        const q = (sel) => this.container.querySelector(sel);
+        this.ui.loopBtn = q('#mb-loop-btn');
+        this.ui.loopMarkerA = q('.jellyjump-marker.marker-a');
+        this.ui.loopMarkerB = q('.jellyjump-marker.marker-b');
+        this.ui.loopRegion = q('.jellyjump-loop-region');
+        this.ui.loopPanel = q('.jellyjump-loop-panel');
+        this.ui.loopStartInput = q('#mb-loop-start');
+        this.ui.loopEndInput = q('#mb-loop-end');
+        this.ui.loopModeRadios = this.container.querySelectorAll('input[name="loop-mode"]');
+        this.ui.loopAbSection = q('.loop-ab-section');
+        this.ui.setABtn = q('#mb-set-a-btn');
+        this.ui.setBBtn = q('#mb-set-b-btn');
+        this.ui.clearLoopBtn = q('#mb-clear-loop-btn');
+        this.ui.closeLoopPanelBtn = q('.jellyjump-loop-panel .jellyjump-close-btn');
+    }
+
+    _initFiltersPanel() {
+        const t = document.getElementById('player-filter-panel-template');
+        if (t) this.container.appendChild(t.content.cloneNode(true));
+        const q = (sel) => this.container.querySelector(sel);
+        this.ui.filtersBtn = q('#mb-filters-btn');
+        this.ui.filterPanel = q('.jellyjump-filter-panel');
+        this.ui.brightnessSlider = q('#mb-filter-brightness');
+        this.ui.contrastSlider = q('#mb-filter-contrast');
+        this.ui.saturationSlider = q('#mb-filter-saturation');
+        this.ui.brightnessValue = q('#mb-brightness-value');
+        this.ui.contrastValue = q('#mb-contrast-value');
+        this.ui.saturationValue = q('#mb-saturation-value');
+        this.ui.resetFiltersBtn = q('#mb-reset-filters-btn');
+        this.ui.closeFilterPanelBtn = q('.jellyjump-filter-panel .jellyjump-close-btn');
+        this.videoFilters = new VideoFilters(this.canvas);
+    }
+
+    _initEqualizerPanel() {
+        const t = document.getElementById('player-audio-panel-template');
+        if (t) this.container.appendChild(t.content.cloneNode(true));
+        const q = (sel) => this.container.querySelector(sel);
+        this.ui.audioSettingsBtn = q('#mb-audio-settings-btn');
+        this.ui.audioPanel = q('.jellyjump-eq-panel');
+        this.ui.panelMuteBtn = q('#mb-panel-mute-btn');
+        this.ui.panelVolumeSlider = q('#mb-panel-volume-slider');
+        this.ui.panelVolumeValue = q('#mb-panel-volume-value');
+        this.ui.eqBassSlider = q('#mb-eq-bass');
+        this.ui.eqMidSlider = q('#mb-eq-mid');
+        this.ui.eqTrebleSlider = q('#mb-eq-treble');
+        this.ui.eqBassValue = q('#mb-bass-value');
+        this.ui.eqMidValue = q('#mb-mid-value');
+        this.ui.eqTrebleValue = q('#mb-treble-value');
+        this.ui.resetEqBtn = q('#mb-reset-eq-btn');
+        this.ui.closeAudioPanelBtn = q('.jellyjump-eq-panel .jellyjump-close-btn');
+
+        if (this.config.controls.volumeOnly) {
+            ['.eq-section-divider', '.eq-sliders', '.eq-presets', '.eq-actions'].forEach(sel => {
+                const el = this.ui.audioPanel.querySelector(sel);
+                if (el) el.style.display = 'none';
+            });
         }
     }
 
@@ -1926,7 +1882,6 @@ export class CorePlayer {
     async load(url, autoplay = false, videoId = null, savedSubtitles = null, options = {}) {
         this.sourceUrl = url;
         try {
-            // Force mute on mobile for autoplay (browser policy requirement)
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             if (autoplay && isMobile) {
                 Logger.log('[Player] Mobile Autoplay requested - enforcing muted playback');
@@ -1934,197 +1889,151 @@ export class CorePlayer {
                 this._updateVolumeUI();
             }
 
-            this._isMediaReady = false;
-            this.pause(false);
+            const isHls = StreamDetector.detect(url) === StreamDetector.TYPE_HLS;
 
-            this._cleanupThumbnails();
-
-            // Detect stream type
-            const streamType = StreamDetector.detect(url);
-            const isHls = streamType === StreamDetector.TYPE_HLS;
-
-            // Reset audio mode if loading a video
-            this._cleanupAudio();
-
-            // Reset stream/live mode from any previous load
-            this._cleanupHLS();
-            this.isStreamMode = false;
-            this.isWebcamMode = false;
-            this._setWebcamModeControls(false);
-            this.isLive = false;
-            if (this.streamVideo && this.streamVideo.srcObject) {
-                Logger.log('[Player] Clearing webcam stream in load()');
-                this.streamVideo.srcObject = null;
-            }
-            this._hideStreamVideo();
-            this._stopStreamRenderLoop();
-
-            this.currentTime = 0;
-
-            // Reset new state
-            if (this.videoFrameIterator) await this.videoFrameIterator.return();
-            // Wait for any pending audio iterator cleanup from pause()
-            if (this.audioIteratorCleanupPromise) await this.audioIteratorCleanupPromise;
-            if (this.audioBufferIterator) await this.audioBufferIterator.return();
-            this.videoFrameIterator = null;
-            this.audioBufferIterator = null;
-            this.nextFrame = null;
-            this.asyncId++;
-            this.playbackTimeAtStart = 0;
-            this.audioContextStartTime = null;
-            this.queuedAudioNodes.clear();
-
-            // Clear canvas and reset UI immediately
-            this._clearCanvas();
-            this._updateTimeDisplay();
-
-            // Dispose previous resources
-            this._disposeMediaBunnyResources();
-
-            // Reset subtitle state for new video
-            this.subtitleTracks = [];
-            this.subtitleTrackCounter = 0;
-            this.activeSubtitleTrackId = null;
-            this.isSubtitlesEnabled = false;
-            if (this.subtitleManager) {
-                this.subtitleManager.cues = [];
-            }
+            await this._cleanupForLoad();
 
             this._setLoading(true);
             Logger.log(`Loading media: ${url}`);
             this.currentVideoId = videoId || url;
 
+            await this._setupMediaTracks(url, isHls);
 
-            // Initialize MediaBunny Input (supports both regular files and HLS)
-            this.input = MediaBunny.createInputFrom(url, [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS]);
+            if (isHls) await this._handleHLSState();
+            if (savedSubtitles?.length > 0) this._restoreSavedSubtitles(savedSubtitles);
 
-            // Get Metadata — skip computeDuration for HLS (may block forever on live)
-            if (!isHls) {
-                this.duration = await this.input.computeDuration();
-                this._updateTimeDisplay();
-            }
-
-            // Get Video Track
-            this.videoTrack = await this.input.getPrimaryVideoTrack();
-            if (this.videoTrack) {
-                // Skip packet analysis for HLS — it eagerly fetches many segments and causes HTTP/2 errors
-                if (!isHls) {
-                    try {
-                        const stats = await this.videoTrack.computePacketStats();
-                        this.frameRate = stats.averagePacketRate || 30;
-                        Logger.log(`Detected frame rate: ${this.frameRate} fps`);
-                    } catch (e) {
-                        Logger.warn("Could not compute frame rate, defaulting to 30fps", e);
-                        this.frameRate = 30;
-                    }
-                } else {
-                    this.frameRate = 30;
-                }
-
-                // Setup Canvas Sink with pool size for memory efficiency
-                // For HLS live streams, use larger pool to handle segment bursts
-                const hlsPoolSize = isHls ? 6 : 2;
-                this.videoSink = new MediaBunny.CanvasSink(this.videoTrack, {
-                    poolSize: hlsPoolSize,
-                    fit: 'contain' // Handle videos that may change dimensions
-                });
-
-                // Set canvas size
-                this.canvas.width = this.videoTrack.displayWidth;
-                this.canvas.height = this.videoTrack.displayHeight;
-
-            } else {
-                // No video track - assume Audio Only Mode
-                Logger.log('No video track found - enabling Audio Mode');
-                this.isAudioMode = true;
-
-                // Set canvas size for visualizer (default to container size)
-                const containerRect = this.container.getBoundingClientRect();
-                this.canvas.width = containerRect.width || 1280;
-                this.canvas.height = containerRect.height || 720;
-            }
-
-            // Setup Audio Track
-            this.audioTrack = await this.input.getPrimaryAudioTrack();
-            if (!this.audioTrack) {
-                const audioTracks = await this.input.getAudioTracks();
-                if (audioTracks.length > 0) {
-                    this.audioTrack = audioTracks[0];
-                }
-            }
-
-            if (this.audioTrack) {
-                // Use AudioSampleSink instead of AudioBufferSink to avoid MediaBunny bug
-                // where AudioSamples aren't closed properly
-                this.audioSink = new MediaBunny.AudioSampleSink(this.audioTrack);
-            }
-
-            this._updateAudioTracks();
-
-            // HLS live detection using MediaBunny's native isLive()
-            if (isHls) {
-                this.isLive = this.videoTrack ? await this.videoTrack.isLive() : false;
-                Logger.log(`[Live:Load] isLive=${this.isLive}, videoTrack=${!!this.videoTrack}, audioTrack=${!!this.audioTrack}, audioSink=${!!this.audioSink}`);
-
-                if (this.isLive) {
-                    const [currentDur, refreshInterval] = await Promise.all([
-                        this.videoTrack.getDurationFromMetadata({ skipLiveWait: true }),
-                        this.videoTrack.getLiveRefreshInterval(),
-                    ]);
-                    const interval = refreshInterval ?? 6;
-                    // Clear saved position - new load starts from live edge
-                    this._lastLivePosition = null;
-                    this._liveStartTimestamp = currentDur ?? 0;
-                    Logger.log(`[Live:Load] liveStartTs=${this._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${interval}s`);
-                    this.duration = 0;
-                } else {
-                    this._liveStartTimestamp = null;
-                    this.duration = await this.input.getDurationFromMetadata() ?? 0;
-                    Logger.log(`[Live:Load] VOD duration=${this.duration.toFixed(3)}s`);
-                }
-
-                this._updateTimeDisplay();
-                this._updateStreamUI();
-            }
-
-            // Restore saved subtitles for this video
-            if (savedSubtitles && savedSubtitles.length > 0) {
-                this.subtitleTracks = savedSubtitles.map(track => ({
-                    id: track.id,
-                    name: track.name,
-                    cues: [...track.cues]
-                }));
-                // Find max counter from restored tracks
-                this.subtitleTrackCounter = savedSubtitles.reduce((max, track) => {
-                    const match = track.id.match(/custom-(\d+)/);
-                    return match ? Math.max(max, parseInt(match[1])) : max;
-                }, 0);
-                Logger.log(`Restored ${savedSubtitles.length} subtitle track(s) for video`);
-            }
-
-            // Phase 19: Handle Initial Frame & State (Now called after Audio setup too)
-            // This ensures saved state is restored for both Video and Audio
             await this._handleInitialFrame(autoplay);
-
             this._updateSubtitleMenu();
 
-            // For live streams, _startLiveVideoLoop owns the loading state and will
-            // hide it when the first video frame renders. Don't clear it here.
-            if (!this.isLive) {
-                this._setLoading(false);
-            }
+            // Live streams: _startLiveVideoLoop owns loading state, clears it on first frame
+            if (!this.isLive) this._setLoading(false);
             Logger.log('Media loaded successfully');
 
         } catch (error) {
             Logger.error('Error loading media:', error);
             this._setLoading(false);
-
-            // Notify playlist to mark item as broken
             if (this.onStreamError && this.currentVideoId) {
-                const errorMsg = error.message || 'Failed to load media';
-                this.onStreamError(this.currentVideoId, errorMsg);
+                this.onStreamError(this.currentVideoId, error.message || 'Failed to load media');
             }
         }
+    }
+
+    async _cleanupForLoad() {
+        this._isMediaReady = false;
+        this.pause(false);
+        this._cleanupThumbnails();
+        this._cleanupAudio();
+        this._cleanupHLS();
+        this.stream.resetForLoad();
+        this._setWebcamModeControls(false);
+        this.currentTime = 0;
+
+        if (this.videoFrameIterator) await this.videoFrameIterator.return();
+        if (this.audioIteratorCleanupPromise) await this.audioIteratorCleanupPromise;
+        if (this.audioBufferIterator) await this.audioBufferIterator.return();
+        this.videoFrameIterator = null;
+        this.audioBufferIterator = null;
+        this.nextFrame = null;
+        this.asyncId++;
+        this.playbackTimeAtStart = 0;
+        this.audioContextStartTime = null;
+        this.queuedAudioNodes.clear();
+
+        this._clearCanvas();
+        this._updateTimeDisplay();
+        this._disposeMediaBunnyResources();
+
+        this.subtitleTracks = [];
+        this.subtitleTrackCounter = 0;
+        this.activeSubtitleTrackId = null;
+        this.isSubtitlesEnabled = false;
+        if (this.subtitleManager) this.subtitleManager.cues = [];
+    }
+
+    async _setupMediaTracks(url, isHls) {
+        this.input = MediaBunny.createInputFrom(url, [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS]);
+
+        if (!isHls) {
+            this.duration = await this.input.computeDuration();
+            this._updateTimeDisplay();
+        }
+
+        this.videoTrack = await this.input.getPrimaryVideoTrack();
+        if (this.videoTrack) {
+            if (!isHls) {
+                try {
+                    const stats = await this.videoTrack.computePacketStats();
+                    this.frameRate = stats.averagePacketRate || 30;
+                    Logger.log(`Detected frame rate: ${this.frameRate} fps`);
+                } catch (e) {
+                    Logger.warn("Could not compute frame rate, defaulting to 30fps", e);
+                    this.frameRate = 30;
+                }
+            } else {
+                this.frameRate = 30;
+            }
+
+            this.videoSink = new MediaBunny.CanvasSink(this.videoTrack, {
+                poolSize: isHls ? 6 : 2,
+                fit: 'contain'
+            });
+            this.canvas.width = this.videoTrack.displayWidth;
+            this.canvas.height = this.videoTrack.displayHeight;
+        } else {
+            Logger.log('No video track found - enabling Audio Mode');
+            this.isAudioMode = true;
+            const containerRect = this.container.getBoundingClientRect();
+            this.canvas.width = containerRect.width || 1280;
+            this.canvas.height = containerRect.height || 720;
+        }
+
+        this.audioTrack = await this.input.getPrimaryAudioTrack();
+        if (!this.audioTrack) {
+            const audioTracks = await this.input.getAudioTracks();
+            if (audioTracks.length > 0) this.audioTrack = audioTracks[0];
+        }
+
+        if (this.audioTrack) {
+            // AudioSampleSink avoids a MediaBunny bug where AudioSamples aren't closed properly
+            this.audioSink = new MediaBunny.AudioSampleSink(this.audioTrack);
+        }
+
+        this._updateAudioTracks();
+    }
+
+    async _handleHLSState() {
+        this.isLive = this.videoTrack ? await this.videoTrack.isLive() : false;
+        Logger.log(`[Live:Load] isLive=${this.isLive}, videoTrack=${!!this.videoTrack}, audioTrack=${!!this.audioTrack}, audioSink=${!!this.audioSink}`);
+
+        if (this.isLive) {
+            const [currentDur, refreshInterval] = await Promise.all([
+                this.videoTrack.getDurationFromMetadata({ skipLiveWait: true }),
+                this.videoTrack.getLiveRefreshInterval(),
+            ]);
+            this._liveStartTimestamp = currentDur ?? 0;
+            Logger.log(`[Live:Load] liveStartTs=${this._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${refreshInterval ?? 6}s`);
+            this.duration = 0;
+        } else {
+            this._liveStartTimestamp = null;
+            this.duration = await this.input.getDurationFromMetadata() ?? 0;
+            Logger.log(`[Live:Load] VOD duration=${this.duration.toFixed(3)}s`);
+        }
+
+        this._updateTimeDisplay();
+        this._updateStreamUI();
+    }
+
+    _restoreSavedSubtitles(savedSubtitles) {
+        this.subtitleTracks = savedSubtitles.map(track => ({
+            id: track.id,
+            name: track.name,
+            cues: [...track.cues]
+        }));
+        this.subtitleTrackCounter = savedSubtitles.reduce((max, track) => {
+            const match = track.id.match(/custom-(\d+)/);
+            return match ? Math.max(max, parseInt(match[1])) : max;
+        }, 0);
+        Logger.log(`Restored ${savedSubtitles.length} subtitle track(s) for video`);
     }
 
     /**
@@ -2157,679 +2066,23 @@ export class CorePlayer {
         // Note: Don't hide loader here - let the caller control loading state
     }
 
-    /**
-     * Create the stream video element (hidden - frames copied to canvas)
-     * @private
-     */
-    _createStreamVideo() {
-        if (this.streamVideo) return;
-
-        this.streamVideo = document.createElement('video');
-        this.streamVideo.className = 'jellyjump-stream-video jellyjump-video';
-        this.streamVideo.setAttribute('playsinline', '');
-        this.streamVideo.setAttribute('webkit-playsinline', '');
-        this.streamVideo.crossOrigin = this.config.withCredentials ? 'use-credentials' : 'anonymous';
-
-        if (this.config.muted) {
-            this.streamVideo.muted = true;
-            this.streamVideo.setAttribute('muted', '');
-        }
-
-        // Ensure volume is synchronized
-        this.streamVideo.volume = this.config.volume;
-
-        // Keep video hidden but accessible
-        this.streamVideo.style.position = 'absolute';
-        this.streamVideo.style.top = '0';
-        this.streamVideo.style.left = '0';
-
-        // Check for mobile device
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-        if (isMobile) {
-            // Mobile: 100% size for HLS quality selection and visible for autoplay
-            this.streamVideo.style.width = '100%';
-            this.streamVideo.style.height = '100%';
-            this.streamVideo.style.visibility = 'visible';
-        } else {
-            // Desktop: 1px/hidden is more performant and prevents rendering issues
-            this.streamVideo.style.width = '1px';
-            this.streamVideo.style.height = '1px';
-            this.streamVideo.style.visibility = 'hidden';
-        }
-
-        this.streamVideo.style.pointerEvents = 'none';
-        this.streamVideo.style.opacity = '0';
-        this.streamVideo.style.zIndex = '-1';
-
-        // Insert into container (hidden)
-        const wrapper = this.container.querySelector('.jellyjump-video-wrapper') || this.container;
-        wrapper.appendChild(this.streamVideo);
-    }
-
-    /**
-     * Show canvas for stream rendering (video stays hidden)
-     * @private
-     */
-    _showStreamVideo() {
-        // For canvas-based stream rendering, show canvas (not video)
-        // Video stays hidden - frames are copied via render loop
-        if (this.canvas) {
-            this.canvas.style.display = 'block';
-        }
-    }
-
-    /**
-     * Hide stream video, show canvas
-     * @private
-     */
-    _hideStreamVideo() {
-        if (this.streamVideo) {
-            this.streamVideo.style.display = 'none';
-        }
-        if (this.canvas) {
-            this.canvas.style.display = 'block';
-        }
-        // Restore controls that were hidden in stream mode
-        this._setStreamModeControls(false);
-    }
-
-    /**
-     * Setup event listeners for stream video (webcam only — HLS uses MediaBunny canvas path)
-     * @private
-     */
-    _setupStreamVideoEvents() {
-        if (!this.streamVideo) return;
-
-        // Handle Playing (Hide Loader)
-        this.streamVideo.onplaying = () => {
-            if (this.isStreamMode) {
-                this._setLoading(false);
-                this._hideStreamError();
-            }
-        };
-
-        // Ended
-        this.streamVideo.onended = () => {
-            if (this.isStreamMode && this.onEnded) {
-                this.onEnded();
-            }
-        };
-
-        // Playing state sync
-        this.streamVideo.onplay = () => {
-            // If video is actually paused (user clicked pause), ignore this stale onplay event
-            if (this.streamVideo.paused) {
-                Logger.log('[Stream] Ignoring stale onplay event - video is paused');
-                return;
-            }
-
-            this.isPlaying = true;
-            this._updatePlayPauseUI();
-            if (this.ui.playOverlay) {
-                this.ui.playOverlay.style.display = 'none';
-            }
-
-            // Start canvas render loop for stream (copies video frames to canvas)
-            this._startStreamRenderLoop();
-
-            // Start auto-hide timer for overlay mode
-            if (this.controlBarMode === 'overlay') {
-                setTimeout(() => {
-                    if (this.isPlaying && this.controlBarMode === 'overlay') {
-                        this._startAutoHideTimer();
-                    }
-                }, 500);
-            }
-        };
-
-        this.streamVideo.onpause = () => {
-            this.isPlaying = false;
-            this._clearAutoHideTimer();
-            // Stop render loop
-            this._stopStreamRenderLoop();
-
-            // Always update play/pause button
-            this._updatePlayPauseUI();
-        };
-
-        // Set canvas size when video dimensions are known (webcam resize)
-        this.streamVideo.onloadedmetadata = () => {
-            if (this.streamVideo.videoWidth && this.streamVideo.videoHeight) {
-                this.canvas.width = this.streamVideo.videoWidth;
-                this.canvas.height = this.streamVideo.videoHeight;
-                Logger.log('[Stream] Canvas size set to:', this.canvas.width, 'x', this.canvas.height);
-                // Render first frame
-                this._renderStreamFrame();
-            }
-        };
-
-        // Click on stream video to toggle play/pause
-        this.streamVideo.addEventListener('click', () => {
-            if (this.config.controls.playOverlay) this.togglePlay();
-        });
-    }
-
-    /**
-     * Start the stream render loop (copies video frames to canvas)
-     * @private
-     */
-    _startStreamRenderLoop() {
-        if (this.streamRenderLoopId) return;
-
-        const render = () => {
-            if (!this.isPlaying || !this.streamVideo) {
-                this._stopStreamRenderLoop();
-                return;
-            }
-
-            // Draw current video frame to canvas
-            this.ctx.drawImage(this.streamVideo, 0, 0, this.canvas.width, this.canvas.height);
-            this._isMediaReady = true; // First frame is now on canvas
-
-            this.streamRenderLoopId = requestAnimationFrame(render);
-        };
-
-        this.streamRenderLoopId = requestAnimationFrame(render);
-    }
-
-    /**
-     * Stop the stream render loop
-     * @private
-     */
-    /**
-     * Start recording webcam stream using MediaBunny
-     * @param {MediaStream} stream 
-     */
-    /**
-     * Load a webcam stream into the player
-     * @param {MediaStream} stream
-     */
-    async loadWebcamStream(stream) {
-        // Show loader immediately for smooth transition
-        this._setLoading(true); // Will be hidden when first frame renders (via _isMediaReady logic if we hook it, or handled manually)
-
-        this._isMediaReady = false;
-        // Stop current playback and cleanup MediaBunny resources
-        this.pause(false);
-        await this._cleanupMediaBunny();
-
-        // 1. Setup Preview (Existing CorePlayer Logic)
-        this._createStreamVideo();
-        // Setup events to ensure canvas resizing (sets up onloadedmetadata)
-        this._setupStreamVideoEvents();
-
-        this.streamVideo.srcObject = stream;
-        this.streamVideo.muted = true;
-        this.streamVideo.autoplay = true;
-
-        this.isStreamMode = true;
-        this.isWebcamMode = true;
-        this.isPlaying = true;
-        this._showStreamVideo(); // Ensure canvas is visible
-        this._setWebcamModeControls(true);
-        this._setLoading(false); // Hide loader once stream is ready
-
-        try {
-            // Use player's play() instead of direct streamVideo.play()
-            // This ensures that recording audio sources are also resumed if active
-            await this.play();
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                Logger.log('[Stream] Webcam play() interrupted (expected if switching back quickly).');
-            } else {
-                throw err;
-            }
-        }
-
-        // Resize Canvas to match Webcam Source (Raw Quality)
-        if (this.streamVideo.videoWidth && this.streamVideo.videoHeight) {
-            this.canvas.width = this.streamVideo.videoWidth;
-            this.canvas.height = this.streamVideo.videoHeight;
-        }
-
-        this._startStreamRenderLoop();
-        this._updatePlayPauseUI();
-    }
-
-    /**
-     * Start recording the current canvas content (Webcam/HLS/etc)
-     * @param {Object} options
-     * @param {MediaStreamTrack} options.audioTrack - Optional specific audio track
-     */
-    async startCanvasRecording(options = {}) {
-        if (this._isCanvasRecording) return;
-
-        Logger.log('[Stream] Video Bitrate: 50 Mbps (Raw Quality)');
-
-        // Setup Recording (MediaBunny)
-        this._isCanvasRecording = true;
-        this._canvasChunks = [];
-        this._canvasChunks = [];
-        this._canvasAudioSource = null;
-        this._canvasReadyForMoreFrames = true;
-        this._canvasLastFrameNumber = -1;
-        this._canvasAudioSource = null;
-        this._canvasReadyForMoreFrames = true;
-        this._canvasLastFrameNumber = -1;
-        // this._canvasStartTime will be set after output starts for sync
-
-        // Continuous Clock Tracking
-        this._canvasRecordedDuration = 0; // Total accumulated video duration
-        this._lastFrameWallTime = performance.now(); // Anchor for calculating delta
-        this._resetRecordingClock = true; // Signal to reset anchor on next frame
-
-        // Manual Audio Sync State
-        this._audioContext = null;
-        this._audioStreamSource = null;
-        this._audioProcessor = null;
-        this._audioRecordedDuration = 0; // Independent audio clock to match video
-
-        // Smart Pause Tracking
-        this._canvasRecordingPausedTime = 0; // Total time spent paused
-        this._canvasPauseStartTime = null;   // Timestamp when current pause started
-
-        // Determine Audio Track
-        let audioTrack = options.audioTrack;
-        if (!audioTrack && this.streamVideo && this.streamVideo.srcObject) {
-            // Try to get track from stream object if available
-            const stream = this.streamVideo.srcObject;
-            if (stream.getAudioTracks && stream.getAudioTracks().length > 0) {
-                audioTrack = stream.getAudioTracks()[0];
-            }
-        }
-
-        // Check audio support
-        const audioIsEncodable = await MediaBunny.canEncodeAudio('opus', {
-            bitrate: 128000,
-        });
-
-        this._canvasOutput = new MediaBunny.Output({
-            format: new MediaBunny.Mp4OutputFormat({ fastStart: 'fragmented' }),
-            target: new MediaBunny.StreamTarget(new WritableStream({
-                write: (chunk) => {
-                    this._canvasChunks.push(chunk.data);
-                },
-            })),
-        });
-
-        // Video Source (Canvas)
-        const frameRate = 30; // Capture rate
-        const videoSource = new MediaBunny.CanvasSource(this.canvas, {
-            codec: 'avc',
-            bitrate: 50_000_000, // 50 Mbps for "Raw"/Near-Lossless Quality
-            keyFrameInterval: 2, // 2s GOP
-            latencyMode: 'realtime',
-            width: this.canvas.width,
-            height: this.canvas.height,
-            sizeChangeBehavior: 'contain' // Automatically resize if canvas resolution changes
-        });
-        this._canvasOutput.addVideoTrack(videoSource, { frameRate });
-
-        // --- MANUAL AUDIO PIPELINE SETUP ---
-        // We use AudioSampleSource instead of MediaStreamAudioTrackSource to manually control timestamps
-        // and ensure audio pauses exactly when video pauses (preventing frozen frames at end).
-        if (audioTrack && audioIsEncodable) {
-            try {
-                // 1. Initialize Audio Source
-                this._canvasAudioSource = new MediaBunny.AudioSampleSource({
-                    codec: 'opus',
-                    bitrate: 128000,
-                    sampleRate: 48000 // Standardize
-                });
-                this._canvasOutput.addAudioTrack(this._canvasAudioSource);
-
-                // 2. Setup Audio Context & Processor
-                this._audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
-
-                // Create stream source from the track
-                const streamForCtx = new MediaStream([audioTrack]);
-                this._audioStreamSource = this._audioContext.createMediaStreamSource(streamForCtx);
-
-                // Use ScriptProcessor for capture (bufferSize 4096 = ~85ms latency)
-                this._audioProcessor = this._audioContext.createScriptProcessor(4096, 2, 2);
-
-                // 3. Audio Process Loop
-                this._audioProcessor.onaudioprocess = (e) => {
-                    if (!this._isCanvasRecording) return;
-
-                    // CRITICAL: Only record audio when VIDEO is also recording (Clock is running)
-                    // If we are in a "gap" (resetRecordingClock is true), DROP samples.
-                    if (this._resetRecordingClock || !this._isMediaReady) {
-                        return;
-                    }
-
-                    const inputBuffer = e.inputBuffer;
-
-                    // Convert WebAudio Buffer to MediaBunny AudioSample
-                    // Use OUR manual clock to sync with video
-                    const timestamp = this._audioRecordedDuration;
-                    const duration = inputBuffer.duration;
-
-                    // Increment clock
-                    this._audioRecordedDuration += duration;
-
-                    try {
-                        const currentTimestamp = Number(timestamp);
-                        if (isNaN(currentTimestamp)) {
-                            Logger.warn('[Record] Timestamp is NaN, resetting to 0');
-                            this._audioRecordedDuration = 0;
-                            return;
-                        }
-
-                        // We must clone the data because inputBuffer is reused
-                        const syncedSamples = MediaBunny.AudioSample.fromAudioBuffer(inputBuffer, currentTimestamp);
-                        const samplesToAdd = Array.isArray(syncedSamples) ? syncedSamples : [syncedSamples];
-
-                        samplesToAdd.forEach(s => {
-                            if (this._canvasAudioSource) {
-                                // IMPORTANT: add() is async, must wait before closing
-                                this._canvasAudioSource.add(s).then(() => {
-                                    s.close();
-                                }).catch(err => {
-                                    Logger.warn('[Record] Failed to add audio sample:', err);
-                                    s.close();
-                                });
-                            } else {
-                                s.close();
-                            }
-                        });
-
-                    } catch (err) {
-                        Logger.warn('[Record] Audio encode error:', err);
-                    }
-                };
-
-                // Connect graph
-                this._audioStreamSource.connect(this._audioProcessor);
-                this._audioProcessor.connect(this._audioContext.destination); // Required for chrome to fire events
-
-                Logger.log('[Record] Manual Audio Pipeline Started');
-
-            } catch (e) {
-                Logger.error('[Record] Audio setup failed', e);
-                this._canvasAudioSource = null;
-            }
-        }
-
-        await this._canvasOutput.start();
-
-        // SYNC FIX: Set start time NOW, after the output engine is ready.
-        // This ensures video timestamps align with the "zero" point of the audio track.
-        this._canvasStartTime = performance.now();
-
-        // Initial state sync: If player is paused, recording audio must also be paused
-        if (!this.isPlaying && this._canvasAudioSource) {
-            try {
-                if (typeof this._canvasAudioSource.pause === 'function') {
-                    this._canvasAudioSource.pause();
-                    Logger.log('[Record] Initialized recording audio in PAUSED state (player is paused)');
-                }
-            } catch (e) {
-                Logger.error('[Record] Failed to set initial pause state for recording audio', e);
-            }
-        }
-
-
-        const addVideoFrame = async () => {
-            if (!this._isCanvasRecording || !this.isPlaying || !this._isMediaReady) return;
-            if (!this._canvasReadyForMoreFrames) return;
-
-            if (!this._canvasReadyForMoreFrames) return;
-
-            const now = performance.now();
-
-            // CLOCK RESET / RESUME LOGIC
-            // If we just came back from a "gap" (loading, pause, etc),
-            // reset the anchor to 'now' so we ignore the time passed during the gap.
-            if (this._resetRecordingClock) {
-                this._lastFrameWallTime = now;
-                this._resetRecordingClock = false;
-                // Logger.log('[Record] Resume detected. Clock anchor reset.');
-                // Skip adding a frame on the exact reset tick to avoid tiny delta oddities
-                return;
-            }
-
-            // Continuous Integration: Accumulate real-time delta
-            const delta = (now - this._lastFrameWallTime) / 1000;
-            this._lastFrameWallTime = now;
-            this._canvasRecordedDuration += delta;
-
-            const timestamp = this._canvasRecordedDuration;
-
-            this._canvasReadyForMoreFrames = false;
-            try {
-                await videoSource.add(timestamp, 1 / frameRate);
-            } catch (e) {
-                Logger.warn('Frame add error', e);
-            }
-            this._canvasReadyForMoreFrames = true;
-        };
-
-        // Loop
-        this._canvasCaptureInterval = setInterval(() => {
-            addVideoFrame().catch(e => Logger.error(e));
-        }, 1000 / frameRate);
-
-        Logger.log('[Stream] Canvas Recording Started (MediaBunny)');
-    }
-
-    /**
-     * Helper to resume recording smart pause tracking
-     * Signals the clock to reset on next frame
-     * @private
-     */
-    _resumeRecordingSmartPause() {
-        if (!this._isCanvasRecording) return;
-        this._resetRecordingClock = true;
-    }
-
-    /**
-     * Stop canvas recording and return the blob
-     * @returns {Promise<Blob|null>}
-     */
-    async stopCanvasRecording() {
-        if (!this._isCanvasRecording) return null;
-
-        this._isCanvasRecording = false;
-        clearInterval(this._canvasCaptureInterval);
-
-        Logger.log('[Stream] Finalizing Canvas Recording...');
-
-        // Cleanup Manual Audio Pipeline
-        if (this._audioProcessor) {
-            this._audioProcessor.disconnect();
-            this._audioProcessor.onaudioprocess = null;
-            this._audioProcessor = null;
-        }
-        if (this._audioStreamSource) {
-            this._audioStreamSource.disconnect();
-            this._audioStreamSource = null;
-        }
-        if (this._audioContext) {
-            await this._audioContext.close();
-            this._audioContext = null;
-        }
-
-        // Finalize
-        if (this._canvasOutput) {
-            await this._canvasOutput.finalize();
-        }
-
-        this._canvasAudioSource = null;
-
-        // Create Blob
-        if (this._canvasChunks && this._canvasChunks.length > 0) {
-            const blob = new Blob(this._canvasChunks, { type: 'video/mp4' });
-            this._canvasOutput = null;
-            this._canvasChunks = null;
-            return blob;
-        }
-        return null;
-    }
-
-    /**
-     * Stop webcam stream mode (cleanup preview, stop render loop)
-     */
-    stopWebcamStreamMode() {
-        if (this.streamVideo) {
-            this.streamVideo.srcObject = null;
-            this.streamVideo.pause();
-        }
-        this.isStreamMode = false;
-        this.isPlaying = false;
-        this._stopStreamRenderLoop();
-
-        this._updatePlayPauseUI();
-    }
-
-    /**
-     * Stop the stream render loop
-     * @private
-     */
-    _stopStreamRenderLoop() {
-        if (this.streamRenderLoopId) {
-            cancelAnimationFrame(this.streamRenderLoopId);
-            this.streamRenderLoopId = null;
-            Logger.log('[Stream] Stopped canvas render loop');
-        }
-    }
-
-    /**
-     * Render a single frame from stream video to canvas
-     * @private
-     */
-    _renderStreamFrame() {
-        if (!this.streamVideo || !this.ctx || !this.canvas) return;
-        if (this.streamVideo.readyState < 2) return; // Not enough data
-
-        // Draw video frame to canvas
-        // Note: VideoFilters applies CSS filters to canvas element, so they auto-apply
-        this.ctx.drawImage(
-            this.streamVideo,
-            0, 0,
-            this.canvas.width,
-            this.canvas.height
-        );
-
-        // Mark media as ready and handle recording resume if needed
-        if (!this._isMediaReady) {
-            this._isMediaReady = true;
-            if (this.isPlaying) {
-                this._resumeRecordingSmartPause();
-            }
-        }
-
-        // Run after-frame callbacks (for subtitles, overlays, etc.)
-        for (const callback of this.afterFrameRenderCallbacks) {
-            try {
-                callback(this.canvas, this.ctx);
-            } catch (e) {
-                Logger.warn('After-frame callback error:', e);
-            }
-        }
-    }
-
-    /**
-     * Update UI for stream mode (live badge, hide/show controls)
-     * @private
-     */
-    _updateStreamUI() {
-        if (this.isLive) {
-            if (!this.ui.liveBadge) {
-                this.ui.liveBadge = document.createElement('span');
-                this.ui.liveBadge.className = 'jellyjump-live-badge';
-                this.ui.liveBadge.textContent = 'LIVE';
-                this.ui.liveBadge.style.display = 'inline-flex';
-
-                const timeContainer = this.ui.timeDisplay?.parentNode;
-                if (timeContainer) {
-                    timeContainer.insertBefore(this.ui.liveBadge, this.ui.timeDisplay);
-                }
-            }
-            this.ui.liveBadge.style.display = 'inline-flex';
-
-            if (this.ui.progressContainer) this.ui.progressContainer.classList.add('live-mode-hidden');
-            if (this.ui.timeDisplay) this.ui.timeDisplay.classList.add('live-mode-hidden');
-        } else {
-            if (this.ui.liveBadge) this.ui.liveBadge.style.display = 'none';
-            if (this.ui.progressContainer) this.ui.progressContainer.classList.remove('live-mode-hidden');
-            if (this.ui.timeDisplay) this.ui.timeDisplay.classList.remove('live-mode-hidden');
-        }
-
-        this._setStreamModeControls(true);
-    }
-
-    /**
-     * Hide/show controls that don't work in stream mode
-     * Note: Filters DO work in stream mode now (canvas-based rendering)
-     * @param {boolean} isStreamMode - Whether stream mode is active
-     * @private
-     */
-    _setStreamModeControls(isStreamMode) {
-        // These controls don't work with HLS streams
-        // Note: Filters ARE supported now because we render to canvas!
-        const unsupportedControls = [
-            this.ui.ccBtn,           // Subtitles (not supported for streams)
-            this.ui.speedBtn,        // Speed control (not reliable for live)
-            this.ui.loopBtn          // Loop controls (doesn't make sense for live)
-            // filtersBtn REMOVED - filters now work with canvas rendering!
-            // audioSettingsBtn REMOVED - let user adjust audio
-        ];
-
-        // Also hide screenshot button if it exists (actually, screenshots work too!)
-        // const screenshotBtn = this.container.querySelector('#mb-screenshot-btn');
-        // if (screenshotBtn) {
-        //     unsupportedControls.push(screenshotBtn);
-        // }
-
-        unsupportedControls.forEach(control => {
-            if (control) {
-                control.classList.toggle('stream-mode-hidden', isStreamMode);
-            }
-        });
-    }
-
-    /**
-     * Hide/show controls specifically for webcam mode
-     * @param {boolean} isWebcamMode - Whether webcam mode is active
-     * @private
-     */
-    _setWebcamModeControls(isWebcamMode) {
-        // Hide EVERYTHING except Play/Pause, Fullscreen, and Pin
-        const webcamUnsupported = [
-            this.ui.progressContainer,
-            this.ui.timeDisplay,
-            this.ui.prevBtn,
-            this.ui.nextBtn,
-            this.ui.volumeSlider,
-            this.ui.muteBtn,
-            this.ui.ccBtn,
-            this.ui.speedBtn,
-            this.ui.audioBtn,
-            this.ui.audioSettingsBtn, // Volume/Equalizer button
-            this.ui.filtersBtn,        // Video Filters button
-            this.ui.loopBtn
-        ];
-
-        // Handle Screenshot button (managed by ScreenshotManager)
-        if (this.screenshotManager && this.screenshotManager.ui.btn) {
-            webcamUnsupported.push(this.screenshotManager.ui.btn);
-        }
-
-        webcamUnsupported.forEach(control => {
-            if (control) {
-                control.classList.toggle('webcam-mode-hidden', isWebcamMode);
-            }
-        });
-
-        // If entering webcam mode, ensure panels are closed
-        if (isWebcamMode) {
-            if (this.ui.filterPanel) this.ui.filterPanel.classList.remove('visible');
-            if (this.ui.audioPanel) this.ui.audioPanel.classList.remove('visible');
-            if (this.ui.loopPanel) this.ui.loopPanel.classList.remove('visible');
-        }
-    }
+    _createStreamVideo() { this.stream.createStreamVideo(); }
+    _showStreamVideo() { this.stream.showStreamVideo(); }
+    _hideStreamVideo() { this.stream.hideStreamVideo(); }
+    _setupStreamVideoEvents() { this.stream.setupStreamVideoEvents(); }
+    _startStreamRenderLoop() { this.stream.startStreamRenderLoop(); }
+    async loadWebcamStream(stream) { return this.stream.loadWebcamStream(stream); }
+
+    async startCanvasRecording(options = {}) { return this.stream.startCanvasRecording(options); }
+    _resumeRecordingSmartPause() { this.stream.resumeRecordingSmartPause(); }
+    async stopCanvasRecording() { return this.stream.stopCanvasRecording(); }
+    stopWebcamStreamMode() { this.stream.stopWebcamStreamMode(); }
+    _stopStreamRenderLoop() { this.stream.stopStreamRenderLoop(); }
+    _renderStreamFrame() { this.stream.renderStreamFrame(); }
+    _updateStreamUI() { this.stream.updateStreamUI(); }
+
+    _setStreamModeControls(isStreamMode) { this.stream.setStreamModeControls(isStreamMode); }
+    _setWebcamModeControls(isWebcamMode) { this.stream.setWebcamModeControls(isWebcamMode); }
 
     /**
      * Clean up MediaBunny resources when switching to stream mode
@@ -2859,118 +2112,10 @@ export class CorePlayer {
         this.nextFrame = null;
     }
 
-    /**
-     * Clean up live/stream UI resources
-     * @private
-     */
-    _cleanupHLS() {
-        this.isStreamMode = false;
-        this.isLive = false;
-        this._liveStartTimestamp = null;
-
-        if (this._liveAvSyncMonitor) {
-            clearInterval(this._liveAvSyncMonitor);
-            this._liveAvSyncMonitor = null;
-        }
-        this._liveAvSyncPaused = false;
-
-        if (this.ui.liveBadge) {
-            this.ui.liveBadge.remove();
-            this.ui.liveBadge = null;
-        }
-
-        if (this.ui.progressContainer) this.ui.progressContainer.classList.remove('live-mode-hidden');
-        if (this.ui.timeDisplay) this.ui.timeDisplay.classList.remove('live-mode-hidden');
-
-        this._hideStreamError();
-    }
-
-    /**
-     * Create the error overlay element
-     * @private
-     */
-    _createErrorOverlay() {
-        const overlay = document.createElement('div');
-        overlay.className = 'jellyjump-error-overlay';
-        overlay.style.display = 'none';
-        overlay.innerHTML = `
-            <div class="jellyjump-error-content">
-                <span class="jellyjump-error-icon">⚠️</span>
-                <h3 class="jellyjump-error-title">Stream Error</h3>
-                <p class="jellyjump-error-message">Failed to load stream.</p>
-                <p class="jellyjump-error-suggestion"></p>
-                <div class="jellyjump-error-actions">
-                    <button class="jellyjump-btn-secondary jellyjump-error-retry">Retry</button>
-                    <button class="hidden jellyjump-btn-secondary jellyjump-error-dismiss">Dismiss</button>
-                </div>
-            </div>
-        `;
-
-        // Insert in the video wrapper
-        const wrapper = this.container.querySelector('.jellyjump-video-wrapper') || this.container;
-        wrapper.appendChild(overlay);
-
-        this.ui.errorOverlay = overlay;
-
-        // Event handlers
-        overlay.querySelector('.jellyjump-error-retry').addEventListener('click', () => {
-            this._hideStreamError();
-            // Retry loading the current stream
-            if (this.sourceUrl) {
-                this.load(this.sourceUrl, false, this.currentVideoId);
-            }
-        });
-
-        overlay.querySelector('.jellyjump-error-dismiss').addEventListener('click', () => {
-            this._hideStreamError();
-        });
-    }
-
-    /**
-     * Show stream error overlay with user-friendly message
-     * @param {Object} errorDetails - Structured error object { icon, title, message, suggestion, recoverable }
-     * @private
-     */
-    _showStreamError(errorDetails) {
-        if (!this.ui.errorOverlay) return;
-
-        const overlay = this.ui.errorOverlay;
-        overlay.querySelector('.jellyjump-error-icon').textContent = errorDetails.icon || '⚠️';
-        overlay.querySelector('.jellyjump-error-title').textContent = errorDetails.title || 'Stream Error';
-        overlay.querySelector('.jellyjump-error-message').textContent = errorDetails.message || 'Failed to load stream.';
-        overlay.querySelector('.jellyjump-error-suggestion').textContent = errorDetails.suggestion || '';
-
-        // Show/hide retry button based on recoverability
-        const retryBtn = overlay.querySelector('.jellyjump-error-retry');
-        retryBtn.style.display = errorDetails.recoverable ? 'inline-block' : 'none';
-
-        // Hide loader, show error
-        this._setLoading(false);
-        overlay.style.display = 'flex';
-
-        // Send error notification to parent (Mini-NVR) so it can show Live button for retry
-        if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-                type: 'streamError',
-                error: {
-                    type: errorDetails.type,
-                    title: errorDetails.title,
-                    message: errorDetails.message,
-                    recoverable: errorDetails.recoverable
-                }
-            }, '*');
-        }
-    }
-
-    /**
-     * Hide stream error overlay
-     * @private
-     */
-    _hideStreamError() {
-        if (this.ui.errorOverlay) {
-            this.ui.errorOverlay.style.display = 'none';
-        }
-    }
+    _cleanupHLS() { this.stream.cleanupHLS(); }
+    _createErrorOverlay() { this.stream.createErrorOverlay(); }
+    _showStreamError(errorDetails) { this.stream.showStreamError(errorDetails); }
+    _hideStreamError() { this.stream.hideStreamError(); }
 
     /**
      * Load a subtitle file (VTT, SRT, or JSON transcript)
@@ -3230,75 +2375,11 @@ export class CorePlayer {
     }
 
     async play() {
-        // Software-wise resume for recording
-        // IMPORTANT: Must be done before any early returns (like stream mode)
-        if (this._isCanvasRecording) {
-            // Manual Audio Resume: done by "connecting" or just via the flag check in onaudioprocess
-            // Since we never disconnected the processor, simply setting _resetRecordingClock = false (implied by logic) 
-            // and having _isMediaReady = true (eventually) will resume recording samples.
-            // We might need to resume the AudioContext if it was suspended?
-            if (this._audioContext && this._audioContext.state === 'suspended') {
-                this._audioContext.resume();
-            }
+        this.stream.onPlay();
 
-            // Smart Pause: Only resume tracking if media is ALREADY ready.
-            // If media is not ready (loading), we keep the pause timer running
-            // until _isMediaReady becomes true (handled in _renderStreamFrame/_updateNextFrame).
-            if (this._isMediaReady) {
-                this._resumeRecordingSmartPause();
-            }
-        }
+        const streamHandled = await this.stream.playStream();
+        if (streamHandled) return;
 
-        // Handle stream mode
-        if (this.isStreamMode && this.streamVideo) {
-            // Show loading until onplaying fires
-            this._setLoading(true);
-            try {
-                await this.streamVideo.play();
-                this.isPlaying = true;
-                this._updatePlayPauseUI();
-                if (this.ui.playOverlay) {
-                    this.ui.playOverlay.style.display = 'none';
-                }
-                // Start auto-hide timer for overlay mode
-                if (this.controlBarMode === 'overlay') {
-                    setTimeout(() => {
-                        if (this.isPlaying && this.controlBarMode === 'overlay') {
-                            this._startAutoHideTimer();
-                        }
-                    }, 500);
-                }
-            } catch (e) {
-                Logger.warn('[Stream] Play failed:', e.message);
-
-                // If play was interrupted by pause (AbortError), respect the pause - don't retry
-                // Don't hide loader - may be from stream switch where new stream is still loading
-                if (e.name === 'AbortError') {
-                    Logger.log('[Stream] Play aborted (user paused), not retrying');
-                    return;
-                }
-
-                // Handle autoplay policy - try muted on mobile/any failure
-                Logger.log('[Stream] Autoplay/Play failed (' + e.name + '), trying muted...');
-                try {
-                    this.config.muted = true;
-                    this.streamVideo.muted = true;
-                    this.streamVideo.setAttribute('muted', '');
-                    this._updateVolumeUI();
-                    await this.streamVideo.play();
-                    this.isPlaying = true;
-                    this._updatePlayPauseUI();
-                    Logger.log('[Stream] Playing muted (touch/click to unmute)');
-                } catch (mutedError) {
-                    Logger.error('[Stream] Even muted play failed:', mutedError);
-                    // Don't hide loader on AbortError - may be from stream switch
-                    if (mutedError.name !== 'AbortError') {
-                        this._setLoading(false);
-                    }
-                }
-            }
-            return; // Stream mode handled, don't continue to file-based logic
-        }
         this._updateVolumeUI();
 
         // Prevent restarting clock if already playing (fixes jump-to-zero on double play call)
@@ -3422,47 +2503,14 @@ export class CorePlayer {
     pause(showOverlay = true) {
         Logger.log("Player.pause() called");
 
-        // Software-wise pause for recording
-        // Software-wise pause for recording
-        if (this._isCanvasRecording) {
-            // Manual Audio Pause:
-            // onaudioprocess checks _resetRecordingClock and _isMediaReady, so setting resetClock=true stops inputs.
-            // We can also suspend context to save CPU
-            if (this._audioContext && this._audioContext.state === 'running') {
-                this._audioContext.suspend();
-            }
+        this.stream.onPause();
 
-            // Smart Pause: No need to set start time, just stop accumulating (which happens automatically since addVideoFrame stops running)
-            // But we mark reset for safety when resuming
-            this._resetRecordingClock = true;
-        }
-
-        // Handle stream mode
-        if (this.isStreamMode && this.streamVideo) {
-            this.streamVideo.pause();
-            this.isPlaying = false;
-            this._clearAutoHideTimer();
-
-            // If user explicitly paused (showOverlay=true), hide loader and show paused state
-            // If internal pause (showOverlay=false, e.g. stream switch), keep loader visible
-            if (showOverlay) {
-                this._setLoading(false);
-            }
-
-            this._updatePlayPauseUI();
-            if (this.ui.playOverlay) {
-                const shouldShow = showOverlay && this.config.controls.playOverlay;
-                this.ui.playOverlay.style.display = shouldShow ? 'flex' : 'none';
-            }
-            return;
-        }
-
-
+        const streamHandled = this.stream.pauseStream(showOverlay);
+        if (streamHandled) return;
 
         // File-based playback (MediaBunny)
         const calculatedTime = this._getPlaybackTime();
 
-        
 
         // Sanity check: If calculated time is 0 but we were playing at a later time (e.g. > 1s), use the UI time.
         // This prevents the "progress bar goes to initial" bug if clocks desync on pause.
@@ -3524,231 +2572,7 @@ export class CorePlayer {
         }
     }
 
-    /**
-     * Continuous frame loop for live HLS streams.
-     * Decouples segment fetching (async) from display (RAF) to prevent burst+freeze stutter.
-     * @private
-     */
-    async _startLiveVideoLoop() {
-        if (!this.videoSink) {
-            Logger.warn('[Live:Video] No videoSink - cannot start');
-            return;
-        }
-
-        this.asyncId++;
-        const asyncId = this.asyncId;
-
-        Logger.log(`[Live:Video] Loop starting — asyncId=${asyncId}, liveStartTs=${this._liveStartTimestamp?.toFixed(3)}, audioSink=${!!this.audioSink}, audioContext=${!!this.audioContext}, audioContextState=${this.audioContext?.state}`);
-
-        if (this.videoFrameIterator) {
-            Logger.log(`[Live:Video] Closing existing videoFrameIterator`);
-            await this.videoFrameIterator.return();
-        }
-        if (this.audioBufferIterator) {
-            Logger.log(`[Live:Video] Closing existing audioBufferIterator`);
-            await this.audioBufferIterator.return();
-        }
-        this.audioBufferIterator = null;
-
-        this._setLoading(true);
-        this._isFetchingLiveFrame = true;
-
-        // Always use live start timestamp for live streams (never resume from saved position)
-        const resumePosition = this._liveStartTimestamp;
-        
-        // Start both iterators from the same timestamp so they cover the same content.
-        // Then race them: wait for BOTH first frames in parallel so that neither can
-        // race ahead of the other. The anchor is set when the slower one (video) arrives,
-        // preventing audio from pre-scheduling seconds of content before video is ready.
-        const fetchStart = performance.now();
-        this.videoFrameIterator = this.videoSink.canvases(resumePosition ?? undefined);
-
-        let anchorWall = null;
-        let anchorContent = null;
-        let prefetchedAudioSample = null;
-        let firstVideoFrame = null;
-
-        const hasAudio = !!(this.audioSink && this.audioContext);
-        
-        if (hasAudio) {
-            this.audioBufferIterator = this.audioSink.samples(resumePosition ?? 0);
-            Logger.log(`[Live] Fetching first video+audio frames in parallel from ts=${resumePosition?.toFixed(3)}`);
-
-            // Both .next() calls run concurrently — video and audio segments fetch in parallel
-            const [videoResult, audioResult] = await Promise.all([
-                this.videoFrameIterator.next(),
-                this.audioBufferIterator.next(),
-            ]);
-
-            const fetchMs = (performance.now() - fetchStart).toFixed(0);
-
-            if (!videoResult.done && videoResult.value) firstVideoFrame = videoResult.value;
-            if (!audioResult.done && audioResult.value) prefetchedAudioSample = audioResult.value;
-
-            Logger.log(`[Live] Both first frames received in ${fetchMs}ms — videoTs=${firstVideoFrame?.timestamp?.toFixed(3)}, audioTs=${prefetchedAudioSample?.timestamp?.toFixed(3)}, audioCtx=${this.audioContext.currentTime.toFixed(3)}`);
-        } else {
-            Logger.log(`[Live:Video] No audio — fetching first video frame from ts=${this._liveStartTimestamp?.toFixed(3)}`);
-            const videoResult = await this.videoFrameIterator.next();
-            const fetchMs = (performance.now() - fetchStart).toFixed(0);
-            if (!videoResult.done && videoResult.value) firstVideoFrame = videoResult.value;
-            Logger.log(`[Live:Video] First frame in ${fetchMs}ms — ts=${firstVideoFrame?.timestamp?.toFixed(3)}`);
-        }
-
-        if (this.asyncId !== asyncId) {
-            Logger.warn(`[Live] Cancelled after first-frame fetch — asyncId changed (${asyncId} → ${this.asyncId})`);
-            prefetchedAudioSample?.close();
-            this._setLoading(false);
-            return;
-        }
-
-        if (!firstVideoFrame) {
-            Logger.warn(`[Live:Video] No first video frame received — aborting`);
-            prefetchedAudioSample?.close();
-            this._setLoading(false);
-            return;
-        }
-
-        // Anchor is set from the VIDEO frame arrival — audio starts from the same content
-        // position, so identical timestamps in both tracks map to the same AudioContext time.
-        // Add 100ms buffer to account for network jitter and processing time
-        if (this.audioContext) {
-            // On seamless deep resync, use the pre-computed wall time so new audio/video
-            // starts exactly when the old audio queue drains — no silence, no overlap.
-            const wallOverride = this._liveAnchorWallOverride;
-            this._liveAnchorWallOverride = null;
-            anchorWall = wallOverride ?? (this.audioContext.currentTime + 0.15);
-            // Use _liveStartTimestamp as anchorContent - this is the common origin for both tracks
-            anchorContent = this._liveStartTimestamp;
-
-            // Store anchor for pause/resume calculation
-            this._liveAnchorWall = anchorWall;
-            this._liveAnchorContent = anchorContent;
-            
-            Logger.log(`[Live] Anchor set — anchorWall=${anchorWall.toFixed(3)}, anchorContent=${anchorContent.toFixed(3)}, audioTs=${prefetchedAudioSample?.timestamp?.toFixed(3)}, audioCtxState=${this.audioContext.state}`);
-        }
-
-        // Start audio scheduling anchored to the first video frame
-        // The audio iterator now has built-in throttling to stay within 2s of video position
-        if (prefetchedAudioSample && anchorWall !== null) {
-            Logger.log(`[Live:Audio] Starting audio iterator — anchorWall=${anchorWall.toFixed(3)}, anchorContent=${anchorContent.toFixed(3)}`);
-            this._runAudioIterator(anchorWall, anchorContent, prefetchedAudioSample);
-        } else if (hasAudio) {
-            Logger.warn(`[Live:Audio] No prefetched audio sample — audio will not play`);
-        }
-
-        // Draw first video frame
-        if (this.canvas.width !== firstVideoFrame.canvas.width || this.canvas.height !== firstVideoFrame.canvas.height) {
-            Logger.log(`[Live:Video] Canvas resize: ${this.canvas.width}x${this.canvas.height} → ${firstVideoFrame.canvas.width}x${firstVideoFrame.canvas.height}`);
-            this.canvas.width = firstVideoFrame.canvas.width;
-            this.canvas.height = firstVideoFrame.canvas.height;
-        }
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.drawImage(firstVideoFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
-        if (this.afterFrameRenderCallbacks.length > 0) {
-            this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
-        }
-        this._setLoading(false);
-        this._isFetchingLiveFrame = false;
-        this._isMediaReady = true;
-        if (this.isPlaying) this._resumeRecordingSmartPause?.();
-        Logger.log(`[Live:Video] First frame drawn — audioCtx=${this.audioContext?.currentTime?.toFixed(3)}`);
-
-        // Continue with frames 2, 3, … (frame 1 was consumed above via .next())
-        const myIterator = this.videoFrameIterator;
-        let frameCount = 1; // already drew frame 1
-        let drawnFrames = 1; // frames actually rendered (vs skipped)
-        let skippedFrames = 0; // frames skipped in current catch-up burst
-        let isCatchingUp = false; // hysteresis state: true = actively skipping to catch up
-        let lastDrawMs = performance.now();
-        let lastFrameDrawMs = lastDrawMs;
-        let totalLateMs = 0;
-        const fallbackFrameDurationMs = 1000 / (this.frameRate || 30);
-
-        try {
-            for await (const frame of myIterator) {
-                frameCount++;
-
-                if (this.asyncId !== asyncId || !this.isLive || !this.isPlaying) {
-                    Logger.log(`[Live:Video] Breaking loop at frame ${frameCount} — asyncId=${this.asyncId === asyncId}, isLive=${this.isLive}, isPlaying=${this.isPlaying}`);
-                    break;
-                }
-
-                if (this.canvas.width !== frame.canvas.width || this.canvas.height !== frame.canvas.height) {
-                    Logger.log(`[Live:Video] Canvas resize: ${this.canvas.width}x${this.canvas.height} → ${frame.canvas.width}x${frame.canvas.height}`);
-                    this.canvas.width = frame.canvas.width;
-                    this.canvas.height = frame.canvas.height;
-                }
-
-                // Pace to AudioContext clock — RAF gives vsync-aligned wakeups
-                let targetWall = null;
-                if (anchorWall !== null && anchorContent !== null && this.audioContext) {
-                    targetWall = anchorWall + (frame.timestamp - anchorContent);
-                    const behindSec = this.audioContext.currentTime - targetWall;
-
-                    // Skip stale frames after buffering stalls. For live streams, skipping is
-                    // preferable to fast-forwarding backlogged frames (which causes visible A/V desync).
-                    // SKIP_ENTER=0.3s: any real stall exceeds this; normal RAF jitter stays <20ms.
-                    if (behindSec > 0.5) {
-                        Logger.warn(`[Live:Video] Deep resync: ${behindSec.toFixed(1)}s behind audio — jumping to live edge`);
-                        this._setLoading(true); // Show loader immediately
-                        if (this.videoTrack) {
-                            const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                            this._liveStartTimestamp = currentLiveEdge ?? 0;
-                            Logger.log(`[Live:Video] Jumping to live edge: ${this._liveStartTimestamp.toFixed(3)}`);
-                            this._startLiveVideoLoop();
-                            return;
-                        }
-                    }
-
-                    await new Promise(r => {
-                        const check = () => {
-                            if (this.asyncId !== asyncId || !this.isPlaying) { r(); return; }
-                            if (this.audioContext.currentTime >= targetWall - 0.002) { r(); return; }
-                            requestAnimationFrame(check);
-                        };
-                        requestAnimationFrame(check);
-                    });
-                } else {
-                    const targetMs = lastDrawMs + fallbackFrameDurationMs;
-                    await new Promise(r => {
-                        const check = () => {
-                            if (this.asyncId !== asyncId || !this.isPlaying) { r(); return; }
-                            if (performance.now() >= targetMs - 2) { r(); return; }
-                            requestAnimationFrame(check);
-                        };
-                        requestAnimationFrame(check);
-                    });
-                }
-
-                if (this.asyncId !== asyncId || !this.isLive || !this.isPlaying) break;
-
-                const drawMs = performance.now();
-                if (targetWall !== null && this.audioContext) {
-                    const lateMs = (this.audioContext.currentTime - targetWall) * 1000;
-                    totalLateMs += lateMs;
-                    drawnFrames++;
-                    if (drawnFrames % 60 === 0) {
-                        const intervalMs = lastFrameDrawMs > 0 ? (drawMs - lastFrameDrawMs).toFixed(1) : '—';
-                        Logger.log(`[Live:Video] Drawn ${drawnFrames} (total ${frameCount}) — late=${lateMs.toFixed(1)}ms, avgLate=${(totalLateMs / drawnFrames).toFixed(1)}ms, interval=${intervalMs}ms, audioCtx=${this.audioContext.currentTime.toFixed(3)}, target=${targetWall.toFixed(3)}`);
-                    }
-                }
-
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.ctx.drawImage(frame.canvas, 0, 0, this.canvas.width, this.canvas.height);
-                if (this.afterFrameRenderCallbacks.length > 0) {
-                    this.afterFrameRenderCallbacks.forEach(cb => cb(this.canvas, this.ctx));
-                }
-
-                lastDrawMs = drawMs;
-                lastFrameDrawMs = drawMs;
-            }
-            Logger.log(`[Live:Video] Loop exited normally — total=${frameCount}, drawn=${drawnFrames}, skipped=${frameCount - drawnFrames}`);
-        } catch (e) {
-            Logger.warn(`[Live:Video] Loop error after ${frameCount} frames: ${e.message}`);
-        } finally {
-            this._setLoading(false);
-        }
-    }
+    async _startLiveVideoLoop() { return this.stream.startLiveVideoLoop(); }
 
     /**
      * Creates a new video frame iterator and renders the first video frame.

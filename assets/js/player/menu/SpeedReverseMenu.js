@@ -1,9 +1,8 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../utils/mediaUtils.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * Speed & Reverse Menu Handler
@@ -16,19 +15,8 @@ export class SpeedReverseMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('reverse-content-template');
-
-        if (!contentTemplate) {
-            Logger.error('Speed/Reverse content template not found!');
-            return;
-        }
-
-        const modal = new Modal({ maxWidth: '500px' });
-        modal.setTitle('Playback Speed & Direction');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.reverse));
-
-        const modalContent = modal.modal;
+        const { modal, content: modalContent } = openProcessMenu('Playback Speed & Direction', 'reverse-content-template', FOOTER_CONFIGS.reverse, { maxWidth: '500px' });
+        if (!modal) return;
 
         // Elements
         const sourceFilename = modalContent.querySelector('.source-filename');
@@ -126,9 +114,6 @@ export class SpeedReverseMenu {
 
         // Initialize UI
         updateUI();
-
-        // Open Modal
-        modal.open();
 
         // Process Handler
         if (processBtn) {

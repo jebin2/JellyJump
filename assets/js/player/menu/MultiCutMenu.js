@@ -1,10 +1,9 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { formatTime, parseTime, generateId } from '../../utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * MultiCut Menu Handler
@@ -12,21 +11,11 @@ import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js
  */
 export class MultiCutMenu {
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('multicut-content-template');
-
-        if (!contentTemplate) return;
-
-        const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Remove Clips');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.multicut));
-
-        const modalContent = modal.modal;
+        const { modal, content: modalContent } = openProcessMenu('Remove Clips', 'multicut-content-template', FOOTER_CONFIGS.multicut);
+        if (!modal) return;
 
         const videoPanel = modalContent.querySelector('.modal-video-panel');
         const editorUI = setupEditor(videoPanel, { type: 'multicut', enableOverlay: false });
-
-        modal.open();
 
         const multicutLoading = modalContent.querySelector('.multicut-loading');
         const multicutContent = modalContent.querySelector('.multicut-content');

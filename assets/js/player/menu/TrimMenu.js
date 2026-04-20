@@ -1,10 +1,9 @@
 import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 
 /**
  * Trim Menu Handler
@@ -17,23 +16,12 @@ export class TrimMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const contentTemplate = document.getElementById('trim-content-template');
-
-        if (!contentTemplate) return;
-
-        const modal = new Modal({ splitLayout: true });
-        modal.setTitle('Clip Video');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(createProcessFooter(FOOTER_CONFIGS.trim));
-
-        const modalContent = modal.modal;
+        const { modal, content: modalContent } = openProcessMenu('Clip Video', 'trim-content-template', FOOTER_CONFIGS.trim);
+        if (!modal) return;
 
         // === SETUP EDITOR DOM (Unified) ===
         const videoPanel = modalContent.querySelector('.modal-video-panel');
         const editorUI = setupEditor(videoPanel, { type: 'trim', enableOverlay: false });
-
-        // Open Modal Immediately
-        modal.open();
 
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
