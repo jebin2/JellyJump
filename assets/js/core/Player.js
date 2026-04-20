@@ -14,6 +14,7 @@ import { PlayerStream } from '../player/PlayerStream.js';
 import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
 import { PlayerLoopControl } from '../player/PlayerLoopControl.js';
+import { PlayerThumbnails } from '../player/PlayerThumbnails.js';
 
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { formatTime, parseTime } from '../utils/mediaUtils.js';
@@ -245,6 +246,7 @@ export class CorePlayer {
         this.keyboard = new PlayerKeyboard(this);
         this.subtitles = new PlayerSubtitles(this);
         this.loop = new PlayerLoopControl(this);
+        this.thumbnails = new PlayerThumbnails(this);
         this._init();
     }
 
@@ -351,136 +353,12 @@ export class CorePlayer {
      * Create Thumbnail Overlay
      * @private
      */
-    _createThumbnailOverlay() {
-        if (this.ui.thumbnailOverlay) return;
-
-        const overlay = document.createElement('div');
-        overlay.className = 'jellyjump-thumbnail-overlay';
-        overlay.innerHTML = `
-            <div class="jelly-loader"></div>
-            <div class="jellyjump-thumbnail-time">00:00</div>
-        `;
-
-        // Append to progress container so it moves relative to it? 
-        // No, absolute pos based on mouse is better, but inside progressContainer makes scoping easier.
-        // But progressContainer might overflow hidden? No, usually not.
-        // Let's append to container and position manually for safety.
-        this.container.appendChild(overlay);
-        this.ui.thumbnailOverlay = overlay;
-        this.ui.thumbnailTime = overlay.querySelector('.jellyjump-thumbnail-time');
-        this.ui.thumbnailLoader = overlay.querySelector('.jelly-loader');
-    }
-
-    _handleThumbnailHover(e) {
-        if (this.isStreamMode || !this.ui.thumbnailOverlay) return;
-
-        const rect = this.ui.progressContainer.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left;
-        const pos = Math.max(0, Math.min(1, offsetX / rect.width));
-        const time = pos * this.duration;
-
-        // Show overlay
-        this.ui.thumbnailOverlay.classList.add('visible');
-
-        // Position overlay (centered above cursor)
-        const overlayRect = this.ui.thumbnailOverlay.getBoundingClientRect();
-        let overlayLeft = e.clientX - rect.left - (overlayRect.width / 2);
-
-        // Clamp to container bounds
-        overlayLeft = Math.max(0, Math.min(overlayLeft, rect.width - overlayRect.width));
-
-        // Update CSS variables or left/bottom if not relative
-        // Since we appended to container, coordinate system is container
-        // But e.clientX is viewport.
-        // Let's calculate relative to container
-        const containerRect = this.container.getBoundingClientRect();
-        const relativeLeft = e.clientX - containerRect.left - (overlayRect.width / 2);
-        const clampedRelLeft = Math.max(10, Math.min(relativeLeft, containerRect.width - overlayRect.width - 10));
-
-        this.ui.thumbnailOverlay.style.left = `${clampedRelLeft}px`;
-
-        // Dynamic bottom position: distance from container bottom to progress top + 15px
-        const bottomOffset = containerRect.bottom - rect.top + 15;
-        this.ui.thumbnailOverlay.style.bottom = `${bottomOffset}px`;
-
-        // Update time text
-        this.ui.thumbnailTime.textContent = formatTime(time);
-
-        // Store for live updates
-        this.lastThumbnailHoverTime = time;
-
-        // Check/Get Thumbnail
-        this._updateThumbnailImage(time);
-    }
-
-    _updateThumbnailImage(time) {
-        if (!this.ui.thumbnailOverlay || !this.thumbnailGenerator) return;
-
-        const thumb = this.thumbnailGenerator.getThumbnail(time);
-        if (thumb) {
-            this.ui.thumbnailOverlay.style.backgroundImage = `url(${thumb})`;
-            this.ui.thumbnailLoader.style.display = 'none';
-        } else {
-            this.ui.thumbnailOverlay.style.backgroundImage = 'none';
-            this.ui.thumbnailLoader.style.display = 'block';
-
-            // Trigger generation if not started
-            if (!this.thumbnailGenerationStarted && !this.thumbnailHoverTimer) {
-                // Wait 300ms of hover to start heavy process
-                this.thumbnailHoverTimer = setTimeout(() => {
-                    this._startThumbnailGeneration();
-                }, 300);
-            }
-        }
-    }
-
-    _handleThumbnailLeave() {
-        if (this.ui.thumbnailOverlay) {
-            this.ui.thumbnailOverlay.classList.remove('visible');
-        }
-        if (this.thumbnailHoverTimer) {
-            clearTimeout(this.thumbnailHoverTimer);
-            this.thumbnailHoverTimer = null;
-        }
-    }
-
-    async _startThumbnailGeneration() {
-        if (this.thumbnailGenerationStarted) return;
-        this.thumbnailGenerationStarted = true;
-
-        // Use current video source
-        const url = this.sourceUrl;
-        if (!url) return;
-
-        Logger.log('[Thumbnails] Starting generation with URL:', url);
-
-        try {
-            await this.thumbnailGenerator.generate(url, this.duration, {
-                width: 160,
-                count: 100 // Target ~100 thumbnails regardless of duration
-            });
-            Logger.log('[Thumbnails] Generation complete');
-            // Force update if still hovering?
-            // User moving mouse will trigger update
-        } catch (e) {
-            Logger.warn('[Thumbnails] Generation failed:', e);
-            this.thumbnailGenerationStarted = false;
-        }
-    }
-
-    _cleanupThumbnails() {
-        if (this.thumbnailGenerator) {
-            this.thumbnailGenerator.cancel();
-        }
-        this.thumbnailGenerationStarted = false;
-        if (this.thumbnailHoverTimer) {
-            clearTimeout(this.thumbnailHoverTimer);
-            this.thumbnailHoverTimer = null;
-        }
-        if (this.ui.thumbnailOverlay) {
-            this.ui.thumbnailOverlay.style.backgroundImage = 'none';
-        }
-    }
+    _createThumbnailOverlay() { this.thumbnails.createOverlay(); }
+    _handleThumbnailHover(e) { this.thumbnails.handleHover(e); }
+    _updateThumbnailImage(time) { this.thumbnails.updateImage(time); }
+    _handleThumbnailLeave() { this.thumbnails.handleLeave(); }
+    async _startThumbnailGeneration() { return this.thumbnails.startGeneration(); }
+    _cleanupThumbnails() { this.thumbnails.cleanup(); }
 
     /**
      * Initialize Audio Context (must be done after user interaction)
