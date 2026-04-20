@@ -42,6 +42,45 @@ export class MediaProcessor {
         return Math.floor(targetBitrate);
     }
 
+    // Standard audio bitrate for all encode operations (128 kbps is broadly compatible)
+    static AUDIO_BITRATE_BPS = 128000;
+
+    /**
+     * Time-stretch an AudioBuffer to a new speed using OfflineAudioContext.
+     * Returns the original buffer unchanged on failure (caller logs the warning).
+     * @param {AudioBuffer} buffer
+     * @param {number} speed - Playback rate multiplier (e.g. 2 = double speed, half duration)
+     * @returns {Promise<AudioBuffer>}
+     */
+    static async _stretchAudioBuffer(buffer, speed) {
+        const targetFrames = Math.ceil((buffer.duration / speed) * buffer.sampleRate);
+        const offlineCtx = new OfflineAudioContext(buffer.numberOfChannels, targetFrames, buffer.sampleRate);
+        const source = offlineCtx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = speed;
+        source.connect(offlineCtx.destination);
+        source.start(0);
+        return offlineCtx.startRendering();
+    }
+
+    /**
+     * Convert an AudioBuffer to AudioSample(s) and write them to an AudioSampleSource.
+     * @param {Object} audioSource - MediaBunny AudioSampleSource
+     * @param {AudioBuffer} buffer
+     * @param {number} outputTimestamp - Content timestamp of the first sample
+     * @returns {Promise<number>} Updated outputTimestamp after all samples are added
+     */
+    static async _addAudioSamples(audioSource, buffer, outputTimestamp) {
+        const samples = MediaBunny.AudioSample.fromAudioBuffer(buffer, outputTimestamp);
+        const arr = Array.isArray(samples) ? samples : [samples];
+        for (const s of arr) {
+            await audioSource.add(s);
+            outputTimestamp += s.duration;
+            s.close();
+        }
+        return outputTimestamp;
+    }
+
     /**
      * Process video (transcode, trim, resize, crop, etc.)
      * @param {Object} options
@@ -918,7 +957,6 @@ export class MediaProcessor {
                 canvasSource = new MediaBunny.CanvasSource(canvas, {
                     codec: format === 'webm' ? 'vp9' : 'avc',
                     bitrate: MediaBunny.QUALITY_HIGH,
-                    // frameRate: outputFps
                 });
 
                 output.addVideoTrack(canvasSource);
@@ -1006,7 +1044,7 @@ export class MediaProcessor {
 
                 const audioSourceConfig = format === 'flac'
                     ? { codec: supportedCodecs[0] }
-                    : { codec: supportedCodecs[0], bitrate: 128000 };
+                    : { codec: supportedCodecs[0], bitrate: MediaProcessor.AUDIO_BITRATE_BPS };
                 audioSource = new MediaBunny.AudioSampleSource(audioSourceConfig);
                 output.addAudioTrack(audioSource);
                 await output.start();
@@ -1018,38 +1056,14 @@ export class MediaProcessor {
                     const sample = samples[i];
                     const buffer = sample.toAudioBuffer();
 
-                    // Time-stretch using OfflineAudioContext
                     let finalBuffer = buffer;
                     try {
-                        const targetDuration = buffer.duration / speed;
-                        const targetFrames = Math.ceil(targetDuration * buffer.sampleRate);
-
-                        const offlineCtx = new OfflineAudioContext(
-                            buffer.numberOfChannels,
-                            targetFrames,
-                            buffer.sampleRate
-                        );
-
-                        const source = offlineCtx.createBufferSource();
-                        source.buffer = buffer;
-                        source.playbackRate.value = speed;
-                        source.connect(offlineCtx.destination);
-                        source.start(0);
-
-                        finalBuffer = await offlineCtx.startRendering();
+                        finalBuffer = await MediaProcessor._stretchAudioBuffer(buffer, speed);
                     } catch (e) {
                         Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
                     }
 
-                    const processedSamples = MediaBunny.AudioSample.fromAudioBuffer(finalBuffer, outputTimestamp);
-                    const samplesToAdd = Array.isArray(processedSamples) ? processedSamples : [processedSamples];
-
-                    for (const s of samplesToAdd) {
-                        await audioSource.add(s);
-                        outputTimestamp += s.duration;
-                        s.close();
-                    }
-
+                    outputTimestamp = await MediaProcessor._addAudioSamples(audioSource, finalBuffer, outputTimestamp);
                     sample.close();
 
                     if (onProgress && i % 100 === 0) {
@@ -1228,14 +1242,13 @@ export class MediaProcessor {
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: format === 'webm' ? 'vp9' : 'avc',
                 bitrate: MediaBunny.QUALITY_HIGH,
-                // frameRate: targetFps
             });
 
             output.addVideoTrack(canvasSource);
 
             // Setup audio with codec detection
             let audioCodec;
-            let audioBitrate = 128000;
+            let audioBitrate = MediaProcessor.AUDIO_BITRATE_BPS;
             const targetSampleRate = 48000; // Standard sample rate for merged audio
             const targetChannels = 2; // Stereo
 
@@ -1681,7 +1694,6 @@ export class MediaProcessor {
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: 'avc',
                 bitrate: MediaBunny.QUALITY_HIGH,
-                // frameRate: outputFps
             });
 
             output.addVideoTrack(canvasSource);
@@ -1694,7 +1706,7 @@ export class MediaProcessor {
                     if (supportedCodecs.length > 0) {
                         audioSource = new MediaBunny.AudioSampleSource({
                             codec: supportedCodecs[0],
-                            bitrate: 128000
+                            bitrate: MediaProcessor.AUDIO_BITRATE_BPS
                         });
                         output.addAudioTrack(audioSource);
                     }
@@ -1857,7 +1869,6 @@ export class MediaProcessor {
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: 'avc',
                 bitrate: MediaBunny.QUALITY_HIGH,
-                // frameRate: outputFps
             });
 
             output.addVideoTrack(canvasSource);
@@ -1878,7 +1889,7 @@ export class MediaProcessor {
                             // If we can't change speed, let's at least include it.
                             audioSource = new MediaBunny.AudioSampleSource({
                                 codec: supportedCodecs[0],
-                                bitrate: 128000
+                                bitrate: MediaProcessor.AUDIO_BITRATE_BPS
                             });
                             output.addAudioTrack(audioSource);
                             Logger.log('[MediaProcessor] Audio track added (experimental speed sync)');
@@ -1942,9 +1953,9 @@ export class MediaProcessor {
             return new Blob([output.target.buffer], { type: 'video/mp4' });
 
         } finally {
-            if (input && typeof input.dispose === 'function') input.dispose();
-            if (output && typeof output.dispose === 'function') output.dispose();
-            if (canvasSource && typeof canvasSource.dispose === 'function') canvasSource.dispose();
+            try { if (input) input.dispose(); } catch (e) { Logger.warn('[MediaProcessor] input dispose failed:', e); }
+            try { if (output) output.dispose(); } catch (e) { Logger.warn('[MediaProcessor] output dispose failed:', e); }
+            try { if (canvasSource) canvasSource.dispose(); } catch (e) { Logger.warn('[MediaProcessor] canvasSource dispose failed:', e); }
         }
     }
 
@@ -1959,49 +1970,20 @@ export class MediaProcessor {
     static async _processAudioWithSpeed(audioTrack, audioSource, speed = 1, onProgress) {
         const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
         let outputTimestamp = 0;
-        let sampleCount = 0;
 
         for await (const sample of audioSink.samples()) {
             let finalBuffer = sample.toAudioBuffer();
 
-            // Time-stretch if speed != 1
             if (speed !== 1) {
                 try {
-                    // At 2x speed, audio duration is halved, pitch is higher
-                    const originalDuration = finalBuffer.duration;
-                    const targetDuration = originalDuration / speed;
-                    const targetFrames = Math.ceil(targetDuration * finalBuffer.sampleRate);
-
-                    const offlineCtx = new OfflineAudioContext(
-                        finalBuffer.numberOfChannels,
-                        targetFrames,
-                        finalBuffer.sampleRate
-                    );
-
-                    const source = offlineCtx.createBufferSource();
-                    source.buffer = finalBuffer;
-                    source.playbackRate.value = speed;
-                    source.connect(offlineCtx.destination);
-                    source.start(0);
-
-                    finalBuffer = await offlineCtx.startRendering();
+                    finalBuffer = await MediaProcessor._stretchAudioBuffer(finalBuffer, speed);
                 } catch (e) {
                     Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
                 }
             }
 
-            // Create new sample(s)
-            const processedSamples = MediaBunny.AudioSample.fromAudioBuffer(finalBuffer, outputTimestamp);
-            const samplesToAdd = Array.isArray(processedSamples) ? processedSamples : [processedSamples];
-
-            for (const s of samplesToAdd) {
-                await audioSource.add(s);
-                outputTimestamp += s.duration;
-                s.close();
-            }
-
+            outputTimestamp = await MediaProcessor._addAudioSamples(audioSource, finalBuffer, outputTimestamp);
             sample.close();
-            sampleCount++;
         }
     }
 
@@ -2045,45 +2027,16 @@ export class MediaProcessor {
                 data.reverse();
             }
 
-            // Time-stretch audio if speed != 1
-            // At 2x speed, audio duration is halved
-            // At 0.5x speed, audio duration is doubled
             let finalBuffer = buffer;
             if (speed !== 1) {
                 try {
-                    const originalDuration = buffer.duration;
-                    const targetDuration = originalDuration / speed;
-                    const targetFrames = Math.ceil(targetDuration * buffer.sampleRate);
-
-                    // Use OfflineAudioContext for resampling
-                    const offlineCtx = new OfflineAudioContext(
-                        buffer.numberOfChannels,
-                        targetFrames,
-                        buffer.sampleRate
-                    );
-
-                    const source = offlineCtx.createBufferSource();
-                    source.buffer = buffer;
-                    source.playbackRate.value = speed;
-                    source.connect(offlineCtx.destination);
-                    source.start(0);
-
-                    finalBuffer = await offlineCtx.startRendering();
+                    finalBuffer = await MediaProcessor._stretchAudioBuffer(buffer, speed);
                 } catch (e) {
                     Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
                 }
             }
 
-            // Create new sample(s) from processed buffer
-            const reversedSamples = MediaBunny.AudioSample.fromAudioBuffer(finalBuffer, outputTimestamp);
-            const samplesToAdd = Array.isArray(reversedSamples) ? reversedSamples : [reversedSamples];
-
-            for (const s of samplesToAdd) {
-                await audioSource.add(s);
-                outputTimestamp += s.duration;
-                s.close();
-            }
-
+            outputTimestamp = await MediaProcessor._addAudioSamples(audioSource, finalBuffer, outputTimestamp);
             sample.close();
 
             // Update progress (80-100% for audio)
@@ -2153,15 +2106,7 @@ export class MediaProcessor {
                     }
                 }
 
-                // Convert to MediaBunny AudioSample
-                const samples = MediaBunny.AudioSample.fromAudioBuffer(chunkBuffer, outputTimestamp);
-                const samplesToAdd = Array.isArray(samples) ? samples : [samples];
-
-                for (const sample of samplesToAdd) {
-                    await audioSource.add(sample);
-                    outputTimestamp += sample.duration;
-                    sample.close();
-                }
+                outputTimestamp = await MediaProcessor._addAudioSamples(audioSource, chunkBuffer, outputTimestamp);
 
                 // Update progress (80-100% for audio)
                 if (onProgress) {
@@ -2261,7 +2206,7 @@ export class MediaProcessor {
                     if (supportedCodecs.length > 0) {
                         audioSource = new MediaBunny.AudioSampleSource({
                             codec: supportedCodecs[0],
-                            bitrate: 128000
+                            bitrate: MediaProcessor.AUDIO_BITRATE_BPS
                         });
                         output.addAudioTrack(audioSource);
                     }
