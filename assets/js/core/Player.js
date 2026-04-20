@@ -12,6 +12,7 @@ import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
 import { PlayerStream } from '../player/PlayerStream.js';
 import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
+import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
 
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { formatTime, parseTime } from '../utils/mediaUtils.js';
@@ -241,6 +242,7 @@ export class CorePlayer {
 
         this.stream = new PlayerStream(this);
         this.keyboard = new PlayerKeyboard(this);
+        this.subtitles = new PlayerSubtitles(this);
         this._init();
     }
 
@@ -1471,109 +1473,10 @@ export class CorePlayer {
         }
     }
 
-    _updateSubtitleMenu() {
-        // Skip if captions control is disabled
-        if (!this.ui.subtitleOptions || !this.ui.ccBtn) return;
-
-        // Remove old custom track radio options (keep Off)
-        const oldCustomOptions = this.ui.subtitleOptions.querySelectorAll('[data-track-id]');
-        oldCustomOptions.forEach(item => item.remove());
-
-        // Add radio options for each subtitle track
-        this.subtitleTracks.forEach(track => {
-            const label = document.createElement('label');
-            label.className = 'subtitle-radio-option';
-            label.setAttribute('data-track-id', track.id);
-            label.innerHTML = `
-                <input type="radio" name="subtitle-track" value="${track.id}">
-                <span class="radio-label">${track.name}</span>
-            `;
-            this.ui.subtitleOptions.appendChild(label);
-        });
-
-        // Update radio button states
-        const offRadio = this.ui.subtitleOptions.querySelector('input[value="off"]');
-        if (!this.isSubtitlesEnabled) {
-            if (offRadio) offRadio.checked = true;
-            this.ui.ccBtn.classList.remove('active');
-        } else {
-            const activeRadio = this.ui.subtitleOptions.querySelector(`input[value="${this.activeSubtitleTrackId}"]`);
-            if (activeRadio) {
-                activeRadio.checked = true;
-            }
-            this.ui.ccBtn.classList.add('active');
-        }
-    }
-
-    /**
-     * Switch to a different subtitle track
-     * @param {string} trackId 
-     * @private
-     */
-    _switchSubtitleTrack(trackId) {
-        const track = this.subtitleTracks.find(t => t.id === trackId);
-        if (!track) return;
-
-        // Load the cues into the subtitle manager
-        this.subtitleManager.cues = [...track.cues];
-        this.activeSubtitleTrackId = trackId;
-        this.isSubtitlesEnabled = true;
-        this._updateSubtitleMenu();
-        Logger.log(`Switched to subtitle track: ${track.name}`);
-    }
-
-    async _switchAudioTrack(trackId) {
-        if (!this.input) return;
-
-        const audioTracks = await this.input.getAudioTracks();
-        const track = audioTracks.find(t => t.id === trackId);
-
-        if (track) {
-            this.audioTrack = track;
-
-            this.audioSink = new MediaBunny.AudioSampleSink(this.audioTrack);
-
-            // If playing, we must restart the audio iterator to pick up the new track
-            if (this.isPlaying) {
-                this.pause();
-                const startTime = this._getPlaybackTime();
-                Logger.log(`[Audio] Switching track while playing - restarting iterator at ${startTime.toFixed(2)}s`);
-                this.play();
-            }
-
-            // Update UI
-            this._updateAudioTracks();
-            Logger.log(`Switched to audio track: ${track.id}`);
-        }
-    }
-
-    async _updateAudioTracks() {
-        // Skip if captions control is disabled (audio tracks are under captions)
-        if (!this.ui.audioMenu || !this.ui.audioContainer) return;
-
-        this.ui.audioMenu.textContent = '';
-        const tracks = this.input ? await this.input.getAudioTracks() : [];
-
-        if (tracks.length <= 1) {
-            this.ui.audioContainer.style.display = 'none';
-            return;
-        }
-
-        this.ui.audioContainer.style.display = 'block';
-        const template = document.getElementById('player-menu-item-template');
-
-        tracks.forEach((track, index) => {
-            const item = template.content.cloneNode(true).querySelector('.jellyjump-menu-item');
-            item.textContent = track.languageCode || `Track ${index + 1}`;
-            item.dataset.value = track.id;
-
-            if (this.audioTrack && this.audioTrack.id === track.id) {
-                item.classList.add('active');
-            }
-
-            this.ui.audioMenu.appendChild(item);
-        });
-    }
+    _updateSubtitleMenu() { this.subtitles.updateSubtitleMenu(); }
+    _switchSubtitleTrack(trackId) { this.subtitles.switchSubtitleTrack(trackId); }
+    async _switchAudioTrack(trackId) { return this.subtitles.switchAudioTrack(trackId); }
+    async _updateAudioTracks() { return this.subtitles.updateAudioTracks(); }
 
     /**
      * Handle keyboard shortcuts
@@ -1853,18 +1756,7 @@ export class CorePlayer {
         this._updateStreamUI();
     }
 
-    _restoreSavedSubtitles(savedSubtitles) {
-        this.subtitleTracks = savedSubtitles.map(track => ({
-            id: track.id,
-            name: track.name,
-            cues: [...track.cues]
-        }));
-        this.subtitleTrackCounter = savedSubtitles.reduce((max, track) => {
-            const match = track.id.match(/custom-(\d+)/);
-            return match ? Math.max(max, parseInt(match[1])) : max;
-        }, 0);
-        Logger.log(`Restored ${savedSubtitles.length} subtitle track(s) for video`);
-    }
+    _restoreSavedSubtitles(savedSubtitles) { this.subtitles.restoreSavedSubtitles(savedSubtitles); }
 
     /**
      * Cleanup audio-only playback visualizer
@@ -1951,57 +1843,7 @@ export class CorePlayer {
      * Load a subtitle file (VTT, SRT, or JSON transcript)
      * @param {string} url - URL of the subtitle file
      */
-    async loadSubtitle(url) {
-        if (!this.subtitleManager) {
-            Logger.warn('Subtitle manager not initialized (captions disabled)');
-            return;
-        }
-        try {
-            Logger.log(`Loading subtitles: ${url}`);
-            const response = await fetch(url);
-            const content = await response.text();
-
-            // Detect if content is JSON (transcript format)
-            let vttContent = content;
-            if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
-                try {
-                    const { parseTranscriptJSON, jsonToVTT } = await import('./SubtitleConverter.js');
-                    const words = parseTranscriptJSON(content);
-                    vttContent = jsonToVTT(words);
-                    Logger.log('Converted JSON transcript to VTT format');
-                } catch (jsonError) {
-                    Logger.warn('Failed to parse as JSON transcript, treating as VTT:', jsonError);
-                }
-            }
-
-            // Parse the subtitle content
-            this.subtitleManager.parse(vttContent);
-
-            // Store as a new track with incrementing name
-            this.subtitleTrackCounter++;
-            const trackId = `custom-${this.subtitleTrackCounter}`;
-            const trackName = `Custom ${this.subtitleTrackCounter}`;
-
-            this.subtitleTracks.push({
-                id: trackId,
-                name: trackName,
-                cues: [...this.subtitleManager.cues] // Copy cues
-            });
-
-            // Set this track as active
-            this.activeSubtitleTrackId = trackId;
-            this.isSubtitlesEnabled = true;
-            this._updateSubtitleMenu();
-            Logger.log(`Subtitles loaded successfully as "${trackName}"`);
-
-            // Notify callback (for playlist to persist subtitles)
-            if (this.onSubtitleChange) {
-                this.onSubtitleChange(this.subtitleTracks);
-            }
-        } catch (error) {
-            Logger.error('Error loading subtitles:', error);
-        }
-    }
+    async loadSubtitle(url) { return this.subtitles.loadSubtitle(url); }
 
     /**
      * Render a specific frame
@@ -2054,58 +1896,7 @@ export class CorePlayer {
         }
     }
 
-    /**
-     * Render subtitles on the canvas
-     * @param {number} timestamp
-     * @private
-     */
-    _renderSubtitles(timestamp) {
-        if (!this.subtitleManager) return;
-
-        const activeCues = this.subtitleManager.getActiveCues(timestamp);
-        if (activeCues.length === 0) return;
-
-        const fontSize = Math.max(22, this.canvas.height * 0.055);
-        const lineHeight = fontSize * 1.35;
-        const bottomMargin = this.canvas.height * 0.08;
-        const x = this.canvas.width / 2;
-
-        // Collect all lines from all active cues
-        const allLines = [];
-        activeCues.forEach(cue => {
-            cue.text.split('\n').forEach(line => {
-                if (line.trim()) allLines.push(line.trim());
-            });
-        });
-
-        if (allLines.length === 0) return;
-
-        // Calculate starting Y position (draw from bottom up)
-        let y = this.canvas.height - bottomMargin;
-
-        // Setup text styling - Netflix/YouTube style with thick outline
-        this.ctx.font = `bold ${fontSize}px "Segoe UI", Roboto, Arial, sans-serif`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.lineJoin = 'round';
-        this.ctx.miterLimit = 2;
-
-        // Draw lines from bottom to top
-        for (let i = allLines.length - 1; i >= 0; i--) {
-            const line = allLines[i];
-
-            // Draw thick black outline
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = fontSize * 0.15;
-            this.ctx.strokeText(line, x, y);
-
-            // Draw white fill
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.fillText(line, x, y);
-
-            y -= lineHeight;
-        }
-    }
+    _renderSubtitles(timestamp) { this.subtitles.renderSubtitles(timestamp); }
 
     /**
      * Returns the current playback time in the media file.
