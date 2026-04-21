@@ -222,137 +222,13 @@ export class MediaProcessor {
             // Without it, MediaBunny can stream-copy video data for lossless trim/remux.
             const needsRotation = rotate || flip || nativeRotation !== 0;
             if (removeBackgroundOptions || watermarkItems || blur || needsRotation) {
-                const useOffscreen = typeof OffscreenCanvas !== 'undefined';
-                let canvas = null;
-                let ctx = null;
-
-                videoConfig.process = (sample) => {
-                    // Use squarePixelWidth/Height (SAR-corrected display dimensions) so that
-                    // non-square pixel videos (anamorphic) produce correctly-sized output and
-                    // watermark/blur coordinates map accurately. Falls back to codedWidth/Height.
-                    const width = sample.squarePixelWidth || sample.codedWidth;
-                    const height = sample.squarePixelHeight || sample.codedHeight;
-
-                    // When rotation/flip is active, use configured output dimensions.
-                    // Otherwise use SAR-corrected display dimensions.
-                    const outputWidth = needsRotation ? (videoConfig.width || width) : width;
-                    const outputHeight = needsRotation ? (videoConfig.height || height) : height;
-
-                    if (!canvas || canvas.width !== outputWidth || canvas.height !== outputHeight) {
-                        if (useOffscreen) {
-                            canvas = new OffscreenCanvas(outputWidth, outputHeight);
-                        } else {
-                            canvas = document.createElement('canvas');
-                            canvas.width = outputWidth;
-                            canvas.height = outputHeight;
-                        }
-                        ctx = canvas.getContext('2d', { willReadFrequently: true });
-                    }
-
-                    ctx.clearRect(0, 0, outputWidth, outputHeight);
-
-                    if (needsRotation) {
-                        // Apply rotation/flip transforms
-                        ctx.save();
-                        ctx.translate(outputWidth / 2, outputHeight / 2);
-
-                        if (rotate) {
-                            ctx.rotate((rotate * Math.PI) / 180);
-                        }
-
-                        if (flip) {
-                            ctx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
-                        }
-
-                        if (nativeRotation) {
-                            ctx.rotate((nativeRotation * Math.PI) / 180);
-                        }
-
-                        // Draw raw video centered — swap draw dims if native rotation is 90/270
-                        let drawWidth, drawHeight;
-                        if (Math.abs(nativeRotation) % 180 === 90) {
-                            drawWidth = originalHeight;
-                            drawHeight = originalWidth;
-                        } else {
-                            drawWidth = originalWidth;
-                            drawHeight = originalHeight;
-                        }
-
-                        sample.draw(ctx, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-                        ctx.restore();
-                    } else {
-                        // No rotation — draw frame directly (preserves existing behavior)
-                        ctx.clearRect(0, 0, width, height);
-                        sample.draw(ctx, 0, 0, width, height);
-                    }
-
-                    // --- 1. Background Removal ---
-                    if (removeBackgroundOptions) {
-                        const imageData = ctx.getImageData(0, 0, width, height);
-                        const { colors, bgType, bgColor } = removeBackgroundOptions;
-                        MediaProcessor.applyChromaKey(imageData, colors, bgType, bgColor);
-                        ctx.putImageData(imageData, 0, 0);
-                    }
-
-                    // --- 2. Watermarks ---
-                    if (watermarkItems) {
-                        const currentTimeWm = sample.timestamp - firstTimestamp;
-                        for (const wm of watermarkItems) {
-                            if (currentTimeWm < wm.startTime || currentTimeWm > wm.endTime) continue;
-
-                            ctx.save();
-                            ctx.globalAlpha = wm.opacity || 1.0;
-
-                            if (wm.type === 'image') {
-                                const img = watermarkImages.get(wm.id || wm);
-                                if (img) {
-                                    ctx.drawImage(img, wm.x, wm.y, wm.width, wm.height);
-                                }
-                            } else if (wm.type === 'text' && wm.text) {
-                                ctx.font = wm.font;
-                                ctx.fillStyle = wm.fillStyle;
-                                ctx.strokeStyle = wm.strokeStyle;
-                                ctx.lineWidth = wm.lineWidth;
-                                ctx.textAlign = wm.textAlign;
-                                ctx.textBaseline = wm.textBaseline;
-
-                                ctx.strokeText(wm.text, wm.x, wm.y);
-                                ctx.fillText(wm.text, wm.x, wm.y);
-                            }
-
-                            ctx.restore();
-                        }
-                    }
-
-                    // --- 3. Blur Regions ---
-                    if (blur && blur.areas && blur.areas.length > 0) {
-                        const currentTime = sample.timestamp - firstTimestamp;
-                        const intensity = blur.intensity || 15;
-
-                        for (const area of blur.areas) {
-                            if (currentTime < area.startTime || currentTime > area.endTime) continue;
-
-                            // Scale from original video display dimensions to canvas dimensions
-                            const sx = width / originalWidth;
-                            const sy = height / originalHeight;
-
-                            const bx = area.x * sx;
-                            const by = area.y * sy;
-                            const bw = area.width * sx;
-                            const bh = area.height * sy;
-
-                            ctx.save();
-                            ctx.beginPath();
-                            ctx.rect(bx, by, bw, bh);
-                            ctx.clip();
-                            ctx.filter = `blur(${intensity}px)`;
-                            ctx.drawImage(canvas, 0, 0, width, height);
-                            ctx.restore();
-                        }
-                    }
-
-                    return canvas;
-                };
+                videoConfig.process = MediaProcessor._buildFrameProcessor({
+                    removeBackgroundOptions, watermarkItems, watermarkImages,
+                    blur, rotate, flip, nativeRotation,
+                    originalWidth, originalHeight, firstTimestamp,
+                    rotatedOutputWidth: videoConfig.width,
+                    rotatedOutputHeight: videoConfig.height
+                });
             }
 
             // Initialize Conversion
@@ -1167,43 +1043,9 @@ export class MediaProcessor {
         try {
             // Step 1: Analyze all input videos
             Logger.log('[MediaProcessor] Step 1: Analyzing input videos...');
-            const videoInfos = [];
-            let maxWidth = 0;
-            let maxHeight = 0;
-            for (let i = 0; i < inputs.length; i++) {
-                const input = new MediaBunny.Input({
-                    source: new MediaBunny.BlobSource(inputs[i]),
-                    formats: MediaBunny.ALL_FORMATS
-                });
-                inputObjects.push(input); // Track for cleanup
-
-                const videoTrack = await input.getPrimaryVideoTrack();
-                if (!videoTrack) {
-                    throw new Error(`No video track found in input file ${i + 1}`);
-                }
-
-                const duration = await videoTrack.computeDuration();
-                const width = videoTrack.displayWidth || videoTrack.codedWidth;
-                const height = videoTrack.displayHeight || videoTrack.codedHeight;
-
-                Logger.log(`[MediaProcessor] Video ${i + 1}: ${width}x${height}, ${duration}s, codec: ${videoTrack.codec}`);
-
-                maxWidth = Math.max(maxWidth, width);
-                maxHeight = Math.max(maxHeight, height);
-
-                videoInfos.push({
-                    index: i,
-                    input: input,
-                    width,
-                    height,
-                    duration,
-                    codec: videoTrack.codec
-                });
-
-                if (onProgress) {
-                    onProgress((i + 1) / (inputs.length * 2));
-                }
-            }
+            const { videoInfos, inputObjects: analysedInputs, maxWidth, maxHeight } =
+                await MediaProcessor._analyzeInputVideos(inputs, onProgress);
+            inputObjects.push(...analysedInputs);
 
             const targetWidth = resolution?.width || maxWidth;
             const targetHeight = resolution?.height || maxHeight;
@@ -1354,54 +1196,23 @@ export class MediaProcessor {
 
                             let processedSample = sample;
 
-                            // Resample/remix if needed using Web Audio API
                             if (needsResampling || needsRemixing) {
                                 try {
-                                    // Create an offline audio context for resampling
-                                    const offlineCtx = new OfflineAudioContext(
-                                        targetChannels,
-                                        Math.ceil(sample.numberOfFrames * (targetSampleRate / sample.sampleRate)),
-                                        targetSampleRate
+                                    processedSample = await MediaProcessor._resampleAudioSample(
+                                        sample, absoluteTimestamp, targetChannels, targetSampleRate
                                     );
-
-                                    // Convert sample to AudioBuffer
-                                    const sourceBuffer = sample.toAudioBuffer();
-
-                                    // Create source node
-                                    const source = offlineCtx.createBufferSource();
-                                    source.buffer = sourceBuffer;
-                                    source.connect(offlineCtx.destination);
-                                    source.start(0);
-
-                                    // Render the resampled audio
-                                    const resampledBuffer = await offlineCtx.startRendering();
-
-                                    // Convert back to AudioSample with adjusted timestamp
-                                    const resampledSamples = MediaBunny.AudioSample.fromAudioBuffer(
-                                        resampledBuffer,
-                                        absoluteTimestamp
-                                    );
-
-                                    // fromAudioBuffer can return multiple samples, use the first one
-                                    processedSample = Array.isArray(resampledSamples) ? resampledSamples[0] : resampledSamples;
-
-                                    sample.close(); // Close original sample
+                                    sample.close();
                                 } catch (resampleError) {
                                     Logger.error(`[MediaProcessor] Error resampling audio:`, resampleError);
                                     sample.close();
                                     throw resampleError;
                                 }
                             } else {
-                                // No resampling needed, just adjust timestamp
                                 processedSample.setTimestamp(absoluteTimestamp);
                             }
 
                             await audioSource.add(processedSample);
-
-                            // Close the processed sample if it's different from the original
-                            if (processedSample !== sample) {
-                                processedSample.close();
-                            }
+                            if (processedSample !== sample) processedSample.close();
 
                             audioSampleCount++;
                         }
@@ -2239,119 +2050,6 @@ export class MediaProcessor {
             };
 
             // rectA/rectB are pre-computed per transition pair — not recomputed each frame
-            const renderTransitionFrame = (ctx, bmA, bmB, rectA, rectB, progress, transType, w, h) => {
-                switch (transType) {
-                    case 'crossfade': {
-                        ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, w, h);
-                        ctx.globalAlpha = 1 - progress;
-                        ctx.drawImage(bmA, rectA.dx, rectA.dy, rectA.dw, rectA.dh);
-                        ctx.globalAlpha = progress;
-                        ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
-                        ctx.globalAlpha = 1;
-                        break;
-                    }
-                    case 'slide-left':
-                    case 'slide-right':
-                    case 'slide-up':
-                    case 'slide-down': {
-                        const isH = transType === 'slide-left' || transType === 'slide-right';
-                        const dir = (transType === 'slide-left' || transType === 'slide-up') ? -1 : 1;
-                        const span = isH ? w : h;
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.rect(0, 0, w, h);
-                        ctx.clip();
-                        ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, w, h);
-                        const aOff = dir * progress * span;
-                        const bOff = -dir * (1 - progress) * span;
-                        if (isH) {
-                            ctx.drawImage(bmA, rectA.dx + aOff, rectA.dy, rectA.dw, rectA.dh);
-                            ctx.drawImage(bmB, rectB.dx + bOff, rectB.dy, rectB.dw, rectB.dh);
-                        } else {
-                            ctx.drawImage(bmA, rectA.dx, rectA.dy + aOff, rectA.dw, rectA.dh);
-                            ctx.drawImage(bmB, rectB.dx, rectB.dy + bOff, rectB.dw, rectB.dh);
-                        }
-                        ctx.restore();
-                        break;
-                    }
-                    case 'fade-to-black': {
-                        // Two-phase: A fades to black (0→0.5), B fades from black (0.5→1)
-                        ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, w, h);
-                        if (progress < 0.5) {
-                            ctx.globalAlpha = 1 - progress * 2;
-                            ctx.drawImage(bmA, rectA.dx, rectA.dy, rectA.dw, rectA.dh);
-                        } else {
-                            ctx.globalAlpha = (progress - 0.5) * 2;
-                            ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
-                        }
-                        ctx.globalAlpha = 1;
-                        break;
-                    }
-                    case 'wipe-left':
-                    case 'wipe-right': {
-                        // A stays; B revealed behind an expanding edge
-                        drawImageCentered(ctx, bmA, w, h);
-                        ctx.save();
-                        ctx.beginPath();
-                        if (transType === 'wipe-left') {
-                            ctx.rect(0, 0, progress * w, h);
-                        } else {
-                            ctx.rect((1 - progress) * w, 0, progress * w, h);
-                        }
-                        ctx.clip();
-                        ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
-                        ctx.restore();
-                        break;
-                    }
-                    case 'zoom-out': {
-                        // A shrinks to nothing; B fades in at 1.0x
-                        const shrink = 1 - progress;
-                        ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, w, h);
-                        ctx.globalAlpha = shrink;
-                        ctx.drawImage(bmA,
-                            rectA.dx + rectA.dw * progress / 2,
-                            rectA.dy + rectA.dh * progress / 2,
-                            rectA.dw * shrink, rectA.dh * shrink);
-                        ctx.globalAlpha = progress;
-                        ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
-                        ctx.globalAlpha = 1;
-                        break;
-                    }
-                    case 'flip': {
-                        // Horizontal flip: A narrows to nothing (0→0.5), B widens from nothing (0.5→1)
-                        ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, w, h);
-                        const scaleX = progress < 0.5 ? 1 - 2 * progress : 2 * progress - 1;
-                        const { dx, dy, dw, dh } = progress < 0.5 ? rectA : rectB;
-                        ctx.save();
-                        ctx.translate(w / 2, h / 2);
-                        ctx.scale(scaleX, 1);
-                        ctx.translate(-w / 2, -h / 2);
-                        ctx.drawImage(progress < 0.5 ? bmA : bmB, dx, dy, dw, dh);
-                        ctx.restore();
-                        break;
-                    }
-                    case 'zoom': {
-                        // rectA is at 1.06x (final Ken Burns state) — fades out without snapping
-                        ctx.fillStyle = '#000000';
-                        ctx.fillRect(0, 0, w, h);
-                        ctx.globalAlpha = 1 - progress;
-                        ctx.drawImage(bmA, rectA.dx, rectA.dy, rectA.dw, rectA.dh);
-                        // B fades in at 1.0x — Ken Burns zooms it in during static frames
-                        ctx.globalAlpha = progress;
-                        ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
-                        ctx.globalAlpha = 1;
-                        break;
-                    }
-                    default:
-                        drawImageCentered(ctx, bmB, w, h);
-                }
-            };
-
             const isZoom = transition === 'zoom';
 
             for (let i = 0; i < bitmaps.length; i++) {
@@ -2390,7 +2088,7 @@ export class MediaProcessor {
                     const transFrames = Math.round(transDur * fps);
                     for (let f = 0; f < transFrames; f++) {
                         const progress = transFrames > 1 ? f / (transFrames - 1) : 1;
-                        renderTransitionFrame(ctx, bmA, bmB, rectA, rectB, progress, transition, canvasW, canvasH);
+                        MediaProcessor._renderTransitionFrame(ctx, bmA, bmB, rectA, rectB, progress, transition, canvasW, canvasH);
                         await canvasSource.add(outputTimestamp, frameDur);
                         outputTimestamp += frameDur;
                         totalFramesRendered++;
@@ -2401,64 +2099,12 @@ export class MediaProcessor {
 
             Logger.log(`[MediaProcessor] Rendered ${totalFramesRendered} frames, total ts: ${outputTimestamp.toFixed(3)}s`);
 
-            // Step 5: Audio — decode via Web Audio API, loop if needed
+            // Step 5: Audio
             if (audioSource && audioBlob) {
-                const audioContext = new AudioContext();
                 try {
-                    Logger.log('[MediaProcessor] Adding background music...');
-                    const arrayBuffer = await audioBlob.arrayBuffer();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-                    const sampleRate = audioBuffer.sampleRate;
-                    const numChannels = audioBuffer.numberOfChannels;
-                    const trackDur = audioBuffer.duration;
-
-                    const trimStart = Math.max(0, audioStartTime);
-                    const trimEnd = Math.min(audioEndTime !== null ? audioEndTime : trackDur, trackDur);
-
-                    if (trimEnd > trimStart) {
-                        let outputTs = 0;
-                        let passStart = trimStart;
-
-                        while (outputTs < totalDuration) {
-                            const remaining = totalDuration - outputTs;
-                            const chunkDur = Math.min(trimEnd - passStart, remaining);
-                            if (chunkDur <= 0) break;
-
-                            const startSample = Math.floor(passStart * sampleRate);
-                            const chunkSamples = Math.ceil(chunkDur * sampleRate);
-                            const endSample = Math.min(startSample + chunkSamples, audioBuffer.length);
-                            const actualSamples = endSample - startSample;
-                            if (actualSamples <= 0) break;
-
-                            const chunkBuffer = audioContext.createBuffer(numChannels, actualSamples, sampleRate);
-                            for (let ch = 0; ch < numChannels; ch++) {
-                                const src = audioBuffer.getChannelData(ch);
-                                const dst = chunkBuffer.getChannelData(ch);
-                                dst.set(src.subarray(startSample, endSample));
-                            }
-
-                            const samples = MediaBunny.AudioSample.fromAudioBuffer(chunkBuffer, outputTs);
-                            const samplesArr = Array.isArray(samples) ? samples : [samples];
-                            for (const sample of samplesArr) {
-                                await audioSource.add(sample);
-                                sample.close();
-                            }
-
-                            outputTs += chunkDur;
-                            passStart += chunkDur;
-
-                            // Loop back to trim start
-                            if (passStart >= trimEnd) {
-                                if (!audioLoop) break;
-                                passStart = trimStart;
-                            }
-                        }
-                    }
+                    await MediaProcessor._addSlideshowAudio(audioSource, audioBlob, totalDuration, audioStartTime, audioEndTime, audioLoop);
                 } catch (e) {
                     Logger.warn('[MediaProcessor] Audio processing failed for slideshow:', e);
-                } finally {
-                    await audioContext.close();
                 }
             }
 
@@ -2482,6 +2128,342 @@ export class MediaProcessor {
             if (audioSource && typeof audioSource.dispose === 'function') {
                 try { audioSource.dispose(); } catch (e) { Logger.warn('Error disposing audioSource:', e); }
             }
+        }
+    }
+
+    /**
+     * Build the per-frame canvas process callback for process().
+     * Extracted here so process() only handles orchestration.
+     */
+    static _buildFrameProcessor({
+        removeBackgroundOptions, watermarkItems, watermarkImages,
+        blur, rotate, flip, nativeRotation,
+        originalWidth, originalHeight, firstTimestamp,
+        rotatedOutputWidth, rotatedOutputHeight
+    }) {
+        const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+        const needsRotation = rotate || flip || nativeRotation !== 0;
+        let canvas = null;
+        let ctx = null;
+
+        return (sample) => {
+            const width = sample.squarePixelWidth || sample.codedWidth;
+            const height = sample.squarePixelHeight || sample.codedHeight;
+            const outputWidth = needsRotation ? (rotatedOutputWidth || width) : width;
+            const outputHeight = needsRotation ? (rotatedOutputHeight || height) : height;
+
+            if (!canvas || canvas.width !== outputWidth || canvas.height !== outputHeight) {
+                canvas = useOffscreen
+                    ? new OffscreenCanvas(outputWidth, outputHeight)
+                    : Object.assign(document.createElement('canvas'), { width: outputWidth, height: outputHeight });
+                ctx = canvas.getContext('2d', { willReadFrequently: true });
+            }
+
+            ctx.clearRect(0, 0, outputWidth, outputHeight);
+
+            if (needsRotation) {
+                ctx.save();
+                ctx.translate(outputWidth / 2, outputHeight / 2);
+                if (rotate) ctx.rotate((rotate * Math.PI) / 180);
+                if (flip) ctx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
+                if (nativeRotation) ctx.rotate((nativeRotation * Math.PI) / 180);
+
+                let drawWidth, drawHeight;
+                if (Math.abs(nativeRotation) % 180 === 90) {
+                    drawWidth = originalHeight;
+                    drawHeight = originalWidth;
+                } else {
+                    drawWidth = originalWidth;
+                    drawHeight = originalHeight;
+                }
+                sample.draw(ctx, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+                ctx.restore();
+            } else {
+                ctx.clearRect(0, 0, width, height);
+                sample.draw(ctx, 0, 0, width, height);
+            }
+
+            if (removeBackgroundOptions) {
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const { colors, bgType, bgColor } = removeBackgroundOptions;
+                MediaProcessor.applyChromaKey(imageData, colors, bgType, bgColor);
+                ctx.putImageData(imageData, 0, 0);
+            }
+
+            if (watermarkItems) {
+                const currentTimeWm = sample.timestamp - firstTimestamp;
+                for (const wm of watermarkItems) {
+                    if (currentTimeWm < wm.startTime || currentTimeWm > wm.endTime) continue;
+                    ctx.save();
+                    ctx.globalAlpha = wm.opacity || 1.0;
+                    if (wm.type === 'image') {
+                        const img = watermarkImages.get(wm.id || wm);
+                        if (img) ctx.drawImage(img, wm.x, wm.y, wm.width, wm.height);
+                    } else if (wm.type === 'text' && wm.text) {
+                        ctx.font = wm.font;
+                        ctx.fillStyle = wm.fillStyle;
+                        ctx.strokeStyle = wm.strokeStyle;
+                        ctx.lineWidth = wm.lineWidth;
+                        ctx.textAlign = wm.textAlign;
+                        ctx.textBaseline = wm.textBaseline;
+                        ctx.strokeText(wm.text, wm.x, wm.y);
+                        ctx.fillText(wm.text, wm.x, wm.y);
+                    }
+                    ctx.restore();
+                }
+            }
+
+            if (blur && blur.areas && blur.areas.length > 0) {
+                const currentTime = sample.timestamp - firstTimestamp;
+                const intensity = blur.intensity || 15;
+                for (const area of blur.areas) {
+                    if (currentTime < area.startTime || currentTime > area.endTime) continue;
+                    const sx = width / originalWidth;
+                    const sy = height / originalHeight;
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(area.x * sx, area.y * sy, area.width * sx, area.height * sy);
+                    ctx.clip();
+                    ctx.filter = `blur(${intensity}px)`;
+                    ctx.drawImage(canvas, 0, 0, width, height);
+                    ctx.restore();
+                }
+            }
+
+            return canvas;
+        };
+    }
+
+    /**
+     * Analyze all input videos for merge() — returns videoInfos, inputObjects, maxWidth, maxHeight.
+     */
+    static async _analyzeInputVideos(inputs, onProgress) {
+        const videoInfos = [];
+        const inputObjects = [];
+        let maxWidth = 0;
+        let maxHeight = 0;
+
+        for (let i = 0; i < inputs.length; i++) {
+            const input = new MediaBunny.Input({
+                source: new MediaBunny.BlobSource(inputs[i]),
+                formats: MediaBunny.ALL_FORMATS
+            });
+            inputObjects.push(input);
+
+            const videoTrack = await input.getPrimaryVideoTrack();
+            if (!videoTrack) throw new Error(`No video track found in input file ${i + 1}`);
+
+            const duration = await videoTrack.computeDuration();
+            const width = videoTrack.displayWidth || videoTrack.codedWidth;
+            const height = videoTrack.displayHeight || videoTrack.codedHeight;
+
+            Logger.log(`[MediaProcessor] Video ${i + 1}: ${width}x${height}, ${duration}s, codec: ${videoTrack.codec}`);
+
+            maxWidth = Math.max(maxWidth, width);
+            maxHeight = Math.max(maxHeight, height);
+            videoInfos.push({ index: i, input, width, height, duration, codec: videoTrack.codec });
+
+            if (onProgress) onProgress((i + 1) / (inputs.length * 2));
+        }
+
+        return { videoInfos, inputObjects, maxWidth, maxHeight };
+    }
+
+    /**
+     * Resample/remix an audio sample to target channels and sample rate using OfflineAudioContext.
+     * Returns a new AudioSample at absoluteTimestamp; caller must close both the original and result.
+     */
+    static async _resampleAudioSample(sample, absoluteTimestamp, targetChannels, targetSampleRate) {
+        const offlineCtx = new OfflineAudioContext(
+            targetChannels,
+            Math.ceil(sample.numberOfFrames * (targetSampleRate / sample.sampleRate)),
+            targetSampleRate
+        );
+        const sourceBuffer = sample.toAudioBuffer();
+        const source = offlineCtx.createBufferSource();
+        source.buffer = sourceBuffer;
+        source.connect(offlineCtx.destination);
+        source.start(0);
+        const resampledBuffer = await offlineCtx.startRendering();
+        const resampledSamples = MediaBunny.AudioSample.fromAudioBuffer(resampledBuffer, absoluteTimestamp);
+        return Array.isArray(resampledSamples) ? resampledSamples[0] : resampledSamples;
+    }
+
+    /**
+     * Render one frame of a transition between two images onto ctx.
+     * Extracted from createSlideshowVideo() so the switch is not buried inside a 350-line method.
+     */
+    static _renderTransitionFrame(ctx, bmA, bmB, rectA, rectB, progress, transType, w, h) {
+        switch (transType) {
+            case 'crossfade': {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                ctx.globalAlpha = 1 - progress;
+                ctx.drawImage(bmA, rectA.dx, rectA.dy, rectA.dw, rectA.dh);
+                ctx.globalAlpha = progress;
+                ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                ctx.globalAlpha = 1;
+                break;
+            }
+            case 'slide-left':
+            case 'slide-right':
+            case 'slide-up':
+            case 'slide-down': {
+                const isH = transType === 'slide-left' || transType === 'slide-right';
+                const dir = (transType === 'slide-left' || transType === 'slide-up') ? -1 : 1;
+                const span = isH ? w : h;
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(0, 0, w, h);
+                ctx.clip();
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                const aOff = dir * progress * span;
+                const bOff = -dir * (1 - progress) * span;
+                if (isH) {
+                    ctx.drawImage(bmA, rectA.dx + aOff, rectA.dy, rectA.dw, rectA.dh);
+                    ctx.drawImage(bmB, rectB.dx + bOff, rectB.dy, rectB.dw, rectB.dh);
+                } else {
+                    ctx.drawImage(bmA, rectA.dx, rectA.dy + aOff, rectA.dw, rectA.dh);
+                    ctx.drawImage(bmB, rectB.dx, rectB.dy + bOff, rectB.dw, rectB.dh);
+                }
+                ctx.restore();
+                break;
+            }
+            case 'fade-to-black': {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                if (progress < 0.5) {
+                    ctx.globalAlpha = 1 - progress * 2;
+                    ctx.drawImage(bmA, rectA.dx, rectA.dy, rectA.dw, rectA.dh);
+                } else {
+                    ctx.globalAlpha = (progress - 0.5) * 2;
+                    ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                }
+                ctx.globalAlpha = 1;
+                break;
+            }
+            case 'wipe-left':
+            case 'wipe-right': {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                const { dx: adx, dy: ady, dw: adw, dh: adh } = rectA;
+                ctx.drawImage(bmA, adx, ady, adw, adh);
+                ctx.save();
+                ctx.beginPath();
+                if (transType === 'wipe-left') {
+                    ctx.rect(0, 0, progress * w, h);
+                } else {
+                    ctx.rect((1 - progress) * w, 0, progress * w, h);
+                }
+                ctx.clip();
+                ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                ctx.restore();
+                break;
+            }
+            case 'zoom-out': {
+                const shrink = 1 - progress;
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                ctx.globalAlpha = shrink;
+                ctx.drawImage(bmA,
+                    rectA.dx + rectA.dw * progress / 2,
+                    rectA.dy + rectA.dh * progress / 2,
+                    rectA.dw * shrink, rectA.dh * shrink);
+                ctx.globalAlpha = progress;
+                ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                ctx.globalAlpha = 1;
+                break;
+            }
+            case 'flip': {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                const scaleX = progress < 0.5 ? 1 - 2 * progress : 2 * progress - 1;
+                const { dx, dy, dw, dh } = progress < 0.5 ? rectA : rectB;
+                ctx.save();
+                ctx.translate(w / 2, h / 2);
+                ctx.scale(scaleX, 1);
+                ctx.translate(-w / 2, -h / 2);
+                ctx.drawImage(progress < 0.5 ? bmA : bmB, dx, dy, dw, dh);
+                ctx.restore();
+                break;
+            }
+            case 'zoom': {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                ctx.globalAlpha = 1 - progress;
+                ctx.drawImage(bmA, rectA.dx, rectA.dy, rectA.dw, rectA.dh);
+                ctx.globalAlpha = progress;
+                ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+                ctx.globalAlpha = 1;
+                break;
+            }
+            default: {
+                // Fallback: cut to next image
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(bmB, rectB.dx, rectB.dy, rectB.dw, rectB.dh);
+            }
+        }
+    }
+
+    /**
+     * Write looped/trimmed audio from audioBlob into audioSource for totalDuration seconds.
+     * Extracted from createSlideshowVideo() Step 5.
+     */
+    static async _addSlideshowAudio(audioSource, audioBlob, totalDuration, audioStartTime, audioEndTime, audioLoop) {
+        const audioContext = new AudioContext();
+        try {
+            Logger.log('[MediaProcessor] Adding background music...');
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            const sampleRate = audioBuffer.sampleRate;
+            const numChannels = audioBuffer.numberOfChannels;
+            const trackDur = audioBuffer.duration;
+
+            const trimStart = Math.max(0, audioStartTime);
+            const trimEnd = Math.min(audioEndTime !== null ? audioEndTime : trackDur, trackDur);
+
+            if (trimEnd <= trimStart) return;
+
+            let outputTs = 0;
+            let passStart = trimStart;
+
+            while (outputTs < totalDuration) {
+                const remaining = totalDuration - outputTs;
+                const chunkDur = Math.min(trimEnd - passStart, remaining);
+                if (chunkDur <= 0) break;
+
+                const startSample = Math.floor(passStart * sampleRate);
+                const chunkSamples = Math.ceil(chunkDur * sampleRate);
+                const endSample = Math.min(startSample + chunkSamples, audioBuffer.length);
+                const actualSamples = endSample - startSample;
+                if (actualSamples <= 0) break;
+
+                const chunkBuffer = audioContext.createBuffer(numChannels, actualSamples, sampleRate);
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const src = audioBuffer.getChannelData(ch);
+                    chunkBuffer.getChannelData(ch).set(src.subarray(startSample, endSample));
+                }
+
+                const samples = MediaBunny.AudioSample.fromAudioBuffer(chunkBuffer, outputTs);
+                const samplesArr = Array.isArray(samples) ? samples : [samples];
+                for (const sample of samplesArr) {
+                    await audioSource.add(sample);
+                    sample.close();
+                }
+
+                outputTs += chunkDur;
+                passStart += chunkDur;
+
+                if (passStart >= trimEnd) {
+                    if (!audioLoop) break;
+                    passStart = trimStart;
+                }
+            }
+        } finally {
+            await audioContext.close();
         }
     }
 
