@@ -16,7 +16,7 @@ export class TrimMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Clip Video', 'trim-content-template', FOOTER_CONFIGS.trim);
+        const { modal, content: modalContent } = openProcessMenu('Clip Video', 'trim-content-template', FOOTER_CONFIGS.trim, { splitLayout: true });
         if (!modal) return;
 
         // === SETUP EDITOR DOM (Unified) ===

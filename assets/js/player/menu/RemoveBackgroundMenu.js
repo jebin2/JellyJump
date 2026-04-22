@@ -12,7 +12,7 @@ export class RemoveBackgroundMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Remove Background', 'remove-bg-content-template', FOOTER_CONFIGS.removeBg);
+        const { modal, content: modalContent } = openProcessMenu('Remove Background', 'remove-bg-content-template', FOOTER_CONFIGS.removeBg, { splitLayout: true });
         if (!modal) return;
 
         // Elements

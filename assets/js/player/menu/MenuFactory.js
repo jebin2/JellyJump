@@ -19,7 +19,7 @@ export function openProcessMenu(title, templateId, footerConfig, options = {}) {
         return { modal: null, content: null };
     }
 
-    const modal = new Modal({ splitLayout: true, ...options });
+    const modal = new Modal({ ...options });
     modal.setTitle(title);
     modal.setBody(template.content.cloneNode(true));
     if (footerConfig) modal.setFooter(createProcessFooter(footerConfig));

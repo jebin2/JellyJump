@@ -17,7 +17,7 @@ export class GifMenu {
      * @param {Playlist} playlist - Playlist instance  
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('GIF', 'gif-content-template', FOOTER_CONFIGS.gif);
+        const { modal, content: modalContent } = openProcessMenu('GIF', 'gif-content-template', FOOTER_CONFIGS.gif, { splitLayout: true });
         if (!modal) return;
 
         // ---------------------------------------------------------

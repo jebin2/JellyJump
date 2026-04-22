@@ -20,7 +20,7 @@ import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
 export class WatermarkMenu {
     static async init(item, playlist) {
         const itemTemplate = document.getElementById('watermark-item-template');
-        const { modal, content: modalContent } = openProcessMenu('Watermark', 'watermark-content-template', FOOTER_CONFIGS.watermark);
+        const { modal, content: modalContent } = openProcessMenu('Watermark', 'watermark-content-template', FOOTER_CONFIGS.watermark, { splitLayout: true });
         if (!modal) return;
         if (!itemTemplate) {
             Logger.error('Watermark modal templates not found!');

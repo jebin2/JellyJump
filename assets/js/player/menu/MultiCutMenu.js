@@ -11,7 +11,7 @@ import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
  */
 export class MultiCutMenu {
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Remove Clips', 'multicut-content-template', FOOTER_CONFIGS.multicut);
+        const { modal, content: modalContent } = openProcessMenu('Remove Clips', 'multicut-content-template', FOOTER_CONFIGS.multicut, { splitLayout: true });
         if (!modal) return;
 
         const videoPanel = modalContent.querySelector('.modal-video-panel');

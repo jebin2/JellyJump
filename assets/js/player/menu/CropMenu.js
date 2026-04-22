@@ -22,7 +22,7 @@ import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
  */
 export class CropMenu {
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Crop Video', 'crop-content-template', FOOTER_CONFIGS.crop);
+        const { modal, content: modalContent } = openProcessMenu('Crop Video', 'crop-content-template', FOOTER_CONFIGS.crop, { splitLayout: true });
         if (!modal) return;
         const playerContainerId = 'crop-player-container';
         const playerContainer = modalContent.querySelector(`#${playerContainerId}`);

@@ -16,7 +16,7 @@ export class RotateMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate);
+        const { modal, content: modalContent } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate, { splitLayout: true });
         if (!modal) return;
 
         // === Setup Editor DOM (Left Panel) ===

@@ -21,7 +21,7 @@ export class BlurMenu {
      */
     static async init(item, playlist) {
         const itemTemplate = document.getElementById('blur-item-template');
-        const { modal, content: modalContent } = openProcessMenu('Blur', 'blur-content-template', FOOTER_CONFIGS.blur);
+        const { modal, content: modalContent } = openProcessMenu('Blur', 'blur-content-template', FOOTER_CONFIGS.blur, { splitLayout: true });
         if (!modal) return;
         if (!itemTemplate) {
             Logger.error('Blur modal templates not found!');
