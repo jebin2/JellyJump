@@ -81,6 +81,12 @@ export class PlayerThumbnails {
         const url = p.sourceUrl;
         if (!url) return;
 
+        // Skip thumbnail generation for HLS/live streams
+        if (url.includes('.m3u8') || url.includes('/hls/') || url.includes('/live/') || url.includes('/manifest/')) {
+            Logger.log('[Thumbnails] Skipping HLS/live stream');
+            return;
+        }
+
         Logger.log('[Thumbnails] Starting generation with URL:', url);
         try {
             await p.thumbnailGenerator.generate(url, p.duration, { width: 160, count: 100 });

@@ -137,6 +137,8 @@ export class CorePlayer {
         this.isAudioInitialized = false;
         this.currentAudioSource = null;
         this.activeSources = [];
+        this._vodAnchorWall = undefined; // VOD sync anchor (audioContext time when playback started)
+        this._vodAnchorContent = undefined; // VOD sync anchor (media position when playback started)
         this.playbackId = 0;
 
         // New state variables for MediaBunny example pattern
@@ -1419,6 +1421,9 @@ export class CorePlayer {
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
         this.queuedAudioNodes.clear();
+        this._vodAnchorWall = undefined;
+        this._vodAnchorContent = undefined;
+        this._frameSyncLogCount = 0;
 
         this._clearCanvas();
         this._updateTimeDisplay();
@@ -1612,6 +1617,7 @@ export class CorePlayer {
 
             const playbackTime = this._getPlaybackTime();
             if (newNextFrame.timestamp <= playbackTime) {
+                Logger.log(`[FrameSync] Late frame: ts=${newNextFrame.timestamp.toFixed(3)}, playback=${playbackTime.toFixed(3)}, behind=${((playbackTime - newNextFrame.timestamp) * 1000).toFixed(0)}ms`);
                 // Draw it immediately
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                 this.ctx.drawImage(newNextFrame.canvas, 0, 0, this.canvas.width, this.canvas.height);
@@ -1648,6 +1654,19 @@ export class CorePlayer {
         // Stream mode (HLS) delegates to video element
         if (this.isStreamMode && this.streamVideo) {
             return this.streamVideo.currentTime;
+        }
+
+        // Audio-synced mode: If we have VOD sync anchors, calculate position from audioContext
+        // This ensures video stays synced to the audio master clock
+        // The formula: currentPosition = startPosition + (audioClock - startAudioClock)
+        if (this._vodAnchorWall !== undefined && this._vodAnchorContent !== undefined && this.audioContext) {
+            const elapsed = this.audioContext.currentTime - this._vodAnchorWall;
+            const newPosition = this._vodAnchorContent + elapsed;
+            // Only use if not going backwards
+            if (newPosition >= this._vodAnchorContent - 0.1) {
+                return newPosition;
+            }
+            return this._vodAnchorContent;
         }
 
         // File-based playback (MediaBunny) - Stopwatch Mode
@@ -1822,11 +1841,30 @@ export class CorePlayer {
                 // Audio will be started by _startLiveVideoLoop() after the first video frame
                 // to guarantee A/V sync by anchoring the AudioContext clock at that moment.
             } else {
+                // Capture position BEFORE the async cleanup so elapsed time during
+                // audioBufferIterator.return() doesn't skew the audio start point.
+                const startTime = this.playbackTimeAtStart;
                 if (this.audioBufferIterator) await this.audioBufferIterator.return();
-                const startTime = this._getPlaybackTime();
                 Logger.log(`[Play] Starting audio iterator at time: ${startTime.toFixed(2)}s`);
                 this.audioBufferIterator = this.audioSink.samples(startTime);
-                this._runAudioIterator();
+
+                // Prefetch the first audio sample before the render loop starts.
+                // Without this, the render loop advances the video ~80-100ms (MediaBunny's
+                // decode startup time) before the first audio sample arrives, then the anchor
+                // snaps back — causing a persistent initial desync visible on the first few frames.
+                const firstResult = await this.audioBufferIterator.next();
+                const vodPrefetchedSample = firstResult?.value ?? null;
+
+                // Set anchors now so the render loop (started below) sees the correct clock
+                // from its very first tick. Anchor: audio ts=vodPrefetchedSample.timestamp
+                // will start playing at audioCtx ≈ currentTime + 0.02s.
+                const vodAnchorWall = this.audioContext.currentTime + 0.02;
+                const vodAnchorContent = vodPrefetchedSample?.timestamp ?? startTime;
+                this._vodAnchorWall = vodAnchorWall;
+                this._vodAnchorContent = vodAnchorContent;
+                Logger.log(`[Play] VOD anchor prefetched — wall=${vodAnchorWall.toFixed(3)}, content=${vodAnchorContent.toFixed(3)}, sample=${vodPrefetchedSample ? 'ok' : 'null'}`);
+
+                this._runAudioIterator(vodAnchorWall, vodAnchorContent, vodPrefetchedSample);
             }
 
             // Start visualizer if in audio mode
@@ -1949,8 +1987,15 @@ export class CorePlayer {
         this.videoFrameIterator = this.videoSink.canvases(this._getPlaybackTime());
 
         // Get the first two frames
-        const firstFrame = (await this.videoFrameIterator.next()).value ?? null;
-        const secondFrame = (await this.videoFrameIterator.next()).value ?? null;
+        let firstFrame = null, secondFrame = null;
+        try {
+            firstFrame = (await this.videoFrameIterator.next()).value ?? null;
+            secondFrame = (await this.videoFrameIterator.next()).value ?? null;
+        } catch (e) {
+            Logger.warn('[VideoIterator] Failed to get initial frames, will retry on next play:', e);
+            this.videoFrameIterator = null;
+            return;
+        }
 
         // Prevent race conditions if asyncId changed while awaiting
         if (currentAsyncId !== this.asyncId) return;
@@ -1978,6 +2023,14 @@ export class CorePlayer {
             if (this.isPlaying) {
                 const playbackTime = this._getPlaybackTime();
                 this.currentTime = playbackTime; // Update internal time for UI
+                
+                if (this._frameSyncLogCount === undefined) this._frameSyncLogCount = 0;
+                this._frameSyncLogCount++;
+                if (this._frameSyncLogCount % 60 === 0 && this._vodAnchorWall !== undefined) {
+                    const nextTs = this.nextFrame?.timestamp;
+                    const drift = nextTs !== undefined ? ((nextTs - playbackTime) * 1000).toFixed(0) : 'n/a';
+                    Logger.log(`[FrameSync] frame=${this._frameSyncLogCount}, playback=${playbackTime.toFixed(3)}, nextFrameTs=${nextTs?.toFixed(3) ?? 'none'}, drift=${drift}ms, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}`);
+                }
 
                 // Trigger timeupdate event
                 this.trigger('timeupdate', { currentTime: this.currentTime });
@@ -2042,6 +2095,10 @@ export class CorePlayer {
     async _runAudioIterator(anchorWall, anchorContent, prefetchedSample) {
         if (!this.audioSink) return;
 
+        // Save anchors for _getPlaybackTime() to use
+        if (anchorWall !== undefined) this._vodAnchorWall = anchorWall;
+        if (anchorContent !== undefined) this._vodAnchorContent = anchorContent;
+        
         const myIterator = this.audioBufferIterator;
         // Live mode: anchorWall/anchorContent are set.
         //   nextAudioTime is initialized to the anchor-relative position of the first sample,
@@ -2051,12 +2108,21 @@ export class CorePlayer {
         const isLiveMode = anchorWall !== undefined && anchorContent !== undefined;
         // For live mode, nextAudioTime is aligned to the first sample below; use anchorWall
         // as a temporary sentinel so VOD fallback keeps working until the first sample runs.
-        let nextAudioTime = isLiveMode && prefetchedSample
-            ? anchorWall + (prefetchedSample.timestamp - anchorContent)
-            : (anchorWall ?? ((this.audioContext?.currentTime || 0) + 0.1));
+        // nextAudioTime is the audioContext clock time when the first sample should start playing.
+        // For live/VOD with anchors: align to anchorWall (adjusted for any elapsed time since anchor was set).
+        let nextAudioTime;
+        if (isLiveMode && prefetchedSample) {
+            nextAudioTime = anchorWall + (prefetchedSample.timestamp - anchorContent);
+        } else if (isLiveMode) {
+            nextAudioTime = anchorWall + (this.audioContext.currentTime - anchorWall);
+        } else {
+            nextAudioTime = (this.audioContext?.currentTime || 0) + 0.1;
+        }
         let sampleCount = 0;
+        let firstSampleScheduled = false;
 
-        Logger.log(`[Live:Audio] Iterator started — mode=${isLiveMode ? 'live' : 'vod'}, anchorWall=${anchorWall?.toFixed(3)}, anchorContent=${anchorContent?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}, audioCtxState=${this.audioContext?.state}`);
+        const _audioLogTag = this.isLive ? 'Live' : 'VOD';
+        Logger.log(`[${_audioLogTag}:Audio] Iterator started — anchorWall=${anchorWall?.toFixed(3)}, anchorContent=${anchorContent?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}, audioCtxState=${this.audioContext?.state}`);
 
         const scheduleOne = (audioSample) => {
             if (!this.isPlaying) { audioSample.close(); return; }
@@ -2075,15 +2141,30 @@ export class CorePlayer {
                 audioSource.connect(this.gainNode);
             }
 
-            const startAt = Math.max(nextAudioTime, this.audioContext.currentTime + 0.02);
+            // Absolute timestamp scheduling (mirrors the official MediaBunny example):
+            // Each sample independently maps its media timestamp to an audioCtx wall-clock time.
+            // Unlike sequential scheduling, a late-arriving sample never shifts subsequent ones.
+            const targetTime = anchorWall + (timestamp - anchorContent) / this.playbackRate;
 
-            if (isLiveMode && sampleCount === 0) {
-                const theoreticalTarget = anchorWall + (timestamp - anchorContent);
-                Logger.log(`[Live:Audio] First sample — ts=${timestamp.toFixed(3)}, theoreticalTarget=${theoreticalTarget.toFixed(3)}, startAt=${startAt.toFixed(3)}, drift=${((startAt - theoreticalTarget) * 1000).toFixed(1)}ms, bufDur=${buffer.duration.toFixed(3)}s`);
+            if (!firstSampleScheduled) {
+                firstSampleScheduled = true;
+                Logger.log(`[${_audioLogTag}:Audio] First sample — ts=${timestamp.toFixed(3)}, targetTime=${targetTime.toFixed(3)}, audioCtx=${this.audioContext.currentTime.toFixed(3)}, bufDur=${buffer.duration.toFixed(3)}s`);
             }
 
-            audioSource.start(startAt);
-            nextAudioTime = startAt + buffer.duration / this.playbackRate;
+            if (targetTime >= this.audioContext.currentTime) {
+                audioSource.start(targetTime);
+            } else {
+                // Sample arrived late: play only the remaining portion of this buffer
+                const bufferOffset = (this.audioContext.currentTime - targetTime) * this.playbackRate;
+                if (bufferOffset < buffer.duration) {
+                    audioSource.start(this.audioContext.currentTime, bufferOffset);
+                } else {
+                    return; // Entirely in the past — skip
+                }
+            }
+
+            // Keep nextAudioTime for throttle calculation only (not for scheduling)
+            nextAudioTime = targetTime + buffer.duration / this.playbackRate;
             this._liveNextAudioTime = nextAudioTime;
 
             this.queuedAudioNodes.add(audioSource);
@@ -2101,22 +2182,23 @@ export class CorePlayer {
                 scheduleOne(audioSample);
 
                 if (sampleCount === 1) {
-                    Logger.log(`[Live:Audio] First iterator sample — ts=${timestamp.toFixed(3)}, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}`);
+                    Logger.log(`[${_audioLogTag}:Audio] First iterator sample — ts=${timestamp.toFixed(3)}, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}`);
                 }
                 if (sampleCount % 100 === 0) {
-                    Logger.log(`[Live:Audio] ${sampleCount} samples — ts=${timestamp.toFixed(3)}, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, buffer=${((nextAudioTime - this.audioContext.currentTime) * 1000).toFixed(0)}ms`);
+                    Logger.log(`[${_audioLogTag}:Audio] ${sampleCount} samples — ts=${timestamp.toFixed(3)}, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, bufferAhead=${((nextAudioTime - this.audioContext.currentTime) * 1000).toFixed(0)}ms`);
                 }
 
-// Live mode: throttle to keep audio close to video position
-                // For live streams, audio should stay ~300ms ahead to allow video to catch up
-                if (isLiveMode && this.audioContext && anchorWall && anchorContent) {
+                // Throttle audio decode to stay ~300ms ahead of playback position.
+                // isLiveMode guarantees anchorWall/anchorContent are defined; don't use them
+                // as truthiness checks because anchorContent=0 is falsy (start of file).
+                if (isLiveMode && this.audioContext) {
                     const videoContentTime = anchorContent + (this.audioContext.currentTime - anchorWall);
                     const audioContentTime = anchorContent + (nextAudioTime - anchorWall);
                     const audioAheadMs = (audioContentTime - videoContentTime) * 1000;
                     if (audioAheadMs > 300) {
                         const waitMs = audioAheadMs - 300;
                         if (sampleCount % 200 === 0) {
-                            Logger.log(`[Live:Audio] Audio ${audioAheadMs.toFixed(0)}ms ahead — throttling ${waitMs.toFixed(0)}ms`);
+                            Logger.log(`[${_audioLogTag}:Audio] Audio ${audioAheadMs.toFixed(0)}ms ahead — throttling ${waitMs.toFixed(0)}ms`);
                         }
                         await new Promise(r => setTimeout(r, waitMs));
                     }
@@ -2134,15 +2216,15 @@ export class CorePlayer {
                     });
                 }
             }
-            Logger.log(`[Live:Audio] Iterator completed after ${sampleCount} samples`);
+            Logger.log(`[${_audioLogTag}:Audio] Iterator completed after ${sampleCount} samples`);
         } catch (error) {
             if (error.name !== 'InputDisposedError' && !error.message?.includes('Input has been disposed')) {
-                Logger.error(`[Live:Audio] Iterator error after ${sampleCount} samples:`, error);
+                Logger.error(`[${_audioLogTag}:Audio] Iterator error after ${sampleCount} samples:`, error);
             } else {
-                Logger.log(`[Live:Audio] Iterator stopped (input disposed) after ${sampleCount} samples`);
+                Logger.log(`[${_audioLogTag}:Audio] Iterator stopped (input disposed) after ${sampleCount} samples`);
             }
         } finally {
-            Logger.log(`[Live:Audio] Cleanup — sampleCount=${sampleCount}, isOurIterator=${this.audioBufferIterator === myIterator}`);
+            Logger.log(`[${_audioLogTag}:Audio] Cleanup — sampleCount=${sampleCount}, isOurIterator=${this.audioBufferIterator === myIterator}`);
             if (this.audioBufferIterator === myIterator) {
                 try { await myIterator.return(); } catch (e) { }
             }
@@ -2150,7 +2232,7 @@ export class CorePlayer {
     }
 
     async _seekTo(time) {
-        Logger.log(`_seekTo called with time: ${time}`);
+        Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${this._vodAnchorWall?.toFixed(3)}, vodAnchorContent=${this._vodAnchorContent?.toFixed(3)}, playbackTime=${this._getPlaybackTime().toFixed(3)}`);
 
         this._setLoading(true);
 
@@ -2163,6 +2245,10 @@ export class CorePlayer {
         this.playbackTimeAtStart = Math.max(0, Math.min(this.duration, time));
         this.currentTime = this.playbackTimeAtStart; // Sync internal currentTime for UI
         this._updateProgress(); // Update UI immediately
+
+        // Clear VOD sync anchors so _getPlaybackTime() uses the new playbackTimeAtStart
+        this._vodAnchorWall = undefined;
+        this._vodAnchorContent = undefined;
 
         try {
             await this._startVideoIterator();
