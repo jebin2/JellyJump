@@ -110,30 +110,6 @@ export class ScreenRecorderMenu {
         const micSelectorContainer = modalOverlay.querySelector('#mic-selector-container');
         const micDeviceSelect = modalOverlay.querySelector('#mic-device-select');
 
-        // Helper to check mic permission and populate dropdown
-        const checkMicPermission = async (selectElement, selectorContainer, checkbox) => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                // Stop the stream immediately - we just needed permission
-                stream.getTracks().forEach(track => track.stop());
-
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const audioInputs = devices.filter(d => d.kind === 'audioinput');
-
-                selectElement.innerHTML = audioInputs.map(d =>
-                    `<option value="${d.deviceId}">${d.label || 'Microphone ' + (audioInputs.indexOf(d) + 1)}</option>`
-                ).join('');
-                selectorContainer.style.display = 'block';
-                return true;
-            } catch (err) {
-                // Uncheck the checkbox since permission was denied
-                if (checkbox) checkbox.checked = false;
-                selectorContainer.style.display = 'none';
-                alert('Microphone access denied. Please allow microphone access in your browser settings and try again.');
-                return false;
-            }
-        };
-
         // Helper to check camera permission
         const checkCameraPermission = async (checkbox) => {
             try {
@@ -152,7 +128,7 @@ export class ScreenRecorderMenu {
         // Mic checkbox logic
         captureAudioCheckbox.addEventListener('change', async () => {
             if (captureAudioCheckbox.checked) {
-                await checkMicPermission(micDeviceSelect, micSelectorContainer, captureAudioCheckbox);
+                await this._requestMicPermission(micDeviceSelect, micSelectorContainer, captureAudioCheckbox);
             } else {
                 micSelectorContainer.style.display = 'none';
             }
@@ -298,28 +274,19 @@ export class ScreenRecorderMenu {
         const micDeviceSelect = modalOverlay.querySelector('#cam-mic-device-select');
 
         captureAudioCheckbox.addEventListener('change', async () => {
-            if (!captureAudioCheckbox.checked) { micSelectorContainer.style.display = 'none'; return; }
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                stream.getTracks().forEach(t => t.stop());
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const inputs = devices.filter(d => d.kind === 'audioinput');
-                micDeviceSelect.innerHTML = inputs.map((d, i) =>
-                    `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
-                ).join('');
-                micSelectorContainer.style.display = 'block';
-            } catch {
-                captureAudioCheckbox.checked = false;
+            if (captureAudioCheckbox.checked) {
+                await this._requestMicPermission(micDeviceSelect, micSelectorContainer, captureAudioCheckbox);
+            } else {
                 micSelectorContainer.style.display = 'none';
-                alert('Microphone access denied.');
             }
         });
 
         modalOverlay.querySelector('.mb-modal-start').addEventListener('click', () => {
             const captureAudio = captureAudioCheckbox.checked;
             const micDeviceId = captureAudio ? micDeviceSelect.value : null;
+            const disableEchoCancel = modalOverlay.querySelector('#cam-disable-echo-cancel')?.checked ?? false;
             closeModal();
-            this._startWebcamRecording(playlist, captureAudio, micDeviceId);
+            this._startWebcamRecording(playlist, captureAudio, micDeviceId, disableEchoCancel);
         });
     }
 
@@ -327,16 +294,16 @@ export class ScreenRecorderMenu {
      * @param {string} mode - 'pip', 'popup', 'in-page', 'off'
      * @param {string} displaySurface - 'monitor', 'browser', or null for free choice
      */
-    static async _startWebcamRecording(playlist, captureAudio = true, micDeviceId = null) {
+    static async _startWebcamRecording(playlist, captureAudio = true, micDeviceId = null, disableEchoCancel = false) {
         try {
             // Build audio constraints
             let audioConstraints = captureAudio;
-            if (captureAudio && micDeviceId) {
+            if (captureAudio) {
                 audioConstraints = {
-                    deviceId: { exact: micDeviceId },
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
+                    echoCancellation: !disableEchoCancel,
+                    noiseSuppression: !disableEchoCancel,
+                    autoGainControl: !disableEchoCancel,
+                    ...(micDeviceId && { deviceId: { exact: micDeviceId } }),
                 };
             }
 
@@ -797,6 +764,25 @@ export class ScreenRecorderMenu {
             if (playlist.loadMedia) playlist.loadMedia(playlist.files.length - 1);
         }
         playlist._showToast('Recording saved to playlist', 'success');
+    }
+
+    static async _requestMicPermission(selectEl, containerEl, checkboxEl) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const inputs = devices.filter(d => d.kind === 'audioinput');
+            selectEl.innerHTML = inputs.map((d, i) =>
+                `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
+            ).join('');
+            containerEl.style.display = 'block';
+            return true;
+        } catch {
+            if (checkboxEl) checkboxEl.checked = false;
+            containerEl.style.display = 'none';
+            alert('Microphone access denied. Please allow microphone access in your browser settings and try again.');
+            return false;
+        }
     }
 
     static _updateButtonState(isRecording) {
