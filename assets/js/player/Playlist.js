@@ -2298,13 +2298,21 @@ export class Playlist {
             const content = document.createElement('div');
             content.className = 'tools-grid';
             content.innerHTML = `
-                <button class="tools-tile" data-action="screen-record" title="Record Screen/Webcam">
+                <button class="tools-tile" data-action="screen-record" title="Record Screen">
                     <div class="tools-tile-icon">
                         <svg width="24" height="24" fill="currentColor">
                             <use href="assets/icons/sprite.svg#icon-record"></use>
                         </svg>
                     </div>
-                    <span class="tools-tile-label">Record</span>
+                    <span class="tools-tile-label">Record Screen</span>
+                </button>
+                <button class="tools-tile" data-action="camera-record" title="Camera Recording">
+                    <div class="tools-tile-icon">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-camera"></use>
+                        </svg>
+                    </div>
+                    <span class="tools-tile-label">Camera</span>
                 </button>
                 <button class="tools-tile" data-action="merge" title="Merge Videos">
                     <div class="tools-tile-icon">
@@ -2344,6 +2352,9 @@ export class Playlist {
                     if (action === 'screen-record') {
                         const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
                         ScreenRecorderMenu.showOptions(this);
+                    } else if (action === 'camera-record') {
+                        const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
+                        ScreenRecorderMenu.showCameraOptions(this);
                     } else if (action === 'merge') {
                         const { MergeMenu } = await import('./menu/MergeMenu.js');
                         MergeMenu.init(null, this);

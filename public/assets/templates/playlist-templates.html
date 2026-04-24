@@ -1817,14 +1817,6 @@
                 <button class="mb-modal-close" aria-label="Close">&times;</button>
             </div>
             <div class="mb-modal-body">
-                <p class="text-secondary text-sm mb-lg">Choose your recording source:</p>
-
-                <!-- Recording Mode Tabs -->
-                <div class="recorder-tabs">
-                    <button class="recorder-tab-btn active" id="tab-screen-record">Screen</button>
-                    <button class="recorder-tab-btn" id="tab-webcam-record">Camera</button>
-                </div>
-
                 <div id="screen-record-options">
                     <div class="options-group mb-lg">
                         <!-- Source Constraint (Top) -->
@@ -1927,34 +1919,6 @@
                     </div>
                 </div>
 
-                <!-- Webcam Only Options -->
-                <div id="webcam-record-options" class="hidden text-center py-lg">
-                    <div
-                        class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-bg-tertiary mb-md text-3xl">
-                        📹
-                    </div>
-                    <h3 class="text-lg font-bold text-primary mb-sm">Record Camera Only</h3>
-                    <p class="text-sm text-secondary mb-md">This will display your camera in the main player and record
-                        it
-                        directly.</p>
-
-                    <!-- Microphone Option for Webcam -->
-                    <div class="text-left mt-md">
-                        <label class="checkbox-option flex items-center mb-sm cursor-pointer justify-center">
-                            <input type="checkbox" id="webcam-capture-audio" class="mr-sm">
-                            <span class="block text-sm font-bold text-primary">Record Microphone</span>
-                        </label>
-
-                        <div id="webcam-mic-selector-container" class="mb-md px-lg" style="display: none;">
-                            <select id="webcam-mic-device-select" class="mb-select w-full">
-                                <option value="">Loading microphones...</option>
-                            </select>
-                            <a href="https://webcammictest.com/" target="_blank" rel="noopener noreferrer"
-                                class="text-xs text-accent hover-underline mt-xs inline-block">📹 Test your webcam &
-                                mic: https://webcammictest.com/mic/</a>
-                        </div>
-                    </div>
-                </div>
             </div>
             <div class="mb-modal-footer flex justify-end gap-sm">
                 <button class="jellyjump-btn-secondary mb-modal-cancel">Cancel</button>

@@ -105,15 +105,10 @@ export class ScreenRecorderMenu {
         surfaceRadios.forEach(r => r.addEventListener('change', updateVisibility));
         // Note: enableFacecamCheckbox listener is added below with camera permission check
 
-        // Mic Selector Elements (Screen tab)
+        // Mic Selector Elements
         const captureAudioCheckbox = modalOverlay.querySelector('#capture-audio');
         const micSelectorContainer = modalOverlay.querySelector('#mic-selector-container');
         const micDeviceSelect = modalOverlay.querySelector('#mic-device-select');
-
-        // Mic Selector Elements (Webcam tab)
-        const webcamCaptureAudioCheckbox = modalOverlay.querySelector('#webcam-capture-audio');
-        const webcamMicSelectorContainer = modalOverlay.querySelector('#webcam-mic-selector-container');
-        const webcamMicDeviceSelect = modalOverlay.querySelector('#webcam-mic-device-select');
 
         // Helper to check mic permission and populate dropdown
         const checkMicPermission = async (selectElement, selectorContainer, checkbox) => {
@@ -154,7 +149,7 @@ export class ScreenRecorderMenu {
             }
         };
 
-        // Screen tab mic checkbox logic
+        // Mic checkbox logic
         captureAudioCheckbox.addEventListener('change', async () => {
             if (captureAudioCheckbox.checked) {
                 await checkMicPermission(micDeviceSelect, micSelectorContainer, captureAudioCheckbox);
@@ -162,17 +157,6 @@ export class ScreenRecorderMenu {
                 micSelectorContainer.style.display = 'none';
             }
         });
-
-        // Webcam tab mic checkbox logic
-        if (webcamCaptureAudioCheckbox) {
-            webcamCaptureAudioCheckbox.addEventListener('change', async () => {
-                if (webcamCaptureAudioCheckbox.checked) {
-                    await checkMicPermission(webcamMicDeviceSelect, webcamMicSelectorContainer, webcamCaptureAudioCheckbox);
-                } else {
-                    webcamMicSelectorContainer.style.display = 'none';
-                }
-            });
-        }
 
         // Facecam checkbox - request camera permission immediately
         enableFacecamCheckbox.addEventListener('change', async () => {
@@ -231,44 +215,7 @@ export class ScreenRecorderMenu {
             }
         });
 
-        // Tab Logic
-        const tabScreen = modalOverlay.querySelector('#tab-screen-record');
-        const tabWebcam = modalOverlay.querySelector('#tab-webcam-record');
-        const screenOptions = modalOverlay.querySelector('#screen-record-options');
-        const webcamOptions = modalOverlay.querySelector('#webcam-record-options');
-        let currentMode = 'screen'; // 'screen' or 'webcam'
-
-        const switchTab = (mode) => {
-            currentMode = mode;
-            if (mode === 'screen') {
-                tabScreen.classList.add('active');
-                tabWebcam.classList.remove('active');
-                screenOptions.style.display = 'block';
-                webcamOptions.style.display = 'none';
-                webcamOptions.classList.add('hidden');
-            } else {
-                tabScreen.classList.remove('active');
-                tabWebcam.classList.add('active');
-                screenOptions.style.display = 'none';
-                webcamOptions.style.display = 'block';
-                webcamOptions.classList.remove('hidden');
-            }
-        };
-
-        if (tabScreen && tabWebcam) {
-            tabScreen.addEventListener('click', () => switchTab('screen'));
-            tabWebcam.addEventListener('click', () => switchTab('webcam'));
-        }
-
         startBtn.addEventListener('click', () => {
-            if (currentMode === 'webcam') {
-                const captureAudio = webcamCaptureAudioCheckbox ? webcamCaptureAudioCheckbox.checked : true;
-                const micDeviceId = captureAudio && webcamMicDeviceSelect ? webcamMicDeviceSelect.value : null;
-                closeModal();
-                this._startWebcamRecording(playlist, captureAudio, micDeviceId);
-                return;
-            }
-
             const isFacecamEnabled = enableFacecamCheckbox ? enableFacecamCheckbox.checked : false;
             let mode = 'off';
 
@@ -296,9 +243,87 @@ export class ScreenRecorderMenu {
         this._startRecording(playlist, 'off', 'monitor');
     }
 
+    static async showCameraOptions(playlist) {
+        if (this.isRecording) {
+            this.stopRecording(playlist);
+            return;
+        }
+
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'mb-modal-overlay';
+        modalOverlay.innerHTML = `
+            <div class="mb-modal" role="dialog" aria-modal="true">
+                <div class="mb-modal-header">
+                    <h3 class="mb-modal-title">Camera Recording</h3>
+                    <button class="mb-modal-close" aria-label="Close">&times;</button>
+                </div>
+                <div class="mb-modal-body">
+                    <div class="text-center mb-lg">
+                        <p class="text-sm text-secondary">Records your camera directly into the player.</p>
+                    </div>
+                    <label class="checkbox-option flex items-center mb-sm cursor-pointer">
+                        <input type="checkbox" id="cam-capture-audio" class="mr-sm">
+                        <span class="block text-sm font-bold text-primary">Record Microphone</span>
+                    </label>
+                    <div id="cam-mic-selector-container" style="display:none;" class="mb-md pl-md">
+                        <select id="cam-mic-device-select" class="mb-select w-full">
+                            <option value="">Loading microphones...</option>
+                        </select>
+                        <label class="checkbox-option flex items-center mt-sm cursor-pointer">
+                            <input type="checkbox" id="cam-disable-echo-cancel" class="mr-sm">
+                            <div>
+                                <span class="block text-xs text-primary">Include system audio</span>
+                                <span class="block text-xs text-secondary">Use headphones to avoid echo.</span>
+                            </div>
+                        </label>
+                        <a href="https://webcammictest.com/mic/" target="_blank" rel="noopener noreferrer"
+                            class="text-xs text-accent hover-underline mt-xs inline-block">🎙️ Test your microphone</a>
+                    </div>
+                </div>
+                <div class="mb-modal-footer flex justify-end gap-sm">
+                    <button class="jellyjump-btn-secondary mb-modal-cancel">Cancel</button>
+                    <button class="jellyjump-btn-primary mb-modal-start">Start Recording</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modalOverlay);
+
+        const closeModal = () => { if (modalOverlay.parentNode) document.body.removeChild(modalOverlay); };
+        modalOverlay.querySelector('.mb-modal-close').addEventListener('click', closeModal);
+        modalOverlay.querySelector('.mb-modal-cancel').addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) e.preventDefault(); });
+
+        const captureAudioCheckbox = modalOverlay.querySelector('#cam-capture-audio');
+        const micSelectorContainer = modalOverlay.querySelector('#cam-mic-selector-container');
+        const micDeviceSelect = modalOverlay.querySelector('#cam-mic-device-select');
+
+        captureAudioCheckbox.addEventListener('change', async () => {
+            if (!captureAudioCheckbox.checked) { micSelectorContainer.style.display = 'none'; return; }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(t => t.stop());
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const inputs = devices.filter(d => d.kind === 'audioinput');
+                micDeviceSelect.innerHTML = inputs.map((d, i) =>
+                    `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
+                ).join('');
+                micSelectorContainer.style.display = 'block';
+            } catch {
+                captureAudioCheckbox.checked = false;
+                micSelectorContainer.style.display = 'none';
+                alert('Microphone access denied.');
+            }
+        });
+
+        modalOverlay.querySelector('.mb-modal-start').addEventListener('click', () => {
+            const captureAudio = captureAudioCheckbox.checked;
+            const micDeviceId = captureAudio ? micDeviceSelect.value : null;
+            closeModal();
+            this._startWebcamRecording(playlist, captureAudio, micDeviceId);
+        });
+    }
+
     /**
-     * Start Recording
-     * @param {Playlist} playlist 
      * @param {string} mode - 'pip', 'popup', 'in-page', 'off'
      * @param {string} displaySurface - 'monitor', 'browser', or null for free choice
      */
