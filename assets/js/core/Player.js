@@ -2026,7 +2026,7 @@ export class CorePlayer {
                 
                 if (this._frameSyncLogCount === undefined) this._frameSyncLogCount = 0;
                 this._frameSyncLogCount++;
-                if (this._frameSyncLogCount % 60 === 0 && this._vodAnchorWall !== undefined) {
+                if (this._frameSyncLogCount % 60 === 0 && this._vodAnchorWall !== undefined && !this.isLive) {
                     const nextTs = this.nextFrame?.timestamp;
                     const drift = nextTs !== undefined ? ((nextTs - playbackTime) * 1000).toFixed(0) : 'n/a';
                     Logger.log(`[FrameSync] frame=${this._frameSyncLogCount}, playback=${playbackTime.toFixed(3)}, nextFrameTs=${nextTs?.toFixed(3) ?? 'none'}, drift=${drift}ms, audioCtx=${this.audioContext?.currentTime?.toFixed(3)}`);
@@ -2141,20 +2141,17 @@ export class CorePlayer {
                 audioSource.connect(this.gainNode);
             }
 
-            // Absolute timestamp scheduling (mirrors the official MediaBunny example):
-            // Each sample independently maps its media timestamp to an audioCtx wall-clock time.
-            // Unlike sequential scheduling, a late-arriving sample never shifts subsequent ones.
+            // Absolute timestamp scheduling: each sample maps independently to audioCtx time.
+            // A network stall that delays a segment causes a brief skip/silence rather than
+            // accumulating drift (as sequential scheduling would).
             const targetTime = anchorWall + (timestamp - anchorContent) / this.playbackRate;
-
             if (!firstSampleScheduled) {
                 firstSampleScheduled = true;
                 Logger.log(`[${_audioLogTag}:Audio] First sample — ts=${timestamp.toFixed(3)}, targetTime=${targetTime.toFixed(3)}, audioCtx=${this.audioContext.currentTime.toFixed(3)}, bufDur=${buffer.duration.toFixed(3)}s`);
             }
-
             if (targetTime >= this.audioContext.currentTime) {
                 audioSource.start(targetTime);
             } else {
-                // Sample arrived late: play only the remaining portion of this buffer
                 const bufferOffset = (this.audioContext.currentTime - targetTime) * this.playbackRate;
                 if (bufferOffset < buffer.duration) {
                     audioSource.start(this.audioContext.currentTime, bufferOffset);
@@ -2162,8 +2159,6 @@ export class CorePlayer {
                     return; // Entirely in the past — skip
                 }
             }
-
-            // Keep nextAudioTime for throttle calculation only (not for scheduling)
             nextAudioTime = targetTime + buffer.duration / this.playbackRate;
             this._liveNextAudioTime = nextAudioTime;
 
@@ -2189,16 +2184,17 @@ export class CorePlayer {
                 }
 
                 // Throttle audio decode to stay ~300ms ahead of playback position.
+                // Use this sample's targetTime (not nextAudioTime) so stalls that cause
+                // skipped samples don't leave nextAudioTime stale and disable the throttle.
                 // isLiveMode guarantees anchorWall/anchorContent are defined; don't use them
                 // as truthiness checks because anchorContent=0 is falsy (start of file).
                 if (isLiveMode && this.audioContext) {
-                    const videoContentTime = anchorContent + (this.audioContext.currentTime - anchorWall);
-                    const audioContentTime = anchorContent + (nextAudioTime - anchorWall);
-                    const audioAheadMs = (audioContentTime - videoContentTime) * 1000;
-                    if (audioAheadMs > 300) {
-                        const waitMs = audioAheadMs - 300;
+                    const sampleTargetTime = anchorWall + (timestamp - anchorContent) / this.playbackRate;
+                    const aheadMs = (sampleTargetTime - this.audioContext.currentTime) * 1000;
+                    if (aheadMs > 300) {
+                        const waitMs = aheadMs - 300;
                         if (sampleCount % 200 === 0) {
-                            Logger.log(`[${_audioLogTag}:Audio] Audio ${audioAheadMs.toFixed(0)}ms ahead — throttling ${waitMs.toFixed(0)}ms`);
+                            Logger.log(`[${_audioLogTag}:Audio] Audio ${aheadMs.toFixed(0)}ms ahead — throttling ${waitMs.toFixed(0)}ms`);
                         }
                         await new Promise(r => setTimeout(r, waitMs));
                     }
