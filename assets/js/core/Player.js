@@ -2197,6 +2197,18 @@ export class CorePlayer {
                             Logger.log(`[${_audioLogTag}:Audio] Audio ${aheadMs.toFixed(0)}ms ahead — throttling ${waitMs.toFixed(0)}ms`);
                         }
                         await new Promise(r => setTimeout(r, waitMs));
+                    } else if (aheadMs < -1000 && this.isPlaying && this.isLive) {
+                        // Audio fell >1s behind (segment stall caused anchor drift) — jump to live edge.
+                        // Mirrors the video loop's deep-resync at PlayerStream.js startLiveVideoLoop.
+                        Logger.warn(`[${_audioLogTag}:Audio] Audio ${(-aheadMs).toFixed(0)}ms behind — triggering live resync`);
+                        this._setLoading(true);
+                        if (this.videoTrack) {
+                            const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+                            this._liveStartTimestamp = currentLiveEdge ?? this._liveStartTimestamp;
+                            Logger.log(`[${_audioLogTag}:Audio] Jumping to live edge: ${this._liveStartTimestamp?.toFixed(3)}`);
+                        }
+                        this._startLiveVideoLoop();
+                        break;
                     }
                 }
 
