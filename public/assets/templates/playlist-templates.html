@@ -1828,14 +1828,22 @@
                 <div id="screen-record-options">
                     <div class="options-group mb-lg">
                         <!-- Source Constraint (Top) -->
-                        <label
-                            class="checkbox-option flex items-center cursor-pointer mb-md p-sm bg-bg-tertiary rounded-md border border-border-light">
-                            <input type="checkbox" id="prefer-current-tab" class="mr-sm">
-                            <div>
-                                <span class="block text-sm font-bold text-primary">Record this tab only</span>
-                                <span class="block text-xs text-secondary">Uncheck to record other windows/apps.</span>
-                            </div>
-                        </label>
+                        <div class="mb-md">
+                            <label class="radio-option flex items-center cursor-pointer mb-sm p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="record-entire-screen" value="monitor" class="mr-sm" checked>
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Record Entire Screen</span>
+                                    <span class="block text-xs text-secondary">Capture everything on your display.</span>
+                                </div>
+                            </label>
+                            <label class="radio-option flex items-center cursor-pointer p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="prefer-current-tab" value="browser" class="mr-sm">
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Record this tab only</span>
+                                    <span class="block text-xs text-secondary">Only records content in this browser tab.</span>
+                                </div>
+                            </label>
+                        </div>
 
                         <!-- Capture Audio Checkbox -->
                         <label class="checkbox-option flex items-center mb-sm cursor-pointer">

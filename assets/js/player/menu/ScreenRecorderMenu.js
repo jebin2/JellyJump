@@ -42,9 +42,13 @@ export class ScreenRecorderMenu {
         const startBtn = modalOverlay.querySelector('.mb-modal-start');
         const hint = modalOverlay.querySelector('#facecam-hint');
         const radios = modalOverlay.querySelectorAll('input[name="facecam-mode"]');
-        const preferTabCheckbox = modalOverlay.querySelector('#prefer-current-tab');
+        const surfaceRadios = modalOverlay.querySelectorAll('input[name="record-surface"]');
         const enableFacecamCheckbox = modalOverlay.querySelector('#enable-facecam');
         const facecamOptions = modalOverlay.querySelector('#facecam-options');
+        const getSelectedSurface = () => {
+            const checked = modalOverlay.querySelector('input[name="record-surface"]:checked');
+            return checked ? checked.value : 'monitor';
+        };
 
         // Option Containers
         const optPiP = modalOverlay.querySelector('.option-pip');
@@ -53,7 +57,7 @@ export class ScreenRecorderMenu {
 
         // Dynamic Visibility Function
         const updateVisibility = () => {
-            const isTabOnly = preferTabCheckbox.checked;
+            const isTabOnly = getSelectedSurface() === 'browser';
             const isFacecamEnabled = enableFacecamCheckbox.checked;
 
             if (!isFacecamEnabled) {
@@ -97,8 +101,8 @@ export class ScreenRecorderMenu {
             }
         };
 
-        // Attach Checkbox Listeners
-        preferTabCheckbox.addEventListener('change', updateVisibility);
+        // Attach Source Listeners
+        surfaceRadios.forEach(r => r.addEventListener('change', updateVisibility));
         // Note: enableFacecamCheckbox listener is added below with camera permission check
 
         // Mic Selector Elements (Screen tab)
@@ -186,7 +190,6 @@ export class ScreenRecorderMenu {
         });
 
         // Initial State
-        preferTabCheckbox.checked = false;
         enableFacecamCheckbox.checked = false;
         updateVisibility();
 
@@ -274,14 +277,14 @@ export class ScreenRecorderMenu {
                 mode = selected ? selected.value : 'off';
             }
 
-            const preferCurrentTab = preferTabCheckbox ? preferTabCheckbox.checked : false;
+            const displaySurface = getSelectedSurface();
             const captureAudio = captureAudioCheckbox ? captureAudioCheckbox.checked : false;
             const micDeviceId = captureAudio && micDeviceSelect ? micDeviceSelect.value : null;
             const disableEchoCancelCheckbox = modalOverlay.querySelector('#disable-echo-cancel');
             const disableEchoCancel = disableEchoCancelCheckbox ? disableEchoCancelCheckbox.checked : false;
 
             closeModal();
-            this._startRecording(playlist, mode, preferCurrentTab, captureAudio, micDeviceId, disableEchoCancel);
+            this._startRecording(playlist, mode, displaySurface, captureAudio, micDeviceId, disableEchoCancel);
         });
     }
 
@@ -290,14 +293,14 @@ export class ScreenRecorderMenu {
             this.stopRecording(playlist);
             return;
         }
-        this._startRecording(playlist, 'off', false);
+        this._startRecording(playlist, 'off', 'monitor');
     }
 
     /**
      * Start Recording
      * @param {Playlist} playlist 
      * @param {string} mode - 'pip', 'popup', 'in-page', 'off'
-     * @param {boolean} preferCurrentTab - Whether to restrict to current tab
+     * @param {string} displaySurface - 'monitor', 'browser', or null for free choice
      */
     static async _startWebcamRecording(playlist, captureAudio = true, micDeviceId = null) {
         try {
@@ -346,7 +349,7 @@ export class ScreenRecorderMenu {
         }
     }
 
-    static async _startRecording(playlist, mode, preferCurrentTab = false, captureAudio = false, micDeviceId = null, disableEchoCancel = false) {
+    static async _startRecording(playlist, mode, displaySurface = 'monitor', captureAudio = false, micDeviceId = null, disableEchoCancel = false) {
         try {
             this.chunks = [];
             this.currentMode = mode;
@@ -364,10 +367,12 @@ export class ScreenRecorderMenu {
                 audio: false
             };
 
-            if (preferCurrentTab) {
+            if (displaySurface === 'browser') {
                 constraints.video.displaySurface = "browser";
                 constraints.selfBrowserSurface = "include";
                 constraints.preferCurrentTab = true;
+            } else if (displaySurface === 'monitor') {
+                constraints.video.displaySurface = "monitor";
             }
 
             this.stream = await navigator.mediaDevices.getDisplayMedia(constraints);
@@ -437,7 +442,6 @@ export class ScreenRecorderMenu {
 
             const audioTracks = combinedStream.getAudioTracks();
             this._updateButtonState(true);
-            playlist.setRecordingState(true);
             const audioStatus = captureAudio ? (audioTracks.length > 0 ? '🎤 Mic ON' : '⚠️ No mic') : '🔇 No Audio';
             playlist._showToast(`Recording started (${audioStatus})`, 'info');
 
@@ -715,7 +719,6 @@ export class ScreenRecorderMenu {
 
             this.isRecording = false;
             this._updateButtonState(false);
-            playlist.setRecordingState(false);
             playlist._showToast('Processing recording...', 'info');
         }
     }
@@ -737,7 +740,6 @@ export class ScreenRecorderMenu {
             this.stream = null;
             this._stopFacecam();
             this._updateButtonState(false);
-            playlist.setRecordingState(false);
         }
     }
 
