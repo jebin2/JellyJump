@@ -298,7 +298,7 @@ export class MediaProcessor {
      */
     static _createInput(source) {
         if (typeof source === 'string') {
-            return MediaBunny.createInputFrom(source, [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS]);
+            return new MediaBunny.Input({ source: new MediaBunny.UrlSource(source), formats: [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS] });
         }
         return new MediaBunny.Input({ source: new MediaBunny.BlobSource(source), formats: MediaBunny.ALL_FORMATS });
     }
