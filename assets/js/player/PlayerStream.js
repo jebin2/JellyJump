@@ -865,7 +865,9 @@ export class PlayerStream {
         } catch (e) {
             Logger.warn(`[Live:Video] Loop error after ${frameCount} frames: ${e.message}`);
         } finally {
-            player._setLoading(false);
+            // Only clear loading state if we're still the active loop — a newer loop may have
+            // already set _setLoading(true) and must not be interrupted by this stale finally.
+            if (player.asyncId === asyncId) player._setLoading(false);
         }
     }
 }
