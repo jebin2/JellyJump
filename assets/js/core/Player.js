@@ -1437,7 +1437,7 @@ export class CorePlayer {
     }
 
     async _setupMediaTracks(url, isHls) {
-        const urlSourceOptions = this.withCredentials ? { requestInit: { credentials: 'include' } } : {};
+        const urlSourceOptions = this.config.withCredentials ? { requestInit: { credentials: 'include' } } : {};
         this.input = new MediaBunny.Input({ source: new MediaBunny.UrlSource(url, urlSourceOptions), formats: [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS] });
 
         if (!isHls) {
