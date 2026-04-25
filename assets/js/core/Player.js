@@ -26,6 +26,13 @@ import {
     cleanupPlayerMediaBunny
 } from './playback/MediaLifecycle.js';
 import {
+    getPlayerPlaybackTime,
+    handlePlayerVisibilityChange,
+    togglePlayerPlay,
+    cyclePlayerSpeed,
+    stepPlayerFrame
+} from './playback/PlaybackState.js';
+import {
     createStreamController,
     getStreamState,
     setStreamState
@@ -481,29 +488,14 @@ export class CorePlayer {
     _handleKeyboard(e) { this.keyboard.handleKeyboard(e); }
     _toggleHelp() { this.keyboard.toggleHelp(); }
 
-    _cycleSpeed(direction) {
-        const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-        let index = speeds.indexOf(this.playbackRate);
-        if (index === -1) index = 3; // Default to 1x if weird value
-
-        index += direction;
-        if (index >= 0 && index < speeds.length) {
-            this.setPlaybackRate(speeds[index]);
-        }
-    }
+    _cycleSpeed(direction) { cyclePlayerSpeed(this, direction); }
 
     /**
      * Step forward or backward by frames
      * @param {number} direction - 1 for forward, -1 for backward
      * @private
      */
-    _stepFrame(direction) {
-        // Use actual frame rate if available, otherwise default to 30fps
-        const fps = this.frameRate || 30;
-        const frameDuration = 1 / fps;
-        const newTime = this.currentTime + (direction * frameDuration);
-        this._seekTo(Math.max(0, Math.min(this.duration, newTime)));
-    }
+    _stepFrame(direction) { stepPlayerFrame(this, direction); }
 
     /**
      * Clear the canvas
@@ -677,34 +669,7 @@ export class CorePlayer {
      * Note: We don't multiply by playbackRate here because audioContext.currentTime advances at real-time,
      * but audio sources play at playbackRate speed, effectively advancing media time faster.
      */
-    _getPlaybackTime() {
-        // Stream mode (HLS) delegates to video element
-        if (this.isStreamMode && this.streamVideo) {
-            return this.streamVideo.currentTime;
-        }
-
-        // Audio-synced mode: If we have VOD sync anchors, calculate position from audioContext
-        // This ensures video stays synced to the audio master clock
-        // The formula: currentPosition = startPosition + (audioClock - startAudioClock)
-        if (this._vodAnchorWall !== undefined && this._vodAnchorContent !== undefined && this.audioContext) {
-            const elapsed = this.audioContext.currentTime - this._vodAnchorWall;
-            const newPosition = this._vodAnchorContent + elapsed;
-            // Only use if not going backwards
-            if (newPosition >= this._vodAnchorContent - 0.1) {
-                return newPosition;
-            }
-            return this._vodAnchorContent;
-        }
-
-        // File-based playback (MediaBunny) - Stopwatch Mode
-        // We use performance.now() as the Master Clock to ensure linearity and prevent jumps.
-        if (this.isPlaying && this.fallbackStartTime !== undefined) {
-            const elapsedRealTime = (performance.now() - this.fallbackStartTime) / 1000;
-            return elapsedRealTime * this.playbackRate + this.playbackTimeAtStart;
-        }
-
-        return this.playbackTimeAtStart;
-    }
+    _getPlaybackTime() { return getPlayerPlaybackTime(this); }
 
     /**
      * Handle visibility change (tab switching).
@@ -719,67 +684,12 @@ export class CorePlayer {
      * When visible again, restart video from current live edge (not where user left).
      * @private
      */
-    async _handleVisibilityChange() {
-        // Skip for stream mode - native video element handles this
-        if (this.isStreamMode) return;
-
-        // Only handle if we're currently playing
-        if (!this.isPlaying) return;
-
-        if (document.hidden) {
-            // Tab is now hidden - remember state but don't pause (audio continues)
-            this._wasHiddenWhilePlaying = true;
-            Logger.log(`[Visibility] Tab hidden at playback time: ${this._getPlaybackTime().toFixed(2)}s`);
-        } else if (this._wasHiddenWhilePlaying) {
-            // Tab is now visible again - use live edge (audio throttle will keep sync)
-            this._setLoading(true);
-            if (this.isLive && this.videoTrack) {
-                const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                this._liveStartTimestamp = currentLiveEdge ?? 0;
-                Logger.log(`[Visibility:Visible:Live] Live edge ${currentLiveEdge?.toFixed(3)}`);
-                this._startLiveVideoLoop();
-            } else if (this.isLive) {
-                // Fallback: just restart
-                this._startLiveVideoLoop();
-            } else {
-                // For VOD: restart video from where audio is
-                const currentTime = this._getPlaybackTime();
-                Logger.log(`[Visibility] Tab visible, syncing video to: ${currentTime.toFixed(2)}s`);
-                this._startVideoIterator();
-            }
-
-            // Clear the flag
-            this._wasHiddenWhilePlaying = false;
-        }
-    }
+    async _handleVisibilityChange() { return handlePlayerVisibilityChange(this); }
 
     /**
      * Toggle play/pause
      */
-    togglePlay() {
-        // Restore audio if muted for autoplay (user is now interacting)
-        if (this._wasMutedForAutoplay && this.gainNode) {
-            Logger.log('[Autoplay] Play button pressed, restoring audio...');
-            this.config.muted = false;
-            this.gainNode.gain.value = this.config.volume;
-            this._wasMutedForAutoplay = false;
-            this._updateVolumeUI();
-        }
-
-        // If no video loaded (neither file nor stream), try to request play from playlist
-        if (!this.videoTrack && !this.audioTrack && !this.isStreamMode && !this.currentVideoId) {
-            if (this.onPlayRequest) {
-                this.onPlayRequest();
-            }
-            return;
-        }
-
-        if (this.isPlaying) {
-            this.pause();
-        } else {
-            this.play();
-        }
-    }
+    togglePlay() { togglePlayerPlay(this); }
 
     async play() {
         this.stream.onPlay();
