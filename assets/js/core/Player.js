@@ -13,7 +13,7 @@ import {
 } from './config.js';
 import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
-import { AudioEqualizer } from '../player/AudioEqualizer.js';
+import { initPlayerAudio } from './audio/AudioEngine.js';
 import { mountPlayerShell } from '../ui/player/PlayerShell.js';
 import { createHelpOverlay } from '../ui/player/PlayerOverlays.js';
 import { createPlayerControls } from '../ui/player/PlayerControlsView.js';
@@ -281,43 +281,7 @@ export class CorePlayer {
      * @private
      */
     _initAudio() {
-        if (this.isAudioInitialized) return;
-
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        this.audioContext = new AudioContext();
-
-        // Create Gain Node (Volume)
-        this.gainNode = this.audioContext.createGain();
-
-        // Initialize Equalizer if enabled
-        if (this.config.controls.equalizer) {
-            this.audioEqualizer = new AudioEqualizer(this.audioContext);
-            const eqInput = this.audioEqualizer.init();
-            const eqOutput = this.audioEqualizer.getOutputNode();
-
-            // Chain: EQ Output -> Gain Node
-            // Note: Source connection happens in _runAudioIterator
-            eqOutput.connect(this.gainNode);
-        }
-
-        // Connect gainNode to destination for audio output
-        this.gainNode.connect(this.audioContext.destination);
-
-        // Set initial volume
-        this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
-
-        // Lazy-load AudioVisualizer (taps into gainNode for analysis)
-        if (!this.audioVisualizer && this.canvas) {
-            import('../player/AudioVisualizer.js').then(({ AudioVisualizer }) => {
-                if (!this.audioVisualizer && this.canvas && this.audioContext && this.gainNode) {
-                    this.audioVisualizer = new AudioVisualizer(this.canvas);
-                    this.audioVisualizer.connect(this.audioContext, this.gainNode);
-                }
-            });
-        }
-
-        this.isInitialized = true;
-        this.isAudioInitialized = true;
+        initPlayerAudio(this);
     }
 
     /**
