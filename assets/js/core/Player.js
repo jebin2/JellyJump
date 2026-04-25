@@ -13,10 +13,10 @@ import {
 } from './config.js';
 import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
-import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
 import { mountPlayerShell } from '../ui/player/PlayerShell.js';
 import { createHelpOverlay } from '../ui/player/PlayerOverlays.js';
+import { createPlayerControls } from '../ui/player/PlayerControlsView.js';
 import { PlayerStream } from '../player/PlayerStream.js';
 import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
@@ -324,137 +324,7 @@ export class CorePlayer {
      * @private
      */
     _createControls() {
-        const mount = (id) => {
-            const t = document.getElementById(id);
-            if (t) this.container.appendChild(t.content.cloneNode(true));
-        };
-        const q = (sel) => this.container.querySelector(sel);
-
-        mount('player-loader-template');
-        this.ui.loader = q('.jellyjump-loader');
-
-        mount('player-controls-template');
-        if (this.config.controls.loop) mount('player-loop-panel-template');
-
-        if (this.screenshotManager) this.screenshotManager.init();
-
-        this.ui.controls = q('.jellyjump-controls');
-        this.ui.playOverlay = q('.jellyjump-play-overlay');
-        this.ui.bezelOverlay = q('.jellyjump-bezel-overlay');
-
-        if (!this.config.controls.playOverlay && this.ui.playOverlay) {
-            this.ui.playOverlay.style.display = 'none';
-        }
-
-        if (this.config.controls.playPause) this.ui.playBtn = q('#mb-play-btn');
-        if (this.config.controls.navigation) {
-            this.ui.prevBtn = q('#mb-prev-btn');
-            this.ui.nextBtn = q('#mb-next-btn');
-        }
-        if (this.config.controls.progress) {
-            this.ui.progressContainer = q('.jellyjump-progress-container');
-            this.ui.progressBar = q('.jellyjump-progress-bar');
-        }
-        if (this.config.controls.time) this.ui.timeDisplay = q('#mb-time-display');
-        if (this.config.controls.fullscreen) this.ui.fullscreenBtn = q('#mb-fullscreen-btn');
-        if (this.config.controls.modeToggle) this.ui.modeToggleBtn = q('#mb-mode-toggle-btn');
-
-        if (this.config.controls.captions) this._initCaptionsPanel();
-        if (this.config.controls.speed) this._initSpeedPanel();
-        if (this.config.controls.loop) this._initLoopPanel();
-        if (this.config.controls.filters) this._initFiltersPanel();
-        if (this.config.controls.equalizer) this._initEqualizerPanel();
-
-        this._createErrorOverlay();
-        this._createThumbnailOverlay();
-        this._applyControlVisibility();
-        if (this.config.controls.speed) this._updateSpeedMenu();
-    }
-
-    _initCaptionsPanel() {
-        const t = document.getElementById('player-subtitle-panel-template');
-        if (t) this.container.appendChild(t.content.cloneNode(true));
-        const q = (sel) => this.container.querySelector(sel);
-        this.ui.ccBtn = q('#mb-cc-btn');
-        this.ui.ccPanel = q('.jellyjump-subtitle-panel');
-        this.ui.ccInput = q('#mb-cc-input');
-        this.ui.closeCcPanelBtn = q('.jellyjump-subtitle-panel .jellyjump-close-btn');
-        this.ui.subtitleOptions = q('.subtitle-options');
-        this.ui.audioContainer = q('#mb-audio-container');
-        this.ui.audioBtn = q('#mb-audio-btn');
-        this.ui.audioMenu = q('#mb-audio-menu');
-    }
-
-    _initSpeedPanel() {
-        const t = document.getElementById('player-speed-panel-template');
-        if (t) this.container.appendChild(t.content.cloneNode(true));
-        const q = (sel) => this.container.querySelector(sel);
-        this.ui.speedBtn = q('#mb-speed-btn');
-        this.ui.speedPanel = q('.jellyjump-speed-panel');
-        this.ui.speedSlider = q('#mb-speed-slider');
-        this.ui.speedValue = q('#mb-speed-value');
-        this.ui.resetSpeedBtn = q('#mb-reset-speed-btn');
-        this.ui.closeSpeedPanelBtn = q('.jellyjump-speed-panel .jellyjump-close-btn');
-    }
-
-    _initLoopPanel() {
-        const q = (sel) => this.container.querySelector(sel);
-        this.ui.loopBtn = q('#mb-loop-btn');
-        this.ui.loopMarkerA = q('.jellyjump-marker.marker-a');
-        this.ui.loopMarkerB = q('.jellyjump-marker.marker-b');
-        this.ui.loopRegion = q('.jellyjump-loop-region');
-        this.ui.loopPanel = q('.jellyjump-loop-panel');
-        this.ui.loopStartInput = q('#mb-loop-start');
-        this.ui.loopEndInput = q('#mb-loop-end');
-        this.ui.loopModeRadios = this.container.querySelectorAll('input[name="loop-mode"]');
-        this.ui.loopAbSection = q('.loop-ab-section');
-        this.ui.setABtn = q('#mb-set-a-btn');
-        this.ui.setBBtn = q('#mb-set-b-btn');
-        this.ui.clearLoopBtn = q('#mb-clear-loop-btn');
-        this.ui.closeLoopPanelBtn = q('.jellyjump-loop-panel .jellyjump-close-btn');
-    }
-
-    _initFiltersPanel() {
-        const t = document.getElementById('player-filter-panel-template');
-        if (t) this.container.appendChild(t.content.cloneNode(true));
-        const q = (sel) => this.container.querySelector(sel);
-        this.ui.filtersBtn = q('#mb-filters-btn');
-        this.ui.filterPanel = q('.jellyjump-filter-panel');
-        this.ui.brightnessSlider = q('#mb-filter-brightness');
-        this.ui.contrastSlider = q('#mb-filter-contrast');
-        this.ui.saturationSlider = q('#mb-filter-saturation');
-        this.ui.brightnessValue = q('#mb-brightness-value');
-        this.ui.contrastValue = q('#mb-contrast-value');
-        this.ui.saturationValue = q('#mb-saturation-value');
-        this.ui.resetFiltersBtn = q('#mb-reset-filters-btn');
-        this.ui.closeFilterPanelBtn = q('.jellyjump-filter-panel .jellyjump-close-btn');
-        this.videoFilters = new VideoFilters(this.canvas);
-    }
-
-    _initEqualizerPanel() {
-        const t = document.getElementById('player-audio-panel-template');
-        if (t) this.container.appendChild(t.content.cloneNode(true));
-        const q = (sel) => this.container.querySelector(sel);
-        this.ui.audioSettingsBtn = q('#mb-audio-settings-btn');
-        this.ui.audioPanel = q('.jellyjump-eq-panel');
-        this.ui.panelMuteBtn = q('#mb-panel-mute-btn');
-        this.ui.panelVolumeSlider = q('#mb-panel-volume-slider');
-        this.ui.panelVolumeValue = q('#mb-panel-volume-value');
-        this.ui.eqBassSlider = q('#mb-eq-bass');
-        this.ui.eqMidSlider = q('#mb-eq-mid');
-        this.ui.eqTrebleSlider = q('#mb-eq-treble');
-        this.ui.eqBassValue = q('#mb-bass-value');
-        this.ui.eqMidValue = q('#mb-mid-value');
-        this.ui.eqTrebleValue = q('#mb-treble-value');
-        this.ui.resetEqBtn = q('#mb-reset-eq-btn');
-        this.ui.closeAudioPanelBtn = q('.jellyjump-eq-panel .jellyjump-close-btn');
-
-        if (this.config.controls.volumeOnly) {
-            ['.eq-section-divider', '.eq-sliders', '.eq-presets', '.eq-actions'].forEach(sel => {
-                const el = this.ui.audioPanel.querySelector(sel);
-                if (el) el.style.display = 'none';
-            });
-        }
+        createPlayerControls(this);
     }
 
     /**
