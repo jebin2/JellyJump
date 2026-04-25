@@ -14,11 +14,15 @@ import {
 import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { initPlayerAudio } from './audio/AudioEngine.js';
+import {
+    createStreamController,
+    getStreamState,
+    setStreamState
+} from './streaming/StreamController.js';
 import { mountPlayerShell } from '../ui/player/PlayerShell.js';
 import { createHelpOverlay } from '../ui/player/PlayerOverlays.js';
 import { createPlayerControls } from '../ui/player/PlayerControlsView.js';
 import { attachPlayerBindings } from '../ui/player/PlayerBindings.js';
-import { PlayerStream } from '../player/PlayerStream.js';
 import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
 import { PlayerLoopControl } from '../player/PlayerLoopControl.js';
@@ -193,7 +197,7 @@ export class CorePlayer {
             this._handlers.keydown = (e) => this._handleKeyboard(e);
         }
 
-        this.stream = new PlayerStream(this);
+        this.stream = createStreamController(this);
         this.keyboard = new PlayerKeyboard(this);
         this.subtitles = new PlayerSubtitles(this);
         this.loop = new PlayerLoopControl(this);
@@ -203,20 +207,20 @@ export class CorePlayer {
     }
 
     // ─── Stream state proxies (state lives in PlayerStream) ──────────────────────
-    get isStreamMode() { return this.stream.isStreamMode; }
-    set isStreamMode(v) { this.stream.isStreamMode = v; }
-    get isLive() { return this.stream.isLive; }
-    set isLive(v) { this.stream.isLive = v; }
-    get streamVideo() { return this.stream.streamVideo; }
-    set streamVideo(v) { this.stream.streamVideo = v; }
-    get isWebcamMode() { return this.stream.isWebcamMode; }
-    set isWebcamMode(v) { this.stream.isWebcamMode = v; }
-    get _liveStartTimestamp() { return this.stream._liveStartTimestamp; }
-    set _liveStartTimestamp(v) { this.stream._liveStartTimestamp = v; }
-    get _wasMutedForAutoplay() { return this.stream._wasMutedForAutoplay; }
-    set _wasMutedForAutoplay(v) { this.stream._wasMutedForAutoplay = v; }
-    get _isMediaReady() { return this.stream._isMediaReady; }
-    set _isMediaReady(v) { this.stream._isMediaReady = v; }
+    get isStreamMode() { return getStreamState(this, 'isStreamMode'); }
+    set isStreamMode(v) { setStreamState(this, 'isStreamMode', v); }
+    get isLive() { return getStreamState(this, 'isLive'); }
+    set isLive(v) { setStreamState(this, 'isLive', v); }
+    get streamVideo() { return getStreamState(this, 'streamVideo'); }
+    set streamVideo(v) { setStreamState(this, 'streamVideo', v); }
+    get isWebcamMode() { return getStreamState(this, 'isWebcamMode'); }
+    set isWebcamMode(v) { setStreamState(this, 'isWebcamMode', v); }
+    get _liveStartTimestamp() { return getStreamState(this, '_liveStartTimestamp'); }
+    set _liveStartTimestamp(v) { setStreamState(this, '_liveStartTimestamp', v); }
+    get _wasMutedForAutoplay() { return getStreamState(this, '_wasMutedForAutoplay'); }
+    set _wasMutedForAutoplay(v) { setStreamState(this, '_wasMutedForAutoplay', v); }
+    get _isMediaReady() { return getStreamState(this, '_isMediaReady'); }
+    set _isMediaReady(v) { setStreamState(this, '_isMediaReady', v); }
 
     /**
      * Initialize the player
