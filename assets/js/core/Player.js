@@ -1464,8 +1464,8 @@ export class CorePlayer {
                 poolSize: isHls ? 6 : 2,
                 fit: 'contain'
             });
-            this.canvas.width = this.videoTrack.displayWidth;
-            this.canvas.height = this.videoTrack.displayHeight;
+            this.canvas.width = await this.videoTrack.getDisplayWidth();
+            this.canvas.height = await this.videoTrack.getDisplayHeight();
         } else {
             Logger.log('No video track found - enabling Audio Mode');
             this.isAudioMode = true;
