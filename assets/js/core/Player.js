@@ -11,7 +11,7 @@ import {
     PLAYER_CONTROL_PRESETS,
     CONTROL_BAR_MODE_DEFAULT
 } from './config.js';
-import { SubtitleManager } from './SubtitleManager.js';
+import { SubtitleManager } from './subtitles/SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { initPlayerAudio, runPlayerAudioIterator, startPlayerAudioVisualizer } from './audio/AudioEngine.js';
 import {

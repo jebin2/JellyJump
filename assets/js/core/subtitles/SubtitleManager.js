@@ -1,5 +1,5 @@
-import { Logger } from "../utils/Logger.js";
-import { parseTime } from "../utils/mediaUtils.js";
+import { Logger } from "../../utils/Logger.js";
+import { parseTime } from "../../utils/mediaUtils.js";
 /**
  * Subtitle Manager
  * Handles parsing and management of WebVTT subtitles.

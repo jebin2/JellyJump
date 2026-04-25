@@ -20,7 +20,7 @@ export class PlayerSubtitles {
             let vttContent = content;
             if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
                 try {
-                    const { parseTranscriptJSON, jsonToVTT } = await import('../core/SubtitleConverter.js');
+                    const { parseTranscriptJSON, jsonToVTT } = await import('../core/subtitles/SubtitleConverter.js');
                     const words = parseTranscriptJSON(content);
                     vttContent = jsonToVTT(words);
                     Logger.log('Converted JSON transcript to VTT format');
