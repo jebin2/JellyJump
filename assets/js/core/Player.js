@@ -15,6 +15,17 @@ import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { initPlayerAudio } from './audio/AudioEngine.js';
 import {
+    clearPlayerCanvas,
+    disposeMediaBunnyResources,
+    resetPlayer,
+    cleanupPlayerForLoad,
+    setupPlayerMediaTracks,
+    handlePlayerHlsState,
+    cleanupPlayerAudioMode,
+    resetPlayerUI,
+    cleanupPlayerMediaBunny
+} from './playback/MediaLifecycle.js';
+import {
     createStreamController,
     getStreamState,
     setStreamState
@@ -498,95 +509,18 @@ export class CorePlayer {
      * Clear the canvas
      * @private
      */
-    _clearCanvas() {
-        if (this.ctx && this.canvas) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        }
-    }
+    _clearCanvas() { clearPlayerCanvas(this); }
 
     /**
      * Dispose MediaBunny resources (sinks and input)
      * @private
      */
-    _disposeMediaBunnyResources() {
-        if (this.videoSink?.dispose) {
-            try { this.videoSink.dispose(); } catch (e) { }
-        }
-        if (this.audioSink?.dispose) {
-            try { this.audioSink.dispose(); } catch (e) { }
-        }
-        if (this.input?.dispose) {
-            try { this.input.dispose(); } catch (e) { }
-        }
-        this.videoSink = null;
-        this.audioSink = null;
-        this.input = null;
-    }
+    _disposeMediaBunnyResources() { disposeMediaBunnyResources(this); }
 
     /**
      * Reset the player state and unload media
      */
-    async reset() {
-        this.pause();
-
-        // Clean up live/stream UI if active
-        if (this.isLive || this.isStreamMode) {
-            this._cleanupHLS();
-        }
-
-        // Clean up audio-only mode
-        if (this.isAudioMode) {
-            this._cleanupAudio();
-        }
-
-        // Clear canvas
-        this._clearCanvas();
-
-        // Reset state
-        this.currentTime = 0;
-        this.duration = 0;
-        this.audioContextStartTime = null;
-        this.fallbackStartTime = undefined;
-
-        this._cleanupThumbnails();
-
-        // Await iterator cleanup BEFORE disposing resources to prevent orphaned VideoFrames
-        try {
-            if (this.videoFrameIterator) {
-                await this.videoFrameIterator.return();
-            }
-        } catch (e) { /* ignore */ }
-        try {
-            if (this.audioBufferIterator) {
-                await this.audioBufferIterator.return();
-            }
-        } catch (e) { /* ignore */ }
-
-        // Dispose MediaBunny resources (safe now that iterators are closed)
-        this._disposeMediaBunnyResources();
-
-        this.videoTrack = null;
-        this.audioTrack = null;
-        this.videoFrameIterator = null;
-        this.audioBufferIterator = null;
-        this.nextFrame = null;
-        this.currentVideoId = null;
-
-        // Update UI
-        this._updateTimeDisplay();
-        this._updateProgress();
-        if (this.ui?.loader) this.ui.loader.style.display = 'none';
-
-        // Reset Audio Context if needed
-        if (this.audioContext) {
-            this.activeSources.forEach(source => {
-                try { source.stop(); } catch (e) { }
-            });
-            this.activeSources = [];
-        }
-
-        Logger.log('[Player] Reset complete - select a video to play');
-    }
+    async reset() { return resetPlayer(this); }
 
     /**
      * Load a media source
@@ -635,114 +569,11 @@ export class CorePlayer {
         }
     }
 
-    async _cleanupForLoad() {
-        this._isMediaReady = false;
-        this.pause(false);
-        this._cleanupThumbnails();
-        this._cleanupAudio();
-        this._cleanupHLS();
-        this.stream.resetForLoad();
-        this._setWebcamModeControls(false);
-        this.currentTime = 0;
+    async _cleanupForLoad() { return cleanupPlayerForLoad(this); }
 
-        if (this.videoFrameIterator) await this.videoFrameIterator.return();
-        if (this.audioIteratorCleanupPromise) await this.audioIteratorCleanupPromise;
-        if (this.audioBufferIterator) await this.audioBufferIterator.return();
-        this.videoFrameIterator = null;
-        this.audioBufferIterator = null;
-        this.nextFrame = null;
-        this.asyncId++;
-        this.playbackTimeAtStart = 0;
-        this.audioContextStartTime = null;
-        this.queuedAudioNodes.clear();
-        this._vodAnchorWall = undefined;
-        this._vodAnchorContent = undefined;
-        this._frameSyncLogCount = 0;
+    async _setupMediaTracks(url, isHls) { return setupPlayerMediaTracks(this, url, isHls); }
 
-        this._clearCanvas();
-        this._updateTimeDisplay();
-        this._disposeMediaBunnyResources();
-
-        this.subtitleTracks = [];
-        this.subtitleTrackCounter = 0;
-        this.activeSubtitleTrackId = null;
-        this.isSubtitlesEnabled = false;
-        if (this.subtitleManager) this.subtitleManager.cues = [];
-    }
-
-    async _setupMediaTracks(url, isHls) {
-        const urlSourceOptions = this.config.withCredentials ? { requestInit: { credentials: 'include' } } : {};
-        this.input = new MediaBunny.Input({ source: new MediaBunny.UrlSource(url, urlSourceOptions), formats: [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS] });
-
-        if (!isHls) {
-            this.duration = await this.input.computeDuration();
-            this._updateTimeDisplay();
-        }
-
-        this.videoTrack = await this.input.getPrimaryVideoTrack();
-        if (this.videoTrack) {
-            if (!isHls) {
-                try {
-                    const stats = await this.videoTrack.computePacketStats();
-                    this.frameRate = stats.averagePacketRate || 30;
-                    Logger.log(`Detected frame rate: ${this.frameRate} fps`);
-                } catch (e) {
-                    Logger.warn("Could not compute frame rate, defaulting to 30fps", e);
-                    this.frameRate = 30;
-                }
-            } else {
-                this.frameRate = 30;
-            }
-
-            this.videoSink = new MediaBunny.CanvasSink(this.videoTrack, {
-                poolSize: isHls ? 6 : 2,
-                fit: 'contain'
-            });
-            this.canvas.width = await this.videoTrack.getDisplayWidth();
-            this.canvas.height = await this.videoTrack.getDisplayHeight();
-        } else {
-            Logger.log('No video track found - enabling Audio Mode');
-            this.isAudioMode = true;
-            const containerRect = this.container.getBoundingClientRect();
-            this.canvas.width = containerRect.width || 1280;
-            this.canvas.height = containerRect.height || 720;
-        }
-
-        this.audioTrack = await this.input.getPrimaryAudioTrack();
-        if (!this.audioTrack) {
-            const audioTracks = await this.input.getAudioTracks();
-            if (audioTracks.length > 0) this.audioTrack = audioTracks[0];
-        }
-
-        if (this.audioTrack) {
-            // AudioSampleSink avoids a MediaBunny bug where AudioSamples aren't closed properly
-            this.audioSink = new MediaBunny.AudioSampleSink(this.audioTrack);
-        }
-
-        this._updateAudioTracks();
-    }
-
-    async _handleHLSState() {
-        this.isLive = this.videoTrack ? await this.videoTrack.isLive() : false;
-        Logger.log(`[Live:Load] isLive=${this.isLive}, videoTrack=${!!this.videoTrack}, audioTrack=${!!this.audioTrack}, audioSink=${!!this.audioSink}`);
-
-        if (this.isLive) {
-            const [currentDur, refreshInterval] = await Promise.all([
-                this.videoTrack.getDurationFromMetadata({ skipLiveWait: true }),
-                this.videoTrack.getLiveRefreshInterval(),
-            ]);
-            this._liveStartTimestamp = currentDur ?? 0;
-            Logger.log(`[Live:Load] liveStartTs=${this._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${refreshInterval ?? 6}s`);
-            this.duration = 0;
-        } else {
-            this._liveStartTimestamp = null;
-            this.duration = await this.input.getDurationFromMetadata() ?? 0;
-            Logger.log(`[Live:Load] VOD duration=${this.duration.toFixed(3)}s`);
-        }
-
-        this._updateTimeDisplay();
-        this._updateStreamUI();
-    }
+    async _handleHLSState() { return handlePlayerHlsState(this); }
 
     _restoreSavedSubtitles(savedSubtitles) { this.subtitles.restoreSavedSubtitles(savedSubtitles); }
 
@@ -750,31 +581,14 @@ export class CorePlayer {
      * Cleanup audio-only playback visualizer
      * @private
      */
-    _cleanupAudio() {
-        this.isAudioMode = false;
-
-        if (this.audioVisualizer) {
-            this.audioVisualizer.disconnect();
-            this.audioVisualizer = null;
-        }
-    }
+    _cleanupAudio() { cleanupPlayerAudioMode(this); }
 
 
 
     /**
      * Reset UI elements (canvas, time, progress)
      */
-    resetUI() {
-        this._clearCanvas();
-
-        // Reset time and duration
-        this.currentTime = 0;
-        this.duration = 0;
-        this._updateTimeDisplay();
-        this._updateProgress();
-
-        // Note: Don't hide loader here - let the caller control loading state
-    }
+    resetUI() { resetPlayerUI(this); }
 
     _createStreamVideo() { this.stream.createStreamVideo(); }
     _showStreamVideo() { this.stream.showStreamVideo(); }
@@ -798,29 +612,7 @@ export class CorePlayer {
      * Clean up MediaBunny resources when switching to stream mode
      * @private
      */
-    async _cleanupMediaBunny() {
-        // Await iterator cleanup before disposing resources
-        try {
-            if (this.videoFrameIterator) {
-                await this.videoFrameIterator.return();
-            }
-        } catch (e) { /* ignore */ }
-        this.videoFrameIterator = null;
-
-        try {
-            if (this.audioBufferIterator) {
-                await this.audioBufferIterator.return();
-            }
-        } catch (e) { /* ignore */ }
-        this.audioBufferIterator = null;
-
-        // Dispose sinks and input (safe now that iterators are closed)
-        this._disposeMediaBunnyResources();
-
-        this.videoTrack = null;
-        this.audioTrack = null;
-        this.nextFrame = null;
-    }
+    async _cleanupMediaBunny() { return cleanupPlayerMediaBunny(this); }
 
     _cleanupHLS() { this.stream.cleanupHLS(); }
     _createErrorOverlay() { this.stream.createErrorOverlay(); }
