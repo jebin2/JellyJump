@@ -204,6 +204,151 @@ export function resetPlayerUI(player) {
     player._updateProgress();
 }
 
+export async function startPlayerVideoIterator(player) {
+    if (!player.videoSink) return;
+
+    player.asyncId++;
+    const currentAsyncId = player.asyncId;
+
+    if (player.videoFrameIterator) await player.videoFrameIterator.return();
+
+    player.videoFrameIterator = player.videoSink.canvases(player._getPlaybackTime());
+
+    let firstFrame = null, secondFrame = null;
+    try {
+        firstFrame = (await player.videoFrameIterator.next()).value ?? null;
+        secondFrame = (await player.videoFrameIterator.next()).value ?? null;
+    } catch (e) {
+        Logger.warn('[VideoIterator] Failed to get initial frames, will retry on next play:', e);
+        player.videoFrameIterator = null;
+        return;
+    }
+
+    if (currentAsyncId !== player.asyncId) return;
+
+    player.nextFrame = secondFrame;
+
+    if (firstFrame) {
+        player.ctx.drawImage(firstFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+        if (player.afterFrameRenderCallbacks.length > 0) {
+            player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
+        }
+    }
+}
+
+export async function extractAndDrawPlayerFrame(player, timestamp) {
+    if (!player.videoSink) return;
+
+    const iterator = player.videoSink.canvases(timestamp);
+    const result = await iterator.next();
+    const frame = result.value;
+
+    if (frame) {
+        player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+        if (player.afterFrameRenderCallbacks.length > 0) {
+            player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
+        }
+    }
+
+    await iterator.return();
+}
+
+export async function handlePlayerInitialFrame(player, autoplay = false) {
+    if (player.isLive) {
+        if (autoplay) await player.play().catch(e => Logger.warn('Live autoplay failed:', e));
+        return;
+    }
+
+    const savedState = player._loadPlaybackState();
+    let startTimestamp = 0;
+
+    if (savedState && savedState.videoIdentifier === player.currentVideoId) {
+        Logger.log('Restoring playback state:', savedState);
+        startTimestamp = savedState.timestamp;
+    } else {
+        Logger.log('No saved state, using default frame');
+        if (!autoplay) {
+            const middleTimestamp = player.duration * 0.5;
+            if (player.videoTrack) await player._extractAndDrawFrame(middleTimestamp);
+            return;
+        }
+    }
+
+    player.playbackTimeAtStart = startTimestamp;
+    player.currentTime = startTimestamp;
+    player._updateProgress();
+
+    Logger.log(`[InitialFrame] Restored state - isAudioMode: ${player.isAudioMode}, playbackTimeAtStart: ${player.playbackTimeAtStart}, currentTime: ${player.currentTime}`);
+
+    if (autoplay) {
+        try {
+            const playPromise = player.play();
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Autoplay timeout')), 10000)
+            );
+            await Promise.race([playPromise, timeoutPromise]);
+        } catch (e) {
+            Logger.warn('Autoplay failed or timed out:', e);
+
+            if (!player.config.muted) {
+                Logger.log('Attempting fallback to muted autoplay...');
+                player.config.muted = true;
+                if (player.ui.muteBtn) player._updateVolumeUI();
+
+                try {
+                    if (player.audioContext && player.audioContext.state === 'running') {
+                        try { await player.audioContext.suspend(); } catch (ignore) { }
+                    }
+                    await player.play();
+                    return;
+                } catch (retryErr) {
+                    Logger.warn('Muted autoplay fallback also failed:', retryErr);
+                }
+            }
+
+            Logger.warn('Falling back to paused state.');
+            player.isPlaying = false;
+            player._updatePlayPauseUI();
+
+            if (player.audioBufferIterator) {
+                player.audioBufferIterator.return().catch(() => { });
+                player.audioBufferIterator = null;
+            }
+            if (player.audioContext && player.audioContext.state === 'running') {
+                try { await player.audioContext.suspend(); } catch (e) { }
+            }
+
+            for (const node of player.queuedAudioNodes) {
+                try { node.stop(); } catch (e) { }
+            }
+            player.queuedAudioNodes.clear();
+
+            if (player.audioContext) {
+                try { player.audioContext.close(); } catch (e) { }
+                player.audioContext = null;
+                player.gainNode = null;
+                player.isAudioInitialized = false;
+            }
+
+            try {
+                await player._startVideoIterator();
+            } catch (e) {
+                Logger.warn('Fallback video iterator failed:', e);
+            }
+
+            if (player.ui.playOverlay && player.config.controls.playOverlay) player.ui.playOverlay.style.display = 'flex';
+            player.isPlaying = false;
+        }
+    } else {
+        try {
+            await player._startVideoIterator();
+        } catch (e) {
+            Logger.warn('Initial video iterator failed:', e);
+        }
+    }
+    player._updateVolumeUI();
+}
+
 export async function cleanupPlayerMediaBunny(player) {
     try {
         if (player.videoFrameIterator) {
