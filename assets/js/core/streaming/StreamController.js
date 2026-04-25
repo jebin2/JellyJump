@@ -1,4 +1,4 @@
-import { PlayerStream } from '../../player/PlayerStream.js';
+import { PlayerStream } from './PlayerStream.js';
 
 export function createStreamController(player) {
     return new PlayerStream(player);

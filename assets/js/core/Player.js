@@ -13,7 +13,7 @@ import {
 } from './config.js';
 import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
-import { initPlayerAudio, runPlayerAudioIterator } from './audio/AudioEngine.js';
+import { initPlayerAudio, runPlayerAudioIterator, startPlayerAudioVisualizer } from './audio/AudioEngine.js';
 import {
     clearPlayerCanvas,
     disposeMediaBunnyResources,
@@ -576,16 +576,7 @@ export class CorePlayer {
                 this._runAudioIterator(vodAnchorWall, vodAnchorContent, vodPrefetchedSample);
             }
 
-            if (this.isAudioMode) {
-                if (!this.audioVisualizer && this.canvas) {
-                    const { AudioVisualizer } = await import('../player/AudioVisualizer.js');
-                    this.audioVisualizer = new AudioVisualizer(this.canvas);
-                    this.audioVisualizer.connect(this.audioContext, this.gainNode);
-                }
-                if (this.audioVisualizer) {
-                    this.audioVisualizer.start();
-                }
-            }
+            await startPlayerAudioVisualizer(this);
         }
 
         this._startRenderLoop();

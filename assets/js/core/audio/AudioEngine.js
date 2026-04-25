@@ -1,4 +1,4 @@
-import { AudioEqualizer } from '../../player/AudioEqualizer.js';
+import { AudioEqualizer } from './AudioEqualizer.js';
 import { Logger } from '../../utils/Logger.js';
 
 
@@ -33,6 +33,19 @@ export function initPlayerAudio(player) {
 
     player.isInitialized = true;
     player.isAudioInitialized = true;
+}
+
+export async function startPlayerAudioVisualizer(player) {
+    if (!player.isAudioMode) return;
+
+    if (!player.audioVisualizer && player.canvas) {
+        const { AudioVisualizer } = await import('../../player/AudioVisualizer.js');
+        player.audioVisualizer = new AudioVisualizer(player.canvas);
+        player.audioVisualizer.connect(player.audioContext, player.gainNode);
+    }
+    if (player.audioVisualizer) {
+        player.audioVisualizer.start();
+    }
 }
 
 export async function runPlayerAudioIterator(player, anchorWall, anchorContent, prefetchedSample) {
