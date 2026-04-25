@@ -15,6 +15,8 @@ import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
 import { AudioEqualizer } from '../player/AudioEqualizer.js';
+import { mountPlayerShell } from '../ui/player/PlayerShell.js';
+import { createHelpOverlay } from '../ui/player/PlayerOverlays.js';
 import { PlayerStream } from '../player/PlayerStream.js';
 import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
@@ -220,14 +222,7 @@ export class CorePlayer {
      * @private
      */
     _init() {
-        this.container.classList.add('jellyjump-container');
-
-        // Create canvas element using template
-        const canvasTemplate = document.getElementById('player-canvas-template');
-        const canvasClone = canvasTemplate.content.cloneNode(true);
-        this.canvas = canvasClone.querySelector('canvas');
-        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-        this.container.appendChild(canvasClone);
+        mountPlayerShell(this);
 
         // Initialize Subtitle Manager only if captions control is enabled
         if (this.config.controls.captions) {
@@ -266,36 +261,7 @@ export class CorePlayer {
      * @private
      */
     _createHelpOverlay() {
-        const template = document.getElementById('player-help-overlay-template');
-        const clone = template.content.cloneNode(true);
-
-        // Configure sections based on mode
-        const navSection = clone.getElementById('help-navigation-section');
-        const editorSection = clone.getElementById('help-editor-section');
-
-        if (this.config.mode === 'player') {
-            if (navSection) navSection.style.display = 'block';
-            if (editorSection) editorSection.style.display = 'none';
-        } else if (this.config.mode === 'editor') {
-            if (navSection) navSection.style.display = 'none';
-            if (editorSection) editorSection.style.display = 'block';
-        }
-
-        // Update title
-        const title = clone.querySelector('.jellyjump-help-title');
-        if (title) {
-            title.textContent = `Keyboard Shortcuts ${this.config.mode === 'editor' ? '(Editor Mode)' : '(Player Mode)'}`;
-        }
-
-        this.container.appendChild(clone);
-
-        this.ui.helpOverlay = this.container.querySelector('.jellyjump-help-overlay');
-        this.ui.closeHelpBtn = this.container.querySelector('.jellyjump-close-help');
-
-        this.ui.closeHelpBtn.addEventListener('click', () => this._toggleHelp());
-        this.ui.helpOverlay.addEventListener('click', (e) => {
-            if (e.target === this.ui.helpOverlay) this._toggleHelp();
-        });
+        createHelpOverlay(this);
     }
 
     /**
