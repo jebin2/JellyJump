@@ -1,22 +1,8 @@
 /**
- * Player Configuration
- * Default settings for the JellyJump Player.
+ * Compatibility facade for player configuration exports.
  */
 
-export const PLAYER_CONFIG = {
-    // Playback
-    autoplay: false,
-    loop: false,
-    muted: false,
-    volume: 1.0,
-    playbackRate: 1.0,
-
-    // UI
-    theme: 'dark',
-    showControls: true,
-    mode: 'player', // 'player' or 'editor'
-
-    // Advanced
-    bufferSize: 30, // seconds
-    maxRetries: 3,
-};
+export { PLAYER_DEFAULTS as PLAYER_CONFIG } from './config/playerDefaults.js';
+export { PLAYER_DEFAULTS } from './config/playerDefaults.js';
+export { PLAYER_CONTROL_DEFAULTS, CONTROL_BAR_MODE_DEFAULT } from './config/controlDefaults.js';
+export { PLAYER_CONTROL_PRESETS } from './config/playerPresets.js';

@@ -5,7 +5,12 @@
  */
 
 import { MediaBunny } from './MediaBunny.js';
-import { PLAYER_CONFIG } from './config.js';
+import {
+    PLAYER_CONFIG,
+    PLAYER_CONTROL_DEFAULTS,
+    PLAYER_CONTROL_PRESETS,
+    CONTROL_BAR_MODE_DEFAULT
+} from './config.js';
 import { SubtitleManager } from './SubtitleManager.js';
 import { ScreenshotManager } from '../player/ScreenshotManager.js';
 import { VideoFilters } from '../player/VideoFilters.js';
@@ -43,73 +48,15 @@ export class CorePlayer {
         this.animationFrameId = null;
 
         // Control bar mode
-        this.controlBarMode = options.controlBarMode || 'overlay'; // 'overlay' or 'fixed'
+        this.controlBarMode = options.controlBarMode || CONTROL_BAR_MODE_DEFAULT; // 'overlay' or 'fixed'
         this.autoHideTimer = null;
 
-        // Controls Configuration
         this.config.controls = {
-            controlBar: true,  // Show/hide the entire control bar
-            playOverlay: true, // Show/hide the big play overlay
-            playPause: true,
-            navigation: true,  // Enable/disable prev/next buttons
-            volume: true,
-            time: true,
-            progress: true,
-            thumbnails: true,  // Enable/disable thumbnail preview on hover
-            captions: true,
-            settings: true,
-            fullscreen: true,
-            loop: true,
-            speed: true,
-            filters: true,
-            equalizer: true,
-            volumeOnly: false,  // When true, Audio Settings panel shows only volume (no EQ)
-            modeToggle: true,
-            keyboard: true,  // Enable/disable keyboard shortcuts
+            ...PLAYER_CONTROL_DEFAULTS,
             ...this.config.controls
         };
 
-        // Controls Presets
-        this.PRESETS = {
-            player: {
-                playPause: true,
-                volume: true,
-                time: true,
-                progress: true,
-                captions: true,
-                settings: true,
-                fullscreen: true,
-                loop: true,
-                speed: true,
-                filters: true,
-                equalizer: true,
-                modeToggle: true
-            },
-            editor: {
-                playPause: true,
-                volume: true,
-                time: true,
-                progress: true,
-                captions: true,
-                settings: false,
-                fullscreen: true,
-                loop: false,
-                speed: true,
-                modeToggle: false
-            },
-            minimal: {
-                playPause: true,
-                time: true,
-                progress: true,
-                volume: false,
-                captions: false,
-                settings: false,
-                fullscreen: false,
-                loop: false,
-                speed: false,
-                modeToggle: false
-            }
-        };
+        this.PRESETS = PLAYER_CONTROL_PRESETS;
 
         // MediaBunny objects
         this.input = null;
