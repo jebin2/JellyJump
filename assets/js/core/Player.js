@@ -23,6 +23,18 @@ import { mountPlayerShell } from '../ui/player/PlayerShell.js';
 import { createHelpOverlay } from '../ui/player/PlayerOverlays.js';
 import { createPlayerControls } from '../ui/player/PlayerControlsView.js';
 import { attachPlayerBindings } from '../ui/player/PlayerBindings.js';
+import {
+    handlePlayerDocumentClick,
+    updatePlayerSpeedMenu,
+    togglePlayerFilterPanel,
+    togglePlayerSpeedPanel,
+    togglePlayerSubtitlePanel,
+    syncPlayerFilterSliders,
+    updatePlayerFiltersButtonState,
+    togglePlayerAudioPanel,
+    syncPlayerEqSliders,
+    updatePlayerAudioButtonState
+} from '../ui/player/PlayerPanels.js';
 import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
 import { PlayerLoopControl } from '../player/PlayerLoopControl.js';
@@ -357,65 +369,8 @@ export class CorePlayer {
         this._events[event].forEach(callback => callback(data));
     }
 
-    _handleDocumentClick(e) {
-        // Hide subtitle panel when clicking outside
-        if (this.ui.ccPanel && this.ui.ccBtn &&
-            !this.ui.ccBtn.contains(e.target) && !this.ui.ccPanel.contains(e.target)) {
-            this.ui.ccPanel.style.display = 'none';
-        }
-        if (this.ui.audioBtn && this.ui.audioMenu && !this.ui.audioBtn.contains(e.target) && !this.ui.audioMenu.contains(e.target)) {
-            this.ui.audioMenu.classList.remove('visible');
-        }
-        // Hide speed panel when clicking outside
-        if (this.ui.speedPanel && this.ui.speedBtn &&
-            !this.ui.speedBtn.contains(e.target) && !this.ui.speedPanel.contains(e.target)) {
-            this.ui.speedPanel.style.display = 'none';
-        }
-        // Hide filter panel when clicking outside
-        if (this.ui.filterPanel && this.ui.filtersBtn &&
-            !this.ui.filtersBtn.contains(e.target) && !this.ui.filterPanel.contains(e.target)) {
-            this.ui.filterPanel.style.display = 'none';
-        }
-        // Hide Audio panel when clicking outside
-        if (this.ui.audioPanel && this.ui.audioSettingsBtn &&
-            !this.ui.audioSettingsBtn.contains(e.target) && !this.ui.audioPanel.contains(e.target)) {
-            this.ui.audioPanel.style.display = 'none';
-        }
-        // Hide Loop panel when clicking outside
-        if (this.ui.loopPanel && this.ui.loopBtn &&
-            !this.ui.loopBtn.contains(e.target) && !this.ui.loopPanel.contains(e.target)) {
-            this.ui.loopPanel.style.display = 'none';
-        }
-        // Restore audio if muted for autoplay on proper user interaction (not during loading)
-        if (this._wasMutedForAutoplay && this.gainNode && !this._isLoading) {
-            Logger.log('[Autoplay] User interaction restoring audio...');
-            this.config.muted = false;
-            this.gainNode.gain.value = this.config.volume;
-            this._wasMutedForAutoplay = false;
-            this._updateVolumeUI();
-        }
-    }
-
-    _updateSpeedMenu() {
-        // Skip if speed control is disabled
-        if (!this.ui.speedBtn) return;
-
-        // Update button text
-        this.ui.speedBtn.textContent = this.playbackRate === 1 ? '1x' : `${this.playbackRate}x`;
-        if (this.playbackRate !== 1) {
-            this.ui.speedBtn.style.color = 'var(--accent-primary)';
-        } else {
-            this.ui.speedBtn.style.color = '';
-        }
-
-        // Update slider and value display if panel exists
-        if (this.ui.speedSlider) {
-            this.ui.speedSlider.value = this.playbackRate;
-        }
-        if (this.ui.speedValue) {
-            this.ui.speedValue.textContent = `${this.playbackRate.toFixed(2)}x`;
-        }
-    }
+    _handleDocumentClick(e) { handlePlayerDocumentClick(this, e); }
+    _updateSpeedMenu() { updatePlayerSpeedMenu(this); }
 
     /**
      * Toggle Loop Mode: Off -> Playlist -> One -> Off
@@ -426,140 +381,46 @@ export class CorePlayer {
     /**
      * Toggle video filters panel visibility
      */
-    toggleFilterPanel() {
-        if (!this.ui.filterPanel) return;
-        const isVisible = this.ui.filterPanel.style.display !== 'none';
-        this.ui.filterPanel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) {
-            this._syncFilterSliders(); // Ensure sliders match current state
-        }
-    }
+    toggleFilterPanel() { togglePlayerFilterPanel(this); }
 
     /**
      * Toggle speed panel visibility
      */
-    toggleSpeedPanel() {
-        if (!this.ui.speedPanel) return;
-        const isVisible = this.ui.speedPanel.style.display !== 'none';
-        this.ui.speedPanel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) {
-            // Sync slider with current speed
-            this.ui.speedSlider.value = this.playbackRate;
-            this.ui.speedValue.textContent = `${this.playbackRate.toFixed(2)}x`;
-        }
-    }
+    toggleSpeedPanel() { togglePlayerSpeedPanel(this); }
 
     /**
      * Toggle subtitle panel visibility
      */
-    toggleSubtitlePanel() {
-        if (!this.ui.ccPanel) return;
-        const isVisible = this.ui.ccPanel.style.display !== 'none';
-        this.ui.ccPanel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) {
-            this._updateSubtitleMenu();
-        }
-    }
+    toggleSubtitlePanel() { togglePlayerSubtitlePanel(this); }
 
     /**
      * Sync filter sliders with current VideoFilters state
      * @private
      */
-    _syncFilterSliders() {
-        if (!this.videoFilters) return;
-        const state = this.videoFilters.getState();
-
-        if (this.ui.brightnessSlider) {
-            this.ui.brightnessSlider.value = state.brightness;
-            this.ui.brightnessValue.textContent = `${state.brightness}%`;
-        }
-        if (this.ui.contrastSlider) {
-            this.ui.contrastSlider.value = state.contrast;
-            this.ui.contrastValue.textContent = `${state.contrast}%`;
-        }
-        if (this.ui.saturationSlider) {
-            this.ui.saturationSlider.value = state.saturation;
-            this.ui.saturationValue.textContent = `${state.saturation}%`;
-        }
-    }
+    _syncFilterSliders() { syncPlayerFilterSliders(this); }
 
     /**
      * Update filter button to show active state when filters are applied
      * @private
      */
-    _updateFiltersButtonState() {
-        if (!this.ui.filtersBtn || !this.videoFilters) return;
-
-        if (this.videoFilters.isActive()) {
-            this.ui.filtersBtn.style.color = 'var(--accent-primary)';
-            this.ui.filtersBtn.setAttribute('aria-label', 'Video Filters (Active)');
-        } else {
-            this.ui.filtersBtn.style.color = '';
-            this.ui.filtersBtn.setAttribute('aria-label', 'Video Filters');
-        }
-    }
+    _updateFiltersButtonState() { updatePlayerFiltersButtonState(this); }
 
     /**
      * Toggle audio settings panel visibility
      */
-    toggleAudioPanel() {
-        if (!this.ui.audioPanel) return;
-        const isVisible = this.ui.audioPanel.style.display !== 'none';
-        this.ui.audioPanel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) {
-            this._syncEqSliders(); // Ensure sliders match current state
-            this._updateVolumeUI(); // Ensure volume UI is synced
-        }
-    }
+    toggleAudioPanel() { togglePlayerAudioPanel(this); }
 
     /**
      * Sync EQ sliders with current AudioEqualizer state
      * @private
      */
-    _syncEqSliders() {
-        if (!this.audioEqualizer) return;
-        const state = this.audioEqualizer.getState();
-
-        if (this.ui.eqBassSlider) {
-            this.ui.eqBassSlider.value = state.bass;
-            this.ui.eqBassValue.textContent = state.bass;
-        }
-        if (this.ui.eqMidSlider) {
-            this.ui.eqMidSlider.value = state.mid;
-            this.ui.eqMidValue.textContent = state.mid;
-        }
-        if (this.ui.eqTrebleSlider) {
-            this.ui.eqTrebleSlider.value = state.treble;
-            this.ui.eqTrebleValue.textContent = state.treble;
-        }
-    }
+    _syncEqSliders() { syncPlayerEqSliders(this); }
 
     /**
      * Update Audio button to show active state (mute/volume)
      * @private
      */
-    _updateAudioButtonState() {
-        if (!this.ui.audioSettingsBtn) return;
-
-        const iconUse = this.ui.audioSettingsBtn.querySelector('use');
-        if (!iconUse) return;
-
-        if (this.isMuted || this.volume === 0) {
-            iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-mute');
-            this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings (Muted)');
-            this.ui.audioSettingsBtn.style.color = '';
-        } else {
-            iconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-volume-high');
-            this.ui.audioSettingsBtn.setAttribute('aria-label', 'Audio Settings');
-
-            // Highlight if EQ is active
-            if (this.audioEqualizer && this.audioEqualizer.isActive()) {
-                this.ui.audioSettingsBtn.style.color = 'var(--accent-primary)';
-            } else {
-                this.ui.audioSettingsBtn.style.color = '';
-            }
-        }
-    }
+    _updateAudioButtonState() { updatePlayerAudioButtonState(this); }
 
     setLoopStart() { this.loop.setLoopStart(); }
     setLoopEnd() { this.loop.setLoopEnd(); }
