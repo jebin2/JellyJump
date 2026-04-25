@@ -19,6 +19,7 @@ async function initEmbed() {
     const withCredentials = params.get('credentials') === 'true';
     const controlBarMode = params.get('controlBarMode') || 'fixed';
     const liveMode = params.get('liveMode') || 'buffer';
+    const startTime = parseFloat(params.get('start_time') || '0');
 
     // Validate video_url
     if (!videoUrl) {
@@ -101,6 +102,18 @@ async function initEmbed() {
         // Load the video (use load() method with autoplay param)
         const decodedUrl = decodeURIComponent(videoUrl);
         await player.load(decodedUrl, autoplay);
+
+        // Seek to start_time if specified (VOD seek-on-load)
+        if (startTime > 0) {
+            player.seek(startTime);
+        }
+
+        // Relay timeupdate to parent frame for timeline sync
+        if (window.parent !== window) {
+            player.on('timeupdate', ({ currentTime }) => {
+                window.parent.postMessage({ type: 'timeupdate', currentTime }, '*');
+            });
+        }
 
     } catch (err) {
         console.error('[Embed] Init error:', err);
