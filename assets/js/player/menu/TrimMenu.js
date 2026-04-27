@@ -191,7 +191,7 @@ export class TrimMenu {
 
                 // Configure Download
                 const ext = 'mp4';
-                const filename = item.title.replace(/\.[^/.]+$/, "") + `- trimmed - ${Math.round(startTime)} -${Math.round(endTime)}.${ext} `;
+                const filename = item.title.replace(/\.[^/.]+$/, "") + `- trimmed - ${Math.round(startTime)} -${Math.round(endTime)}.${ext}`;
 
                 // Always add to Playlist
                 const { url } = playlist.insertProcessedItem(item, blob, filename, {
@@ -207,7 +207,7 @@ export class TrimMenu {
 
             } catch (e) {
                 Logger.error('Trimming failed:', e);
-                errorMessage.textContent = `Trimming failed: ${e.message} `;
+                errorMessage.textContent = `Trimming failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 trimBtn.disabled = false;
                 modal.closeBtn.disabled = false;
