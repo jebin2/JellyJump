@@ -1,6 +1,8 @@
 import { Logger } from "../utils/Logger.js";
 import { MediaBunny } from './MediaBunny.js';
 import GIF from '../lib/gif.js';
+import { getMetadata as getProcessingMetadata, getVideoStats as getProcessingVideoStats } from '../processing/metadata/MetadataService.js';
+import { createMediaBunnyInput } from '../processing/shared/InputFactory.js';
 
 /**
  * MediaProcessor
@@ -297,10 +299,7 @@ export class MediaProcessor {
      * @returns {Promise<Blob>} MP4 blob
      */
     static _createInput(source) {
-        if (typeof source === 'string') {
-            return new MediaBunny.Input({ source: new MediaBunny.UrlSource(source), formats: [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS] });
-        }
-        return new MediaBunny.Input({ source: new MediaBunny.BlobSource(source), formats: MediaBunny.ALL_FORMATS });
+        return createMediaBunnyInput(source);
     }
 
     static _shortVideoCodec(fullCodec = '') {
@@ -420,71 +419,7 @@ export class MediaProcessor {
      * @returns {Promise<Object>}
      */
     static async getVideoStats(source, count = 50) {
-        const blobSource = new MediaBunny.BlobSource(source);
-        const input = new MediaBunny.Input({
-            source: blobSource,
-            formats: MediaBunny.ALL_FORMATS
-        });
-
-        try {
-            const videoTrack = await input.getPrimaryVideoTrack();
-            if (!videoTrack) return null;
-
-            return await videoTrack.computePacketStats(count);
-        } finally {
-            if (input && typeof input.dispose === 'function') {
-                try {
-                    input.dispose();
-                } catch (e) {
-                    Logger.warn('Error disposing input in getVideoStats:', e);
-                }
-            }
-        }
-    }
-
-    /**
-     * Get track details from an input
-     * @param {MediaBunny.Input} input
-     * @returns {Promise<{video: Array, audio: Array}>}
-     * @private
-     */
-    static async _getTrackDetails(input) {
-        const videoTracks = await input.getVideoTracks();
-        const audioTracks = await input.getAudioTracks();
-
-        const formatTrackInfo = async (tracks) => {
-            return Promise.all(tracks.map(async (track) => {
-                const duration = await track.computeDuration();
-                const codecString = await track.getCodecParameterString();
-                return {
-                    id: track.id,
-                    type: track.type,
-                    language: track.languageCode,
-                    codec: track.codec,
-                    codecString: codecString,
-                    duration: duration,
-                    width: track.width || track.displayWidth,
-                    height: track.height || track.displayHeight,
-                    displayWidth: track.displayWidth,
-                    displayHeight: track.displayHeight,
-                    codedWidth: track.codedWidth,
-                    codedHeight: track.codedHeight,
-                    rotation: track.rotation || 0,
-                    channels: track.numberOfChannels,
-                    sampleRate: track.sampleRate,
-                    // Keep reference to track for internal use if needed (e.g. in getMetadata)
-                    _track: track
-                };
-            }));
-        };
-
-        const videoTracksInfo = await formatTrackInfo(videoTracks);
-        const audioTracksInfo = await formatTrackInfo(audioTracks);
-
-        return {
-            video: videoTracksInfo,
-            audio: audioTracksInfo
-        };
+        return getProcessingVideoStats(source, count);
     }
 
 
@@ -496,81 +431,7 @@ export class MediaProcessor {
      * @returns {Promise<{videoInfo: Object|null, audioInfo: Object|null, duration: number, videoTracks: Array, audioTracks: Array}>}
      */
     static async getMetadata(source) {
-        const input = MediaProcessor._createInput(source);
-
-        try {
-            const { video, audio } = await this._getTrackDetails(input);
-
-            let videoInfo = null;
-            let audioInfo = null;
-            let duration = 0;
-
-            // Extract video metadata
-            if (video && video.length > 0) {
-                const videoTrackInfo = video[0]; // Use primary track
-                const videoTrack = videoTrackInfo._track;
-                duration = videoTrackInfo.duration;
-
-                videoInfo = {
-                    width: videoTrackInfo.width,
-                    height: videoTrackInfo.height,
-                    displayWidth: videoTrack.displayWidth,
-                    displayHeight: videoTrack.displayHeight,
-                    codedWidth: videoTrack.codedWidth,
-                    codedHeight: videoTrack.codedHeight,
-                    codec: videoTrackInfo.codec,
-                    rotation: videoTrack.rotation || 0,
-                    hasHDR: false // Computed on-demand if needed
-                };
-
-                // Calculate FPS and Bitrate
-                try {
-                    const stats = await videoTrack.computePacketStats(50);
-                    videoInfo.fps = Math.round(stats.averagePacketRate);
-                    videoInfo.bitrate = stats.averageBitrate;
-                } catch (e) {
-                    Logger.warn('Failed to compute packet stats:', e);
-                    videoInfo.fps = 0;
-                    videoInfo.bitrate = 0;
-                }
-            }
-
-            // Extract audio metadata
-            if (audio && audio.length > 0) {
-                const audioTrackInfo = audio[0]; // Use primary track
-                if (!duration) {
-                    duration = audioTrackInfo.duration;
-                }
-
-                audioInfo = {
-                    codec: audioTrackInfo.codec,
-                    channels: audioTrackInfo.channels,
-                    sampleRate: audioTrackInfo.sampleRate,
-                    languageCode: audioTrackInfo.language
-                };
-            }
-
-            // Prepare full track lists for return (removing internal references)
-            const videoTracks = video.map(t => {
-                const { _track, ...rest } = t;
-                return rest;
-            });
-            const audioTracks = audio.map(t => {
-                const { _track, ...rest } = t;
-                return rest;
-            });
-
-            return { videoInfo, audioInfo, duration, videoTracks, audioTracks };
-        } finally {
-            // MediaBunny handles cleanup
-            if (input && typeof input.dispose === 'function') {
-                try {
-                    input.dispose();
-                } catch (e) {
-                    Logger.warn('Error disposing input in getMetadata:', e);
-                }
-            }
-        }
+        return getProcessingMetadata(source);
     }
 
     /**
