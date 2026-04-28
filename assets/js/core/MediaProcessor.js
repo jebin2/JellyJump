@@ -3,6 +3,7 @@ import { MediaBunny } from './MediaBunny.js';
 import GIF from '../lib/gif.js';
 import { getMetadata as getProcessingMetadata, getVideoStats as getProcessingVideoStats } from '../processing/metadata/MetadataService.js';
 import { createMediaBunnyInput } from '../processing/shared/InputFactory.js';
+import { losslessTrim as losslessTrimMedia } from '../processing/trim/TrimService.js';
 
 /**
  * MediaProcessor
@@ -323,93 +324,7 @@ export class MediaProcessor {
     }
 
     static async losslessTrim({ source, trim, onProgress }) {
-        Logger.log('[MediaProcessor] Starting lossless trim...', trim);
-
-        let input = null;
-        try {
-            input = MediaProcessor._createInput(source);
-
-            const videoTrack = await input.getPrimaryVideoTrack();
-            if (!videoTrack) throw new Error('No video track found');
-
-            const audioTracks = await input.getAudioTracks();
-            const audioTrack = audioTracks[0] ?? null;
-
-            const { start: trimStart, end: trimEnd } = trim;
-            const duration = trimEnd - trimStart;
-
-            // Find the keyframe at or before trimStart
-            const videoSink = new MediaBunny.EncodedPacketSink(videoTrack);
-            let startKeyPacket = await videoSink.getKeyPacket(trimStart);
-            if (!startKeyPacket) startKeyPacket = await videoSink.getFirstKeyPacket();
-            if (!startKeyPacket) throw new Error('No keyframe found in video');
-
-            const startOffset = startKeyPacket.timestamp;
-
-            const videoDecoderConfig = await videoTrack.getDecoderConfig();
-            if (!videoDecoderConfig) throw new Error('Could not get video decoder config');
-
-            // Build output
-            const target = new MediaBunny.BufferTarget();
-            const output = new MediaBunny.Output({
-                format: new MediaBunny.Mp4OutputFormat(),
-                target
-            });
-
-            const videoPacketSource = new MediaBunny.EncodedVideoPacketSource(MediaProcessor._shortVideoCodec(videoDecoderConfig.codec));
-            output.addVideoTrack(videoPacketSource);
-
-            let audioPacketSource = null;
-            let audioDecoderConfig = null;
-            if (audioTrack) {
-                audioDecoderConfig = await audioTrack.getDecoderConfig();
-                if (audioDecoderConfig) {
-                    audioPacketSource = new MediaBunny.EncodedAudioPacketSource(MediaProcessor._shortAudioCodec(audioDecoderConfig.codec));
-                    output.addAudioTrack(audioPacketSource);
-                }
-            }
-
-            await output.start();
-
-            // Write video packets (shifted so startOffset → 0)
-            let firstVideo = true;
-            for await (const packet of videoSink.packets(startKeyPacket)) {
-                if (packet.timestamp >= trimEnd) break;
-                const shiftedTs = packet.timestamp - startOffset;
-                const shifted = packet.clone({ timestamp: shiftedTs });
-                await videoPacketSource.add(shifted, firstVideo ? { decoderConfig: videoDecoderConfig } : undefined);
-                firstVideo = false;
-                onProgress?.(Math.min((shiftedTs / duration) * 0.85, 0.85));
-            }
-            videoPacketSource.close();
-
-            // Write audio packets
-            if (audioTrack && audioPacketSource && audioDecoderConfig) {
-                const audioSink = new MediaBunny.EncodedPacketSink(audioTrack);
-                const audioStartPacket = await audioSink.getPacket(startOffset) ?? await audioSink.getFirstPacket();
-                if (audioStartPacket) {
-                    let firstAudio = true;
-                    for await (const packet of audioSink.packets(audioStartPacket)) {
-                        if (packet.timestamp >= trimEnd) break;
-                        const shiftedTs = packet.timestamp - startOffset;
-                        if (shiftedTs < 0) continue;
-                        const shifted = packet.clone({ timestamp: shiftedTs });
-                        await audioPacketSource.add(shifted, firstAudio ? { decoderConfig: audioDecoderConfig } : undefined);
-                        firstAudio = false;
-                    }
-                }
-                audioPacketSource.close();
-            }
-
-            await output.finalize();
-            onProgress?.(1);
-
-            return new Blob([target.buffer], { type: 'video/mp4' });
-        } finally {
-            if (input && typeof input.dispose === 'function') {
-                try { input.dispose(); } catch (e) { Logger.warn('losslessTrim: dispose error', e); }
-            }
-        }
+        return losslessTrimMedia({ source, trim, onProgress });
     }
 
     /**
