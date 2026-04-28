@@ -3,6 +3,101 @@ import { MediaBunny } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
 
+export async function extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress }) {
+    const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);
+    const input = new MediaBunny.Input({
+        source: blobSource,
+        formats: MediaBunny.ALL_FORMATS
+    });
+
+    let outputFormat;
+    switch (format) {
+        case 'mp4':
+        case 'm4a':
+            outputFormat = new MediaBunny.Mp4OutputFormat();
+            break;
+        case 'mp3':
+            outputFormat = new MediaBunny.Mp3OutputFormat();
+            break;
+        case 'aac':
+            outputFormat = new MediaBunny.AdtsOutputFormat();
+            break;
+        case 'wav':
+            outputFormat = new MediaBunny.WavOutputFormat();
+            break;
+        case 'flac':
+            outputFormat = new MediaBunny.FlacOutputFormat();
+            break;
+        default:
+            throw new Error(`Unsupported format: ${format}`);
+    }
+
+    const output = new MediaBunny.Output({
+        format: outputFormat,
+        target: new MediaBunny.BufferTarget()
+    });
+
+    let conversion = null;
+
+    try {
+        const config = {
+            input,
+            output,
+            video: (t, i) => {
+                const keep = trackType === 'video' && (i - 1) === trackIndex;
+                Logger.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
+                return keep ? {} : { discard: true };
+            },
+            audio: (t, i) => {
+                const keep = trackType === 'audio' && (i - 1) === trackIndex;
+                Logger.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
+                return keep ? {} : { discard: true };
+            }
+        };
+
+        conversion = await MediaBunny.Conversion.init(config);
+
+        if (!conversion.isValid) {
+            Logger.error('Conversion invalid:', conversion.discardedTracks);
+            const reasons = conversion.discardedTracks.map(d => `${d.track.type}: ${d.reason}`).join(', ');
+            throw new Error(`Cannot execute conversion: ${reasons}`);
+        }
+
+        if (onProgress) {
+            conversion.onProgress = onProgress;
+        }
+
+        await conversion.execute();
+
+        const mimeType = trackType === 'video' ? `video/${format}` : `audio/${format}`;
+        return new Blob([output.target.buffer], { type: mimeType });
+    } finally {
+        if (conversion && typeof conversion.dispose === 'function') {
+            try {
+                conversion.dispose();
+            } catch (e) {
+                Logger.warn('Error disposing conversion in extractTrack:', e);
+            }
+        }
+
+        if (output && typeof output.dispose === 'function') {
+            try {
+                output.dispose();
+            } catch (e) {
+                Logger.warn('Error disposing output in extractTrack:', e);
+            }
+        }
+
+        if (input && typeof input.dispose === 'function') {
+            try {
+                input.dispose();
+            } catch (e) {
+                Logger.warn('Error disposing input in extractTrack:', e);
+            }
+        }
+    }
+}
+
 export async function extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress }) {
     Logger.log(`[MediaProcessor] Extracting ${trackType} track ${trackIndex} with speed ${speed}x`);
 

@@ -5,7 +5,10 @@ import { getMetadata as getProcessingMetadata, getVideoStats as getProcessingVid
 import { createMediaBunnyInput } from '../processing/shared/InputFactory.js';
 import { losslessTrim as losslessTrimMedia } from '../processing/trim/TrimService.js';
 import { reverseVideo as reverseProcessedVideo, changeVideoSpeed as changeProcessedVideoSpeed } from '../processing/speed/SpeedService.js';
-import { extractTrackWithSpeed as extractProcessedTrackWithSpeed } from '../processing/tracks/TrackExtractionService.js';
+import {
+    extractTrackStreamCopy as extractProcessedTrackStreamCopy,
+    extractTrackWithSpeed as extractProcessedTrackWithSpeed
+} from '../processing/tracks/TrackExtractionService.js';
 
 /**
  * MediaProcessor
@@ -380,99 +383,7 @@ export class MediaProcessor {
      * @private
      */
     static async _extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress }) {
-        const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);
-        const input = new MediaBunny.Input({
-            source: blobSource,
-            formats: MediaBunny.ALL_FORMATS
-        });
-
-        let outputFormat;
-        switch (format) {
-            case 'mp4':
-            case 'm4a':
-                outputFormat = new MediaBunny.Mp4OutputFormat();
-                break;
-            case 'mp3':
-                outputFormat = new MediaBunny.Mp3OutputFormat();
-                break;
-            case 'aac':
-                outputFormat = new MediaBunny.AdtsOutputFormat();
-                break;
-            case 'wav':
-                outputFormat = new MediaBunny.WavOutputFormat();
-                break;
-            case 'flac':
-                outputFormat = new MediaBunny.FlacOutputFormat();
-                break;
-            default:
-                throw new Error(`Unsupported format: ${format}`);
-        }
-
-        const output = new MediaBunny.Output({
-            format: outputFormat,
-            target: new MediaBunny.BufferTarget()
-        });
-
-        let conversion = null;
-
-        try {
-            const config = {
-                input: input,
-                output: output,
-                video: (t, i) => {
-                    const keep = trackType === 'video' && (i - 1) === trackIndex;
-                    Logger.log(`[MediaProcessor] Video track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
-                    return keep ? {} : { discard: true };
-                },
-                audio: (t, i) => {
-                    const keep = trackType === 'audio' && (i - 1) === trackIndex;
-                    Logger.log(`[MediaProcessor] Audio track ${i} (${t.codec}): ${keep ? 'KEEP' : 'DISCARD'}`);
-                    return keep ? {} : { discard: true };
-                }
-            };
-
-            conversion = await MediaBunny.Conversion.init(config);
-
-            if (!conversion.isValid) {
-                Logger.error('Conversion invalid:', conversion.discardedTracks);
-                const reasons = conversion.discardedTracks.map(d => `${d.track.type}: ${d.reason}`).join(', ');
-                throw new Error(`Cannot execute conversion: ${reasons}`);
-            }
-
-            if (onProgress) {
-                conversion.onProgress = onProgress;
-            }
-
-            await conversion.execute();
-
-            const mimeType = trackType === 'video' ? `video/${format}` : `audio/${format}`;
-            return new Blob([output.target.buffer], { type: mimeType });
-        } finally {
-            // Cleanup all MediaBunny resources
-            if (conversion && typeof conversion.dispose === 'function') {
-                try {
-                    conversion.dispose();
-                } catch (e) {
-                    Logger.warn('Error disposing conversion in extractTrack:', e);
-                }
-            }
-
-            if (output && typeof output.dispose === 'function') {
-                try {
-                    output.dispose();
-                } catch (e) {
-                    Logger.warn('Error disposing output in extractTrack:', e);
-                }
-            }
-
-            if (input && typeof input.dispose === 'function') {
-                try {
-                    input.dispose();
-                } catch (e) {
-                    Logger.warn('Error disposing input in extractTrack:', e);
-                }
-            }
-        }
+        return extractProcessedTrackStreamCopy({ source, trackIndex, trackType, format, onProgress });
     }
 
     /**
