@@ -170,6 +170,9 @@ export async function handlePlayerHlsState(player) {
     Logger.log(`[Live:Load] isLive=${player.isLive}, videoTrack=${!!player.videoTrack}, audioTrack=${!!player.audioTrack}, audioSink=${!!player.audioSink}`);
 
     if (player.isLive) {
+        player.playbackRate = 1;
+        player._updateSpeedMenu();
+
         const [currentDur, refreshInterval] = await Promise.all([
             player.videoTrack.getDurationFromMetadata({ skipLiveWait: true }),
             player.videoTrack.getLiveRefreshInterval(),

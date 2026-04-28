@@ -160,6 +160,13 @@ export function pausePlayer(player, showOverlay = true) {
 
 export async function setPlayerPlaybackRate(player, rate) {
     if (rate < 0.25 || rate > 2) return;
+    if (player.isLive) {
+        if (player.playbackRate !== 1) {
+            player.playbackRate = 1;
+        }
+        player._updateSpeedMenu();
+        return;
+    }
 
     const wasPlaying = player.isPlaying;
     const currentPosition = player._getPlaybackTime();
