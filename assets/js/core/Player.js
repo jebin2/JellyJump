@@ -6,6 +6,11 @@
 
 import { MediaBunny } from './MediaBunny.js';
 import {
+    onPlayerEvent,
+    offPlayerEvent,
+    triggerPlayerEvent
+} from './PlayerEvents.js';
+import {
     PLAYER_CONFIG,
     PLAYER_CONTROL_DEFAULTS,
     PLAYER_CONTROL_PRESETS,
@@ -318,20 +323,9 @@ export class CorePlayer {
     }
 
     // ─── Event emitter ───────────────────────────────────────────────────────────
-    on(event, callback) {
-        if (!this._events[event]) this._events[event] = [];
-        this._events[event].push(callback);
-    }
-
-    off(event, callback) {
-        if (!this._events[event]) return;
-        this._events[event] = this._events[event].filter(cb => cb !== callback);
-    }
-
-    trigger(event, data = {}) {
-        if (!this._events[event]) return;
-        this._events[event].forEach(callback => callback(data));
-    }
+    on(event, callback) { onPlayerEvent(this, event, callback); }
+    off(event, callback) { offPlayerEvent(this, event, callback); }
+    trigger(event, data = {}) { triggerPlayerEvent(this, event, data); }
 
     // ─── UI Updates ──────────────────────────────────────────────────────────────
     _updatePlayPauseUI() { updatePlayerPlayPauseUI(this); }
