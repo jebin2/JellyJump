@@ -48,6 +48,11 @@ import {
     loadPlayerPlaybackState
 } from './playback/PlaybackState.js';
 import {
+    playPlayer,
+    pausePlayer,
+    setPlayerPlaybackRate
+} from './playback/PlaybackTransport.js';
+import {
     startPlayerRenderLoop,
     updatePlayerNextFrame
 } from './playback/RenderLoop.js';
@@ -413,8 +418,8 @@ export class CorePlayer {
     // ─── Audio ───────────────────────────────────────────────────────────────────
     _initAudio() { initPlayerAudio(this); }
     _cleanupAudio() { cleanupPlayerAudioMode(this); }
-    async _runAudioIterator(anchorWall, anchorContent, prefetchedSample) {
-        return runPlayerAudioIterator(this, anchorWall, anchorContent, prefetchedSample);
+    async _runAudioIterator(iterator, anchorWall, anchorContent, prefetchedSample) {
+        return runPlayerAudioIterator(this, iterator, anchorWall, anchorContent, prefetchedSample);
     }
 
     // ─── Render loop ─────────────────────────────────────────────────────────────
@@ -488,187 +493,13 @@ export class CorePlayer {
     }
 
     // ─── Play ────────────────────────────────────────────────────────────────────
-    async play() {
-        this.stream.onPlay();
-
-        const streamHandled = await this.stream.playStream();
-        if (streamHandled) return;
-
-        this._updateVolumeUI();
-
-        if (this.isPlaying) return;
-        if (!this.videoTrack && !this.audioTrack) return;
-
-        Logger.log(`[Play] Starting playback - isAudioMode: ${this.isAudioMode}, playbackTimeAtStart: ${this.playbackTimeAtStart}`);
-
-        try {
-            this._initAudio();
-
-            if (this.audioContext && this.audioContext.state === 'suspended') {
-                const resumePromise = this.audioContext.resume();
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('AudioContext resume timed out')), 500)
-                );
-                await Promise.race([resumePromise, timeoutPromise]);
-            }
-        } catch (e) {
-            Logger.warn('[Play] AudioContext blocked/failed:', e);
-            Logger.log('[Play] Auto-muting due to audio block...');
-            this._wasMutedForAutoplay = true;
-            if (!this.config.muted) {
-                this.config.muted = true;
-                if (this.gainNode) this.gainNode.gain.value = 0;
-                if (this.ui.muteBtn) this._updateVolumeUI();
-            }
-        }
-
-        if (this.isLive) {
-            Logger.log(`[Play:Live] isLive=${this.isLive}, videoTrack=${!!this.videoTrack}, audioContext=${!!this.audioContext}, audioCtxTime=${this.audioContext?.currentTime?.toFixed(3)}`);
-            if (this.videoTrack) {
-                try {
-                    const currentLiveEdge = await this.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                    this._liveStartTimestamp = currentLiveEdge ?? 0;
-                    Logger.log(`[Play:Live] Current live edge: ${currentLiveEdge?.toFixed(3)}, starting from: ${this._liveStartTimestamp.toFixed(3)}`);
-                } catch (e) {
-                    Logger.warn(`[Play:Live] Failed to get duration, using fallback`);
-                    if (this.audioContext) {
-                        this._liveStartTimestamp = Date.now() / 1000 - 5;
-                    }
-                }
-            } else {
-                Logger.warn(`[Play:Live] No videoTrack, using existing _liveStartTimestamp`);
-            }
-            this._startLiveVideoLoop();
-        } else if (this.duration > 0 && this._getPlaybackTime() >= this.duration - 0.1) {
-            this.playbackTimeAtStart = 0;
-            await this._startVideoIterator();
-        } else if (!this.videoFrameIterator) {
-            await this._startVideoIterator();
-        }
-
-        this.fallbackStartTime = performance.now();
-
-        this.isPlaying = true;
-        this._updatePlayPauseUI();
-
-        if (this.audioSink) {
-            if (!this.isLive) {
-                const startTime = this.playbackTimeAtStart;
-                if (this.audioBufferIterator) await this.audioBufferIterator.return();
-                Logger.log(`[Play] Starting audio iterator at time: ${startTime.toFixed(2)}s`);
-                this.audioBufferIterator = this.audioSink.samples(startTime);
-
-                const firstResult = await this.audioBufferIterator.next();
-                const vodPrefetchedSample = firstResult?.value ?? null;
-
-                const vodAnchorWall = this.audioContext.currentTime + 0.02;
-                const vodAnchorContent = vodPrefetchedSample?.timestamp ?? startTime;
-                this._vodAnchorWall = vodAnchorWall;
-                this._vodAnchorContent = vodAnchorContent;
-                Logger.log(`[Play] VOD anchor prefetched — wall=${vodAnchorWall.toFixed(3)}, content=${vodAnchorContent.toFixed(3)}, sample=${vodPrefetchedSample ? 'ok' : 'null'}`);
-
-                this._runAudioIterator(vodAnchorWall, vodAnchorContent, vodPrefetchedSample);
-            }
-
-            await startPlayerAudioVisualizer(this);
-        }
-
-        this._startRenderLoop();
-
-        if (this.controlBarMode === 'overlay') {
-            setTimeout(() => {
-                if (this.isPlaying && this.controlBarMode === 'overlay') {
-                    this._startAutoHideTimer();
-                }
-            }, 500);
-        }
-
-        if (this.ui.playOverlay) {
-            this.ui.playOverlay.style.display = 'none';
-        }
-    }
+    async play() { return playPlayer(this); }
 
     // ─── Pause ───────────────────────────────────────────────────────────────────
-    pause(showOverlay = true) {
-        Logger.log("Player.pause() called");
-
-        this.stream.onPause();
-
-        const streamHandled = this.stream.pauseStream(showOverlay);
-        if (streamHandled) return;
-
-        const calculatedTime = this._getPlaybackTime();
-
-        if (calculatedTime < 0.1 && this.currentTime > 1.0) {
-            Logger.warn(`[Pause] Correction: _getPlaybackTime returned ${calculatedTime} but currentTime is ${this.currentTime}. Keeping ${this.currentTime}.`);
-            this.playbackTimeAtStart = this.currentTime;
-        } else {
-            this.playbackTimeAtStart = calculatedTime;
-        }
-        this.isPlaying = false;
-        this._clearAutoHideTimer();
-
-        this._updatePlayPauseUI();
-
-        if (this.audioBufferIterator) {
-            const iterator = this.audioBufferIterator;
-            this.audioBufferIterator = null;
-            this.audioIteratorCleanupPromise = iterator.return().catch(e => {
-                Logger.debug("Error closing audio iterator:", e);
-            }).finally(() => {
-                this.audioIteratorCleanupPromise = null;
-            });
-        }
-
-        if (this.animationFrameId) {
-            cancelAnimationFrame(this.animationFrameId);
-            this.animationFrameId = null;
-        }
-
-        if (this.audioContext && this.audioContext.state === 'running') {
-            this.audioContext.suspend();
-        }
-
-        for (const node of this.queuedAudioNodes) {
-            try { node.stop(); } catch (e) { }
-        }
-        this.queuedAudioNodes.clear();
-
-        this._savePlaybackState();
-
-        if (this.ui.playOverlay && !this.isLoading) {
-            const shouldShow = showOverlay && this.config.controls.playOverlay;
-            this.ui.playOverlay.style.display = shouldShow ? 'flex' : 'none';
-        }
-
-        if (this.isAudioMode && this.audioVisualizer) {
-            this.audioVisualizer.stop();
-        }
-    }
+    pause(showOverlay = true) { return pausePlayer(this, showOverlay); }
 
     // ─── Playback Rate ───────────────────────────────────────────────────────────
-    async setPlaybackRate(rate) {
-        if (rate < 0.25 || rate > 2) return;
-
-        const wasPlaying = this.isPlaying;
-        const currentPosition = this._getPlaybackTime();
-
-        if (wasPlaying) {
-            this.pause();
-            if (this.audioIteratorCleanupPromise) {
-                await this.audioIteratorCleanupPromise;
-            }
-        }
-
-        this.playbackRate = rate;
-        localStorage.setItem('jellyjump-speed', rate);
-        this._updateSpeedMenu();
-
-        if (wasPlaying) {
-            await this._seekTo(currentPosition);
-            await this.play();
-        }
-    }
+    async setPlaybackRate(rate) { return setPlayerPlaybackRate(this, rate); }
 
     // ─── Volume / Mute ───────────────────────────────────────────────────────────
     get volume() { return this.config.volume; }

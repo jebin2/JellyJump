@@ -8,7 +8,7 @@ export function getPlayerPlaybackTime(player) {
 
     if (player._vodAnchorWall !== undefined && player._vodAnchorContent !== undefined && player.audioContext) {
         const elapsed = player.audioContext.currentTime - player._vodAnchorWall;
-        const newPosition = player._vodAnchorContent + elapsed;
+        const newPosition = player._vodAnchorContent + (elapsed * player.playbackRate);
         if (newPosition >= player._vodAnchorContent - 0.1) {
             return newPosition;
         }

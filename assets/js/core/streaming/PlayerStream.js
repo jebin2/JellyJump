@@ -752,7 +752,7 @@ export class PlayerStream {
 
         if (prefetchedAudioSample && anchorWall !== null) {
             Logger.log(`[Live:Audio] Starting audio iterator — anchorWall=${anchorWall.toFixed(3)}, anchorContent=${anchorContent.toFixed(3)}`);
-            player._runAudioIterator(anchorWall, anchorContent, prefetchedAudioSample);
+            player._runAudioIterator(player.audioBufferIterator, anchorWall, anchorContent, prefetchedAudioSample);
         } else if (hasAudio) {
             Logger.warn(`[Live:Audio] No prefetched audio sample — audio will not play`);
         }

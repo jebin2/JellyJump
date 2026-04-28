@@ -48,13 +48,13 @@ export async function startPlayerAudioVisualizer(player) {
     }
 }
 
-export async function runPlayerAudioIterator(player, anchorWall, anchorContent, prefetchedSample) {
-    if (!player.audioSink) return;
+export async function runPlayerAudioIterator(player, iterator, anchorWall, anchorContent, prefetchedSample) {
+    if (!player.audioSink || !iterator) return;
 
     if (anchorWall !== undefined) player._vodAnchorWall = anchorWall;
     if (anchorContent !== undefined) player._vodAnchorContent = anchorContent;
 
-    const myIterator = player.audioBufferIterator;
+    const myIterator = iterator;
     const isLiveMode = anchorWall !== undefined && anchorContent !== undefined;
 
     let nextAudioTime;
