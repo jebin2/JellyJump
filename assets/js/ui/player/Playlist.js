@@ -126,7 +126,7 @@ export class Playlist {
     // Navigation convenience wrappers
     playNext() { this.navigation.playNext(); }
     playPrevious() { this.navigation.playPrevious(); }
-    scrollToPlaying() { this.navigation.scrollToPlaying(); }
+    scrollToPlaying() { return this.navigation.scrollToPlaying(); }
     _updatePlayerNavigationState() { this.navigation.updatePlayerNavigationState(); }
 
 
