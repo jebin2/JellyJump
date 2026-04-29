@@ -1,7 +1,7 @@
 import { Logger } from "./Logger.js";
-import { MediaBunny } from '../core/MediaBunny.js';
-import { MediaProcessor } from '../core/MediaProcessor.js';
-import { IndexedDBService } from '../player/IndexedDBService.js';
+import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { IndexedDBService } from "../services/IndexedDBService.js";
 import { formatTime } from './mediaUtils.js';
 import { ElectronHelper } from './ElectronHelper.js';
 

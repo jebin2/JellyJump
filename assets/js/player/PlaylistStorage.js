@@ -1,5 +1,5 @@
-import { Logger } from "../utils/Logger.js";
-import { IndexedDBService } from './IndexedDBService.js';
+import { Logger } from "../shared/utils/Logger.js";
+import { IndexedDBService } from "../shared/services/IndexedDBService.js";
 
 /**
  * Playlist Storage Service

@@ -1,21 +1,21 @@
-import { Logger } from "../utils/Logger.js";
-import { IndexedDBService } from './IndexedDBService.js';
+import { Logger } from "../shared/utils/Logger.js";
+import { IndexedDBService } from "../shared/services/IndexedDBService.js";
 import { CorePlayer } from '../core/Player.js';
-import { ConfirmDialog } from '../utils/ConfirmDialog.js';
-import { Modal as DialogModal } from './Modal.js';
+import { ConfirmDialog } from '../shared/utils/ConfirmDialog.js';
+import { Modal as DialogModal } from '../ui/Modal.js';
 import { MenuRouter } from '../ui/menus/core/MenuRouter.js';
 import { RecordMenu } from '../ui/menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../ui/menus/features/ScreenRecorderMenu.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
-import { MediaMetadata } from '../utils/MediaMetadata.js';
-import { FileDropHandler } from '../utils/FileDropHandler.js';
-import { ElectronHelper } from '../utils/ElectronHelper.js';
-import { formatTime, generateId } from '../utils/mediaUtils.js';
-import { M3UParser } from '../utils/M3UParser.js';
-import { StreamDetector } from '../utils/StreamDetector.js';
+import { MediaMetadata } from '../shared/utils/MediaMetadata.js';
+import { FileDropHandler } from '../shared/utils/FileDropHandler.js';
+import { ElectronHelper } from '../shared/utils/ElectronHelper.js';
+import { formatTime, generateId } from '../shared/utils/mediaUtils.js';
+import { M3UParser } from '../shared/utils/M3UParser.js';
+import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { PlaylistRenderer } from '../ui/player/PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
-import { PlaylistProcessor } from './PlaylistProcessor.js';
+import { PlaylistProcessor } from "../shared/services/PlaylistProcessor.js";
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
@@ -2016,7 +2016,7 @@ export class Playlist {
             return;
         }
 
-        const { Modal } = await import('./Modal.js');
+        const { Modal } = await import('../ui/Modal.js');
 
         // Treat streams, IPTV, and live content as restricted (limited menu options)
         const isRestricted = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/live/') || item.url.includes('/hls/')));

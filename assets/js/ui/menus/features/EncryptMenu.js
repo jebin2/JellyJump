@@ -1,6 +1,6 @@
-import { Logger } from '../../../utils/Logger.js';
-import { CryptoHelper } from '../../../utils/CryptoHelper.js';
-import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { Logger } from '../../../shared/utils/Logger.js';
+import { CryptoHelper } from '../../../shared/utils/CryptoHelper.js';
+import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 /**

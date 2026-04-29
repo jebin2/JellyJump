@@ -1,5 +1,5 @@
 import { MediaBunny } from '../MediaBunny.js';
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 
 export function clearPlayerCanvas(player) {
     if (player.ctx && player.canvas) {

@@ -1,9 +1,9 @@
-import { Modal as ModalDialog } from "../../../player/Modal.js";
-import { Logger } from "../../../utils/Logger.js";
+import { Modal as ModalDialog } from '../../Modal.js';
+import { Logger } from "../../../shared/utils/Logger.js";
 import { HardCutDetector } from "../../../player/HardCutDetector.js";
-import { formatTime, generateId } from "../../../utils/mediaUtils.js";
+import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 
 export class CutDetectionMenu {
     static async init(item, playlist) {

@@ -1,4 +1,4 @@
-import { Logger } from "../utils/Logger.js";
+import { Logger } from "../shared/utils/Logger.js";
 import { MediaBunny } from './MediaBunny.js';
 import { getMetadata as getProcessingMetadata, getVideoStats as getProcessingVideoStats } from '../processing/metadata/MetadataService.js';
 import { createMediaBunnyInput, AUDIO_BITRATE_BPS } from '../processing/shared/InputFactory.js';

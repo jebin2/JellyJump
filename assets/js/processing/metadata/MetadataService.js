@@ -1,4 +1,4 @@
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
 

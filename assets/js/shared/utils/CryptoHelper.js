@@ -324,7 +324,7 @@ export class CryptoHelper {
      * @returns {Promise<Blob>}
      */
     static async _generatePlaceholder() {
-        const { MediaBunny } = await import('../core/MediaBunny.js');
+        const { MediaBunny } = await import('../../core/MediaBunny.js');
 
         const W = 640, H = 360, FPS = 2, DURATION_SEC = 2;
 

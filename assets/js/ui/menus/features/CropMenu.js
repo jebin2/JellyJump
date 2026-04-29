@@ -1,6 +1,6 @@
-import { Logger } from "../../../utils/Logger.js";
+import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import {
     loadVideo,
     updateScale,

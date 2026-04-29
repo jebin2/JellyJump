@@ -1,4 +1,4 @@
-import { Logger } from "../../../utils/Logger.js";
+import { Logger } from "../../../shared/utils/Logger.js";
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { MediaProcessor } from "../../../core/MediaProcessor.js";
 import {
@@ -7,7 +7,7 @@ import {
     setupCleanup
 } from './BoxEditorUtils.js';
 
-import { MediaMetadata } from "../../../utils/MediaMetadata.js";
+import { MediaMetadata } from "../../../shared/utils/MediaMetadata.js";
 
 export class RotateMenu {
     /**

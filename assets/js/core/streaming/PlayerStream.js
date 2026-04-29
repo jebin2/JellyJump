@@ -1,5 +1,5 @@
 import { MediaBunny } from '../MediaBunny.js';
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 
 export class PlayerStream {
     constructor(player) {

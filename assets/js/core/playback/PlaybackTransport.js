@@ -1,4 +1,4 @@
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 import { startPlayerAudioVisualizer } from '../audio/AudioEngine.js';
 
 export async function playPlayer(player) {

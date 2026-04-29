@@ -1,6 +1,6 @@
-import { Logger } from "../utils/Logger.js";
-import { Modal } from "./Modal.js";
-import { formatTime } from "../utils/mediaUtils.js";
+import { Logger } from "../shared/utils/Logger.js";
+import { Modal } from "../ui/Modal.js";
+import { formatTime } from "../shared/utils/mediaUtils.js";
 
 /**
  * Screenshot Manager

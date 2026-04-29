@@ -1,4 +1,4 @@
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 
 export function mountPlayerShell(player) {
     player.container.classList.add('jellyjump-container');

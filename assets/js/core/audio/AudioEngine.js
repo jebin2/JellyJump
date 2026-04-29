@@ -1,5 +1,5 @@
 import { AudioEqualizer } from './AudioEqualizer.js';
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 
 
 export async function initPlayerAudio(player) {

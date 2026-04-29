@@ -1,4 +1,4 @@
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 
 export async function updatePlayerNextFrame(player) {
     if (player._isFetchingFrame || !player.videoFrameIterator) return;

@@ -1,4 +1,4 @@
-import { parseTime } from '../../utils/mediaUtils.js';
+import { parseTime } from '../../shared/utils/mediaUtils.js';
 
 export function attachPlayerBindings(player) {
     if (player.config.controls.playPause && player.ui.playBtn) {

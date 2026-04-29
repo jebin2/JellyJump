@@ -1,4 +1,4 @@
-import { Logger } from '../../utils/Logger.js';
+import { Logger } from '../../shared/utils/Logger.js';
 
 export function handlePlayerDocumentClick(player, e) {
     if (player.ui.ccPanel && player.ui.ccBtn &&

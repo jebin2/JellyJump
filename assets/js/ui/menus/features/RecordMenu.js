@@ -1,5 +1,5 @@
-import { Logger } from "../../../utils/Logger.js";
-import { Modal } from '../../../player/Modal.js';
+import { Logger } from "../../../shared/utils/Logger.js";
+import { Modal } from '../../Modal.js';
 
 /**
  * Record Menu Handler

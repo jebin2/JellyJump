@@ -97,8 +97,8 @@ import { PlayerLoopControl } from '../player/PlayerLoopControl.js';
 import { PlayerThumbnails } from '../player/PlayerThumbnails.js';
 import { PlayerControlBar } from '../player/PlayerControlBar.js';
 
-import { StreamDetector } from '../utils/StreamDetector.js';
-import { Logger } from '../utils/Logger.js';
+import { StreamDetector } from '../shared/utils/StreamDetector.js';
+import { Logger } from '../shared/utils/Logger.js';
 import { ThumbnailGenerator } from '../player/ThumbnailGenerator.js';
 
 export class CorePlayer {

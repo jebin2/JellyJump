@@ -1,5 +1,5 @@
 import { HardCutDetector } from "./player/HardCutDetector.js";
-import { Logger } from "./utils/Logger.js";
+import { Logger } from "./shared/utils/Logger.js";
 
 document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('btn-hard-cut-demo');

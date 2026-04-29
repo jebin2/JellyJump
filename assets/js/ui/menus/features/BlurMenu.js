@@ -1,7 +1,7 @@
-import { Logger } from "../../../utils/Logger.js";
-import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { Logger } from "../../../shared/utils/Logger.js";
+import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
-import { generateId, formatTime, parseTime } from '../../../utils/mediaUtils.js';
+import { generateId, formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import {
     loadVideo,
     setupDragHandlers,

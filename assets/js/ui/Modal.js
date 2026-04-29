@@ -1,4 +1,4 @@
-import { Logger } from "../utils/Logger.js";
+import { Logger } from "../shared/utils/Logger.js";
 /**
  * Reusable Modal Component
  * Uses the 'modal-shell-template' to create consistent modals.
