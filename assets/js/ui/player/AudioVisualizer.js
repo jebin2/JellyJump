@@ -14,7 +14,7 @@ export class AudioVisualizer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d', { alpha: false });
-        
+
         // Modularized helpers
         this.renderer = new VisualizerRenderer(this);
         this.characters = new VisualizerCharacters(this);
@@ -29,7 +29,7 @@ export class AudioVisualizer {
         this.freqData = null;
         this.timeData = null;
         this.lastFreqData = null;
-        
+
         // Features
         this.bassLevel = 0;
         this.midLevel = 0;
@@ -38,7 +38,7 @@ export class AudioVisualizer {
         this.currentPitchHz = 0;
         this.pitchSmoothedHz = 0;
         this.lastBeatAt = 0;
-        
+
         // History for beat detection
         this.energyHistory = [];
         this.fluxHistory = [];
@@ -53,20 +53,19 @@ export class AudioVisualizer {
         this.sceneComposition = {};
         this.sceneWidth = 0;
         this.sceneHeight = 0;
-        
+
         this.simTime = 0;
         this.simulatedMode = false;
         this.lightningCooldownMs = 1200;
         this.lastLightningAt = 0;
 
         this.woman = {
-            x: -150, y: 0, 
+            x: -150, y: 0,
             height: 180, speed: 1.15,
             frame: 0, state: "walking_to_balloon",
             waitTimer: 0, hasBalloon: false
         };
 
-        this.drawStaticBackground();
         Logger.log("[AudioVisualizer] Created");
     }
 
@@ -200,7 +199,7 @@ export class AudioVisualizer {
                 this.pitchSmoothedHz = this.pitchSmoothedHz === 0 ? this.currentPitchHz : this.pitchSmoothedHz * 0.8 + this.currentPitchHz * 0.2;
             }
         }
-        
+
         this.frameCounter++;
     }
 

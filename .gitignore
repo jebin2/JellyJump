@@ -20,3 +20,8 @@ product-demo/
 medibunny-llms-full.txt
 examples/
 *.txt
+REPO_RESTRUCTURING_CHECKLIST.md
+REPO_RESTRUCTURING_PLAN.md
+reading-hls.md
+writing-hls.md
+docs/
