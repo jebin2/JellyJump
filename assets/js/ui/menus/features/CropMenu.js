@@ -1,6 +1,6 @@
-import { Logger } from "../../utils/Logger.js";
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
+import { Logger } from "../../../utils/Logger.js";
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
 import {
     loadVideo,
     updateScale,
@@ -14,7 +14,7 @@ import {
     setupCleanup,
     setupAutoUpdate
 } from './BoxEditorUtils.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 /**
  * Crop Menu Handler - Fresh Implementation

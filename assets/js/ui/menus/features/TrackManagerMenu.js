@@ -1,8 +1,8 @@
-import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { CustomDropdown } from '../../utils/CustomDropdown.js';
+import { Logger } from "../../../utils/Logger.js";
+import { Modal } from '../../../player/Modal.js';
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { CustomDropdown } from '../../../utils/CustomDropdown.js';
 
 /**
  * Track Manager Menu Handler

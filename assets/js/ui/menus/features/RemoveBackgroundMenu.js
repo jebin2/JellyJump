@@ -1,9 +1,9 @@
-import { Logger } from "../../utils/Logger.js";
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { formatTime } from '../../utils/mediaUtils.js';
+import { Logger } from "../../../utils/Logger.js";
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { formatTime } from '../../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 export class RemoveBackgroundMenu {
     /**

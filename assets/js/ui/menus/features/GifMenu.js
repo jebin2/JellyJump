@@ -1,10 +1,10 @@
-import { Logger } from "../../utils/Logger.js";
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { formatTime, parseTime, formatFileSize } from '../../utils/mediaUtils.js';
+import { Logger } from "../../../utils/Logger.js";
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { formatTime, parseTime, formatFileSize } from '../../../utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
-import { CustomDropdown } from '../../utils/CustomDropdown.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
+import { CustomDropdown } from '../../../utils/CustomDropdown.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 /**
  * GIF Menu Handler

@@ -3,9 +3,9 @@ import { IndexedDBService } from './IndexedDBService.js';
 import { CorePlayer } from '../core/Player.js';
 import { ConfirmDialog } from '../utils/ConfirmDialog.js';
 import { Modal as DialogModal } from './Modal.js';
-import { MenuRouter } from './menu/MenuRouter.js';
-import { RecordMenu } from './menu/RecordMenu.js';
-import { ScreenRecorderMenu } from './menu/ScreenRecorderMenu.js';
+import { MenuRouter } from '../ui/menus/core/MenuRouter.js';
+import { RecordMenu } from '../ui/menus/features/RecordMenu.js';
+import { ScreenRecorderMenu } from '../ui/menus/features/ScreenRecorderMenu.js';
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { FileDropHandler } from '../utils/FileDropHandler.js';
@@ -13,7 +13,7 @@ import { ElectronHelper } from '../utils/ElectronHelper.js';
 import { formatTime, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
-import { PlaylistRenderer } from './PlaylistRenderer.js';
+import { PlaylistRenderer } from '../ui/player/PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
 import { PlaylistProcessor } from './PlaylistProcessor.js';
 
@@ -54,7 +54,7 @@ export class Playlist {
         // Setup Drag and Drop
         this.fileDropHandler = new FileDropHandler(this.container, (files) => this.handleFiles(files));
 
-        // Save state on beforeunload (works for most cases)
+        // Save state on beforeunload
         this._beforeUnloadHandler = () => {
             Logger.log('[Playlist] beforeunload - saving state');
             this._saveState();
@@ -75,7 +75,7 @@ export class Playlist {
         // Load saved playlist
         this._loadSavedPlaylist();
 
-        // Setup player error callback to mark broken streams
+        // Setup player error callback
         if (this.player) {
             this.player.onStreamError = (videoId, error) => {
                 this.markItemBroken(videoId, error);
@@ -2097,116 +2097,16 @@ export class Playlist {
      * @private
      */
     _setupToolsButton(toolsBtn) {
-        const showToolsModal = async () => {
-            const { Modal } = await import('./Modal.js');
-
-            const modal = new Modal({ maxWidth: '320px' });
-            modal.setTitle('Tools');
-
-            // Create tools grid content
-            const content = document.createElement('div');
-            content.className = 'tools-grid';
-            content.innerHTML = `
-                <button class="tools-tile" data-action="screen-record" title="Record Screen">
-                    <div class="tools-tile-icon">
-                        <svg width="24" height="24" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-record"></use>
-                        </svg>
-                    </div>
-                    <span class="tools-tile-label">Record Screen</span>
-                </button>
-                <button class="tools-tile" data-action="camera-record" title="Camera Recording">
-                    <div class="tools-tile-icon">
-                        <svg width="24" height="24" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-camera"></use>
-                        </svg>
-                    </div>
-                    <span class="tools-tile-label">Camera</span>
-                </button>
-                <button class="tools-tile" data-action="merge" title="Merge Videos">
-                    <div class="tools-tile-icon">
-                        <svg width="24" height="24" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-copy"></use>
-                        </svg>
-                    </div>
-                    <span class="tools-tile-label">Merge Videos</span>
-                </button>
-                <button class="tools-tile" data-action="slideshow" title="Images to Video">
-                    <div class="tools-tile-icon">
-                        <svg width="24" height="24" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-image"></use>
-                        </svg>
-                    </div>
-                    <span class="tools-tile-label">Slideshow</span>
-                </button>
-                <button class="tools-tile tools-tile-danger" data-action="reset" title="Reset App">
-                    <div class="tools-tile-icon">
-                        <svg width="24" height="24" fill="currentColor">
-                            <use href="assets/icons/sprite.svg#icon-trash"></use>
-                        </svg>
-                    </div>
-                    <span class="tools-tile-label">Reset App</span>
-                </button>
-            `;
-
-            modal.setBody(content);
-            // No footer needed
-
-            // Handle tile clicks
-            content.querySelectorAll('.tools-tile').forEach(tile => {
-                tile.addEventListener('click', async (e) => {
-                    const action = tile.dataset.action;
-                    modal.close();
-
-                    if (action === 'screen-record') {
-                        const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
-                        ScreenRecorderMenu.showOptions(this);
-                    } else if (action === 'camera-record') {
-                        const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
-                        ScreenRecorderMenu.showCameraOptions(this);
-                    } else if (action === 'merge') {
-                        const { MergeMenu } = await import('./menu/MergeMenu.js');
-                        MergeMenu.init(null, this);
-                    } else if (action === 'slideshow') {
-                        const { SlideshowMenu } = await import('./menu/SlideshowMenu.js');
-                        SlideshowMenu.init(this);
-                    } else if (action === 'reset') {
-                        if (confirm('Reset the app? This will clear all data and reload.')) {
-                            try {
-                                // Delete the entire IndexedDB database
-                                await new Promise((resolve, reject) => {
-                                    const request = indexedDB.deleteDatabase('JellyJumpDB');
-                                    request.onsuccess = () => resolve();
-                                    request.onerror = () => reject(request.error);
-                                    request.onblocked = () => resolve(); // Still proceed if blocked
-                                });
-
-                                // Clear all localStorage
-                                localStorage.clear();
-
-                                // Reload the page
-                                window.location.reload();
-                            } catch (err) {
-                                Logger.error('Reset failed:', err);
-                                // Still reload even if clearing fails
-                                window.location.reload();
-                            }
-                        }
-                    }
-                });
-            });
-
-            modal.open();
-        };
-
         toolsBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (toolsBtn.classList.contains('recording-active')) {
-                const { ScreenRecorderMenu } = await import('./menu/ScreenRecorderMenu.js');
+                const { ScreenRecorderMenu } = await import('../ui/menus/features/ScreenRecorderMenu.js');
                 ScreenRecorderMenu.stopRecording(this);
                 return;
             }
-            showToolsModal();
+            
+            const { ToolsMenu } = await import('../ui/menus/features/ToolsMenu.js');
+            ToolsMenu.show(this);
         });
 
         // Store reference for recording state updates
@@ -2294,104 +2194,16 @@ export class Playlist {
             return path.startsWith(prefix) && item.isStream;
         });
 
-        if (folderItems.length === 0) {
-            this._showToast('No streams found in this folder');
-            return;
-        }
-
-        const modal = this._createValidationModal(folderItems.length);
-        document.body.appendChild(modal.overlay);
-
-        let workingCount = 0;
-        let brokenCount = 0;
-        let cancelled = false;
-
-        modal.okBtn.onclick = () => {
-            cancelled = true;
-            this._closeValidationModal(modal);
-        };
-
-        await this.processor.validateStreams(folderItems, (progress, item, isBroken) => {
-            if (cancelled) return;
-
-            if (isBroken) {
-                brokenCount++;
-                // UI update only, data is already set by processor
-                const index = this.state.items.indexOf(item);
-                const itemEl = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
-                if (itemEl) itemEl.classList.add('playlist-item--broken');
-            } else {
-                workingCount++;
+        const { ValidationModal } = await import('../ui/menus/features/ValidationModal.js');
+        await ValidationModal.show({
+            items: folderItems,
+            processor: this.processor,
+            onToast: (msg) => this._showToast(msg),
+            onComplete: () => {
+                this._saveState();
+                this.render();
             }
-
-            modal.progressFill.style.width = `${progress * 100}%`;
-            modal.status.textContent = `Checking ${Math.round(progress * folderItems.length)} of ${folderItems.length}...`;
-            modal.currentItem.textContent = item.title;
-            modal.brokenCountEl.textContent = brokenCount;
-            modal.workingCountEl.textContent = workingCount;
         });
-
-        if (cancelled) return;
-
-        modal.status.textContent = 'Validation complete!';
-        modal.okBtn.textContent = 'OK';
-        modal.okBtn.onclick = () => this._closeValidationModal(modal);
-
-        this._showToast(`Validation complete: ${brokenCount} broken, ${workingCount} working`);
-        this._saveState(); // Save once at the end
-        this.render();
     }
 
-    /**
-     * Create validation progress modal
-     * @param {number} totalCount - Total items to validate
-     * @returns {Object} - Modal elements
-     * @private
-     */
-    _createValidationModal(totalCount) {
-        const overlay = document.createElement('div');
-        overlay.className = 'mb-modal-overlay';
-        overlay.innerHTML = `
-            <div class="mb-modal" style="max-width: 400px;">
-                <div class="mb-modal-header">
-                    <h3>Validating Streams</h3>
-                </div>
-                <div class="validation-modal-content">
-                    <div class="validation-progress-container">
-                        <div class="validation-progress-bar">
-                            <div class="validation-progress-fill"></div>
-                        </div>
-                        <div class="validation-status">Checking 0 of ${totalCount}...</div>
-                        <div class="validation-counts">
-                            <span>Broken: <span class="count-broken">0</span></span>
-                            <span>Working: <span class="count-working">0</span></span>
-                        </div>
-                        <div class="validation-current-item"></div>
-                    </div>
-                    <div class="validation-actions">
-                        <button class="validation-ok-btn">Cancel</button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        return {
-            overlay,
-            progressFill: overlay.querySelector('.validation-progress-fill'),
-            status: overlay.querySelector('.validation-status'),
-            currentItem: overlay.querySelector('.validation-current-item'),
-            brokenCountEl: overlay.querySelector('.count-broken'),
-            workingCountEl: overlay.querySelector('.count-working'),
-            okBtn: overlay.querySelector('.validation-ok-btn')
-        };
-    }
-
-    /**
-     * Close validation modal
-     * @param {Object} modal - Modal elements
-     * @private
-     */
-    _closeValidationModal(modal) {
-        modal.overlay.remove();
-    }
 }

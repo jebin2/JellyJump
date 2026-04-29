@@ -1,7 +1,7 @@
-import { Logger } from "../../utils/Logger.js";
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { generateId, formatTime, parseTime } from '../../utils/mediaUtils.js';
+import { Logger } from "../../../utils/Logger.js";
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { generateId, formatTime, parseTime } from '../../../utils/mediaUtils.js';
 import {
     loadVideo,
     setupDragHandlers,
@@ -11,7 +11,7 @@ import {
     setupCleanup,
     updateOverlay
 } from './BoxEditorUtils.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 /**
  * Watermark Menu Handler - Multi-watermark with time ranges

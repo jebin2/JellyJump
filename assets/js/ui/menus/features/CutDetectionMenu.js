@@ -1,23 +1,26 @@
-import { Modal as ModalDialog } from "../Modal.js";
-import { Logger } from "../../utils/Logger.js";
-import { MotionDetector } from "../MotionDetector.js";
-import { formatTime, generateId } from "../../utils/mediaUtils.js";
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
+import { Modal as ModalDialog } from "../../../player/Modal.js";
+import { Logger } from "../../../utils/Logger.js";
+import { HardCutDetector } from "../../../player/HardCutDetector.js";
+import { formatTime, generateId } from "../../../utils/mediaUtils.js";
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
 
-export class MotionDetectionMenu {
+export class CutDetectionMenu {
     static async init(item, playlist) {
         const videoUrl = item?.blob_url || item?.url;
         if (!item || !videoUrl) {
-            Logger.warn('MotionDetectionMenu: No valid item or URL provided');
+            Logger.warn('CutDetectionMenu: No valid item or URL provided');
             return;
         }
 
         const contentTemplate = document.getElementById('detection-content-template');
         const footerTemplate = document.getElementById('detection-footer-template');
-        if (!contentTemplate || !footerTemplate) return;
+        if (!contentTemplate || !footerTemplate) {
+            Logger.error('CutDetectionMenu: Missing templates');
+            return;
+        }
 
-        let detector = new MotionDetector();
+        let detector = new HardCutDetector();
         let isCancelled = false;
         let isDetecting = false;
 
@@ -32,7 +35,7 @@ export class MotionDetectionMenu {
             }
         });
 
-        modal.setTitle('Motion Detection');
+        modal.setTitle('Scene Detection');
         modal.setBody(contentTemplate.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
 
@@ -44,10 +47,7 @@ export class MotionDetectionMenu {
         const sensitivitySlider = modalContent.querySelector('.sensitivity-slider');
         const sensitivityValue = modalContent.querySelector('.sensitivity-value');
         const statusArea = modalContent.querySelector('.detection-status-area');
-        const statusText = modalContent.querySelector('.status-text');
-        const statusPercent = modalContent.querySelector('.status-percent');
-        const progressBar = modalContent.querySelector('.progress-bar-fill');
-        const segmentsList = modalContent.querySelector('.detected-items-list');
+        const cutsList = modalContent.querySelector('.detected-items-list');
 
         // Footer Elements
         const detectBtn = modalContent.querySelector('.detect-btn');
@@ -56,51 +56,54 @@ export class MotionDetectionMenu {
         const successMessage = modalContent.querySelector('.success-message');
         const errorMessage = modalContent.querySelector('.error-message');
 
-        targetFilename.textContent = item.title;
-
-        // Show sensitivity section, hide status area initially
-        if (sensitivitySection) sensitivitySection.classList.remove('hidden');
-        if (statusArea) statusArea.classList.add('hidden');
+        // Update Detect Button Icon (Scenes)
         if (detectBtn) {
             const useEl = detectBtn.querySelector('use');
-            if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-motion');
-            detectBtn.title = "Detect Motion";
-            detectBtn.setAttribute('aria-label', "Detect Motion");
+            if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-scenes');
+            detectBtn.title = "Detect Scenes";
+            detectBtn.setAttribute('aria-label', "Detect Scenes");
         }
 
-        // Sensitivity slider labels (for motion: High=more sensitive, Low=less)
-        const sensitivityLabels = { 1: 'High', 2: 'Medium', 3: 'Low' };
-        // Map sensitivity to threshold (High=0.03, Medium=0.05, Low=0.08)
-        const sensitivityToThreshold = { 1: 0.03, 2: 0.05, 3: 0.08 };
+        targetFilename.textContent = item.title;
 
+        // Show sensitivity section (hidden by default), hide status area
+        if (sensitivitySection) sensitivitySection.classList.remove('hidden');
+        if (statusArea) statusArea.classList.add('hidden');
+
+        // Sensitivity slider labels
+        const sensitivityLabels = { 1: 'High', 2: 'Medium', 3: 'Low' };
         sensitivitySlider.addEventListener('input', () => {
             sensitivityValue.textContent = sensitivityLabels[sensitivitySlider.value];
         });
 
+        // Detect button click (button is in footer)
         detectBtn.addEventListener('click', async () => {
             if (isDetecting) return;
             isDetecting = true;
             detectBtn.disabled = true;
-            // detectBtn.textContent = '...';
+            // detectBtn.textContent = 'Detecting...'; // Don't change icon button text
 
             const sensitivity = parseInt(sensitivitySlider.value);
-            const threshold = sensitivityToThreshold[sensitivity];
-            Logger.log('MotionDetectionMenu: Starting detection with threshold', threshold);
+            Logger.log('CutDetectionMenu: Starting detection with sensitivity', sensitivity);
 
             // Show footer progress section
             progressSection.classList.remove('hidden');
             const progressStatus = modalContent.querySelector('.progress-status');
-            if (progressStatus) progressStatus.textContent = 'Scanning...';
+            if (progressStatus) progressStatus.textContent = 'Analyzing...';
 
-            segmentsList.innerHTML = '<div class="flex-center flex-col gap-sm h-full text-muted italic py-xl"><div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-6 h-6 animate-spin opacity-50"></div><span class="text-sm">Scanning video...</span></div>';
+            cutsList.innerHTML = '<div class="flex-center flex-col gap-sm h-full text-muted italic py-xl"><div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-6 h-6 animate-spin opacity-50"></div><span class="text-sm">Analyzing video...</span></div>';
 
-            await MotionDetectionMenu.runDetection(item, videoUrl, detector, playlist, { threshold }, isCancelled, {
-                segmentsList, progressSection, progressPercentage, successMessage, errorMessage, modalContent
+            await CutDetectionMenu.runDetection(item, videoUrl, detector, playlist, {
+                sensitivity,
+                adaptiveMode: true
+            }, isCancelled, {
+                statusText: progressStatus, statusPercent: progressPercentage, cutsList,
+                progressSection, successMessage, errorMessage, modalContent
             });
 
             isDetecting = false;
             detectBtn.disabled = false;
-            // detectBtn.textContent = 'Re-detect';
+            // detectBtn.textContent = 'Detect Scenes'; 
             progressSection.classList.add('hidden');
         });
 
@@ -108,37 +111,84 @@ export class MotionDetectionMenu {
     }
 
     static async runDetection(item, videoUrl, detector, playlist, options, isCancelled, ui) {
-        const { segmentsList, progressSection, progressPercentage, successMessage, errorMessage, modalContent } = ui;
+        const { statusText, statusPercent, cutsList,
+            progressSection, successMessage, errorMessage, modalContent } = ui;
 
-        const progressStatus = modalContent.querySelector('.progress-status');
-        if (progressStatus) progressStatus.textContent = 'Scanning video...';
+        if (statusText) statusText.textContent = 'Analyzing video...';
 
         detector.progressCallback = (progress) => {
             if (isCancelled) return;
             const pct = Math.round(progress * 100);
-            if (progressPercentage) progressPercentage.textContent = `${pct}%`;
-            if (progressStatus) {
-                if (progress < 0.5) {
-                    progressStatus.textContent = 'Scanning frames...';
+            if (statusPercent) statusPercent.textContent = `${pct}%`;
+
+            // Update status text for phases
+            if (statusText) {
+                if (progress < 0.4) {
+                    statusText.textContent = 'Analyzing frames...';
                 } else {
-                    progressStatus.textContent = 'Detecting motion...';
+                    statusText.textContent = 'Detecting cuts...';
                 }
             }
         };
 
         try {
-            const results = await detector.detect(videoUrl, options);
+            // Get duration
+            let duration = 0;
+            if (playlist.player && playlist.player.duration) {
+                duration = playlist.player.duration;
+            }
+
+            if (!duration && item.duration) {
+                if (typeof item.duration === 'number') duration = item.duration;
+                else if (typeof item.duration === 'string' && item.duration.includes(':')) {
+                    const parts = item.duration.split(':').map(Number);
+                    if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                    else if (parts.length === 2) duration = parts[0] * 60 + parts[1];
+                }
+            }
+
+            // Run detection with user options
+            const cuts = await detector.detect(videoUrl, {
+                adaptiveMode: options.adaptiveMode,
+                sensitivity: options.sensitivity
+            });
+
             if (isCancelled) return;
 
-            if (progressStatus) progressStatus.textContent = `Found ${results.length} events`;
+            // Show statistics if adaptive mode was used
+            const stats = detector.getLastStats();
+            if (stats && options.adaptiveMode) {
+                Logger.log('CutDetectionMenu: Detection stats', stats);
+            }
+
+            statusText.textContent = `Found ${cuts.length} scene changes`;
+            statusText.classList.add('text-success');
+
+            // Calculate segments
+            const points = [0, ...cuts];
+            const lastCut = cuts.length > 0 ? cuts[cuts.length - 1] : 0;
+            const finalEnd = (duration > lastCut) ? duration : (lastCut > 0 ? lastCut + 10 : 60);
+
+            if (finalEnd > points[points.length - 1]) {
+                points.push(finalEnd);
+            }
+
+            const segments = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                segments.push({
+                    start: points[i],
+                    end: points[i + 1],
+                    index: i + 1
+                });
+            }
 
             // Render Results
-            segmentsList.innerHTML = '';
+            cutsList.innerHTML = '';
 
-            if (results.length === 0) {
-                segmentsList.innerHTML = '<div class="p-4 text-center text-muted italic">No significant motion detected. Try higher sensitivity.</div>';
+            if (segments.length === 0) {
+                cutsList.innerHTML = '<div class="p-4 text-center text-muted italic">No distinct scenes detected. Try higher sensitivity.</div>';
             } else {
-                const listHtml = results.map((seg, idx) => {
+                const listHtml = segments.map((seg) => {
                     const startStr = formatTime(seg.start);
                     const endStr = formatTime(seg.end);
                     const durationStr = formatTime(seg.end - seg.start);
@@ -146,29 +196,24 @@ export class MotionDetectionMenu {
                     return `
                     <div class="segment-item p-sm rounded bg-tertiary flex-between hover:bg-white/5 transition-colors group border border-transparent hover:border-white/10">
                         <div class="flex flex-col gap-xs flex-1">
-                            <span class="font-bold text-accent text-sm">Event ${idx + 1}</span>
+                            <span class="font-bold text-accent text-sm">Segment ${seg.index}</span>
                             <span class="text-xs text-muted font-mono">${startStr} - ${endStr} (${durationStr})</span>
-                            <div class="w-20 h-1 bg-black/30 rounded mt-1 overflow-hidden">
-                                <div class="h-full bg-success/50" style="width: ${Math.min(100, seg.score * 500)}%"></div>
-                            </div>
                         </div>
-                        <div class="flex gap-sm items-center">
                         <div class="flex gap-sm items-center">
                             <button class="add-segment-btn btn jellyjump-btn-small flex items-center justify-center p-sm" 
                                 data-start="${seg.start}" 
                                 data-end="${seg.end}" 
-                                data-index="${idx + 1}"
+                                data-index="${seg.index}"
                                 title="Add Clip">
                                 <svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-plus"></use></svg>
                             </button>
                         </div>
-                        </div>
                     </div>`;
                 }).join('');
 
-                segmentsList.innerHTML = listHtml;
+                cutsList.innerHTML = listHtml;
 
-                const addBtns = segmentsList.querySelectorAll('.add-segment-btn');
+                const addBtns = cutsList.querySelectorAll('.add-segment-btn');
                 addBtns.forEach(btn => {
                     btn.onclick = async (e) => {
                         e.stopPropagation();
@@ -192,7 +237,7 @@ export class MotionDetectionMenu {
                         const index = parseInt(btn.dataset.index);
 
                         try {
-                            await MotionDetectionMenu.addSegmentToPlaylist(item, start, end, index, btn, playlist, (pct) => {
+                            await CutDetectionMenu.addSegmentToPlaylist(item, start, end, index, btn, playlist, (pct) => {
                                 if (footerPct) footerPct.textContent = `${Math.round(pct * 100)}%`;
                                 if (footerStatus) footerStatus.textContent = 'Processing...';
                             });
@@ -214,14 +259,15 @@ export class MotionDetectionMenu {
 
         } catch (err) {
             if (isCancelled) return;
-            Logger.error('MotionDetectionMenu: Error', err);
-            if (progressStatus) progressStatus.textContent = 'Error';
-            segmentsList.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
+            Logger.error('CutDetectionMenu: Error', err);
+            statusText.textContent = 'Error: ' + err.message;
+            statusText.classList.add('text-danger');
+            cutsList.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
         }
     }
 
     static async addSegmentToPlaylist(originalItem, start, end, index, btn, playlist, onProgress) {
-        Logger.log(`Adding motion segment ${index}: ${start} -> ${end}`);
+        Logger.log(`Trimming segment ${index}: ${start} -> ${end}`);
 
         // 1. Get Source
         const source = await MediaMetadata.getSourceBlob(originalItem, () => playlist._saveState());
@@ -240,8 +286,8 @@ export class MotionDetectionMenu {
 
         // 3. Create Item
         const cleanTitle = originalItem.title.replace(/\.[^/.]+$/, "");
-        const segmentTitle = `${cleanTitle} - Motion ${index}.mp4`;
-        const folderName = `Motion from ${originalItem.title}`;
+        const segmentTitle = `${cleanTitle} - Scene ${index}.mp4`;
+        const folderName = `Cuts from ${originalItem.title}`;
         const newPath = `${folderName}/${segmentTitle}`;
         const url = URL.createObjectURL(blob);
 
@@ -264,7 +310,7 @@ export class MotionDetectionMenu {
         const useEl = btn.querySelector('use');
         if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-check');
         btn.classList.add('text-success');
-        btn.classList.remove('jellyjump-btn-small');
+        btn.classList.remove('jellyjump-btn-small'); // Optional: remove style if needed, or keep for checkmark
         btn.title = "Added";
     }
 }

@@ -1,7 +1,7 @@
-import { Logger } from '../../utils/Logger.js';
-import { CryptoHelper } from '../../utils/CryptoHelper.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
+import { Logger } from '../../../utils/Logger.js';
+import { CryptoHelper } from '../../../utils/CryptoHelper.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 /**
  * Encrypt Menu Handler

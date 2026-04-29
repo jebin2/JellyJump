@@ -1,5 +1,5 @@
-import { Modal } from '../Modal.js';
-import { createProcessFooter, FOOTER_CONFIGS } from '../../utils/FooterHelper.js';
+import { Modal } from '../../../player/Modal.js';
+import { createProcessFooter, FOOTER_CONFIGS } from '../../../utils/FooterHelper.js';
 
 export { FOOTER_CONFIGS };
 

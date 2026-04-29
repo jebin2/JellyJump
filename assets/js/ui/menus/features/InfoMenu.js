@@ -1,8 +1,8 @@
-import { Logger } from "../../utils/Logger.js";
-import { Modal } from '../Modal.js';
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaBunny } from '../../core/MediaBunny.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
+import { Logger } from "../../../utils/Logger.js";
+import { Modal } from '../../../player/Modal.js';
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaBunny } from '../../../core/MediaBunny.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
 
 /**
  * Info Menu Handler

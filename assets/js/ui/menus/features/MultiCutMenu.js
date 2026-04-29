@@ -1,9 +1,9 @@
-import { Logger } from "../../utils/Logger.js";
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { formatTime, parseTime, generateId } from '../../utils/mediaUtils.js';
+import { Logger } from "../../../utils/Logger.js";
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { formatTime, parseTime, generateId } from '../../../utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 /**
  * MultiCut Menu Handler

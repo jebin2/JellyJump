@@ -1,7 +1,7 @@
-import { Logger } from "../../utils/Logger.js";
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { CustomDropdown } from '../../utils/CustomDropdown.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
+import { Logger } from "../../../utils/Logger.js";
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { CustomDropdown } from '../../../utils/CustomDropdown.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
 /**
  * Slideshow Menu Handler

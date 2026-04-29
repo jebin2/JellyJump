@@ -1,4 +1,4 @@
-import { Logger } from '../utils/Logger.js';
+import { Logger } from '../../utils/Logger.js';
 
 export class PlaylistRenderer {
     constructor(playlist) {

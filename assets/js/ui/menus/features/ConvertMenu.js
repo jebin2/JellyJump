@@ -1,9 +1,9 @@
-import { Logger } from "../../utils/Logger.js";
-import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { MediaMetadata } from '../../utils/MediaMetadata.js';
-import { CustomDropdown } from '../../utils/CustomDropdown.js';
-import { openProcessMenu, FOOTER_CONFIGS } from './MenuFactory.js';
-import { ZipHelper } from '../../utils/ZipHelper.js';
+import { Logger } from "../../../utils/Logger.js";
+import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaMetadata } from '../../../utils/MediaMetadata.js';
+import { CustomDropdown } from '../../../utils/CustomDropdown.js';
+import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { ZipHelper } from '../../../utils/ZipHelper.js';
 
 /**
  * Convert Menu Handler
