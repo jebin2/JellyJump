@@ -1,4 +1,4 @@
-import { Logger } from "../shared/utils/Logger.js";
+import { Logger } from "../../shared/utils/Logger.js";
 
 /**
  * Audio visualizer tuned for beat response.

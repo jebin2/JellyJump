@@ -1,5 +1,5 @@
-import { Logger } from '../shared/utils/Logger.js';
-import { formatTime } from '../shared/utils/mediaUtils.js';
+import { Logger } from '../../shared/utils/Logger.js';
+import { formatTime } from '../../shared/utils/mediaUtils.js';
 
 export class PlayerThumbnails {
     constructor(player) {

@@ -17,7 +17,7 @@ import {
     CONTROL_BAR_MODE_DEFAULT
 } from './config.js';
 import { SubtitleManager } from './subtitles/SubtitleManager.js';
-import { ScreenshotManager } from '../player/ScreenshotManager.js';
+import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
 import { initPlayerAudio, runPlayerAudioIterator, startPlayerAudioVisualizer } from './audio/AudioEngine.js';
 import {
     clearPlayerCanvas,
@@ -91,15 +91,15 @@ import {
     showPlayerBezel,
     updatePlayerVolumeUI
 } from '../ui/player/PlayerUIUpdates.js';
-import { PlayerKeyboard } from '../player/PlayerKeyboard.js';
-import { PlayerSubtitles } from '../player/PlayerSubtitles.js';
-import { PlayerLoopControl } from '../player/PlayerLoopControl.js';
-import { PlayerThumbnails } from '../player/PlayerThumbnails.js';
-import { PlayerControlBar } from '../player/PlayerControlBar.js';
+import { PlayerKeyboard } from '../ui/player/PlayerKeyboard.js';
+import { PlayerSubtitles } from '../ui/player/PlayerSubtitles.js';
+import { PlayerLoopControl } from '../ui/player/PlayerLoopControl.js';
+import { PlayerThumbnails } from '../ui/player/PlayerThumbnails.js';
+import { PlayerControlBar } from '../ui/player/PlayerControlBar.js';
 
 import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { Logger } from '../shared/utils/Logger.js';
-import { ThumbnailGenerator } from '../player/ThumbnailGenerator.js';
+import { ThumbnailGenerator } from '../ui/player/ThumbnailGenerator.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {

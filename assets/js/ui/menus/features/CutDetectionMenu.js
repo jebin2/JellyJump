@@ -1,6 +1,6 @@
 import { Modal as ModalDialog } from '../../Modal.js';
 import { Logger } from "../../../shared/utils/Logger.js";
-import { HardCutDetector } from "../../../player/HardCutDetector.js";
+import { HardCutDetector } from "../../../shared/services/HardCutDetector.js";
 import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';

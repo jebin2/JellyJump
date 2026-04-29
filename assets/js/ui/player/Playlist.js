@@ -1,24 +1,24 @@
-import { Logger } from "../shared/utils/Logger.js";
-import { Toast } from "../shared/utils/Toast.js";
-import { IndexedDBService } from "../shared/services/IndexedDBService.js";
-import { CorePlayer } from '../core/Player.js';
-import { ConfirmDialog } from '../shared/utils/ConfirmDialog.js';
-import { Modal as DialogModal } from '../ui/Modal.js';
-import { MenuRouter } from '../ui/menus/core/MenuRouter.js';
-import { RecordMenu } from '../ui/menus/features/RecordMenu.js';
-import { ScreenRecorderMenu } from '../ui/menus/features/ScreenRecorderMenu.js';
-import { UrlUploadMenu } from "../ui/menus/features/UrlUploadMenu.js";
-import { ItemToolsMenu } from "../ui/menus/features/ItemToolsMenu.js";
+import { Logger } from "../../../shared/utils/Logger.js";
+import { Toast } from "../../../shared/utils/Toast.js";
+import { IndexedDBService } from "../../../shared/services/IndexedDBService.js";
+import { CorePlayer } from '../../../core/Player.js';
+import { ConfirmDialog } from '../../../shared/utils/ConfirmDialog.js';
+import { Modal as DialogModal } from '../Modal.js';
+import { MenuRouter } from '../menus/core/MenuRouter.js';
+import { RecordMenu } from '../menus/features/RecordMenu.js';
+import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
+import { UrlUploadMenu } from "../menus/features/UrlUploadMenu.js";
+import { ItemToolsMenu } from "../menus/features/ItemToolsMenu.js";
 import { PlaylistStorage } from './PlaylistStorage.js';
-import { MediaMetadata } from '../shared/utils/MediaMetadata.js';
-import { FileDropHandler } from '../shared/utils/FileDropHandler.js';
-import { ElectronHelper } from '../shared/utils/ElectronHelper.js';
-import { formatTime, generateId, sanitizeFilename, getAudioMimeType } from '../shared/utils/mediaUtils.js';
-import { M3UParser } from '../shared/utils/M3UParser.js';
-import { StreamDetector } from '../shared/utils/StreamDetector.js';
-import { PlaylistRenderer } from '../ui/player/PlaylistRenderer.js';
+import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
+import { FileDropHandler } from '../../../shared/utils/FileDropHandler.js';
+import { ElectronHelper } from '../../../shared/utils/ElectronHelper.js';
+import { formatTime, generateId, sanitizeFilename, getAudioMimeType } from '../../../shared/utils/mediaUtils.js';
+import { M3UParser } from '../../../shared/utils/M3UParser.js';
+import { StreamDetector } from '../../../shared/utils/StreamDetector.js';
+import { PlaylistRenderer } from './PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
-import { PlaylistProcessor } from "../shared/services/PlaylistProcessor.js";
+import { PlaylistProcessor } from "../../../shared/services/PlaylistProcessor.js";
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
@@ -1825,12 +1825,12 @@ export class Playlist {
         toolsBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (toolsBtn.classList.contains('recording-active')) {
-                const { ScreenRecorderMenu } = await import('../ui/menus/features/ScreenRecorderMenu.js');
+                const { ScreenRecorderMenu } = await import('../menus/features/ScreenRecorderMenu.js');
                 ScreenRecorderMenu.stopRecording(this);
                 return;
             }
             
-            const { ToolsMenu } = await import('../ui/menus/features/ToolsMenu.js');
+            const { ToolsMenu } = await import('../menus/features/ToolsMenu.js');
             ToolsMenu.show(this);
         });
 
@@ -1881,7 +1881,7 @@ export class Playlist {
             return path.startsWith(prefix) && item.isStream;
         });
 
-        const { ValidationModal } = await import('../ui/menus/features/ValidationModal.js');
+        const { ValidationModal } = await import('../menus/features/ValidationModal.js');
         await ValidationModal.show({
             items: folderItems,
             processor: this.processor,

@@ -1,6 +1,6 @@
 import { Modal as ModalDialog } from '../../Modal.js';
 import { Logger } from "../../../shared/utils/Logger.js";
-import { MotionDetector } from "../../../player/MotionDetector.js";
+import { MotionDetector } from "../../../shared/services/MotionDetector.js";
 import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';

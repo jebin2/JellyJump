@@ -1,4 +1,4 @@
-import { VideoFilters } from '../../player/VideoFilters.js';
+import { VideoFilters } from './VideoFilters.js';
 
 export function createPlayerControls(player) {
     const mount = (id) => {

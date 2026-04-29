@@ -1,4 +1,4 @@
-import { HardCutDetector } from "./player/HardCutDetector.js";
+import { HardCutDetector } from "./shared/services/HardCutDetector.js";
 import { Logger } from "./shared/utils/Logger.js";
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -22,7 +22,7 @@ async function initializeApp() {
 
     // Now that templates are loaded, import and initialize
     const { CorePlayer } = await import('./core/Player.js');
-    const { Playlist } = await import('./player/Playlist.js');
+    const { Playlist } = await import('./ui/player/Playlist.js');
 
     // Initialize Player (attach to window for cleanup on unload)
     const player = window.player = new CorePlayer('player-container', {

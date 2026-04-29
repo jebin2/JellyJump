@@ -2,82 +2,48 @@
 
 ## Purpose
 
-This document defines the intended ownership of the top-level JavaScript folders under `assets/js/` during the restructuring process.
-
-## Current Transition Rule
-
-Existing code may still live in legacy locations while the repo is being refactored. New code and extracted modules should follow the structure below unless a compatibility constraint requires otherwise.
+This document defines the intended ownership of the top-level JavaScript folders under `assets/js/`.
 
 ## Folder Ownership
 
-### `app/`
-
-Page or entry-specific bootstrap code.
-
-Intended examples:
-
-- landing page entry
-- player page entry
-- embed page entry
-
 ### `core/`
 
-Runtime logic that should not primarily exist to create or manipulate UI.
+Media playback engine and low-level runtime logic.
 
-Intended examples:
+- **`playback/`**: Render loop, media lifecycle, and transport.
+- **`audio/`**: Web Audio engine and processing.
+- **`streaming/`**: Stream controller and segment management.
+- **`subtitles/`**: Format conversion and display management.
 
-- playback runtime
-- streaming state
-- audio engine
-- subtitles
-- shared config
+### `shared/`
 
-### `processing/`
+Reusable code shared across entry points.
 
-Media editing and export pipelines.
-
-Intended examples:
-
-- metadata inspection
-- trim
-- conversion
-- extraction
-- GIF generation
-- slideshow generation
+- **`utils/`**: Stateless helper functions (Logger, mediaUtils, M3UParser, etc.).
+- **`services/`**: Stateful application services (IndexedDB, PlaylistProcessor, CutDetection).
 
 ### `ui/`
 
-Player and app UI composition code.
+UI components and interaction logic.
 
-Intended examples:
+- **`player/`**: Feature controllers for the main player interface (Playlist, Keyboard, Overlays).
+- **`menus/`**: Hierarchical menu system (Core router, Feature modals).
+- **`Modal.js`**: Base component for all application dialogs.
 
-- controls
-- overlays
-- panels
-- menus
-- bindings
+### `processing/`
 
-### `services/`
+Media editing and export pipelines (Trim, Convert, GIF, etc.).
 
-Stateful browser-facing helpers and app services that are not pure utilities.
+### `lib/`
 
-Intended examples:
-
-- storage services
-- Electron/browser bridge adapters
-- file-drop or integration services
+WASM binaries and worker threads (AAC, MP3, HLS).
 
 ### `vendor/`
 
-Local wrappers around third-party libraries or vendored modules.
+Third-party libraries used directly in the browser.
 
-Intended examples:
+## Entry Points
 
-- MediaBunny wrapper
-- local compatibility shims for browser/runtime imports
-
-## Transition Notes
-
-- Legacy locations such as `assets/js/player/`, `assets/js/core/`, `assets/js/utils/`, and `assets/js/lib/` may remain in use during migration.
-- Prefer compatibility re-exports over large import churn in one change.
-- Do not move large modules until their destination boundaries are already clear.
+- `index-main.js`: Landing page bootstrap.
+- `player-main.js`: Main player application bootstrap.
+- `embed-main.js`: Minimal player embed bootstrap.

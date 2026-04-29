@@ -1,5 +1,5 @@
-import { Logger } from '../shared/utils/Logger.js';
-import { MediaBunny } from '../core/MediaBunny.js';
+import { Logger } from '../../shared/utils/Logger.js';
+import { MediaBunny } from '../../core/MediaBunny.js';
 
 export class PlayerSubtitles {
     constructor(player) {
@@ -20,7 +20,7 @@ export class PlayerSubtitles {
             let vttContent = content;
             if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
                 try {
-                    const { parseTranscriptJSON, jsonToVTT } = await import('../core/subtitles/SubtitleConverter.js');
+                    const { parseTranscriptJSON, jsonToVTT } = await import('../../core/subtitles/SubtitleConverter.js');
                     const words = parseTranscriptJSON(content);
                     vttContent = jsonToVTT(words);
                     Logger.log('Converted JSON transcript to VTT format');

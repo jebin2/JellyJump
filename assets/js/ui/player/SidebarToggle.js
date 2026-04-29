@@ -1,4 +1,4 @@
-import { Logger } from "../shared/utils/Logger.js";
+import { Logger } from "../../shared/utils/Logger.js";
 /**
  * SidebarToggle - Manages playlist sidebar collapse/expand functionality
  * Phase 16: Collapsible Sidebar
