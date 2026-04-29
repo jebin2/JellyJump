@@ -38,4 +38,8 @@ echo "Downloading hls.js..."
 curl -L "https://cdn.jsdelivr.net/npm/hls.js@1.6.15/dist/hls.mjs" \
      -o "$OUT/hls.js"
 
+echo "Downloading mediabunny-llms-full.txt"
+curl -L "https://mediabunny.dev/llms-full.txt" \
+     -o "medibunny-llms-full.txt"
+
 echo "All files downloaded into $OUT/"
