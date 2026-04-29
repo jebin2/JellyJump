@@ -7,17 +7,15 @@ import { Modal as DialogModal } from '../Modal.js';
 import { MenuRouter } from '../menus/core/MenuRouter.js';
 import { RecordMenu } from '../menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
-import { UrlUploadMenu } from "../menus/features/UrlUploadMenu.js";
 import { ItemToolsMenu } from "../menus/features/ItemToolsMenu.js";
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
-import { ElectronHelper } from '../../shared/utils/ElectronHelper.js';
-import { formatTime, generateId, sanitizeFilename, getAudioMimeType } from '../../shared/utils/mediaUtils.js';
-import { M3UParser } from '../../shared/utils/M3UParser.js';
-import { StreamDetector } from '../../shared/utils/StreamDetector.js';
+import { formatTime, generateId, sanitizeFilename } from '../../shared/utils/mediaUtils.js';
 import { PlaylistRenderer } from './PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
+import { PlaylistUI } from './PlaylistUI.js';
+import { PlaylistNavigation } from './PlaylistNavigation.js';
 import { PlaylistProcessor } from "../../shared/services/PlaylistProcessor.js";
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
@@ -36,52 +34,38 @@ export class Playlist {
         this.container = container;
         this.player = player;
         
-        // Modularized state and processing
+        // Modularized helpers
         this.state = new PlaylistState();
-        this.processor = PlaylistProcessor; // Use as static service for now
+        this.renderer = new PlaylistRenderer(this);
+        this.ui = new PlaylistUI(this);
+        this.navigation = new PlaylistNavigation(this);
+        
+        this.processor = PlaylistProcessor;
         this.storage = new IndexedDBService();
 
-        // Start periodic state saving (every 1 second)
+        // Initialize UI and Navigation
+        this.ui.init();
+        this.ui.setupKeyboardShortcuts();
+        this._initPlayerNavigation();
+
+        // Start periodic state saving
         this._progressIntervalId = setInterval(() => {
             if (this.player && this.player.isPlaying) {
                 this._savePlaybackProgress();
             }
         }, 1000);
 
-        this.renderer = new PlaylistRenderer(this);
-
-        // Initialize UI
-        this._createHeader();
-        this._createListContainer();
-
         // Setup Drag and Drop
         this.fileDropHandler = new FileDropHandler(this.container, (files) => this.handleFiles(files));
 
-        // Save state on beforeunload
+        // Lifecycle management
         this._beforeUnloadHandler = () => {
-            Logger.log('[Playlist] beforeunload - saving state');
             this._saveState();
-            Logger.log('[Playlist] beforeunload - revoking blob URLs');
             this._revokeAllBlobUrls();
         };
         window.addEventListener('beforeunload', this._beforeUnloadHandler);
 
-        // Keyboard Shortcuts
-        this._initKeyboardShortcuts();
-
-        // Setup player navigation
-        this._initPlayerNavigation();
-
-        // Initialize URL Upload
-        // Initialize URL Upload Feature
-        const urlBtn = document.getElementById('mb-add-url');
-        if (urlBtn) {
-            urlBtn.addEventListener('click', () => {
-                UrlUploadMenu.show(this);
-            });
-        }
-
-        // Load saved playlist
+        // Load saved data
         this._loadSavedPlaylist();
 
         // Setup player error callback
@@ -113,19 +97,15 @@ export class Playlist {
      * @private
      */
     async _initPlayerNavigation() {
-        if (!this.player) {
-            Logger.error('Playlist: Player instance is missing!');
-            return;
-        }
+        if (!this.player) return;
+        
         this.player.setNavigationCallbacks(
             () => this.playPrevious(),
             () => this.playNext()
         );
 
-        // Handle play request when no video is loaded
         this.player.setPlayCallback(() => {
             if (this.items.length > 0 && this.activeIndex === -1) {
-                // Playlist has items but none selected - show message
                 ConfirmDialog.alert({
                     title: 'No Video Selected',
                     message: 'Please select a video from the playlist to play.',
@@ -133,7 +113,6 @@ export class Playlist {
                     icon: '📺'
                 });
             } else if (this.items.length === 0) {
-                // Playlist is empty - show message
                 ConfirmDialog.alert({
                     title: 'Playlist Empty',
                     message: 'Add videos to the playlist using the upload button or paste a URL.',
@@ -144,239 +123,20 @@ export class Playlist {
         });
     }
 
+    // Navigation convenience wrappers
+    playNext() { this.navigation.playNext(); }
+    playPrevious() { this.navigation.playPrevious(); }
+    scrollToPlaying() { this.navigation.scrollToPlaying(); }
+    _updatePlayerNavigationState() { this.navigation.updatePlayerNavigationState(); }
 
-    /**
-     * Initialize Keyboard Shortcuts
-     * @private
-     */
-    _initKeyboardShortcuts() {
-        this._keydownHandler = async (e) => {
-            // Ignore if typing in input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-            // Shift + N: Next Video
-            if (e.shiftKey && (e.key === 'N' || e.key === 'n')) {
-                e.preventDefault();
-                this.playNext();
-            }
 
-            // Shift + P: Previous Video
-            if (e.shiftKey && (e.key === 'P' || e.key === 'p')) {
-                e.preventDefault();
-                this.playPrevious();
-            }
 
-            // Delete: Remove selected/active video
-            if (e.key === 'Delete' || e.key === 'Backspace') {
-                // Only if not editing text
-                if (this.activeIndex >= 0) {
-                    // Optional: Confirm before delete via shortcut?
-                    // For now, let's just delete to be snappy, or maybe prompt
-                    const confirmed = await ConfirmDialog.confirm({
-                        title: 'Remove Video',
-                        message: 'Remove current video from playlist?'
-                    });
-                    if (confirmed) {
-                        this.removeItem(this.activeIndex);
-                    }
-                }
-            }
-
-            // Ctrl + U: Upload Files
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
-                e.preventDefault();
-                const fileInput = document.getElementById('mb-file-input');
-                if (fileInput) fileInput.click();
-            }
-        };
-        document.addEventListener('keydown', this._keydownHandler);
-    }
-
-    _createHeader() {
-        const template = document.getElementById('playlist-header-controls-template');
-        if (!template) {
-            Logger.error('Playlist header template not found!');
-            return;
-        }
-
-        const clone = template.content.cloneNode(true);
-
-        const header = document.createElement('div');
-        header.className = 'playlist-header';
-        header.appendChild(clone);
-
-        // Insert before container
-        this.container.parentNode.insertBefore(header, this.container);
-
-        // Initialize Sidebar Toggle RIGHT AFTER header is in DOM
-        const sidebarElement = document.querySelector('.playlist-section');
-        const toggleButton = document.getElementById('sidebar-toggle-btn');
-
-        if (sidebarElement && toggleButton) {
-            import('./SidebarToggle.js').then(({ SidebarToggle }) => {
-                new SidebarToggle(sidebarElement, toggleButton);
-            }).catch(err => {
-                Logger.error('Failed to load SidebarToggle:', err);
-            });
-        } else {
-            Logger.warn('Sidebar toggle elements not found', { sidebarElement, toggleButton });
-        }
-
-        // Attach events
-        const addFilesBtn = header.querySelector('#mb-add-files');
-        const addFolderBtn = header.querySelector('#mb-add-folder');
-        const toolsBtn = header.querySelector('#mb-tools');
-        const searchInput = header.querySelector('#mb-playlist-search-input');
-        const searchClearBtn = header.querySelector('#mb-playlist-search-clear');
-
-        if (toolsBtn) {
-            this._setupToolsButton(toolsBtn);
-        }
-
-        if (searchInput) {
-            // Debounce function
-            const debounce = (func, wait) => {
-                let timeout;
-                return function executedFunction(...args) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
-            };
-
-            const handleSearch = debounce((e) => {
-                this.searchQuery = e.target.value.trim().toLowerCase();
-
-                // Toggle clear button
-                if (this.searchQuery) {
-                    searchClearBtn?.classList.remove('hidden');
-                } else {
-                    searchClearBtn?.classList.add('hidden');
-                }
-
-                this.render();
-            }, 300); // 300ms delay
-
-            searchInput.addEventListener('input', handleSearch);
-
-            searchInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    searchInput.value = '';
-                    this.searchQuery = '';
-                    searchClearBtn?.classList.add('hidden');
-                    this.render();
-                    searchInput.blur();
-                }
-            });
-        }
-
-        if (searchClearBtn) {
-            searchClearBtn.addEventListener('click', () => {
-                searchInput.value = '';
-                this.searchQuery = '';
-                searchClearBtn.classList.add('hidden');
-                this.render();
-                searchInput.focus();
-            });
-        }
-
-        if (addFilesBtn) {
-            addFilesBtn.addEventListener('click', async () => {
-                // Electron: Use native file dialog to get file paths
-                if (ElectronHelper.isElectron()) {
-                    const result = await ElectronHelper.openFileDialog();
-                    if (result.success && result.files) {
-                        this.handleElectronFiles(result.files);
-                    }
-                } else {
-                    // Web: Use HTML file input
-                    document.getElementById('mb-file-input').click();
-                }
-            });
-        }
-
-        if (addFolderBtn) {
-            addFolderBtn.addEventListener('click', () => {
-                document.getElementById('mb-folder-input').click();
-            });
-        }
-
-        // Scroll to playing button
-        const scrollToPlayingBtn = header.querySelector('#mb-scroll-to-playing');
-        if (scrollToPlayingBtn) {
-            scrollToPlayingBtn.addEventListener('click', () => {
-                this.scrollToPlaying();
-            });
-        }
-
-        // File input events
-        const fileInput = document.getElementById('mb-file-input');
-        const folderInput = document.getElementById('mb-folder-input');
-
-        if (fileInput) {
-            fileInput.addEventListener('change', (e) => {
-                this.handleFiles(e.target.files);
-                e.target.value = ''; // Reset
-            });
-        }
-
-        if (folderInput) {
-            folderInput.addEventListener('change', (e) => {
-                this.handleFiles(e.target.files);
-                e.target.value = ''; // Reset
-            });
-        }
-    }
-
-    _createListContainer() {
-        // The passed container is the list container
-        this.container.classList.add('playlist-items');
-    }
 
     /**
      * Initialize mobile drawer toggle
      * @private
      */
-    _initMobileDrawer() {
-        const toggleBtn = document.getElementById('playlist-toggle');
-        const overlay = document.getElementById('playlist-overlay');
-        const section = this.container.closest('.playlist-section');
-
-        if (toggleBtn && overlay && section) {
-            // Show button only on mobile (handled via CSS usually, but let's force check)
-            const checkMobile = () => {
-                if (window.innerWidth <= 768) {
-                    toggleBtn.style.display = 'flex';
-                } else {
-                    toggleBtn.style.display = 'none';
-                    section.classList.remove('open');
-                    overlay.classList.remove('visible');
-                }
-            };
-
-            window.addEventListener('resize', checkMobile);
-            checkMobile();
-
-            const toggleDrawer = () => {
-                const isOpen = section.classList.contains('open');
-                if (isOpen) {
-                    section.classList.remove('open');
-                    overlay.classList.remove('visible');
-                    toggleBtn.setAttribute('aria-expanded', 'false');
-                } else {
-                    section.classList.add('open');
-                    overlay.classList.add('visible');
-                    toggleBtn.setAttribute('aria-expanded', 'true');
-                }
-            };
-
-            toggleBtn.addEventListener('click', toggleDrawer);
-            overlay.addEventListener('click', toggleDrawer);
-        }
-    }
 
 
 
@@ -393,167 +153,19 @@ export class Playlist {
         Logger.log('[Playlist] Playback stopped - select a video to play');
     }
 
+
+
     /**
-     * Check if can go to previous video
+     * Stop playback and show 'Select video to play' message
+     * Called when active video/folder is deleted
      * @private
      */
-    _canGoPrevious() {
-        return this.activeIndex > 0 && this.items.length > 0;
-    }
-
-    /**
-     * Check if can go to next video
-     * @private
-     */
-    _canGoNext() {
-        return this.activeIndex >= 0 && this.activeIndex < this.items.length - 1;
-    }
-
-    /**
-     * Update player navigation button states
-     * @private
-     */
-    _updatePlayerNavigationState() {
-        if (this.player && typeof this.player.updateNavigationButtons === 'function') {
-            this.player.updateNavigationButtons(this._canGoPrevious(), this._canGoNext());
-        }
-    }
-
-    /**
-     * Scroll to the currently playing item and highlight it
-     */
-    async scrollToPlaying() {
-        if (this.activeIndex < 0) return;
-        const item = this.items[this.activeIndex];
-        if (!item) return;
-
-        // 1. Recursive Expansion
-        let targetFolderWrapper = this.container;
-
-        if (item.path && item.path.includes('/')) {
-            const parts = item.path.split('/');
-            // Expand all parents
-            for (let i = 0; i < parts.length - 1; i++) {
-                const folderPath = parts.slice(0, i + 1).join('/');
-                await this._ensureFolderExpanded(folderPath);
-            }
-
-            // Find target wrapper
-            const parentPath = parts.slice(0, parts.length - 1).join('/');
-            const folderEl = this.container.querySelector(`.playlist-folder[data-path="${parentPath}"]`);
-            if (folderEl) {
-                targetFolderWrapper = folderEl.querySelector('.playlist-children');
-            }
-        }
-
-        // Wait for render
-        await new Promise(r => setTimeout(r, 50));
-
-        // 2. Try Standard Scroll
-        let itemEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
-
-        // 3. Virtual Scroll Fallback
-        if (!itemEl && targetFolderWrapper) {
-            const index = this._calculateVirtualIndex(item);
-            if (index !== -1) {
-                // Estimate height: 40px item + 1px border
-                targetFolderWrapper.scrollTop = index * 41;
-
-                // Wait for scroll listener to trigger render
-                await new Promise(r => setTimeout(r, 200)); // Generous wait for large lists
-                itemEl = this.container.querySelector(`.playlist-item[data-index="${this.activeIndex}"]`);
-            }
-        }
-
-        if (itemEl) {
-            itemEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            itemEl.classList.add('playlist-item--highlight');
-            setTimeout(() => itemEl.classList.remove('playlist-item--highlight'), 1500);
-        }
-    }
-
-    /**
-     * Calculate virtual index of an item within its folder (Drawer)
-     * Used to scroll virtual lists to the correct position
-     */
-    _calculateVirtualIndex(targetItem) {
-        // Determine parent path
-        let parentPath = '';
-        if (targetItem.path && targetItem.path.includes('/')) {
-            parentPath = targetItem.path.substring(0, targetItem.path.lastIndexOf('/'));
-        }
-        const prefix = parentPath ? parentPath + '/' : '';
-
-        // 1. Count Sibling Folders (Folders come first in Drawer)
-        const siblingFolders = new Set();
-        this.items.forEach(i => {
-            const p = i.path || '';
-            // Check if derivative path
-            if (p.startsWith(prefix) && p !== prefix) {
-                const relative = p.substring(prefix.length);
-                const slashIndex = relative.indexOf('/');
-                if (slashIndex !== -1) {
-                    siblingFolders.add(relative.substring(0, slashIndex));
-                }
-            }
-        });
-
-        const folderCount = siblingFolders.size;
-
-        // 2. Count Sibling Items (items equal to or before target)
-        let itemCountBefore = 0;
-        let found = false;
-
-        for (const i of this.items) {
-            const p = i.path || '';
-            let isDirectSibling = false;
-            if (prefix === '') {
-                isDirectSibling = !p.includes('/');
-            } else {
-                isDirectSibling = p.startsWith(prefix) && !p.substring(prefix.length).includes('/');
-            }
-
-            if (isDirectSibling) {
-                if (i === targetItem) {
-                    found = true;
-                    break;
-                }
-                itemCountBefore++;
-            }
-        }
-
-        if (!found) return -1;
-
-        return folderCount + itemCountBefore;
-    }
-
-    /**
-     * Recursively ensure a folder is expanded in the DOM
-     */
-    async _ensureFolderExpanded(path) {
-        // Find wrapper
-        const folderEl = this.container.querySelector(`.playlist-folder[data-path="${path}"]`);
-        if (!folderEl) return;
-
-        const children = folderEl.querySelector('.playlist-children');
-        // Check if hidden or not loaded
-        if (children && children.classList.contains('hidden')) {
-            const header = folderEl.querySelector('.playlist-folder-header');
-            if (header) {
-                header.click(); // Triggers toggleDrawer -> setupInfiniteScroll
-                // Wait a tick for rendering
-                await new Promise(r => setTimeout(r, 50));
-            }
-        }
-    }
-
-    /**
-     * Play previous video
-     */
-    playPrevious() {
-        if (this.activeIndex > 0) {
-            this.selectItem(this.activeIndex - 1);
-        }
+    _stopPlayback() {
+        this.activeIndex = -1;
+        this.player.reset();
+        this._updateUI();
+        this._updatePlayerNavigationState();
+        Logger.log('[Playlist] Playback stopped - select a video to play');
     }
 
     /**
@@ -1189,9 +801,8 @@ export class Playlist {
             }
         }
     }
-
     /**
-     * Destroy the playlist and release all resources
+     * Destroy the playlist instance
      */
     destroy() {
         // Clear the progress-save interval
@@ -1205,12 +816,9 @@ export class Playlist {
             window.removeEventListener('beforeunload', this._beforeUnloadHandler);
             this._beforeUnloadHandler = null;
         }
-        if (this._keydownHandler) {
-            document.removeEventListener('keydown', this._keydownHandler);
-            this._keydownHandler = null;
-        }
-
-        // Destroy FileDropHandler
+        
+        // Cleanup UI and D&D
+        this.ui.destroy();
         if (this.fileDropHandler) {
             this.fileDropHandler.destroy();
             this.fileDropHandler = null;
@@ -1220,22 +828,6 @@ export class Playlist {
         this._revokeAllBlobUrls();
 
         Logger.log('[Playlist] destroyed');
-    }
-
-    /**
-     * Play the next video in the playlist
-     */
-    playNext() {
-        if (this.activeIndex < this.items.length - 1) {
-            this.selectItem(this.activeIndex + 1);
-        } else {
-            // Check if playlist loop is enabled
-            if (this.player.loopMode === 'playlist') {
-                this.selectItem(0);
-            } else {
-                Logger.log('Playlist ended');
-            }
-        }
     }
 
     /**
@@ -1595,171 +1187,26 @@ export class Playlist {
      */
     async _handleUrlUpload(url) {
         try {
-            const urlLower = url.toLowerCase();
+            const result = await this.processor.processUrl(url);
 
-            // Check if it's an M3U playlist (not HLS stream)
-            // M3U playlists end with .m3u (not .m3u8)
-            const isM3UPlaylist = urlLower.endsWith('.m3u') ||
-                (urlLower.includes('.m3u') && !urlLower.includes('.m3u8'));
-
-            if (isM3UPlaylist) {
-                await this._handleM3UPlaylist(url);
+            // Handle M3U/IPTV Playlist result
+            if (result.type === 'm3u') {
+                await this._handleM3UPlaylist(result.url);
                 return;
             }
 
-            // Check if it's potentially an M3U8 file (could be HLS or IPTV playlist)
-            const hasM3u8Extension = urlLower.includes('.m3u8');
-            const looksLikeStream = urlLower.includes('/hls/') || urlLower.includes('/live/');
+            // Add item to playlist
+            this.addItem(result);
 
-            // For .m3u8 URLs, we need to inspect content to differentiate IPTV playlists from HLS streams
-            // IPTV playlists contain #EXTINF channel entries; HLS manifests contain #EXT-X-* tags
-            if (hasM3u8Extension && !looksLikeStream) {
-                try {
-                    Logger.log('[Playlist] Fetching .m3u8 to determine if IPTV or HLS:', url);
-                    const response = await fetch(url);
-                    const content = await response.text();
-
-                    // Check for IPTV playlist indicators (#EXTINF with channel info)
-                    // vs HLS manifest indicators (#EXT-X-STREAM-INF, #EXT-X-MEDIA-SEQUENCE, .ts segments)
-                    const isIPTVPlaylist = content.includes('#EXTINF') &&
-                        (content.includes('group-title=') || content.includes('tvg-logo=') || content.includes('tvg-id=')) &&
-                        !content.includes('#EXT-X-STREAM-INF') &&
-                        !content.includes('#EXT-X-MEDIA-SEQUENCE') &&
-                        !content.includes('#EXT-X-TARGETDURATION');
-
-                    if (isIPTVPlaylist) {
-                        Logger.log('[Playlist] Detected IPTV playlist in .m3u8 format, parsing as M3U');
-                        await this._handleM3UPlaylist(url);
-                        return;
-                    }
-                    Logger.log('[Playlist] Detected HLS stream manifest');
-                } catch (fetchError) {
-                    Logger.warn('[Playlist] Could not fetch .m3u8 for inspection, treating as HLS stream:', fetchError);
-                }
+            // Process metadata if it's a regular file
+            if (!result.isStream) {
+                PlaylistProcessor.processMetadata([result], (item) => this.render());
             }
 
-            // Check if it's an HLS stream (m3u8 or /hls/ or /live/ paths)
-            const isHLSStream = hasM3u8Extension || looksLikeStream;
-
-            if (isHLSStream) {
-                // For HLS streams, skip HEAD request validation
-                // since many stream servers return different content-types
-                const urlPath = new URL(url).pathname;
-                let filename = urlPath.split('/').pop() || 'stream';
-
-                // Remove query string from filename
-                filename = filename.split('?')[0];
-
-                // Create a display title
-                const displayTitle = filename.replace('.m3u8', '') || 'Live Stream';
-
-                const newItem = {
-                    title: displayTitle,
-                    url: url,
-                    blob_url: url, // For streams, blob_url IS the stream URL
-                    duration: 'LIVE',
-                    thumbnail: '',
-                    isLocal: false,
-                    isStream: true,
-                    file: null,
-                    fileType: 'application/vnd.apple.mpegurl',
-                    mimeType: 'application/vnd.apple.mpegurl',
-                    id: generateId()
-                };
-
-                this.addItem(newItem);
-
-                // Always select and play the new stream item
-                this.selectItem(this.items.length - 1);
-
-                return;
-            }
-
-            // Check if it's an audio file
-            const audioExtensions = ['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma'];
-            const isAudioFile = audioExtensions.some(ext => urlLower.endsWith(ext));
-
-            if (isAudioFile) {
-                const urlPath = new URL(url).pathname;
-                let filename = urlPath.split('/').pop() || 'audio';
-                filename = filename.split('?')[0];
-
-                // Remove extension for display
-                const displayTitle = filename.replace(/\.[^/.]+$/, '') || 'Audio Track';
-
-                const newItem = {
-                    title: displayTitle,
-                    url: url,
-                    blob_url: url,
-                    duration: 'Loading...',
-                    thumbnail: '',
-                    isLocal: false,
-                    isAudio: true,
-                    file: null,
-                    fileType: getAudioMimeType(urlLower),
-                    mimeType: getAudioMimeType(urlLower),
-                    id: generateId()
-                };
-
-                this.addItem(newItem);
-
-                // Always select and play the new audio item
-                this.selectItem(this.items.length - 1);
-
-                return;
-            }
-
-            // For regular video files, verify access
-            const response = await fetch(url, { method: 'HEAD' });
-
-            if (!response.ok) {
-                // Try GET if HEAD fails (some servers don't support HEAD)
-                const getResponse = await fetch(url);
-                if (!getResponse.ok) {
-                    throw new Error(`Failed to fetch video: ${getResponse.statusText}`);
-                }
-            }
-
-            // Get content type from headers
-            const contentType = response.headers.get('content-type') || 'video/mp4';
-
-            // Allow video types and HLS types
-            const validTypes = ['video/', 'application/vnd.apple.mpegurl', 'application/x-mpegurl'];
-            const isValidType = validTypes.some(type => contentType.toLowerCase().includes(type.toLowerCase()));
-
-            if (!isValidType) {
-                throw new Error('The URL does not point to a valid video file or stream.');
-            }
-
-            // Extract filename from URL
-            const urlPath = new URL(url).pathname;
-            const filename = urlPath.split('/').pop() || 'remote-video.mp4';
-
-            // Create item with original URL for re-fetching
-            const newItem = {
-                title: filename,
-                url: url,
-                duration: 'Loading...',
-                thumbnail: '',
-                isLocal: false,
-                file: null,
-                fileType: contentType,
-                mimeType: contentType,
-                id: generateId()
-            };
-
-            this.addItem(newItem);
-
-            // Process metadata
-            this._processMetadata([newItem]);
-
-            // Always select and play the new video item
+            // Always select and play the new item
             this.selectItem(this.items.length - 1);
 
         } catch (error) {
-            if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
-                throw new Error('CORS Error: Cannot access this URL. The server must allow cross-origin requests.');
-            }
             throw error;
         }
     }

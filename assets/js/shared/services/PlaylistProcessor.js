@@ -249,4 +249,112 @@ export class PlaylistProcessor {
         
         return results;
     }
+
+    /**
+     * Process a single URL into a playlist item
+     * @param {string} url 
+     * @returns {Promise<Object>} Prepared item
+     */
+    static async processUrl(url) {
+        const urlLower = url.toLowerCase();
+        const urlObj = new URL(url);
+
+        // 1. Detect M3U/IPTV Playlist
+        const isM3UPlaylist = urlLower.endsWith('.m3u') ||
+            (urlLower.includes('.m3u') && !urlLower.includes('.m3u8'));
+
+        if (isM3UPlaylist) {
+            return { type: 'm3u', url };
+        }
+
+        // 2. Detect HLS/Stream
+        const hasM3u8Extension = urlLower.includes('.m3u8');
+        const looksLikeStream = urlLower.includes('/hls/') || urlLower.includes('/live/');
+
+        if (hasM3u8Extension && !looksLikeStream) {
+            try {
+                const response = await fetch(url);
+                const content = await response.text();
+                const isIPTVPlaylist = content.includes('#EXTINF') &&
+                    (content.includes('group-title=') || content.includes('tvg-logo=') || content.includes('tvg-id=')) &&
+                    !content.includes('#EXT-X-STREAM-INF') &&
+                    !content.includes('#EXT-X-MEDIA-SEQUENCE');
+
+                if (isIPTVPlaylist) return { type: 'm3u', url };
+            } catch (e) {
+                Logger.warn('[Processor] Could not inspect .m3u8, treating as stream');
+            }
+        }
+
+        if (hasM3u8Extension || looksLikeStream) {
+            const pathParts = urlObj.pathname.split('/');
+            let filename = pathParts.pop() || 'stream';
+            filename = filename.split('?')[0];
+            const displayTitle = filename.replace('.m3u8', '') || 'Live Stream';
+
+            return {
+                title: displayTitle,
+                url: url,
+                blob_url: url,
+                duration: 'LIVE',
+                thumbnail: '',
+                isLocal: false,
+                isStream: true,
+                isLive: true,
+                file: null,
+                fileType: 'application/vnd.apple.mpegurl',
+                mimeType: 'application/vnd.apple.mpegurl',
+                id: generateId()
+            };
+        }
+
+        // 3. Detect Audio
+        const audioExtensions = ['.mp3', '.flac', '.aac', '.ogg', '.wav', '.m4a', '.opus', '.wma'];
+        const isAudioFile = audioExtensions.some(ext => urlLower.endsWith(ext));
+
+        if (isAudioFile) {
+            const filename = urlObj.pathname.split('/').pop() || 'audio';
+            const displayTitle = filename.replace(/\.[^/.]+$/, '') || 'Audio Track';
+
+            return {
+                title: displayTitle,
+                url: url,
+                blob_url: url,
+                duration: 'Loading...',
+                thumbnail: '',
+                isLocal: false,
+                isAudio: true,
+                file: null,
+                fileType: 'audio/mpeg', // Generic fallback
+                mimeType: 'audio/mpeg',
+                id: generateId()
+            };
+        }
+
+        // 4. Regular Video File
+        try {
+            const response = await fetch(url, { method: 'HEAD' });
+            const contentType = response.headers.get('content-type') || 'video/mp4';
+
+            const urlPath = urlObj.pathname;
+            const filename = urlPath.split('/').pop() || 'remote-video.mp4';
+
+            return {
+                title: filename,
+                url: url,
+                duration: 'Loading...',
+                thumbnail: '',
+                isLocal: false,
+                file: null,
+                fileType: contentType,
+                mimeType: contentType,
+                id: generateId()
+            };
+        } catch (e) {
+            if (e.name === 'TypeError') {
+                throw new Error('CORS Error: Cannot access this URL. The server must allow cross-origin requests.');
+            }
+            throw e;
+        }
+    }
 }
