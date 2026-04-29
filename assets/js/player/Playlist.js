@@ -14,6 +14,8 @@ import { formatTime, generateId } from '../utils/mediaUtils.js';
 import { M3UParser } from '../utils/M3UParser.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { PlaylistRenderer } from './PlaylistRenderer.js';
+import { PlaylistState } from './PlaylistState.js';
+import { PlaylistProcessor } from './PlaylistProcessor.js';
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
@@ -30,23 +32,11 @@ export class Playlist {
     constructor(container, player) {
         this.container = container;
         this.player = player;
-        this.items = [];
-        this.activeIndex = -1;
+        
+        // Modularized state and processing
+        this.state = new PlaylistState();
+        this.processor = PlaylistProcessor; // Use as static service for now
         this.storage = new IndexedDBService();
-        this.expandedFolders = new Set(); // Track expanded folders
-        this.searchQuery = ''; // Search query state
-
-        // Initial Loading State
-        this.isLoading = true;
-
-        // Note: Do NOT clear container.innerHTML here.
-        // We want to keep the "Loading..." placeholder from player.html visible
-        // until the first render() call.
-
-
-        // Initialize sortable
-        // Initialize sortable
-        // this._initSortable(); // Not implemented yet
 
         // Start periodic state saving (every 1 second)
         this._progressIntervalId = setInterval(() => {
@@ -63,10 +53,6 @@ export class Playlist {
 
         // Setup Drag and Drop
         this.fileDropHandler = new FileDropHandler(this.container, (files) => this.handleFiles(files));
-
-        // Note: Auto-play next would require CorePlayer to emit a custom event
-        // when video ends. For now, this is not implemented.
-        // TODO: Add player.on('ended', () => this.playNext()) if CorePlayer supports events
 
         // Save state on beforeunload (works for most cases)
         this._beforeUnloadHandler = () => {
@@ -93,20 +79,25 @@ export class Playlist {
         if (this.player) {
             this.player.onStreamError = (videoId, error) => {
                 this.markItemBroken(videoId, error);
-
-                // Show error modal for CORS/fetch errors
-                const isCorsError = error?.includes?.('CORS') || error?.includes?.('fetch');
-                if (isCorsError) {
-                    ConfirmDialog.alert({
-                        title: 'Playback Error',
-                        message: 'Unable to load stream. Player.pause() called\n\nThis may be a network or CORS issue.',
-                        confirmText: 'OK',
-                        icon: '❌'
-                    });
-                }
             };
         }
     }
+
+    // Compatibility getters for Renderer and external callers
+    get items() { return this.state.items; }
+    get activeIndex() { return this.state.activeIndex; }
+    get expandedFolders() { return this.state.expandedFolders; }
+    get searchQuery() { return this.state.searchQuery; }
+    get isLoading() { return this.state.isLoading; }
+
+    // Compatibility setters
+    set items(val) { this.state.setItems(val); }
+    set activeIndex(val) { this.state.setActiveIndex(val); }
+    set searchQuery(val) { this.state.setSearchQuery(val); }
+    set isLoading(val) { this.state.setIsLoading(val); }
+
+
+
 
     /**
      * Setup player navigation callbacks
@@ -628,81 +619,18 @@ export class Playlist {
      * @param {FileList} files 
      */
     handleFiles(files) {
-        const fileArray = Array.from(files);
+        if (!files || files.length === 0) return;
 
-        // 1. Separate Media and Subtitle files
-        const mediaFiles = fileArray.filter(file =>
-            file.type.startsWith('video/') || file.type.startsWith('audio/')
-        );
-
-        const subtitleFiles = fileArray.filter(file =>
-            file.name.toLowerCase().endsWith('.vtt') || file.name.toLowerCase().endsWith('.srt')
-        );
-
-        if (mediaFiles.length === 0) {
+        const newItems = this.processor.processFiles(files);
+        
+        if (newItems.length === 0) {
             alert('Please select valid video or audio files.');
             return;
         }
 
-        const newItems = mediaFiles.map(file => {
-            // Determine path
-            let path = file.webkitRelativePath || file.name;
-            // If path doesn't contain separators, it's at root
-            if (!path.includes('/')) {
-                path = file.name;
-            }
-
-            const isAudio = file.type.startsWith('audio/');
-
-            // Generate ID first
-            const id = generateId();
-
-            const item = {
-                title: file.name,
-                url: URL.createObjectURL(file),
-                duration: 'Loading...',
-                thumbnail: '',
-                isLocal: true,
-                isAudio: isAudio,
-                needsReload: false,
-                file: file,
-                fileSize: file.size,      // Cache size for InfoMenu (file will be released after IndexedDB save)
-                fileType: file.type,      // Cache type for InfoMenu
-                mimeType: file.type,      // Store MIME type for blob creation
-                path: path,
-                id: id // Add unique ID for persistence
-            };
-
-            // Electron: Store absolute file path for direct disk access
-            // file.path is only available in Electron, not in browsers
-            if (file.path) {
-                item.localPath = file.path;
-                Logger.log('[Electron] Storing localPath for:', file.name, '->', file.path);
-            }
-
-            // Check for matching subtitle
-            // Helper to get basename without extension
-            const getBasename = (name) => name.substring(0, name.lastIndexOf('.'));
-            const mediaBasename = getBasename(file.name);
-
-            const matchingSubtitle = subtitleFiles.find(subFile =>
-                getBasename(subFile.name) === mediaBasename
-            );
-
-            if (matchingSubtitle) {
-                item.subtitleFile = matchingSubtitle;
-                Logger.log(`[Playlist] Auto-detected subtitle for ${file.name}: ${matchingSubtitle.name}`);
-            }
-
-            return item;
-        });
 
         this.addItems(newItems);
-
-        // Process metadata for new items
         this._processMetadata(newItems);
-
-        // Note: addItems() handles autoplay, no selectItem needed here
     }
 
     /**
@@ -809,26 +737,16 @@ export class Playlist {
         }
     }
 
-    /**
-     * Process metadata for local files
-     * @param {Array} items
-     */
     async _processMetadata(items) {
-        await MediaMetadata.processMetadata(
+        await this.processor.processMetadata(
             items,
             (item) => this._updateItemUI(item),
             () => this._saveState()
         );
     }
 
-    /**
-     * Ensure metadata exists on item (fetch if not cached)
-     * @param {Object} item - Playlist item
-     * @returns {Promise<void>}
-     * @private
-     */
     async _ensureMetadata(item) {
-        await MediaMetadata.ensureMetadata(item, () => this._saveState());
+        await this.processor.ensureMetadata(item, () => this._saveState());
     }
 
     /**
@@ -1028,7 +946,7 @@ export class Playlist {
      */
     addItem(video) {
         if (!video.id) video.id = generateId();
-        this.items.push(video);
+        this.state.addItem(video);
         this._saveState();
         this.render();
         this._updatePlayerNavigationState();
@@ -1064,11 +982,11 @@ export class Playlist {
             ...options.extra,
         };
 
-        const index = sourceItem ? this.items.indexOf(sourceItem) : -1;
+        const index = sourceItem ? this.state.items.indexOf(sourceItem) : -1;
         if (index !== -1) {
-            this.items.splice(index + 1, 0, newItem);
+            this.state.insertItem(index + 1, newItem);
         } else {
-            this.items.push(newItem);
+            this.state.addItem(newItem);
         }
 
         this.render();
@@ -1105,8 +1023,8 @@ export class Playlist {
 
         // Add regular items immediately
         if (regularItems.length > 0) {
-            const startIndex = this.items.length;
-            this.items = [...this.items, ...regularItems];
+            const startIndex = this.state.items.length;
+            this.state.addItems(regularItems);
             this._saveState();
             this.render();
             this._updatePlayerNavigationState();
@@ -1124,7 +1042,7 @@ export class Playlist {
                 Logger.error(`[Playlist] Failed to expand M3U: ${m3u.url}`, error);
                 // Add as a regular item if expansion fails
                 if (!m3u.id) m3u.id = generateId();
-                this.items.push(m3u);
+                this.state.addItem(m3u);
                 this._saveState();
                 this.render();
             }
@@ -1140,27 +1058,16 @@ export class Playlist {
      * @param {number} index
      */
     removeItem(index) {
-        if (index < 0 || index >= this.items.length) return;
+        if (index < 0 || index >= this.state.items.length) return;
 
         // Revoke blob URL to free memory
-        const removedItem = this.items[index];
+        const removedItem = this.state.items[index];
         if (removedItem && removedItem.url && removedItem.url.startsWith('blob:')) {
             URL.revokeObjectURL(removedItem.url);
         }
 
-        // If removing the currently playing item, stop playback
-        const wasActive = index === this.activeIndex;
-
-        // Adjust activeIndex if removing item before it
-        if (index < this.activeIndex) {
-            this.activeIndex--;
-        } else if (wasActive) {
-            // Will stop playback after removal
-            this.activeIndex = -1;
-        }
-
-        // 1. Data Removal
-        this.items.splice(index, 1);
+        // 1. Data Removal (handles activeIndex adjustment)
+        this.state.removeItem(index);
         this._saveState();
         this._updatePlayerNavigationState();
 
@@ -1201,77 +1108,47 @@ export class Playlist {
      * Remove a folder and all its contents (Surgical DOM Update)
      */
     removeFolder(folderPath) {
-        // Find items to remove
-        const indicesToRemove = [];
-        this.items.forEach((item, idx) => {
-            const itemPath = item.path || '';
-            if (itemPath.startsWith(folderPath + '/')) {
-                indicesToRemove.push(idx);
+        const prefix = folderPath + '/';
+        const itemsToRemove = this.state.items.filter(item => (item.path || '').startsWith(prefix));
+        
+        if (itemsToRemove.length === 0) {
+            // Even if no items, remove the folder from DOM if it exists
+            const folderEl = this.container.querySelector(`.playlist-folder[data-path="${folderPath}"]`);
+            if (folderEl) folderEl.remove();
+            return;
+        }
+
+        // Active Item Check
+        const activeItem = this.state.getActiveItem();
+        const isActiveRemoved = activeItem && (activeItem.path || '').startsWith(prefix);
+
+        // Revoke blob URLs to free memory
+        itemsToRemove.forEach(item => {
+            if (item.url && item.url.startsWith('blob:')) {
+                URL.revokeObjectURL(item.url);
             }
         });
 
-        // Active Item Logic
-        const originalActive = this.activeIndex >= 0 ? this.items[this.activeIndex] : null;
-        let wasActiveRemoved = false;
-
-        // 1. Remove Data (if any items to remove)
-        if (indicesToRemove.length > 0) {
-            // Sort desc to splice correctly from end
-            indicesToRemove.sort((a, b) => b - a);
-
-            indicesToRemove.forEach(idx => {
-                // Revoke blob URL to free memory
-                const item = this.items[idx];
-                if (item && item.url && item.url.startsWith('blob:')) {
-                    URL.revokeObjectURL(item.url);
-                }
-                this.items.splice(idx, 1);
-            });
-
-            // 2. Update Active Index
-            if (originalActive) {
-                const newIndex = this.items.indexOf(originalActive);
-                if (newIndex === -1) {
-                    // Active item was removed - stop playback
-                    wasActiveRemoved = true;
-                    this.activeIndex = -1;
-                } else {
-                    this.activeIndex = newIndex;
-                }
-            } else {
-                this.activeIndex = -1;
-            }
-
-            // Patch visible indices (collapsed folders use ID-based lookup)
-            const allItems = this.container.querySelectorAll('.playlist-item');
-            for (const el of allItems) {
-                const oldIdx = parseInt(el.dataset.index);
-                let shift = 0;
-                for (const removedIdx of indicesToRemove) {
-                    if (removedIdx < oldIdx) {
-                        shift++;
-                    }
-                }
-                if (shift > 0) {
-                    el.dataset.index = oldIdx - shift;
-                }
-            }
-        }
-
+        // 1. Filter out items and update state (setItems handles index restoration)
+        const newItems = this.state.items.filter(item => !(item.path || '').startsWith(prefix));
+        this.state.setItems(newItems);
+        
         this._saveState();
         this._updatePlayerNavigationState();
 
-        // 3. Surgical DOM Removal - ALWAYS remove folder from DOM (even if empty)
+        // 2. Surgical DOM Removal
         const folderEl = this.container.querySelector(`.playlist-folder[data-path="${folderPath}"]`);
         if (folderEl) {
             folderEl.remove();
         }
 
-
-        // 4. Stop playback if active was removed
-        if (wasActiveRemoved) {
+        // 3. Stop playback if active was removed
+        if (isActiveRemoved) {
             this._stopPlayback();
         }
+
+        // Always re-render to update data-indices on items
+        this.render();
     }
 
 
@@ -1287,8 +1164,7 @@ export class Playlist {
             this._revokeAllBlobUrls();
 
             // 3. Clear Playlist Data
-            this.items = [];
-            this.activeIndex = -1;
+            this.state.clear();
 
             // 3. Clear IndexedDB
             await this.storage.clear();
@@ -1525,19 +1401,17 @@ export class Playlist {
                     // Auto-remove and skip to next
                     Logger.warn(`File not found: ${video.title}. Removing and skipping.`);
 
-                    this.items.splice(index, 1);
+                    // 1. Data Removal (handles activeIndex adjustment)
+                    this.state.removeItem(index);
                     this._saveState();
                     this.render();
 
-                    // Since we removed the item at 'index', the next item is now at 'index'
-                    if (index < this.items.length) {
-                        // Play the next available item
+                    // 2. Play next or loop back
+                    if (index < this.state.items.length) {
                         this.selectItem(index, autoplay);
-                    } else if (this.items.length > 0 && this.player.loopMode === 'playlist') {
-                        // Loop back to start if needed
+                    } else if (this.state.items.length > 0 && this.player.loopMode === 'playlist') {
                         this.selectItem(0, autoplay);
                     } else {
-                        // End of playlist
                         this._stopPlayback();
                     }
                     return;
@@ -1643,20 +1517,11 @@ export class Playlist {
         // Check if item.path includes the folder segments.
 
         if (confirm(`Delete folder "${folderData.name}" and all contents?`)) {
-            // Deletion logic
-            // We need to implement _deleteItemsByPathPrefix
-            // For now simple approach:
-            const countBefore = this.items.length;
-            this.items = this.items.filter(item => {
-                // Check if item belongs to folder. 
-                // Item path: "Root/Folder/Item"
-                // Folder path: "Root/Folder"
-                // So item.path starts with folder.path + '/' ?
-                // Wait, path separator logic.
-                return !item.path.startsWith(folderData.path + '/');
-            });
+            const countBefore = this.state.items.length;
+            const newItems = this.state.items.filter(item => !item.path.startsWith(folderData.path + '/'));
 
-            if (this.items.length < countBefore) {
+            if (newItems.length < countBefore) {
+                this.state.setItems(newItems);
                 this._saveState();
                 this.render();
             }
@@ -2066,81 +1931,25 @@ export class Playlist {
      */
     async _handleM3UPlaylist(url, isSync = false) {
         try {
-            // Fetch and parse the M3U playlist
-            const channels = await M3UParser.fetchAndParse(url);
-
-            if (!channels || channels.length === 0) {
-                throw new Error('No channels found in this playlist.');
-            }
-
-            // Extract playlist name from URL for root folder
-            const urlPath = new URL(url).pathname;
-            let playlistName = urlPath.split('/').pop() || 'IPTV Playlist';
-            playlistName = playlistName.replace('.m3u', '').replace(/_/g, ' ');
-            // Capitalize first letter
-            playlistName = playlistName.charAt(0).toUpperCase() + playlistName.slice(1);
-
-            // Convert channels to playlist items with folder hierarchy
-            const newItems = channels.map(channel => {
-                // Build path: PlaylistName/Group/ChannelName
-                const group = channel.group || 'Uncategorized';
-                const channelName = channel.name || 'Unknown Channel';
-                const path = `${playlistName}/${group}/${channelName}`;
-
-                return {
-                    title: channelName,
-                    url: channel.url,
-                    blob_url: channel.url, // For streams, blob_url IS the stream URL
-                    duration: 'LIVE',
-                    thumbnail: channel.logo || '',
-                    isLocal: false,
-                    isStream: true,
-                    isLive: true,
-                    file: null,
-                    fileType: 'application/vnd.apple.mpegurl',
-                    mimeType: 'application/vnd.apple.mpegurl',
-                    path: path,
-                    id: channel.id || generateId(),
-                    m3uSource: url, // Store source for sync
-                    // Store M3U metadata for potential future use
-                    m3uData: {
-                        tvgId: channel.tvgId,
-                        tvgName: channel.tvgName,
-                        language: channel.language,
-                        country: channel.country,
-                        group: channel.group
-                    }
-                };
-            });
+            const newItems = await this.processor.importM3U(url);
 
             // If syncing, remove OLD items from this source first
             if (isSync) {
-                // We do this inside to ensure atomic-ish replacement
-                // but actually the caller should handle removal or we do it here.
-                // Let's do it here.
-                this.items = this.items.filter(item => item.m3uSource !== url);
+                this.state.setItems(this.items.filter(item => item.m3uSource !== url));
                 Logger.log(`[M3U] Removed old items for sync: ${url}`);
             }
 
             // Add all items at once
-            newItems.forEach(item => {
-                if (!item.id) item.id = generateId();
-            });
-            this.items = [...this.items, ...newItems];
+            this.state.addItems(newItems);
             this._saveState();
             this.render();
             this._updatePlayerNavigationState();
 
             // Show success message
-            this._showToast(`${isSync ? 'Synced' : 'Added'} ${channels.length} channels from ${playlistName}`);
-
-            Logger.log(`[M3U] Imported ${channels.length} channels from: ${url}`);
+            this._showToast(`${isSync ? 'Synced' : 'Added'} ${newItems.length} channels`);
 
         } catch (error) {
             Logger.error('[M3U] Failed to import playlist:', error);
-            if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
-                throw new Error('CORS Error: Cannot access this M3U playlist. The server must allow cross-origin requests.');
-            }
             throw error;
         }
     }
@@ -2480,7 +2289,7 @@ export class Playlist {
     async _validateStreams(folderPath, m3uSource) {
         // Get all stream items in this folder
         const prefix = folderPath + '/';
-        const folderItems = this.items.filter(item => {
+        const folderItems = this.state.items.filter(item => {
             const path = item.path || '';
             return path.startsWith(prefix) && item.isStream;
         });
@@ -2490,136 +2299,47 @@ export class Playlist {
             return;
         }
 
-        // Create validation modal
         const modal = this._createValidationModal(folderItems.length);
         document.body.appendChild(modal.overlay);
 
-        let cancelled = false;
-        let checkedCount = 0;
-        let brokenCount = 0;
         let workingCount = 0;
+        let brokenCount = 0;
+        let cancelled = false;
 
         modal.okBtn.onclick = () => {
             cancelled = true;
             this._closeValidationModal(modal);
         };
 
-        // Validate each stream one by one
-        for (const item of folderItems) {
-            if (cancelled) break;
+        await this.processor.validateStreams(folderItems, (progress, item, isBroken) => {
+            if (cancelled) return;
 
-            // Update progress UI
-            checkedCount++;
-            modal.progressFill.style.width = `${(checkedCount / folderItems.length) * 100}%`;
-            modal.status.textContent = `Checking ${checkedCount} of ${folderItems.length}...`;
+            if (isBroken) {
+                brokenCount++;
+                // UI update only, data is already set by processor
+                const index = this.state.items.indexOf(item);
+                const itemEl = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
+                if (itemEl) itemEl.classList.add('playlist-item--broken');
+            } else {
+                workingCount++;
+            }
+
+            modal.progressFill.style.width = `${progress * 100}%`;
+            modal.status.textContent = `Checking ${Math.round(progress * folderItems.length)} of ${folderItems.length}...`;
             modal.currentItem.textContent = item.title;
             modal.brokenCountEl.textContent = brokenCount;
             modal.workingCountEl.textContent = workingCount;
+        });
 
-            try {
-                // Check stream accessibility with HEAD request + timeout
-                const isAccessible = await this._checkStreamAccessibility(item.url);
+        if (cancelled) return;
 
-                if (isAccessible) {
-                    workingCount++;
-                } else {
-                    brokenCount++;
-                    this.markItemBroken(item.id, 'Failed to connect');
-                }
-            } catch (err) {
-                brokenCount++;
-                this.markItemBroken(item.id, err.message);
-            }
-
-            // Small delay to avoid overwhelming the UI and network
-            await new Promise(r => setTimeout(r, 50));
-        }
-
-        // Final update
-        modal.progressFill.style.width = '100%';
-        modal.status.textContent = cancelled ? 'Validation cancelled' : 'Validation complete!';
-        modal.currentItem.textContent = '';
-        modal.brokenCountEl.textContent = brokenCount;
-        modal.workingCountEl.textContent = workingCount;
-
-        // Change button to OK
+        modal.status.textContent = 'Validation complete!';
         modal.okBtn.textContent = 'OK';
         modal.okBtn.onclick = () => this._closeValidationModal(modal);
 
         this._showToast(`Validation complete: ${brokenCount} broken, ${workingCount} working`);
-    }
-
-    /**
-     * Check if a stream URL is accessible
-     * @param {string} url - Stream URL to check
-     * @returns {Promise<boolean>} - True if accessible
-     * @private
-     */
-    async _checkStreamAccessibility(url) {
-        const streamType = StreamDetector.detect(url);
-
-        // For HLS streams, do a simple HEAD/GET fetch to check manifest accessibility
-        if (streamType === StreamDetector.TYPE_HLS) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            try {
-                const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
-                clearTimeout(timeoutId);
-                return response.ok;
-            } catch {
-                clearTimeout(timeoutId);
-                return false;
-            }
-        }
-
-        // TYPE_FILE means URL doesn't look like a valid stream (e.g., twitch.tv/user, youtube.com/channel)
-        // In the context of IPTV validation, these are broken - not playable streams
-        if (streamType === StreamDetector.TYPE_FILE) {
-            return false;
-        }
-
-        // For M3U playlists or other types, use fetch-based checking
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-        try {
-            // Try regular fetch first - this can properly detect 404, 403, etc.
-            const response = await fetch(url, {
-                method: 'HEAD',
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            return response.ok; // true for 2xx status codes
-        } catch (err) {
-            clearTimeout(timeoutId);
-
-            if (err.name === 'AbortError') {
-                return false; // Timeout = broken
-            }
-
-            // CORS error - try no-cors mode as fallback
-            // With no-cors, we can only check if the server responds at all
-            // If server returns 404/403, the request still completes (opaque response)
-            // So we assume it MIGHT work if no-cors doesn't throw
-            try {
-                const controller2 = new AbortController();
-                const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
-
-                await fetch(url, {
-                    method: 'HEAD',
-                    signal: controller2.signal,
-                    mode: 'no-cors'
-                });
-
-                clearTimeout(timeoutId2);
-                // no-cors completed without network error - assume working
-                // (We can't tell if it's 404 in no-cors mode, but the stream 
-                // will be marked broken when user actually tries to play it)
-                return true;
-            } catch {
-                return false; // Network error = definitely broken
-            }
-        }
+        this._saveState(); // Save once at the end
+        this.render();
     }
 
     /**
