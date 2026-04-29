@@ -64,3 +64,46 @@ export function generateId() {
     }
     return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
+
+/**
+ * Sanitize filename for download
+ * @param {string} filename - Original filename
+ * @returns {string} Sanitized filename
+ */
+export function sanitizeFilename(filename) {
+    if (!filename) return 'video.mp4';
+    
+    // Remove invalid filename characters
+    let sanitized = filename.replace(/[<>:"/\\|?*]/g, '_');
+
+    // Ensure we have a file extension
+    if (!sanitized.match(/\.\w+$/)) {
+        sanitized += '.mp4';
+    }
+
+    return sanitized;
+}
+
+/**
+ * Get MIME type for audio file extension
+ * @param {string} url - URL or filename
+ * @returns {string} MIME type
+ */
+export function getAudioMimeType(url) {
+    const urlLower = url.toLowerCase();
+    const mimeTypes = {
+        '.mp3': 'audio/mpeg',
+        '.flac': 'audio/flac',
+        '.aac': 'audio/aac',
+        '.ogg': 'audio/ogg',
+        '.wav': 'audio/wav',
+        '.m4a': 'audio/mp4',
+        '.opus': 'audio/opus',
+        '.wma': 'audio/x-ms-wma'
+    };
+
+    for (const [ext, mime] of Object.entries(mimeTypes)) {
+        if (urlLower.endsWith(ext)) return mime;
+    }
+    return 'audio/mpeg'; // Default
+}

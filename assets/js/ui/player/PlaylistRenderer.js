@@ -398,6 +398,10 @@ export class PlaylistRenderer {
         }
     }
 
+    /**
+     * Update a specific item's UI (thumbnail, duration)
+     * @param {Object} item 
+     */
     updateItemUI(item) {
         const p = this.playlist;
         const index = p.items.indexOf(item);
@@ -426,6 +430,74 @@ export class PlaylistRenderer {
                     }
                 });
             }
+        }
+    }
+
+    /**
+     * Remove an item from the DOM surgically
+     * @param {number} index - Index of the item to remove
+     */
+    removeItemFromDOM(index) {
+        const p = this.playlist;
+        const itemEl = p.container.querySelector(`.playlist-item[data-index="${index}"]`);
+        
+        if (itemEl) {
+            // Update Parent Folder Count if it exists
+            const folder = itemEl.closest('.playlist-folder');
+            if (folder) {
+                const header = folder.querySelector('.playlist-folder-header');
+                const countSpan = header?.querySelector('.folder-name span:last-child');
+                if (countSpan && countSpan.textContent.startsWith('(')) {
+                    const currentCount = parseInt(countSpan.textContent.replace(/\D/g, ''));
+                    const newCount = Math.max(0, currentCount - 1);
+                    countSpan.textContent = `(${newCount})`;
+                    // If folder is now empty, remove it entirely
+                    if (newCount === 0) folder.remove();
+                }
+            }
+            itemEl.remove();
+        }
+
+        // Patch remaining visible indices to stay in sync without a full re-render
+        const allItems = p.container.querySelectorAll('.playlist-item');
+        for (const el of allItems) {
+            const curr = parseInt(el.dataset.index);
+            if (curr > index) {
+                el.dataset.index = (curr - 1).toString();
+            }
+        }
+    }
+
+    /**
+     * Remove a folder from the DOM surgically
+     * @param {string} folderPath - Path of the folder to remove
+     */
+    removeFolderFromDOM(folderPath) {
+        const folderEl = this.playlist.container.querySelector(`.playlist-folder[data-path="${folderPath}"]`);
+        if (folderEl) {
+            folderEl.remove();
+        }
+    }
+
+    /**
+     * Update UI to reflect recording state
+     * @param {boolean} isRecording 
+     */
+    setRecordingState(isRecording) {
+        const activeEl = this.playlist.container.querySelector('.playlist-item.active');
+        if (activeEl) {
+            activeEl.classList.toggle('recording-item', isRecording);
+        }
+    }
+
+    /**
+     * Mark an item as broken in the DOM
+     * @param {string} itemId 
+     */
+    markItemBrokenInDOM(itemId) {
+        const itemEl = this.playlist.container.querySelector(`.playlist-item[data-id="${itemId}"]`);
+        if (itemEl) {
+            itemEl.classList.add('playlist-item--broken');
         }
     }
 

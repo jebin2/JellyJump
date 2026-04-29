@@ -1,4 +1,5 @@
 import { Logger } from "../shared/utils/Logger.js";
+import { Toast } from "../shared/utils/Toast.js";
 import { IndexedDBService } from "../shared/services/IndexedDBService.js";
 import { CorePlayer } from '../core/Player.js';
 import { ConfirmDialog } from '../shared/utils/ConfirmDialog.js';
@@ -6,11 +7,13 @@ import { Modal as DialogModal } from '../ui/Modal.js';
 import { MenuRouter } from '../ui/menus/core/MenuRouter.js';
 import { RecordMenu } from '../ui/menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../ui/menus/features/ScreenRecorderMenu.js';
+import { UrlUploadMenu } from "../ui/menus/features/UrlUploadMenu.js";
+import { ItemToolsMenu } from "../ui/menus/features/ItemToolsMenu.js";
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../shared/utils/FileDropHandler.js';
 import { ElectronHelper } from '../shared/utils/ElectronHelper.js';
-import { formatTime, generateId } from '../shared/utils/mediaUtils.js';
+import { formatTime, generateId, sanitizeFilename, getAudioMimeType } from '../shared/utils/mediaUtils.js';
 import { M3UParser } from '../shared/utils/M3UParser.js';
 import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { PlaylistRenderer } from '../ui/player/PlaylistRenderer.js';
@@ -70,7 +73,13 @@ export class Playlist {
         this._initPlayerNavigation();
 
         // Initialize URL Upload
-        this._initUrlUpload();
+        // Initialize URL Upload Feature
+        const urlBtn = document.getElementById('mb-add-url');
+        if (urlBtn) {
+            urlBtn.addEventListener('click', () => {
+                UrlUploadMenu.show(this);
+            });
+        }
 
         // Load saved playlist
         this._loadSavedPlaylist();
@@ -100,10 +109,10 @@ export class Playlist {
 
 
     /**
-     * Setup player navigation callbacks
+     * Initialize keyboard and player navigation
      * @private
      */
-    _initPlayerNavigation() {
+    async _initPlayerNavigation() {
         if (!this.player) {
             Logger.error('Playlist: Player instance is missing!');
             return;
@@ -141,7 +150,7 @@ export class Playlist {
      * @private
      */
     _initKeyboardShortcuts() {
-        this._keydownHandler = (e) => {
+        this._keydownHandler = async (e) => {
             // Ignore if typing in input
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -163,7 +172,11 @@ export class Playlist {
                 if (this.activeIndex >= 0) {
                     // Optional: Confirm before delete via shortcut?
                     // For now, let's just delete to be snappy, or maybe prompt
-                    if (confirm('Remove current video from playlist?')) {
+                    const confirmed = await ConfirmDialog.confirm({
+                        title: 'Remove Video',
+                        message: 'Remove current video from playlist?'
+                    });
+                    if (confirmed) {
                         this.removeItem(this.activeIndex);
                     }
                 }
@@ -624,7 +637,7 @@ export class Playlist {
         const newItems = this.processor.processFiles(files);
         
         if (newItems.length === 0) {
-            alert('Please select valid video or audio files.');
+            Toast.show('Please select valid video or audio files.', 3000, true);
             return;
         }
 
@@ -661,7 +674,7 @@ export class Playlist {
         });
 
         if (mediaFiles.length === 0) {
-            alert('Please select valid video or audio files.');
+            Toast.show('Please select valid video or audio files.', 3000, true);
             return;
         }
 
@@ -1067,38 +1080,15 @@ export class Playlist {
         }
 
         // 1. Data Removal (handles activeIndex adjustment)
+        const wasActive = this.activeIndex === index;
         this.state.removeItem(index);
         this._saveState();
         this._updatePlayerNavigationState();
 
         // 2. Surgical DOM Removal
-        const itemEl = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
-        if (itemEl) {
-            // Update Parent Folder Count
-            const folder = itemEl.closest('.playlist-folder');
-            if (folder) {
-                const header = folder.querySelector('.playlist-folder-header');
-                const countSpan = header.querySelector('span:last-child');
-                if (countSpan && countSpan.textContent.startsWith('(')) {
-                    const currentCount = parseInt(countSpan.textContent.replace(/\D/g, ''));
-                    const newCount = Math.max(0, currentCount - 1);
-                    countSpan.textContent = `(${newCount})`;
-                    if (newCount === 0) folder.remove();
-                }
-            }
-            itemEl.remove();
-        }
+        this.renderer.removeItemFromDOM(index);
 
-        // 3. Patch visible indices (collapsed folders use ID-based lookup)
-        const allItems = this.container.querySelectorAll('.playlist-item');
-        for (const el of allItems) {
-            const curr = parseInt(el.dataset.index);
-            if (curr > index) {
-                el.dataset.index = curr - 1;
-            }
-        }
-
-        // 4. Stop playback if active item was removed
+        // 3. Stop playback if active item was removed
         if (wasActive) {
             this._stopPlayback();
         }
@@ -1113,8 +1103,7 @@ export class Playlist {
         
         if (itemsToRemove.length === 0) {
             // Even if no items, remove the folder from DOM if it exists
-            const folderEl = this.container.querySelector(`.playlist-folder[data-path="${folderPath}"]`);
-            if (folderEl) folderEl.remove();
+            this.renderer.removeFolderFromDOM(folderPath);
             return;
         }
 
@@ -1137,10 +1126,7 @@ export class Playlist {
         this._updatePlayerNavigationState();
 
         // 2. Surgical DOM Removal
-        const folderEl = this.container.querySelector(`.playlist-folder[data-path="${folderPath}"]`);
-        if (folderEl) {
-            folderEl.remove();
-        }
+        this.renderer.removeFolderFromDOM(folderPath);
 
         // 3. Stop playback if active was removed
         if (isActiveRemoved) {
@@ -1156,7 +1142,17 @@ export class Playlist {
      * Clear the playlist
      */
     async clear(ask_confirm = true) {
-        if (!ask_confirm || (ask_confirm && confirm('Are you sure you want to clear the playlist? This will reset the application state.'))) {
+        let confirmed = true;
+        if (ask_confirm) {
+            confirmed = await ConfirmDialog.confirm({
+                title: 'Clear Playlist',
+                message: 'Are you sure you want to clear the playlist? This will reset the application state.',
+                confirmText: 'Clear All',
+                confirmType: 'danger'
+            });
+        }
+        
+        if (confirmed) {
             // 1. Reset Player State
             this.player.reset();
 
@@ -1287,7 +1283,7 @@ export class Playlist {
             const video = this.items[index];
 
             if (video.needsReload) {
-                alert('This local file needs to be re-uploaded.');
+                Toast.show('This local file needs to be re-uploaded.', 4000, true);
                 return;
             }
 
@@ -1506,7 +1502,7 @@ export class Playlist {
         // No render needed if it's hidden
     }
 
-    _removeFolder(folderData) {
+    async _removeFolder(folderData) {
         // Find items that start with folder path
         const prefix = folderData.path + '/';
         // And exact path matches? Folders are virtual.
@@ -1516,7 +1512,14 @@ export class Playlist {
         // Folder: `Playlist/Group`.
         // Check if item.path includes the folder segments.
 
-        if (confirm(`Delete folder "${folderData.name}" and all contents?`)) {
+        const confirmed = await ConfirmDialog.confirm({
+            title: 'Delete Folder',
+            message: `Delete folder "${folderData.name}" and all contents?`,
+            confirmText: 'Delete',
+            confirmType: 'danger'
+        });
+
+        if (confirmed) {
             const countBefore = this.state.items.length;
             const newItems = this.state.items.filter(item => !item.path.startsWith(folderData.path + '/'));
 
@@ -1538,36 +1541,10 @@ export class Playlist {
      * @param {boolean} isRecording
      */
     setRecordingState(isRecording) {
-        const activeEl = this.container.querySelector('.playlist-item.active');
-        if (activeEl) {
-            activeEl.classList.toggle('recording-item', isRecording);
-        }
+        this.renderer.setRecordingState(isRecording);
     }
 
-    /**
-     * Sanitize filename for download
-     * @param {string} filename - Original filename
-     * @returns {string} Sanitized filename
-     * @private
-     */
-    _sanitizeFilename(filename) {
-        // Remove invalid filename characters
-        let sanitized = filename.replace(/[<>:"/\\|?*]/g, '_');
 
-        // Ensure we have a file extension
-        if (!sanitized.match(/\.\w+$/)) {
-            // Try to get extension from URL or default to .mp4
-            sanitized += '.mp4';
-        }
-
-        return sanitized;
-    }
-
-    /**
-     * Download a video from the playlist
-     * @param {number} index - Index of video to download
-     * @private
-     */
     async _downloadItem(index) {
         if (index < 0 || index >= this.items.length) return;
 
@@ -1577,175 +1554,39 @@ export class Playlist {
         try {
             // Determine filename
             let filename = item.title || 'video';
+            if (item.file && item.file.name) filename = item.file.name;
 
-            // If the item has a File object (local upload), try to get original filename
-            if (item.file && item.file.name) {
-                filename = item.file.name;
-            }
-
-            // Sanitize filename
-            filename = this._sanitizeFilename(filename);
+            // Sanitize filename using shared utility
+            filename = sanitizeFilename(filename);
 
             if (!item.blob_url) {
-                // Show loading state
+                // Show loading state in UI
                 if (downloadBtn) {
-                    const loadingTemplate = document.getElementById('loading-spinner-template');
-                    const loadingIcon = loadingTemplate.content.cloneNode(true);
-                    downloadBtn.innerHTML = '';
-                    downloadBtn.appendChild(loadingIcon);
-                    downloadBtn.style.opacity = '1';
+                    downloadBtn.classList.add('loading');
                 }
 
                 Logger.log(`Getting source for download: ${item.title}`);
-
                 await MediaMetadata.getProcessedSourceURL(item, () => this._saveState());
 
-                if (downloadBtn) {
-                    downloadBtn.style.opacity = "";
-                }
+                if (downloadBtn) downloadBtn.classList.remove('loading');
             }
 
-            // Use reusable download anchor from HTML
+            // Trigger download
             const downloadLink = document.getElementById('mb-download-link');
-            downloadLink.href = item.blob_url;
-            downloadLink.download = filename;
-            downloadLink.click();
-
-            // Clean up blob URL if we created one
-            if (item.blob_url) {
-                setTimeout(() => URL.revokeObjectURL(item.blob_url), 100);
+            if (downloadLink) {
+                downloadLink.href = item.blob_url;
+                downloadLink.download = filename;
+                downloadLink.click();
             }
 
             Logger.log(`Downloading: ${filename}`);
-
-            // Restore download button icon
-            if (downloadBtn) {
-                // Clone from template in playlist-templates.html
-                const template = document.getElementById('playlist-item-template');
-                const tempItem = template.content.cloneNode(true);
-                const downloadIcon = tempItem.querySelector('.playlist-download-btn svg').cloneNode(true);
-                downloadBtn.innerHTML = '';
-                downloadBtn.appendChild(downloadIcon);
-            }
-
         } catch (error) {
             Logger.error('Download failed:', error);
-            alert(`Failed to download video: ${error.message}\n\nThis may be due to CORS restrictions on the remote server.`);
-
-            // Restore download button icon on error
-            if (downloadBtn) {
-                // Clone from template in playlist-templates.html
-                const template = document.getElementById('playlist-item-template');
-                const tempItem = template.content.cloneNode(true);
-                const downloadIcon = tempItem.querySelector('.playlist-download-btn svg').cloneNode(true);
-                downloadBtn.innerHTML = '';
-                downloadBtn.appendChild(downloadIcon);
-            }
+            Toast.show(`Failed to download video: ${error.message}`, 4000, true);
+            if (downloadBtn) downloadBtn.classList.remove('loading');
         }
     }
 
-    /**
-     * Initialize URL Upload Feature
-     * @private
-     */
-    _initUrlUpload() {
-        // Add event listener to "URL" button
-        // Note: Header is a sibling of container, so we use getElementById
-        const urlBtn = document.getElementById('mb-add-url');
-        if (urlBtn) {
-            urlBtn.addEventListener('click', () => {
-                this._openUrlModal();
-            });
-        } else {
-            Logger.warn('URL Upload button not found');
-        }
-    }
-
-    /**
-     * Open URL Upload Modal
-     * @private
-     */
-    _openUrlModal() {
-        const contentTemplate = document.getElementById('url-upload-content-template');
-        const footerTemplate = document.getElementById('url-upload-footer-template');
-        if (!contentTemplate || !footerTemplate) return;
-
-        const modal = new DialogModal({ maxWidth: '500px' });
-        modal.setTitle('Add Video from URL');
-        modal.setBody(contentTemplate.content.cloneNode(true));
-        modal.setFooter(footerTemplate.content.cloneNode(true));
-
-        const modalContent = modal.modal;
-
-        const input = modalContent.querySelector('#url-input');
-        const addBtn = modalContent.querySelector('.mb-modal-add');
-        const errorDiv = modalContent.querySelector('.mb-modal-error');
-        const loadingDiv = modalContent.querySelector('.mb-modal-loading');
-
-        modal.open();
-
-        // Focus input
-        setTimeout(() => input.focus(), 100);
-
-        // Validate input
-        input.addEventListener('input', () => {
-            const isValid = this._isValidUrl(input.value);
-            addBtn.disabled = !isValid;
-            errorDiv.style.display = 'none';
-        });
-
-        // Handle Add
-        addBtn.addEventListener('click', async () => {
-            const url = input.value.trim();
-            if (!url) return;
-
-            // Show loading
-            input.disabled = true;
-            addBtn.disabled = true;
-            modal.closeBtn.disabled = true;
-            loadingDiv.style.display = 'flex';
-            errorDiv.style.display = 'none';
-
-            try {
-                await this._handleUrlUpload(url);
-                // Close modal on success
-                modal.close();
-            } catch (error) {
-                // Show error
-                input.disabled = false;
-                addBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-                loadingDiv.style.display = 'none';
-                errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
-            }
-        });
-
-        // Handle Enter key
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !addBtn.disabled) {
-                addBtn.click();
-            }
-            if (e.key === 'Escape') {
-                modal.close();
-            }
-        });
-    }
-
-    /**
-     * Validate URL
-     * @private
-     * @param {string} string 
-     * @returns {boolean}
-     */
-    _isValidUrl(string) {
-        try {
-            const url = new URL(string);
-            return url.protocol === "http:" || url.protocol === "https:";
-        } catch (_) {
-            return false;
-        }
-    }
 
     /**
      * Handle URL Upload logic
@@ -1855,8 +1696,8 @@ export class Playlist {
                     isLocal: false,
                     isAudio: true,
                     file: null,
-                    fileType: this._getAudioMimeType(urlLower),
-                    mimeType: this._getAudioMimeType(urlLower),
+                    fileType: getAudioMimeType(urlLower),
+                    mimeType: getAudioMimeType(urlLower),
                     id: generateId()
                 };
 
@@ -1946,7 +1787,7 @@ export class Playlist {
             this._updatePlayerNavigationState();
 
             // Show success message
-            this._showToast(`${isSync ? 'Synced' : 'Added'} ${newItems.length} channels`);
+            Toast.show(`${isSync ? 'Synced' : 'Added'} ${newItems.length} channels`);
 
         } catch (error) {
             Logger.error('[M3U] Failed to import playlist:', error);
@@ -1961,135 +1802,19 @@ export class Playlist {
      */
     async _syncM3UPlaylist(name, url) {
         if (!url) return;
-        this._showToast(`Syncing ${name}...`);
+        Toast.show(`Syncing ${name}...`);
         try {
             await this._handleM3UPlaylist(url, true);
         } catch (e) {
-            this._showToast(`Sync failed: ${e.message}`, 3000, true);
+            Toast.show(`Sync failed: ${e.message}`, 3000, true);
         }
     }
 
-    /**
-     * Get MIME type for audio file extension
-     * @param {string} url - URL in lowercase
-     * @returns {string} MIME type
-     * @private
-     */
-    _getAudioMimeType(url) {
-        const mimeTypes = {
-            '.mp3': 'audio/mpeg',
-            '.flac': 'audio/flac',
-            '.aac': 'audio/aac',
-            '.ogg': 'audio/ogg',
-            '.wav': 'audio/wav',
-            '.m4a': 'audio/mp4',
-            '.opus': 'audio/opus',
-            '.wma': 'audio/x-ms-wma'
-        };
 
-        for (const [ext, mime] of Object.entries(mimeTypes)) {
-            if (url.endsWith(ext)) return mime;
-        }
-        return 'audio/mpeg'; // Default
+    _toggleSettingsMenu(index) {
+        ItemToolsMenu.show(index, this);
     }
 
-    /**
-     * Toggle settings menu for an item
-     * @param {number} index
-     * @param {HTMLElement} buttonEl
-     * @private
-     */
-    _toggleSettingsMenu(index, buttonEl) {
-        this._createSettingsMenu(index, buttonEl);
-    }
-
-    /**
-     * Create and show settings menu as a tile-based modal
-     * @param {number} index
-     * @param {HTMLElement} buttonEl
-     * @private
-     */
-    async _createSettingsMenu(index, buttonEl) {
-        const item = this.items[index];
-        if (!item) {
-            console.error('[Playlist] Item not found for index:', index);
-            return;
-        }
-
-        const { Modal } = await import('../ui/Modal.js');
-
-        // Treat streams, IPTV, and live content as restricted (limited menu options)
-        const isRestricted = item.isStream || item.isLive || (item.url && (item.url.includes('.m3u8') || item.url.includes('/live/') || item.url.includes('/hls/')));
-
-        const modal = new Modal({ maxWidth: '480px' });
-
-        // Truncate title if too long
-        const displayTitle = item.title.length > 30 ? item.title.substring(0, 30) + '...' : item.title;
-        modal.setTitle(`Tools: ${displayTitle}`);
-
-        // Define menu items with SVG icons
-        const videoTools = [
-            { action: 'convert', icon: 'icon-convert', label: 'Convert' },
-            { action: 'download-manage', icon: 'icon-download', label: 'Tracks' },
-            { action: 'trim', icon: 'icon-scissors', label: 'Cut' },
-            { action: 'multicut', icon: 'icon-scissors', label: 'Multi-Cut' },
-            { action: 'resize', icon: 'icon-maximize', label: 'Resize' },
-            { action: 'crop', icon: 'icon-crop', label: 'Crop' },
-            { action: 'create-gif', icon: 'icon-gif', label: 'GIF' },
-            { action: 'reverse', icon: 'icon-speed', label: 'Speed' },
-            { action: 'remove-bg', icon: 'icon-eyedropper', label: 'Remove BG' },
-            { action: 'watermark', icon: 'icon-watermark', label: 'Watermark' },
-            { action: 'rotate', icon: 'icon-rotate-cw', label: 'Rotate' },
-            { action: 'blur', icon: 'icon-blur', label: 'Blur' },
-            { action: 'detect-cuts', icon: 'icon-scenes', label: 'Scenes' },
-            { action: 'detect-motion', icon: 'icon-motion', label: 'Motion' },
-            { action: 'encrypt', icon: 'icon-lock', label: 'Encrypt/Decrypt' },
-            { action: 'info', icon: 'icon-info', label: 'Info' }
-        ];
-
-        const streamTools = [
-            { action: 'record', icon: 'icon-record', label: RecordMenu.isRecording ? 'Stop Rec' : 'Record' },
-            { action: 'info', icon: 'icon-info', label: 'Info' }
-        ];
-
-        const tools = isRestricted ? streamTools : videoTools;
-
-        // Create tools grid content
-        const content = document.createElement('div');
-        content.className = 'tools-grid tools-grid-3';
-        content.innerHTML = tools.map(tool => `
-            <button class="tools-tile tools-tile-sm" data-action="${tool.action}" title="${tool.label}">
-                <div class="tools-tile-icon">
-                    <svg width="20" height="20" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#${tool.icon}"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">${tool.label}</span>
-            </button>
-        `).join('');
-
-        modal.setBody(content);
-
-        // Handle tile clicks
-        content.querySelectorAll('.tools-tile').forEach(tile => {
-            tile.addEventListener('click', (e) => {
-                const action = tile.dataset.action;
-                modal.close();
-                MenuRouter.init(action, index, this);
-                this.player.pause();
-                // Restore audio if muted for autoplay (user is now interacting)
-                if (this.player._wasMutedForAutoplay && this.player.gainNode) {
-                    Logger.log('[Autoplay] Tools menu opened, restoring audio...');
-                    this.player.config.muted = false;
-                    this.player.gainNode.gain.value = this.player.config.volume;
-                    this.player._wasMutedForAutoplay = false;
-                    if (this.player.ui?.muteBtn) this.player._updateVolumeUI();
-                }
-            });
-        });
-
-        modal.open();
-    }
 
     /**
      * Setup Tools button and modal
@@ -2124,38 +1849,6 @@ export class Playlist {
         return await MediaMetadata.getFormattedMetadata(blob, filename);
     }
 
-    /**
-     * Show toast notification
-     * @param {string} message 
-     * @private
-     */
-    _showToast(message) {
-        // Simple toast implementation or reuse existing if available
-        // For now, let's use a simple alert or console log if no toast system exists
-        // Actually, let's create a temporary element
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--accent-primary);
-            color: #000;
-            padding: 10px 20px;
-            border-radius: 4px;
-            font-weight: bold;
-            z-index: 3000;
-            opacity: 0;
-            transition: opacity 0.3s;
-        `;
-        document.body.appendChild(toast);
-        requestAnimationFrame(() => toast.style.opacity = '1');
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => document.body.removeChild(toast), 300);
-        }, 2000);
-    }
 
     /**
      * Mark a playlist item as broken (stream failed to load)
@@ -2170,13 +1863,7 @@ export class Playlist {
         item.errorMessage = error || 'Stream unavailable';
         Logger.log(`[Playlist] Marked as broken: ${item.title}`);
 
-        // Update UI for this item
-        const index = this.items.indexOf(item);
-        const itemEl = this.container.querySelector(`.playlist-item[data-index="${index}"]`);
-        if (itemEl) {
-            itemEl.classList.add('playlist-item--broken');
-        }
-
+        this.renderer.markItemBrokenInDOM(item.id);
         this._saveState();
     }
 
@@ -2198,7 +1885,7 @@ export class Playlist {
         await ValidationModal.show({
             items: folderItems,
             processor: this.processor,
-            onToast: (msg) => this._showToast(msg),
+            onToast: (msg) => Toast.show(msg),
             onComplete: () => {
                 this._saveState();
                 this.render();
