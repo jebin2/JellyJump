@@ -56,12 +56,12 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
     if (anchorContent !== undefined) player._vodAnchorContent = anchorContent;
 
     const myIterator = iterator;
-    const isLiveMode = anchorWall !== undefined && anchorContent !== undefined;
+    const isAnchored = anchorWall !== undefined && anchorContent !== undefined;
 
     let nextAudioTime;
-    if (isLiveMode && prefetchedBuffer) {
+    if (isAnchored && prefetchedBuffer) {
         nextAudioTime = anchorWall + (prefetchedBuffer.timestamp - anchorContent);
-    } else if (isLiveMode) {
+    } else if (isAnchored) {
         nextAudioTime = anchorWall + (player.audioContext.currentTime - anchorWall);
     } else {
         nextAudioTime = (player.audioContext?.currentTime || 0) + 0.1;
@@ -170,15 +170,12 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
                 }
             }
 
-            if (!isLiveMode && timestamp - player._getPlaybackTime() >= 3) {
-                await new Promise((resolve) => {
-                    const id = setInterval(() => {
-                        if (!player.isPlaying || player.isLive || timestamp - player._getPlaybackTime() < 2) {
-                            clearInterval(id);
-                            resolve();
-                        }
-                    }, 100);
-                });
+            if (!player.isLive && isAnchored && timestamp - player._getPlaybackTime() >= 3) {
+                const aheadMs = (timestamp - player._getPlaybackTime()) * 1000;
+                const waitMs = Math.min(aheadMs - 2000, 1000); // Wait until we are only 2s ahead, max 1s wait
+                if (waitMs > 10) {
+                    await new Promise(r => setTimeout(r, waitMs));
+                }
             }
         }
         Logger.log(`[${_audioLogTag}:Audio] Iterator completed after ${sampleCount} buffers`);
