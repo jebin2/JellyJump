@@ -111,6 +111,7 @@ export class ConvertMenu {
                 }, downloadBtn);
 
                 // Success
+                successMessage.textContent = format === 'hls' ? '✓ Ready for download (ZIP)' : '✓ Added to playlist';
                 successMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
 
