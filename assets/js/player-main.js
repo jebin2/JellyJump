@@ -44,10 +44,6 @@ async function initializeApp() {
                 title: 'Sample Video',
                 url: window.location.href.includes('//localhost:') ? '/homepage.mp4' : '/JellyJump/homepage.mp4',
                 isLocal: true
-            }, {
-                title: 'Serene',
-                url: window.location.href.includes('//localhost:') ? '/serene.mp4' : '/JellyJump/serene.mp4',
-                isLocal: true
             }
         ], true); // true = autoplay on page load
     }
