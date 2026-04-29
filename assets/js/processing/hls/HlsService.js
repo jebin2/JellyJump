@@ -2,13 +2,21 @@ import { Logger } from '../../utils/Logger.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput, getBitrate } from '../shared/InputFactory.js';
 
+let currentConversion = null;
+
 export async function processHls({ source, quality = 100, onProgress }) {
     Logger.log('[MediaProcessor] Starting HLS conversion...');
 
+    await currentConversion?.cancel();
+
     let input = null;
     let output = null;
-    let conversion = null;
+    currentConversion = null;
     const writtenFiles = new Map();
+    const filePromises = [];
+    let bytesWritten = 0;
+    let filesCreated = 0;
+    let latestFile = '-';
 
     try {
         input = createMediaBunnyInput(source);
@@ -24,39 +32,71 @@ export async function processHls({ source, quality = 100, onProgress }) {
             target: new MediaBunny.PathedTarget(
                 'master.m3u8',
                 ({ path }) => {
-                    const target = new MediaBunny.BufferTarget();
-                    target.on('finalized', () => {
-                        writtenFiles.set(path, target.buffer);
+                    let fileBytes = 0;
+
+                    filesCreated++;
+                    latestFile = path;
+
+                    const target = new MediaBunny.BufferTarget({
+                        onFinalize: (buffer) => {
+                            writtenFiles.set(path, buffer);
+                        },
                     });
+
+                    target.on('write', ({ end }) => {
+                        const newFileBytes = Math.max(fileBytes, end);
+                        bytesWritten += newFileBytes - fileBytes;
+                        fileBytes = newFileBytes;
+                    });
+
+                    const filePromise = new Promise((resolve) => {
+                        target.on('finalized', () => {
+                            resolve(undefined);
+                        });
+                    });
+                    filePromises.push(filePromise);
+
                     return target;
                 },
             ),
+            onFinalize: () => Promise.all(filePromises),
         });
 
-        const videoConfig = {};
-        if (quality < 100) {
-            const originalWidth = videoTrack.displayWidth || videoTrack.codedWidth;
-            const originalHeight = videoTrack.displayHeight || videoTrack.codedHeight;
-            let originalBitrate = 0;
-            try {
-                const stats = await videoTrack.computePacketStats(50);
-                originalBitrate = stats.averageBitrate;
-            } catch (e) {
-                Logger.warn('[MediaProcessor] Could not compute original bitrate for HLS.');
-            }
-            videoConfig.codec = 'avc';
-            videoConfig.bitrate = getBitrate(quality, originalWidth * originalHeight, originalBitrate);
+        const originalWidth = videoTrack.displayWidth || videoTrack.codedWidth;
+        const originalHeight = videoTrack.displayHeight || videoTrack.codedHeight;
+
+        const renditionHeights = [1080, 720, 480, 360, 240]
+            .filter(h => h <= originalHeight);
+
+        const videoConfig = renditionHeights.map(height => {
+            const width = Math.round((height / originalHeight) * originalWidth);
+            const bitrate = quality < 100
+                ? getBitrate(quality, width * height)
+                : getBitrate(100, width * height);
+            return { codec: 'avc', height, bitrate };
+        });
+
+        if (videoConfig.length === 0) {
+            videoConfig.push({ codec: 'avc' });
         }
 
-        conversion = await MediaBunny.Conversion.init({ input, output, video: videoConfig });
-        if (onProgress) conversion.onProgress = onProgress;
-        await conversion.execute();
+        const audioConfig = [{ codec: 'aac', bitrate: MediaBunny.QUALITY_HIGH }];
+
+        currentConversion = await MediaBunny.Conversion.init({ input, output, tracks: 'primary', video: videoConfig, audio: audioConfig });
+
+        if (!currentConversion.isValid) {
+            Logger.warn('[MediaProcessor] Discarded tracks:', currentConversion.discardedTracks);
+            throw new Error('HLS conversion is invalid; see logs for details.');
+        }
+
+        if (onProgress) currentConversion.onProgress = onProgress;
+        await currentConversion.execute();
 
         Logger.log(`[MediaProcessor] HLS done — ${writtenFiles.size} files`);
         return writtenFiles;
     } finally {
-        if (conversion && typeof conversion.dispose === 'function') {
-            try { conversion.dispose(); } catch (e) { Logger.warn('Error disposing HLS conversion:', e); }
+        if (currentConversion && typeof currentConversion.dispose === 'function') {
+            try { currentConversion.dispose(); } catch (e) { Logger.warn('Error disposing HLS conversion:', e); }
         }
         if (output && typeof output.dispose === 'function') {
             try { output.dispose(); } catch (e) { Logger.warn('Error disposing HLS output:', e); }
@@ -64,5 +104,6 @@ export async function processHls({ source, quality = 100, onProgress }) {
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('Error disposing HLS input:', e); }
         }
+        currentConversion = null;
     }
 }

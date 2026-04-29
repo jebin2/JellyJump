@@ -20,7 +20,7 @@ export async function playPlayer(player) {
         if (player.audioContext && player.audioContext.state === 'suspended') {
             const resumePromise = player.audioContext.resume();
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('AudioContext resume timed out')), 500)
+                setTimeout(() => reject(new Error('AudioContext resume timed out')), 3000)
             );
             await Promise.race([resumePromise, timeoutPromise]);
         }
@@ -35,24 +35,59 @@ export async function playPlayer(player) {
         }
     }
 
+    player.isPlaying = true;
+    player._updatePlayPauseUI();
+
     if (player.isLive) {
+        let forceRestart = false;
         Logger.log(`[Play:Live] isLive=${player.isLive}, videoTrack=${!!player.videoTrack}, audioContext=${!!player.audioContext}, audioCtxTime=${player.audioContext?.currentTime?.toFixed(3)}`);
-        if (player.videoTrack) {
-            try {
-                const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                player._liveStartTimestamp = currentLiveEdge ?? 0;
-                Logger.log(`[Play:Live] Current live edge: ${currentLiveEdge?.toFixed(3)}, starting from: ${player._liveStartTimestamp.toFixed(3)}`);
-            } catch (e) {
-                Logger.warn('[Play:Live] Failed to get duration, using fallback');
-                if (player.audioContext) {
-                    player._liveStartTimestamp = Date.now() / 1000 - 5;
+        
+        const lastPosition = player._getPlaybackTime();
+        const isLastPosUnix = lastPosition > 1000000000;
+        const isStartTsUnix = (player._liveStartTimestamp || 0) > 1000000000;
+
+        if (lastPosition > 0 && isLastPosUnix === isStartTsUnix && Math.abs(lastPosition - (player._liveStartTimestamp || 0)) > 1.0) {
+            player._liveStartTimestamp = lastPosition;
+            Logger.log(`[Play:Live] Resuming from last position: ${player._liveStartTimestamp.toFixed(3)}`);
+        }
+
+        if (player.isLive && player._liveStartTimestamp) {
+            const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+            const drift = (currentLiveEdge ?? 0) - player._liveStartTimestamp;
+            // If drift is too large (lagging or leading), reset to edge
+            if (Math.abs(drift) > 60) {
+                Logger.log(`[Play:Live] Resume position drift is too high (${drift.toFixed(1)}s) — resetting to edge`);
+                player._liveStartTimestamp = null;
+                forceRestart = true;
+            }
+        }
+
+        if (!player._liveStartTimestamp || forceRestart) {
+            if (player.videoTrack) {
+                try {
+                    const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+                    const refreshInterval = await player.videoTrack.getLiveRefreshInterval();
+                    const backoff = (refreshInterval || 6) * 3;
+                    player._liveStartTimestamp = Math.max(0, (currentLiveEdge ?? 0) - backoff);
+                    Logger.log(`[Play:Live] Calculated new live start: ${player._liveStartTimestamp.toFixed(3)}`);
+                } catch (e) {
+                    player._liveStartTimestamp = Date.now() / 1000 - 15;
                 }
+            } else {
+                player._liveStartTimestamp = Date.now() / 1000 - 15;
             }
         } else {
-            Logger.warn('[Play:Live] No videoTrack, using existing _liveStartTimestamp');
+            Logger.log(`[Play:Live] Using existing live start timestamp: ${player._liveStartTimestamp.toFixed(3)}`);
         }
-        player._startLiveVideoLoop();
-    } else if (player.duration > 0 && player._getPlaybackTime() >= player.duration - 0.1) {
+        
+        await player._startLiveVideoLoop(forceRestart);
+        player._updateStreamUI();
+        return; // IMPORTANT: Prevent VOD logic below from clobbering the live loop
+    }
+
+    const currentPosition = player._getPlaybackTime();
+    if (player.duration > 1.0 && currentPosition >= player.duration - 0.5) {
+        Logger.log(`[Play] Resetting to start (position=${currentPosition.toFixed(2)}, duration=${player.duration.toFixed(2)})`);
         player.playbackTimeAtStart = 0;
         await player._startVideoIterator();
     } else if (!player.videoFrameIterator) {
@@ -61,26 +96,23 @@ export async function playPlayer(player) {
 
     player.fallbackStartTime = performance.now();
 
-    player.isPlaying = true;
-    player._updatePlayPauseUI();
-
     if (player.audioSink) {
         if (!player.isLive) {
             const startTime = player.playbackTimeAtStart;
             if (player.audioBufferIterator) await player.audioBufferIterator.return();
             Logger.log(`[Play] Starting audio iterator at time: ${startTime.toFixed(2)}s`);
-            player.audioBufferIterator = player.audioSink.samples(startTime);
+            player.audioBufferIterator = player.audioSink.buffers(startTime);
 
             const firstResult = await player.audioBufferIterator.next();
-            const vodPrefetchedSample = firstResult?.value ?? null;
+            const vodPrefetchedBuffer = firstResult?.value ?? null;
 
             const vodAnchorWall = player.audioContext.currentTime + 0.02;
-            const vodAnchorContent = vodPrefetchedSample?.timestamp ?? startTime;
+            const vodAnchorContent = vodPrefetchedBuffer?.timestamp ?? startTime;
             player._vodAnchorWall = vodAnchorWall;
             player._vodAnchorContent = vodAnchorContent;
-            Logger.log(`[Play] VOD anchor prefetched — wall=${vodAnchorWall.toFixed(3)}, content=${vodAnchorContent.toFixed(3)}, sample=${vodPrefetchedSample ? 'ok' : 'null'}`);
+            Logger.log(`[Play] VOD anchor prefetched — wall=${vodAnchorWall.toFixed(3)}, content=${vodAnchorContent.toFixed(3)}, buffer=${vodPrefetchedBuffer ? 'ok' : 'null'}`);
 
-            player._runAudioIterator(player.audioBufferIterator, vodAnchorWall, vodAnchorContent, vodPrefetchedSample);
+            player._runAudioIterator(player.audioBufferIterator, vodAnchorWall, vodAnchorContent, vodPrefetchedBuffer);
         }
 
         await startPlayerAudioVisualizer(player);

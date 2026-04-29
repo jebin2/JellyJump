@@ -51,6 +51,9 @@ async function initializeApp() {
             }, {
                 url: "https://30a-tv.com/feeds/720p/63.m3u8",
                 title: "30A Ridiculous IP TV",
+            }, {
+                url: "https://bcovlive-a.akamaihd.net/7f5ec16d102f4b5d92e8e27bc95ff424/us-east-1/6240731308001/playlist.m3u8",
+                title: "BBC IP TV",
                 isStream: true
             }
         ], true); // true = autoplay on page load

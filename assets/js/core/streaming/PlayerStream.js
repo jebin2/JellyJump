@@ -112,6 +112,8 @@ export class PlayerStream {
                 }
             }
         }
+
+        player._setLoading(false);
         return true;
     }
 
@@ -266,7 +268,6 @@ export class PlayerStream {
             Logger.log('[Stream] Stopped canvas render loop');
         }
     }
-
     renderStreamFrame() {
         const player = this.player;
         if (!this.streamVideo || !player.ctx || !player.canvas) return;
@@ -291,10 +292,10 @@ export class PlayerStream {
 
         if (this.isLive) {
             if (!player.ui.liveBadge) {
-                player.ui.liveBadge = document.createElement('span');
+                player.ui.liveBadge = document.createElement('button');
                 player.ui.liveBadge.className = 'jellyjump-live-badge';
                 player.ui.liveBadge.textContent = 'LIVE';
-                player.ui.liveBadge.style.display = 'inline-flex';
+                player.ui.liveBadge.onclick = () => this.jumpToLiveEdge();
 
                 const timeContainer = player.ui.timeDisplay?.parentNode;
                 if (timeContainer) timeContainer.insertBefore(player.ui.liveBadge, player.ui.timeDisplay);
@@ -302,13 +303,80 @@ export class PlayerStream {
             player.ui.liveBadge.style.display = 'inline-flex';
             player.ui.progressContainer?.classList.add('live-mode-hidden');
             player.ui.timeDisplay?.classList.add('live-mode-hidden');
+
+            // Periodic check for live drift
+            if (!this._liveBadgeTimer) {
+                this._liveBadgeTimer = setInterval(() => this._updateLiveBadgeState(), 1000);
+            }
         } else {
+            if (this._liveBadgeTimer) {
+                clearInterval(this._liveBadgeTimer);
+                this._liveBadgeTimer = null;
+            }
             if (player.ui.liveBadge) player.ui.liveBadge.style.display = 'none';
             player.ui.progressContainer?.classList.remove('live-mode-hidden');
             player.ui.timeDisplay?.classList.remove('live-mode-hidden');
         }
 
         this.setStreamModeControls(true);
+    }
+
+    async jumpToLiveEdge() {
+        const player = this.player;
+        if (!this.isLive || !player.videoTrack) return;
+
+        this._liveAnchorWall = null;
+        this._liveAnchorContent = null;
+        player.asyncId++;
+
+        Logger.log('[Live] User requested jump to live edge');
+        player._setLoading(true);
+
+        try {
+            const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+            const refreshInterval = await player.videoTrack.getLiveRefreshInterval();
+            // Use a more aggressive backoff (2 segments) for manual jumps to stay closer to edge
+            const backoff = (refreshInterval || 6) * 2;
+
+            const targetTs = Math.max(0, (currentLiveEdge ?? 0) - backoff);
+            player._liveStartTimestamp = targetTs;
+            this._liveStartTimestamp = targetTs;
+
+            // Restart the loop at the edge
+            this.startLiveVideoLoop(true);
+        } catch (e) {
+            Logger.warn('[Live] Failed to jump to live edge:', e);
+            player._setLoading(false);
+        }
+    }
+
+    _updateLiveBadgeState() {
+        const player = this.player;
+        if (!player.ui.liveBadge || !this.isLive) return;
+
+        const currentTime = player._getPlaybackTime();
+
+        // We estimate the current live edge based on our anchor and elapsed wall time
+        if (this._liveAnchorWall && player.audioContext) {
+            const elapsedSinceAnchor = player.audioContext.currentTime - this._liveAnchorWall;
+            const liveWallPos = this._liveAnchorContent + elapsedSinceAnchor;
+            const drift = liveWallPos - currentTime;
+
+            // If we are more than 10s behind the "moving" live anchor, mark as not-live
+            if (drift > 10.0) {
+                if (!player.ui.liveBadge.classList.contains('not-live')) {
+                    player.ui.liveBadge.classList.add('not-live');
+                    player.ui.liveBadge.textContent = 'NOT LIVE';
+                }
+                player.ui.liveBadge.title = `You are ${Math.round(drift)}s behind. Click to go live.`;
+            } else {
+                if (player.ui.liveBadge.classList.contains('not-live')) {
+                    player.ui.liveBadge.classList.remove('not-live');
+                    player.ui.liveBadge.textContent = 'LIVE';
+                }
+                player.ui.liveBadge.title = 'You are live';
+            }
+        }
     }
 
     setStreamModeControls(isStreamMode) {
@@ -345,7 +413,10 @@ export class PlayerStream {
     cleanupHLS() {
         this.isStreamMode = false;
         this.isLive = false;
+        this._isLiveLoopActive = false;
         this._liveStartTimestamp = null;
+        this._liveAnchorWall = null;
+        this._liveAnchorContent = null;
 
         if (this._liveAvSyncMonitor) {
             clearInterval(this._liveAvSyncMonitor);
@@ -667,207 +738,204 @@ export class PlayerStream {
 
     // ─── Live video loop ─────────────────────────────────────────────────────────
 
-    async startLiveVideoLoop() {
+    async startLiveVideoLoop(force = false) {
         const player = this.player;
+
+        if (this._isLiveLoopActive && !force) {
+            Logger.log('[Live:Video] Loop already active, ignoring redundant start');
+            return;
+        }
 
         if (!player.videoSink) {
             Logger.warn('[Live:Video] No videoSink - cannot start');
             return;
         }
 
-        player.asyncId++;
-        const asyncId = player.asyncId;
-
-        Logger.log(`[Live:Video] Loop starting — asyncId=${asyncId}, liveStartTs=${this._liveStartTimestamp?.toFixed(3)}, audioSink=${!!player.audioSink}, audioContext=${!!player.audioContext}, audioContextState=${player.audioContext?.state}`);
-
-        if (player.videoFrameIterator) {
-            Logger.log(`[Live:Video] Closing existing videoFrameIterator`);
-            await player.videoFrameIterator.return();
-        }
-        if (player.audioBufferIterator) {
-            Logger.log(`[Live:Video] Closing existing audioBufferIterator`);
-            await player.audioBufferIterator.return();
-        }
-        player.audioBufferIterator = null;
-
-        player._setLoading(true);
-        this._isFetchingLiveFrame = true;
-
-        const resumePosition = this._liveStartTimestamp;
-        const fetchStart = performance.now();
-        player.videoFrameIterator = player.videoSink.canvases(resumePosition ?? undefined);
-
-        let anchorWall = null;
-        let anchorContent = null;
-        let prefetchedAudioSample = null;
-        let firstVideoFrame = null;
-
-        const hasAudio = !!(player.audioSink && player.audioContext);
-
-        if (hasAudio) {
-            player.audioBufferIterator = player.audioSink.samples(resumePosition ?? 0);
-            Logger.log(`[Live] Fetching first video+audio frames in parallel from ts=${resumePosition?.toFixed(3)}`);
-
-            const [videoResult, audioResult] = await Promise.all([
-                player.videoFrameIterator.next(),
-                player.audioBufferIterator.next(),
-            ]);
-
-            const fetchMs = (performance.now() - fetchStart).toFixed(0);
-            if (!videoResult.done && videoResult.value) firstVideoFrame = videoResult.value;
-            if (!audioResult.done && audioResult.value) prefetchedAudioSample = audioResult.value;
-
-            Logger.log(`[Live] Both first frames received in ${fetchMs}ms — videoTs=${firstVideoFrame?.timestamp?.toFixed(3)}, audioTs=${prefetchedAudioSample?.timestamp?.toFixed(3)}, audioCtx=${player.audioContext.currentTime.toFixed(3)}`);
-        } else {
-            Logger.log(`[Live:Video] No audio — fetching first video frame from ts=${this._liveStartTimestamp?.toFixed(3)}`);
-            const videoResult = await player.videoFrameIterator.next();
-            const fetchMs = (performance.now() - fetchStart).toFixed(0);
-            if (!videoResult.done && videoResult.value) firstVideoFrame = videoResult.value;
-            Logger.log(`[Live:Video] First frame in ${fetchMs}ms — ts=${firstVideoFrame?.timestamp?.toFixed(3)}`);
-        }
-
-        if (player.asyncId !== asyncId) {
-            Logger.warn(`[Live] Cancelled after first-frame fetch — asyncId changed (${asyncId} → ${player.asyncId})`);
-            prefetchedAudioSample?.close();
-            player._setLoading(false);
-            return;
-        }
-
-        if (!firstVideoFrame) {
-            Logger.warn(`[Live:Video] No first video frame received — aborting`);
-            prefetchedAudioSample?.close();
-            player._setLoading(false);
-            return;
-        }
-
-        if (player.audioContext) {
-            const wallOverride = this._liveAnchorWallOverride;
-            this._liveAnchorWallOverride = null;
-            anchorWall = wallOverride ?? (player.audioContext.currentTime + 0.15); // 150ms ahead to absorb first-frame decode jitter
-            anchorContent = this._liveStartTimestamp;
-            this._liveAnchorWall = anchorWall;
-            this._liveAnchorContent = anchorContent;
-            Logger.log(`[Live] Anchor set — anchorWall=${anchorWall.toFixed(3)}, anchorContent=${anchorContent.toFixed(3)}, audioTs=${prefetchedAudioSample?.timestamp?.toFixed(3)}, audioCtxState=${player.audioContext.state}`);
-        }
-
-        if (prefetchedAudioSample && anchorWall !== null) {
-            Logger.log(`[Live:Audio] Starting audio iterator — anchorWall=${anchorWall.toFixed(3)}, anchorContent=${anchorContent.toFixed(3)}`);
-            player._runAudioIterator(player.audioBufferIterator, anchorWall, anchorContent, prefetchedAudioSample);
-        } else if (hasAudio) {
-            Logger.warn(`[Live:Audio] No prefetched audio sample — audio will not play`);
-        }
-
-        // Draw first video frame
-        if (player.canvas.width !== firstVideoFrame.canvas.width || player.canvas.height !== firstVideoFrame.canvas.height) {
-            Logger.log(`[Live:Video] Canvas resize: ${player.canvas.width}x${player.canvas.height} → ${firstVideoFrame.canvas.width}x${firstVideoFrame.canvas.height}`);
-            player.canvas.width = firstVideoFrame.canvas.width;
-            player.canvas.height = firstVideoFrame.canvas.height;
-        }
-        player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
-        player.ctx.drawImage(firstVideoFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-        if (player.afterFrameRenderCallbacks.length > 0) {
-            player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
-        }
-        player._setLoading(false);
-        this._isFetchingLiveFrame = false;
-        this._isMediaReady = true;
-        if (player.isPlaying) this.resumeRecordingSmartPause();
-        Logger.log(`[Live:Video] First frame drawn — audioCtx=${player.audioContext?.currentTime?.toFixed(3)}`);
-
-        // Continuous frame loop (frames 2, 3, …)
-        const myIterator = player.videoFrameIterator;
-        let frameCount = 1;
-        let drawnFrames = 1;
-        let lastDrawMs = performance.now();
-        let lastFrameDrawMs = lastDrawMs;
-        let totalLateMs = 0;
-        const fallbackFrameDurationMs = 1000 / (player.frameRate || 30);
+        let asyncId = -1;
+        let frameCount = 0;
+        let drawnCount = 0;
 
         try {
-            for await (const frame of myIterator) {
+            this._isLiveLoopActive = true;
+            player.asyncId++;
+            asyncId = player.asyncId;
+
+            Logger.log(`[Live:Video] Loop starting — asyncId=${asyncId}, liveStartTs=${this._liveStartTimestamp?.toFixed(3)}, audioSink=${!!player.audioSink}, audioContext=${!!player.audioContext}, audioContextState=${player.audioContext?.state}`);
+
+            if (player.videoFrameIterator) {
+                Logger.log(`[Live:Video] Closing existing videoFrameIterator`);
+                const it = player.videoFrameIterator;
+                player.videoFrameIterator = null;
+                await it.return().catch(() => { });
+            }
+            if (player.audioBufferIterator) {
+                Logger.log(`[Live:Video] Closing existing audioBufferIterator`);
+                const it = player.audioBufferIterator;
+                player.audioBufferIterator = null;
+                await it.return().catch(() => { });
+            }
+
+            player._setLoading(true);
+            const resumePosition = this._liveStartTimestamp;
+
+            // ─── Instant Anchoring (Official Pattern) ───
+            const anchorWall = player.audioContext ? player.audioContext.currentTime : 0;
+            const anchorContent = resumePosition ?? 0;
+
+            this._liveAnchorWall = anchorWall;
+            this._liveAnchorContent = anchorContent;
+
+            Logger.log(`[Live] Instant Anchor set — wall=${anchorWall.toFixed(3)}, content=${anchorContent.toFixed(3)}`);
+
+            // Start iterators in parallel
+            player.videoFrameIterator = player.videoSink.canvases(anchorContent);
+            player.audioBufferIterator = player.audioSink ? player.audioSink.buffers(anchorContent) : null;
+
+            let audioStarted = false;
+            const startAudio = () => {
+                if (audioStarted || !player.audioBufferIterator || !player.audioContext) return;
+                audioStarted = true;
+                Logger.log(`[Live:Audio] Starting audio sync loop`);
+                player._runAudioIterator(player.audioBufferIterator, this._liveAnchorWall, this._liveAnchorContent);
+            };
+
+            player._setLoading(false);
+            this._isFetchingLiveFrame = false;
+            this._isMediaReady = true;
+            if (player.isPlaying) this.resumeRecordingSmartPause();
+
+            // ─── Main Video Rendering Loop (Official Pattern) ───
+            const myIterator = player.videoFrameIterator;
+
+            while (true) {
+                let result;
+                try {
+                    // Watchdog: If a frame takes > 6s to arrive, something is wrong
+                    result = await Promise.race([
+                        myIterator.next(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
+                    ]);
+                } catch (e) {
+                    Logger.warn(`[Live:Video] Iterator stalled or failed: ${e.message} — forcing resync`);
+                    await player._startLiveVideoLoop(true); // force restart
+                    break;
+                }
+
+                if (result.done || !result.value) break;
+                const frame = result.value;
                 frameCount++;
 
+                // Validate frame timestamp for Live streams
+                if (!player._hasSnappedAnchor && this.isLive && Math.abs(frame.timestamp - anchorContent) > 120) {
+                    // This frame is from a stale segment (likely pre-pause cache). Discard it.
+                    if (frameCount % 60 === 0) {
+                        Logger.warn(`[Live:Video] Discarding stale frame (ts=${frame.timestamp.toFixed(3)}, expected=${anchorContent.toFixed(3)})`);
+                    }
+                    continue; 
+                }
+
+                if (!player._hasSnappedAnchor) {
+                    this._liveAnchorContent = frame.timestamp;
+                    this._liveAnchorWall = player.audioContext ? player.audioContext.currentTime : 0;
+                    player._hasSnappedAnchor = true;
+                    Logger.log(`[Live] Anchor snapped to first frame — content=${frame.timestamp.toFixed(3)}, wall=${this._liveAnchorWall.toFixed(3)}`);
+                    
+                    player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
+                    player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                    startAudio();
+                }
+
                 if (player.asyncId !== asyncId || !this.isLive || !player.isPlaying) {
-                    Logger.log(`[Live:Video] Breaking loop at frame ${frameCount} — asyncId=${player.asyncId === asyncId}, isLive=${this.isLive}, isPlaying=${player.isPlaying}`);
+                    Logger.log(`[Live:Video] Loop breaking — active=${player.isPlaying}, live=${this.isLive}`);
                     break;
                 }
 
                 if (player.canvas.width !== frame.canvas.width || player.canvas.height !== frame.canvas.height) {
-                    Logger.log(`[Live:Video] Canvas resize: ${player.canvas.width}x${player.canvas.height} → ${frame.canvas.width}x${frame.canvas.height}`);
                     player.canvas.width = frame.canvas.width;
                     player.canvas.height = frame.canvas.height;
                 }
 
-                let targetWall = null;
-                if (anchorWall !== null && anchorContent !== null && player.audioContext) {
-                    targetWall = anchorWall + (frame.timestamp - anchorContent);
-                    const behindSec = player.audioContext.currentTime - targetWall;
+                const isBackground = document.hidden;
+                const dynamicAnchorWall = this._liveAnchorWall;
+                const dynamicAnchorContent = this._liveAnchorContent;
 
-                    if (behindSec > 3.0) {
-                        // Genuine deep stall (tab backgrounded, network outage) — jump to live edge
-                        Logger.warn(`[Live:Video] Deep resync: ${behindSec.toFixed(1)}s behind audio — jumping to live edge`);
-                        player._setLoading(true);
-                        if (player.videoTrack) {
-                            const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                            this._liveStartTimestamp = currentLiveEdge ?? 0;
-                            Logger.log(`[Live:Video] Jumping to live edge: ${this._liveStartTimestamp.toFixed(3)}`);
-                            this.startLiveVideoLoop();
-                            return;
+                if (dynamicAnchorWall !== null && dynamicAnchorContent !== null && player.audioContext) {
+                    const currentTime = player.audioContext.currentTime;
+                    const outputLatency = player.audioContext.outputLatency || 0;
+                    const targetWall = dynamicAnchorWall + (frame.timestamp - dynamicAnchorContent) + outputLatency;
+                    const drift = currentTime - targetWall;
+
+                    if (drift > 0.25) {
+                        if (frameCount % 120 === 0 || drift > 2.0) {
+                            if (frameCount % 120 === 0) Logger.log(`[Live:Video] Catching up — behind=${drift.toFixed(3)}s, frame=${frameCount}`);
+                            if (drift > 1.0) {
+                                player._setLoading(true);
+                                this._updateLiveBadgeState();
+                            }
+                        }
+
+                        if (drift > 30.0) {
+                            Logger.warn(`[Live:Video] Massive drift detected (${drift.toFixed(1)}s) — jumping to live edge`);
+                            if (player.videoTrack) {
+                                const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+                                this._liveStartTimestamp = currentLiveEdge ?? 0;
+                                setTimeout(() => this.startLiveVideoLoop(true), 0);
+                                break; 
+                            }
+                        }
+
+                        if (!isBackground) {
+                            player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                        }
+                        continue;
+                    }
+
+                    if (!audioStarted) startAudio();
+                    player._setLoading(false);
+
+                    if (isBackground) {
+                        await new Promise(r => setTimeout(r, 100));
+                    } else {
+                        if (currentTime < targetWall - 0.005) {
+                            await new Promise(r => {
+                                const check = () => {
+                                    if (player.asyncId !== asyncId || !player.isPlaying) { r(); return; }
+                                    if (player.audioContext.currentTime >= targetWall - 0.005) { r(); return; }
+                                    requestAnimationFrame(check);
+                                };
+                                requestAnimationFrame(check);
+                            });
+                        }
+
+                        player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
+                        player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                        drawnCount++;
+
+                        if (drawnCount % 120 === 0) {
+                            Logger.log(`[Live:Video] Sync status — late=${((player.audioContext.currentTime - targetWall) * 1000).toFixed(1)}ms, drawn=${drawnCount}, total=${frameCount}`);
+                        }
+
+                        for (const cb of player.afterFrameRenderCallbacks) {
+                            try { cb(player.canvas, player.ctx); } catch (e) { }
                         }
                     }
-                    // Minor drift (segment fetch latency): targetWall is in the past, so the
-                    // timing await below resolves immediately and frames draw at full speed
-                    // until video catches up to audio — no intervention needed.
-
-                    await new Promise(r => {
-                        const check = () => {
-                            if (player.asyncId !== asyncId || !player.isPlaying) { r(); return; }
-                            if (player.audioContext.currentTime >= targetWall - 0.002) { r(); return; } // 2ms early-draw tolerance
-                            requestAnimationFrame(check);
-                        };
-                        requestAnimationFrame(check);
-                    });
                 } else {
-                    const targetMs = lastDrawMs + fallbackFrameDurationMs;
-                    await new Promise(r => {
-                        const check = () => {
-                            if (player.asyncId !== asyncId || !player.isPlaying) { r(); return; }
-                            if (performance.now() >= targetMs - 2) { r(); return; }
-                            requestAnimationFrame(check);
-                        };
-                        requestAnimationFrame(check);
-                    });
-                }
-
-                if (player.asyncId !== asyncId || !this.isLive || !player.isPlaying) break;
-
-                const drawMs = performance.now();
-                if (targetWall !== null && player.audioContext) {
-                    const lateMs = (player.audioContext.currentTime - targetWall) * 1000;
-                    totalLateMs += lateMs;
-                    drawnFrames++;
-                    if (drawnFrames % 60 === 0) {
-                        const intervalMs = lastFrameDrawMs > 0 ? (drawMs - lastFrameDrawMs).toFixed(1) : '—';
-                        Logger.log(`[Live:Video] Drawn ${drawnFrames} (total ${frameCount}) — late=${lateMs.toFixed(1)}ms, avgLate=${(totalLateMs / drawnFrames).toFixed(1)}ms, interval=${intervalMs}ms, audioCtx=${player.audioContext.currentTime.toFixed(3)}, target=${targetWall.toFixed(3)}`);
+                    if (!isBackground) {
+                        player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                        await new Promise(r => requestAnimationFrame(r));
+                    } else {
+                        await new Promise(r => setTimeout(r, 100));
                     }
                 }
-
-                player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
-                player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-                if (player.afterFrameRenderCallbacks.length > 0) {
-                    player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
-                }
-
-                lastDrawMs = drawMs;
-                lastFrameDrawMs = drawMs;
             }
-            Logger.log(`[Live:Video] Loop exited normally — total=${frameCount}, drawn=${drawnFrames}, skipped=${frameCount - drawnFrames}`);
         } catch (e) {
-            Logger.warn(`[Live:Video] Loop error after ${frameCount} frames: ${e.message}`);
+            Logger.warn(`[Live:Video] Loop error: ${e.message}`);
         } finally {
-            // Only clear loading state if we're still the active loop — a newer loop may have
-            // already set _setLoading(true) and must not be interrupted by this stale finally.
+            if (player.asyncId === asyncId) {
+                this._isLiveLoopActive = false;
+            }
             if (player.asyncId === asyncId) player._setLoading(false);
+            Logger.log(`[Live:Video] Loop exited — total=${frameCount ?? 0}, drawn=${drawnCount ?? 0}`);
         }
     }
 }

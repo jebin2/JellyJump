@@ -413,7 +413,7 @@ export class CorePlayer {
     _createErrorOverlay() { this.stream.createErrorOverlay(); }
     _showStreamError(errorDetails) { this.stream.showStreamError(errorDetails); }
     _hideStreamError() { this.stream.hideStreamError(); }
-    async _startLiveVideoLoop() { return this.stream.startLiveVideoLoop(); }
+    async _startLiveVideoLoop(force = false) { return this.stream.startLiveVideoLoop(force); }
 
     // ─── Audio ───────────────────────────────────────────────────────────────────
     _initAudio() { initPlayerAudio(this); }
@@ -465,6 +465,7 @@ export class CorePlayer {
             }
 
             const isHls = StreamDetector.detect(url) === StreamDetector.TYPE_HLS;
+            if (isHls) this.isLive = true;
 
             await this._cleanupForLoad();
 

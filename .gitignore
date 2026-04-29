@@ -18,3 +18,5 @@ desktop/*.dmg
 desktop/*.zip
 product-demo/
 medibunny-llms-full.txt
+examples/
+*.txt

@@ -99,7 +99,14 @@ export async function cleanupPlayerForLoad(player) {
     player._vodAnchorWall = undefined;
     player._vodAnchorContent = undefined;
     player._frameSyncLogCount = 0;
-
+    player._hasSnappedAnchor = false;
+    player.fallbackStartTime = undefined;
+    player.isLive = false;
+    if (player.stream) {
+        player.stream.isLive = false;
+        player._cleanupHLS();
+    }
+    
     clearPlayerCanvas(player);
     player._updateTimeDisplay();
     disposeMediaBunnyResources(player);
@@ -113,9 +120,10 @@ export async function cleanupPlayerForLoad(player) {
 
 export async function setupPlayerMediaTracks(player, url, isHls) {
     const urlSourceOptions = player.config.withCredentials ? { requestInit: { credentials: 'include' } } : {};
+    Logger.log(`[MediaLifecycle] Setting up tracks for ${url} (isHls: ${isHls})`);
     player.input = new MediaBunny.Input({
         source: new MediaBunny.UrlSource(url, urlSourceOptions),
-        formats: [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS]
+        formats: [...(MediaBunny.HLS_FORMATS || []), ...MediaBunny.ALL_FORMATS]
     });
 
     if (!isHls) {
@@ -123,65 +131,97 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         player._updateTimeDisplay();
     }
 
-    player.videoTrack = await player.input.getPrimaryVideoTrack();
-    if (player.videoTrack) {
-        if (!isHls) {
-            try {
-                const stats = await player.videoTrack.computePacketStats();
-                player.frameRate = stats.averagePacketRate || 30;
-                Logger.log(`Detected frame rate: ${player.frameRate} fps`);
-            } catch (e) {
-                Logger.warn("Could not compute frame rate, defaulting to 30fps", e);
+    try {
+        Logger.log('[MediaLifecycle] Fetching primary video track...');
+        player.videoTrack = await player.input.getPrimaryVideoTrack();
+        
+        if (player.videoTrack) {
+            Logger.log(`[MediaLifecycle] Video track found: ${player.videoTrack.codec}`);
+            if (!isHls) {
+                try {
+                    const stats = await player.videoTrack.computePacketStats();
+                    player.frameRate = stats.averagePacketRate || 30;
+                    Logger.log(`Detected frame rate: ${player.frameRate} fps`);
+                } catch (e) {
+                    Logger.warn("Could not compute frame rate, defaulting to 30fps", e);
+                    player.frameRate = 30;
+                }
+            } else {
                 player.frameRate = 30;
             }
+
+            player.videoSink = new MediaBunny.CanvasSink(player.videoTrack, {
+                poolSize: isHls ? 6 : 2,
+                fit: 'contain'
+            });
+            
+            player.canvas.width = await player.videoTrack.getDisplayWidth();
+            player.canvas.height = await player.videoTrack.getDisplayHeight();
+            Logger.log(`[MediaLifecycle] Video dimensions: ${player.canvas.width}x${player.canvas.height}`);
         } else {
-            player.frameRate = 30;
+            Logger.log('[MediaLifecycle] No video track found - enabling Audio Mode');
+            player.isAudioMode = true;
+            const containerRect = player.container.getBoundingClientRect();
+            player.canvas.width = containerRect.width || 1280;
+            player.canvas.height = containerRect.height || 720;
         }
 
-        player.videoSink = new MediaBunny.CanvasSink(player.videoTrack, {
-            poolSize: isHls ? 6 : 2,
-            fit: 'contain'
-        });
-        player.canvas.width = await player.videoTrack.getDisplayWidth();
-        player.canvas.height = await player.videoTrack.getDisplayHeight();
-    } else {
-        Logger.log('No video track found - enabling Audio Mode');
-        player.isAudioMode = true;
-        const containerRect = player.container.getBoundingClientRect();
-        player.canvas.width = containerRect.width || 1280;
-        player.canvas.height = containerRect.height || 720;
-    }
+        Logger.log('[MediaLifecycle] Fetching primary audio track...');
+        player.audioTrack = await player.input.getPrimaryAudioTrack();
+        if (!player.audioTrack) {
+            const audioTracks = await player.input.getAudioTracks();
+            if (audioTracks.length > 0) player.audioTrack = audioTracks[0];
+        }
 
-    player.audioTrack = await player.input.getPrimaryAudioTrack();
-    if (!player.audioTrack) {
-        const audioTracks = await player.input.getAudioTracks();
-        if (audioTracks.length > 0) player.audioTrack = audioTracks[0];
-    }
-
-    if (player.audioTrack) {
-        player.audioSink = new MediaBunny.AudioSampleSink(player.audioTrack);
+        if (player.audioTrack) {
+            Logger.log(`[MediaLifecycle] Audio track found: ${player.audioTrack.codec}`);
+            player.audioSink = new MediaBunny.AudioBufferSink(player.audioTrack);
+        }
+    } catch (e) {
+        Logger.error('[MediaLifecycle] Error setting up media tracks:', e);
+        throw e;
     }
 
     player._updateAudioTracks();
 }
 
 export async function handlePlayerHlsState(player) {
+    Logger.log('[MediaLifecycle] Handling HLS state...');
     player.isLive = player.videoTrack ? await player.videoTrack.isLive() : false;
+    
+    // Sync with stream controller
+    if (player.streamController) {
+        player.streamController.isLive = player.isLive;
+    }
+
     Logger.log(`[Live:Load] isLive=${player.isLive}, videoTrack=${!!player.videoTrack}, audioTrack=${!!player.audioTrack}, audioSink=${!!player.audioSink}`);
 
     if (player.isLive) {
         player.playbackRate = 1;
         player._updateSpeedMenu();
 
+        Logger.log('[MediaLifecycle] Fetching live duration and refresh interval...');
         const [currentDur, refreshInterval] = await Promise.all([
             player.videoTrack.getDurationFromMetadata({ skipLiveWait: true }),
             player.videoTrack.getLiveRefreshInterval(),
         ]);
-        player._liveStartTimestamp = currentDur ?? 0;
-        Logger.log(`[Live:Load] liveStartTs=${player._liveStartTimestamp.toFixed(3)}, liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${refreshInterval ?? 6}s`);
+        
+        // Start 3 segments back to avoid stuttering at the live edge
+        const backoff = (refreshInterval || 6) * 3;
+        const startTs = Math.max(0, (currentDur ?? 0) - backoff);
+        
+        player._liveStartTimestamp = startTs;
+        if (player.streamController) {
+            player.streamController._liveStartTimestamp = startTs;
+        }
+        
+        Logger.log(`[Live:Load] liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${refreshInterval ?? 6}s, starting at=${startTs.toFixed(3)} (backoff: ${backoff}s)`);
         player.duration = 0;
     } else {
         player._liveStartTimestamp = null;
+        if (player.streamController) {
+            player.streamController._liveStartTimestamp = null;
+        }
         player.duration = await player.input.getDurationFromMetadata() ?? 0;
         Logger.log(`[Live:Load] VOD duration=${player.duration.toFixed(3)}s`);
     }
@@ -210,32 +250,49 @@ export function resetPlayerUI(player) {
 export async function startPlayerVideoIterator(player) {
     if (!player.videoSink) return;
 
+    if (player._isFetchingFrame) {
+        Logger.debug('[VideoIterator] Skipping startVideoIterator - already fetching');
+        return;
+    }
+    player._isFetchingFrame = true;
+
     player.asyncId++;
     const currentAsyncId = player.asyncId;
 
-    if (player.videoFrameIterator) await player.videoFrameIterator.return();
-
-    player.videoFrameIterator = player.videoSink.canvases(player._getPlaybackTime());
-
-    let firstFrame = null, secondFrame = null;
+    let firstFrame = null;
+    let secondFrame = null;
     try {
-        firstFrame = (await player.videoFrameIterator.next()).value ?? null;
-        secondFrame = (await player.videoFrameIterator.next()).value ?? null;
-    } catch (e) {
-        Logger.warn('[VideoIterator] Failed to get initial frames, will retry on next play:', e);
-        player.videoFrameIterator = null;
-        return;
-    }
+        if (player.videoFrameIterator) await player.videoFrameIterator.return();
 
-    if (currentAsyncId !== player.asyncId) return;
-
-    player.nextFrame = secondFrame;
-
-    if (firstFrame) {
-        player.ctx.drawImage(firstFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-        if (player.afterFrameRenderCallbacks.length > 0) {
-            player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
+        const startTime = player._getPlaybackTime();
+        Logger.log(`[VideoIterator] Initializing canvases at time: ${startTime.toFixed(3)}s (asyncId=${currentAsyncId})`);
+        player.videoFrameIterator = player.videoSink.canvases(startTime);
+        if (!player.videoFrameIterator) {
+            Logger.warn('[VideoIterator] videoSink returned null iterator for time:', player._getPlaybackTime());
+            return;
         }
+
+        try {
+            firstFrame = (await player.videoFrameIterator.next()).value ?? null;
+            secondFrame = (await player.videoFrameIterator.next()).value ?? null;
+        } catch (e) {
+            Logger.warn('[VideoIterator] Failed to get initial frames, will retry on next play:', e);
+            player.videoFrameIterator = null;
+            return;
+        }
+
+        if (currentAsyncId !== player.asyncId) return;
+
+        player.nextFrame = secondFrame;
+
+        if (firstFrame) {
+            player.ctx.drawImage(firstFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+            if (player.afterFrameRenderCallbacks.length > 0) {
+                player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
+            }
+        }
+    } finally {
+        player._isFetchingFrame = false;
     }
 }
 

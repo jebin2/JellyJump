@@ -2,11 +2,12 @@ import { AudioEqualizer } from './AudioEqualizer.js';
 import { Logger } from '../../utils/Logger.js';
 
 
-export function initPlayerAudio(player) {
+export async function initPlayerAudio(player) {
     if (player.isAudioInitialized) return;
 
     const AudioContext = window.AudioContext || window.webkitAudioContext;
-    player.audioContext = new AudioContext();
+    const sampleRate = player.audioTrack ? await player.audioTrack.getSampleRate() : undefined;
+    player.audioContext = sampleRate ? new AudioContext({ sampleRate }) : new AudioContext();
 
     player.gainNode = player.audioContext.createGain();
 
@@ -48,7 +49,7 @@ export async function startPlayerAudioVisualizer(player) {
     }
 }
 
-export async function runPlayerAudioIterator(player, iterator, anchorWall, anchorContent, prefetchedSample) {
+export async function runPlayerAudioIterator(player, iterator, anchorWall, anchorContent, prefetchedBuffer) {
     if (!player.audioSink || !iterator) return;
 
     if (anchorWall !== undefined) player._vodAnchorWall = anchorWall;
@@ -58,8 +59,8 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
     const isLiveMode = anchorWall !== undefined && anchorContent !== undefined;
 
     let nextAudioTime;
-    if (isLiveMode && prefetchedSample) {
-        nextAudioTime = anchorWall + (prefetchedSample.timestamp - anchorContent);
+    if (isLiveMode && prefetchedBuffer) {
+        nextAudioTime = anchorWall + (prefetchedBuffer.timestamp - anchorContent);
     } else if (isLiveMode) {
         nextAudioTime = anchorWall + (player.audioContext.currentTime - anchorWall);
     } else {
@@ -72,12 +73,8 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
 
     Logger.log(`[${_audioLogTag}:Audio] Iterator started — anchorWall=${anchorWall?.toFixed(3)}, anchorContent=${anchorContent?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}, audioCtxState=${player.audioContext?.state}`);
 
-    const scheduleOne = (audioSample) => {
-        if (!player.isPlaying) { audioSample.close(); return; }
-
-        const buffer = audioSample.toAudioBuffer();
-        const timestamp = audioSample.timestamp;
-        audioSample.close();
+    const scheduleOne = ({ buffer, timestamp }) => {
+        if (!player.isPlaying || !buffer) return;
 
         const audioSource = player.audioContext.createBufferSource();
         audioSource.buffer = buffer;
@@ -89,10 +86,18 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
             audioSource.connect(player.gainNode);
         }
 
-        const targetTime = anchorWall + (timestamp - anchorContent) / player.playbackRate;
+        // Use dynamic anchors for Live streams to keep in sync with video loop snaps
+        const currentAnchorWall = player.isLive ? (player.stream?._liveAnchorWall ?? anchorWall) : anchorWall;
+        const currentAnchorContent = player.isLive ? (player.stream?._liveAnchorContent ?? anchorContent) : anchorContent;
+
+        // Account for hardware output latency (usually 10-40ms)
+        const outputLatency = player.audioContext.outputLatency || 0;
+        
+        const targetTime = currentAnchorWall + (timestamp - currentAnchorContent) / player.playbackRate - outputLatency;
+        
         if (!firstSampleScheduled) {
             firstSampleScheduled = true;
-            Logger.log(`[${_audioLogTag}:Audio] First sample — ts=${timestamp.toFixed(3)}, targetTime=${targetTime.toFixed(3)}, audioCtx=${player.audioContext.currentTime.toFixed(3)}, bufDur=${buffer.duration.toFixed(3)}s`);
+            Logger.log(`[${_audioLogTag}:Audio] First buffer — ts=${timestamp.toFixed(3)}, targetTime=${targetTime.toFixed(3)}, audioCtx=${player.audioContext.currentTime.toFixed(3)}, latency=${(outputLatency * 1000).toFixed(1)}ms`);
         }
 
         if (targetTime >= player.audioContext.currentTime) {
@@ -113,41 +118,54 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
         audioSource.onended = () => player.queuedAudioNodes.delete(audioSource);
     };
 
-    if (prefetchedSample) scheduleOne(prefetchedSample);
+    if (prefetchedBuffer) scheduleOne(prefetchedBuffer);
 
     try {
-        for await (const audioSample of myIterator) {
-            if (!player.isPlaying) { audioSample.close(); break; }
+        for await (const bufferObj of myIterator) {
+            if (!player.isPlaying) break;
 
             sampleCount++;
-            const timestamp = audioSample.timestamp;
-            scheduleOne(audioSample);
+            const { buffer, timestamp } = bufferObj;
+            scheduleOne(bufferObj);
 
             if (sampleCount === 1) {
-                Logger.log(`[${_audioLogTag}:Audio] First iterator sample — ts=${timestamp.toFixed(3)}, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}`);
+                Logger.log(`[${_audioLogTag}:Audio] First iterator buffer — ts=${timestamp.toFixed(3)}, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}`);
             }
             if (sampleCount % 100 === 0) {
-                Logger.log(`[${_audioLogTag}:Audio] ${sampleCount} samples — ts=${timestamp.toFixed(3)}, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, bufferAhead=${((nextAudioTime - player.audioContext.currentTime) * 1000).toFixed(0)}ms`);
+                Logger.log(`[${_audioLogTag}:Audio] ${sampleCount} buffers — ts=${timestamp.toFixed(3)}, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}, nextAudioTime=${nextAudioTime.toFixed(3)}, bufferAhead=${((nextAudioTime - player.audioContext.currentTime) * 1000).toFixed(0)}ms`);
             }
 
-            if (isLiveMode && player.audioContext) {
-                const sampleTargetTime = anchorWall + (timestamp - anchorContent) / player.playbackRate;
+            if (player.isLive && player.audioContext) {
+                const liveAnchorWall = player.stream?._liveAnchorWall;
+                const liveAnchorContent = player.stream?._liveAnchorContent;
+
+                if (liveAnchorWall === undefined || liveAnchorContent === undefined || liveAnchorWall === null || (!player._hasSnappedAnchor && timestamp > 1000000)) {
+                    // Wait for anchor to be snapped by the video loop
+                    if (sampleCount % 100 === 0) Logger.log(`[${_audioLogTag}:Audio] Waiting for snapped anchor...`);
+                    await new Promise(r => setTimeout(r, 50));
+                    continue;
+                }
+
+                const outputLatency = player.audioContext.outputLatency || 0;
+                const sampleTargetTime = liveAnchorWall + (timestamp - liveAnchorContent) / player.playbackRate - outputLatency;
                 const aheadMs = (sampleTargetTime - player.audioContext.currentTime) * 1000;
-                if (aheadMs > 300) {
-                    const waitMs = aheadMs - 300;
+                
+                if (aheadMs > 150) {
+                    const waitMs = Math.min(aheadMs - 150, 1000); // Limit wait to 1s to avoid long freezes
                     if (sampleCount % 200 === 0) {
                         Logger.log(`[${_audioLogTag}:Audio] Audio ${aheadMs.toFixed(0)}ms ahead — throttling ${waitMs.toFixed(0)}ms`);
                     }
                     await new Promise(r => setTimeout(r, waitMs));
-                } else if (aheadMs < -1000 && player.isPlaying && player.isLive) {
+                } else if (aheadMs < -5000 && player.isPlaying && player.isLive) {
+                    // Only trigger a hard resync if we are MASSIVELY behind (> 2s).
+                    // Minor lag should be handled by the catch-up logic in PlayerStream.
                     Logger.warn(`[${_audioLogTag}:Audio] Audio ${(-aheadMs).toFixed(0)}ms behind — triggering live resync`);
-                    player._setLoading(true);
                     if (player.videoTrack) {
                         const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
                         player._liveStartTimestamp = currentLiveEdge ?? player._liveStartTimestamp;
                         Logger.log(`[${_audioLogTag}:Audio] Jumping to live edge: ${player._liveStartTimestamp?.toFixed(3)}`);
                     }
-                    player._startLiveVideoLoop();
+                    player._startLiveVideoLoop(true);
                     break;
                 }
             }
@@ -163,12 +181,12 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
                 });
             }
         }
-        Logger.log(`[${_audioLogTag}:Audio] Iterator completed after ${sampleCount} samples`);
+        Logger.log(`[${_audioLogTag}:Audio] Iterator completed after ${sampleCount} buffers`);
     } catch (error) {
         if (error.name !== 'InputDisposedError' && !error.message?.includes('Input has been disposed')) {
-            Logger.error(`[${_audioLogTag}:Audio] Iterator error after ${sampleCount} samples:`, error);
+            Logger.error(`[${_audioLogTag}:Audio] Iterator error after ${sampleCount} buffers:`, error);
         } else {
-            Logger.log(`[${_audioLogTag}:Audio] Iterator stopped (input disposed) after ${sampleCount} samples`);
+            Logger.log(`[${_audioLogTag}:Audio] Iterator stopped (input disposed) after ${sampleCount} buffers`);
         }
     } finally {
         Logger.log(`[${_audioLogTag}:Audio] Cleanup — sampleCount=${sampleCount}, isOurIterator=${player.audioBufferIterator === myIterator}`);

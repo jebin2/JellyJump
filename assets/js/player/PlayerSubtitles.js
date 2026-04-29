@@ -102,7 +102,7 @@ export class PlayerSubtitles {
 
         if (track) {
             p.audioTrack = track;
-            p.audioSink = new MediaBunny.AudioSampleSink(p.audioTrack);
+            p.audioSink = new MediaBunny.AudioBufferSink(p.audioTrack);
 
             if (p.isPlaying) {
                 p.pause();

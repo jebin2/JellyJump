@@ -6,13 +6,17 @@ export function getPlayerPlaybackTime(player) {
         return player.streamVideo.currentTime;
     }
 
-    if (player._vodAnchorWall !== undefined && player._vodAnchorContent !== undefined && player.audioContext) {
-        const elapsed = player.audioContext.currentTime - player._vodAnchorWall;
-        const newPosition = player._vodAnchorContent + (elapsed * player.playbackRate);
-        if (newPosition >= player._vodAnchorContent - 0.1) {
+    const isLive = player.isLive;
+    const anchorWall = isLive ? player.stream?._liveAnchorWall : player._vodAnchorWall;
+    const anchorContent = isLive ? player.stream?._liveAnchorContent : player._vodAnchorContent;
+
+    if (anchorWall !== undefined && anchorContent !== undefined && player.audioContext && player.audioContext.state === 'running') {
+        const elapsed = player.audioContext.currentTime - anchorWall;
+        const newPosition = anchorContent + (elapsed * player.playbackRate);
+        if (newPosition >= anchorContent - 0.1) {
             return newPosition;
         }
-        return player._vodAnchorContent;
+        return anchorContent;
     }
 
     if (player.isPlaying && player.fallbackStartTime !== undefined) {
@@ -31,18 +35,17 @@ export async function handlePlayerVisibilityChange(player) {
         player._wasHiddenWhilePlaying = true;
         Logger.log(`[Visibility] Tab hidden at playback time: ${player._getPlaybackTime().toFixed(2)}s`);
     } else if (player._wasHiddenWhilePlaying) {
-        player._setLoading(true);
-        if (player.isLive && player.videoTrack) {
-            const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-            player._liveStartTimestamp = currentLiveEdge ?? 0;
-            Logger.log(`[Visibility:Visible:Live] Live edge ${currentLiveEdge?.toFixed(3)}`);
-            player._startLiveVideoLoop();
-        } else if (player.isLive) {
-            player._startLiveVideoLoop();
-        } else {
+        if (!player.isLive) {
+            player._setLoading(true);
             const currentTime = player._getPlaybackTime();
-            Logger.log(`[Visibility] Tab visible, syncing video to: ${currentTime.toFixed(2)}s`);
-            player._startVideoIterator();
+            Logger.log(`[Visibility] Tab visible, syncing VOD video to: ${currentTime.toFixed(2)}s`);
+            await player._startVideoIterator();
+            player._setLoading(false);
+        } else {
+            // For LIVE streams, we don't restart the loop or jump to the edge.
+            // Our catch-up logic in PlayerStream handles syncing automatically
+            // by skipping frames until we are back in line with the audio clock.
+            Logger.log('[Visibility] Tab visible, allowing Live loop to catch up naturally');
         }
 
         player._wasHiddenWhilePlaying = false;
