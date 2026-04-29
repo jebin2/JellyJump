@@ -1,8 +1,8 @@
-import { Logger } from "../../../shared/utils/Logger.js";
-import { Toast } from "../../../shared/utils/Toast.js";
-import { IndexedDBService } from "../../../shared/services/IndexedDBService.js";
-import { CorePlayer } from '../../../core/Player.js';
-import { ConfirmDialog } from '../../../shared/utils/ConfirmDialog.js';
+import { Logger } from "../../shared/utils/Logger.js";
+import { Toast } from "../../shared/utils/Toast.js";
+import { IndexedDBService } from "../../shared/services/IndexedDBService.js";
+import { CorePlayer } from '../../core/Player.js';
+import { ConfirmDialog } from '../../shared/utils/ConfirmDialog.js';
 import { Modal as DialogModal } from '../Modal.js';
 import { MenuRouter } from '../menus/core/MenuRouter.js';
 import { RecordMenu } from '../menus/features/RecordMenu.js';
@@ -10,15 +10,15 @@ import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
 import { UrlUploadMenu } from "../menus/features/UrlUploadMenu.js";
 import { ItemToolsMenu } from "../menus/features/ItemToolsMenu.js";
 import { PlaylistStorage } from './PlaylistStorage.js';
-import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-import { FileDropHandler } from '../../../shared/utils/FileDropHandler.js';
-import { ElectronHelper } from '../../../shared/utils/ElectronHelper.js';
-import { formatTime, generateId, sanitizeFilename, getAudioMimeType } from '../../../shared/utils/mediaUtils.js';
-import { M3UParser } from '../../../shared/utils/M3UParser.js';
-import { StreamDetector } from '../../../shared/utils/StreamDetector.js';
+import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
+import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
+import { ElectronHelper } from '../../shared/utils/ElectronHelper.js';
+import { formatTime, generateId, sanitizeFilename, getAudioMimeType } from '../../shared/utils/mediaUtils.js';
+import { M3UParser } from '../../shared/utils/M3UParser.js';
+import { StreamDetector } from '../../shared/utils/StreamDetector.js';
 import { PlaylistRenderer } from './PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
-import { PlaylistProcessor } from "../../../shared/services/PlaylistProcessor.js";
+import { PlaylistProcessor } from "../../shared/services/PlaylistProcessor.js";
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children

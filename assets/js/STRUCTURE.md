@@ -36,7 +36,7 @@ Media editing and export pipelines (Trim, Convert, GIF, etc.).
 
 ### `lib/`
 
-WASM binaries and worker threads (AAC, MP3, HLS).
+WASM binaries and worker threads (AAC, MP3, AC3).
 
 ### `vendor/`
 

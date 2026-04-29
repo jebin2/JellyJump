@@ -24,7 +24,7 @@ export async function initPlayerAudio(player) {
     player.gainNode.gain.value = player.config.muted ? 0 : player.config.volume;
 
     if (!player.audioVisualizer && player.canvas) {
-        import('../../player/AudioVisualizer.js').then(({ AudioVisualizer }) => {
+        import('../../ui/player/AudioVisualizer.js').then(({ AudioVisualizer }) => {
             if (!player.audioVisualizer && player.canvas && player.audioContext && player.gainNode) {
                 player.audioVisualizer = new AudioVisualizer(player.canvas);
                 player.audioVisualizer.connect(player.audioContext, player.gainNode);
@@ -40,7 +40,7 @@ export async function startPlayerAudioVisualizer(player) {
     if (!player.isAudioMode) return;
 
     if (!player.audioVisualizer && player.canvas) {
-        const { AudioVisualizer } = await import('../../player/AudioVisualizer.js');
+        const { AudioVisualizer } = await import('../../ui/player/AudioVisualizer.js');
         player.audioVisualizer = new AudioVisualizer(player.canvas);
         player.audioVisualizer.connect(player.audioContext, player.gainNode);
     }

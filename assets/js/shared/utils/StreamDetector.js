@@ -69,7 +69,7 @@ export class StreamDetector {
         if (video.canPlayType('application/vnd.apple.mpegurl')) {
             return true;
         }
-        // Other browsers need hls.js + MSE
+        // Other browsers need MSE for HLS
         return 'MediaSource' in window;
     }
 
