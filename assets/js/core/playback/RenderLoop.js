@@ -59,7 +59,14 @@ export async function updatePlayerNextFrame(player) {
         }
     } catch (e) {
         if (player.asyncId === currentAsyncId) {
-            Logger.error('[FrameSync] Iterator error:', e);
+            if (e?.name === 'QuotaExceededError' || e?.message?.includes('Codec reclaimed')) {
+                Logger.warn('[FrameSync] Codec reclaimed, restarting video iterator:', e);
+                player.videoFrameIterator = null;
+                player.nextFrame = null;
+                player._startVideoIterator();
+            } else {
+                Logger.error('[FrameSync] Iterator error:', e);
+            }
         }
     } finally {
         if (player.asyncId === currentAsyncId) {
