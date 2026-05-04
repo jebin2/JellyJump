@@ -70,9 +70,7 @@ export class MediaProcessor {
         // Clamp speed to valid range
         const clampedSpeed = Math.max(0.25, Math.min(2, speed));
 
-        // FLAC requires re-encoding (lossless, incompatible with stream copy from other codecs)
-        // For all other formats at speed=1, use fast stream copy
-        if (clampedSpeed === 1 && format !== 'flac') {
+        if (clampedSpeed === 1) {
             return this._extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress });
         } else {
             return this._extractTrackWithSpeed({ source, trackIndex, trackType, format, speed: clampedSpeed, onProgress });
