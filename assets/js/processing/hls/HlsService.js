@@ -1,6 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
-import { createMediaBunnyInput, getBitrate } from '../shared/InputFactory.js';
+import { createMediaBunnyInput } from '../shared/InputFactory.js';
 
 let currentConversion = null;
 
@@ -62,19 +62,22 @@ export async function processHls({ source, quality = 100, onProgress }) {
             onFinalize: () => Promise.all(filePromises),
         });
 
-        const originalWidth = videoTrack.displayWidth || videoTrack.codedWidth;
         const originalHeight = videoTrack.displayHeight || videoTrack.codedHeight;
 
-        const renditionHeights = [1080, 720, 480, 360, 240]
-            .filter(h => h <= originalHeight);
+        const renditionTiers = [
+            { height: 1080, quality: MediaBunny.QUALITY_VERY_HIGH },
+            { height: 720, quality: MediaBunny.QUALITY_HIGH },
+            { height: 480, quality: MediaBunny.QUALITY_MEDIUM },
+            { height: 360, quality: MediaBunny.QUALITY_LOW },
+            { height: 240, quality: MediaBunny.QUALITY_VERY_LOW },
+        ];
 
-        const videoConfig = renditionHeights.map(height => {
-            const width = Math.round((height / originalHeight) * originalWidth);
-            const bitrate = quality < 100
-                ? getBitrate(quality, width * height)
-                : getBitrate(100, width * height);
-            return { codec: 'avc', height, bitrate };
-        });
+        const tierOffset = quality < 100 ? Math.floor((100 - quality) / 20) : 0;
+        const availableTiers = renditionTiers.slice(tierOffset);
+
+        const videoConfig = availableTiers
+            .filter(t => t.height <= originalHeight)
+            .map(t => ({ codec: 'avc', height: t.height, bitrate: t.quality }));
 
         if (videoConfig.length === 0) {
             videoConfig.push({ codec: 'avc' });
