@@ -6,11 +6,11 @@ let currentConversion = null;
 
 export async function processHls({ source, quality = 100, onProgress }) {
     Logger.log('[MediaProcessor] Starting HLS conversion...');
+    const startTime = performance.now();
 
     await currentConversion?.cancel();
 
     let input = null;
-    let output = null;
     currentConversion = null;
     const writtenFiles = new Map();
     const filePromises = [];
@@ -24,10 +24,9 @@ export async function processHls({ source, quality = 100, onProgress }) {
         const videoTrack = await input.getPrimaryVideoTrack();
         if (!videoTrack) throw new Error('No video track found');
 
-        output = new MediaBunny.Output({
+        const output = new MediaBunny.Output({
             format: new MediaBunny.HlsOutputFormat({
                 segmentFormat: new MediaBunny.MpegTsOutputFormat(),
-                targetDuration: 6,
             }),
             target: new MediaBunny.PathedTarget(
                 'master.m3u8',
@@ -40,6 +39,7 @@ export async function processHls({ source, quality = 100, onProgress }) {
                     const target = new MediaBunny.BufferTarget({
                         onFinalize: (buffer) => {
                             writtenFiles.set(path, buffer);
+                            filePromises.push(Promise.resolve());
                         },
                     });
 
@@ -48,13 +48,6 @@ export async function processHls({ source, quality = 100, onProgress }) {
                         bytesWritten += newFileBytes - fileBytes;
                         fileBytes = newFileBytes;
                     });
-
-                    const filePromise = new Promise((resolve) => {
-                        target.on('finalized', () => {
-                            resolve(undefined);
-                        });
-                    });
-                    filePromises.push(filePromise);
 
                     return target;
                 },
@@ -98,12 +91,6 @@ export async function processHls({ source, quality = 100, onProgress }) {
         Logger.log(`[MediaProcessor] HLS done — ${writtenFiles.size} files`);
         return writtenFiles;
     } finally {
-        if (currentConversion && typeof currentConversion.dispose === 'function') {
-            try { currentConversion.dispose(); } catch (e) { Logger.warn('Error disposing HLS conversion:', e); }
-        }
-        if (output && typeof output.dispose === 'function') {
-            try { output.dispose(); } catch (e) { Logger.warn('Error disposing HLS output:', e); }
-        }
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('Error disposing HLS input:', e); }
         }
