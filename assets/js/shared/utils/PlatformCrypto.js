@@ -40,7 +40,7 @@ import {
 import {
     encodeFrame, decodeFrame, assembleChunks,
     DATA_BYTES_PER_FRAME, FPS, FRAME_COPIES, VIDEO_W, VIDEO_H,
-    stripDurationSec, framesNeeded,
+    stripDurationSec,
 } from './VisualStripCodec.js';
 
 const MAGIC = 'JJC3';
