@@ -1,9 +1,9 @@
 /**
- * TwitterCrypto — JJC3 format
+ * PlatformCrypto — JJC3 format
  *
  * A transcode-survivable encrypted video format.  The encrypted payload is
  * embedded INSIDE a carrier MP4's actual pixel and audio content so that
- * Twitter's (or any platform's) re-encoding cannot strip it.
+ * any platform's re-encoding cannot strip it.
  *
  * Two independent channels carry data:
  *
@@ -25,8 +25,8 @@
  *
  * File size guideline:
  *   ~1 200 bytes/sec of usable visual-strip capacity at 30 fps after ×2 repeat.
- *   Twitter tweet timeline limit ≈ 140 s → ≈ 168 KB max payload.
- *   Twitter DMs allow up to 10 min → ≈ 720 KB max.
+ *   Short-form platforms (≈140 s limit) → ≈168 KB max payload.
+ *   Long-form platforms (≈10 min limit) → ≈720 KB max.
  *
  * Crypto: identical to JJC2 (AES-256-CTR + HMAC-SHA256 + PBKDF2 100k iter).
  * Detection: "JJC3" magic in the audio header.
@@ -47,7 +47,7 @@ const MAGIC = 'JJC3';
 const AUDIO_REPEAT = 3;   // transmit the audio header this many times
 const AUDIO_GAP_SEC = 1;  // silence between audio repetitions
 
-export class TwitterCrypto {
+export class PlatformCrypto {
     static MAGIC = MAGIC;
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -67,14 +67,14 @@ export class TwitterCrypto {
         const { filename, mimeType, hint, onProgress } = options;
         const progress = (v) => onProgress && onProgress(v);
 
-        Logger.log(`[TwitterCrypto] ENCRYPT start — ${blob.size} bytes`);
+        Logger.log(`[PlatformCrypto] ENCRYPT start — ${blob.size} bytes`);
         progress(0);
 
         // ── Step 1: Derive keys + encrypt payload ─────────────────────────
         const salt = crypto.getRandomValues(new Uint8Array(CryptoHelper.SALT_SIZE));
         const iv   = crypto.getRandomValues(new Uint8Array(CryptoHelper.IV_SIZE));
         const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
-        Logger.log('[TwitterCrypto] Keys derived');
+        Logger.log('[PlatformCrypto] Keys derived');
 
         const fileData = new Uint8Array(await blob.arrayBuffer());
         const ciphertext = new Uint8Array(fileData);
@@ -82,7 +82,7 @@ export class TwitterCrypto {
         progress(0.25);
 
         const hmac = await CryptoHelper._computeHmac(hmacKey, ciphertext);
-        Logger.log('[TwitterCrypto] HMAC computed');
+        Logger.log('[PlatformCrypto] HMAC computed');
         progress(0.35);
 
         // ── Step 2: Build audio header bytes ──────────────────────────────
@@ -108,7 +108,7 @@ export class TwitterCrypto {
         const audioHeaderBytes = new Uint8Array(headerFixed.length + metaBytes.length);
         audioHeaderBytes.set(headerFixed, 0);
         audioHeaderBytes.set(metaBytes, headerFixed.length);
-        Logger.log(`[TwitterCrypto] Audio header — ${audioHeaderBytes.length} B (fixed=76 meta=${metaBytes.length})`);
+        Logger.log(`[PlatformCrypto] Audio header — ${audioHeaderBytes.length} B (fixed=76 meta=${metaBytes.length})`);
 
         // ── Step 3: Compute durations ──────────────────────────────────────
         const singleAudioSec = audioDurationSec(audioHeaderBytes.length);
@@ -120,11 +120,11 @@ export class TwitterCrypto {
         const videoSec     = Math.max(totalAudioSec + 2, videoDataSec) + 1; // 1 s tail
         const totalFrames  = Math.ceil(videoSec * FPS);
 
-        Logger.log(`[TwitterCrypto] payload=${payloadSize} B, audioSec=${totalAudioSec.toFixed(1)}, videoSec=${videoSec.toFixed(1)}, totalFrames=${totalFrames}`);
+        Logger.log(`[PlatformCrypto] payload=${payloadSize} B, audioSec=${totalAudioSec.toFixed(1)}, videoSec=${videoSec.toFixed(1)}, totalFrames=${totalFrames}`);
         progress(0.40);
 
         // ── Step 4: Generate carrier MP4 ─────────────────────────────────
-        const mp4Blob = await TwitterCrypto._generateCarrierMp4({
+        const mp4Blob = await PlatformCrypto._generateCarrierMp4({
             ciphertext,
             audioHeaderBytes,
             totalAudioSec,
@@ -135,7 +135,7 @@ export class TwitterCrypto {
         });
 
         progress(1);
-        Logger.log(`[TwitterCrypto] ENCRYPT done — ${mp4Blob.size} bytes`);
+        Logger.log(`[PlatformCrypto] ENCRYPT done — ${mp4Blob.size} bytes`);
         return mp4Blob;
     }
 
@@ -148,7 +148,7 @@ export class TwitterCrypto {
      */
     static async decrypt(blob, password, onProgress) {
         const progress = (v) => onProgress && onProgress(v);
-        Logger.log(`[TwitterCrypto] DECRYPT start — ${blob.size} bytes`);
+        Logger.log(`[PlatformCrypto] DECRYPT start — ${blob.size} bytes`);
         progress(0);
 
         const { MediaBunny } = await import('../../core/MediaBunny.js');
@@ -184,12 +184,12 @@ export class TwitterCrypto {
             audioPos += chunk.length;
         }
 
-        Logger.log(`[TwitterCrypto] Audio read — ${audioChunks.length} chunks, ${totalAudioSamples} samples (${(totalAudioSamples / AUDIO_SAMPLE_RATE).toFixed(2)} s)`);
+        Logger.log(`[PlatformCrypto] Audio read — ${audioChunks.length} chunks, ${totalAudioSamples} samples (${(totalAudioSamples / AUDIO_SAMPLE_RATE).toFixed(2)} s)`);
         progress(0.15);
 
         const headerBytes = decodeAudio(allAudioSamples);
         if (!headerBytes) throw new Error('JJC3: could not decode audio header');
-        Logger.log(`[TwitterCrypto] Audio header decoded — ${headerBytes.length} B`);
+        Logger.log(`[PlatformCrypto] Audio header decoded — ${headerBytes.length} B`);
 
         const magic = new TextDecoder().decode(headerBytes.slice(0, 4));
         if (magic !== MAGIC) throw new Error('JJC3: wrong magic in audio header');
@@ -209,7 +209,7 @@ export class TwitterCrypto {
             } catch { /* ignore parse errors */ }
         }
 
-        Logger.log(`[TwitterCrypto] Header parsed — payloadSize=${payloadSize} B, salt=${salt.length}B iv=${iv.length}B hmac=${storedHmac.length}B meta=${JSON.stringify(metadata)}`);
+        Logger.log(`[PlatformCrypto] Header parsed — payloadSize=${payloadSize} B, salt=${salt.length}B iv=${iv.length}B hmac=${storedHmac.length}B meta=${JSON.stringify(metadata)}`);
         progress(0.20);
 
         // ── Step 2: Decode visual strip ───────────────────────────────────
@@ -247,29 +247,29 @@ export class TwitterCrypto {
             }
         }
 
-        Logger.log(`[TwitterCrypto] Decoded ${decodedFrames.length} valid frames from ${numFrames} total`);
+        Logger.log(`[PlatformCrypto] Decoded ${decodedFrames.length} valid frames from ${numFrames} total`);
         progress(0.75);
 
         const ciphertext = assembleChunks(decodedFrames, payloadSize);
-        Logger.log(`[TwitterCrypto] Ciphertext assembled — ${ciphertext.length} B`);
+        Logger.log(`[PlatformCrypto] Ciphertext assembled — ${ciphertext.length} B`);
         progress(0.82);
 
         // ── Step 3: Verify HMAC + decrypt ────────────────────────────────
         const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
-        Logger.log('[TwitterCrypto] Keys derived');
+        Logger.log('[PlatformCrypto] Keys derived');
 
         const computedHmac = await CryptoHelper._computeHmac(hmacKey, ciphertext);
         if (!CryptoHelper._constantTimeEqual(storedHmac, computedHmac)) {
             throw new Error('Integrity check failed. File tampered or wrong password.');
         }
-        Logger.log('[TwitterCrypto] HMAC OK — decrypting…');
+        Logger.log('[PlatformCrypto] HMAC OK — decrypting…');
         progress(0.90);
 
         const plaintext = new Uint8Array(ciphertext);
         await CryptoHelper._xorRegion(plaintext, 0, plaintext.length, aesKey, iv, 0);
 
         const outputType = metadata.type || 'application/octet-stream';
-        Logger.log(`[TwitterCrypto] DECRYPT done — ${plaintext.length} B (type=${outputType})`);
+        Logger.log(`[PlatformCrypto] DECRYPT done — ${plaintext.length} B (type=${outputType})`);
         progress(1);
         return { blob: new Blob([plaintext], { type: outputType }), metadata };
     }
@@ -330,7 +330,7 @@ export class TwitterCrypto {
             }
             return {};
         } catch (e) {
-            Logger.log(`[TwitterCrypto] readMetadata: ${e.message}`);
+            Logger.log(`[PlatformCrypto] readMetadata: ${e.message}`);
             return null;
         }
     }
@@ -373,7 +373,7 @@ export class TwitterCrypto {
         const supportedAudioCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'flac', 'opus']);
         if (!supportedAudioCodecs.length) throw new Error('JJC3: no encodable audio codec');
         const audioCodec = supportedAudioCodecs[0];
-        Logger.log(`[TwitterCrypto] Audio codec: ${audioCodec}`);
+        Logger.log(`[PlatformCrypto] Audio codec: ${audioCodec}`);
 
         const audioSource = new MediaBunny.AudioSampleSource({ codec: audioCodec, bitrate: 128_000 });
 
@@ -387,13 +387,13 @@ export class TwitterCrypto {
         const silenceFloat  = new Float32Array(gapSamples); // zeros = silence
 
         // Repeat the header AUDIO_REPEAT times with gaps
-        const totalAudioArray = TwitterCrypto._buildAudioArray(
+        const totalAudioArray = PlatformCrypto._buildAudioArray(
             headerFloat32, silenceFloat, AUDIO_REPEAT, totalAudioSec
         );
 
-        Logger.log(`[TwitterCrypto] Audio signal — ${(totalAudioArray.length / AUDIO_SAMPLE_RATE).toFixed(2)} s, feeding…`);
-        await TwitterCrypto._feedAudio(audioSource, totalAudioArray);
-        Logger.log('[TwitterCrypto] Audio fed, encoding video frames…');
+        Logger.log(`[PlatformCrypto] Audio signal — ${(totalAudioArray.length / AUDIO_SAMPLE_RATE).toFixed(2)} s, feeding…`);
+        await PlatformCrypto._feedAudio(audioSource, totalAudioArray);
+        Logger.log('[PlatformCrypto] Audio fed, encoding video frames…');
 
         // ── Feed video frames ──────────────────────────────────────────────
         const totalChunks = Math.ceil(ciphertext.length / DATA_BYTES_PER_FRAME);
@@ -403,7 +403,7 @@ export class TwitterCrypto {
         // Interleaved layout: encode all chunks for repeat 0, then all for repeat 1, etc.
         // Each copy of a chunk lands in a completely different section of the video,
         // giving it an independent H.264 I-frame. If one I-frame is heavily quantized
-        // (Twitter encodes at ~133 kbps), only that copy is affected — the others survive.
+        // (platforms typically encode at ~128–256 kbps), only that copy is affected — the others survive.
         for (let repeatIdx = 0; repeatIdx < FRAME_COPIES; repeatIdx++) {
             for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
                 const start = chunkIndex * DATA_BYTES_PER_FRAME;
@@ -411,7 +411,7 @@ export class TwitterCrypto {
                 const chunk = new Uint8Array(DATA_BYTES_PER_FRAME);
                 chunk.set(ciphertext.slice(start, end));
 
-                TwitterCrypto._drawPlaceholder(ctx, hint);
+                PlatformCrypto._drawPlaceholder(ctx, hint);
                 encodeFrame(ctx, chunkIndex, totalChunks, repeatIdx, chunk);
                 await canvasSource.add(frameIdx * frameDuration, frameDuration);
                 frameIdx++;
@@ -425,7 +425,7 @@ export class TwitterCrypto {
 
         // Tail frames: placeholder only, no data
         while (frameIdx < totalFrames) {
-            TwitterCrypto._drawPlaceholder(ctx, hint);
+            PlatformCrypto._drawPlaceholder(ctx, hint);
             await canvasSource.add(frameIdx * frameDuration, frameDuration);
             frameIdx++;
 
@@ -435,7 +435,7 @@ export class TwitterCrypto {
             }
         }
 
-        Logger.log(`[TwitterCrypto] Video encoded — ${frameIdx} frames (${FRAME_COPIES} passes × ${totalChunks} chunks + ${frameIdx - totalChunks * FRAME_COPIES} tail)`);
+        Logger.log(`[PlatformCrypto] Video encoded — ${frameIdx} frames (${FRAME_COPIES} passes × ${totalChunks} chunks + ${frameIdx - totalChunks * FRAME_COPIES} tail)`);
         canvasSource.close();
         audioSource.close();
         await output.finalize();

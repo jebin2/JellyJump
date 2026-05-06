@@ -1,6 +1,6 @@
 import { Logger } from '../../../shared/utils/Logger.js';
 import { CryptoHelper } from '../../../shared/utils/CryptoHelper.js';
-import { TwitterCrypto } from '../../../shared/utils/TwitterCrypto.js';
+import { PlatformCrypto } from '../../../shared/utils/PlatformCrypto.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 
@@ -32,22 +32,22 @@ export class EncryptMenu {
         const infoText          = modalContent.querySelector('.encrypt-info-text');
         const actionIconUse     = modalContent.querySelector('.action-icon-use');
 
-        const twitterDuration   = modalContent.querySelector('.encrypt-twitter-duration');
-        const twitterSection    = modalContent.querySelector('.encrypt-twitter-section');
+        const platformDuration  = modalContent.querySelector('.encrypt-platform-duration');
+        const platformSection   = modalContent.querySelector('.encrypt-platform-section');
 
         let currentMode  = 'encrypt';
         let fileMetadata = null;
         let sourceBlob   = null; // cached for duration estimate
 
         // Re-encoding resistance is always on
-        const updateTwitterUI = () => {
-            if (!twitterSection) return;
-            twitterSection.style.display = currentMode === 'encrypt' ? '' : 'none';
-            if (currentMode === 'encrypt' && twitterDuration && sourceBlob) {
-                const sec = TwitterCrypto.estimatedDuration(sourceBlob.size);
+        const updatePlatformUI = () => {
+            if (!platformSection) return;
+            platformSection.style.display = currentMode === 'encrypt' ? '' : 'none';
+            if (currentMode === 'encrypt' && platformDuration && sourceBlob) {
+                const sec = PlatformCrypto.estimatedDuration(sourceBlob.size);
                 const min = Math.floor(sec / 60);
                 const s   = Math.round(sec % 60);
-                twitterDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
+                platformDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
             }
         };
 
@@ -57,17 +57,17 @@ export class EncryptMenu {
                 confirmSection.classList.remove('hidden');
                 hintSection.classList.remove('hidden');
                 hintDisplay.classList.add('hidden');
-                if (twitterSection) twitterSection.style.display = '';
+                if (platformSection) platformSection.style.display = '';
                 encryptBtn.title = 'Encrypt';
                 encryptBtn.setAttribute('aria-label', 'Encrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock');
                 infoText.textContent =
-                    'Encrypts the file into a carrier MP4. External players (VLC, Twitter, etc) ' +
+                    'Encrypts the file into a carrier MP4. External players (VLC, YouTube, etc) ' +
                     'show an encrypted banner — only the correct password restores the original.';
             } else {
                 confirmSection.classList.add('hidden');
                 hintSection.classList.add('hidden');
-                if (twitterSection) twitterSection.style.display = 'none';
+                if (platformSection) platformSection.style.display = 'none';
                 encryptBtn.title = 'Decrypt';
                 encryptBtn.setAttribute('aria-label', 'Decrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock-open');
@@ -95,7 +95,7 @@ export class EncryptMenu {
             // Try JJC2 first, then JJC3
             fileMetadata = await CryptoHelper.readMetadata(sourceBlob);
             if (!fileMetadata) {
-                fileMetadata = await TwitterCrypto.readMetadata(sourceBlob);
+                fileMetadata = await PlatformCrypto.readMetadata(sourceBlob);
                 if (fileMetadata) {
                     Logger.log('[EncryptMenu] Detected JJC3 file');
                     // Pre-select decrypt mode for JJC3 files
@@ -111,7 +111,7 @@ export class EncryptMenu {
         }
 
         updateModeUI();
-        updateTwitterUI();
+        updatePlatformUI();
 
         // ── Process handler ─────────────────────────────────────────────────
         encryptBtn.addEventListener('click', async () => {
@@ -157,14 +157,14 @@ export class EncryptMenu {
                         hint:     hintInput.value.trim() || undefined,
                         onProgress,
                     };
-                    resultBlob  = await TwitterCrypto.encrypt(source, password, encOpts);
+                    resultBlob  = await PlatformCrypto.encrypt(source, password, encOpts);
                     newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
                 } else {
                     // Auto-detect format for decryption
                     let result;
-                    const isJJC3 = await TwitterCrypto.readMetadata(source);
+                    const isJJC3 = await PlatformCrypto.readMetadata(source);
                     if (isJJC3 !== null) {
-                        result = await TwitterCrypto.decrypt(source, password, onProgress);
+                        result = await PlatformCrypto.decrypt(source, password, onProgress);
                     } else {
                         result = await CryptoHelper.decrypt(source, password, onProgress);
                     }
