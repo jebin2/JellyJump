@@ -377,13 +377,9 @@ export class PlatformCrypto {
             target: new MediaBunny.BufferTarget(),
         });
 
-        // ── Video source ───────────────────────────────────────────────────
-        const canvas = document.createElement('canvas');
-        canvas.width  = VIDEO_W;
-        canvas.height = VIDEO_H;
-        const ctx = canvas.getContext('2d');
-
-        const canvasSource = new MediaBunny.CanvasSource(canvas, {
+        // ── Video source — VideoSampleSource feeds raw RGBA frames directly, ──
+        // bypassing the canvas GPU capture overhead of CanvasSource.
+        const videoSampleSource = new MediaBunny.VideoSampleSource({
             codec:   'avc',
             bitrate: MediaBunny.QUALITY_HIGH,
         });
@@ -395,7 +391,7 @@ export class PlatformCrypto {
 
         const audioSource = new MediaBunny.AudioSampleSource({ codec: audioCodec, bitrate: 128_000 });
 
-        output.addVideoTrack(canvasSource);
+        output.addVideoTrack(videoSampleSource);
         output.addAudioTrack(audioSource);
 
         t = performance.now();
@@ -422,9 +418,15 @@ export class PlatformCrypto {
         const frameDuration = 1 / FPS;
         let frameIdx = 0;
 
+        // Use a temporary canvas only to pre-render the placeholder once into ImageData.
+        // The canvas is not used again after this point.
         t = performance.now();
-        PlatformCrypto._drawPlaceholder(ctx, hint);
-        const placeholderPixels = ctx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width  = VIDEO_W;
+        tmpCanvas.height = VIDEO_H;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        PlatformCrypto._drawPlaceholder(tmpCtx, hint);
+        const placeholderPixels = tmpCtx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
         const frameImageData = new ImageData(
             new Uint8ClampedArray(placeholderPixels.length), VIDEO_W, VIDEO_H
         );
@@ -433,7 +435,7 @@ export class PlatformCrypto {
 
         // Per-frame timing accumulators — reported every REPORT_EVERY frames
         const REPORT_EVERY = 300;
-        let tMemcpy = 0, tPixelWrite = 0, tPutImageData = 0, tCanvasAdd = 0;
+        let tMemcpy = 0, tPixelWrite = 0, tSampleCreate = 0, tVideoSourceAdd = 0;
         let windowStart = performance.now();
 
         // Interleaved layout: encode all chunks for repeat 0, then all for repeat 1, etc.
@@ -457,13 +459,21 @@ export class PlatformCrypto {
                 encodeFrameToImageData(frameImageData, chunkIndex, totalChunks, repeatIdx, chunk);
                 tPixelWrite += performance.now() - ts;
 
+                // Feed raw RGBA pixels directly — no putImageData / canvas capture needed.
                 ts = performance.now();
-                ctx.putImageData(frameImageData, 0, 0);
-                tPutImageData += performance.now() - ts;
+                const sample = new MediaBunny.VideoSample(frameImageData.data, {
+                    format: 'RGBA',
+                    codedWidth:  VIDEO_W,
+                    codedHeight: VIDEO_H,
+                    timestamp:   frameIdx * frameDuration,
+                    duration:    frameDuration,
+                });
+                tSampleCreate += performance.now() - ts;
 
                 ts = performance.now();
-                await canvasSource.add(frameIdx * frameDuration, frameDuration);
-                tCanvasAdd += performance.now() - ts;
+                await videoSampleSource.add(sample);
+                tVideoSourceAdd += performance.now() - ts;
+                sample.close();
 
                 frameIdx++;
 
@@ -474,11 +484,11 @@ export class PlatformCrypto {
                         `(pass ${repeatIdx + 1}/${FRAME_COPIES}) | window=${windowMs.toFixed(0)}ms ` +
                         `| memcpy=${tMemcpy.toFixed(1)}ms ` +
                         `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
-                        `| putImageData=${tPutImageData.toFixed(1)}ms ` +
-                        `| canvasAdd=${tCanvasAdd.toFixed(1)}ms ` +
-                        `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tPutImageData - tCanvasAdd).toFixed(1)}ms`
+                        `| sampleCreate=${tSampleCreate.toFixed(1)}ms ` +
+                        `| videoSourceAdd=${tVideoSourceAdd.toFixed(1)}ms ` +
+                        `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tSampleCreate - tVideoSourceAdd).toFixed(1)}ms`
                     );
-                    tMemcpy = 0; tPixelWrite = 0; tPutImageData = 0; tCanvasAdd = 0;
+                    tMemcpy = 0; tPixelWrite = 0; tSampleCreate = 0; tVideoSourceAdd = 0;
                     windowStart = performance.now();
 
                     signal?.throwIfAborted();
@@ -496,17 +506,25 @@ export class PlatformCrypto {
                 `| window=${windowMs.toFixed(0)}ms ` +
                 `| memcpy=${tMemcpy.toFixed(1)}ms ` +
                 `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
-                `| putImageData=${tPutImageData.toFixed(1)}ms ` +
-                `| canvasAdd=${tCanvasAdd.toFixed(1)}ms`
+                `| sampleCreate=${tSampleCreate.toFixed(1)}ms ` +
+                `| videoSourceAdd=${tVideoSourceAdd.toFixed(1)}ms`
             );
         }
 
-        // Tail frames: placeholder only, no data
+        // Tail frames: placeholder only — reuse placeholder pixels directly
+        frameImageData.data.set(placeholderPixels);
         const tailStart = performance.now();
         const tailStartIdx = frameIdx;
         while (frameIdx < totalFrames) {
-            ctx.putImageData(frameImageData, 0, 0);
-            await canvasSource.add(frameIdx * frameDuration, frameDuration);
+            const tailSample = new MediaBunny.VideoSample(frameImageData.data, {
+                format: 'RGBA',
+                codedWidth:  VIDEO_W,
+                codedHeight: VIDEO_H,
+                timestamp:   frameIdx * frameDuration,
+                duration:    frameDuration,
+            });
+            await videoSampleSource.add(tailSample);
+            tailSample.close();
             frameIdx++;
 
             if (frameIdx % REPORT_EVERY === 0) {
@@ -520,7 +538,7 @@ export class PlatformCrypto {
         }
 
         t = performance.now();
-        canvasSource.close();
+        videoSampleSource.close();
         audioSource.close();
         await output.finalize();
         Logger.log(`[PlatformCrypto] [${rel()}] output.finalize(): ${ms(t, performance.now())}`);
