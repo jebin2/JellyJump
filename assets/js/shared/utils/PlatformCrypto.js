@@ -166,7 +166,7 @@ export class PlatformCrypto {
         const audioSink = new MediaBunny.AudioSampleSink(audioTracks[0]);
         const audioChunks = [];
         let totalAudioSamples = 0;
-        const maxAudioSamples = AUDIO_SAMPLE_RATE * 20; // first repetition fits within 20 s
+        const maxAudioSamples = AUDIO_SAMPLE_RATE * 60; // one full header repetition fits within 60 s
 
         for await (const sample of audioSink.samples()) {
             const buf = sample.toAudioBuffer();
@@ -296,7 +296,7 @@ export class PlatformCrypto {
             const audioSink = new MediaBunny.AudioSampleSink(audioTracks[0]);
             const chunks = [];
             let totalSamples = 0;
-            const maxSamples = AUDIO_SAMPLE_RATE * 20; // read up to 20 s
+            const maxSamples = AUDIO_SAMPLE_RATE * 60; // read up to 60 s
 
             for await (const sample of audioSink.samples()) {
                 const buf = sample.toAudioBuffer();
