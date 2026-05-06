@@ -433,8 +433,15 @@ export class PlatformCrypto {
 
         // Per-frame timing accumulators — reported every REPORT_EVERY frames
         const REPORT_EVERY = 300;
-        let tMemcpy = 0, tPixelWrite = 0, tPutImageData = 0, tCanvasAdd = 0;
+        let tMemcpy = 0, tPixelWrite = 0, tPutImageData = 0, tWaitAdd = 0;
         let windowStart = performance.now();
+
+        // Pipelined frame loop: canvasSource.add() captures canvas pixels synchronously
+        // (via VideoFrame internally), so we can start preparing frame N+1 on the canvas
+        // immediately after calling add() for frame N — before awaiting it.
+        // This overlaps preparation (~5ms) with encoder wait (~6.5ms), reducing per-frame
+        // wall time from ~11.5ms to ~max(5ms, 6.5ms) = ~6.5ms.
+        let pendingAdd = null;
 
         // Interleaved layout: encode all chunks for repeat 0, then all for repeat 1, etc.
         // Each copy of a chunk lands in a completely different section of the video,
@@ -449,6 +456,7 @@ export class PlatformCrypto {
 
                 let ts;
 
+                // ── Prepare frame N (runs while previous frame is being encoded) ──
                 ts = performance.now();
                 frameImageData.data.set(placeholderPixels);
                 tMemcpy += performance.now() - ts;
@@ -461,13 +469,18 @@ export class PlatformCrypto {
                 ctx.putImageData(frameImageData, 0, 0);
                 tPutImageData += performance.now() - ts;
 
+                // ── Wait for N-1, then submit N ───────────────────────────────────
                 ts = performance.now();
-                await canvasSource.add(frameIdx * frameDuration, frameDuration);
-                tCanvasAdd += performance.now() - ts;
-
+                await pendingAdd;
+                tWaitAdd += performance.now() - ts;
+                pendingAdd = canvasSource.add(frameIdx * frameDuration, frameDuration);
                 frameIdx++;
 
                 if (frameIdx % REPORT_EVERY === 0) {
+                    // Flush pipeline before yielding
+                    await pendingAdd;
+                    pendingAdd = null;
+
                     const windowMs = performance.now() - windowStart;
                     Logger.log(
                         `[PlatformCrypto] [${rel()}] frames ${frameIdx - REPORT_EVERY + 1}–${frameIdx}/${totalFrames} ` +
@@ -475,10 +488,10 @@ export class PlatformCrypto {
                         `| memcpy=${tMemcpy.toFixed(1)}ms ` +
                         `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
                         `| putImageData=${tPutImageData.toFixed(1)}ms ` +
-                        `| canvasAdd=${tCanvasAdd.toFixed(1)}ms ` +
-                        `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tPutImageData - tCanvasAdd).toFixed(1)}ms`
+                        `| waitAdd(pipeline)=${tWaitAdd.toFixed(1)}ms ` +
+                        `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tPutImageData - tWaitAdd).toFixed(1)}ms`
                     );
-                    tMemcpy = 0; tPixelWrite = 0; tPutImageData = 0; tCanvasAdd = 0;
+                    tMemcpy = 0; tPixelWrite = 0; tPutImageData = 0; tWaitAdd = 0;
                     windowStart = performance.now();
 
                     signal?.throwIfAborted();
@@ -487,6 +500,10 @@ export class PlatformCrypto {
                 }
             }
         }
+
+        // Flush last data frame
+        await pendingAdd;
+        pendingAdd = null;
 
         // Flush any partial window
         if (frameIdx % REPORT_EVERY !== 0) {
@@ -497,24 +514,31 @@ export class PlatformCrypto {
                 `| memcpy=${tMemcpy.toFixed(1)}ms ` +
                 `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
                 `| putImageData=${tPutImageData.toFixed(1)}ms ` +
-                `| canvasAdd=${tCanvasAdd.toFixed(1)}ms`
+                `| waitAdd(pipeline)=${tWaitAdd.toFixed(1)}ms`
             );
         }
 
-        // Tail frames: placeholder only, no data
+        // Tail frames: reset to pure placeholder then pipeline adds
+        // (canvas content is constant so no preparation needed per frame)
+        frameImageData.data.set(placeholderPixels);
+        ctx.putImageData(frameImageData, 0, 0);
+
         const tailStart = performance.now();
         const tailStartIdx = frameIdx;
         while (frameIdx < totalFrames) {
-            ctx.putImageData(frameImageData, 0, 0);
-            await canvasSource.add(frameIdx * frameDuration, frameDuration);
+            await pendingAdd;
+            pendingAdd = canvasSource.add(frameIdx * frameDuration, frameDuration);
             frameIdx++;
 
             if (frameIdx % REPORT_EVERY === 0) {
+                await pendingAdd;
+                pendingAdd = null;
                 signal?.throwIfAborted();
                 onProgress && onProgress(frameIdx / totalFrames);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
+        await pendingAdd;
         if (frameIdx > tailStartIdx) {
             Logger.log(`[PlatformCrypto] [${rel()}] tail frames: ${frameIdx - tailStartIdx} frames in ${ms(tailStart, performance.now())}`);
         }
