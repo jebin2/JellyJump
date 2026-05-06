@@ -76,8 +76,7 @@ export class PlatformCrypto {
         const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
         Logger.log('[PlatformCrypto] Keys derived');
 
-        const fileData = new Uint8Array(await blob.arrayBuffer());
-        const ciphertext = new Uint8Array(fileData);
+        const ciphertext = new Uint8Array(await blob.arrayBuffer());
         await CryptoHelper._xorRegion(ciphertext, 0, ciphertext.length, aesKey, iv, 0);
         progress(0.25);
 
