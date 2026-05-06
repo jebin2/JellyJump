@@ -162,36 +162,10 @@ export class PlatformCrypto {
         const audioTracks = await input.getAudioTracks();
         if (!audioTracks.length) throw new Error('JJC3: no audio track found');
 
-        const audioSink = new MediaBunny.AudioSampleSink(audioTracks[0]);
-        const audioChunks = [];
-        let totalAudioSamples = 0;
-        const maxAudioSamples = AUDIO_SAMPLE_RATE * 60; // one full header repetition fits within 60 s
-
-        for await (const sample of audioSink.samples()) {
-            const buf = sample.toAudioBuffer();
-            const ch = new Float32Array(buf.getChannelData(0));
-            audioChunks.push(ch);
-            totalAudioSamples += ch.length;
-            sample.close();
-            if (totalAudioSamples >= maxAudioSamples) break;
-        }
-
-        const allAudioSamples = new Float32Array(totalAudioSamples);
-        let audioPos = 0;
-        for (const chunk of audioChunks) {
-            allAudioSamples.set(chunk, audioPos);
-            audioPos += chunk.length;
-        }
-
-        Logger.log(`[PlatformCrypto] Audio read — ${audioChunks.length} chunks, ${totalAudioSamples} samples (${(totalAudioSamples / AUDIO_SAMPLE_RATE).toFixed(2)} s)`);
-        progress(0.15);
-
-        const headerBytes = decodeAudio(allAudioSamples);
+        const headerBytes = await PlatformCrypto._readAndDecodeAudio(audioTracks[0]);
         if (!headerBytes) throw new Error('JJC3: could not decode audio header');
         Logger.log(`[PlatformCrypto] Audio header decoded — ${headerBytes.length} B`);
-
-        const magic = new TextDecoder().decode(headerBytes.slice(0, 4));
-        if (magic !== MAGIC) throw new Error('JJC3: wrong magic in audio header');
+        progress(0.15);
 
         const hdv          = new DataView(headerBytes.buffer, headerBytes.byteOffset);
         const payloadSize  = hdv.getUint32(6,  false);
@@ -291,30 +265,8 @@ export class PlatformCrypto {
             const audioTracks = await input.getAudioTracks();
             if (!audioTracks.length) return null;
 
-            // Only read enough audio to find the first header (first AUDIO_REPEAT occurrence)
-            const audioSink = new MediaBunny.AudioSampleSink(audioTracks[0]);
-            const chunks = [];
-            let totalSamples = 0;
-            const maxSamples = AUDIO_SAMPLE_RATE * 60; // read up to 60 s
-
-            for await (const sample of audioSink.samples()) {
-                const buf = sample.toAudioBuffer();
-                const ch  = new Float32Array(buf.getChannelData(0));
-                chunks.push(ch);
-                totalSamples += ch.length;
-                sample.close();
-                if (totalSamples >= maxSamples) break;
-            }
-
-            const allSamples = new Float32Array(totalSamples);
-            let pos = 0;
-            for (const c of chunks) { allSamples.set(c, pos); pos += c.length; }
-
-            const headerBytes = decodeAudio(allSamples);
+            const headerBytes = await PlatformCrypto._readAndDecodeAudio(audioTracks[0]);
             if (!headerBytes) return null;
-
-            const magic = new TextDecoder().decode(headerBytes.slice(0, 4));
-            if (magic !== MAGIC) return null;
 
             const metadataSize = new DataView(
                 headerBytes.buffer, headerBytes.byteOffset
@@ -345,6 +297,36 @@ export class PlatformCrypto {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    static async _readAndDecodeAudio(audioTrack) {
+        const MB = await _getMediaBunny();
+        const audioSink = new MB.AudioSampleSink(audioTrack);
+        const chunks = [];
+        let totalSamples = 0;
+        const maxSamples = AUDIO_SAMPLE_RATE * 60; // one full header repetition fits within 60 s
+
+        for await (const sample of audioSink.samples()) {
+            const buf = sample.toAudioBuffer();
+            const ch  = new Float32Array(buf.getChannelData(0));
+            chunks.push(ch);
+            totalSamples += ch.length;
+            sample.close();
+            if (totalSamples >= maxSamples) break;
+        }
+
+        const allSamples = new Float32Array(totalSamples);
+        let pos = 0;
+        for (const c of chunks) { allSamples.set(c, pos); pos += c.length; }
+        Logger.log(`[PlatformCrypto] Audio read — ${chunks.length} chunks, ${totalSamples} samples (${(totalSamples / AUDIO_SAMPLE_RATE).toFixed(2)} s)`);
+
+        const headerBytes = decodeAudio(allSamples);
+        if (!headerBytes) return null;
+
+        const magic = new TextDecoder().decode(headerBytes.slice(0, 4));
+        if (magic !== MAGIC) return null;
+
+        return headerBytes;
+    }
 
     static async _generateCarrierMp4({
         ciphertext, audioHeaderBytes, totalAudioSec, totalFrames,
