@@ -32,35 +32,24 @@ export class EncryptMenu {
         const infoText          = modalContent.querySelector('.encrypt-info-text');
         const actionIconUse     = modalContent.querySelector('.action-icon-use');
 
-        const twitterCheckbox   = modalContent.querySelector('.encrypt-twitter-checkbox');
-        const twitterInfo       = modalContent.querySelector('.encrypt-twitter-info');
         const twitterDuration   = modalContent.querySelector('.encrypt-twitter-duration');
         const twitterSection    = modalContent.querySelector('.encrypt-twitter-section');
 
-        let currentMode    = 'encrypt';
-        let fileMetadata   = null;
-        let twitterSafe    = false;
-        let sourceBlob     = null; // cached for duration estimate
+        let currentMode  = 'encrypt';
+        let fileMetadata = null;
+        let sourceBlob   = null; // cached for duration estimate
 
-        // ── Twitter-safe checkbox ───────────────────────────────────────────
+        // Re-encoding resistance is always on
         const updateTwitterUI = () => {
-            if (currentMode !== 'encrypt' || !twitterSection) return;
-            twitterSection.style.display = '';
-            if (twitterCheckbox) {
-                twitterSafe = twitterCheckbox.checked;
-                if (twitterInfo) twitterInfo.style.display = twitterSafe ? '' : 'none';
-                if (twitterSafe && twitterDuration && sourceBlob) {
-                    const sec = TwitterCrypto.estimatedDuration(sourceBlob.size);
-                    const min = Math.floor(sec / 60);
-                    const s   = Math.round(sec % 60);
-                    twitterDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
-                }
+            if (!twitterSection) return;
+            twitterSection.style.display = currentMode === 'encrypt' ? '' : 'none';
+            if (currentMode === 'encrypt' && twitterDuration && sourceBlob) {
+                const sec = TwitterCrypto.estimatedDuration(sourceBlob.size);
+                const min = Math.floor(sec / 60);
+                const s   = Math.round(sec % 60);
+                twitterDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
             }
         };
-
-        if (twitterCheckbox) {
-            twitterCheckbox.addEventListener('change', updateTwitterUI);
-        }
 
         // ── Encrypt/Decrypt mode toggle ─────────────────────────────────────
         const updateModeUI = () => {
@@ -73,8 +62,8 @@ export class EncryptMenu {
                 encryptBtn.setAttribute('aria-label', 'Encrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock');
                 infoText.textContent =
-                    'Encrypts the file with a password. The output plays a short "encrypted" ' +
-                    'message in external players (VLC, etc). Only the correct password can restore the original.';
+                    'Encrypts the file into a carrier MP4. External players (VLC, Twitter, etc) ' +
+                    'show an encrypted banner — only the correct password restores the original.';
             } else {
                 confirmSection.classList.add('hidden');
                 hintSection.classList.add('hidden');
@@ -146,7 +135,6 @@ export class EncryptMenu {
             confirmInput.disabled      = true;
             hintInput.disabled         = true;
             toggleCheckbox.disabled    = true;
-            if (twitterCheckbox) twitterCheckbox.disabled = true;
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
             downloadBtn.classList.add('hidden');
@@ -169,14 +157,8 @@ export class EncryptMenu {
                         hint:     hintInput.value.trim() || undefined,
                         onProgress,
                     };
-
-                    if (twitterSafe) {
-                        resultBlob  = await TwitterCrypto.encrypt(source, password, encOpts);
-                        newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted-tw.mp4';
-                    } else {
-                        resultBlob  = await CryptoHelper.encrypt(source, password, encOpts);
-                        newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
-                    }
+                    resultBlob  = await TwitterCrypto.encrypt(source, password, encOpts);
+                    newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
                 } else {
                     // Auto-detect format for decryption
                     let result;
@@ -217,7 +199,6 @@ export class EncryptMenu {
             confirmInput.disabled      = false;
             hintInput.disabled         = false;
             toggleCheckbox.disabled    = false;
-            if (twitterCheckbox) twitterCheckbox.disabled = false;
         });
     }
 }
