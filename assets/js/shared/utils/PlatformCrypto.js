@@ -61,10 +61,11 @@ export class PlatformCrypto {
      * @param {string}   [options.mimeType]
      * @param {string}   [options.hint]
      * @param {Function} [options.onProgress]  (0..1)
+     * @param {AbortSignal} [options.signal]
      * @returns {Promise<Blob>}
      */
     static async encrypt(blob, password, options = {}) {
-        const { filename, mimeType, hint, onProgress } = options;
+        const { filename, mimeType, hint, onProgress, signal } = options;
         const progress = (v) => onProgress && onProgress(v);
 
         Logger.log(`[PlatformCrypto] ENCRYPT start — ${blob.size} bytes`);
@@ -130,6 +131,7 @@ export class PlatformCrypto {
             totalFrames,
             singleAudioSec,
             hint,
+            signal,
             onProgress: (v) => progress(0.40 + v * 0.55),
         });
 
@@ -143,9 +145,10 @@ export class PlatformCrypto {
      * @param {Blob} blob
      * @param {string} password
      * @param {Function} [onProgress]
+     * @param {AbortSignal} [signal]
      * @returns {Promise<{blob: Blob, metadata: Object}>}
      */
-    static async decrypt(blob, password, onProgress) {
+    static async decrypt(blob, password, onProgress, signal) {
         const progress = (v) => onProgress && onProgress(v);
         Logger.log(`[PlatformCrypto] DECRYPT start — ${blob.size} bytes`);
         progress(0);
@@ -215,6 +218,7 @@ export class PlatformCrypto {
             sample.close();
             frameCount++;
             if (frameCount % 30 === 0) {
+                signal?.throwIfAborted();
                 progress(0.20 + (frameCount / numFrames) * 0.55);
                 await new Promise(r => setTimeout(r, 0));
             }
@@ -330,7 +334,7 @@ export class PlatformCrypto {
 
     static async _generateCarrierMp4({
         ciphertext, audioHeaderBytes, totalAudioSec, totalFrames,
-        singleAudioSec, hint, onProgress,
+        singleAudioSec, hint, signal, onProgress,
     }) {
         const { MediaBunny } = await import('../../core/MediaBunny.js');
 
@@ -398,6 +402,7 @@ export class PlatformCrypto {
                 frameIdx++;
 
                 if (frameIdx % 30 === 0) {
+                    signal?.throwIfAborted();
                     onProgress && onProgress(frameIdx / totalFrames);
                     await new Promise(r => setTimeout(r, 0));
                 }
@@ -411,6 +416,7 @@ export class PlatformCrypto {
             frameIdx++;
 
             if (frameIdx % 30 === 0) {
+                signal?.throwIfAborted();
                 onProgress && onProgress(frameIdx / totalFrames);
                 await new Promise(r => setTimeout(r, 0));
             }

@@ -139,6 +139,15 @@ export class EncryptMenu {
             }
 
             // Disable UI
+            const abortController = new AbortController();
+            const { signal } = abortController;
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.className = 'jellyjump-btn-secondary text-sm';
+            cancelBtn.addEventListener('click', () => abortController.abort());
+            progressSection.appendChild(cancelBtn);
+
             encryptBtn.disabled        = true;
             modal.closeBtn.disabled    = true;
             passwordInput.disabled     = true;
@@ -166,6 +175,7 @@ export class EncryptMenu {
                         mimeType: source.type || item.type || 'video/mp4',
                         hint:     hintInput.value.trim() || undefined,
                         onProgress,
+                        signal,
                     };
                     resultBlob  = await PlatformCrypto.encrypt(source, password, encOpts);
                     newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
@@ -174,7 +184,7 @@ export class EncryptMenu {
                     let result;
                     const jjc3Meta = await PlatformCrypto.readMetadata(source);
                     if (jjc3Meta !== null) {
-                        result = await PlatformCrypto.decrypt(source, password, onProgress);
+                        result = await PlatformCrypto.decrypt(source, password, onProgress, signal);
                     } else {
                         result = await CryptoHelper.decrypt(source, password, onProgress);
                     }
@@ -196,10 +206,16 @@ export class EncryptMenu {
                 downloadBtn.title = `Download ${currentMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}`;
 
             } catch (error) {
-                Logger.error('Encrypt/Decrypt failed:', error);
-                errorMessage.textContent = `Operation failed: ${error.message}`;
-                errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
+                if (error.name === 'AbortError') {
+                    errorMessage.textContent = 'Operation cancelled.';
+                } else {
+                    Logger.error('Encrypt/Decrypt failed:', error);
+                    errorMessage.textContent = `Operation failed: ${error.message}`;
+                }
+                errorMessage.classList.remove('hidden');
+            } finally {
+                cancelBtn.remove();
             }
 
             // Re-enable UI
