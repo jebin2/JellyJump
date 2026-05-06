@@ -261,36 +261,16 @@ export class CryptoHelper {
     }
 
     /**
-     * Compute HMAC-SHA256 over a blob, streaming in chunks.
+     * Compute HMAC-SHA256 over data.
+     * Web Crypto requires all bytes at once; accept BufferSource or Blob to avoid
+     * an extra copy when the caller already holds a typed array.
      * @param {CryptoKey} hmacKey
-     * @param {Blob} blob
+     * @param {BufferSource|Blob} data
      * @returns {Promise<Uint8Array>} 32-byte HMAC
      */
-    static async _computeHmac(hmacKey, blob) {
-        const size = blob.size;
-        let offset = 0;
-        const chunks = [];
-
-        while (offset < size) {
-            const end = Math.min(offset + CryptoHelper.CHUNK_SIZE, size);
-            const chunkBuf = await blob.slice(offset, end).arrayBuffer();
-            chunks.push(new Uint8Array(chunkBuf));
-            offset = end;
-
-            if (offset < size) {
-                await new Promise(r => setTimeout(r, 0));
-            }
-        }
-
-        const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
-        const data = new Uint8Array(totalLen);
-        let pos = 0;
-        for (const chunk of chunks) {
-            data.set(chunk, pos);
-            pos += chunk.length;
-        }
-
-        const sig = await crypto.subtle.sign('HMAC', hmacKey, data);
+    static async _computeHmac(hmacKey, data) {
+        const buf = data instanceof Blob ? await data.arrayBuffer() : data;
+        const sig = await crypto.subtle.sign('HMAC', hmacKey, buf);
         return new Uint8Array(sig);
     }
 

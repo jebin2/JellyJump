@@ -2039,6 +2039,20 @@
         <span class="encrypt-hint-value text-sm" style="color: var(--accent-primary); margin-left: 6px;"></span>
     </div>
 
+    <!-- Twitter-safe mode (encrypt only) -->
+    <div class="encrypt-twitter-section mb-md">
+        <label class="flex items-center gap-sm" style="cursor:pointer;">
+            <input type="checkbox" class="encrypt-twitter-checkbox" style="accent-color:var(--accent-primary);width:16px;height:16px;">
+            <span class="text-sm font-mono" style="color:var(--accent-primary);">TWITTER-SAFE MODE</span>
+        </label>
+        <p class="encrypt-twitter-info text-xs text-secondary mt-xs" style="display:none;">
+            Embeds encrypted data inside the video's pixel strip and audio track so it survives
+            platform re-encoding (Twitter, YouTube, etc). Estimated output video length:
+            <span class="encrypt-twitter-duration" style="color:var(--accent-primary);">—</span>.
+            Larger files produce longer videos and take more time to encode.
+        </p>
+    </div>
+
     <!-- Info -->
     <div class="encrypt-info text-xs text-secondary">
         <p class="encrypt-info-text">Encrypts the file with a password. The output plays a short "encrypted" message in
