@@ -207,6 +207,8 @@ export class PlatformCrypto {
 
         const decodedFrames = [];
         let frameCount = 0;
+        let knownTotalChunks = 0;
+        const validChunksSeen = new Set();
 
         const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
         for await (const sample of videoSink.samplesAtTimestamps(timestamps)) {
@@ -214,17 +216,31 @@ export class PlatformCrypto {
             sample.draw(ctx, 0, 0, VIDEO_W, VIDEO_H);
             const imageData = ctx.getImageData(0, 0, VIDEO_W, VIDEO_H);
             const decoded = decodeFrame(imageData);
-            if (decoded) decodedFrames.push(decoded);
+            if (decoded) {
+                decodedFrames.push(decoded);
+                if (decoded.totalChunks > 0) knownTotalChunks = decoded.totalChunks;
+                if (decoded.valid) validChunksSeen.add(decoded.chunkIndex);
+            }
             sample.close();
             frameCount++;
+
+            // Early exit: every chunk has at least one CRC-valid copy
+            if (knownTotalChunks > 0 && validChunksSeen.size >= knownTotalChunks) {
+                Logger.log(`[PlatformCrypto] Early exit — all ${knownTotalChunks} chunks validated at frame ${frameCount}/${numFrames}`);
+                break;
+            }
+
             if (frameCount % 30 === 0) {
                 signal?.throwIfAborted();
-                progress(0.20 + (frameCount / numFrames) * 0.55);
+                const pct = knownTotalChunks > 0
+                    ? validChunksSeen.size / knownTotalChunks
+                    : frameCount / numFrames;
+                progress(0.20 + pct * 0.55);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
 
-        Logger.log(`[PlatformCrypto] Decoded ${decodedFrames.length} valid frames from ${numFrames} total`);
+        Logger.log(`[PlatformCrypto] Decoded ${decodedFrames.length} valid frames from ${frameCount} read (${numFrames} total)`);
         progress(0.75);
 
         const ciphertext = assembleChunks(decodedFrames, payloadSize);
