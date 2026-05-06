@@ -68,21 +68,31 @@ export class PlatformCrypto {
         const { filename, mimeType, hint, onProgress, signal } = options;
         const progress = (v) => onProgress && onProgress(v);
 
-        Logger.log(`[PlatformCrypto] ENCRYPT start — ${blob.size} bytes`);
+        const t0 = performance.now();
+        const ms = (a, b) => `${(b - a).toFixed(1)}ms`;
+
+        Logger.log(`[PlatformCrypto] ──── ENCRYPT START — ${(blob.size / 1048576).toFixed(2)} MB ────`);
         progress(0);
 
         // ── Step 1: Derive keys + encrypt payload ─────────────────────────
+        let t = performance.now();
         const salt = crypto.getRandomValues(new Uint8Array(CryptoHelper.SALT_SIZE));
         const iv   = crypto.getRandomValues(new Uint8Array(CryptoHelper.IV_SIZE));
         const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
-        Logger.log('[PlatformCrypto] Keys derived');
+        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] key derivation (PBKDF2): ${ms(t,performance.now())}`);
 
+        t = performance.now();
         const ciphertext = new Uint8Array(await blob.arrayBuffer());
+        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] blob.arrayBuffer(): ${ms(t,performance.now())}`);
+
+        t = performance.now();
         await CryptoHelper._xorRegion(ciphertext, 0, ciphertext.length, aesKey, iv, 0);
+        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] AES-CTR XOR (${(ciphertext.length/1048576).toFixed(2)} MB): ${ms(t,performance.now())}`);
         progress(0.25);
 
+        t = performance.now();
         const hmac = await CryptoHelper._computeHmac(hmacKey, ciphertext);
-        Logger.log('[PlatformCrypto] HMAC computed');
+        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] HMAC-SHA256: ${ms(t,performance.now())}`);
         progress(0.35);
 
         // ── Step 2: Build audio header bytes ──────────────────────────────
@@ -120,7 +130,7 @@ export class PlatformCrypto {
         const videoSec     = Math.max(totalAudioSec + 2, videoDataSec) + 1; // 1 s tail
         const totalFrames  = Math.ceil(videoSec * FPS);
 
-        Logger.log(`[PlatformCrypto] payload=${payloadSize} B, audioSec=${totalAudioSec.toFixed(1)}, videoSec=${videoSec.toFixed(1)}, totalFrames=${totalFrames}`);
+        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] plan: payload=${(payloadSize/1048576).toFixed(2)}MB audioSec=${totalAudioSec.toFixed(1)}s videoSec=${videoSec.toFixed(1)}s totalFrames=${totalFrames}`);
         progress(0.40);
 
         // ── Step 4: Generate carrier MP4 ─────────────────────────────────
@@ -132,11 +142,13 @@ export class PlatformCrypto {
             singleAudioSec,
             hint,
             signal,
+            t0,
             onProgress: (v) => progress(0.40 + v * 0.55),
         });
 
         progress(1);
-        Logger.log(`[PlatformCrypto] ENCRYPT done — ${mp4Blob.size} bytes`);
+        const totalMs = performance.now() - t0;
+        Logger.log(`[PlatformCrypto] ──── ENCRYPT DONE — ${(mp4Blob.size/1048576).toFixed(2)} MB in ${(totalMs/1000).toFixed(1)}s ────`);
         return mp4Blob;
     }
 
@@ -350,9 +362,15 @@ export class PlatformCrypto {
 
     static async _generateCarrierMp4({
         ciphertext, audioHeaderBytes, totalAudioSec, totalFrames,
-        singleAudioSec, hint, signal, onProgress,
+        singleAudioSec, hint, signal, t0, onProgress,
     }) {
+        const ms  = (a, b) => `${(b - a).toFixed(1)}ms`;
+        const rel = () => `t=${ms(t0, performance.now())}`;
+        let t;
+
+        t = performance.now();
         const { MediaBunny } = await import('../../core/MediaBunny.js');
+        Logger.log(`[PlatformCrypto] [${rel()}] MediaBunny import: ${ms(t, performance.now())}`);
 
         const output = new MediaBunny.Output({
             format: new MediaBunny.Mp4OutputFormat(),
@@ -374,40 +392,49 @@ export class PlatformCrypto {
         const supportedAudioCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'flac', 'opus']);
         if (!supportedAudioCodecs.length) throw new Error('JJC3: no encodable audio codec');
         const audioCodec = supportedAudioCodecs[0];
-        Logger.log(`[PlatformCrypto] Audio codec: ${audioCodec}`);
 
         const audioSource = new MediaBunny.AudioSampleSource({ codec: audioCodec, bitrate: 128_000 });
 
         output.addVideoTrack(canvasSource);
         output.addAudioTrack(audioSource);
+
+        t = performance.now();
         await output.start();
+        Logger.log(`[PlatformCrypto] [${rel()}] output.start(): ${ms(t, performance.now())}`);
 
         // ── Feed audio ─────────────────────────────────────────────────────
+        t = performance.now();
         const headerFloat32 = encodeAudio(audioHeaderBytes);
-        const gapSamples    = Math.round(AUDIO_SAMPLE_RATE * AUDIO_GAP_SEC);
-        const silenceFloat  = new Float32Array(gapSamples); // zeros = silence
+        Logger.log(`[PlatformCrypto] [${rel()}] encodeAudio (${audioHeaderBytes.length}B → ${headerFloat32.length} samples): ${ms(t, performance.now())}`);
 
-        // Repeat the header AUDIO_REPEAT times with gaps
+        const gapSamples    = Math.round(AUDIO_SAMPLE_RATE * AUDIO_GAP_SEC);
+        const silenceFloat  = new Float32Array(gapSamples);
         const totalAudioArray = PlatformCrypto._buildAudioArray(
             headerFloat32, silenceFloat, AUDIO_REPEAT, totalAudioSec
         );
 
-        Logger.log(`[PlatformCrypto] Audio signal — ${(totalAudioArray.length / AUDIO_SAMPLE_RATE).toFixed(2)} s, feeding…`);
+        t = performance.now();
         await PlatformCrypto._feedAudio(audioSource, totalAudioArray);
-        Logger.log('[PlatformCrypto] Audio fed, encoding video frames…');
+        Logger.log(`[PlatformCrypto] [${rel()}] _feedAudio (${(totalAudioArray.length/AUDIO_SAMPLE_RATE).toFixed(1)}s audio): ${ms(t, performance.now())}`);
 
         // ── Feed video frames ──────────────────────────────────────────────
         const totalChunks = Math.ceil(ciphertext.length / DATA_BYTES_PER_FRAME);
         const frameDuration = 1 / FPS;
         let frameIdx = 0;
 
-        // Pre-render the placeholder once into an ImageData so we can memcpy
-        // it per frame instead of redrawing ~10 canvas shapes every frame.
+        t = performance.now();
         PlatformCrypto._drawPlaceholder(ctx, hint);
         const placeholderPixels = ctx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
         const frameImageData = new ImageData(
             new Uint8ClampedArray(placeholderPixels.length), VIDEO_W, VIDEO_H
         );
+        Logger.log(`[PlatformCrypto] [${rel()}] placeholder pre-render: ${ms(t, performance.now())}`);
+        Logger.log(`[PlatformCrypto] [${rel()}] video loop starting — totalChunks=${totalChunks} totalFrames=${totalFrames} (${FRAME_COPIES} passes)`);
+
+        // Per-frame timing accumulators — reported every REPORT_EVERY frames
+        const REPORT_EVERY = 300;
+        let tMemcpy = 0, tPixelWrite = 0, tPutImageData = 0, tCanvasAdd = 0;
+        let windowStart = performance.now();
 
         // Interleaved layout: encode all chunks for repeat 0, then all for repeat 1, etc.
         // Each copy of a chunk lands in a completely different section of the video,
@@ -420,15 +447,40 @@ export class PlatformCrypto {
                 const chunk = new Uint8Array(DATA_BYTES_PER_FRAME);
                 chunk.set(ciphertext.slice(start, end));
 
-                // Reset to placeholder pixels then write data blocks directly —
-                // replaces ~6 500 canvas API calls with one memcpy + pixel writes.
+                let ts;
+
+                ts = performance.now();
                 frameImageData.data.set(placeholderPixels);
+                tMemcpy += performance.now() - ts;
+
+                ts = performance.now();
                 encodeFrameToImageData(frameImageData, chunkIndex, totalChunks, repeatIdx, chunk);
+                tPixelWrite += performance.now() - ts;
+
+                ts = performance.now();
                 ctx.putImageData(frameImageData, 0, 0);
+                tPutImageData += performance.now() - ts;
+
+                ts = performance.now();
                 await canvasSource.add(frameIdx * frameDuration, frameDuration);
+                tCanvasAdd += performance.now() - ts;
+
                 frameIdx++;
 
-                if (frameIdx % 30 === 0) {
+                if (frameIdx % REPORT_EVERY === 0) {
+                    const windowMs = performance.now() - windowStart;
+                    Logger.log(
+                        `[PlatformCrypto] [${rel()}] frames ${frameIdx - REPORT_EVERY + 1}–${frameIdx}/${totalFrames} ` +
+                        `(pass ${repeatIdx + 1}/${FRAME_COPIES}) | window=${windowMs.toFixed(0)}ms ` +
+                        `| memcpy=${tMemcpy.toFixed(1)}ms ` +
+                        `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
+                        `| putImageData=${tPutImageData.toFixed(1)}ms ` +
+                        `| canvasAdd=${tCanvasAdd.toFixed(1)}ms ` +
+                        `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tPutImageData - tCanvasAdd).toFixed(1)}ms`
+                    );
+                    tMemcpy = 0; tPixelWrite = 0; tPutImageData = 0; tCanvasAdd = 0;
+                    windowStart = performance.now();
+
                     signal?.throwIfAborted();
                     onProgress && onProgress(frameIdx / totalFrames);
                     await new Promise(r => setTimeout(r, 0));
@@ -436,26 +488,44 @@ export class PlatformCrypto {
             }
         }
 
+        // Flush any partial window
+        if (frameIdx % REPORT_EVERY !== 0) {
+            const windowMs = performance.now() - windowStart;
+            Logger.log(
+                `[PlatformCrypto] [${rel()}] frames ${frameIdx - (frameIdx % REPORT_EVERY) + 1}–${frameIdx}/${totalFrames} (data done) ` +
+                `| window=${windowMs.toFixed(0)}ms ` +
+                `| memcpy=${tMemcpy.toFixed(1)}ms ` +
+                `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
+                `| putImageData=${tPutImageData.toFixed(1)}ms ` +
+                `| canvasAdd=${tCanvasAdd.toFixed(1)}ms`
+            );
+        }
+
         // Tail frames: placeholder only, no data
+        const tailStart = performance.now();
+        const tailStartIdx = frameIdx;
         while (frameIdx < totalFrames) {
             ctx.putImageData(frameImageData, 0, 0);
             await canvasSource.add(frameIdx * frameDuration, frameDuration);
             frameIdx++;
 
-            if (frameIdx % 30 === 0) {
+            if (frameIdx % REPORT_EVERY === 0) {
                 signal?.throwIfAborted();
                 onProgress && onProgress(frameIdx / totalFrames);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
+        if (frameIdx > tailStartIdx) {
+            Logger.log(`[PlatformCrypto] [${rel()}] tail frames: ${frameIdx - tailStartIdx} frames in ${ms(tailStart, performance.now())}`);
+        }
 
-        Logger.log(`[PlatformCrypto] Video encoded — ${frameIdx} frames (${FRAME_COPIES} passes × ${totalChunks} chunks + ${frameIdx - totalChunks * FRAME_COPIES} tail)`);
+        t = performance.now();
         canvasSource.close();
         audioSource.close();
         await output.finalize();
+        Logger.log(`[PlatformCrypto] [${rel()}] output.finalize(): ${ms(t, performance.now())}`);
 
         const mp4Blob = new Blob([output.target.buffer], { type: 'video/mp4' });
-
         if (typeof output.dispose === 'function') output.dispose();
 
         return mp4Blob;
