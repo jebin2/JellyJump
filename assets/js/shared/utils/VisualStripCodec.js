@@ -135,17 +135,23 @@ export function encodeFrame(ctx, chunkIndex, totalChunks, repeatIndex, data) {
 
 // ─── Fast pixel-direct encoding (for bulk frame generation) ──────────────────
 
-function _writeBlockPixels(pixels, col, row, bit) {
-    const color = bit ? 255 : 0;
+// Uint32 color constants — computed once at load time to be correct on any
+// CPU endianness. ImageData.data is RGBA; a Uint32Array view over the same
+// buffer reads/writes all 4 channels in one operation.
+const _scratch = new Uint8Array(4);
+_scratch[3] = 255;
+const _BLACK32 = new Uint32Array(_scratch.buffer)[0]; // RGBA(0,0,0,255)
+_scratch[0] = _scratch[1] = _scratch[2] = 255;
+const _WHITE32 = new Uint32Array(_scratch.buffer)[0]; // RGBA(255,255,255,255)
+
+function _writeBlockPixels(u32view, col, row, bit) {
+    const color32 = bit ? _WHITE32 : _BLACK32;
     const x0 = col * BLOCK_PX;
     const y0 = row * BLOCK_PX;
     for (let dy = 0; dy < BLOCK_PX; dy++) {
-        let idx = ((y0 + dy) * VIDEO_W + x0) * 4;
-        for (let dx = 0; dx < BLOCK_PX; dx++, idx += 4) {
-            pixels[idx]     = color;
-            pixels[idx + 1] = color;
-            pixels[idx + 2] = color;
-            // alpha already 255 from placeholder copy
+        let i = (y0 + dy) * VIDEO_W + x0;
+        for (let dx = 0; dx < BLOCK_PX; dx++, i++) {
+            u32view[i] = color32;
         }
     }
 }
@@ -162,7 +168,7 @@ function _writeBlockPixels(pixels, col, row, bit) {
  * @param {Uint8Array} data      exactly DATA_BYTES_PER_FRAME bytes
  */
 export function encodeFrameToImageData(imageData, chunkIndex, totalChunks, repeatIndex, data) {
-    const pixels = imageData.data;
+    const u32view = new Uint32Array(imageData.data.buffer);
 
     const crcInput = new Uint8Array(4 + data.length);
     crcInput[0] = (chunkIndex  >> 8) & 0xFF;
@@ -182,7 +188,7 @@ export function encodeFrameToImageData(imageData, chunkIndex, totalChunks, repea
 
     for (let i = 0; i < _HDR_BLOCKS.length; i++) {
         const { row, col } = _HDR_BLOCKS[i];
-        _writeBlockPixels(pixels, col, row, hBits[i] ?? 0);
+        _writeBlockPixels(u32view, col, row, hBits[i] ?? 0);
     }
 
     // Data bits
@@ -191,7 +197,7 @@ export function encodeFrameToImageData(imageData, chunkIndex, totalChunks, repea
         const bitIdx  = 7 - (i & 7);
         const bit     = byteIdx < data.length ? (data[byteIdx] >> bitIdx) & 1 : 0;
         const { row, col } = _DATA_BLOCKS[i];
-        _writeBlockPixels(pixels, col, row, bit);
+        _writeBlockPixels(u32view, col, row, bit);
     }
 }
 
