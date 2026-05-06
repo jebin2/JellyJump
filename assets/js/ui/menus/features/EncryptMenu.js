@@ -172,8 +172,8 @@ export class EncryptMenu {
                 } else {
                     // Auto-detect format for decryption
                     let result;
-                    const isJJC3 = await PlatformCrypto.readMetadata(source);
-                    if (isJJC3 !== null) {
+                    const jjc3Meta = await PlatformCrypto.readMetadata(source);
+                    if (jjc3Meta !== null) {
                         result = await PlatformCrypto.decrypt(source, password, onProgress);
                     } else {
                         result = await CryptoHelper.decrypt(source, password, onProgress);
