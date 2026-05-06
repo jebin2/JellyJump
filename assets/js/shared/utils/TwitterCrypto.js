@@ -40,7 +40,6 @@ import {
 import {
     encodeFrame, decodeFrame, assembleChunks,
     DATA_BYTES_PER_FRAME, FPS, FRAME_COPIES, VIDEO_W, VIDEO_H,
-    BANNER_COL_START, BANNER_COL_END, BANNER_ROW_START, BANNER_ROW_END, BLOCK_PX,
     stripDurationSec, framesNeeded,
 } from './VisualStripCodec.js';
 
@@ -131,6 +130,7 @@ export class TwitterCrypto {
             totalAudioSec,
             totalFrames,
             singleAudioSec,
+            hint,
             onProgress: (v) => progress(0.40 + v * 0.55),
         });
 
@@ -349,7 +349,7 @@ export class TwitterCrypto {
 
     static async _generateCarrierMp4({
         ciphertext, audioHeaderBytes, totalAudioSec, totalFrames,
-        singleAudioSec, onProgress,
+        singleAudioSec, hint, onProgress,
     }) {
         const { MediaBunny } = await import('../../core/MediaBunny.js');
 
@@ -411,7 +411,7 @@ export class TwitterCrypto {
                 const chunk = new Uint8Array(DATA_BYTES_PER_FRAME);
                 chunk.set(ciphertext.slice(start, end));
 
-                TwitterCrypto._drawPlaceholder(ctx);
+                TwitterCrypto._drawPlaceholder(ctx, hint);
                 encodeFrame(ctx, chunkIndex, totalChunks, repeatIdx, chunk);
                 await canvasSource.add(frameIdx * frameDuration, frameDuration);
                 frameIdx++;
@@ -425,7 +425,7 @@ export class TwitterCrypto {
 
         // Tail frames: placeholder only, no data
         while (frameIdx < totalFrames) {
-            TwitterCrypto._drawPlaceholder(ctx);
+            TwitterCrypto._drawPlaceholder(ctx, hint);
             await canvasSource.add(frameIdx * frameDuration, frameDuration);
             frameIdx++;
 
@@ -489,39 +489,72 @@ export class TwitterCrypto {
         }
     }
 
-    static _drawPlaceholder(ctx) {
-        // Full frame dark background (data blocks will be drawn on top by encodeFrame)
-        ctx.fillStyle = '#000000';
+    static _drawPlaceholder(ctx, hint) {
+        // Black frame; data blocks are drawn on top by encodeFrame
+        ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, VIDEO_W, VIDEO_H);
 
-        // Animation lives only inside the banner zone
-        const bx = BANNER_COL_START * BLOCK_PX;                          // 320
-        const by = BANNER_ROW_START * BLOCK_PX;                          // 176
-        const bw = (BANNER_COL_END - BANNER_COL_START) * BLOCK_PX;      // 640
-        const bh = (BANNER_ROW_END - BANNER_ROW_START) * BLOCK_PX;      // 384
-        const cx = bx + bw / 2;
-        const cy = by + bh / 2;
+        // Card centered on the full frame
+        const cx = VIDEO_W / 2;
+        const cy = VIDEO_H / 2;
+        const hasHint = hint && hint.trim().length > 0;
+        const cardW = 340;
+        const cardPad = 22;
+        // Heights derived from layout: pad(22)+lock(34)+title(28)+brand(22)+url(16)+pad(22)=144
+        // + hint section: gap(22)+divider+gap(10)+hint(15)=47 → 191 total
+        const cardH = hasHint ? 192 : 148;
+        const cardX = Math.round(cx - cardW / 2);
+        const cardY = Math.round(cy - cardH / 2);
 
-        ctx.fillStyle = '#0f0f1a';
-        ctx.fillRect(bx, by, bw, bh);
+        // Neobrutalist solid shadow
+        ctx.fillStyle = '#00ff88';
+        ctx.fillRect(cardX + 6, cardY + 6, cardW, cardH);
 
-        ctx.strokeStyle = '#e94560';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(bx + 1.5, by + 1.5, bw - 3, bh - 3);
+        // Card
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(cardX, cardY, cardW, cardH);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(cardX + 2, cardY + 2, cardW - 4, cardH - 4);
 
-        ctx.font = '56px serif';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#e94560';
-        ctx.fillText('\u{1F512}', cx, cy - 60);
+        ctx.textBaseline = 'top';
 
-        ctx.font = 'bold 28px sans-serif';
+        let ty = cardY + cardPad;
+
+        ctx.font = '24px serif';
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText('\u{1F512}', cx, ty);
+        ty += 34;
+
+        ctx.font = 'bold 20px Arial, sans-serif';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('This video is encrypted', cx, cy);
+        ctx.fillText('VIDEO IS ENCRYPTED', cx, ty);
+        ty += 28;
 
-        ctx.font = '20px sans-serif';
-        ctx.fillStyle = '#888888';
-        ctx.fillText('JellyJump JJC3 — Twitter-safe format', cx, cy + 50);
+        ctx.font = '14px Arial, sans-serif';
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText('By JellyJump', cx, ty);
+        ty += 22;
+
+        ctx.font = '13px "Courier New", monospace';
+        ctx.fillStyle = '#666666';
+        ctx.fillText('voidall.com/JellyJump', cx, ty);
+
+        if (hasHint) {
+            ty += 22;
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(cardX + cardPad, ty);
+            ctx.lineTo(cardX + cardW - cardPad, ty);
+            ctx.stroke();
+            ty += 10;
+
+            ctx.font = '12px "Courier New", monospace';
+            ctx.fillStyle = '#b0b0b0';
+            ctx.fillText(`Hint: ${hint}`, cx, ty);
+        }
     }
 
 }

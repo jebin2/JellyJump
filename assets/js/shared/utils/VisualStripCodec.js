@@ -1,17 +1,17 @@
 /**
  * VisualStripCodec
  * Encodes bytes as black/white 16×16-pixel blocks across the entire video frame,
- * skipping only the center banner zone where the placeholder animation lives.
+ * skipping only the compact center banner zone where the card animation lives.
  *
  * Frame layout (1280 × 720, 80 × 45 blocks):
  *
  *   ┌──────────────────────────────────────────────────────────┐
  *   │ ROW 0: header (sync + chunk_idx + total_chunks + crc32)  │
- *   │ DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA     │  rows 1–10
- *   ├────────────────┬─────────────────────┬───────────────────┤
- *   │  DATA  (left)  │   ANIMATION BANNER  │  DATA  (right)    │  rows 11–34
- *   ├────────────────┴─────────────────────┴───────────────────┤
- *   │ DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA     │  rows 35–44
+ *   │ DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA     │  rows 1–14
+ *   ├──────────────────────┬──────────────┬────────────────────┤
+ *   │  DATA  (left)        │  CARD BANNER │  DATA  (right)     │  rows 15–29
+ *   ├──────────────────────┴──────────────┴────────────────────┤
+ *   │ DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA  DATA     │  rows 30–44
  *   └──────────────────────────────────────────────────────────┘
  *
  * Header (row 0, 80 blocks = 80 bits = 10 bytes):
@@ -21,7 +21,7 @@
  *   bits 40–47  repeat_index (uint8)  — 0, 1, or 2
  *   bits 48–79  CRC-32 of (chunk_index ‖ total_chunks ‖ data)
  *
- * Data blocks: 2640 − 80 = 2560 → 320 bytes/frame
+ * Data blocks: 3240 − 80 = 3160 → 395 bytes/frame
  *
  * Redundancy: FRAME_COPIES=3 (each chunk written into 3 consecutive frames).
  * Decoder takes the first copy whose CRC-32 passes.
@@ -38,11 +38,12 @@ export const BLOCKS_Y  = VIDEO_H / BLOCK_PX;  // 45
 export const FPS       = 30;
 export const FRAME_COPIES = 3;
 
-// Center banner zone — codec skips these blocks (animation lives here)
-export const BANNER_COL_START = 20;
-export const BANNER_COL_END   = 60;
-export const BANNER_ROW_START = 11;
-export const BANNER_ROW_END   = 35;
+// Compact card zone — codec skips these blocks (banner card lives here)
+// Sized to contain the 340×182px card + 6px shadow, centered at 640×360, with 1-block margin.
+export const BANNER_COL_START = 28;  // x: 448px
+export const BANNER_COL_END   = 52;  // x: 832px  → 384px wide
+export const BANNER_ROW_START = 15;  // y: 240px
+export const BANNER_ROW_END   = 30;  // y: 480px  → 240px tall
 
 // Header occupies the entire row 0 (80 blocks = 80 bits)
 const HEADER_BITS = 80;
@@ -75,11 +76,11 @@ function _buildBlockList() {
     return all;
 }
 
-const _ALL_BLOCKS  = _buildBlockList();                      // 2640 blocks
+const _ALL_BLOCKS  = _buildBlockList();                      // 3240 blocks
 const _HDR_BLOCKS  = _ALL_BLOCKS.slice(0, HEADER_BITS);     // 80 blocks (row 0)
-const _DATA_BLOCKS = _ALL_BLOCKS.slice(HEADER_BITS);        // 2560 blocks
+const _DATA_BLOCKS = _ALL_BLOCKS.slice(HEADER_BITS);        // 3160 blocks
 
-export const DATA_BYTES_PER_FRAME = _DATA_BLOCKS.length >> 3; // 320
+export const DATA_BYTES_PER_FRAME = _DATA_BLOCKS.length >> 3; // 395
 
 // ─── Encoding ────────────────────────────────────────────────────────────────
 

@@ -44,7 +44,7 @@ export class CryptoHelper {
 
         // Step 1: Generate placeholder video
         if (onProgress) onProgress(0);
-        const placeholderBlob = await CryptoHelper._generatePlaceholder();
+        const placeholderBlob = await CryptoHelper._generatePlaceholder(hint);
         const placeholderSize = placeholderBlob.size;
         Logger.log(`[CryptoHelper] Placeholder generated: ${placeholderSize} bytes`);
 
@@ -301,9 +301,10 @@ export class CryptoHelper {
     /**
      * Generate a short placeholder MP4 video showing an encryption message.
      * Uses MediaBunny CanvasSource encoder.
+     * @param {string} [hint]
      * @returns {Promise<Blob>}
      */
-    static async _generatePlaceholder() {
+    static async _generatePlaceholder(hint) {
         const { MediaBunny } = await import('../../core/MediaBunny.js');
 
         const W = 640, H = 360, FPS = 2, DURATION_SEC = 2;
@@ -312,7 +313,7 @@ export class CryptoHelper {
         canvas.width = W;
         canvas.height = H;
         const ctx = canvas.getContext('2d');
-        CryptoHelper._drawEncryptionMessage(ctx, W, H);
+        CryptoHelper._drawEncryptionMessage(ctx, W, H, hint);
 
         const output = new MediaBunny.Output({
             format: new MediaBunny.Mp4OutputFormat(),
@@ -344,33 +345,76 @@ export class CryptoHelper {
 
     /**
      * Draw the encryption message on a canvas context.
-     * Dark background with red accent border, lock icon, and text.
      * @param {CanvasRenderingContext2D} ctx
-     * @param {number} w - Canvas width
-     * @param {number} h - Canvas height
+     * @param {number} w
+     * @param {number} h
+     * @param {string} [hint]
      */
-    static _drawEncryptionMessage(ctx, w, h) {
-        ctx.fillStyle = '#0f0f1a';
+    static _drawEncryptionMessage(ctx, w, h, hint) {
+        const cx = w / 2;
+        const cy = h / 2;
+        const hasHint = hint && hint.trim().length > 0;
+
+        ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, w, h);
 
-        const borderWidth = 3;
-        ctx.strokeStyle = '#e94560';
-        ctx.lineWidth = borderWidth;
-        ctx.strokeRect(borderWidth / 2, borderWidth / 2, w - borderWidth, h - borderWidth);
+        const cardW = 300;
+        const cardPad = 20;
+        // Heights: pad(20)+lock(32)+title(26)+brand(20)+url(15)+pad(20)=133
+        // + hint: gap(20)+divider+gap(10)+hint(14)=44 → 177
+        const cardH = hasHint ? 178 : 134;
+        const cardX = Math.round(cx - cardW / 2);
+        const cardY = Math.round(cy - cardH / 2);
 
-        ctx.font = '48px serif';
+        // Neobrutalist solid shadow
+        ctx.fillStyle = '#00ff88';
+        ctx.fillRect(cardX + 6, cardY + 6, cardW, cardH);
+
+        // Card
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(cardX, cardY, cardW, cardH);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(cardX + 2, cardY + 2, cardW - 4, cardH - 4);
+
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#e94560';
-        ctx.fillText('\u{1F512}', w / 2, h / 2 - 50);
+        ctx.textBaseline = 'top';
 
-        ctx.font = 'bold 24px sans-serif';
+        let ty = cardY + cardPad;
+
+        ctx.font = '22px serif';
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText('\u{1F512}', cx, ty);
+        ty += 32;
+
+        ctx.font = 'bold 18px Arial, sans-serif';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText('This video is encrypted', w / 2, h / 2 + 10);
+        ctx.fillText('VIDEO IS ENCRYPTED', cx, ty);
+        ty += 26;
 
-        ctx.font = '18px sans-serif';
-        ctx.fillStyle = '#888888';
-        ctx.fillText('voidall.com/JellyJump', w / 2, h / 2 + 50);
+        ctx.font = '13px Arial, sans-serif';
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText('By JellyJump', cx, ty);
+        ty += 20;
+
+        ctx.font = '12px "Courier New", monospace';
+        ctx.fillStyle = '#666666';
+        ctx.fillText('voidall.com/JellyJump', cx, ty);
+
+        if (hasHint) {
+            ty += 20;
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(cardX + cardPad, ty);
+            ctx.lineTo(cardX + cardW - cardPad, ty);
+            ctx.stroke();
+            ty += 10;
+
+            ctx.font = '11px "Courier New", monospace';
+            ctx.fillStyle = '#b0b0b0';
+            ctx.fillText(`Hint: ${hint}`, cx, ty);
+        }
     }
 
     /**
