@@ -209,6 +209,71 @@ export function stripDurationSec(byteCount) {
     return framesNeeded(byteCount) / FPS;
 }
 
+// ─── I420 encoding (fastest path — avoids RGBA and canvas entirely) ───────────
+//
+// I420 is the native format for H.264. Feeding it directly skips the
+// RGBA→I420 color-space conversion the encoder would otherwise do per frame.
+// Buffer layout: [Y plane: W×H] [U plane: W/2×H/2] [V plane: W/2×H/2]
+
+export const I420_Y_SIZE  = VIDEO_W * VIDEO_H;                // 921 600 B
+export const I420_UV_SIZE = (VIDEO_W >> 1) * (VIDEO_H >> 1); // 230 400 B
+export const I420_SIZE    = I420_Y_SIZE + I420_UV_SIZE * 2;  // 1 382 400 B
+
+function _writeBlockI420Y(i420, col, row, bit) {
+    // bit=0 → Y stays at whatever the placeholder has (<128 → decoded as 0). No write.
+    // bit=1 → write Y=255 to every pixel in the 16×16 block.
+    if (!bit) return;
+    const x0 = col * BLOCK_PX;
+    const y0 = row * BLOCK_PX;
+    for (let dy = 0; dy < BLOCK_PX; dy++) {
+        const base = (y0 + dy) * VIDEO_W + x0;
+        i420.fill(255, base, base + BLOCK_PX);
+    }
+}
+
+/**
+ * Encode one frame directly into a pre-allocated I420 buffer.
+ * The buffer must already contain the placeholder I420 (copied before calling).
+ * Only white (bit=1) blocks are written to the Y plane — black blocks are left
+ * as-is from the placeholder (background Y < 128, decoded as 0). U/V planes
+ * are never touched; they stay at 128 (neutral chroma) from the placeholder.
+ *
+ * @param {Uint8Array} i420     pre-filled with placeholder I420 pixels
+ * @param {number} chunkIndex
+ * @param {number} totalChunks
+ * @param {number} repeatIndex
+ * @param {Uint8Array} data     exactly DATA_BYTES_PER_FRAME bytes
+ */
+export function encodeFrameToI420(i420, chunkIndex, totalChunks, repeatIndex, data) {
+    const crcInput = new Uint8Array(4 + data.length);
+    crcInput[0] = (chunkIndex  >> 8) & 0xFF;
+    crcInput[1] =  chunkIndex        & 0xFF;
+    crcInput[2] = (totalChunks >> 8) & 0xFF;
+    crcInput[3] =  totalChunks       & 0xFF;
+    crcInput.set(data, 4);
+    const checksum = crc32(crcInput);
+
+    const hBits = [];
+    for (let i = 7; i >= 0; i--) hBits.push((SYNC_BYTE    >> i) & 1);
+    for (let i = 15; i >= 0; i--) hBits.push((chunkIndex  >> i) & 1);
+    for (let i = 15; i >= 0; i--) hBits.push((totalChunks >> i) & 1);
+    for (let i = 7; i >= 0; i--) hBits.push((repeatIndex  >> i) & 1);
+    for (let i = 31; i >= 0; i--) hBits.push((checksum    >> i) & 1);
+
+    for (let i = 0; i < _HDR_BLOCKS.length; i++) {
+        const { row, col } = _HDR_BLOCKS[i];
+        _writeBlockI420Y(i420, col, row, hBits[i] ?? 0);
+    }
+
+    for (let i = 0; i < _DATA_BLOCKS.length; i++) {
+        const byteIdx = i >> 3;
+        const bitIdx  = 7 - (i & 7);
+        const bit     = byteIdx < data.length ? (data[byteIdx] >> bitIdx) & 1 : 0;
+        const { row, col } = _DATA_BLOCKS[i];
+        _writeBlockI420Y(i420, col, row, bit);
+    }
+}
+
 // ─── Decoding ────────────────────────────────────────────────────────────────
 
 function _readBit(imageData, col, row) {

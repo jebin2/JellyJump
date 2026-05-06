@@ -38,8 +38,10 @@ import {
     encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
 import {
-    encodeFrame, encodeFrameToImageData, decodeFrame, assembleChunks,
+    encodeFrame, encodeFrameToImageData, encodeFrameToI420,
+    decodeFrame, assembleChunks,
     DATA_BYTES_PER_FRAME, FPS, FRAME_COPIES, VIDEO_W, VIDEO_H,
+    I420_Y_SIZE, I420_UV_SIZE, I420_SIZE,
     stripDurationSec,
 } from './VisualStripCodec.js';
 
@@ -418,20 +420,27 @@ export class PlatformCrypto {
         const frameDuration = 1 / FPS;
         let frameIdx = 0;
 
-        // Use a temporary canvas only to pre-render the placeholder once into ImageData.
-        // The canvas is not used again after this point.
+        // Pre-render placeholder once: canvas → RGBA → I420.
+        // I420 is H.264's native format — feeding it directly skips the per-frame
+        // RGBA→I420 conversion the encoder would otherwise do, and cuts buffer size
+        // from 3.7 MB (RGBA) to 1.4 MB (I420).
         t = performance.now();
         const tmpCanvas = document.createElement('canvas');
         tmpCanvas.width  = VIDEO_W;
         tmpCanvas.height = VIDEO_H;
         const tmpCtx = tmpCanvas.getContext('2d');
         PlatformCrypto._drawPlaceholder(tmpCtx, hint);
-        const placeholderPixels = tmpCtx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
-        const frameImageData = new ImageData(
-            new Uint8ClampedArray(placeholderPixels.length), VIDEO_W, VIDEO_H
-        );
-        Logger.log(`[PlatformCrypto] [${rel()}] placeholder pre-render: ${ms(t, performance.now())}`);
+        const placeholderRgba = tmpCtx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
+        const placeholderI420 = PlatformCrypto._rgbaToI420(placeholderRgba, VIDEO_W, VIDEO_H);
+        const i420Frame       = new Uint8Array(I420_SIZE);
+        Logger.log(`[PlatformCrypto] [${rel()}] placeholder pre-render + RGBA→I420: ${ms(t, performance.now())}`);
         Logger.log(`[PlatformCrypto] [${rel()}] video loop starting — totalChunks=${totalChunks} totalFrames=${totalFrames} (${FRAME_COPIES} passes)`);
+
+        const I420_LAYOUT = [
+            { offset: 0,                    stride: VIDEO_W       },
+            { offset: I420_Y_SIZE,          stride: VIDEO_W >> 1  },
+            { offset: I420_Y_SIZE + I420_UV_SIZE, stride: VIDEO_W >> 1 },
+        ];
 
         // Per-frame timing accumulators — reported every REPORT_EVERY frames
         const REPORT_EVERY = 300;
@@ -452,21 +461,21 @@ export class PlatformCrypto {
                 let ts;
 
                 ts = performance.now();
-                frameImageData.data.set(placeholderPixels);
+                i420Frame.set(placeholderI420);
                 tMemcpy += performance.now() - ts;
 
                 ts = performance.now();
-                encodeFrameToImageData(frameImageData, chunkIndex, totalChunks, repeatIdx, chunk);
+                encodeFrameToI420(i420Frame, chunkIndex, totalChunks, repeatIdx, chunk);
                 tPixelWrite += performance.now() - ts;
 
-                // Feed raw RGBA pixels directly — no putImageData / canvas capture needed.
                 ts = performance.now();
-                const sample = new MediaBunny.VideoSample(frameImageData.data, {
-                    format: 'RGBA',
+                const sample = new MediaBunny.VideoSample(i420Frame, {
+                    format:      'I420',
                     codedWidth:  VIDEO_W,
                     codedHeight: VIDEO_H,
                     timestamp:   frameIdx * frameDuration,
                     duration:    frameDuration,
+                    layout:      I420_LAYOUT,
                 });
                 tSampleCreate += performance.now() - ts;
 
@@ -511,17 +520,17 @@ export class PlatformCrypto {
             );
         }
 
-        // Tail frames: placeholder only — reuse placeholder pixels directly
-        frameImageData.data.set(placeholderPixels);
+        // Tail frames: placeholder only — feed placeholderI420 directly each time
         const tailStart = performance.now();
         const tailStartIdx = frameIdx;
         while (frameIdx < totalFrames) {
-            const tailSample = new MediaBunny.VideoSample(frameImageData.data, {
-                format: 'RGBA',
+            const tailSample = new MediaBunny.VideoSample(placeholderI420, {
+                format:      'I420',
                 codedWidth:  VIDEO_W,
                 codedHeight: VIDEO_H,
                 timestamp:   frameIdx * frameDuration,
                 duration:    frameDuration,
+                layout:      I420_LAYOUT,
             });
             await videoSampleSource.add(tailSample);
             tailSample.close();
@@ -657,6 +666,31 @@ export class PlatformCrypto {
             ctx.fillStyle = '#b0b0b0';
             ctx.fillText(`Hint: ${hint}`, cx, ty);
         }
+    }
+
+    /**
+     * Convert RGBA ImageData pixels to a packed I420 (YUV 4:2:0) Uint8Array.
+     * Done once per encrypt call for the placeholder frame.
+     * BT.601 full-range coefficients, integer arithmetic.
+     */
+    static _rgbaToI420(rgba, width, height) {
+        const ySize  = width * height;
+        const uvSize = (width >> 1) * (height >> 1);
+        const i420   = new Uint8Array(ySize + uvSize * 2);
+        i420.fill(128, ySize); // neutral chroma for U and V
+
+        for (let row = 0; row < height; row++) {
+            for (let col = 0; col < width; col++) {
+                const pi = (row * width + col) * 4;
+                const R = rgba[pi], G = rgba[pi + 1], B = rgba[pi + 2];
+                i420[row * width + col] = (77 * R + 150 * G + 29 * B) >> 8;
+                if (row & 1 || col & 1) continue; // U/V subsampled 2×2
+                const uvOff = ySize + (row >> 1) * (width >> 1) + (col >> 1);
+                i420[uvOff]           = ((-43 * R -  85 * G + 128 * B + 32768) >> 8);
+                i420[uvOff + uvSize]  = ((128 * R - 107 * G -  21 * B + 32768) >> 8);
+            }
+        }
+        return i420;
     }
 
 }
