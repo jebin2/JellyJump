@@ -128,6 +128,16 @@ export class EncryptMenu {
                 return;
             }
 
+            if (currentMode === 'encrypt' && sourceBlob) {
+                const estSec = PlatformCrypto.estimatedDuration(sourceBlob.size);
+                if (estSec > 600) {
+                    const estMin = Math.round(estSec / 60);
+                    errorMessage.textContent = `File too large: output would be ~${estMin} min. Keep files under ~2 MB for platform compatibility.`;
+                    errorMessage.classList.remove('hidden');
+                    return;
+                }
+            }
+
             // Disable UI
             encryptBtn.disabled        = true;
             modal.closeBtn.disabled    = true;
