@@ -133,6 +133,68 @@ export function encodeFrame(ctx, chunkIndex, totalChunks, repeatIndex, data) {
     }
 }
 
+// ─── Fast pixel-direct encoding (for bulk frame generation) ──────────────────
+
+function _writeBlockPixels(pixels, col, row, bit) {
+    const color = bit ? 255 : 0;
+    const x0 = col * BLOCK_PX;
+    const y0 = row * BLOCK_PX;
+    for (let dy = 0; dy < BLOCK_PX; dy++) {
+        let idx = ((y0 + dy) * VIDEO_W + x0) * 4;
+        for (let dx = 0; dx < BLOCK_PX; dx++, idx += 4) {
+            pixels[idx]     = color;
+            pixels[idx + 1] = color;
+            pixels[idx + 2] = color;
+            // alpha already 255 from placeholder copy
+        }
+    }
+}
+
+/**
+ * Encode one frame directly into a pre-allocated ImageData pixel buffer.
+ * The buffer must already contain the placeholder image (copied before calling).
+ * Replaces ~6 500 canvas API calls per frame with direct typed-array writes.
+ *
+ * @param {ImageData} imageData  pre-filled with placeholder pixels
+ * @param {number} chunkIndex
+ * @param {number} totalChunks
+ * @param {number} repeatIndex
+ * @param {Uint8Array} data      exactly DATA_BYTES_PER_FRAME bytes
+ */
+export function encodeFrameToImageData(imageData, chunkIndex, totalChunks, repeatIndex, data) {
+    const pixels = imageData.data;
+
+    const crcInput = new Uint8Array(4 + data.length);
+    crcInput[0] = (chunkIndex  >> 8) & 0xFF;
+    crcInput[1] =  chunkIndex        & 0xFF;
+    crcInput[2] = (totalChunks >> 8) & 0xFF;
+    crcInput[3] =  totalChunks       & 0xFF;
+    crcInput.set(data, 4);
+    const checksum = crc32(crcInput);
+
+    // Header bits
+    const hBits = [];
+    for (let i = 7; i >= 0; i--) hBits.push((SYNC_BYTE    >> i) & 1);
+    for (let i = 15; i >= 0; i--) hBits.push((chunkIndex  >> i) & 1);
+    for (let i = 15; i >= 0; i--) hBits.push((totalChunks >> i) & 1);
+    for (let i = 7; i >= 0; i--) hBits.push((repeatIndex  >> i) & 1);
+    for (let i = 31; i >= 0; i--) hBits.push((checksum    >> i) & 1);
+
+    for (let i = 0; i < _HDR_BLOCKS.length; i++) {
+        const { row, col } = _HDR_BLOCKS[i];
+        _writeBlockPixels(pixels, col, row, hBits[i] ?? 0);
+    }
+
+    // Data bits
+    for (let i = 0; i < _DATA_BLOCKS.length; i++) {
+        const byteIdx = i >> 3;
+        const bitIdx  = 7 - (i & 7);
+        const bit     = byteIdx < data.length ? (data[byteIdx] >> bitIdx) & 1 : 0;
+        const { row, col } = _DATA_BLOCKS[i];
+        _writeBlockPixels(pixels, col, row, bit);
+    }
+}
+
 export function framesNeeded(byteCount) {
     return Math.ceil(byteCount / DATA_BYTES_PER_FRAME) * FRAME_COPIES;
 }

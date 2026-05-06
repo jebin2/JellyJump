@@ -38,7 +38,7 @@ import {
     encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
 import {
-    encodeFrame, decodeFrame, assembleChunks,
+    encodeFrame, encodeFrameToImageData, decodeFrame, assembleChunks,
     DATA_BYTES_PER_FRAME, FPS, FRAME_COPIES, VIDEO_W, VIDEO_H,
     stripDurationSec,
 } from './VisualStripCodec.js';
@@ -401,6 +401,14 @@ export class PlatformCrypto {
         const frameDuration = 1 / FPS;
         let frameIdx = 0;
 
+        // Pre-render the placeholder once into an ImageData so we can memcpy
+        // it per frame instead of redrawing ~10 canvas shapes every frame.
+        PlatformCrypto._drawPlaceholder(ctx, hint);
+        const placeholderPixels = ctx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
+        const frameImageData = new ImageData(
+            new Uint8ClampedArray(placeholderPixels.length), VIDEO_W, VIDEO_H
+        );
+
         // Interleaved layout: encode all chunks for repeat 0, then all for repeat 1, etc.
         // Each copy of a chunk lands in a completely different section of the video,
         // giving it an independent H.264 I-frame. If one I-frame is heavily quantized
@@ -412,8 +420,11 @@ export class PlatformCrypto {
                 const chunk = new Uint8Array(DATA_BYTES_PER_FRAME);
                 chunk.set(ciphertext.slice(start, end));
 
-                PlatformCrypto._drawPlaceholder(ctx, hint);
-                encodeFrame(ctx, chunkIndex, totalChunks, repeatIdx, chunk);
+                // Reset to placeholder pixels then write data blocks directly —
+                // replaces ~6 500 canvas API calls with one memcpy + pixel writes.
+                frameImageData.data.set(placeholderPixels);
+                encodeFrameToImageData(frameImageData, chunkIndex, totalChunks, repeatIdx, chunk);
+                ctx.putImageData(frameImageData, 0, 0);
                 await canvasSource.add(frameIdx * frameDuration, frameDuration);
                 frameIdx++;
 
@@ -427,7 +438,7 @@ export class PlatformCrypto {
 
         // Tail frames: placeholder only, no data
         while (frameIdx < totalFrames) {
-            PlatformCrypto._drawPlaceholder(ctx, hint);
+            ctx.putImageData(frameImageData, 0, 0);
             await canvasSource.add(frameIdx * frameDuration, frameDuration);
             frameIdx++;
 
