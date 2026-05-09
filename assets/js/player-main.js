@@ -1,5 +1,6 @@
 // Player page entry point
 import './pull-to-refresh.js';
+import { DOMAIN } from './shared/config.js';
 
 // Load templates first, then initialize player
 async function initializeApp() {
@@ -38,11 +39,11 @@ async function initializeApp() {
     );
 
     // Demo Videos (optional)
-    if (!localStorage.getItem('JellyJumpDB-playlist') && (window.location.href.includes('//localhost:') || window.location.href.includes('//jebin2.github.io/JellyJump/') || window.location.href.includes('//www.voidall.com/JellyJump/'))) {
+    if (!localStorage.getItem('JellyJumpDB-playlist') && (window.location.href.includes('//localhost:') || window.location.href.includes('//jebin2.github.io/JellyJump/') || window.location.href.includes('//www.voidall.com/JellyJump/') || window.location.href.includes(`//${DOMAIN}/`))) {
         playlist.addItems([
             {
                 title: 'Sample Video',
-                url: window.location.href.includes('//localhost:') ? '/homepage.mp4' : '/JellyJump/homepage.mp4',
+                url: (window.location.href.includes('//localhost:') || window.location.href.includes(`//${DOMAIN}/`)) ? '/homepage.mp4' : '/JellyJump/homepage.mp4',
                 isLocal: true
             }
         ], true); // true = autoplay on page load

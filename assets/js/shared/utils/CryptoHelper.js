@@ -1,4 +1,5 @@
 import { Logger } from './Logger.js';
+import { DOMAIN } from '../config.js';
 
 /**
  * CryptoHelper - Encrypts/decrypts files using a playable placeholder + AES-CTR + HMAC format.
@@ -399,7 +400,7 @@ export class CryptoHelper {
 
         ctx.font = '12px "Courier New", monospace';
         ctx.fillStyle = '#666666';
-        ctx.fillText('voidall.com/JellyJump', cx, ty);
+        ctx.fillText(DOMAIN, cx, ty);
 
         if (hasHint) {
             ty += 20;

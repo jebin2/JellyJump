@@ -34,6 +34,7 @@
 
 import { Logger } from './Logger.js';
 import { CryptoHelper } from './CryptoHelper.js';
+import { DOMAIN } from '../config.js';
 import {
     encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
@@ -650,7 +651,7 @@ export class PlatformCrypto {
 
         ctx.font = '13px "Courier New", monospace';
         ctx.fillStyle = '#666666';
-        ctx.fillText('voidall.com/JellyJump', cx, ty);
+        ctx.fillText(DOMAIN, cx, ty);
 
         if (hasHint) {
             ty += 22;
