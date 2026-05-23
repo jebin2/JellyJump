@@ -6,5 +6,8 @@ window.electronAPI = {
     readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
     fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
     getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
-    openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options)
+    openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
+
+    readConfig: () => ipcRenderer.invoke('read-config'),
+    writeConfig: (data) => ipcRenderer.invoke('write-config', data),
 };

@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+const configPath = path.join(app.getPath('userData'), 'jellyjump.json');
+
 // Resolve preload script path
 // In packaged apps, unpacked files are in app.asar.unpacked
 let preloadPath = path.join(__dirname, 'preload.js');
@@ -11,6 +13,28 @@ if (app.isPackaged) {
         preloadPath = unpackedPath;
     }
 }
+
+// ============================================
+// IPC Handlers for Config File (jellyjump.json)
+// ============================================
+
+ipcMain.handle('read-config', async () => {
+    try {
+        const data = await fs.promises.readFile(configPath, 'utf8');
+        return JSON.parse(data);
+    } catch {
+        return null;
+    }
+});
+
+ipcMain.handle('write-config', async (event, data) => {
+    try {
+        await fs.promises.writeFile(configPath, JSON.stringify(data, null, 2), 'utf8');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
 
 // ============================================
 // IPC Handlers for File System Access

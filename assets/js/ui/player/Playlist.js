@@ -1,6 +1,6 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { Toast } from "../../shared/utils/Toast.js";
-import { IndexedDBService } from "../../shared/services/IndexedDBService.js";
+import { StorageService } from "../../shared/services/StorageService.js";
 import { CorePlayer } from '../../core/Player.js';
 import { ConfirmDialog } from '../../shared/utils/ConfirmDialog.js';
 import { Modal as DialogModal } from '../Modal.js';
@@ -41,7 +41,7 @@ export class Playlist {
         this.navigation = new PlaylistNavigation(this);
         
         this.processor = PlaylistProcessor;
-        this.storage = new IndexedDBService();
+        this.storage = new StorageService();
 
         // Initialize UI and Navigation
         this.ui.init();

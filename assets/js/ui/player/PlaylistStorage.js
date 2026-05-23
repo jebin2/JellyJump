@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { IndexedDBService } from "../../shared/services/IndexedDBService.js";
+import { StorageService } from "../../shared/services/StorageService.js";
 
 /**
  * Playlist Storage Service
@@ -11,7 +11,7 @@ export class PlaylistStorage {
      * @returns {Promise<Object>} { items: Array, playbackState: Object }
      */
     static async loadPlaylist() {
-        const storage = new IndexedDBService();
+        const storage = new StorageService();
 
         try {
             const savedItems = await storage.loadPlaylist();
@@ -37,7 +37,7 @@ export class PlaylistStorage {
      * @param {number} currentTime - Current playback time
      */
     static savePlaylist(items, activeIndex, currentTime = 0) {
-        const storage = new IndexedDBService();
+        const storage = new StorageService();
 
         // 1. Filter out transient "Live Camera" items (don't save to DB)
         const persistentItems = items.filter(item => !item.isWebcam);
@@ -68,7 +68,7 @@ export class PlaylistStorage {
     static savePlaybackProgress(activeItem, activeIndex, currentTime) {
         if (!activeItem) return;
 
-        const storage = new IndexedDBService();
+        const storage = new StorageService();
 
         // 1. Save to IndexedDB (for playlist restoration)
         storage.savePlaybackState({
@@ -95,7 +95,7 @@ export class PlaylistStorage {
      * Clear all saved data
      */
     static async clearStorage() {
-        const storage = new IndexedDBService();
-        await storage.clearPlaylist();
+        const storage = new StorageService();
+        await storage.clear();
     }
 }

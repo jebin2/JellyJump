@@ -1,12 +1,12 @@
 import { Logger } from "./Logger.js";
 import { MediaBunny } from '../../core/MediaBunny.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
-import { IndexedDBService } from "../services/IndexedDBService.js";
+import { StorageService } from "../services/StorageService.js";
 import { formatTime } from './mediaUtils.js';
 import { ElectronHelper } from './ElectronHelper.js';
 
 // Shared IndexedDB instance for caching remote blobs
-const _dbService = new IndexedDBService();
+const _dbService = new StorageService();
 
 /**
  * Media Metadata Service
