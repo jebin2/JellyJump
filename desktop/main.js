@@ -2,6 +2,14 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Required on Linux AppImage: kernel user-namespace sandboxing is often
+// unavailable (restricted sysctl), which silently prevents the window from
+// opening. --disable-dev-shm-usage avoids /dev/shm size issues in containers.
+if (process.platform === 'linux') {
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-dev-shm-usage');
+}
+
 const configPath = path.join(app.getPath('userData'), 'jellyjump.json');
 
 // Resolve preload script path
