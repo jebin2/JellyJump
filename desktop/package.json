@@ -27,10 +27,7 @@
       "main.js",
       "preload.js",
       "package.json",
-      "build/**/*",
-      "node_modules/mediabunny/**/*",
-      "node_modules/@mediabunny/server/**/*",
-      "node_modules/node-av/**/*"
+      "build/**/*"
     ],
     "asarUnpack": [
       "preload.js",
