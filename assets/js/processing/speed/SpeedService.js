@@ -108,12 +108,7 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
             target: new MediaBunny.BufferTarget()
         });
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        canvasSource = new MediaBunny.CanvasSource(canvas, {
+        canvasSource = new MediaBunny.VideoSampleSource({
             codec: 'avc',
             bitrate: MediaBunny.QUALITY_HIGH,
         });
@@ -151,8 +146,9 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         for await (const sample of videoSink.samplesAtTimestamps(reverseTimestampGenerator)) {
             if (!sample) continue;
 
-            sample.draw(ctx, 0, 0, width, height);
-            await canvasSource.add(outputTimestamp, frameDuration);
+            sample.setTimestamp(outputTimestamp);
+            sample.setDuration(frameDuration);
+            await canvasSource.add(sample);
             outputTimestamp += frameDuration;
             sample.close();
             frameCount++;
@@ -213,8 +209,6 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
         const videoTrack = await input.getPrimaryVideoTrack();
         if (!videoTrack) throw new Error('No video track found');
 
-        const width = videoTrack.displayWidth || videoTrack.codedWidth;
-        const height = videoTrack.displayHeight || videoTrack.codedHeight;
         const duration = await videoTrack.computeDuration();
         const firstTimestamp = await videoTrack.getFirstTimestamp();
 
@@ -240,12 +234,7 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
             target: new MediaBunny.BufferTarget()
         });
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-        canvasSource = new MediaBunny.CanvasSource(canvas, {
+        canvasSource = new MediaBunny.VideoSampleSource({
             codec: 'avc',
             bitrate: MediaBunny.QUALITY_HIGH,
         });
@@ -289,8 +278,9 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
         for await (const sample of videoSink.samplesAtTimestamps(timestampGenerator)) {
             if (!sample) continue;
 
-            sample.draw(ctx, 0, 0, width, height);
-            await canvasSource.add(outputTimestamp, frameDuration);
+            sample.setTimestamp(outputTimestamp);
+            sample.setDuration(frameDuration);
+            await canvasSource.add(sample);
             outputTimestamp += frameDuration;
             sample.close();
             frameCount++;
@@ -315,6 +305,8 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
             }
         }
 
+        canvasSource.close();
+        if (audioSource) audioSource.close();
         await output.finalize();
         return new Blob([output.target.buffer], { type: 'video/mp4' });
     } finally {
