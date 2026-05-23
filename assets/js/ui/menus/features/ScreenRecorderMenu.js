@@ -1,4 +1,5 @@
 import { Logger } from "../../../shared/utils/Logger.js";
+import { Toast } from "../../../shared/utils/Toast.js";
 
 /**
  * Recorder Menu Handler
@@ -333,11 +334,11 @@ export class ScreenRecorderMenu {
             this._addLiveCameraItem(playlist);
 
             const audioStatus = captureAudio ? '🎤 Mic ON' : '🔇 No Audio';
-            playlist._showToast(`Webcam recording started (${audioStatus})`, 'info');
+            Toast.show(`Webcam recording started (${audioStatus})`);
 
         } catch (err) {
             console.error("Error starting webcam:", err);
-            playlist._showToast('Webcam access denied or error.', 'error');
+            Toast.show('Webcam access denied or error.', 3000, true);
         }
     }
 
@@ -401,7 +402,7 @@ export class ScreenRecorderMenu {
                     Logger.log(`[ScreenRecorder] Combined stream: video=${combinedStream.getVideoTracks().length}, audio=${combinedStream.getAudioTracks().length}`);
                 } catch (micErr) {
                     Logger.warn('[ScreenRecorder] Microphone access denied:', micErr);
-                    playlist._showToast('Microphone access denied', 'warning');
+                    Toast.show('Microphone access denied', 3000, true);
                 }
             }
 
@@ -435,12 +436,12 @@ export class ScreenRecorderMenu {
             const audioTracks = combinedStream.getAudioTracks();
             this._updateButtonState(true);
             const audioStatus = captureAudio ? (audioTracks.length > 0 ? '🎤 Mic ON' : '⚠️ No mic') : '🔇 No Audio';
-            playlist._showToast(`Recording started (${audioStatus})`, 'info');
+            Toast.show(`Recording started (${audioStatus})`);
 
         } catch (err) {
             Logger.error('ScreenRecorder: Start Error', err);
             if (err.name !== 'NotAllowedError') {
-                playlist._showToast('Failed to start recording: ' + err.message, 'error');
+                Toast.show('Failed to start recording: ' + err.message, 3000, true);
             }
             this._stopFacecam();
             this.isRecording = false;
@@ -467,7 +468,7 @@ export class ScreenRecorderMenu {
 
         } catch (err) {
             Logger.error('ScreenRecorder: Facecam Error', err);
-            playlist._showToast('Facecam failed: ' + err.message, 'error');
+            Toast.show('Facecam failed: ' + err.message, 3000, true);
             this._stopFacecam();
         }
     }
@@ -674,12 +675,12 @@ export class ScreenRecorderMenu {
 
             // Stop Canvas Recording
             if (window.player && typeof window.player.stopCanvasRecording === 'function') {
-                playlist._showToast('Finalizing webcam recording...', 'info');
+                Toast.show('Finalizing webcam recording...');
                 const blob = await window.player.stopCanvasRecording();
                 if (blob) {
                     this._saveRecordingBlob(playlist, blob);
                 } else {
-                    playlist._showToast('No recording data found.', 'warning');
+                    Toast.show('No recording data found.', 3000, true);
                 }
                 // Stop Webcam Stream Mode (preview cleanup)
                 window.player.stopWebcamStreamMode();
@@ -711,7 +712,7 @@ export class ScreenRecorderMenu {
 
             this.isRecording = false;
             this._updateButtonState(false);
-            playlist._showToast('Processing recording...', 'info');
+            Toast.show('Processing recording...');
         }
     }
 
@@ -724,7 +725,7 @@ export class ScreenRecorderMenu {
 
         } catch (err) {
             Logger.error('ScreenRecorder: Save Error', err);
-            playlist._showToast('Failed to save recording', 'error');
+            Toast.show('Failed to save recording', 3000, true);
         } finally {
             this.chunks = [];
             this.isRecording = false;
@@ -763,7 +764,7 @@ export class ScreenRecorderMenu {
             if (playlist.renderPlaylist) playlist.renderPlaylist();
             if (playlist.loadMedia) playlist.loadMedia(playlist.files.length - 1);
         }
-        playlist._showToast('Recording saved to playlist', 'success');
+        Toast.show('Recording saved to playlist');
     }
 
     static async _requestMicPermission(selectEl, containerEl, checkboxEl) {
