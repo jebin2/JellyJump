@@ -18,7 +18,11 @@ cd desktop
 echo "Installing desktop dependencies..."
 npm install
 
-# 4. Build Electron App
+# 4. Rebuild native modules against Electron's Node (required for @mediabunny/server / node-av)
+echo "Rebuilding native modules..."
+npm run rebuild
+
+# 5. Build Electron App
 echo "Running Electron Build..."
 npm run dist
 

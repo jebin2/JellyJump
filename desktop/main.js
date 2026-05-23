@@ -112,10 +112,10 @@ function createWindow() {
         width: 1280,
         height: 720,
         webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            webSecurity: true, // Important for loading local resources properly
-            preload: preloadPath // Load preload script (handles ASAR unpacking)
+            nodeIntegration: true,
+            contextIsolation: false,
+            webSecurity: true,
+            preload: preloadPath
         },
         autoHideMenuBar: true,
         title: "JellyJump Player",
