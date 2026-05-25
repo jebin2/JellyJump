@@ -18,7 +18,13 @@ import {
 } from './config.js';
 import { SubtitleManager } from './subtitles/SubtitleManager.js';
 import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
-import { initPlayerAudio, runPlayerAudioIterator, startPlayerAudioVisualizer } from './audio/AudioEngine.js';
+import {
+    closePlayerAudioContext,
+    initPlayerAudio,
+    runPlayerAudioIterator,
+    startPlayerAudioVisualizer,
+    syncPlayerAudioGain
+} from './audio/AudioEngine.js';
 import {
     clearPlayerCanvas,
     disposeMediaBunnyResources,
@@ -402,6 +408,8 @@ export class CorePlayer {
     // ─── Audio ───────────────────────────────────────────────────────────────────
     _initAudio() { initPlayerAudio(this); }
     _cleanupAudio() { cleanupPlayerAudioMode(this); }
+    _syncAudioGain() { syncPlayerAudioGain(this); }
+    async _closeAudioContext() { return closePlayerAudioContext(this); }
     async _runAudioIterator(iterator, anchorWall, anchorContent, prefetchedSample) {
         return runPlayerAudioIterator(this, iterator, anchorWall, anchorContent, prefetchedSample);
     }
@@ -496,9 +504,7 @@ export class CorePlayer {
 
         this.stream.syncVolumeState();
 
-        if (this.gainNode) {
-            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
-        }
+        this._syncAudioGain();
 
         this._updateVolumeUI();
 
@@ -513,9 +519,7 @@ export class CorePlayer {
 
         this.stream.syncVolumeState();
 
-        if (this.gainNode) {
-            this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
-        }
+        this._syncAudioGain();
 
         this._updateVolumeUI();
     }
@@ -586,10 +590,7 @@ export class CorePlayer {
 
         this._events = {};
 
-        if (this.audioContext) {
-            this.audioContext.close();
-            this.audioContext = null;
-        }
+        await this._closeAudioContext();
 
         if (this.config.controls.fullscreen) {
             document.removeEventListener('fullscreenchange', this._handlers.fullscreen);

@@ -49,6 +49,19 @@ export async function startPlayerAudioVisualizer(player) {
     }
 }
 
+export function syncPlayerAudioGain(player) {
+    if (!player.gainNode) return;
+    player.gainNode.gain.value = player.config.muted ? 0 : player.config.volume;
+}
+
+export async function closePlayerAudioContext(player) {
+    if (!player.audioContext) return;
+
+    await player.audioContext.close();
+    player.audioContext = null;
+    player.gainNode = null;
+}
+
 export async function runPlayerAudioIterator(player, iterator, anchorWall, anchorContent, prefetchedBuffer) {
     if (!player.audioSink || !iterator) return;
 
