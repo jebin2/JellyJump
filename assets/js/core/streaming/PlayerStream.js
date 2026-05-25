@@ -143,6 +143,20 @@ export class PlayerStream {
         return true;
     }
 
+    syncVolumeState() {
+        const player = this.player;
+        if (!this.isStreamMode || !this.streamVideo) return;
+
+        this.streamVideo.volume = player.config.volume;
+        this.streamVideo.muted = player.config.muted;
+
+        if (player.config.muted) {
+            this.streamVideo.setAttribute('muted', '');
+        } else {
+            this.streamVideo.removeAttribute('muted');
+        }
+    }
+
     // ─── Stream video element ────────────────────────────────────────────────────
 
     createStreamVideo() {

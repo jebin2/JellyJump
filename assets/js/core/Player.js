@@ -58,8 +58,7 @@ import {
 } from './playback/RenderLoop.js';
 import {
     createStreamController,
-    getStreamState,
-    setStreamState
+    installStreamStateProxies
 } from './streaming/StreamController.js';
 import {
     mountPlayerShell,
@@ -260,6 +259,7 @@ export class CorePlayer {
         }
 
         this.stream = createStreamController(this);
+        installStreamStateProxies(this);
         this.keyboard = new PlayerKeyboard(this);
         this.subtitles = new PlayerSubtitles(this);
         this.loop = new PlayerLoopControl(this);
@@ -267,22 +267,6 @@ export class CorePlayer {
         this.controlBar = new PlayerControlBar(this);
         this._init();
     }
-
-    // ─── Stream state proxies ────────────────────────────────────────────────────
-    get isStreamMode() { return getStreamState(this, 'isStreamMode'); }
-    set isStreamMode(v) { setStreamState(this, 'isStreamMode', v); }
-    get isLive() { return getStreamState(this, 'isLive'); }
-    set isLive(v) { setStreamState(this, 'isLive', v); }
-    get streamVideo() { return getStreamState(this, 'streamVideo'); }
-    set streamVideo(v) { setStreamState(this, 'streamVideo', v); }
-    get isWebcamMode() { return getStreamState(this, 'isWebcamMode'); }
-    set isWebcamMode(v) { setStreamState(this, 'isWebcamMode', v); }
-    get _liveStartTimestamp() { return getStreamState(this, '_liveStartTimestamp'); }
-    set _liveStartTimestamp(v) { setStreamState(this, '_liveStartTimestamp', v); }
-    get _wasMutedForAutoplay() { return getStreamState(this, '_wasMutedForAutoplay'); }
-    set _wasMutedForAutoplay(v) { setStreamState(this, '_wasMutedForAutoplay', v); }
-    get _isMediaReady() { return getStreamState(this, '_isMediaReady'); }
-    set _isMediaReady(v) { setStreamState(this, '_isMediaReady', v); }
 
     _init() {
         mountPlayerShell(this);
@@ -510,15 +494,7 @@ export class CorePlayer {
         this.config.volume = Math.max(0, Math.min(1, value));
         if (this.config.volume > 0) this.config.muted = false;
 
-        if (this.isStreamMode && this.streamVideo) {
-            this.streamVideo.volume = this.config.volume;
-            this.streamVideo.muted = this.config.muted;
-            if (this.config.muted) {
-                this.streamVideo.setAttribute('muted', '');
-            } else {
-                this.streamVideo.removeAttribute('muted');
-            }
-        }
+        this.stream.syncVolumeState();
 
         if (this.gainNode) {
             this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
@@ -535,14 +511,7 @@ export class CorePlayer {
     toggleMute() {
         this.config.muted = !this.config.muted;
 
-        if (this.isStreamMode && this.streamVideo) {
-            this.streamVideo.muted = this.config.muted;
-            if (this.config.muted) {
-                this.streamVideo.setAttribute('muted', '');
-            } else {
-                this.streamVideo.removeAttribute('muted');
-            }
-        }
+        this.stream.syncVolumeState();
 
         if (this.gainNode) {
             this.gainNode.gain.value = this.config.muted ? 0 : this.config.volume;
