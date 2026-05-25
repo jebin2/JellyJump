@@ -99,7 +99,7 @@ export async function playPlayer(player) {
     if (player.audioSink) {
         if (!player.isLive) {
             const startTime = player.playbackTimeAtStart;
-            if (player.audioBufferIterator) await player.audioBufferIterator.return();
+            await player._closeAudioBufferIterator();
             Logger.log(`[Play] Starting audio iterator at time: ${startTime.toFixed(2)}s`);
             player.audioBufferIterator = player.audioSink.buffers(startTime);
 
@@ -154,29 +154,16 @@ export function pausePlayer(player, showOverlay = true) {
 
     player._updatePlayPauseUI();
 
-    if (player.audioBufferIterator) {
-        const iterator = player.audioBufferIterator;
-        player.audioBufferIterator = null;
-        player.audioIteratorCleanupPromise = iterator.return().catch(e => {
-            Logger.debug('Error closing audio iterator:', e);
-        }).finally(() => {
-            player.audioIteratorCleanupPromise = null;
-        });
-    }
+    player._closeAudioBufferIteratorSoon();
 
     if (player.animationFrameId) {
         cancelAnimationFrame(player.animationFrameId);
         player.animationFrameId = null;
     }
 
-    if (player.audioContext && player.audioContext.state === 'running') {
-        player.audioContext.suspend();
-    }
+    player._suspendAudioContext();
 
-    for (const node of player.queuedAudioNodes) {
-        try { node.stop(); } catch (e) { }
-    }
-    player.queuedAudioNodes.clear();
+    player._stopQueuedAudio();
 
     player._savePlaybackState();
 

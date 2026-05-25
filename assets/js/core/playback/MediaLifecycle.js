@@ -48,9 +48,7 @@ export async function resetPlayer(player) {
         }
     } catch (e) { }
     try {
-        if (player.audioBufferIterator) {
-            await player.audioBufferIterator.return();
-        }
+        await player._closeAudioBufferIterator();
     } catch (e) { }
 
     disposeMediaBunnyResources(player);
@@ -58,7 +56,6 @@ export async function resetPlayer(player) {
     player.videoTrack = null;
     player.audioTrack = null;
     player.videoFrameIterator = null;
-    player.audioBufferIterator = null;
     player.nextFrame = null;
     player.currentVideoId = null;
 
@@ -66,12 +63,7 @@ export async function resetPlayer(player) {
     player._updateProgress();
     if (player.ui?.loader) player.ui.loader.style.display = 'none';
 
-    if (player.audioContext) {
-        player.activeSources.forEach(source => {
-            try { source.stop(); } catch (e) { }
-        });
-        player.activeSources = [];
-    }
+    player._stopQueuedAudio();
 
     Logger.log('[Player] Reset complete - select a video to play');
 }
@@ -88,14 +80,13 @@ export async function cleanupPlayerForLoad(player) {
 
     if (player.videoFrameIterator) await player.videoFrameIterator.return();
     if (player.audioIteratorCleanupPromise) await player.audioIteratorCleanupPromise;
-    if (player.audioBufferIterator) await player.audioBufferIterator.return();
+    await player._closeAudioBufferIterator();
     player.videoFrameIterator = null;
-    player.audioBufferIterator = null;
     player.nextFrame = null;
     player.asyncId++;
     player.playbackTimeAtStart = 0;
     player.audioContextStartTime = null;
-    player.queuedAudioNodes.clear();
+    player._stopQueuedAudio();
     player._vodAnchorWall = undefined;
     player._vodAnchorContent = undefined;
     player._frameSyncLogCount = 0;
@@ -356,9 +347,7 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
                 if (player.ui.muteBtn) player._updateVolumeUI();
 
                 try {
-                    if (player.audioContext && player.audioContext.state === 'running') {
-                        try { await player.audioContext.suspend(); } catch (ignore) { }
-                    }
+                    await player._suspendAudioContext();
                     await player.play();
                     return;
                 } catch (retryErr) {
@@ -370,25 +359,10 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
             player.isPlaying = false;
             player._updatePlayPauseUI();
 
-            if (player.audioBufferIterator) {
-                player.audioBufferIterator.return().catch(() => { });
-                player.audioBufferIterator = null;
-            }
-            if (player.audioContext && player.audioContext.state === 'running') {
-                try { await player.audioContext.suspend(); } catch (e) { }
-            }
-
-            for (const node of player.queuedAudioNodes) {
-                try { node.stop(); } catch (e) { }
-            }
-            player.queuedAudioNodes.clear();
-
-            if (player.audioContext) {
-                try { player.audioContext.close(); } catch (e) { }
-                player.audioContext = null;
-                player.gainNode = null;
-                player.isAudioInitialized = false;
-            }
+            player._closeAudioBufferIteratorSoon();
+            await player._suspendAudioContext();
+            player._stopQueuedAudio();
+            await player._closeAudioContext();
 
             try {
                 await player._startVideoIterator();
@@ -418,11 +392,8 @@ export async function cleanupPlayerMediaBunny(player) {
     player.videoFrameIterator = null;
 
     try {
-        if (player.audioBufferIterator) {
-            await player.audioBufferIterator.return();
-        }
+        await player._closeAudioBufferIterator();
     } catch (e) { }
-    player.audioBufferIterator = null;
 
     disposeMediaBunnyResources(player);
 

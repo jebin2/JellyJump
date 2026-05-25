@@ -19,11 +19,15 @@ import {
 import { SubtitleManager } from './subtitles/SubtitleManager.js';
 import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
 import {
+    closePlayerAudioBufferIterator,
+    closePlayerAudioBufferIteratorSoon,
     closePlayerAudioContext,
     initPlayerAudio,
     restorePlayerAutoplayAudio,
     runPlayerAudioIterator,
     startPlayerAudioVisualizer,
+    stopPlayerQueuedAudio,
+    suspendPlayerAudioContext,
     syncPlayerAudioGain
 } from './audio/AudioEngine.js';
 import {
@@ -411,6 +415,10 @@ export class CorePlayer {
     _cleanupAudio() { cleanupPlayerAudioMode(this); }
     _syncAudioGain() { syncPlayerAudioGain(this); }
     async _closeAudioContext() { return closePlayerAudioContext(this); }
+    async _suspendAudioContext() { return suspendPlayerAudioContext(this); }
+    _stopQueuedAudio() { stopPlayerQueuedAudio(this); }
+    async _closeAudioBufferIterator() { return closePlayerAudioBufferIterator(this); }
+    _closeAudioBufferIteratorSoon() { closePlayerAudioBufferIteratorSoon(this); }
     _restoreAutoplayAudio(sourceLabel) { return restorePlayerAutoplayAudio(this, sourceLabel); }
     async _runAudioIterator(iterator, anchorWall, anchorContent, prefetchedSample) {
         return runPlayerAudioIterator(this, iterator, anchorWall, anchorContent, prefetchedSample);

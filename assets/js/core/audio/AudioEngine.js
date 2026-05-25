@@ -60,6 +60,39 @@ export async function closePlayerAudioContext(player) {
     await player.audioContext.close();
     player.audioContext = null;
     player.gainNode = null;
+    player.isAudioInitialized = false;
+}
+
+export async function suspendPlayerAudioContext(player) {
+    if (player.audioContext?.state !== 'running') return;
+    await player.audioContext.suspend();
+}
+
+export function stopPlayerQueuedAudio(player) {
+    for (const node of player.queuedAudioNodes) {
+        try { node.stop(); } catch (e) { }
+    }
+    player.queuedAudioNodes.clear();
+}
+
+export async function closePlayerAudioBufferIterator(player) {
+    if (!player.audioBufferIterator) return;
+
+    const iterator = player.audioBufferIterator;
+    player.audioBufferIterator = null;
+    await iterator.return();
+}
+
+export function closePlayerAudioBufferIteratorSoon(player) {
+    if (!player.audioBufferIterator) return;
+
+    const iterator = player.audioBufferIterator;
+    player.audioBufferIterator = null;
+    player.audioIteratorCleanupPromise = iterator.return().catch(e => {
+        Logger.debug('Error closing audio iterator:', e);
+    }).finally(() => {
+        player.audioIteratorCleanupPromise = null;
+    });
 }
 
 export function restorePlayerAutoplayAudio(player, sourceLabel) {
