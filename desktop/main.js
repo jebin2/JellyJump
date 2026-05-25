@@ -3,14 +3,70 @@ const path = require('path');
 const fs = require('fs');
 
 // Required on Linux AppImage: kernel user-namespace sandboxing is often
-// unavailable (restricted sysctl), which silently prevents the window from
-// opening. --disable-dev-shm-usage avoids /dev/shm size issues in containers.
+// unavailable (restricted sysctl), which causes the network service to crash
+// before any file:// navigation can complete.
+// NetworkServiceSandbox: the network service process inherits the same
+//   sandbox restrictions and fails on systems without user namespaces.
+// in-process-gpu: keeps GPU code in the main process to avoid GPU zygote
+//   spawn failures on headless / restricted desktops.
 if (process.platform === 'linux') {
     app.commandLine.appendSwitch('no-sandbox');
     app.commandLine.appendSwitch('disable-dev-shm-usage');
+    app.commandLine.appendSwitch('disable-features', 'NetworkServiceSandbox');
+    app.commandLine.appendSwitch('in-process-gpu');
 }
 
 const configPath = path.join(app.getPath('userData'), 'jellyjump.json');
+
+function isTrustedIpcEvent(event) {
+    const frameUrl = event.senderFrame?.url;
+    if (!frameUrl) return false;
+
+    try {
+        const url = new URL(frameUrl);
+        return url.protocol === 'file:';
+    } catch {
+        return false;
+    }
+}
+
+function assertTrustedIpcEvent(event) {
+    if (!isTrustedIpcEvent(event)) {
+        throw new Error('Rejected IPC request from untrusted sender');
+    }
+}
+
+function normalizeUserFilePath(filePath) {
+    if (typeof filePath !== 'string' || filePath.trim() === '' || filePath.includes('\0')) {
+        throw new Error('Invalid file path');
+    }
+
+    return path.resolve(filePath);
+}
+
+function sanitizeOpenDialogOptions(options = {}) {
+    const sanitized = {};
+
+    if (Array.isArray(options.properties)) {
+        const allowedProperties = new Set(['openFile', 'multiSelections', 'openDirectory']);
+        sanitized.properties = options.properties.filter((property) => allowedProperties.has(property));
+    }
+
+    if (Array.isArray(options.filters)) {
+        sanitized.filters = options.filters
+            .filter((filter) => filter && typeof filter.name === 'string' && Array.isArray(filter.extensions))
+            .map((filter) => ({
+                name: filter.name,
+                extensions: filter.extensions.filter((extension) => typeof extension === 'string')
+            }));
+    }
+
+    if (typeof options.defaultPath === 'string' && !options.defaultPath.includes('\0')) {
+        sanitized.defaultPath = path.resolve(options.defaultPath);
+    }
+
+    return sanitized;
+}
 
 // Resolve preload script path
 // In packaged apps, unpacked files are in app.asar.unpacked
@@ -26,8 +82,9 @@ if (app.isPackaged) {
 // IPC Handlers for Config File (jellyjump.json)
 // ============================================
 
-ipcMain.handle('read-config', async () => {
+ipcMain.handle('read-config', async (event) => {
     try {
+        assertTrustedIpcEvent(event);
         const data = await fs.promises.readFile(configPath, 'utf8');
         return JSON.parse(data);
     } catch {
@@ -37,6 +94,7 @@ ipcMain.handle('read-config', async () => {
 
 ipcMain.handle('write-config', async (event, data) => {
     try {
+        assertTrustedIpcEvent(event);
         await fs.promises.writeFile(configPath, JSON.stringify(data, null, 2), 'utf8');
         return { success: true };
     } catch (error) {
@@ -53,8 +111,10 @@ ipcMain.handle('write-config', async (event, data) => {
  */
 ipcMain.handle('read-file', async (event, filePath) => {
     try {
-        console.log('[Electron] Reading file:', filePath);
-        const buffer = await fs.promises.readFile(filePath);
+        assertTrustedIpcEvent(event);
+        const resolvedPath = normalizeUserFilePath(filePath);
+        console.log('[Electron] Reading file:', resolvedPath);
+        const buffer = await fs.promises.readFile(resolvedPath);
         // Convert Node Buffer to ArrayBuffer for transfer
         return {
             success: true,
@@ -71,7 +131,8 @@ ipcMain.handle('read-file', async (event, filePath) => {
  */
 ipcMain.handle('file-exists', async (event, filePath) => {
     try {
-        await fs.promises.access(filePath, fs.constants.R_OK);
+        assertTrustedIpcEvent(event);
+        await fs.promises.access(normalizeUserFilePath(filePath), fs.constants.R_OK);
         return true;
     } catch {
         return false;
@@ -83,7 +144,8 @@ ipcMain.handle('file-exists', async (event, filePath) => {
  */
 ipcMain.handle('get-file-stats', async (event, filePath) => {
     try {
-        const stats = await fs.promises.stat(filePath);
+        assertTrustedIpcEvent(event);
+        const stats = await fs.promises.stat(normalizeUserFilePath(filePath));
         return {
             success: true,
             stats: {
@@ -103,13 +165,14 @@ ipcMain.handle('open-file-dialog', async (event, options = {}) => {
     const { dialog } = require('electron');
 
     try {
+        assertTrustedIpcEvent(event);
         const result = await dialog.showOpenDialog({
             properties: ['openFile', 'multiSelections'],
             filters: [
                 { name: 'Videos', extensions: ['mp4', 'mkv', 'avi', 'webm', 'mov', 'm4v', 'wmv', 'flv'] },
                 { name: 'All Files', extensions: ['*'] }
             ],
-            ...options
+            ...sanitizeOpenDialogOptions(options)
         });
 
         if (result.canceled) {

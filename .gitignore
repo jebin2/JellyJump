@@ -24,4 +24,8 @@ REPO_RESTRUCTURING_CHECKLIST.md
 REPO_RESTRUCTURING_PLAN.md
 reading-hls.md
 writing-hls.md
+
+# Generated Remotion render output
+remotion_test5/out/
 docs/
+workers/

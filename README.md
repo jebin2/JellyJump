@@ -10,4 +10,3 @@
 -   **GIF Creation**: Create high-quality GIFs from your videos.
 -   **Privacy First**: No data is uploaded to any server; everything happens in your browser.
 -   **PWA Support**: Installable as a Progressive Web App for a native-like experience.
-claude --resume f91c1b5b-3e63-487a-92c5-1acbaeeb6f7f

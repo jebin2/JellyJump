@@ -129,32 +129,6 @@ export class Playlist {
     scrollToPlaying() { return this.navigation.scrollToPlaying(); }
     _updatePlayerNavigationState() { this.navigation.updatePlayerNavigationState(); }
 
-
-
-
-
-    /**
-     * Initialize mobile drawer toggle
-     * @private
-     */
-
-
-
-    /**
-     * Stop playback and show 'Select video to play' message
-     * Called when active video/folder is deleted
-     * @private
-     */
-    _stopPlayback() {
-        this.activeIndex = -1;
-        this.player.reset();
-        this._updateUI();
-        this._updatePlayerNavigationState();
-        Logger.log('[Playlist] Playback stopped - select a video to play');
-    }
-
-
-
     /**
      * Stop playback and show 'Select video to play' message
      * Called when active video/folder is deleted

@@ -213,7 +213,4 @@ export class MotionDetector {
         return totalDiff / maxTotalDiff;
     }
 
-    cancel() {
-        this.isDetecting = false;
-    }
 }

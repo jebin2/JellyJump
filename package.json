@@ -8,6 +8,8 @@
     "build": "vite build",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
+    "quality": "node scripts/quality-check.mjs",
+    "check": "npm run quality && npm run build",
     "clean": "rm -rf dist",
     "build:desktop": "./build-desktop.sh"
   },
