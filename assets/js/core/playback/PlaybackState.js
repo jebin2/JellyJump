@@ -53,13 +53,7 @@ export async function handlePlayerVisibilityChange(player) {
 }
 
 export function togglePlayerPlay(player) {
-    if (player._wasMutedForAutoplay && player.gainNode) {
-        Logger.log('[Autoplay] Play button pressed, restoring audio...');
-        player.config.muted = false;
-        player.gainNode.gain.value = player.config.volume;
-        player._wasMutedForAutoplay = false;
-        player._updateVolumeUI();
-    }
+    player._restoreAutoplayAudio('Play button pressed');
 
     if (!player.videoTrack && !player.audioTrack && !player.isStreamMode && !player.currentVideoId) {
         if (player.onPlayRequest) {

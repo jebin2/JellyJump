@@ -30,7 +30,7 @@ export async function playPlayer(player) {
         player._wasMutedForAutoplay = true;
         if (!player.config.muted) {
             player.config.muted = true;
-            if (player.gainNode) player.gainNode.gain.value = 0;
+            player._syncAudioGain();
             if (player.ui.muteBtn) player._updateVolumeUI();
         }
     }

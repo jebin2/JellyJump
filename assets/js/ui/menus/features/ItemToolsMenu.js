@@ -87,13 +87,7 @@ export const ItemToolsMenu = {
                 
                 // Restore audio if it was muted for autoplay (first user interaction)
                 const player = playlist.player;
-                if (player && player._wasMutedForAutoplay && player.gainNode) {
-                    Logger.log('[Autoplay] Tools menu opened, restoring audio...');
-                    player.config.muted = false;
-                    player.gainNode.gain.value = player.config.volume;
-                    player._wasMutedForAutoplay = false;
-                    if (player.ui?.muteBtn) player._updateVolumeUI();
-                }
+                player?._restoreAutoplayAudio('Tools menu opened');
             });
         });
 

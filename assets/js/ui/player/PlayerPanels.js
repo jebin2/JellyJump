@@ -1,5 +1,3 @@
-import { Logger } from '../../shared/utils/Logger.js';
-
 export function handlePlayerDocumentClick(player, e) {
     if (player.ui.ccPanel && player.ui.ccBtn &&
         !player.ui.ccBtn.contains(e.target) && !player.ui.ccPanel.contains(e.target)) {
@@ -24,12 +22,8 @@ export function handlePlayerDocumentClick(player, e) {
         !player.ui.loopBtn.contains(e.target) && !player.ui.loopPanel.contains(e.target)) {
         player.ui.loopPanel.style.display = 'none';
     }
-    if (player._wasMutedForAutoplay && player.gainNode && !player._isLoading) {
-        Logger.log('[Autoplay] User interaction restoring audio...');
-        player.config.muted = false;
-        player.gainNode.gain.value = player.config.volume;
-        player._wasMutedForAutoplay = false;
-        player._updateVolumeUI();
+    if (!player._isLoading) {
+        player._restoreAutoplayAudio('User interaction');
     }
 }
 

@@ -1,5 +1,3 @@
-import { Logger } from '../../shared/utils/Logger.js';
-
 export class PlayerKeyboard {
     constructor(player) {
         this.player = player;
@@ -22,13 +20,7 @@ export class PlayerKeyboard {
             case 'k':
                 e.preventDefault();
                 // Restore audio if muted for autoplay (user is now interacting)
-                if (p._wasMutedForAutoplay && p.gainNode) {
-                    Logger.log('[Autoplay] Keyboard play, restoring audio...');
-                    p.config.muted = false;
-                    p.gainNode.gain.value = p.config.volume;
-                    p._wasMutedForAutoplay = false;
-                    p._updateVolumeUI();
-                }
+                p._restoreAutoplayAudio('Keyboard play');
                 p.togglePlay();
                 break;
             case 'j':

@@ -42,9 +42,8 @@ export function attachPlayerBindings(player) {
             player.config.volume = parseFloat(e.target.value);
             player.config.muted = false;
 
-            if (player.gainNode) {
-                player.gainNode.gain.value = player.config.volume;
-            }
+            player.stream.syncVolumeState();
+            player._syncAudioGain();
             player._updateVolumeUI();
         });
     }
@@ -53,9 +52,8 @@ export function attachPlayerBindings(player) {
         player.ui.muteBtn.addEventListener('click', () => {
             player.config.muted = !player.config.muted;
 
-            if (player.gainNode) {
-                player.gainNode.gain.value = player.config.muted ? 0 : player.config.volume;
-            }
+            player.stream.syncVolumeState();
+            player._syncAudioGain();
             player._updateVolumeUI();
         });
     }

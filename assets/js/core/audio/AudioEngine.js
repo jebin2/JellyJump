@@ -62,6 +62,17 @@ export async function closePlayerAudioContext(player) {
     player.gainNode = null;
 }
 
+export function restorePlayerAutoplayAudio(player, sourceLabel) {
+    if (!player._wasMutedForAutoplay || !player.gainNode) return false;
+
+    Logger.log(`[Autoplay] ${sourceLabel}, restoring audio...`);
+    player.config.muted = false;
+    syncPlayerAudioGain(player);
+    player._wasMutedForAutoplay = false;
+    player._updateVolumeUI();
+    return true;
+}
+
 export async function runPlayerAudioIterator(player, iterator, anchorWall, anchorContent, prefetchedBuffer) {
     if (!player.audioSink || !iterator) return;
 

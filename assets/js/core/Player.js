@@ -21,6 +21,7 @@ import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
 import {
     closePlayerAudioContext,
     initPlayerAudio,
+    restorePlayerAutoplayAudio,
     runPlayerAudioIterator,
     startPlayerAudioVisualizer,
     syncPlayerAudioGain
@@ -410,6 +411,7 @@ export class CorePlayer {
     _cleanupAudio() { cleanupPlayerAudioMode(this); }
     _syncAudioGain() { syncPlayerAudioGain(this); }
     async _closeAudioContext() { return closePlayerAudioContext(this); }
+    _restoreAutoplayAudio(sourceLabel) { return restorePlayerAutoplayAudio(this, sourceLabel); }
     async _runAudioIterator(iterator, anchorWall, anchorContent, prefetchedSample) {
         return runPlayerAudioIterator(this, iterator, anchorWall, anchorContent, prefetchedSample);
     }
