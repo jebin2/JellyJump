@@ -147,6 +147,48 @@
         </div>
         <div class="estimated-reduction text-xs text-accent mt-sm">No size reduction</div>
     </div>
+
+    <!-- HLS Cloud Upload (shown only when HLS format is selected) -->
+    <div class="hls-cloud-section hidden mt-lg">
+        <div class="text-secondary text-sm font-mono mb-sm">UPLOAD TO CLOUD:</div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">HF TOKEN:</label>
+            <input type="password" class="hf-token-input mb-input w-full text-sm" placeholder="hf_..." autocomplete="off" spellcheck="false">
+        </div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">DATASET REPO:</label>
+            <input type="text" class="hf-repo-input mb-input w-full text-sm" placeholder="username/my-videos" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">FOLDER <span class="text-secondary font-normal">(optional)</span>:</label>
+            <input type="text" class="hf-folder-input mb-input w-full text-sm" placeholder="e.g. movie-title" spellcheck="false">
+        </div>
+        <button class="hf-upload-btn btn jellyjump-btn-small w-full text-sm" disabled>
+            Upload to Hugging Face
+        </button>
+        <div class="hf-progress-section hidden flex items-center gap-sm mt-sm">
+            <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary"></div>
+            <span class="text-sm font-mono text-secondary">Uploading...</span>
+            <span class="hf-progress-pct text-sm font-bold text-accent">0%</span>
+        </div>
+        <div class="hf-error-message hidden text-danger text-sm mt-sm"></div>
+        <div class="hf-success-section hidden mt-sm">
+            <div class="text-success text-sm font-bold mb-sm flex items-center gap-sm">
+                <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-check"></use></svg>
+                Upload complete!
+            </div>
+            <div class="text-xs text-secondary font-mono mb-sm">M3U8 URL:</div>
+            <div class="flex gap-sm mb-sm">
+                <input type="text" class="hf-result-url mb-input w-full text-xs font-mono" readonly>
+                <button class="hf-copy-btn btn jellyjump-btn-small" title="Copy URL" aria-label="Copy URL">
+                    <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-copy"></use></svg>
+                </button>
+                <button class="hf-play-btn btn jellyjump-btn-small" title="Play in JellyJump" aria-label="Play">
+                    <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-play"></use></svg>
+                </button>
+            </div>
+        </div>
+    </div>
 </template>
 
 <!-- Conversion Footer Template -->
