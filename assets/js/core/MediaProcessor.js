@@ -14,6 +14,29 @@ import { createSlideshowVideo as createSlideshowVideoMedia } from '../processing
 import { merge as mergeVideosMedia } from '../processing/merge/MergeService.js';
 import { buildFrameProcessor as buildMediaFrameProcessor, applyChromaKey as applyMediaChromaKey } from '../processing/frame/FrameProcessorService.js';
 import { process as transcodeMedia } from '../processing/transcode/TranscodeService.js';
+import { canUseWorker, runInWorker } from '../processing/worker/WorkerClient.js';
+
+/**
+ * Run an operation in the media worker when available (browser), falling
+ * back to the main thread if the worker itself fails to start or crashes.
+ * Genuine processing errors are rethrown, not retried.
+ * On desktop the inline path is always used: processing there goes through
+ * @mediabunny/server's FFmpeg threads, which need Node in the renderer.
+ */
+async function dispatch(op, options, inlineFn) {
+    if (!canUseWorker()) {
+        return inlineFn(options);
+    }
+    try {
+        return await runInWorker(op, options);
+    } catch (error) {
+        if (error.isWorkerCrash) {
+            Logger.warn(`[MediaProcessor] Worker unavailable for ${op}, running on main thread:`, error.message);
+            return inlineFn(options);
+        }
+        throw error;
+    }
+}
 
 /**
  * MediaProcessor
@@ -24,7 +47,11 @@ export class MediaProcessor {
 
 
     static async process(options) {
-        return transcodeMedia(options);
+        // GIF creation drives a DOM <video> element and must stay on the main thread
+        if (options.format === 'gif') {
+            return transcodeMedia(options);
+        }
+        return dispatch('process', options, transcodeMedia);
     }
 
 
@@ -95,7 +122,7 @@ export class MediaProcessor {
      * @returns {Promise<Map<string, ArrayBuffer>>}
      */
     static async processHls({ source, quality = 100, onProgress }) {
-        return processHlsMedia({ source, quality, onProgress });
+        return dispatch('processHls', { source, quality, onProgress }, processHlsMedia);
     }
 
     /**
@@ -138,7 +165,7 @@ export class MediaProcessor {
      * @returns {Promise<Blob>}
      */
     static async reverseVideo({ source, includeAudio = false, speed = 1, onProgress }) {
-        return reverseProcessedVideo({ source, includeAudio, speed, onProgress });
+        return dispatch('reverseVideo', { source, includeAudio, speed, onProgress }, reverseProcessedVideo);
     }
 
     /**
@@ -150,7 +177,7 @@ export class MediaProcessor {
      * @returns {Promise<Blob>}
      */
     static async changeVideoSpeed({ source, speed = 1, onProgress, includeAudio = true }) {
-        return changeProcessedVideoSpeed({ source, speed, onProgress, includeAudio });
+        return dispatch('changeVideoSpeed', { source, speed, onProgress, includeAudio }, changeProcessedVideoSpeed);
     }
 
 

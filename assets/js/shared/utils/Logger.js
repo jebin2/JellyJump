@@ -4,9 +4,11 @@
  * In production, all log calls are silently ignored.
  */
 
-const isLocalhost = window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    window.location.hostname.startsWith('192.168.');
+// globalThis.location works in both window and worker contexts
+const _hostname = globalThis.location?.hostname ?? '';
+const isLocalhost = _hostname === 'localhost' ||
+    _hostname === '127.0.0.1' ||
+    _hostname.startsWith('192.168.');
 
 /**
  * Logger with automatic environment detection
