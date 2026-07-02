@@ -12,7 +12,8 @@
     "verify:libs": "bash download_libs.sh verify",
     "check": "npm run quality && npm run verify:libs && npm run build",
     "clean": "rm -rf dist",
-    "build:desktop": "./build-desktop.sh"
+    "build:desktop": "./build-desktop.sh",
+    "sim:jjc3": "bash scripts/jjc3-sim.sh"
   },
   "devDependencies": {
     "vite": "^8.0.0"

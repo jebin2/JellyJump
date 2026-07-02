@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JJC3 Channel Simulator</title>
+    <style>body { font-family: monospace; background: #111; color: #ddd; padding: 16px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h3>JJC3 re-encode survival simulator</h3>
+<pre id="log">starting…</pre>
+<script type="module">
+    /**
+     * Simulates what sharing platforms do to a JJC3 carrier (re-encode at
+     * various bitrates/codecs, downscale) and verifies the payload still
+     * decrypts byte-perfectly. Dev-only page; run via scripts/jjc3-sim.sh
+     * or open http://localhost:8080/tests/jjc3-sim.html?kb=32 manually.
+     *
+     * Console output contract (parsed by the runner script):
+     *   "JJC3SIM: <line>"        progress + per-profile results
+     *   "JJC3SIM-RESULT: ..."    ALL-PASS | REQUIRED-PASS | FAIL
+     */
+    import { PlatformCrypto } from '/assets/js/shared/utils/PlatformCrypto.js';
+    import { MediaBunny, ensureEncoders } from '/assets/js/core/MediaBunny.js';
+
+    const logEl = document.getElementById('log');
+    const log = (m) => { logEl.textContent += '\n' + m; console.log('JJC3SIM:', m); };
+    logEl.textContent = '';
+
+    // Deterministic payload so failures are reproducible run-to-run
+    function seededPayload(bytes, seed = 0x1234567) {
+        const out = new Uint8Array(bytes);
+        let s = seed >>> 0;
+        for (let i = 0; i < bytes; i++) {
+            s ^= (s << 13) >>> 0; s ^= s >>> 17; s ^= (s << 5) >>> 0;
+            out[i] = s & 0xFF;
+        }
+        return out;
+    }
+
+    // Attack profiles. "required" ones gate the run (typical platform HD
+    // pipelines); the rest are stress tests that map the format's margins.
+    const PROFILES = [
+        { name: 'baseline (no re-encode)', required: true },
+        { name: 'H.264 2 Mbps 720p / AAC 128k', required: true,
+          video: { codec: 'avc', bitrate: 2_000_000 }, audio: { codec: 'aac', bitrate: 128_000 } },
+        { name: 'H.264 1 Mbps 720p / AAC 96k', required: true,
+          video: { codec: 'avc', bitrate: 1_000_000 }, audio: { codec: 'aac', bitrate: 96_000 } },
+        { name: 'H.264 500 kbps 720p / AAC 64k (stress)', required: false,
+          video: { codec: 'avc', bitrate: 500_000 }, audio: { codec: 'aac', bitrate: 64_000 } },
+        { name: 'H.264 1.5 Mbps downscale 854x480 / AAC 128k (stress)', required: false,
+          video: { codec: 'avc', bitrate: 1_500_000, width: 854, height: 480, fit: 'fill' },
+          audio: { codec: 'aac', bitrate: 128_000 } },
+        { name: 'VP9 1 Mbps 720p / Opus 96k WebM (stress)', required: false, format: 'webm',
+          video: { codec: 'vp9', bitrate: 1_000_000 }, audio: { codec: 'opus', bitrate: 96_000 } },
+    ];
+
+    async function reencode(carrier, profile) {
+        const input = new MediaBunny.Input({
+            source: new MediaBunny.BlobSource(carrier),
+            formats: MediaBunny.ALL_FORMATS,
+        });
+        const output = new MediaBunny.Output({
+            format: profile.format === 'webm'
+                ? new MediaBunny.WebMOutputFormat()
+                : new MediaBunny.Mp4OutputFormat(),
+            target: new MediaBunny.BufferTarget(),
+        });
+        const conversion = await MediaBunny.Conversion.init({
+            input, output,
+            video: profile.video,
+            audio: profile.audio,
+        });
+        await conversion.execute();
+        const blob = new Blob([output.target.buffer],
+            { type: profile.format === 'webm' ? 'video/webm' : 'video/mp4' });
+        conversion.dispose?.(); output.dispose?.(); input.dispose?.();
+        return blob;
+    }
+
+    try {
+        await ensureEncoders();
+
+        const kb = Number(new URLSearchParams(location.search).get('kb') || 32);
+        const payload = seededPayload(kb * 1024);
+        log(`payload: ${kb} KB (seeded)`);
+
+        let t = performance.now();
+        const carrier = await PlatformCrypto.encrypt(new Blob([payload]), 'sim-password', { filename: 'payload.bin' });
+        log(`carrier: ${(carrier.size / 1048576).toFixed(2)} MB — encrypt took ${((performance.now() - t) / 1000).toFixed(1)}s`);
+
+        const results = [];
+        for (const profile of PROFILES) {
+            try {
+                let attacked = carrier;
+                let encodeSec = 0;
+                if (profile.video) {
+                    t = performance.now();
+                    attacked = await reencode(carrier, profile);
+                    encodeSec = (performance.now() - t) / 1000;
+                }
+
+                t = performance.now();
+                const { blob } = await PlatformCrypto.decrypt(attacked, 'sim-password');
+                const decSec = (performance.now() - t) / 1000;
+
+                const got = new Uint8Array(await blob.arrayBuffer());
+                const ok = got.length === payload.length && got.every((b, i) => b === payload[i]);
+
+                results.push({ profile, ok });
+                log(`${ok ? 'PASS' : 'FAIL (decrypted bytes differ)'} — ${profile.name} ` +
+                    `[reencode ${encodeSec.toFixed(1)}s → ${(attacked.size / 1048576).toFixed(2)}MB, decrypt ${decSec.toFixed(1)}s]`);
+            } catch (e) {
+                results.push({ profile, ok: false });
+                log(`FAIL (${e && e.message}) — ${profile.name}`);
+            }
+        }
+
+        const failedRequired = results.filter(r => !r.ok && r.profile.required);
+        const failedStress   = results.filter(r => !r.ok && !r.profile.required);
+        log(`SUMMARY: ${results.filter(r => r.ok).length}/${results.length} passed` +
+            (failedStress.length ? ` — stress failures: ${failedStress.map(r => r.profile.name).join('; ')}` : ''));
+
+        if (failedRequired.length === 0 && failedStress.length === 0) {
+            console.log('JJC3SIM-RESULT: ALL-PASS');
+        } else if (failedRequired.length === 0) {
+            console.log('JJC3SIM-RESULT: REQUIRED-PASS');
+        } else {
+            console.log('JJC3SIM-RESULT: FAIL required=' + failedRequired.map(r => r.profile.name).join('|'));
+        }
+    } catch (e) {
+        log('FATAL: ' + (e && e.message));
+        console.log('JJC3SIM-RESULT: FAIL fatal=' + (e && e.message));
+    }
+</script>
+</body>
+</html>
