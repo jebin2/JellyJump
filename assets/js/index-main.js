@@ -1,4 +1,5 @@
 // Landing page entry point
+import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
 
 // Register Service Worker for PWA

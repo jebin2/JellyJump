@@ -1,4 +1,5 @@
 // Player page entry point
+import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
 import { DOMAIN } from './shared/config.js';
 

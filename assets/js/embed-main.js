@@ -8,6 +8,7 @@
  *   - autoplay: 1 to autoplay (default: 1)
  *   - muted: 1 to start muted (default: 0)
  */
+import './shared/utils/reload-on-stale-chunks.js';
 
 async function initEmbed() {
     // Parse query params
