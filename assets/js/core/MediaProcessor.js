@@ -208,5 +208,41 @@ export class MediaProcessor {
         return applyMediaChromaKey(imageData, colors, bgType, bgColor);
     }
 
+    /**
+     * Encrypt a file into a JJC3 carrier MP4 (heavy: synthesizes and encodes
+     * the carrier video). Runs in the media worker in the browser.
+     * @param {Blob} blob
+     * @param {string} password
+     * @param {Object} [opts] - { filename, mimeType, hint, onProgress, signal }
+     * @returns {Promise<Blob>}
+     */
+    static async encryptPlatform(blob, password, opts = {}) {
+        const { onProgress, signal, ...rest } = opts;
+        return dispatch(
+            'encryptPlatform',
+            { blob, password, opts: rest, onProgress, signal },
+            async () => {
+                const { PlatformCrypto } = await import('../shared/utils/PlatformCrypto.js');
+                return PlatformCrypto.encrypt(blob, password, opts);
+            }
+        );
+    }
+
+    /**
+     * Decrypt a JJC3 carrier MP4 (heavy: decodes every carrier frame).
+     * Runs in the media worker in the browser.
+     * @returns {Promise<{blob: Blob, metadata: Object}>}
+     */
+    static async decryptPlatform(blob, password, onProgress, signal) {
+        return dispatch(
+            'decryptPlatform',
+            { blob, password, onProgress, signal },
+            async () => {
+                const { PlatformCrypto } = await import('../shared/utils/PlatformCrypto.js');
+                return PlatformCrypto.decrypt(blob, password, onProgress, signal);
+            }
+        );
+    }
+
 
 }

@@ -167,14 +167,16 @@ export class EncryptMenu {
                         onProgress,
                         signal,
                     };
-                    resultBlob  = await PlatformCrypto.encrypt(source, password, encOpts);
+                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
+                    resultBlob  = await MediaProcessor.encryptPlatform(source, password, encOpts);
                     newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
                 } else {
                     // Auto-detect format for decryption
                     let result;
                     const jjc3Meta = await PlatformCrypto.readMetadata(source);
                     if (jjc3Meta !== null) {
-                        result = await PlatformCrypto.decrypt(source, password, onProgress, signal);
+                        const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
+                        result = await MediaProcessor.decryptPlatform(source, password, onProgress, signal);
                     } else {
                         result = await CryptoHelper.decrypt(source, password, onProgress);
                     }

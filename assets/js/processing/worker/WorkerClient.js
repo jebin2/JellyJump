@@ -42,7 +42,9 @@ function handleMessage(event) {
         scheduleIdleShutdown();
     } else if (type === 'error') {
         pending.delete(id);
-        entry.reject(new Error(error));
+        const err = new Error(error);
+        if (event.data.errorName) err.name = event.data.errorName; // preserve AbortError etc.
+        entry.reject(err);
         scheduleIdleShutdown();
     }
 }
@@ -83,17 +85,27 @@ export function canUseWorker() {
 /**
  * Run a processing operation in the worker.
  * @param {string} op - Operation name registered in media-worker.js
- * @param {Object} options - Service options; onProgress is relayed, the rest
- *   must be structured-cloneable (Blob/File/string sources all are)
+ * @param {Object} options - Service options; onProgress is relayed, signal is
+ *   translated into a cancel message, the rest must be structured-cloneable
+ *   (Blob/File/string sources all are)
  * @returns {Promise<*>}
  */
 export function runInWorker(op, options = {}) {
-    const { onProgress, ...cloneable } = options;
+    const { onProgress, signal, ...cloneable } = options;
     const id = nextId++;
 
     return new Promise((resolve, reject) => {
         clearTimeout(idleTimer);
         pending.set(id, { resolve, reject, onProgress });
+
+        if (signal) {
+            // The worker aborts its own controller for this job; the resulting
+            // AbortError comes back through the normal error path.
+            signal.addEventListener('abort', () => {
+                if (pending.has(id)) worker?.postMessage({ id, type: 'cancel' });
+            }, { once: true });
+        }
+
         try {
             getWorker().postMessage({ id, op, options: cloneable });
         } catch (error) {

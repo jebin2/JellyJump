@@ -12,16 +12,29 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { process as transcode } from '../transcode/TranscodeService.js';
 import { processHls } from '../hls/HlsService.js';
 import { reverseVideo, changeVideoSpeed } from '../speed/SpeedService.js';
+import { PlatformCrypto } from '../../shared/utils/PlatformCrypto.js';
 
 const OPS = {
     process: transcode,
     processHls,
     reverseVideo,
     changeVideoSpeed,
+    encryptPlatform: ({ blob, password, opts, signal, onProgress }) =>
+        PlatformCrypto.encrypt(blob, password, { ...opts, signal, onProgress }),
+    decryptPlatform: ({ blob, password, signal, onProgress }) =>
+        PlatformCrypto.decrypt(blob, password, onProgress, signal),
 };
 
+// AbortControllers for in-flight jobs, keyed by job id (for 'cancel' messages)
+const controllers = new Map();
+
 self.onmessage = async (event) => {
-    const { id, op, options } = event.data;
+    const { id, op, options, type } = event.data;
+
+    if (type === 'cancel') {
+        controllers.get(id)?.abort();
+        return;
+    }
 
     const fn = OPS[op];
     if (!fn) {
@@ -29,9 +42,13 @@ self.onmessage = async (event) => {
         return;
     }
 
+    const controller = new AbortController();
+    controllers.set(id, controller);
+
     try {
         const result = await fn({
             ...options,
+            signal: controller.signal,
             onProgress: (value) => self.postMessage({ id, type: 'progress', value }),
         });
 
@@ -48,6 +65,13 @@ self.onmessage = async (event) => {
         self.postMessage({ id, type: 'done', value: result }, transfer);
     } catch (error) {
         Logger.error(`[MediaWorker] ${op} failed:`, error);
-        self.postMessage({ id, type: 'error', error: error?.message || String(error) });
+        self.postMessage({
+            id,
+            type: 'error',
+            error: error?.message || String(error),
+            errorName: error?.name,
+        });
+    } finally {
+        controllers.delete(id);
     }
 };

@@ -211,9 +211,7 @@ export class PlatformCrypto {
         const duration   = await videoTrack.computeDuration();
         const numFrames  = Math.round(duration * FPS);
 
-        const canvas = document.createElement('canvas');
-        canvas.width  = VIDEO_W;
-        canvas.height = VIDEO_H;
+        const canvas = PlatformCrypto._createCanvas(VIDEO_W, VIDEO_H);
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         const timestamps = (async function*() {
@@ -341,8 +339,11 @@ export class PlatformCrypto {
         const maxSamples = AUDIO_SAMPLE_RATE * 60; // one full header repetition fits within 60 s
 
         for await (const sample of audioSink.samples()) {
-            const buf = sample.toAudioBuffer();
-            const ch  = new Float32Array(buf.getChannelData(0));
+            // Copy channel 0 as raw f32 — avoids AudioBuffer, which does not
+            // exist inside workers.
+            const bytesNeeded = sample.allocationSize({ format: 'f32-planar', planeIndex: 0 });
+            const ch = new Float32Array(bytesNeeded / 4);
+            sample.copyTo(ch, { format: 'f32-planar', planeIndex: 0 });
             chunks.push(ch);
             totalSamples += ch.length;
             sample.close();
@@ -383,9 +384,19 @@ export class PlatformCrypto {
 
         // ── Video source — VideoSampleSource feeds raw RGBA frames directly, ──
         // bypassing the canvas GPU capture overhead of CanvasSource.
+        // Hardware encoders are typically several times faster for 720p30, and
+        // at QUALITY_HIGH bitrate the 16px B/W blocks stay fully readable — but
+        // prefer-hardware is a hard requirement in mediabunny, so probe first
+        // and fall back to the browser's own choice when unavailable.
+        const hwEncode = await MediaBunny.canEncodeVideo('avc', {
+            width: VIDEO_W, height: VIDEO_H, hardwareAcceleration: 'prefer-hardware',
+        }).catch(() => false);
+        Logger.log(`[PlatformCrypto] AVC hardware encoder available: ${hwEncode}`);
+
         const videoSampleSource = new MediaBunny.VideoSampleSource({
             codec:   'avc',
             bitrate: MediaBunny.QUALITY_HIGH,
+            ...(hwEncode ? { hardwareAcceleration: 'prefer-hardware' } : {}),
         });
 
         // ── Audio source ───────────────────────────────────────────────────
@@ -402,20 +413,23 @@ export class PlatformCrypto {
         await output.start();
         Logger.log(`[PlatformCrypto] [${rel()}] output.start(): ${ms(t, performance.now())}`);
 
-        // ── Feed audio ─────────────────────────────────────────────────────
-        t = performance.now();
-        const headerFloat32 = encodeAudio(audioHeaderBytes);
-        Logger.log(`[PlatformCrypto] [${rel()}] encodeAudio (${audioHeaderBytes.length}B → ${headerFloat32.length} samples): ${ms(t, performance.now())}`);
+        // ── Feed audio (concurrently with the video loop below — the Output
+        // interleaves both tracks and applies backpressure per source) ──────
+        const audioPromise = (async () => {
+            let ta = performance.now();
+            const headerFloat32 = encodeAudio(audioHeaderBytes);
+            Logger.log(`[PlatformCrypto] [${rel()}] encodeAudio (${audioHeaderBytes.length}B → ${headerFloat32.length} samples): ${ms(ta, performance.now())}`);
 
-        const gapSamples    = Math.round(AUDIO_SAMPLE_RATE * AUDIO_GAP_SEC);
-        const silenceFloat  = new Float32Array(gapSamples);
-        const totalAudioArray = PlatformCrypto._buildAudioArray(
-            headerFloat32, silenceFloat, AUDIO_REPEAT, totalAudioSec
-        );
+            const gapSamples    = Math.round(AUDIO_SAMPLE_RATE * AUDIO_GAP_SEC);
+            const silenceFloat  = new Float32Array(gapSamples);
+            const totalAudioArray = PlatformCrypto._buildAudioArray(
+                headerFloat32, silenceFloat, AUDIO_REPEAT, totalAudioSec
+            );
 
-        t = performance.now();
-        await PlatformCrypto._feedAudio(audioSource, totalAudioArray);
-        Logger.log(`[PlatformCrypto] [${rel()}] _feedAudio (${(totalAudioArray.length/AUDIO_SAMPLE_RATE).toFixed(1)}s audio): ${ms(t, performance.now())}`);
+            ta = performance.now();
+            await PlatformCrypto._feedAudio(audioSource, totalAudioArray);
+            Logger.log(`[PlatformCrypto] [${rel()}] _feedAudio (${(totalAudioArray.length/AUDIO_SAMPLE_RATE).toFixed(1)}s audio): ${ms(ta, performance.now())}`);
+        })();
 
         // ── Feed video frames ──────────────────────────────────────────────
         const totalChunks = Math.ceil(ciphertext.length / DATA_BYTES_PER_FRAME);
@@ -427,9 +441,7 @@ export class PlatformCrypto {
         // RGBA→I420 conversion the encoder would otherwise do, and cuts buffer size
         // from 3.7 MB (RGBA) to 1.4 MB (I420).
         t = performance.now();
-        const tmpCanvas = document.createElement('canvas');
-        tmpCanvas.width  = VIDEO_W;
-        tmpCanvas.height = VIDEO_H;
+        const tmpCanvas = PlatformCrypto._createCanvas(VIDEO_W, VIDEO_H);
         const tmpCtx = tmpCanvas.getContext('2d');
         PlatformCrypto._drawPlaceholder(tmpCtx, hint);
         const placeholderRgba = tmpCtx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
@@ -548,6 +560,8 @@ export class PlatformCrypto {
             Logger.log(`[PlatformCrypto] [${rel()}] tail frames: ${frameIdx - tailStartIdx} frames in ${ms(tailStart, performance.now())}`);
         }
 
+        await audioPromise; // ensure the concurrent audio feed finished
+
         t = performance.now();
         videoSampleSource.close();
         audioSource.close();
@@ -558,6 +572,17 @@ export class PlatformCrypto {
         if (typeof output.dispose === 'function') output.dispose();
 
         return mp4Blob;
+    }
+
+    /** Create a 2D-capable canvas that also works inside workers. */
+    static _createCanvas(width, height) {
+        if (typeof OffscreenCanvas !== 'undefined') {
+            return new OffscreenCanvas(width, height);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas;
     }
 
     static _buildAudioArray(headerFloat32, silenceFloat, repeats, totalDurationSec) {
@@ -587,18 +612,19 @@ export class PlatformCrypto {
         let timestamp = 0;
 
         for (let offset = 0; offset < float32Array.length; offset += CHUNK) {
-            const slice = float32Array.slice(offset, Math.min(offset + CHUNK, float32Array.length));
-            // AudioBuffer constructor requires no AudioContext — avoids autoplay-policy warnings
-            const buffer = new AudioBuffer({ numberOfChannels: 1, length: slice.length, sampleRate: AUDIO_SAMPLE_RATE });
-            buffer.getChannelData(0).set(slice);
-
-            const samples = MB.AudioSample.fromAudioBuffer(buffer, timestamp);
-            const arr = Array.isArray(samples) ? samples : [samples];
-            for (const s of arr) {
-                await audioSource.add(s);
-                timestamp += s.duration;
-                s.close();
-            }
+            const slice = float32Array.subarray(offset, Math.min(offset + CHUNK, float32Array.length));
+            // Build the AudioSample from raw f32 data directly — no Web Audio
+            // objects involved, so this also works inside workers.
+            const sample = new MB.AudioSample({
+                data: slice,
+                format: 'f32-planar',
+                numberOfChannels: 1,
+                sampleRate: AUDIO_SAMPLE_RATE,
+                timestamp,
+            });
+            await audioSource.add(sample);
+            timestamp += sample.duration;
+            sample.close();
         }
     }
 
