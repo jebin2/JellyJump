@@ -76,6 +76,9 @@ export class ThumbnailGenerator {
             const sink = new CanvasSink(videoTrack, {
                 width: width,
                 // fit: 'contain' // Optional
+                // Keep the hardware decoder free for playback; thumbnails are
+                // small background work that software decoding handles fine.
+                decoderOptions: { hardwareAcceleration: 'prefer-software' },
             });
 
             // 4. Calculate timestamps

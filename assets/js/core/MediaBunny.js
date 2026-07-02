@@ -11,12 +11,20 @@ import { registerMp3Encoder } from '../lib/mediabunny-mp3-encoder.js';
 import { registerAc3Decoder } from '../lib/mediabunny-ac3.js';
 import { registerFlacEncoder } from '../lib/mediabunny-flac-encoder.js';
 import { registerAacEncoder } from '../lib/mediabunny-aac-encoder.js';
+import { registerProresDecoder } from '../lib/mediabunny-prores.js';
+import { Logger } from '../shared/utils/Logger.js';
+
+// Match the project Logger convention: full logs in dev, errors only in production.
+if (!Logger.isEnabled()) {
+    MediaBunny.Logging.level = MediaBunny.LogLevel.Errors;
+}
 
 function registerBrowserPlugins() {
     registerMp3Encoder();
     registerAc3Decoder();
     registerFlacEncoder();
     registerAacEncoder();
+    registerProresDecoder();
 }
 
 const isDesktop = typeof window !== 'undefined' && window.electronAPI?.isElectron;

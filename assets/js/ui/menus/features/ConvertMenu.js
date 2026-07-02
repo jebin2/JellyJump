@@ -5,6 +5,7 @@ import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { ZipHelper } from '../../../shared/utils/ZipHelper.js';
 import { uploadToHuggingFace } from '../../../processing/hls/HuggingFaceUploader.js';
+import { MediaBunny } from '../../../core/MediaBunny.js';
 
 /**
  * Convert Menu Handler
@@ -57,6 +58,18 @@ export class ConvertMenu {
                 hlsCloudSection.classList.toggle('hidden', value !== 'hls');
             },
         });
+
+        // ProRes encoding is only available where a ProRes encoder is registered
+        // (the desktop app via @mediabunny/server); the browser can only decode it.
+        const proresItem = formatMenu.querySelector('[data-value="prores"]');
+        if (proresItem) {
+            MediaBunny.canEncodeVideo('prores').then((supported) => {
+                if (supported) {
+                    proresItem.classList.remove('disabled');
+                    proresItem.removeAttribute('title');
+                }
+            }).catch(() => { /* leave disabled */ });
+        }
 
         // Enable upload button once both token and repo are filled
         const onCredentialsChange = () => {
@@ -133,7 +146,8 @@ export class ConvertMenu {
                 progressSection.classList.add('hidden');
 
                 downloadBtn.classList.remove('hidden');
-                const downloadFormat = (format === 'keep') ? item.title.split('.').pop() : format;
+                const downloadFormat = (format === 'keep') ? item.title.split('.').pop()
+                    : (format === 'prores') ? 'mov' : format;
                 downloadBtn.title = `Download ${downloadFormat.toUpperCase()}`;
                 downloadBtn.setAttribute('aria-label', `Download ${downloadFormat.toUpperCase()}`);
 
@@ -291,7 +305,8 @@ export class ConvertMenu {
      * @private
      */
     static _handleConversionSuccess(blob, originalItem, format, playlist, downloadBtn) {
-        const newFilename = originalItem.title.replace(/\.[^/.]+$/, "") + `-converted.${format}`;
+        const extension = (format === 'prores') ? 'mov' : format;
+        const newFilename = originalItem.title.replace(/\.[^/.]+$/, "") + `-converted.${extension}`;
         const { url } = playlist.insertProcessedItem(originalItem, blob, newFilename);
 
         // Update Download Button

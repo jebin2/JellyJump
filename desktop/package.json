@@ -72,8 +72,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "mediabunny": "^1.45.3",
-    "@mediabunny/server": "^1.45.3"
+    "mediabunny": "^1.50.4",
+    "@mediabunny/server": "^1.50.4"
   },
   "devDependencies": {
     "electron": "^39.2.4",

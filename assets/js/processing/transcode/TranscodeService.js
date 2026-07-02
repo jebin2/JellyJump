@@ -96,7 +96,7 @@ export async function process({
             return createGif({ source, trim, onProgress });
         } else if (format === 'webm') {
             outputFormat = new MediaBunny.WebMOutputFormat();
-        } else if (format === 'mov') {
+        } else if (format === 'mov' || format === 'prores') {
             outputFormat = new MediaBunny.MovOutputFormat();
         } else if (format === 'mkv') {
             outputFormat = new MediaBunny.MkvOutputFormat();
@@ -114,7 +114,13 @@ export async function process({
             (typeof quality === 'string' && quality !== 'high');
         const videoConfig = {};
 
-        if (needsBitrateControl) {
+        if (format === 'prores') {
+            // ProRes always re-encodes; only the desktop app has an encoder for it.
+            videoConfig.codec = 'prores';
+            videoConfig.bitrate = needsBitrateControl
+                ? getBitrate(quality, originalWidth * originalHeight, originalBitrate)
+                : MediaBunny.QUALITY_VERY_HIGH;
+        } else if (needsBitrateControl) {
             videoConfig.codec = (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc';
             videoConfig.bitrate = getBitrate(quality, originalWidth * originalHeight, originalBitrate);
         }
@@ -170,7 +176,7 @@ export async function process({
 
         await conversion.execute();
 
-        return new Blob([output.target.buffer], { type: `video/${format}` });
+        return new Blob([output.target.buffer], { type: format === 'prores' ? 'video/quicktime' : `video/${format}` });
     } finally {
         // CRITICAL: Clean up all MediaBunny resources to prevent memory leaks
         if (conversion && typeof conversion.dispose === 'function') {
