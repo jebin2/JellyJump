@@ -2,6 +2,23 @@
 import './pull-to-refresh.js';
 import { DOMAIN } from './shared/config.js';
 
+// Moved out of an inline <script> in player.html so a strict CSP can apply.
+function hideLoader() {
+    const loader = document.getElementById('page-loader');
+    if (loader) {
+        loader.classList.add('hidden');
+    }
+}
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(() => console.log('[PWA] Service Worker registered'))
+            .catch(err => console.log('[PWA] Service Worker failed', err));
+    });
+}
+
 // Load templates first, then initialize player
 async function initializeApp() {
     // Load templates first, then initialize player (v=2 forces refresh)

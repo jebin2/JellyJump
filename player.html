@@ -3,6 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https: http:; media-src 'self' blob: data: https: http:; connect-src * blob: data:; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JellyJump - Player</title>
     <meta name="description"
@@ -37,16 +39,6 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="JellyJump">
-    <script>
-        // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('[PWA] Service Worker registered'))
-                    .catch(err => console.log('[PWA] Service Worker failed', err));
-            });
-        }
-    </script>
 
     <!-- CSS -->
     <link rel="stylesheet" href="assets/css/theme.css">
@@ -109,15 +101,6 @@
     <a id="mb-download-link" style="display: none;"></a>
 
     <!-- Scripts -->
-    <script>
-        // Function to hide loader
-        function hideLoader() {
-            const loader = document.getElementById('page-loader');
-            if (loader) {
-                loader.classList.add('hidden');
-            }
-        }
-    </script>
     <script type="module" src="assets/js/player-main.js"></script>
 
 </body>

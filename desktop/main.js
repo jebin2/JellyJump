@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -42,6 +42,24 @@ function normalizeUserFilePath(filePath) {
     }
 
     return path.resolve(filePath);
+}
+
+// Paths the user has explicitly granted through the open-file dialog this
+// session. Restored playlist items reference paths from earlier sessions, so
+// media-typed files are also allowed; everything else (keys, configs, source
+// code) is off-limits to the renderer.
+const grantedPaths = new Set();
+const MEDIA_EXTENSIONS = new Set([
+    '.mp4', '.mkv', '.avi', '.webm', '.mov', '.m4v', '.wmv', '.flv', '.ts', '.m2ts', '.mts', '.3gp', '.ogv',
+    '.mp3', '.flac', '.wav', '.m4a', '.aac', '.ogg', '.opus', '.ac3', '.wma',
+    '.srt', '.vtt', '.ass', '.ssa',
+    '.gif', '.png', '.jpg', '.jpeg', '.webp', '.m3u8'
+]);
+
+function assertReadableUserPath(resolvedPath) {
+    if (grantedPaths.has(resolvedPath)) return;
+    if (MEDIA_EXTENSIONS.has(path.extname(resolvedPath).toLowerCase())) return;
+    throw new Error('Access denied: path was not granted by the user');
 }
 
 function sanitizeOpenDialogOptions(options = {}) {
@@ -113,6 +131,7 @@ ipcMain.handle('read-file', async (event, filePath) => {
     try {
         assertTrustedIpcEvent(event);
         const resolvedPath = normalizeUserFilePath(filePath);
+        assertReadableUserPath(resolvedPath);
         console.log('[Electron] Reading file:', resolvedPath);
         const buffer = await fs.promises.readFile(resolvedPath);
         // Convert Node Buffer to ArrayBuffer for transfer
@@ -132,7 +151,9 @@ ipcMain.handle('read-file', async (event, filePath) => {
 ipcMain.handle('file-exists', async (event, filePath) => {
     try {
         assertTrustedIpcEvent(event);
-        await fs.promises.access(normalizeUserFilePath(filePath), fs.constants.R_OK);
+        const resolvedPath = normalizeUserFilePath(filePath);
+        assertReadableUserPath(resolvedPath);
+        await fs.promises.access(resolvedPath, fs.constants.R_OK);
         return true;
     } catch {
         return false;
@@ -145,7 +166,9 @@ ipcMain.handle('file-exists', async (event, filePath) => {
 ipcMain.handle('get-file-stats', async (event, filePath) => {
     try {
         assertTrustedIpcEvent(event);
-        const stats = await fs.promises.stat(normalizeUserFilePath(filePath));
+        const resolvedPath = normalizeUserFilePath(filePath);
+        assertReadableUserPath(resolvedPath);
+        const stats = await fs.promises.stat(resolvedPath);
         return {
             success: true,
             stats: {
@@ -178,6 +201,9 @@ ipcMain.handle('open-file-dialog', async (event, options = {}) => {
         if (result.canceled) {
             return { success: false, canceled: true };
         }
+
+        // Grant read access to the files the user just picked
+        result.filePaths.forEach((filePath) => grantedPaths.add(path.resolve(filePath)));
 
         // Get file stats for each selected file
         const files = await Promise.all(result.filePaths.map(async (filePath) => {
@@ -216,6 +242,24 @@ function createWindow() {
         title: "JellyJump Player",
         icon: path.join(__dirname, 'build/assets/icons/jelly_jump_logo.png'),
         backgroundColor: '#0a0a0a'
+    });
+
+    // The renderer has Node access (required by @mediabunny/server), so it must
+    // never display remote content: open external links in the system browser,
+    // block popups, and refuse any navigation away from the bundled files.
+    win.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith('https://') || url.startsWith('http://')) {
+            shell.openExternal(url);
+        }
+        return { action: 'deny' };
+    });
+    win.webContents.on('will-navigate', (event, url) => {
+        if (!url.startsWith('file://')) {
+            event.preventDefault();
+            if (url.startsWith('https://') || url.startsWith('http://')) {
+                shell.openExternal(url);
+            }
+        }
     });
 
     // Load the index.html from the build folder

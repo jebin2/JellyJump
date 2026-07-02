@@ -211,6 +211,11 @@ export class RemoveBackgroundMenu {
                 const spillSlider = clone.querySelector('.spill-slider');
                 const spillValue = clone.querySelector('.spill-value');
 
+                // Keep slider clicks from toggling the parent row
+                // (was an inline onclick in the template, removed for CSP)
+                [similaritySlider, smoothnessSlider, spillSlider].forEach((slider) =>
+                    slider.addEventListener('click', (e) => e.stopPropagation()));
+
                 const rgbString = `rgb(${color.r}, ${color.g}, ${color.b})`;
                 swatch.style.backgroundColor = rgbString;
                 hex.textContent = rgbToHex(color.r, color.g, color.b);
