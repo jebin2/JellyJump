@@ -372,7 +372,8 @@ export class PlatformCrypto {
         let t;
 
         t = performance.now();
-        const { MediaBunny } = await import('../../core/MediaBunny.js');
+        const { MediaBunny, ensureEncoders } = await import('../../core/MediaBunny.js');
+        await ensureEncoders();
         Logger.log(`[PlatformCrypto] [${rel()}] MediaBunny import: ${ms(t, performance.now())}`);
 
         const output = new MediaBunny.Output({

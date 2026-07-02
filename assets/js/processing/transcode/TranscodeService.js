@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput, getBitrate } from '../shared/InputFactory.js';
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
@@ -24,6 +24,8 @@ export async function process({
     onProgress 
 }) {
     Logger.log('[TranscodeService] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions, watermark, blur });
+
+    await ensureEncoders();
 
     let conversion = null;
     let input = null;

@@ -23,6 +23,12 @@ export default defineConfig({
         }
     },
 
+    // The media worker uses dynamic import() for the lazy encoder plugins,
+    // which requires ES module output (the default iife format cannot code-split).
+    worker: {
+        format: 'es',
+    },
+
     build: {
         outDir: 'dist',
         emptyOutDir: true,

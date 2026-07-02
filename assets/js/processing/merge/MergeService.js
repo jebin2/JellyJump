@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 
 
@@ -108,6 +108,7 @@ async function resampleAudioSample(sample, absoluteTimestamp, targetChannels, ta
  * @returns {Promise<Blob>}
  */
 export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'proportional', backgroundColor = '#000000', onProgress }) {
+    await ensureEncoders();
     if (!inputs || inputs.length < 2) {
         throw new Error('At least 2 videos are required for merging.');
     }

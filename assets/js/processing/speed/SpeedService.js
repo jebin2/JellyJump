@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS, createMediaBunnyInput } from '../shared/InputFactory.js';
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
 
@@ -66,6 +66,7 @@ async function reverseAudioWithSink(audioTrack, audioSource, speed = 1, onProgre
 }
 
 export async function reverseVideo({ source, includeAudio = false, speed = 1, onProgress }) {
+    await ensureEncoders();
     Logger.log('[MediaProcessor] Starting video reversal with samplesAtTimestamps...');
 
     const input = createMediaBunnyInput(source);
@@ -198,6 +199,7 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
 }
 
 export async function changeVideoSpeed({ source, speed = 1, onProgress, includeAudio = true }) {
+    await ensureEncoders();
     Logger.log(`[MediaProcessor] Changing speed to ${speed}x...`);
 
     const input = createMediaBunnyInput(source);

@@ -1,9 +1,11 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
 
 export async function extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress }) {
+    // Conversion auto-transcodes when the source codec doesn't fit the target container
+    await ensureEncoders();
     const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);
     const input = new MediaBunny.Input({
         source: blobSource,
@@ -99,6 +101,7 @@ export async function extractTrackStreamCopy({ source, trackIndex, trackType, fo
 }
 
 export async function extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress }) {
+    await ensureEncoders();
     Logger.log(`[MediaProcessor] Extracting ${trackType} track ${trackIndex} with speed ${speed}x`);
 
     const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);

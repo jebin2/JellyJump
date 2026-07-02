@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 
 
@@ -209,6 +209,8 @@ export async function createSlideshowVideo({
     onProgress
 }) {
     Logger.log('[SlideshowService] createSlideshowVideo start', { count: imageBlobs.length, transition, fps });
+
+    await ensureEncoders();
 
     let output = null;
     let canvasSource = null;
