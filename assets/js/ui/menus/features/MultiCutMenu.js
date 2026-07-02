@@ -173,8 +173,15 @@ export class MultiCutMenu {
                 }
 
                 if (inRemovedRegion) {
-                    // Skip to next valid time
-                    player.seek(nextValidTime);
+                    // Right after seeking, the audio-anchored clock can read a few
+                    // milliseconds BEFORE the seek target, which would put us "back"
+                    // inside the removed region and re-trigger the seek in an endless
+                    // play/seek/pause loop. Only skip when we are meaningfully away
+                    // from the target; otherwise let the clock cross it naturally.
+                    const SKIP_EPSILON = 0.05;
+                    if (nextValidTime - currentTime > SKIP_EPSILON) {
+                        player.seek(nextValidTime);
+                    }
                 }
             };
 

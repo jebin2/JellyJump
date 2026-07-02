@@ -319,7 +319,7 @@ export class ConvertMenu {
     static _handleHlsSuccess(hlsFiles, originalItem, downloadBtn) {
         if (downloadBtn?._hlsObjectUrl) URL.revokeObjectURL(downloadBtn._hlsObjectUrl);
 
-        const zipBlob = new Blob([ZipHelper.build(hlsFiles)], { type: 'application/zip' });
+        const zipBlob = ZipHelper.build(hlsFiles);
         const url = URL.createObjectURL(zipBlob);
         const filename = originalItem.title.replace(/\.[^/.]+$/, '') + '-hls.zip';
 

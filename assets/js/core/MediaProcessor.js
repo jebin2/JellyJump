@@ -165,7 +165,13 @@ export class MediaProcessor {
      * @returns {Promise<Blob>}
      */
     static async reverseVideo({ source, includeAudio = false, speed = 1, onProgress }) {
-        return dispatch('reverseVideo', { source, includeAudio, speed, onProgress }, reverseProcessedVideo);
+        const options = { source, includeAudio, speed, onProgress };
+        // Audio processing uses Web Audio (AudioBuffer/OfflineAudioContext),
+        // which is not available in workers on all browsers — keep it inline.
+        if (includeAudio) {
+            return reverseProcessedVideo(options);
+        }
+        return dispatch('reverseVideo', options, reverseProcessedVideo);
     }
 
     /**
@@ -177,7 +183,12 @@ export class MediaProcessor {
      * @returns {Promise<Blob>}
      */
     static async changeVideoSpeed({ source, speed = 1, onProgress, includeAudio = true }) {
-        return dispatch('changeVideoSpeed', { source, speed, onProgress, includeAudio }, changeProcessedVideoSpeed);
+        const options = { source, speed, onProgress, includeAudio };
+        // See reverseVideo: Web Audio-dependent paths stay on the main thread.
+        if (includeAudio) {
+            return changeProcessedVideoSpeed(options);
+        }
+        return dispatch('changeVideoSpeed', options, changeProcessedVideoSpeed);
     }
 
 

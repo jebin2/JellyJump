@@ -4,10 +4,14 @@
  */
 export class ZipHelper {
     /**
-     * Build a ZIP ArrayBuffer from a Map of path → ArrayBuffer entries.
-     * Single-pass: pre-computes metadata, then writes directly into one output buffer.
+     * Build a ZIP Blob from a Map of path → ArrayBuffer entries.
+     * Assembles the archive as Blob parts (small header buffers interleaved
+     * with views over the existing file buffers) instead of allocating one
+     * output buffer the size of the whole archive — the browser's blob store
+     * can spill large results to disk, so peak JS-heap usage stays at the
+     * size of the headers, not the payload.
      * @param {Map<string, ArrayBuffer>} files
-     * @returns {ArrayBuffer}
+     * @returns {Blob}
      */
     static build(files) {
         const encoder = new TextEncoder();
@@ -22,13 +26,13 @@ export class ZipHelper {
             localSize += 30 + nameBytes.length + data.byteLength;
         }
 
-        const centralSize = entries.reduce((n, e) => n + 46 + e.nameBytes.length, 0);
-        const zip = new Uint8Array(localSize + centralSize + 22);
-        const v = new DataView(zip.buffer);
-        let p = 0;
+        const parts = [];
 
-        // Local file entries
+        // Local file entries: small header buffer + a view over the file data
         for (const { nameBytes, data, crc } of entries) {
+            const header = new Uint8Array(30 + nameBytes.length);
+            const v = new DataView(header.buffer);
+            let p = 0;
             v.setUint32(p, 0x04034b50, true); p += 4; // signature
             v.setUint16(p, 20, true);          p += 2; // version needed
             v.setUint16(p, 0, true);           p += 2; // flags
@@ -39,11 +43,16 @@ export class ZipHelper {
             v.setUint32(p, data.byteLength, true); p += 4; // uncompressed size
             v.setUint16(p, nameBytes.length, true); p += 2; // file name length
             v.setUint16(p, 0, true);           p += 2; // extra field length
-            zip.set(nameBytes, p);             p += nameBytes.length;
-            zip.set(data, p);                  p += data.byteLength;
+            header.set(nameBytes, p);
+            parts.push(header, data);
         }
 
-        // Central directory
+        // Central directory + end record in one small buffer
+        const centralSize = entries.reduce((n, e) => n + 46 + e.nameBytes.length, 0);
+        const tail = new Uint8Array(centralSize + 22);
+        const v = new DataView(tail.buffer);
+        let p = 0;
+
         for (const { nameBytes, data, crc, localOffset } of entries) {
             v.setUint32(p, 0x02014b50, true); p += 4; // signature
             v.setUint16(p, 20, true);          p += 2; // version made by
@@ -59,7 +68,7 @@ export class ZipHelper {
             v.setUint32(p, 0, true);           p += 4; // disk number + internal attrs
             v.setUint32(p, 0, true);           p += 4; // external attributes
             v.setUint32(p, localOffset, true); p += 4; // local header offset
-            zip.set(nameBytes, p);             p += nameBytes.length;
+            tail.set(nameBytes, p);            p += nameBytes.length;
         }
 
         // End of central directory
@@ -70,8 +79,9 @@ export class ZipHelper {
         v.setUint32(p, centralSize, true);         p += 4; // central dir size
         v.setUint32(p, localSize, true);           p += 4; // central dir offset
         v.setUint16(p, 0, true);                            // comment length
+        parts.push(tail);
 
-        return zip.buffer;
+        return new Blob(parts, { type: 'application/zip' });
     }
 
     static _crc32(data) {

@@ -26,41 +26,54 @@ async function processAudioWithSpeed(audioTrack, audioSource, speed = 1) {
 async function reverseAudioWithSink(audioTrack, audioSource, speed = 1, onProgress) {
     const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
 
-    const samples = [];
-    for await (const sample of audioSink.samples()) {
-        samples.push(sample);
-    }
-
-    Logger.log(`[MediaProcessor] Collected ${samples.length} audio samples`);
-
-    samples.reverse();
+    // Walk the track in fixed windows from the end so only a few seconds of
+    // decoded PCM are ever alive at once — decoding the entire track up front
+    // holds the full uncompressed audio in memory (~1.4 GB per hour of stereo).
+    const WINDOW_DURATION = 5;
+    const firstTimestamp = await audioTrack.getFirstTimestamp();
+    const duration = await audioTrack.computeDuration();
+    const totalWindows = Math.max(1, Math.ceil(duration / WINDOW_DURATION));
 
     let outputTimestamp = 0;
-    const totalSamples = samples.length;
 
-    for (let i = 0; i < samples.length; i++) {
-        const sample = samples[i];
-        const buffer = sample.toAudioBuffer();
+    for (let w = totalWindows - 1; w >= 0; w--) {
+        const windowStart = firstTimestamp + w * WINDOW_DURATION;
+        const windowEnd = Math.min(firstTimestamp + duration, windowStart + WINDOW_DURATION);
 
-        for (let c = 0; c < buffer.numberOfChannels; c++) {
-            const data = buffer.getChannelData(c);
-            data.reverse();
-        }
-
-        let finalBuffer = buffer;
-        if (speed !== 1) {
-            try {
-                finalBuffer = await stretchAudioBuffer(buffer, speed);
-            } catch (e) {
-                Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
+        const samples = [];
+        for await (const sample of audioSink.samples(windowStart, windowEnd)) {
+            // The range can yield boundary-straddling samples; keep each sample
+            // in exactly one window (the one its timestamp falls into).
+            if (sample && sample.timestamp >= windowStart && sample.timestamp < windowEnd) {
+                samples.push(sample);
+            } else {
+                sample?.close();
             }
         }
+        samples.reverse();
 
-        outputTimestamp = await addAudioSamples(audioSource, finalBuffer, outputTimestamp);
-        sample.close();
+        for (const sample of samples) {
+            const buffer = sample.toAudioBuffer();
 
-        if (onProgress && i % 100 === 0) {
-            onProgress(0.8 + (i / totalSamples) * 0.2);
+            for (let c = 0; c < buffer.numberOfChannels; c++) {
+                buffer.getChannelData(c).reverse();
+            }
+
+            let finalBuffer = buffer;
+            if (speed !== 1) {
+                try {
+                    finalBuffer = await stretchAudioBuffer(buffer, speed);
+                } catch (e) {
+                    Logger.warn('[MediaProcessor] Audio time-stretch failed, using original:', e);
+                }
+            }
+
+            outputTimestamp = await addAudioSamples(audioSource, finalBuffer, outputTimestamp);
+            sample.close();
+        }
+
+        if (onProgress) {
+            onProgress(0.8 + ((totalWindows - w) / totalWindows) * 0.2);
         }
     }
 }

@@ -138,7 +138,28 @@ export function playerScrubStart(player, e) {
 export function playerScrubMove(player, e) {
     if (!player.isScrubbing) return;
     e.preventDefault();
-    player._seek(e);
+
+    // Coalesce scrub seeks: every seek tears down and rebuilds the video
+    // iterator (a decoder spin-up from the nearest key frame), so running one
+    // per mousemove floods the pipeline with concurrent decoders. Remember
+    // only the newest requested position and seek serially.
+    const rect = player.ui.progressContainer.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    player._pendingScrubTime = pos * player.duration;
+
+    if (player._scrubSeekActive) return;
+    player._scrubSeekActive = true;
+    (async () => {
+        try {
+            while (player._pendingScrubTime != null) {
+                const time = player._pendingScrubTime;
+                player._pendingScrubTime = null;
+                await player._seekTo(time);
+            }
+        } finally {
+            player._scrubSeekActive = false;
+        }
+    })();
 }
 
 export function playerScrubEnd(player, e) {
