@@ -10,6 +10,24 @@ import { Logger } from '../../shared/utils/Logger.js';
 let worker = null;
 let nextId = 1;
 const pending = new Map();
+let idleTimer = null;
+
+// Terminate the worker after it sits idle, releasing its entire heap
+// (parsed codec bundles plus any residue from the last conversion).
+// It respawns transparently on the next job.
+const IDLE_TIMEOUT_MS = 30_000;
+
+function scheduleIdleShutdown() {
+    clearTimeout(idleTimer);
+    if (!worker || pending.size > 0) return;
+    idleTimer = setTimeout(() => {
+        if (worker && pending.size === 0) {
+            Logger.log('[MediaWorker] Idle — terminating to release memory');
+            worker.terminate();
+            worker = null;
+        }
+    }, IDLE_TIMEOUT_MS);
+}
 
 function handleMessage(event) {
     const { id, type, value, error } = event.data;
@@ -21,9 +39,11 @@ function handleMessage(event) {
     } else if (type === 'done') {
         pending.delete(id);
         entry.resolve(value);
+        scheduleIdleShutdown();
     } else if (type === 'error') {
         pending.delete(id);
         entry.reject(new Error(error));
+        scheduleIdleShutdown();
     }
 }
 
@@ -72,6 +92,7 @@ export function runInWorker(op, options = {}) {
     const id = nextId++;
 
     return new Promise((resolve, reject) => {
+        clearTimeout(idleTimer);
         pending.set(id, { resolve, reject, onProgress });
         try {
             getWorker().postMessage({ id, op, options: cloneable });

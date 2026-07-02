@@ -659,10 +659,14 @@ export class Playlist {
     removeItem(index) {
         if (index < 0 || index >= this.state.items.length) return;
 
-        // Revoke blob URL to free memory
+        // Revoke blob URLs to free memory
         const removedItem = this.state.items[index];
         if (removedItem && removedItem.url && removedItem.url.startsWith('blob:')) {
             URL.revokeObjectURL(removedItem.url);
+        }
+        if (removedItem && removedItem.blob_url && removedItem.blob_url.startsWith('blob:')) {
+            URL.revokeObjectURL(removedItem.blob_url);
+            removedItem.blob_url = null;
         }
 
         // 1. Data Removal (handles activeIndex adjustment)
@@ -834,15 +838,24 @@ export class Playlist {
             //     await new Promise(resolve => setTimeout(resolve, 50));
             // }
 
-            // Cleanup previous item's resources if it was local
+            // Cleanup previous item's resources
             if (this.activeIndex !== -1 && this.activeIndex !== index) {
                 const prevItem = this.items[this.activeIndex];
-                if (prevItem && prevItem.isLocal && prevItem.url) {
-                    Logger.log(`Releasing memory for: ${prevItem.title}`);
-                    URL.revokeObjectURL(prevItem.url);
-                    prevItem.url = null;
-                    prevItem.blob_url = null; // Ensure on-demand reload triggers on revisit
-                    prevItem.file = null; // Release Blob
+                if (prevItem) {
+                    // Revoke (not just null) the playback blob URL, otherwise the
+                    // blob stays pinned in the browser's blob store for the page
+                    // lifetime. getProcessedSourceURL recreates it on revisit.
+                    if (prevItem.blob_url && prevItem.blob_url.startsWith('blob:')) {
+                        URL.revokeObjectURL(prevItem.blob_url);
+                    }
+                    prevItem.blob_url = null;
+
+                    if (prevItem.isLocal && prevItem.url) {
+                        Logger.log(`Releasing memory for: ${prevItem.title}`);
+                        URL.revokeObjectURL(prevItem.url);
+                        prevItem.url = null;
+                        prevItem.file = null; // Release Blob
+                    }
                 }
             }
 
