@@ -13,7 +13,8 @@
     "check": "npm run quality && npm run verify:libs && npm run build",
     "clean": "rm -rf dist",
     "build:desktop": "./build-desktop.sh",
-    "sim:jjc3": "bash scripts/jjc3-sim.sh"
+    "sim:jjc3": "bash scripts/jjc3-sim.sh",
+    "test:rs": "node scripts/rs-selftest.mjs"
   },
   "devDependencies": {
     "vite": "^8.0.0"
