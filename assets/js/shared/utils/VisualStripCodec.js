@@ -23,12 +23,23 @@
  *
  * Data blocks: 3240 − 80 = 3160 → 395 bytes/frame
  *
- * Redundancy: FRAME_COPIES=3 (each chunk written into 3 consecutive frames).
- * Decoder takes the first copy whose CRC-32 passes.
- * CRC-32 false-positive rate: 1/4 294 967 296 ≈ 0 for all practical purposes.
+ * Redundancy:
+ *   v4 (current writer): Reed–Solomon erasure coding across frames. The payload
+ *     is split into 395-byte shards (one per frame) grouped into generations of
+ *     RS_DATA_SHARDS data + RS_PARITY_SHARDS parity shards; any k of k+m frames
+ *     recover a generation, so up to m corrupted frames per generation heal at
+ *     m/k (25%) overhead. chunk_index carries the GLOBAL SHARD INDEX and
+ *     repeat_index is always 0. Frames are emitted interleaved round-robin
+ *     across generations so a burst of corrupted frames spreads across
+ *     generations instead of exhausting one generation's parity.
+ *   v3 (legacy, still decodable): FRAME_COPIES=3 — each chunk written into 3
+ *     frames, decoder takes the first copy whose CRC-32 passes.
+ * A frame is "present" iff its CRC-32 passes; CRC-32 false-positive rate:
+ * 1/4 294 967 296 ≈ 0 for all practical purposes.
  */
 
 import { Logger } from './Logger.js';
+import { encode as rsEncode, decode as rsDecode, MAX_SHARDS } from './ReedSolomon.js';
 
 export const VIDEO_W   = 1280;
 export const VIDEO_H   = 720;
@@ -36,7 +47,13 @@ export const BLOCK_PX  = 16;
 export const BLOCKS_X  = VIDEO_W / BLOCK_PX;  // 80
 export const BLOCKS_Y  = VIDEO_H / BLOCK_PX;  // 45
 export const FPS       = 30;
-export const FRAME_COPIES = 3;
+export const FRAME_COPIES = 3;   // v3 legacy repetition factor (decode only)
+
+// v4 Reed–Solomon generation shape: 200 data + 50 parity shards (25% overhead,
+// heals up to 20% corrupted frames per generation). k+m=250 ≤ 255 (GF(256)).
+export const RS_DATA_SHARDS   = 200;
+export const RS_PARITY_SHARDS = 50;
+const RS_MIN_PARITY = 4;         // parity floor for tiny final generations
 
 // Compact card zone — codec skips these blocks (banner card lives here)
 // Sized to contain the 340×182px card + 6px shadow, centered at 640×360, with 1-block margin.
@@ -201,8 +218,111 @@ export function encodeFrameToImageData(imageData, chunkIndex, totalChunks, repea
     }
 }
 
+// ─── Reed–Solomon shard planning (v4) ────────────────────────────────────────
+
+/**
+ * Plan the shard layout for a payload: how data shards group into generations
+ * and how much parity each generation gets. Deterministic from (payloadBytes,
+ * k, m), so encoder and decoder derive the identical plan from the audio
+ * header alone.
+ *
+ * @returns {{ totalDataShards: number, totalShards: number,
+ *             generations: {k: number, m: number, start: number}[] }}
+ *          `start` is the global shard index of the generation's first shard.
+ */
+export function planShards(payloadBytes, k = RS_DATA_SHARDS, m = RS_PARITY_SHARDS) {
+    const totalDataShards = Math.max(1, Math.ceil(payloadBytes / DATA_BYTES_PER_FRAME));
+    const generations = [];
+    let start = 0;
+    for (let done = 0; done < totalDataShards; done += k) {
+        const gk = Math.min(k, totalDataShards - done);
+        // Final partial generation: scale parity to keep the same loss
+        // tolerance ratio, with a floor so tiny payloads still heal.
+        const gm = gk === k ? m : Math.max(RS_MIN_PARITY, Math.ceil((gk * m) / k));
+        if (gk + gm > MAX_SHARDS) throw new Error(`VisualStripCodec: generation ${gk}+${gm} exceeds ${MAX_SHARDS}`);
+        generations.push({ k: gk, m: gm, start });
+        start += gk + gm;
+    }
+    return { totalDataShards, totalShards: start, generations };
+}
+
+/**
+ * Build all shards for a payload: data shards are zero-copy subarray views of
+ * the payload (except a padded final shard); parity shards are RS-encoded per
+ * generation. Returns an array of `plan.totalShards` Uint8Arrays, indexed by
+ * global shard index, each DATA_BYTES_PER_FRAME long.
+ */
+export function buildShards(payload, plan) {
+    const shards = new Array(plan.totalShards);
+    let dataIdx = 0;
+    for (const gen of plan.generations) {
+        const dataShards = [];
+        for (let i = 0; i < gen.k; i++, dataIdx++) {
+            const off = dataIdx * DATA_BYTES_PER_FRAME;
+            let s;
+            if (off + DATA_BYTES_PER_FRAME <= payload.length) {
+                s = payload.subarray(off, off + DATA_BYTES_PER_FRAME);
+            } else {
+                s = new Uint8Array(DATA_BYTES_PER_FRAME); // zero-padded tail
+                s.set(payload.subarray(off));
+            }
+            dataShards.push(s);
+            shards[gen.start + i] = s;
+        }
+        const parity = rsEncode(dataShards, gen.m);
+        for (let i = 0; i < gen.m; i++) shards[gen.start + gen.k + i] = parity[i];
+    }
+    return shards;
+}
+
+/**
+ * Frame emission order: round-robin across generations so consecutive frames
+ * belong to different generations — a burst of corrupted frames then costs
+ * each generation ~burst/G shards instead of landing entirely in one.
+ * Decode is order-independent (each frame header carries its global index).
+ */
+export function interleavedShardOrder(plan) {
+    const order = new Array(plan.totalShards);
+    let pos = 0;
+    const maxLen = plan.generations.reduce((mx, g) => Math.max(mx, g.k + g.m), 0);
+    for (let s = 0; s < maxLen; s++) {
+        for (const g of plan.generations) {
+            if (s < g.k + g.m) order[pos++] = g.start + s;
+        }
+    }
+    return order;
+}
+
+/**
+ * Reassemble the payload from decoded frames (v4). `shardSlots` is an array of
+ * length plan.totalShards holding each CRC-valid frame's data (or null).
+ * Throws when any generation has fewer than k shards present.
+ */
+export function assembleShardsRS(shardSlots, plan, originalSize) {
+    const out = new Uint8Array(originalSize);
+    let dataIdx = 0;
+    for (let g = 0; g < plan.generations.length; g++) {
+        const gen = plan.generations[g];
+        const slots = shardSlots.slice(gen.start, gen.start + gen.k + gen.m);
+        const present = slots.reduce((n, s) => n + (s ? 1 : 0), 0);
+        Logger.log(`[VisualStripCodec] RS gen ${g}: ${present}/${gen.k + gen.m} shards present (need ${gen.k})`);
+        if (present < gen.k) {
+            throw new Error(`Video too damaged to recover: generation ${g} has ${present}/${gen.k} shards`);
+        }
+        const data = rsDecode(slots, gen.k, gen.m);
+        for (let i = 0; i < gen.k; i++, dataIdx++) {
+            const off = dataIdx * DATA_BYTES_PER_FRAME;
+            if (off >= originalSize) break;
+            const take = Math.min(DATA_BYTES_PER_FRAME, originalSize - off);
+            out.set(data[i].subarray(0, take), off);
+        }
+    }
+    Logger.log(`[VisualStripCodec] RS assemble done — ${originalSize} B from ${plan.totalShards} shards`);
+    return out;
+}
+
 export function framesNeeded(byteCount) {
-    return Math.ceil(byteCount / DATA_BYTES_PER_FRAME) * FRAME_COPIES;
+    return planShards(byteCount).totalShards;
 }
 
 export function stripDurationSec(byteCount) {

@@ -14,7 +14,7 @@
     "clean": "rm -rf dist",
     "build:desktop": "./build-desktop.sh",
     "sim:jjc3": "bash scripts/jjc3-sim.sh",
-    "test:rs": "node scripts/rs-selftest.mjs"
+    "test:rs": "node scripts/rs-selftest.mjs && node scripts/shard-pipeline-test.mjs"
   },
   "devDependencies": {
     "vite": "^8.0.0"

@@ -12,8 +12,10 @@
  *     Repeated 3× for robustness. Survives AAC 128 kbps transcoding.
  *
  *   Video strip — carries the encrypted payload as 16×16-pixel black/white
- *     blocks in the bottom 20% of a 1280×720 frame.  Each chunk is written
- *     twice (primary + backup) for single-frame-loss recovery.
+ *     blocks across the frame. v4 splits the payload into 395-byte shards
+ *     protected by Reed–Solomon erasure coding (200 data + 50 parity per
+ *     generation → 25% overhead, up to 20% of frames per generation may be
+ *     lost). v3 files (3× frame repetition) remain decodable.
  *     Survives H.264/H.265 transcoding at typical platform bitrates.
  *
  * Carrier MP4 structure:
@@ -23,10 +25,11 @@
  *   Audio: 48 kHz mono, AAC
  *     Header tones (3 repetitions) + silence to match video duration
  *
- * File size guideline:
- *   ~1 200 bytes/sec of usable visual-strip capacity at 30 fps after ×2 repeat.
- *   Short-form platforms (≈140 s limit) → ≈168 KB max payload.
- *   Long-form platforms (≈10 min limit) → ≈720 KB max.
+ * File size guideline (v4):
+ *   ~9.5 KB/sec of usable visual-strip capacity at 30 fps after 25% parity.
+ *   Short-form platforms (≈140 s limit) → ≈1.3 MB max payload.
+ *   Long-form platforms (≈10 min limit) → ≈5.7 MB max.
+ *   Hard cap: 65 535 shards (uint16 header index) → ≈20 MB payload.
  *
  * Crypto: identical to JJC2 (AES-256-CTR + HMAC-SHA256 + PBKDF2 100k iter).
  * Detection: "JJC3" magic in the audio header.
@@ -39,14 +42,19 @@ import {
     encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
 import {
-    encodeFrame, encodeFrameToImageData, encodeFrameToI420,
+    encodeFrameToI420,
     decodeFrame, assembleChunks,
-    DATA_BYTES_PER_FRAME, FPS, FRAME_COPIES, VIDEO_W, VIDEO_H,
+    planShards, buildShards, interleavedShardOrder, assembleShardsRS,
+    RS_DATA_SHARDS, RS_PARITY_SHARDS,
+    DATA_BYTES_PER_FRAME, FPS, VIDEO_W, VIDEO_H,
     I420_Y_SIZE, I420_UV_SIZE, I420_SIZE,
     stripDurationSec,
 } from './VisualStripCodec.js';
 
 const MAGIC = 'JJC3';
+const VERSION = 4;                 // v4 = Reed–Solomon strip; v3 files still decode
+// chunk_index/total_chunks are uint16 in the frame header → hard shard cap.
+const MAX_TOTAL_SHARDS = 65535;
 const AUDIO_REPEAT = 3;   // transmit the audio header this many times
 const AUDIO_GAP_SEC = 1;  // silence between audio repetitions
 
@@ -101,17 +109,25 @@ export class PlatformCrypto {
         // ── Step 2: Build audio header bytes ──────────────────────────────
         // Layout: magic(4) + version(2) + payloadSize(4) + metadataSize(2)
         //       + salt(16) + iv(16) + hmac(32) + metadata JSON
-        const metadata = {};
+        const metadata = { rs: [RS_DATA_SHARDS, RS_PARITY_SHARDS] }; // v4 RS params
         if (filename) metadata.name = filename;
         if (mimeType)  metadata.type = mimeType;
         if (hint)      metadata.hint = hint;
         const metaBytes   = new TextEncoder().encode(JSON.stringify(metadata));
         const payloadSize = ciphertext.length;
 
+        // v4 shard plan — encoder and decoder derive the identical plan from
+        // (payloadSize, rs) alone, so nothing else needs to travel in-band.
+        const plan = planShards(payloadSize);
+        if (plan.totalShards > MAX_TOTAL_SHARDS) {
+            const maxBytes = Math.floor(MAX_TOTAL_SHARDS * (RS_DATA_SHARDS / (RS_DATA_SHARDS + RS_PARITY_SHARDS))) * DATA_BYTES_PER_FRAME;
+            throw new Error(`File too large to encrypt: ${(payloadSize / 1048576).toFixed(1)} MB (max ≈ ${(maxBytes / 1048576).toFixed(0)} MB)`);
+        }
+
         const headerFixed = new Uint8Array(4 + 2 + 4 + 2 + 16 + 16 + 32); // 76 bytes
         const hdv = new DataView(headerFixed.buffer);
         headerFixed.set(new TextEncoder().encode(MAGIC), 0);         // magic
-        hdv.setUint16(4, 3, false);                                  // version = 3
+        hdv.setUint16(4, VERSION, false);                            // version = 4
         hdv.setUint32(6, payloadSize, false);                        // payloadSize
         hdv.setUint16(10, metaBytes.length, false);                  // metadataSize
         headerFixed.set(salt, 12);                                   // salt
@@ -128,17 +144,17 @@ export class PlatformCrypto {
         const totalAudioSec  = singleAudioSec * AUDIO_REPEAT +
                                AUDIO_GAP_SEC  * (AUDIO_REPEAT - 1);
 
-        const totalStrip   = ciphertext.length;
-        const videoDataSec = stripDurationSec(totalStrip);
+        const videoDataSec = plan.totalShards / FPS;
         const videoSec     = Math.max(totalAudioSec + 2, videoDataSec) + 1; // 1 s tail
         const totalFrames  = Math.ceil(videoSec * FPS);
 
-        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] plan: payload=${(payloadSize/1048576).toFixed(2)}MB audioSec=${totalAudioSec.toFixed(1)}s videoSec=${videoSec.toFixed(1)}s totalFrames=${totalFrames}`);
+        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] plan: payload=${(payloadSize/1048576).toFixed(2)}MB shards=${plan.totalShards} (${plan.generations.length} gen) audioSec=${totalAudioSec.toFixed(1)}s videoSec=${videoSec.toFixed(1)}s totalFrames=${totalFrames}`);
         progress(0.40);
 
         // ── Step 4: Generate carrier MP4 ─────────────────────────────────
         const mp4Blob = await PlatformCrypto._generateCarrierMp4({
             ciphertext,
+            plan,
             audioHeaderBytes,
             totalAudioSec,
             totalFrames,
@@ -186,6 +202,7 @@ export class PlatformCrypto {
         progress(0.15);
 
         const hdv          = new DataView(headerBytes.buffer, headerBytes.byteOffset);
+        const version      = hdv.getUint16(4,  false);
         const payloadSize  = hdv.getUint32(6,  false);
         const metadataSize = hdv.getUint16(10, false);
         const salt         = headerBytes.slice(12, 28);
@@ -200,8 +217,23 @@ export class PlatformCrypto {
             } catch { /* ignore parse errors */ }
         }
 
-        Logger.log(`[PlatformCrypto] Header parsed — payloadSize=${payloadSize} B, salt=${salt.length}B iv=${iv.length}B hmac=${storedHmac.length}B meta=${JSON.stringify(metadata)}`);
+        Logger.log(`[PlatformCrypto] Header parsed — version=${version} payloadSize=${payloadSize} B, salt=${salt.length}B iv=${iv.length}B hmac=${storedHmac.length}B meta=${JSON.stringify(metadata)}`);
         progress(0.20);
+
+        // v4: Reed–Solomon shards — derive the identical plan the encoder used.
+        // v3: legacy 3× chunk repetition, assembled via assembleChunks below.
+        const isV4 = version >= 4;
+        let plan = null, shardSlots = null, genOf = null, genHave = null, gensComplete = 0;
+        if (isV4) {
+            const rs = Array.isArray(metadata.rs) && metadata.rs.length === 2
+                ? metadata.rs : [RS_DATA_SHARDS, RS_PARITY_SHARDS];
+            plan = planShards(payloadSize, rs[0], rs[1]);
+            shardSlots = new Array(plan.totalShards).fill(null);
+            genOf = new Uint16Array(plan.totalShards);
+            plan.generations.forEach((g, gi) => genOf.fill(gi, g.start, g.start + g.k + g.m));
+            genHave = new Uint32Array(plan.generations.length);
+            Logger.log(`[PlatformCrypto] RS plan — ${plan.totalShards} shards, ${plan.generations.length} generation(s), rs=[${rs}]`);
+        }
 
         // ── Step 2: Decode visual strip ───────────────────────────────────
         const videoTracks = await input.getVideoTracks();
@@ -214,49 +246,75 @@ export class PlatformCrypto {
         const canvas = PlatformCrypto._createCanvas(VIDEO_W, VIDEO_H);
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        const timestamps = (async function*() {
-            for (let i = 0; i < numFrames; i++) yield i / FPS;
-        })();
-
-        const decodedFrames = [];
+        const decodedFrames = [];   // v3 only
         let frameCount = 0;
-        let knownTotalChunks = 0;
-        const validChunksSeen = new Set();
+        let knownTotalChunks = 0;   // v3 only
+        const validChunksSeen = new Set(); // v3 only
 
+        // Iterate the track's ACTUAL frames — never sample at computed
+        // timestamps. WebM stores timestamps in integer milliseconds, so
+        // sampling at exact i/30 s falls just before every third stored
+        // timestamp and silently returns the previous frame, losing ⅓ of all
+        // shards. Each frame self-identifies via its header, so decoding
+        // needs no timing assumptions at all.
         const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
-        for await (const sample of videoSink.samplesAtTimestamps(timestamps)) {
-            if (!sample) { frameCount++; continue; }
+        for await (const sample of videoSink.samples()) {
             sample.draw(ctx, 0, 0, VIDEO_W, VIDEO_H);
             const imageData = ctx.getImageData(0, 0, VIDEO_W, VIDEO_H);
             const decoded = decodeFrame(imageData);
             if (decoded) {
-                decodedFrames.push(decoded);
-                if (decoded.totalChunks > 0) knownTotalChunks = decoded.totalChunks;
-                if (decoded.valid) validChunksSeen.add(decoded.chunkIndex);
+                if (isV4) {
+                    // CRC-valid frames fill shard slots; failed frames are
+                    // erasures — Reed–Solomon heals them at assembly.
+                    const idx = decoded.chunkIndex;
+                    if (decoded.valid && idx < plan.totalShards && !shardSlots[idx]) {
+                        shardSlots[idx] = decoded.data;
+                        const gi = genOf[idx];
+                        if (++genHave[gi] === plan.generations[gi].k) gensComplete++;
+                    }
+                } else {
+                    decodedFrames.push(decoded);
+                    if (decoded.totalChunks > 0) knownTotalChunks = decoded.totalChunks;
+                    if (decoded.valid) validChunksSeen.add(decoded.chunkIndex);
+                }
             }
             sample.close();
             frameCount++;
 
-            // Early exit: every chunk has at least one CRC-valid copy
-            if (knownTotalChunks > 0 && validChunksSeen.size >= knownTotalChunks) {
-                Logger.log(`[PlatformCrypto] Early exit — all ${knownTotalChunks} chunks validated at frame ${frameCount}/${numFrames}`);
+            // Early exit — v4: every generation has ≥ k shards (RS can finish);
+            // v3: every chunk has at least one CRC-valid copy.
+            if (isV4
+                ? gensComplete === plan.generations.length
+                : (knownTotalChunks > 0 && validChunksSeen.size >= knownTotalChunks)) {
+                Logger.log(`[PlatformCrypto] Early exit — ${isV4 ? `all ${plan.generations.length} generation(s) recoverable` : `all ${knownTotalChunks} chunks validated`} at frame ${frameCount}/${numFrames}`);
                 break;
             }
 
             if (frameCount % 30 === 0) {
                 signal?.throwIfAborted();
-                const pct = knownTotalChunks > 0
-                    ? validChunksSeen.size / knownTotalChunks
-                    : frameCount / numFrames;
+                let pct;
+                if (isV4) {
+                    let have = 0;
+                    for (let gi = 0; gi < genHave.length; gi++) {
+                        have += Math.min(genHave[gi], plan.generations[gi].k);
+                    }
+                    pct = have / plan.totalDataShards;
+                } else {
+                    pct = knownTotalChunks > 0
+                        ? validChunksSeen.size / knownTotalChunks
+                        : frameCount / numFrames;
+                }
                 progress(0.20 + pct * 0.55);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
 
-        Logger.log(`[PlatformCrypto] Decoded ${decodedFrames.length} valid frames from ${frameCount} read (${numFrames} total)`);
+        Logger.log(`[PlatformCrypto] Frame scan done — ${frameCount} frames read (${numFrames} total)`);
         progress(0.75);
 
-        const ciphertext = assembleChunks(decodedFrames, payloadSize);
+        const ciphertext = isV4
+            ? assembleShardsRS(shardSlots, plan, payloadSize)
+            : assembleChunks(decodedFrames, payloadSize);
         Logger.log(`[PlatformCrypto] Ciphertext assembled — ${ciphertext.length} B`);
         progress(0.82);
 
@@ -365,7 +423,7 @@ export class PlatformCrypto {
     }
 
     static async _generateCarrierMp4({
-        ciphertext, audioHeaderBytes, totalAudioSec, totalFrames,
+        ciphertext, plan, audioHeaderBytes, totalAudioSec, totalFrames,
         singleAudioSec, hint, signal, t0, onProgress,
     }) {
         const ms  = (a, b) => `${(b - a).toFixed(1)}ms`;
@@ -432,9 +490,15 @@ export class PlatformCrypto {
         })();
 
         // ── Feed video frames ──────────────────────────────────────────────
-        const totalChunks = Math.ceil(ciphertext.length / DATA_BYTES_PER_FRAME);
         const frameDuration = 1 / FPS;
         let frameIdx = 0;
+
+        // RS shards: data shards are zero-copy views of the ciphertext; only
+        // the 25% parity is newly allocated. One shard per frame, no repeats.
+        let t2 = performance.now();
+        const shards = buildShards(ciphertext, plan);
+        const shardOrder = interleavedShardOrder(plan);
+        Logger.log(`[PlatformCrypto] [${rel()}] RS encode (${plan.totalShards} shards, ${plan.generations.length} generations): ${ms(t2, performance.now())}`);
 
         // Pre-render placeholder once: canvas → RGBA → I420.
         // I420 is H.264's native format — feeding it directly skips the per-frame
@@ -448,7 +512,7 @@ export class PlatformCrypto {
         const placeholderI420 = PlatformCrypto._rgbaToI420(placeholderRgba, VIDEO_W, VIDEO_H);
         const i420Frame       = new Uint8Array(I420_SIZE);
         Logger.log(`[PlatformCrypto] [${rel()}] placeholder pre-render + RGBA→I420: ${ms(t, performance.now())}`);
-        Logger.log(`[PlatformCrypto] [${rel()}] video loop starting — totalChunks=${totalChunks} totalFrames=${totalFrames} (${FRAME_COPIES} passes)`);
+        Logger.log(`[PlatformCrypto] [${rel()}] video loop starting — totalShards=${plan.totalShards} totalFrames=${totalFrames}`);
 
         const I420_LAYOUT = [
             { offset: 0,                    stride: VIDEO_W       },
@@ -461,17 +525,25 @@ export class PlatformCrypto {
         let tMemcpy = 0, tPixelWrite = 0, tSampleCreate = 0, tVideoSourceAdd = 0;
         let windowStart = performance.now();
 
-        // Interleaved layout: encode all chunks for repeat 0, then all for repeat 1, etc.
-        // Each copy of a chunk lands in a completely different section of the video,
-        // giving it an independent H.264 I-frame. If one I-frame is heavily quantized
-        // (platforms typically encode at ~128–256 kbps), only that copy is affected — the others survive.
-        for (let repeatIdx = 0; repeatIdx < FRAME_COPIES; repeatIdx++) {
-            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                const start = chunkIndex * DATA_BYTES_PER_FRAME;
-                const end   = Math.min(start + DATA_BYTES_PER_FRAME, ciphertext.length);
-                const chunk = new Uint8Array(DATA_BYTES_PER_FRAME);
-                chunk.set(ciphertext.slice(start, end));
+        // One frame per shard, interleaved round-robin across generations so a
+        // burst of heavily-quantized frames spreads its damage across
+        // generations instead of exhausting one generation's parity budget.
+        //
+        // Data frames are spread out with static placeholder frames between
+        // them (up to every 3rd frame) when the carrier timeline has slack —
+        // its duration is usually dictated by the audio header, not the data.
+        // Placeholder frames cost the encoder almost nothing, so each data
+        // frame receives ~3× the rate-control budget it would get in a
+        // back-to-back noise run, buying quantization margin on aggressive
+        // platform re-encodes. Capped at 3 so decrypt's frame scan and the
+        // carrier size don't balloon for small payloads.
+        const nData = shardOrder.length;
+        const step  = Math.min(3, totalFrames / nData); // ≥ 1 (totalFrames ≥ totalShards + FPS)
+        let shardPtr = 0;
 
+        for (frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
+            let frameData = placeholderI420;
+            if (shardPtr < nData && frameIdx === Math.floor(shardPtr * step)) {
                 let ts;
 
                 ts = performance.now();
@@ -479,66 +551,15 @@ export class PlatformCrypto {
                 tMemcpy += performance.now() - ts;
 
                 ts = performance.now();
-                encodeFrameToI420(i420Frame, chunkIndex, totalChunks, repeatIdx, chunk);
+                const globalIdx = shardOrder[shardPtr++];
+                encodeFrameToI420(i420Frame, globalIdx, plan.totalShards, 0, shards[globalIdx]);
                 tPixelWrite += performance.now() - ts;
 
-                ts = performance.now();
-                const sample = new MediaBunny.VideoSample(i420Frame, {
-                    format:      'I420',
-                    codedWidth:  VIDEO_W,
-                    codedHeight: VIDEO_H,
-                    timestamp:   frameIdx * frameDuration,
-                    duration:    frameDuration,
-                    layout:      I420_LAYOUT,
-                });
-                tSampleCreate += performance.now() - ts;
-
-                ts = performance.now();
-                await videoSampleSource.add(sample);
-                tVideoSourceAdd += performance.now() - ts;
-                sample.close();
-
-                frameIdx++;
-
-                if (frameIdx % REPORT_EVERY === 0) {
-                    const windowMs = performance.now() - windowStart;
-                    Logger.log(
-                        `[PlatformCrypto] [${rel()}] frames ${frameIdx - REPORT_EVERY + 1}–${frameIdx}/${totalFrames} ` +
-                        `(pass ${repeatIdx + 1}/${FRAME_COPIES}) | window=${windowMs.toFixed(0)}ms ` +
-                        `| memcpy=${tMemcpy.toFixed(1)}ms ` +
-                        `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
-                        `| sampleCreate=${tSampleCreate.toFixed(1)}ms ` +
-                        `| videoSourceAdd=${tVideoSourceAdd.toFixed(1)}ms ` +
-                        `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tSampleCreate - tVideoSourceAdd).toFixed(1)}ms`
-                    );
-                    tMemcpy = 0; tPixelWrite = 0; tSampleCreate = 0; tVideoSourceAdd = 0;
-                    windowStart = performance.now();
-
-                    signal?.throwIfAborted();
-                    onProgress && onProgress(frameIdx / totalFrames);
-                    await new Promise(r => setTimeout(r, 0));
-                }
+                frameData = i420Frame;
             }
-        }
 
-        // Flush any partial window
-        if (frameIdx % REPORT_EVERY !== 0) {
-            const windowMs = performance.now() - windowStart;
-            Logger.log(
-                `[PlatformCrypto] [${rel()}] frames ${frameIdx - (frameIdx % REPORT_EVERY) + 1}–${frameIdx}/${totalFrames} (data done) ` +
-                `| window=${windowMs.toFixed(0)}ms ` +
-                `| memcpy=${tMemcpy.toFixed(1)}ms ` +
-                `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
-                `| sampleCreate=${tSampleCreate.toFixed(1)}ms ` +
-                `| videoSourceAdd=${tVideoSourceAdd.toFixed(1)}ms`
-            );
-        }
-
-        // Tail frames: placeholder only — feed placeholderI420 directly each time
-        const tailStart = performance.now();
-        const tailStartIdx = frameIdx;
-        while (frameIdx < totalFrames) {
-            const tailSample = new MediaBunny.VideoSample(placeholderI420, {
+            let ts = performance.now();
+            const sample = new MediaBunny.VideoSample(frameData, {
                 format:      'I420',
                 codedWidth:  VIDEO_W,
                 codedHeight: VIDEO_H,
@@ -546,19 +567,33 @@ export class PlatformCrypto {
                 duration:    frameDuration,
                 layout:      I420_LAYOUT,
             });
-            await videoSampleSource.add(tailSample);
-            tailSample.close();
-            frameIdx++;
+            tSampleCreate += performance.now() - ts;
 
-            if (frameIdx % REPORT_EVERY === 0) {
+            ts = performance.now();
+            await videoSampleSource.add(sample);
+            tVideoSourceAdd += performance.now() - ts;
+            sample.close();
+
+            if ((frameIdx + 1) % REPORT_EVERY === 0) {
+                const windowMs = performance.now() - windowStart;
+                Logger.log(
+                    `[PlatformCrypto] [${rel()}] frames ${frameIdx - REPORT_EVERY + 2}–${frameIdx + 1}/${totalFrames} ` +
+                    `(shards ${shardPtr}/${nData}) | window=${windowMs.toFixed(0)}ms ` +
+                    `| memcpy=${tMemcpy.toFixed(1)}ms ` +
+                    `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
+                    `| sampleCreate=${tSampleCreate.toFixed(1)}ms ` +
+                    `| videoSourceAdd=${tVideoSourceAdd.toFixed(1)}ms ` +
+                    `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tSampleCreate - tVideoSourceAdd).toFixed(1)}ms`
+                );
+                tMemcpy = 0; tPixelWrite = 0; tSampleCreate = 0; tVideoSourceAdd = 0;
+                windowStart = performance.now();
+
                 signal?.throwIfAborted();
-                onProgress && onProgress(frameIdx / totalFrames);
+                onProgress && onProgress((frameIdx + 1) / totalFrames);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
-        if (frameIdx > tailStartIdx) {
-            Logger.log(`[PlatformCrypto] [${rel()}] tail frames: ${frameIdx - tailStartIdx} frames in ${ms(tailStart, performance.now())}`);
-        }
+        if (shardPtr !== nData) throw new Error(`JJC3: emitted ${shardPtr}/${nData} shards`); // invariant
 
         await audioPromise; // ensure the concurrent audio feed finished
 
