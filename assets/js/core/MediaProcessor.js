@@ -209,7 +209,7 @@ export class MediaProcessor {
     }
 
     /**
-     * Encrypt a file into a JJC3 carrier MP4 (heavy: synthesizes and encodes
+     * Encrypt a file into a JJC4 carrier MP4 (heavy: synthesizes and encodes
      * the carrier video). Runs in the media worker in the browser.
      * @param {Blob} blob
      * @param {string} password
@@ -229,7 +229,7 @@ export class MediaProcessor {
     }
 
     /**
-     * Decrypt a JJC3 carrier MP4 (heavy: decodes every carrier frame).
+     * Decrypt a JJC4 carrier MP4 (heavy: decodes every carrier frame).
      * Runs in the media worker in the browser.
      * @returns {Promise<{blob: Blob, metadata: Object}>}
      */

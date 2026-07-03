@@ -1,5 +1,4 @@
 import { Logger } from '../../../shared/utils/Logger.js';
-import { CryptoHelper } from '../../../shared/utils/CryptoHelper.js';
 import { PlatformCrypto } from '../../../shared/utils/PlatformCrypto.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
@@ -41,32 +40,32 @@ export class EncryptMenu {
         let fileMetadata = null;
         let sourceBlob   = null; // cached for duration estimate
 
-        // Files up to ~20 MB fit the re-encoding-resistant carrier (JJC4 strip);
-        // larger files automatically use standard encryption (JJC2) — no size
-        // limit, but the output must be shared as-is, not re-encoded.
-        const usesPlatformFormat = () =>
-            !sourceBlob || sourceBlob.size <= PlatformCrypto.MAX_PAYLOAD_BYTES;
+        // The re-encoding-resistant carrier has a physical ~20 MB ceiling.
+        const tooLarge = () =>
+            sourceBlob && sourceBlob.size > PlatformCrypto.MAX_PAYLOAD_BYTES;
 
         const updatePlatformUI = () => {
             if (!platformSection) return;
             platformSection.style.display = currentMode === 'encrypt' ? '' : 'none';
             if (currentMode !== 'encrypt' || !sourceBlob) return;
 
-            if (usesPlatformFormat()) {
+            if (tooLarge()) {
+                const maxMb = Math.floor(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576);
+                if (platformLabel) platformLabel.textContent = 'FILE TOO LARGE';
+                if (platformInfo) {
+                    platformInfo.textContent =
+                        `This file exceeds the ~${maxMb} MB limit for the re-encoding-resistant ` +
+                        'format. Encryption is disabled — the carrier video would be impractically large.';
+                }
+                if (encryptBtn) encryptBtn.disabled = true;
+            } else {
+                if (encryptBtn) encryptBtn.disabled = false;
+                if (platformLabel) platformLabel.textContent = 'RE-ENCODING RESISTANT';
                 if (platformDuration) {
                     const sec = PlatformCrypto.estimatedDuration(sourceBlob.size);
                     const min = Math.floor(sec / 60);
                     const s   = Math.round(sec % 60);
                     platformDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
-                }
-            } else {
-                const maxMb = Math.floor(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576);
-                if (platformLabel) platformLabel.textContent = 'STANDARD ENCRYPTION';
-                if (platformInfo) {
-                    platformInfo.textContent =
-                        `Files over ~${maxMb} MB use standard encryption: same AES-256 protection ` +
-                        'and playable placeholder, output stays about the original size. ' +
-                        'Share the file as-is — it will not survive platform re-encoding.';
                 }
             }
         };
@@ -109,22 +108,15 @@ export class EncryptMenu {
             errorMessage.classList.add('hidden');
         });
 
-        // ── Detect existing encryption format + read metadata ───────────────
+        // ── Detect existing JJC4 file + read metadata ───────────────────────
         try {
             sourceBlob   = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-            // Try JJC2 first, then JJC3
-            fileMetadata = await CryptoHelper.readMetadata(sourceBlob);
-            if (!fileMetadata) {
-                fileMetadata = await PlatformCrypto.readMetadata(sourceBlob);
-                if (fileMetadata) {
-                    Logger.log('[EncryptMenu] Detected JJC3 file');
-                    // Pre-select decrypt mode for JJC3 files
-                    toggleCheckbox.checked = true;
-                    currentMode = 'decrypt';
-                }
-            }
+            fileMetadata = await PlatformCrypto.readMetadata(sourceBlob);
             if (fileMetadata) {
-                Logger.log(`[EncryptMenu] Metadata: ${JSON.stringify(fileMetadata)}`);
+                Logger.log(`[EncryptMenu] Detected JJC4 file — ${JSON.stringify(fileMetadata)}`);
+                // Pre-select decrypt mode
+                toggleCheckbox.checked = true;
+                currentMode = 'decrypt';
             }
         } catch (e) {
             Logger.log(`[EncryptMenu] Could not read metadata: ${e.message}`);
@@ -187,26 +179,12 @@ export class EncryptMenu {
                         onProgress,
                         signal,
                     };
-                    if (source.size <= PlatformCrypto.MAX_PAYLOAD_BYTES) {
-                        const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
-                        resultBlob = await MediaProcessor.encryptPlatform(source, password, encOpts);
-                    } else {
-                        // Too large for the visual-strip carrier — standard
-                        // JJC2 encryption (no size limit, decrypt auto-detects)
-                        resultBlob = await CryptoHelper.encrypt(source, password, encOpts);
-                    }
+                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
+                    resultBlob = await MediaProcessor.encryptPlatform(source, password, encOpts);
                     newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
                 } else {
-                    // Auto-detect format for decryption — JJC2 first (cheap
-                    // trailer read; avoids parsing huge blobs as media)
-                    let result;
-                    const jjc2Meta = await CryptoHelper.readMetadata(source);
-                    if (jjc2Meta !== null) {
-                        result = await CryptoHelper.decrypt(source, password, onProgress);
-                    } else {
-                        const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
-                        result = await MediaProcessor.decryptPlatform(source, password, onProgress, signal);
-                    }
+                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
+                    const result = await MediaProcessor.decryptPlatform(source, password, onProgress, signal);
                     resultBlob  = result.blob;
                     newFilename = result.metadata.name ||
                         (item.title.replace(/\.[^/.]+$/, '') + '-decrypted');

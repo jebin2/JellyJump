@@ -17,25 +17,21 @@
  * Header (row 0, 80 blocks = 80 bits = 10 bytes):
  *   bits  0–7   sync byte 0xAA
  *   bits  8–23  chunk_index  (uint16)
- *   bits 24–39  total_chunks (uint16)
- *   bits 40–47  repeat_index (uint8)  — 0, 1, or 2
+ *   bits 24–39  total_chunks (uint16)  — total shard count in this generation set
+ *   bits 40–47  reserved (uint8, 0)
  *   bits 48–79  CRC-32 of (chunk_index ‖ total_chunks ‖ data)
  *
  * Data blocks: 3240 − 80 = 3160 → 395 bytes/frame
  *
- * Redundancy:
- *   v4 (current writer): Reed–Solomon erasure coding across frames. The payload
- *     is split into 395-byte shards (one per frame) grouped into generations of
- *     RS_DATA_SHARDS data + RS_PARITY_SHARDS parity shards; any k of k+m frames
- *     recover a generation, so up to m corrupted frames per generation heal at
- *     m/k (25%) overhead. chunk_index carries the GLOBAL SHARD INDEX and
- *     repeat_index is always 0. Frames are emitted interleaved round-robin
- *     across generations so a burst of corrupted frames spreads across
- *     generations instead of exhausting one generation's parity.
- *   v3 (legacy, still decodable): FRAME_COPIES=3 — each chunk written into 3
- *     frames, decoder takes the first copy whose CRC-32 passes.
- * A frame is "present" iff its CRC-32 passes; CRC-32 false-positive rate:
- * 1/4 294 967 296 ≈ 0 for all practical purposes.
+ * Redundancy: Reed–Solomon erasure coding across frames. The payload is split
+ * into 395-byte shards (one per frame) grouped into generations of
+ * RS_DATA_SHARDS data + RS_PARITY_SHARDS parity shards; any k of k+m frames
+ * recover a generation, so up to m corrupted frames per generation heal at m/k
+ * (25%) overhead. chunk_index carries the GLOBAL SHARD INDEX. Frames are
+ * emitted interleaved round-robin across generations so a burst of corrupted
+ * frames spreads across generations instead of exhausting one generation's
+ * parity. A frame is "present" iff its CRC-32 passes; CRC-32 false-positive
+ * rate 1/4 294 967 296 ≈ 0 for all practical purposes.
  */
 
 import { Logger } from './Logger.js';
@@ -47,9 +43,8 @@ export const BLOCK_PX  = 16;
 export const BLOCKS_X  = VIDEO_W / BLOCK_PX;  // 80
 export const BLOCKS_Y  = VIDEO_H / BLOCK_PX;  // 45
 export const FPS       = 30;
-export const FRAME_COPIES = 3;   // v3 legacy repetition factor (decode only)
 
-// v4 Reed–Solomon generation shape: 200 data + 50 parity shards (25% overhead,
+// Reed–Solomon generation shape: 200 data + 50 parity shards (25% overhead,
 // heals up to 20% corrupted frames per generation). k+m=250 ≤ 255 (GF(256)).
 export const RS_DATA_SHARDS   = 200;
 export const RS_PARITY_SHARDS = 50;
@@ -466,52 +461,4 @@ export function decodeFrame(imageData) {
         data,
         valid: crc32(crcInput) === storedCrc,
     };
-}
-
-/**
- * Assemble decoded frames into the original byte array.
- * Takes the first valid (CRC-passing) copy for each chunk.
- */
-export function assembleChunks(frames, originalSize) {
-    if (!frames.length) return new Uint8Array(0);
-
-    const totalChunks = frames.reduce((m, f) => f ? Math.max(m, f.totalChunks) : m, 0);
-    const chunks = new Array(totalChunks).fill(null);
-
-    for (const frame of frames) {
-        if (!frame || frame.chunkIndex >= totalChunks) continue;
-        const existing = chunks[frame.chunkIndex];
-        if (!existing) {
-            chunks[frame.chunkIndex] = frame;
-        } else if (frame.valid && !existing.valid) {
-            chunks[frame.chunkIndex] = frame;   // upgrade invalid → valid
-        } else if (frame.valid && existing.valid && frame.repeatIndex < existing.repeatIndex) {
-            chunks[frame.chunkIndex] = frame;   // prefer lower repeat index
-        }
-    }
-
-    let validCount = 0, invalidCount = 0, missingCount = 0;
-    for (let i = 0; i < totalChunks; i++) {
-        if (!chunks[i])          missingCount++;
-        else if (chunks[i].valid) validCount++;
-        else                      invalidCount++;
-    }
-    Logger.log(`[VisualStripCodec] assemble — totalChunks=${totalChunks} valid=${validCount} invalid=${invalidCount} missing=${missingCount}`);
-    if (missingCount > 0 || invalidCount > 0) {
-        const failed = [];
-        for (let i = 0; i < totalChunks; i++) {
-            if (!chunks[i] || !chunks[i].valid) failed.push(i);
-        }
-        Logger.log(`[VisualStripCodec] WARNING: ${missingCount + invalidCount} chunk(s) lost — output will be corrupted. Failed indices: ${failed.slice(0, 20).join(', ')}${failed.length > 20 ? '…' : ''}`);
-    }
-
-    const result = new Uint8Array(originalSize);
-    let written = 0;
-    for (let i = 0; i < totalChunks && written < originalSize; i++) {
-        const take = Math.min(DATA_BYTES_PER_FRAME, originalSize - written);
-        if (chunks[i]) result.set(chunks[i].data.slice(0, take), written);
-        written += take;
-    }
-    Logger.log(`[VisualStripCodec] assemble done — wrote ${written} / ${originalSize} B`);
-    return result;
 }

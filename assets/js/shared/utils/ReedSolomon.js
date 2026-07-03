@@ -4,7 +4,7 @@
  * Used by the JJC4 visual strip: the payload is split into k data shards
  * (one per carrier frame) and m parity shards are added. Any k of the k+m
  * shards reconstruct the original data — so up to m lost/corrupted frames are
- * recovered, at m/k overhead instead of the 3× of JJC3's repetition.
+ * recovered, at m/k overhead instead of the old 3× frame repetition.
  *
  * Erasure-only: the caller always knows which shards are present (a frame's
  * CRC-32 tells present vs. lost), so this never has to *locate* errors, only

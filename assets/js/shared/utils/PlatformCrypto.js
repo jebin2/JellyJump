@@ -1,5 +1,5 @@
 /**
- * PlatformCrypto — JJC3 format
+ * PlatformCrypto — JJC4 format
  *
  * A transcode-survivable encrypted video format.  The encrypted payload is
  * embedded INSIDE a carrier MP4's actual pixel and audio content so that
@@ -12,11 +12,10 @@
  *     Repeated 3× for robustness. Survives AAC 128 kbps transcoding.
  *
  *   Video strip — carries the encrypted payload as 16×16-pixel black/white
- *     blocks across the frame. v4 splits the payload into 395-byte shards
+ *     blocks across the frame. The payload is split into 395-byte shards
  *     protected by Reed–Solomon erasure coding (200 data + 50 parity per
  *     generation → 25% overhead, up to 20% of frames per generation may be
- *     lost). v3 files (3× frame repetition) remain decodable.
- *     Survives H.264/H.265 transcoding at typical platform bitrates.
+ *     lost). Survives H.264/H.265 transcoding at typical platform bitrates.
  *
  * Carrier MP4 structure:
  *   Video: 1280×720, 30 fps
@@ -25,14 +24,14 @@
  *   Audio: 48 kHz mono, AAC
  *     Header tones (3 repetitions) + silence to match video duration
  *
- * File size guideline (v4):
+ * File size guideline:
  *   ~9.5 KB/sec of usable visual-strip capacity at 30 fps after 25% parity.
  *   Short-form platforms (≈140 s limit) → ≈1.3 MB max payload.
  *   Long-form platforms (≈10 min limit) → ≈5.7 MB max.
  *   Hard cap: 65 535 shards (uint16 header index) → ≈20 MB payload.
  *
- * Crypto: identical to JJC2 (AES-256-CTR + HMAC-SHA256 + PBKDF2 100k iter).
- * Detection: "JJC3" magic in the audio header.
+ * Crypto: AES-256-CTR + HMAC-SHA256 + PBKDF2 (100k iter).
+ * Detection: "JJC4" magic in the audio header.
  */
 
 import { Logger } from './Logger.js';
@@ -42,8 +41,7 @@ import {
     encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
 import {
-    encodeFrameToI420,
-    decodeFrame, assembleChunks,
+    encodeFrameToI420, decodeFrame,
     planShards, buildShards, interleavedShardOrder, assembleShardsRS,
     RS_DATA_SHARDS, RS_PARITY_SHARDS,
     DATA_BYTES_PER_FRAME, FPS, VIDEO_W, VIDEO_H,
@@ -51,8 +49,8 @@ import {
     stripDurationSec,
 } from './VisualStripCodec.js';
 
-const MAGIC = 'JJC3';
-const VERSION = 4;                 // v4 = Reed–Solomon strip; v3 files still decode
+const MAGIC = 'JJC4';
+const VERSION = 4;                 // format version carried in the audio header
 // chunk_index/total_chunks are uint16 in the frame header → hard shard cap.
 const MAX_TOTAL_SHARDS = 65535;
 const AUDIO_REPEAT = 3;   // transmit the audio header this many times
@@ -63,9 +61,9 @@ export class PlatformCrypto {
 
     /**
      * Largest payload the visual strip can carry (~20 MB): 65 535 shard
-     * indices minus the 25% parity share. Callers should route larger files
-     * to CryptoHelper (JJC2) — the strip's ~9.5 KB/s channel capacity would
-     * turn a 1 GB file into a multi-hour, tens-of-GB carrier anyway.
+     * indices minus the 25% parity share. This is a physical ceiling of the
+     * re-encoding-resistant channel (~9.5 KB per second of carrier video) —
+     * a larger file would need a multi-hour, tens-of-GB carrier.
      */
     static MAX_PAYLOAD_BYTES =
         Math.floor(MAX_TOTAL_SHARDS * (RS_DATA_SHARDS / (RS_DATA_SHARDS + RS_PARITY_SHARDS))) * DATA_BYTES_PER_FRAME;
@@ -73,7 +71,7 @@ export class PlatformCrypto {
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
-     * Encrypt a file into a JJC3 carrier MP4.
+     * Encrypt a file into a JJC4 carrier MP4.
      * @param {Blob} blob
      * @param {string} password
      * @param {Object} [options]
@@ -129,7 +127,7 @@ export class PlatformCrypto {
         // (payloadSize, rs) alone, so nothing else needs to travel in-band.
         const plan = planShards(payloadSize);
         if (plan.totalShards > MAX_TOTAL_SHARDS) {
-            throw new Error(`File too large for re-encoding-resistant format: ${(payloadSize / 1048576).toFixed(1)} MB (max ≈ ${(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576).toFixed(0)} MB) — use standard encryption (CryptoHelper) instead`);
+            throw new Error(`File too large to encrypt: ${(payloadSize / 1048576).toFixed(1)} MB — the re-encoding-resistant carrier tops out at ~${(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576).toFixed(0)} MB.`);
         }
 
         const headerFixed = new Uint8Array(4 + 2 + 4 + 2 + 16 + 16 + 32); // 76 bytes
@@ -180,7 +178,7 @@ export class PlatformCrypto {
     }
 
     /**
-     * Decrypt a JJC3 carrier MP4.
+     * Decrypt a JJC4 carrier MP4.
      * @param {Blob} blob
      * @param {string} password
      * @param {Function} [onProgress]
@@ -202,10 +200,10 @@ export class PlatformCrypto {
 
         // ── Step 1: Decode audio header ───────────────────────────────────
         const audioTracks = await input.getAudioTracks();
-        if (!audioTracks.length) throw new Error('JJC3: no audio track found');
+        if (!audioTracks.length) throw new Error('JJC4: no audio track found');
 
         const headerBytes = await PlatformCrypto._readAndDecodeAudio(audioTracks[0]);
-        if (!headerBytes) throw new Error('JJC3: could not decode audio header');
+        if (!headerBytes) throw new Error('JJC4: could not decode audio header');
         Logger.log(`[PlatformCrypto] Audio header decoded — ${headerBytes.length} B`);
         progress(0.15);
 
@@ -228,24 +226,24 @@ export class PlatformCrypto {
         Logger.log(`[PlatformCrypto] Header parsed — version=${version} payloadSize=${payloadSize} B, salt=${salt.length}B iv=${iv.length}B hmac=${storedHmac.length}B meta=${JSON.stringify(metadata)}`);
         progress(0.20);
 
-        // v4: Reed–Solomon shards — derive the identical plan the encoder used.
-        // v3: legacy 3× chunk repetition, assembled via assembleChunks below.
-        const isV4 = version >= 4;
-        let plan = null, shardSlots = null, genOf = null, genHave = null, gensComplete = 0;
-        if (isV4) {
-            const rs = Array.isArray(metadata.rs) && metadata.rs.length === 2
-                ? metadata.rs : [RS_DATA_SHARDS, RS_PARITY_SHARDS];
-            plan = planShards(payloadSize, rs[0], rs[1]);
-            shardSlots = new Array(plan.totalShards).fill(null);
-            genOf = new Uint16Array(plan.totalShards);
-            plan.generations.forEach((g, gi) => genOf.fill(gi, g.start, g.start + g.k + g.m));
-            genHave = new Uint32Array(plan.generations.length);
-            Logger.log(`[PlatformCrypto] RS plan — ${plan.totalShards} shards, ${plan.generations.length} generation(s), rs=[${rs}]`);
+        // Reed–Solomon shards — derive the identical plan the encoder used
+        // from (payloadSize, rs) alone.
+        if (version < VERSION) {
+            throw new Error(`Unsupported JJC version ${version} (expected ${VERSION}). This file was made by an incompatible build.`);
         }
+        const rs = Array.isArray(metadata.rs) && metadata.rs.length === 2
+            ? metadata.rs : [RS_DATA_SHARDS, RS_PARITY_SHARDS];
+        const plan = planShards(payloadSize, rs[0], rs[1]);
+        const shardSlots = new Array(plan.totalShards).fill(null);
+        const genOf = new Uint16Array(plan.totalShards);
+        plan.generations.forEach((g, gi) => genOf.fill(gi, g.start, g.start + g.k + g.m));
+        const genHave = new Uint32Array(plan.generations.length);
+        let gensComplete = 0;
+        Logger.log(`[PlatformCrypto] RS plan — ${plan.totalShards} shards, ${plan.generations.length} generation(s), rs=[${rs}]`);
 
         // ── Step 2: Decode visual strip ───────────────────────────────────
         const videoTracks = await input.getVideoTracks();
-        if (!videoTracks.length) throw new Error('JJC3: no video track found');
+        if (!videoTracks.length) throw new Error('JJC4: no video track found');
 
         const videoTrack = videoTracks[0];
         const duration   = await videoTrack.computeDuration();
@@ -254,10 +252,7 @@ export class PlatformCrypto {
         const canvas = PlatformCrypto._createCanvas(VIDEO_W, VIDEO_H);
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-        const decodedFrames = [];   // v3 only
         let frameCount = 0;
-        let knownTotalChunks = 0;   // v3 only
-        const validChunksSeen = new Set(); // v3 only
 
         // Iterate the track's ACTUAL frames — never sample at computed
         // timestamps. WebM stores timestamps in integer milliseconds, so
@@ -270,49 +265,32 @@ export class PlatformCrypto {
             sample.draw(ctx, 0, 0, VIDEO_W, VIDEO_H);
             const imageData = ctx.getImageData(0, 0, VIDEO_W, VIDEO_H);
             const decoded = decodeFrame(imageData);
-            if (decoded) {
-                if (isV4) {
-                    // CRC-valid frames fill shard slots; failed frames are
-                    // erasures — Reed–Solomon heals them at assembly.
-                    const idx = decoded.chunkIndex;
-                    if (decoded.valid && idx < plan.totalShards && !shardSlots[idx]) {
-                        shardSlots[idx] = decoded.data;
-                        const gi = genOf[idx];
-                        if (++genHave[gi] === plan.generations[gi].k) gensComplete++;
-                    }
-                } else {
-                    decodedFrames.push(decoded);
-                    if (decoded.totalChunks > 0) knownTotalChunks = decoded.totalChunks;
-                    if (decoded.valid) validChunksSeen.add(decoded.chunkIndex);
+            if (decoded && decoded.valid) {
+                // CRC-valid frames fill shard slots; failed/absent frames are
+                // erasures — Reed–Solomon heals them at assembly.
+                const idx = decoded.chunkIndex;
+                if (idx < plan.totalShards && !shardSlots[idx]) {
+                    shardSlots[idx] = decoded.data;
+                    const gi = genOf[idx];
+                    if (++genHave[gi] === plan.generations[gi].k) gensComplete++;
                 }
             }
             sample.close();
             frameCount++;
 
-            // Early exit — v4: every generation has ≥ k shards (RS can finish);
-            // v3: every chunk has at least one CRC-valid copy.
-            if (isV4
-                ? gensComplete === plan.generations.length
-                : (knownTotalChunks > 0 && validChunksSeen.size >= knownTotalChunks)) {
-                Logger.log(`[PlatformCrypto] Early exit — ${isV4 ? `all ${plan.generations.length} generation(s) recoverable` : `all ${knownTotalChunks} chunks validated`} at frame ${frameCount}/${numFrames}`);
+            // Early exit — every generation has ≥ k shards, so RS can finish.
+            if (gensComplete === plan.generations.length) {
+                Logger.log(`[PlatformCrypto] Early exit — all ${plan.generations.length} generation(s) recoverable at frame ${frameCount}/${numFrames}`);
                 break;
             }
 
             if (frameCount % 30 === 0) {
                 signal?.throwIfAborted();
-                let pct;
-                if (isV4) {
-                    let have = 0;
-                    for (let gi = 0; gi < genHave.length; gi++) {
-                        have += Math.min(genHave[gi], plan.generations[gi].k);
-                    }
-                    pct = have / plan.totalDataShards;
-                } else {
-                    pct = knownTotalChunks > 0
-                        ? validChunksSeen.size / knownTotalChunks
-                        : frameCount / numFrames;
+                let have = 0;
+                for (let gi = 0; gi < genHave.length; gi++) {
+                    have += Math.min(genHave[gi], plan.generations[gi].k);
                 }
-                progress(0.20 + pct * 0.55);
+                progress(0.20 + (have / plan.totalDataShards) * 0.55);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
@@ -320,9 +298,7 @@ export class PlatformCrypto {
         Logger.log(`[PlatformCrypto] Frame scan done — ${frameCount} frames read (${numFrames} total)`);
         progress(0.75);
 
-        const ciphertext = isV4
-            ? assembleShardsRS(shardSlots, plan, payloadSize)
-            : assembleChunks(decodedFrames, payloadSize);
+        const ciphertext = assembleShardsRS(shardSlots, plan, payloadSize);
         Logger.log(`[PlatformCrypto] Ciphertext assembled — ${ciphertext.length} B`);
         progress(0.82);
 
@@ -347,8 +323,8 @@ export class PlatformCrypto {
     }
 
     /**
-     * Read metadata from a JJC3 file without decrypting the payload.
-     * Returns null if not a JJC3 file.
+     * Read metadata from a JJC4 file without decrypting the payload.
+     * Returns null if not a JJC4 file.
      * @param {Blob} blob
      * @returns {Promise<Object|null>}
      */
@@ -467,7 +443,7 @@ export class PlatformCrypto {
 
         // ── Audio source ───────────────────────────────────────────────────
         const supportedAudioCodecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'flac', 'opus']);
-        if (!supportedAudioCodecs.length) throw new Error('JJC3: no encodable audio codec');
+        if (!supportedAudioCodecs.length) throw new Error('JJC4: no encodable audio codec');
         const audioCodec = supportedAudioCodecs[0];
 
         const audioSource = new MediaBunny.AudioSampleSource({ codec: audioCodec, bitrate: 128_000 });
@@ -533,25 +509,18 @@ export class PlatformCrypto {
         let tMemcpy = 0, tPixelWrite = 0, tSampleCreate = 0, tVideoSourceAdd = 0;
         let windowStart = performance.now();
 
-        // One frame per shard, interleaved round-robin across generations so a
-        // burst of heavily-quantized frames spreads its damage across
-        // generations instead of exhausting one generation's parity budget.
-        //
-        // Data frames are spread out with static placeholder frames between
-        // them (up to every 3rd frame) when the carrier timeline has slack —
-        // its duration is usually dictated by the audio header, not the data.
-        // Placeholder frames cost the encoder almost nothing, so each data
-        // frame receives ~3× the rate-control budget it would get in a
-        // back-to-back noise run, buying quantization margin on aggressive
-        // platform re-encodes. Capped at 3 so decrypt's frame scan and the
-        // carrier size don't balloon for small payloads.
+        // One frame per shard — no repetition (RS parity replaces the old 3×
+        // copies). Shards are emitted in interleaved round-robin order across
+        // generations, so a burst of heavily-quantized frames (platforms
+        // encode bit-starved opening GOPs) spreads its damage across
+        // generations rather than exhausting one generation's parity budget.
+        // Any leftover timeline (the carrier length is usually set by the audio
+        // header) is filled with cheap static placeholder frames as a tail.
         const nData = shardOrder.length;
-        const step  = Math.min(3, totalFrames / nData); // ≥ 1 (totalFrames ≥ totalShards + FPS)
-        let shardPtr = 0;
 
         for (frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
             let frameData = placeholderI420;
-            if (shardPtr < nData && frameIdx === Math.floor(shardPtr * step)) {
+            if (frameIdx < nData) {
                 let ts;
 
                 ts = performance.now();
@@ -559,7 +528,7 @@ export class PlatformCrypto {
                 tMemcpy += performance.now() - ts;
 
                 ts = performance.now();
-                const globalIdx = shardOrder[shardPtr++];
+                const globalIdx = shardOrder[frameIdx];
                 encodeFrameToI420(i420Frame, globalIdx, plan.totalShards, 0, shards[globalIdx]);
                 tPixelWrite += performance.now() - ts;
 
@@ -586,7 +555,7 @@ export class PlatformCrypto {
                 const windowMs = performance.now() - windowStart;
                 Logger.log(
                     `[PlatformCrypto] [${rel()}] frames ${frameIdx - REPORT_EVERY + 2}–${frameIdx + 1}/${totalFrames} ` +
-                    `(shards ${shardPtr}/${nData}) | window=${windowMs.toFixed(0)}ms ` +
+                    `(shards ${Math.min(frameIdx + 1, nData)}/${nData}) | window=${windowMs.toFixed(0)}ms ` +
                     `| memcpy=${tMemcpy.toFixed(1)}ms ` +
                     `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
                     `| sampleCreate=${tSampleCreate.toFixed(1)}ms ` +
@@ -601,7 +570,6 @@ export class PlatformCrypto {
                 await new Promise(r => setTimeout(r, 0));
             }
         }
-        if (shardPtr !== nData) throw new Error(`JJC3: emitted ${shardPtr}/${nData} shards`); // invariant
 
         await audioPromise; // ensure the concurrent audio feed finished
 
