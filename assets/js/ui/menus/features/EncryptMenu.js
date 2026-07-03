@@ -31,7 +31,6 @@ export class EncryptMenu {
         const infoText          = modalContent.querySelector('.encrypt-info-text');
         const actionIconUse     = modalContent.querySelector('.action-icon-use');
 
-        const platformDuration  = modalContent.querySelector('.encrypt-platform-duration');
         const platformSection   = modalContent.querySelector('.encrypt-platform-section');
         const platformLabel     = modalContent.querySelector('.encrypt-platform-label');
         const platformInfo      = modalContent.querySelector('.encrypt-platform-info');
@@ -40,32 +39,51 @@ export class EncryptMenu {
         let fileMetadata = null;
         let sourceBlob   = null; // cached for duration estimate
 
-        // The re-encoding-resistant carrier has a physical ~20 MB ceiling.
-        const tooLarge = () =>
-            sourceBlob && sourceBlob.size > PlatformCrypto.MAX_PAYLOAD_BYTES;
+        // Payloads above the in-RAM ceiling can't be held as one ArrayBuffer;
+        // the carrier is streamed to a disk file the user picks (needs the
+        // File System Access API — Electron and Chromium have it).
+        const needsStreaming = () =>
+            sourceBlob && sourceBlob.size > PlatformCrypto.IN_RAM_PAYLOAD_LIMIT;
+        const canStream = typeof window !== 'undefined' && 'showSaveFilePicker' in window;
 
         const updatePlatformUI = () => {
             if (!platformSection) return;
             platformSection.style.display = currentMode === 'encrypt' ? '' : 'none';
             if (currentMode !== 'encrypt' || !sourceBlob) return;
 
-            if (tooLarge()) {
-                const maxMb = Math.floor(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576);
+            if (needsStreaming() && !canStream) {
+                const maxMb = Math.floor(PlatformCrypto.IN_RAM_PAYLOAD_LIMIT / 1048576);
                 if (platformLabel) platformLabel.textContent = 'FILE TOO LARGE';
                 if (platformInfo) {
                     platformInfo.textContent =
-                        `This file exceeds the ~${maxMb} MB limit for the re-encoding-resistant ` +
-                        'format. Encryption is disabled — the carrier video would be impractically large.';
+                        `Files over ~${maxMb} MB need to stream to disk, which this browser ` +
+                        "doesn't support. Use the desktop app or a Chromium-based browser.";
                 }
                 if (encryptBtn) encryptBtn.disabled = true;
+            } else if (needsStreaming()) {
+                if (encryptBtn) encryptBtn.disabled = false;
+                if (platformLabel) platformLabel.textContent = 'RE-ENCODING RESISTANT (STREAMED)';
+                if (platformInfo) {
+                    platformInfo.textContent =
+                        "This file is large — you'll pick a save location and the encrypted " +
+                        'carrier video is written straight to disk. Note the carrier is much ' +
+                        'longer/larger than the original.';
+                }
             } else {
                 if (encryptBtn) encryptBtn.disabled = false;
                 if (platformLabel) platformLabel.textContent = 'RE-ENCODING RESISTANT';
-                if (platformDuration) {
+                if (platformInfo) {
+                    platformInfo.innerHTML =
+                        "Encrypted data is embedded in the carrier video's pixel strip and audio track — " +
+                        'survives platform re-encoding (Twitter, YouTube, Telegram, etc).<br>Estimated output length: ' +
+                        '<span class="encrypt-platform-duration font-mono" style="color:var(--accent-primary);">—</span>.';
+                }
+                const dur = platformSection.querySelector('.encrypt-platform-duration');
+                if (dur) {
                     const sec = PlatformCrypto.estimatedDuration(sourceBlob.size);
                     const min = Math.floor(sec / 60);
                     const s   = Math.round(sec % 60);
-                    platformDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
+                    dur.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
                 }
             }
         };
@@ -169,9 +187,10 @@ export class EncryptMenu {
                     progressPct.textContent = Math.round(p * 100) + '%';
                 };
 
-                let resultBlob, newFilename;
+                let resultBlob, newFilename, streamed = false;
 
                 if (currentMode === 'encrypt') {
+                    newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
                     const encOpts = {
                         filename: item.title,
                         mimeType: source.type || item.type || 'video/mp4',
@@ -179,9 +198,17 @@ export class EncryptMenu {
                         onProgress,
                         signal,
                     };
+                    // Large payloads stream the carrier straight to a disk file
+                    // the user picks (can't hold a >2 GB carrier in RAM).
+                    if (source.size > PlatformCrypto.IN_RAM_PAYLOAD_LIMIT) {
+                        encOpts.fileHandle = await window.showSaveFilePicker({
+                            suggestedName: newFilename,
+                            types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }],
+                        });
+                        streamed = true;
+                    }
                     const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
                     resultBlob = await MediaProcessor.encryptPlatform(source, password, encOpts);
-                    newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
                 } else {
                     const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
                     const result = await MediaProcessor.decryptPlatform(source, password, onProgress, signal);
@@ -190,17 +217,22 @@ export class EncryptMenu {
                         (item.title.replace(/\.[^/.]+$/, '') + '-decrypted');
                 }
 
-                const { url } = playlist.insertProcessedItem(item, resultBlob, newFilename);
-
-                if (downloadBtn) {
-                    downloadBtn.href     = url;
-                    downloadBtn.download = newFilename;
-                }
-
-                successMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
-                downloadBtn.classList.remove('hidden');
-                downloadBtn.title = `Download ${currentMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}`;
+                successMessage.classList.remove('hidden');
+
+                if (streamed || !resultBlob) {
+                    // Carrier was written directly to the user's chosen file.
+                    successMessage.textContent = `Encrypted and saved to “${newFilename}”.`;
+                    downloadBtn.classList.add('hidden');
+                } else {
+                    const { url } = playlist.insertProcessedItem(item, resultBlob, newFilename);
+                    if (downloadBtn) {
+                        downloadBtn.href     = url;
+                        downloadBtn.download = newFilename;
+                        downloadBtn.classList.remove('hidden');
+                        downloadBtn.title = `Download ${currentMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}`;
+                    }
+                }
 
             } catch (error) {
                 progressSection.classList.add('hidden');

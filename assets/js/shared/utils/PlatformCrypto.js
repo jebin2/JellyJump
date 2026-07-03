@@ -51,8 +51,9 @@ import {
 
 const MAGIC = 'JJC4';
 const VERSION = 4;                 // format version carried in the audio header
-// chunk_index/total_chunks are uint16 in the frame header → hard shard cap.
-const MAX_TOTAL_SHARDS = 65535;
+// The frame header's shard index is uint32, so the format itself imposes no
+// practical ceiling — up to 2^32-1 shards. Size is bounded by memory instead.
+const MAX_TOTAL_SHARDS = 0xFFFFFFFF;
 const AUDIO_REPEAT = 3;   // transmit the audio header this many times
 const AUDIO_GAP_SEC = 1;  // silence between audio repetitions
 
@@ -60,13 +61,13 @@ export class PlatformCrypto {
     static MAGIC = MAGIC;
 
     /**
-     * Largest payload the visual strip can carry (~20 MB): 65 535 shard
-     * indices minus the 25% parity share. This is a physical ceiling of the
-     * re-encoding-resistant channel (~9.5 KB per second of carrier video) —
-     * a larger file would need a multi-hour, tens-of-GB carrier.
+     * Payload size above which the carrier is streamed to a disk file instead
+     * of assembled in RAM. BufferTarget accumulates the whole carrier as one
+     * ArrayBuffer (~2 GB engine limit); at ~20× payload→carrier expansion,
+     * ~64 MB of payload is a safe in-RAM ceiling. Larger payloads must supply
+     * a writable stream (see options.target / options.fileStream).
      */
-    static MAX_PAYLOAD_BYTES =
-        Math.floor(MAX_TOTAL_SHARDS * (RS_DATA_SHARDS / (RS_DATA_SHARDS + RS_PARITY_SHARDS))) * DATA_BYTES_PER_FRAME;
+    static IN_RAM_PAYLOAD_LIMIT = 64 * 1024 * 1024;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -127,7 +128,14 @@ export class PlatformCrypto {
         // (payloadSize, rs) alone, so nothing else needs to travel in-band.
         const plan = planShards(payloadSize);
         if (plan.totalShards > MAX_TOTAL_SHARDS) {
-            throw new Error(`File too large to encrypt: ${(payloadSize / 1048576).toFixed(1)} MB — the re-encoding-resistant carrier tops out at ~${(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576).toFixed(0)} MB.`);
+            throw new Error(`File too large to encrypt: ${(payloadSize / 1048576).toFixed(1)} MB exceeds the format's shard limit.`);
+        }
+        // Above the in-RAM ceiling the carrier must stream to a disk file
+        // (BufferTarget can't hold a >2 GB ArrayBuffer). The caller supplies a
+        // FileSystemFileHandle via options.fileHandle for that path.
+        const streamToDisk = payloadSize > PlatformCrypto.IN_RAM_PAYLOAD_LIMIT;
+        if (streamToDisk && !options.fileHandle) {
+            throw new Error(`File too large to encrypt in memory: ${(payloadSize / 1048576).toFixed(1)} MB. A save location is required to stream the carrier to disk.`);
         }
 
         const headerFixed = new Uint8Array(4 + 2 + 4 + 2 + 16 + 16 + 32); // 76 bytes
@@ -168,13 +176,18 @@ export class PlatformCrypto {
             hint,
             signal,
             t0,
+            fileHandle: options.fileHandle,   // present → stream carrier to disk
             onProgress: (v) => progress(0.40 + v * 0.55),
         });
 
         progress(1);
         const totalMs = performance.now() - t0;
-        Logger.log(`[PlatformCrypto] ──── ENCRYPT DONE — ${(mp4Blob.size/1048576).toFixed(2)} MB in ${(totalMs/1000).toFixed(1)}s ────`);
-        return mp4Blob;
+        if (mp4Blob) {
+            Logger.log(`[PlatformCrypto] ──── ENCRYPT DONE — ${(mp4Blob.size/1048576).toFixed(2)} MB in ${(totalMs/1000).toFixed(1)}s ────`);
+        } else {
+            Logger.log(`[PlatformCrypto] ──── ENCRYPT DONE — streamed to disk in ${(totalMs/1000).toFixed(1)}s ────`);
+        }
+        return mp4Blob; // null when streamed straight to a disk file
     }
 
     /**
@@ -268,7 +281,7 @@ export class PlatformCrypto {
             if (decoded && decoded.valid) {
                 // CRC-valid frames fill shard slots; failed/absent frames are
                 // erasures — Reed–Solomon heals them at assembly.
-                const idx = decoded.chunkIndex;
+                const idx = decoded.shardIndex;
                 if (idx < plan.totalShards && !shardSlots[idx]) {
                     shardSlots[idx] = decoded.data;
                     const gi = genOf[idx];
@@ -408,7 +421,7 @@ export class PlatformCrypto {
 
     static async _generateCarrierMp4({
         ciphertext, plan, audioHeaderBytes, totalAudioSec, totalFrames,
-        singleAudioSec, hint, signal, t0, onProgress,
+        singleAudioSec, hint, signal, t0, fileHandle, onProgress,
     }) {
         const ms  = (a, b) => `${(b - a).toFixed(1)}ms`;
         const rel = () => `t=${ms(t0, performance.now())}`;
@@ -419,9 +432,28 @@ export class PlatformCrypto {
         await ensureEncoders();
         Logger.log(`[PlatformCrypto] [${rel()}] MediaBunny import: ${ms(t, performance.now())}`);
 
+        // Target: in-RAM BufferTarget (returns a Blob), or — for payloads too
+        // big to hold as one ArrayBuffer — a StreamTarget that writes the
+        // carrier straight to the caller's disk file as it's produced.
+        let fileWritable = null;
+        let target;
+        if (fileHandle) {
+            fileWritable = await fileHandle.createWritable();
+            const sink = new WritableStream({
+                // mediabunny emits { data: Uint8Array, position: number }
+                async write(chunk) {
+                    await fileWritable.write({ type: 'write', position: chunk.position, data: chunk.data });
+                },
+            });
+            target = new MediaBunny.StreamTarget(sink);
+            Logger.log(`[PlatformCrypto] [${rel()}] streaming carrier to disk file`);
+        } else {
+            target = new MediaBunny.BufferTarget();
+        }
+
         const output = new MediaBunny.Output({
             format: new MediaBunny.Mp4OutputFormat(),
-            target: new MediaBunny.BufferTarget(),
+            target,
         });
 
         // ── Video source — VideoSampleSource feeds raw RGBA frames directly, ──
@@ -529,7 +561,7 @@ export class PlatformCrypto {
 
                 ts = performance.now();
                 const globalIdx = shardOrder[frameIdx];
-                encodeFrameToI420(i420Frame, globalIdx, plan.totalShards, 0, shards[globalIdx]);
+                encodeFrameToI420(i420Frame, globalIdx, shards[globalIdx]);
                 tPixelWrite += performance.now() - ts;
 
                 frameData = i420Frame;
@@ -578,6 +610,13 @@ export class PlatformCrypto {
         audioSource.close();
         await output.finalize();
         Logger.log(`[PlatformCrypto] [${rel()}] output.finalize(): ${ms(t, performance.now())}`);
+
+        // Streamed path: the writable is closed by finalize()'s stream close;
+        // there is no in-RAM buffer to wrap, so signal completion with null.
+        if (fileWritable) {
+            if (typeof output.dispose === 'function') output.dispose();
+            return null;
+        }
 
         const mp4Blob = new Blob([output.target.buffer], { type: 'video/mp4' });
         if (typeof output.dispose === 'function') output.dispose();
