@@ -36,10 +36,11 @@ export class CryptoHelper {
      * @param {string} [options.mimeType] - Original MIME type to preserve
      * @param {string} [options.hint] - Password hint (cleartext)
      * @param {Function} [options.onProgress] - (0..1)
+     * @param {AbortSignal} [options.signal]
      * @returns {Promise<Blob>}
      */
     static async encrypt(blob, password, options = {}) {
-        const { filename, mimeType, hint, onProgress } = options;
+        const { filename, mimeType, hint, onProgress, signal } = options;
         const fileSize = blob.size;
         Logger.log(`[CryptoHelper] ENCRYPT start — fileSize: ${fileSize} bytes`);
 
@@ -61,6 +62,7 @@ export class CryptoHelper {
         let chunkIndex = 0;
 
         while (fileOffset < fileSize) {
+            signal?.throwIfAborted();
             const chunkEnd = Math.min(fileOffset + CryptoHelper.CHUNK_SIZE, fileSize);
             const chunkBlob = blob.slice(fileOffset, chunkEnd);
             const chunkBuf = await chunkBlob.arrayBuffer();

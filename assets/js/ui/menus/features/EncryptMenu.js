@@ -34,20 +34,40 @@ export class EncryptMenu {
 
         const platformDuration  = modalContent.querySelector('.encrypt-platform-duration');
         const platformSection   = modalContent.querySelector('.encrypt-platform-section');
+        const platformLabel     = modalContent.querySelector('.encrypt-platform-label');
+        const platformInfo      = modalContent.querySelector('.encrypt-platform-info');
 
         let currentMode  = 'encrypt';
         let fileMetadata = null;
         let sourceBlob   = null; // cached for duration estimate
 
-        // Re-encoding resistance is always on
+        // Files up to ~20 MB fit the re-encoding-resistant carrier (JJC4 strip);
+        // larger files automatically use standard encryption (JJC2) — no size
+        // limit, but the output must be shared as-is, not re-encoded.
+        const usesPlatformFormat = () =>
+            !sourceBlob || sourceBlob.size <= PlatformCrypto.MAX_PAYLOAD_BYTES;
+
         const updatePlatformUI = () => {
             if (!platformSection) return;
             platformSection.style.display = currentMode === 'encrypt' ? '' : 'none';
-            if (currentMode === 'encrypt' && platformDuration && sourceBlob) {
-                const sec = PlatformCrypto.estimatedDuration(sourceBlob.size);
-                const min = Math.floor(sec / 60);
-                const s   = Math.round(sec % 60);
-                platformDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
+            if (currentMode !== 'encrypt' || !sourceBlob) return;
+
+            if (usesPlatformFormat()) {
+                if (platformDuration) {
+                    const sec = PlatformCrypto.estimatedDuration(sourceBlob.size);
+                    const min = Math.floor(sec / 60);
+                    const s   = Math.round(sec % 60);
+                    platformDuration.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
+                }
+            } else {
+                const maxMb = Math.floor(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576);
+                if (platformLabel) platformLabel.textContent = 'STANDARD ENCRYPTION';
+                if (platformInfo) {
+                    platformInfo.textContent =
+                        `Files over ~${maxMb} MB use standard encryption: same AES-256 protection ` +
+                        'and playable placeholder, output stays about the original size. ' +
+                        'Share the file as-is — it will not survive platform re-encoding.';
+                }
             }
         };
 
@@ -167,18 +187,25 @@ export class EncryptMenu {
                         onProgress,
                         signal,
                     };
-                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
-                    resultBlob  = await MediaProcessor.encryptPlatform(source, password, encOpts);
+                    if (source.size <= PlatformCrypto.MAX_PAYLOAD_BYTES) {
+                        const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
+                        resultBlob = await MediaProcessor.encryptPlatform(source, password, encOpts);
+                    } else {
+                        // Too large for the visual-strip carrier — standard
+                        // JJC2 encryption (no size limit, decrypt auto-detects)
+                        resultBlob = await CryptoHelper.encrypt(source, password, encOpts);
+                    }
                     newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
                 } else {
-                    // Auto-detect format for decryption
+                    // Auto-detect format for decryption — JJC2 first (cheap
+                    // trailer read; avoids parsing huge blobs as media)
                     let result;
-                    const jjc3Meta = await PlatformCrypto.readMetadata(source);
-                    if (jjc3Meta !== null) {
+                    const jjc2Meta = await CryptoHelper.readMetadata(source);
+                    if (jjc2Meta !== null) {
+                        result = await CryptoHelper.decrypt(source, password, onProgress);
+                    } else {
                         const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
                         result = await MediaProcessor.decryptPlatform(source, password, onProgress, signal);
-                    } else {
-                        result = await CryptoHelper.decrypt(source, password, onProgress);
                     }
                     resultBlob  = result.blob;
                     newFilename = result.metadata.name ||

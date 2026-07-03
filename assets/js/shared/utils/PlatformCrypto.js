@@ -61,6 +61,15 @@ const AUDIO_GAP_SEC = 1;  // silence between audio repetitions
 export class PlatformCrypto {
     static MAGIC = MAGIC;
 
+    /**
+     * Largest payload the visual strip can carry (~20 MB): 65 535 shard
+     * indices minus the 25% parity share. Callers should route larger files
+     * to CryptoHelper (JJC2) — the strip's ~9.5 KB/s channel capacity would
+     * turn a 1 GB file into a multi-hour, tens-of-GB carrier anyway.
+     */
+    static MAX_PAYLOAD_BYTES =
+        Math.floor(MAX_TOTAL_SHARDS * (RS_DATA_SHARDS / (RS_DATA_SHARDS + RS_PARITY_SHARDS))) * DATA_BYTES_PER_FRAME;
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
@@ -120,8 +129,7 @@ export class PlatformCrypto {
         // (payloadSize, rs) alone, so nothing else needs to travel in-band.
         const plan = planShards(payloadSize);
         if (plan.totalShards > MAX_TOTAL_SHARDS) {
-            const maxBytes = Math.floor(MAX_TOTAL_SHARDS * (RS_DATA_SHARDS / (RS_DATA_SHARDS + RS_PARITY_SHARDS))) * DATA_BYTES_PER_FRAME;
-            throw new Error(`File too large to encrypt: ${(payloadSize / 1048576).toFixed(1)} MB (max ≈ ${(maxBytes / 1048576).toFixed(0)} MB)`);
+            throw new Error(`File too large for re-encoding-resistant format: ${(payloadSize / 1048576).toFixed(1)} MB (max ≈ ${(PlatformCrypto.MAX_PAYLOAD_BYTES / 1048576).toFixed(0)} MB) — use standard encryption (CryptoHelper) instead`);
         }
 
         const headerFixed = new Uint8Array(4 + 2 + 4 + 2 + 16 + 16 + 32); // 76 bytes
