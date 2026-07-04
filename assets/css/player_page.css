@@ -88,6 +88,9 @@
 .playlist-section.collapsed {
     width: 0;
     min-width: 0;
+    /* Remove the 1px border-left (set in player.css): with box-sizing:border-box
+       it survives width:0 and shows as a sliver/gap at the right edge. */
+    border-left: none;
     overflow: visible !important;
     z-index: 10000;
     /* CRITICAL: Allow button to show outside collapsed area */
