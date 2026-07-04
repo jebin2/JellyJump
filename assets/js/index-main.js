@@ -1,15 +1,10 @@
 // Landing page entry point
 import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
+import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
 
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('[PWA] Service Worker registered'))
-            .catch(err => console.log('[PWA] Service Worker failed', err));
-    });
-}
+// Register Service Worker for PWA + cross-origin isolation (multi-threaded WASM)
+window.addEventListener('load', registerServiceWorkerWithCOI);
 
 const loader = document.getElementById('page-loader');
 

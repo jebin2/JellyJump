@@ -2,6 +2,7 @@
 import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
 import { DOMAIN } from './shared/config.js';
+import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
 
 // Moved out of an inline <script> in player.html so a strict CSP can apply.
 function hideLoader() {
@@ -11,14 +12,8 @@ function hideLoader() {
     }
 }
 
-// Register Service Worker for PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(() => console.log('[PWA] Service Worker registered'))
-            .catch(err => console.log('[PWA] Service Worker failed', err));
-    });
-}
+// Register Service Worker for PWA + cross-origin isolation (multi-threaded WASM)
+window.addEventListener('load', registerServiceWorkerWithCOI);
 
 // Load templates first, then initialize player
 async function initializeApp() {
