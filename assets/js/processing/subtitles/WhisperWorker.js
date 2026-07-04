@@ -107,66 +107,71 @@ async function webgpuUsable() {
 async function transcribe({ audio, language, task }) {
     const transcriber = await getTranscriber();
 
-    // Mirror the pipeline's internal sliding window: each generate() call covers
-    // a 30s window and advances by `jump = window - 2*stride` seconds. The number
-    // of windows is our progress denominator.
-    const jump = CHUNK_LENGTH_S - 2 * STRIDE_LENGTH_S;
+    // The pipeline slides a 30s window over the audio, advancing by
+    // `hop = window - 2*stride` seconds and calling model.generate() once per
+    // window. That generate() count is the number of windows — our progress
+    // denominator and the source of each window's absolute time offset.
+    const hop = CHUNK_LENGTH_S - 2 * STRIDE_LENGTH_S;
     const durationS = audio.length / SAMPLE_RATE;
     const chunksTotal = durationS <= CHUNK_LENGTH_S
         ? 1
-        : Math.ceil((durationS - CHUNK_LENGTH_S) / jump) + 1;
+        : Math.ceil((durationS - CHUNK_LENGTH_S) / hop) + 1;
 
     self.postMessage({ type: 'inference-start', durationS, chunksTotal });
 
-    let chunksDone = 0;
-    let inWindowFrac = 0;    // 0..1, reset each window from timestamp tokens
-    let windowIndex = 0;     // which 30s window we're decoding (for absolute times)
+    let windowIndex = -1;    // 0-based window; bumped when each generate() starts
+    let inWindowFrac = 0;    // 0..1 within the current window, from timestamp tokens
     let segStart = null;     // absolute start (s) of the segment being decoded
     let segText = '';        // text accumulated for the current segment
 
+    // Absolute time of a within-window timestamp `t`, clamped to the real
+    // duration so live output can never run past the end of the media.
+    const clampAbs = (t) => Math.max(0, Math.min(durationS, windowIndex * hop + t));
+
     const emitProgress = () => {
-        const progress = Math.min(1, (chunksDone + inWindowFrac) / chunksTotal);
-        self.postMessage({ type: 'progress', chunksDone, chunksTotal, progress });
+        const done = Math.max(0, windowIndex);
+        const progress = Math.min(1, (done + inWindowFrac) / chunksTotal);
+        self.postMessage({ type: 'progress', chunksDone: done, chunksTotal, progress });
     };
 
-    // WhisperTextStreamer surfaces the model's tokens as they are decoded:
-    //   - callback_function(text): incremental transcribed text (no timestamps)
-    //   - on_chunk_start(t)/on_chunk_end(t): timestamp tokens, time relative to
-    //     the current 30s window (so we add the window offset for absolute time)
-    //   - on_finalize(): fires once when each window's generate() completes
-    const streamer = new WhisperTextStreamer(transcriber.tokenizer, {
+    // A fresh WhisperTextStreamer per window: reusing one lets the half-open
+    // timestamp-pair state bleed across window boundaries and produces bogus
+    // segments. Each streamer surfaces:
+    //   - callback_function(text): incremental transcribed text
+    //   - on_chunk_start(t)/on_chunk_end(t): timestamp tokens (window-relative)
+    const makeStreamer = () => new WhisperTextStreamer(transcriber.tokenizer, {
         skip_prompt: true,
-        callback_function: (text) => {
-            segText += text;
-        },
+        callback_function: (text) => { segText += text; },
         on_chunk_start: (t) => {
-            const abs = windowIndex * jump + t;
-            segStart = abs;
+            segStart = clampAbs(t);
             segText = '';
             inWindowFrac = Math.max(inWindowFrac, Math.min(1, t / CHUNK_LENGTH_S));
             emitProgress();
         },
         on_chunk_end: (t) => {
-            const abs = windowIndex * jump + t;
+            const end = clampAbs(t);
             const text = segText.trim();
-            if (text) {
-                // Live segment — lets the UI/console show text as it is produced.
-                self.postMessage({
-                    type: 'segment',
-                    start: segStart != null ? segStart : abs,
-                    end: abs,
-                    text,
-                });
+            if (text && segStart != null && end >= segStart) {
+                // Live segment — shows text as it is produced.
+                self.postMessage({ type: 'segment', start: segStart, end, text });
             }
             segText = '';
         },
-        on_finalize: () => {
-            chunksDone = Math.min(chunksDone + 1, chunksTotal);
-            windowIndex++;
-            inWindowFrac = 0;
-            emitProgress();
-        },
     });
+
+    // model.generate() is called exactly once per window — the reliable window
+    // signal. (streamer.end()/on_finalize is NOT reliable: it can fire more than
+    // once per window, which previously pegged progress at 100% early and made
+    // live timestamps drift to ~2x the real duration.)
+    const origGenerate = transcriber.model.generate.bind(transcriber.model);
+    transcriber.model.generate = (params) => {
+        windowIndex++;
+        inWindowFrac = 0;
+        segStart = null;
+        segText = '';
+        emitProgress();
+        return origGenerate({ ...params, streamer: makeStreamer() });
+    };
 
     const output = await transcriber(audio, {
         chunk_length_s: CHUNK_LENGTH_S,
@@ -177,7 +182,6 @@ async function transcribe({ audio, language, task }) {
         // undefined => auto-detect the spoken language.
         language: language || undefined,
         force_full_sequences: false,
-        streamer,
     });
 
     const chunks = Array.isArray(output.chunks) ? output.chunks : [];
