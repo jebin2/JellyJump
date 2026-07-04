@@ -49,9 +49,20 @@ export default defineConfig({
     server: {
         port: 8080,
         open: '/player.html',
+        // Cross-origin isolation unlocks multi-threaded WASM (SharedArrayBuffer),
+        // which speeds up onnxruntime-web (subtitle transcription) and mediabunny.
+        // `credentialless` keeps cross-origin CDN/model loads working.
+        headers: {
+            'Cross-Origin-Opener-Policy': 'same-origin',
+            'Cross-Origin-Embedder-Policy': 'credentialless',
+        },
     },
 
     preview: {
         port: 8080,
+        headers: {
+            'Cross-Origin-Opener-Policy': 'same-origin',
+            'Cross-Origin-Embedder-Policy': 'credentialless',
+        },
     },
 });

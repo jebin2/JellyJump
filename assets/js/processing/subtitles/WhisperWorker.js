@@ -20,6 +20,9 @@ import { pipeline, env, WhisperTextStreamer } from '@huggingface/transformers';
 
 // We always pull the model from the Hub; there are no local model files bundled.
 env.allowLocalModels = false;
+// NOTE: when the page is cross-origin isolated (COOP/COEP headers), onnxruntime-web
+// automatically runs multi-threaded WASM (SharedArrayBuffer), which roughly halves
+// CPU-fallback transcription time. See the server headers in vite.config.js.
 
 // The `_timestamped` export includes cross-attentions, which are required for
 // word-level timestamps (return_timestamps: 'word').
