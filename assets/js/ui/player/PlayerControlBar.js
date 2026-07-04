@@ -34,6 +34,15 @@ export class PlayerControlBar {
         this.saveMode();
     }
 
+    _getExpandBtn() {
+        return document.querySelector('.sidebar-collapse-btn');
+    }
+
+    _toggleExpandBtn(method) {
+        const btn = this._getExpandBtn();
+        if (btn) btn.classList[method]('visible');
+    }
+
     applyMode() {
         const p = this.player;
         p.container.classList.remove('mode-overlay', 'mode-fixed');
@@ -48,10 +57,12 @@ export class PlayerControlBar {
 
         if (p.controlBarMode === 'overlay') {
             p.ui.controls.classList.add('visible');
+            this._toggleExpandBtn('add');
             this.startAutoHideTimer();
         } else {
             this.clearAutoHideTimer();
             p.ui.controls.classList.add('visible');
+            this._toggleExpandBtn('add');
         }
 
         if (p.isAudioMode) {
@@ -69,6 +80,7 @@ export class PlayerControlBar {
         if (p.controlBarMode !== 'overlay') return;
 
         p.ui.controls.classList.add('visible');
+        this._toggleExpandBtn('add');
         this.clearAutoHideTimer();
 
         if (!p.isPlaying) return;
@@ -90,6 +102,7 @@ export class PlayerControlBar {
         this.clearAutoHideTimer();
         p.autoHideTimer = setTimeout(() => {
             p.ui.controls.classList.remove('visible');
+            this._toggleExpandBtn('remove');
             p.container.classList.add('hide-cursor');
         }, 3000);
     }

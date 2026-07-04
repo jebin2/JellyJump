@@ -69,9 +69,15 @@ export function attachPlayerBindings(player) {
     if (player.config.controls.fullscreen) {
         player.container.addEventListener('mousemove', (e) => player._handleMouseMove(e));
 
+        const toggleExpand = (add) => {
+            const btn = document.querySelector('.sidebar-collapse-btn');
+            if (btn) btn.classList.toggle('visible', add);
+        };
+
         player.container.addEventListener('mouseenter', () => {
             if (player.controlBarMode === 'overlay') {
                 player.ui.controls.classList.add('visible');
+                toggleExpand(true);
                 player._clearAutoHideTimer();
                 if (player.isPlaying) player._startAutoHideTimer();
             }
@@ -81,6 +87,7 @@ export function attachPlayerBindings(player) {
             if (player.controlBarMode === 'overlay' && player.isPlaying) {
                 player._clearAutoHideTimer();
                 player.ui.controls.classList.remove('visible');
+                toggleExpand(false);
                 player.container.classList.add('hide-cursor');
             }
         });
@@ -90,6 +97,20 @@ export function attachPlayerBindings(player) {
             if (player.isPlaying && player.controlBarMode === 'overlay') {
                 player._startAutoHideTimer();
             }
+        });
+
+        document.addEventListener('mouseover', (e) => {
+            const btn = e.target.closest('.sidebar-collapse-btn');
+            if (!btn || player.controlBarMode !== 'overlay') return;
+            player.ui.controls.classList.add('visible');
+            btn.classList.add('visible');
+            player._clearAutoHideTimer();
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            const btn = e.target.closest('.sidebar-collapse-btn');
+            if (!btn || player.controlBarMode !== 'overlay') return;
+            if (player.isPlaying) player._startAutoHideTimer();
         });
     }
 

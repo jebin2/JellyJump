@@ -23,6 +23,11 @@
     align-items: center;
 }
 
+/* Remove right border when sidebar is collapsed */
+.player-layout:has(.playlist-section.collapsed) .video-section {
+    border-right: none;
+}
+
 /* Remove border in fullscreen */
 /* Split selectors to avoid invalidation of the entire block if one is unsupported */
 .video-section:fullscreen {
@@ -129,6 +134,12 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     padding: var(--space-sm) var(--space-sm);
     margin: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.playlist-section.collapsed .sidebar-collapse-btn.visible {
+    opacity: 1;
 }
 
 .playlist-header {
