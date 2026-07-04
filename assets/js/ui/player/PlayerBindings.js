@@ -279,12 +279,20 @@ export function attachPlayerBindings(player) {
             });
         }
 
+        // After a mouse drag/click, drop focus so global keyboard shortcuts
+        // (space, arrows) keep working — the keydown handler bails on a focused
+        // INPUT. Keyboard-only users who Tab in aren't affected (no pointerup).
+        player.container.querySelectorAll('.jellyjump-filter-panel input[type="range"]').forEach(slider => {
+            slider.addEventListener('pointerup', () => slider.blur());
+        });
+
         // Colour presets (adjust the sliders)
         player.container.querySelectorAll('.filter-preset-btn[data-preset]').forEach(btn => {
             btn.addEventListener('click', () => {
                 player.videoFilters.applyPreset(btn.dataset.preset);
                 player._syncFilterSliders();
                 player._updateFiltersButtonState();
+                btn.blur();
             });
         });
 
@@ -296,6 +304,7 @@ export function attachPlayerBindings(player) {
                 const active = player.videoFilters.effect;
                 fxButtons.forEach(b => b.classList.toggle('active', b.dataset.effect === active));
                 player._updateFiltersButtonState();
+                btn.blur();
             });
         });
 
