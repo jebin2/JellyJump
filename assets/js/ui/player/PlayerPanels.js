@@ -89,6 +89,14 @@ export function syncPlayerFilterSliders(player) {
         player.ui.saturationSlider.value = state.saturation;
         player.ui.saturationValue.textContent = `${state.saturation}%`;
     }
+    if (player.ui.blurSlider) {
+        player.ui.blurSlider.value = state.blur;
+        player.ui.blurValue.textContent = `${state.blur}px`;
+    }
+    if (player.ui.invertSlider) {
+        player.ui.invertSlider.value = state.invert;
+        player.ui.invertValue.textContent = `${state.invert}%`;
+    }
 }
 
 export function updatePlayerFiltersButtonState(player) {

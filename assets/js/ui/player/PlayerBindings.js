@@ -261,11 +261,40 @@ export function attachPlayerBindings(player) {
             });
         }
 
-        player.container.querySelectorAll('.filter-preset-btn').forEach(btn => {
+        if (player.ui.blurSlider) {
+            player.ui.blurSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                player.videoFilters.setBlur(value);
+                player.ui.blurValue.textContent = `${value}px`;
+                player._updateFiltersButtonState();
+            });
+        }
+
+        if (player.ui.invertSlider) {
+            player.ui.invertSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                player.videoFilters.setInvert(value);
+                player.ui.invertValue.textContent = `${value}%`;
+                player._updateFiltersButtonState();
+            });
+        }
+
+        // Colour presets (adjust the sliders)
+        player.container.querySelectorAll('.filter-preset-btn[data-preset]').forEach(btn => {
             btn.addEventListener('click', () => {
-                const preset = btn.dataset.preset;
-                player.videoFilters.applyPreset(preset);
+                player.videoFilters.applyPreset(btn.dataset.preset);
                 player._syncFilterSliders();
+                player._updateFiltersButtonState();
+            });
+        });
+
+        // Fun FX (toggle on/off, highlight the active one)
+        const fxButtons = player.container.querySelectorAll('.filter-fx-btn');
+        fxButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                player.videoFilters.applyEffect(btn.dataset.effect);
+                const active = player.videoFilters.effect;
+                fxButtons.forEach(b => b.classList.toggle('active', b.dataset.effect === active));
                 player._updateFiltersButtonState();
             });
         });
@@ -274,6 +303,7 @@ export function attachPlayerBindings(player) {
             player.ui.resetFiltersBtn.addEventListener('click', () => {
                 player.videoFilters.reset();
                 player._syncFilterSliders();
+                fxButtons.forEach(b => b.classList.remove('active'));
                 player._updateFiltersButtonState();
             });
         }

@@ -625,6 +625,11 @@ export class CorePlayer {
             this.thumbnailGenerator = null;
         }
 
+        if (this.videoFilters) {
+            this.videoFilters.destroy?.();
+            this.videoFilters = null;
+        }
+
         if (this.canvas) {
             this.canvas.remove();
             this.canvas = null;

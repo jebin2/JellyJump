@@ -107,9 +107,13 @@ function initFiltersPanel(player) {
     player.ui.brightnessValue = q('#mb-brightness-value');
     player.ui.contrastValue = q('#mb-contrast-value');
     player.ui.saturationValue = q('#mb-saturation-value');
+    player.ui.blurSlider = q('#mb-filter-blur');
+    player.ui.blurValue = q('#mb-blur-value');
+    player.ui.invertSlider = q('#mb-filter-invert');
+    player.ui.invertValue = q('#mb-invert-value');
     player.ui.resetFiltersBtn = q('#mb-reset-filters-btn');
     player.ui.closeFilterPanelBtn = q('.jellyjump-filter-panel .jellyjump-close-btn');
-    player.videoFilters = new VideoFilters(player.canvas);
+    player.videoFilters = new VideoFilters(player);
 }
 
 function initEqualizerPanel(player) {
