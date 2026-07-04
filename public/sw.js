@@ -15,9 +15,15 @@ self.addEventListener('fetch', (event) => {
     // Range/`only-if-cached` requests in non-same-origin mode must pass through.
     if (req.cache === 'only-if-cached' && req.mode !== 'same-origin') return;
 
+    const url = new URL(req.url);
+
+    // Only touch real network (http/https) responses. Never intercept blob:/data:
+    // etc. — mediabunny reads video data through those and must not be re-wrapped.
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
     // Cross-origin requests (HF model, CDN wasm, remote video) are left alone;
     // `credentialless` COEP lets them load without CORP headers.
-    if (new URL(req.url).origin !== self.location.origin) return;
+    if (url.origin !== self.location.origin) return;
 
     event.respondWith((async () => {
         const res = await fetch(req);
