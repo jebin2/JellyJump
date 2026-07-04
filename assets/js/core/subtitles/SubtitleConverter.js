@@ -83,19 +83,32 @@ export function jsonToVTT(words, options = {}) {
  * Group Whisper word-level chunks (return_timestamps: 'word') into short cues.
  *
  * Each input chunk is a single word `{ text, timestamp: [start, end] }`. Words
- * are batched into cues of at most `wordsPerCue`, breaking early when a cue
- * would exceed `maxCueDuration` or when the silence before a word exceeds
- * `maxGap` — so cues track natural phrase boundaries instead of running long.
+ * are packed into a cue until adding the next one would exceed the target pixel
+ * width (`measure`/`maxWidth`) — so each cue fills the frame as much as allowed
+ * and wide videos naturally get more words than narrow/portrait ones. When no
+ * `measure` is supplied it falls back to a fixed `wordsPerCue`. Cues also break
+ * early on a long silence (`maxGap`) or excessive duration (`maxCueDuration`).
  *
  * @param {Array<{text: string, timestamp: [number, number|null]}>} chunks
  * @param {Object} [options]
- * @param {number} [options.wordsPerCue=4]
- * @param {number} [options.maxCueDuration=4]  seconds
- * @param {number} [options.maxGap=1]          seconds of silence that forces a break
+ * @param {(text:string)=>number} [options.measure]  text -> pixel width
+ * @param {number} [options.maxWidth=0]   target width (same units as measure)
+ * @param {number} [options.maxWords=16]  hard safety cap when measuring
+ * @param {number} [options.wordsPerCue=4] used only when no measure is given
+ * @param {number} [options.maxCueDuration=6]  seconds
+ * @param {number} [options.maxGap=1.5]        seconds of silence that forces a break
  * @returns {string} WebVTT
  */
 export function wordChunksToVTT(chunks, options = {}) {
-    const { wordsPerCue = 4, maxCueDuration = 4, maxGap = 1.5 } = options;
+    const {
+        measure = null,
+        maxWidth = 0,
+        maxWords = 16,
+        wordsPerCue = 4,
+        maxCueDuration = 6,
+        maxGap = 1.5,
+    } = options;
+    const useWidth = typeof measure === 'function' && maxWidth > 0;
 
     // Normalise to clean {text, start, end}, repairing missing/backwards stamps.
     const words = [];
@@ -127,7 +140,16 @@ export function wordChunksToVTT(chunks, options = {}) {
         if (group.length > 0) {
             const gap = w.start - group[group.length - 1].end;
             const dur = w.end - group[0].start;
-            if (group.length >= wordsPerCue || dur > maxCueDuration || gap > maxGap) flush();
+            let brk = dur > maxCueDuration || gap > maxGap;
+            if (!brk) {
+                if (useWidth) {
+                    const candidate = group.map(x => x.text).join(' ') + ' ' + w.text;
+                    brk = group.length >= maxWords || measure(candidate) > maxWidth;
+                } else {
+                    brk = group.length >= wordsPerCue;
+                }
+            }
+            if (brk) flush();
         }
         group.push(w);
     }

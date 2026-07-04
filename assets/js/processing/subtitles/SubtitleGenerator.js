@@ -248,8 +248,9 @@ export async function generateSubtitles(player, opts = {}) {
             );
         });
 
-        // chunks are word-level (return_timestamps: 'word'); batch ~4 words/cue.
-        const vtt = wordChunksToVTT(chunks, { wordsPerCue: 4 });
+        // chunks are word-level (return_timestamps: 'word'); pack each cue to
+        // fill up to ~80% of the video width so wider videos get more words.
+        const vtt = wordChunksToVTT(chunks, buildCueSizer(player));
         const cueCount = (vtt.match(/-->/g) || []).length;
         step(`4/4 Built VTT (${cueCount} cue${cueCount === 1 ? '' : 's'}). Loading track…`);
         report(PHASE.TRANSCRIBE, 1, 'Done');
@@ -258,6 +259,25 @@ export async function generateSubtitles(player, opts = {}) {
     } finally {
         worker.terminate();
     }
+}
+
+/**
+ * Build a width-based cue sizer from the player's canvas so cue grouping fills
+ * up to 80% of the video width. The font MUST match
+ * PlayerSubtitles.renderSubtitles so measured widths equal rendered widths.
+ * Returns {} (static fallback) if no canvas is available.
+ */
+function buildCueSizer(player) {
+    const canvas = player?.canvas;
+    if (!canvas?.width || !canvas?.height || typeof document === 'undefined') return {};
+    const fontSize = Math.max(22, canvas.height * 0.055);
+    const mctx = document.createElement('canvas').getContext('2d');
+    if (!mctx) return {};
+    mctx.font = `bold ${fontSize}px "Segoe UI", Roboto, Arial, sans-serif`;
+    return {
+        measure: (t) => mctx.measureText(t).width,
+        maxWidth: canvas.width * 0.8,
+    };
 }
 
 function formatClock(seconds) {
