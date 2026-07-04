@@ -214,23 +214,28 @@ export class PlayerSubtitles {
         const lineHeight = fontSize * 1.35;
         const bottomMargin = p.canvas.height * 0.08;
         const x = p.canvas.width / 2;
-
-        const allLines = [];
-        activeCues.forEach(cue => {
-            cue.text.split('\n').forEach(line => {
-                if (line.trim()) allLines.push(line.trim());
-            });
-        });
-
-        if (allLines.length === 0) return;
-
-        let y = p.canvas.height - bottomMargin;
+        // Keep text inside the frame with a margin on each side so nothing is
+        // clipped at the left/right edges.
+        const maxWidth = p.canvas.width * 0.9;
 
         p.ctx.font = `bold ${fontSize}px "Segoe UI", Roboto, Arial, sans-serif`;
         p.ctx.textAlign = 'center';
         p.ctx.textBaseline = 'bottom';
         p.ctx.lineJoin = 'round';
         p.ctx.miterLimit = 2;
+
+        // Split each cue on explicit newlines, then word-wrap to the frame width.
+        const allLines = [];
+        activeCues.forEach(cue => {
+            cue.text.split('\n').forEach(line => {
+                const trimmed = line.trim();
+                if (trimmed) this._wrapLine(trimmed, maxWidth).forEach(l => allLines.push(l));
+            });
+        });
+
+        if (allLines.length === 0) return;
+
+        let y = p.canvas.height - bottomMargin;
 
         for (let i = allLines.length - 1; i >= 0; i--) {
             const line = allLines[i];
@@ -241,6 +246,44 @@ export class PlayerSubtitles {
             p.ctx.fillText(line, x, y);
             y -= lineHeight;
         }
+    }
+
+    /**
+     * Word-wrap a single line to fit within maxWidth using the ctx's current
+     * font. Returns an array of lines. A single word wider than maxWidth is
+     * broken across characters so it can never overflow the frame.
+     */
+    _wrapLine(text, maxWidth) {
+        const ctx = this.player.ctx;
+        const words = text.split(/\s+/);
+        const lines = [];
+        let current = '';
+
+        const pushBrokenWord = (word) => {
+            let piece = '';
+            for (const ch of word) {
+                if (piece && ctx.measureText(piece + ch).width > maxWidth) {
+                    lines.push(piece);
+                    piece = ch;
+                } else {
+                    piece += ch;
+                }
+            }
+            return piece; // remaining fragment becomes the new current line
+        };
+
+        for (const word of words) {
+            const candidate = current ? `${current} ${word}` : word;
+            if (ctx.measureText(candidate).width <= maxWidth) {
+                current = candidate;
+                continue;
+            }
+            if (current) lines.push(current);
+            // The word itself may still be too wide to stand alone.
+            current = ctx.measureText(word).width > maxWidth ? pushBrokenWord(word) : word;
+        }
+        if (current) lines.push(current);
+        return lines;
     }
 
     restoreSavedSubtitles(savedSubtitles) {
