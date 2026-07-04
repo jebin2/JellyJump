@@ -8,7 +8,7 @@
 
 import { MediaBunny } from '../../core/MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
-import { whisperChunksToVTT } from '../../core/subtitles/SubtitleConverter.js';
+import { wordChunksToVTT } from '../../core/subtitles/SubtitleConverter.js';
 
 const TARGET_RATE = 16000;      // Whisper input rate
 const RESAMPLE_SEGMENT_S = 30;  // resample in ~30s batches to bound OfflineAudioContext churn
@@ -248,7 +248,8 @@ export async function generateSubtitles(player, opts = {}) {
             );
         });
 
-        const vtt = whisperChunksToVTT(chunks);
+        // chunks are word-level (return_timestamps: 'word'); batch ~4 words/cue.
+        const vtt = wordChunksToVTT(chunks, { wordsPerCue: 4 });
         const cueCount = (vtt.match(/-->/g) || []).length;
         step(`4/4 Built VTT (${cueCount} cue${cueCount === 1 ? '' : 's'}). Loading track…`);
         report(PHASE.TRANSCRIBE, 1, 'Done');

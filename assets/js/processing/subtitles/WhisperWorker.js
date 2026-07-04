@@ -21,7 +21,9 @@ import { pipeline, env, WhisperTextStreamer } from '@huggingface/transformers';
 // We always pull the model from the Hub; there are no local model files bundled.
 env.allowLocalModels = false;
 
-const MODEL_ID = 'onnx-community/whisper-base';
+// The `_timestamped` export includes cross-attentions, which are required for
+// word-level timestamps (return_timestamps: 'word').
+const MODEL_ID = 'onnx-community/whisper-base_timestamped';
 
 // The Whisper context window is 30s. We slide it with a 5s stride on each side
 // and let the pipeline stitch + de-duplicate the overlaps for us.
@@ -176,7 +178,7 @@ async function transcribe({ audio, language, task }) {
     const output = await transcriber(audio, {
         chunk_length_s: CHUNK_LENGTH_S,
         stride_length_s: STRIDE_LENGTH_S,
-        return_timestamps: true,
+        return_timestamps: 'word',
         // 'transcribe' keeps the source language; 'translate' renders English.
         task: task || 'transcribe',
         // undefined => auto-detect the spoken language.

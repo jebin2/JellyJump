@@ -80,39 +80,58 @@ export function jsonToVTT(words, options = {}) {
 }
 
 /**
- * Convert Whisper (transformers.js ASR) segment chunks to WebVTT.
+ * Group Whisper word-level chunks (return_timestamps: 'word') into short cues.
  *
- * Each chunk is `{ text, timestamp: [start, end] }`. The final chunk's end
- * timestamp is sometimes null (the model didn't emit a closing timestamp); we
- * fall back to the next chunk's start, or a short tail after the start.
+ * Each input chunk is a single word `{ text, timestamp: [start, end] }`. Words
+ * are batched into cues of at most `wordsPerCue`, breaking early when a cue
+ * would exceed `maxCueDuration` or when the silence before a word exceeds
+ * `maxGap` — so cues track natural phrase boundaries instead of running long.
  *
  * @param {Array<{text: string, timestamp: [number, number|null]}>} chunks
- * @returns {string} WebVTT formatted string
+ * @param {Object} [options]
+ * @param {number} [options.wordsPerCue=4]
+ * @param {number} [options.maxCueDuration=4]  seconds
+ * @param {number} [options.maxGap=1]          seconds of silence that forces a break
+ * @returns {string} WebVTT
  */
-export function whisperChunksToVTT(chunks) {
-    if (!Array.isArray(chunks) || chunks.length === 0) {
-        return 'WEBVTT\n\n';
+export function wordChunksToVTT(chunks, options = {}) {
+    const { wordsPerCue = 4, maxCueDuration = 4, maxGap = 1.5 } = options;
+
+    // Normalise to clean {text, start, end}, repairing missing/backwards stamps.
+    const words = [];
+    for (const c of Array.isArray(chunks) ? chunks : []) {
+        const text = (c?.text || '').trim();
+        if (!text) continue;
+        let start = Number(c?.timestamp?.[0]);
+        let end = Number(c?.timestamp?.[1]);
+        if (!Number.isFinite(start)) start = words.length ? words[words.length - 1].end : 0;
+        if (!Number.isFinite(end)) end = start + 0.3;
+        if (end < start) end = start + 0.1;
+        words.push({ text, start, end });
     }
+    if (words.length === 0) return 'WEBVTT\n\n';
 
     let vtt = 'WEBVTT\n\n';
+    let group = [];
 
-    for (let i = 0; i < chunks.length; i++) {
-        const { text, timestamp } = chunks[i];
-        const label = (text || '').trim();
-        if (!label) continue;
+    const flush = () => {
+        if (group.length === 0) return;
+        const start = group[0].start;
+        const end = Math.max(group[group.length - 1].end, start + 0.1);
+        const text = group.map(w => w.text).join(' ');
+        vtt += `${formatVTTTime(start)} --> ${formatVTTTime(end)}\n${text}\n\n`;
+        group = [];
+    };
 
-        const start = Number(timestamp?.[0]) || 0;
-        let end = timestamp?.[1];
-        if (end == null || Number.isNaN(Number(end))) {
-            const nextStart = chunks[i + 1]?.timestamp?.[0];
-            end = (nextStart != null) ? Number(nextStart) : start + 2;
+    for (const w of words) {
+        if (group.length > 0) {
+            const gap = w.start - group[group.length - 1].end;
+            const dur = w.end - group[0].start;
+            if (group.length >= wordsPerCue || dur > maxCueDuration || gap > maxGap) flush();
         }
-        // Guard against zero/negative-length cues, which some players drop.
-        if (end <= start) end = start + 0.1;
-
-        vtt += `${formatVTTTime(start)} --> ${formatVTTTime(end)}\n`;
-        vtt += `${label}\n\n`;
+        group.push(w);
     }
+    flush();
 
     return vtt;
 }
