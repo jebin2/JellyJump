@@ -1,12 +1,13 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
+import { Toast } from '../../shared/utils/Toast.js';
 
 export class PlayerSubtitles {
     constructor(player) {
         this.player = player;
     }
 
-    async loadSubtitle(url) {
+    async loadSubtitle(url, name) {
         const p = this.player;
         if (!p.subtitleManager) {
             Logger.warn('Subtitle manager not initialized (captions disabled)');
@@ -33,7 +34,7 @@ export class PlayerSubtitles {
 
             p.subtitleTrackCounter++;
             const trackId = `custom-${p.subtitleTrackCounter}`;
-            const trackName = `Custom ${p.subtitleTrackCounter}`;
+            const trackName = name || `Custom ${p.subtitleTrackCounter}`;
 
             p.subtitleTracks.push({
                 id: trackId,
@@ -49,6 +50,68 @@ export class PlayerSubtitles {
             if (p.onSubtitleChange) p.onSubtitleChange(p.subtitleTracks);
         } catch (error) {
             Logger.error('Error loading subtitles:', error);
+        }
+    }
+
+    async generateSubtitles(opts = {}) {
+        const p = this.player;
+        if (this._generating) return;
+        if (!p.input) {
+            Toast.show('Load a video first to generate subtitles.', 3000, true);
+            return;
+        }
+        this._generating = true;
+        this._setGenUI(true, 'Preparing…', 0);
+
+        try {
+            const { generateSubtitles } = await import('../../processing/subtitles/SubtitleGenerator.js');
+            const vtt = await generateSubtitles(p, {
+                language: opts.language,
+                task: opts.task || 'transcribe',
+                onProgress: ({ phase, progress, label, device }) => {
+                    // Weight the phases so the bar advances monotonically:
+                    // extract 0–15%, model download 15–35%, transcription 35–100%.
+                    let overall;
+                    if (phase === 'extract') overall = progress * 0.15;
+                    else if (phase === 'model') overall = 0.15 + progress * 0.20;
+                    else overall = 0.35 + progress * 0.65;
+                    const suffix = device ? ` (${device})` : '';
+                    this._setGenUI(true, label + suffix, overall);
+                },
+            });
+
+            // loadSubtitle bumps the counter and assigns this same number.
+            const name = `AI Generated ${p.subtitleTrackCounter + 1}`;
+            const blob = new Blob([vtt], { type: 'text/vtt' });
+            const url = URL.createObjectURL(blob);
+            try {
+                await this.loadSubtitle(url, name);
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+            Toast.show('Subtitles generated');
+        } catch (error) {
+            Logger.error('Subtitle generation failed:', error);
+            Toast.show(`Subtitle generation failed: ${error.message}`, 4000, true);
+        } finally {
+            this._generating = false;
+            this._setGenUI(false);
+        }
+    }
+
+    _setGenUI(active, label = '', progress = 0) {
+        const p = this.player;
+        if (p.ui.genSubtitleBtn) p.ui.genSubtitleBtn.disabled = active;
+        if (p.ui.genSubtitleProgress) {
+            p.ui.genSubtitleProgress.style.display = active ? 'block' : 'none';
+        }
+        if (p.ui.genSubtitleBar) {
+            p.ui.genSubtitleBar.style.width = `${Math.round(progress * 100)}%`;
+        }
+        if (p.ui.genSubtitleLabel) {
+            p.ui.genSubtitleLabel.textContent = active
+                ? `${label} ${Math.round(progress * 100)}%`
+                : '';
         }
     }
 

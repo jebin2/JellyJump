@@ -278,6 +278,19 @@
                     <span>Upload Subtitle</span>
                     <input type="file" id="mb-cc-input" accept=".vtt,.srt,.txt" style="display: none;">
                 </label>
+                <button type="button" class="subtitle-upload-btn subtitle-generate-btn" id="mb-cc-generate-btn"
+                    aria-label="Generate subtitles with AI">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-cc"></use>
+                    </svg>
+                    <span>Generate Subtitles (AI)</span>
+                </button>
+                <div class="subtitle-generate-progress" id="mb-cc-generate-progress" style="display: none;">
+                    <div class="subtitle-generate-progress-track">
+                        <div class="subtitle-generate-progress-bar" id="mb-cc-generate-bar"></div>
+                    </div>
+                    <span class="subtitle-generate-progress-label" id="mb-cc-generate-label"></span>
+                </div>
             </div>
         </div>
     </div>

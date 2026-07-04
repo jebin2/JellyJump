@@ -138,6 +138,10 @@ export function attachPlayerBindings(player) {
             }
         });
 
+        if (player.ui.genSubtitleBtn) {
+            player.ui.genSubtitleBtn.addEventListener('click', () => player.generateSubtitles());
+        }
+
         player.ui.audioBtn.addEventListener('click', () => {
             player.ui.audioMenu.classList.toggle('visible');
             player.ui.audioBtn.setAttribute('aria-expanded', player.ui.audioMenu.classList.contains('visible'));

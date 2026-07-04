@@ -60,6 +60,10 @@ function initCaptionsPanel(player) {
     player.ui.audioContainer = q('#mb-audio-container');
     player.ui.audioBtn = q('#mb-audio-btn');
     player.ui.audioMenu = q('#mb-audio-menu');
+    player.ui.genSubtitleBtn = q('#mb-cc-generate-btn');
+    player.ui.genSubtitleProgress = q('#mb-cc-generate-progress');
+    player.ui.genSubtitleBar = q('#mb-cc-generate-bar');
+    player.ui.genSubtitleLabel = q('#mb-cc-generate-label');
 }
 
 function initSpeedPanel(player) {

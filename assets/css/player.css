@@ -1101,6 +1101,49 @@ button:focus-visible {
     color: #000;
 }
 
+.subtitle-generate-btn {
+    margin-top: 8px;
+}
+
+.subtitle-generate-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.subtitle-generate-btn:disabled:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-dark);
+    color: var(--text-primary);
+}
+
+.subtitle-generate-progress {
+    margin-top: 10px;
+}
+
+.subtitle-generate-progress-track {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.subtitle-generate-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-primary);
+    border-radius: 2px;
+    transition: width 0.25s ease;
+}
+
+.subtitle-generate-progress-label {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
 /* -----------------------------------------
    EQ Panel (extends .jellyjump-panel)
    ----------------------------------------- */

@@ -80,6 +80,44 @@ export function jsonToVTT(words, options = {}) {
 }
 
 /**
+ * Convert Whisper (transformers.js ASR) segment chunks to WebVTT.
+ *
+ * Each chunk is `{ text, timestamp: [start, end] }`. The final chunk's end
+ * timestamp is sometimes null (the model didn't emit a closing timestamp); we
+ * fall back to the next chunk's start, or a short tail after the start.
+ *
+ * @param {Array<{text: string, timestamp: [number, number|null]}>} chunks
+ * @returns {string} WebVTT formatted string
+ */
+export function whisperChunksToVTT(chunks) {
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+        return 'WEBVTT\n\n';
+    }
+
+    let vtt = 'WEBVTT\n\n';
+
+    for (let i = 0; i < chunks.length; i++) {
+        const { text, timestamp } = chunks[i];
+        const label = (text || '').trim();
+        if (!label) continue;
+
+        const start = Number(timestamp?.[0]) || 0;
+        let end = timestamp?.[1];
+        if (end == null || Number.isNaN(Number(end))) {
+            const nextStart = chunks[i + 1]?.timestamp?.[0];
+            end = (nextStart != null) ? Number(nextStart) : start + 2;
+        }
+        // Guard against zero/negative-length cues, which some players drop.
+        if (end <= start) end = start + 0.1;
+
+        vtt += `${formatVTTTime(start)} --> ${formatVTTTime(end)}\n`;
+        vtt += `${label}\n\n`;
+    }
+
+    return vtt;
+}
+
+/**
  * Parse JSON string or file content to word array.
  * Handles both array format and object with words property.
  * 

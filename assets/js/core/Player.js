@@ -371,7 +371,8 @@ export class CorePlayer {
     async _switchAudioTrack(trackId) { return this.subtitles.switchAudioTrack(trackId); }
     async _updateAudioTracks() { return this.subtitles.updateAudioTracks(); }
     _restoreSavedSubtitles(savedSubtitles) { this.subtitles.restoreSavedSubtitles(savedSubtitles); }
-    async loadSubtitle(url) { return this.subtitles.loadSubtitle(url); }
+    async loadSubtitle(url, name) { return this.subtitles.loadSubtitle(url, name); }
+    async generateSubtitles(opts) { return this.subtitles.generateSubtitles(opts); }
     _renderSubtitles(timestamp) { this.subtitles.renderSubtitles(timestamp); }
 
     // ─── Keyboard ────────────────────────────────────────────────────────────────
