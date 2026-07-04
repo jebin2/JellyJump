@@ -91,6 +91,7 @@ export class PlatformCrypto {
         const ms = (a, b) => `${(b - a).toFixed(1)}ms`;
 
         Logger.log(`[PlatformCrypto] ──── ENCRYPT START — ${(blob.size / 1048576).toFixed(2)} MB ────`);
+        const step = (n, msg) => Logger.log(`[PlatformCrypto] [t=${ms(t0, performance.now())}] STEP ${n}/6 — ${msg}`);
         progress(0);
 
         // ── Step 1: Derive keys + encrypt payload ─────────────────────────
@@ -98,20 +99,20 @@ export class PlatformCrypto {
         const salt = crypto.getRandomValues(new Uint8Array(CryptoHelper.SALT_SIZE));
         const iv   = crypto.getRandomValues(new Uint8Array(CryptoHelper.IV_SIZE));
         const { aesKey, hmacKey } = await CryptoHelper.deriveKeys(password, salt);
-        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] key derivation (PBKDF2): ${ms(t,performance.now())}`);
+        step(1, `keys derived (PBKDF2) in ${ms(t, performance.now())}`);
 
         t = performance.now();
         const ciphertext = new Uint8Array(await blob.arrayBuffer());
-        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] blob.arrayBuffer(): ${ms(t,performance.now())}`);
+        step(2, `read ${(ciphertext.length / 1048576).toFixed(2)} MB into memory in ${ms(t, performance.now())}`);
 
         t = performance.now();
         await CryptoHelper._xorRegion(ciphertext, 0, ciphertext.length, aesKey, iv, 0);
-        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] AES-CTR XOR (${(ciphertext.length/1048576).toFixed(2)} MB): ${ms(t,performance.now())}`);
+        step(3, `AES-256-CTR encrypt (${(ciphertext.length / 1048576).toFixed(2)} MB) in ${ms(t, performance.now())}`);
         progress(0.25);
 
         t = performance.now();
         const hmac = await CryptoHelper._computeHmac(hmacKey, ciphertext);
-        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] HMAC-SHA256: ${ms(t,performance.now())}`);
+        step(4, `HMAC-SHA256 integrity tag in ${ms(t, performance.now())}`);
         progress(0.35);
 
         // ── Step 2: Build audio header bytes ──────────────────────────────
@@ -162,7 +163,14 @@ export class PlatformCrypto {
         const videoSec     = Math.max(totalAudioSec + 2, videoDataSec) + 1; // 1 s tail
         const totalFrames  = Math.ceil(videoSec * FPS);
 
-        Logger.log(`[PlatformCrypto] [t=${ms(t0,performance.now())}] plan: payload=${(payloadSize/1048576).toFixed(2)}MB shards=${plan.totalShards} (${plan.generations.length} gen) audioSec=${totalAudioSec.toFixed(1)}s videoSec=${videoSec.toFixed(1)}s totalFrames=${totalFrames}`);
+        step(5, `planned carrier: payload=${(payloadSize/1048576).toFixed(2)}MB → ${plan.totalShards} shards (${plan.generations.length} gen), ${videoSec.toFixed(1)}s video, ${totalFrames} frames`);
+        // Loud heads-up when the carrier will be very long — the encode time
+        // and file size scale linearly with frame count, so this is where a
+        // multi-GB payload turns into an hours-long job.
+        if (videoSec > 600) {
+            const encMin = (totalFrames / 500 / 60).toFixed(0); // ~500 fps observed
+            Logger.warn(`[PlatformCrypto] ⚠ large carrier: ${(videoSec/3600).toFixed(1)}h video, ${totalFrames} frames — encode will take roughly ${encMin} min and the output file will be very large.`);
+        }
         progress(0.40);
 
         // ── Step 4: Generate carrier MP4 ─────────────────────────────────
@@ -436,6 +444,7 @@ export class PlatformCrypto {
         // big to hold as one ArrayBuffer — a StreamTarget that writes the
         // carrier straight to the caller's disk file as it's produced.
         let fileWritable = null;
+        let bytesWritten = 0;   // running total streamed to disk (progress log)
         let target;
         if (fileHandle) {
             fileWritable = await fileHandle.createWritable();
@@ -443,6 +452,7 @@ export class PlatformCrypto {
                 // mediabunny emits { data: Uint8Array, position: number }
                 async write(chunk) {
                     await fileWritable.write({ type: 'write', position: chunk.position, data: chunk.data });
+                    bytesWritten = Math.max(bytesWritten, chunk.position + chunk.data.byteLength);
                 },
             });
             target = new MediaBunny.StreamTarget(sink);
@@ -528,7 +538,7 @@ export class PlatformCrypto {
         const placeholderI420 = PlatformCrypto._rgbaToI420(placeholderRgba, VIDEO_W, VIDEO_H);
         const i420Frame       = new Uint8Array(I420_SIZE);
         Logger.log(`[PlatformCrypto] [${rel()}] placeholder pre-render + RGBA→I420: ${ms(t, performance.now())}`);
-        Logger.log(`[PlatformCrypto] [${rel()}] video loop starting — totalShards=${plan.totalShards} totalFrames=${totalFrames}`);
+        Logger.log(`[PlatformCrypto] [${rel()}] STEP 6/6 — encoding carrier video (${totalFrames} frames, ${plan.totalShards} shards)${fileHandle ? ' → streaming to disk' : ''}`);
 
         const I420_LAYOUT = [
             { offset: 0,                    stride: VIDEO_W       },
@@ -539,7 +549,11 @@ export class PlatformCrypto {
         // Per-frame timing accumulators — reported every REPORT_EVERY frames
         const REPORT_EVERY = 300;
         let tMemcpy = 0, tPixelWrite = 0, tSampleCreate = 0, tVideoSourceAdd = 0;
-        let windowStart = performance.now();
+        const loopStart = performance.now();
+        let windowStart = loopStart;
+        const fmtDur = (sec) => sec >= 3600
+            ? `${(sec / 3600).toFixed(1)}h`
+            : sec >= 60 ? `${(sec / 60).toFixed(1)}m` : `${sec.toFixed(0)}s`;
 
         // One frame per shard — no repetition (RS parity replaces the old 3×
         // copies). Shards are emitted in interleaved round-robin order across
@@ -584,21 +598,26 @@ export class PlatformCrypto {
             sample.close();
 
             if ((frameIdx + 1) % REPORT_EVERY === 0) {
-                const windowMs = performance.now() - windowStart;
+                const now = performance.now();
+                const windowMs = now - windowStart;
+                const done = frameIdx + 1;
+                const pct = done / totalFrames;
+                const elapsedSec = (now - loopStart) / 1000;
+                const etaSec = elapsedSec / pct - elapsedSec; // linear extrapolation
+                // ── Step progress: overall %, elapsed, ETA, throughput ──
                 Logger.log(
-                    `[PlatformCrypto] [${rel()}] frames ${frameIdx - REPORT_EVERY + 2}–${frameIdx + 1}/${totalFrames} ` +
-                    `(shards ${Math.min(frameIdx + 1, nData)}/${nData}) | window=${windowMs.toFixed(0)}ms ` +
-                    `| memcpy=${tMemcpy.toFixed(1)}ms ` +
-                    `| pixelWrite=${tPixelWrite.toFixed(1)}ms ` +
-                    `| sampleCreate=${tSampleCreate.toFixed(1)}ms ` +
-                    `| videoSourceAdd=${tVideoSourceAdd.toFixed(1)}ms ` +
-                    `| other=${Math.max(0, windowMs - tMemcpy - tPixelWrite - tSampleCreate - tVideoSourceAdd).toFixed(1)}ms`
+                    `[PlatformCrypto] [${rel()}] video ${(pct * 100).toFixed(1)}% ` +
+                    `— frame ${done}/${totalFrames} (shards ${Math.min(done, nData)}/${nData}) ` +
+                    `| elapsed ${fmtDur(elapsedSec)} ETA ${fmtDur(etaSec)} ` +
+                    `| ${(REPORT_EVERY / (windowMs / 1000)).toFixed(0)} fps` +
+                    (bytesWritten ? ` | ${(bytesWritten / 1048576).toFixed(0)}MB on disk` : '') +
+                    ` | pixelWrite=${tPixelWrite.toFixed(0)}ms sampleCreate=${tSampleCreate.toFixed(0)}ms videoSourceAdd=${tVideoSourceAdd.toFixed(0)}ms`
                 );
                 tMemcpy = 0; tPixelWrite = 0; tSampleCreate = 0; tVideoSourceAdd = 0;
-                windowStart = performance.now();
+                windowStart = now;
 
                 signal?.throwIfAborted();
-                onProgress && onProgress((frameIdx + 1) / totalFrames);
+                onProgress && onProgress(pct);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
