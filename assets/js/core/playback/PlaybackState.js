@@ -99,8 +99,12 @@ export async function seekPlayerTo(player, time) {
     // window. pause() suspends it, and by the time play() below tries to
     // resume (after the async iterator rebuild), iOS no longer counts the
     // tap as a gesture - resume stalls, the timeout fallback auto-mutes,
-    // and the video resumes silent until a manual pause/play.
-    if (wasPlaying && player.audioContext && player.audioContext.state !== 'running') {
+    // and the video resumes silent until the next tap restores it.
+    // Unconditional on purpose: pause()'s suspend() is async and usually
+    // still pending here, so the state can still read 'running' while a
+    // suspension is already queued. resume() queued after it settles the
+    // context back to running; on an already-running context it's a no-op.
+    if (wasPlaying && player.audioContext) {
         player.audioContext.resume().catch(() => { });
     }
 
