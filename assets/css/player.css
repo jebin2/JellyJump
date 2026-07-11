@@ -615,6 +615,27 @@ button:focus-visible {
     font-family: var(--font-mono);
 }
 
+/* On phones the panels/menus are anchored inside the video section, which
+   is only ~56vw tall with overflow:hidden - anything taller gets clipped.
+   Present them as viewport-fixed bottom sheets instead (fixed escapes the
+   container's clipping; z-index must clear the playlist's 10000). */
+@media (max-width: 768px) {
+
+    .jellyjump-panel,
+    .jellyjump-menu {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
+        bottom: 12px;
+        width: min(92vw, 340px);
+        max-height: 70vh;
+        max-height: 70dvh;
+        overflow-y: auto;
+        z-index: 10010;
+    }
+}
+
 .jellyjump-panel-header {
     display: flex;
     justify-content: space-between;
