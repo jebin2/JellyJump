@@ -172,6 +172,25 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  /* Disable iOS double-tap-to-zoom on everything (touch-action is
+     restricted by ancestors, so html covers the whole app). Scrolling
+     and deliberate pinch-zoom keep working; also removes the 300ms
+     tap delay on controls. */
+  touch-action: manipulation;
+}
+
+/* iOS Safari force-zooms the page when a focused text field's font-size
+   is below 16px - and never zooms back out on blur. Keep every text
+   entry control at >=16px on touch devices. !important on purpose: this
+   must beat per-component sizes (e.g. 13px search box) regardless of
+   how the build orders stylesheets. */
+@media (pointer: coarse) {
+
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=button]):not([type=submit]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 body {
