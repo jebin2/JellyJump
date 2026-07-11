@@ -1647,7 +1647,11 @@ button:focus-visible {
     width: 100dvw !important;
     height: 100vh !important;
     height: 100dvh !important;
-    z-index: 9999 !important;
+    /* Above the playlist section (z-index 10000) and its overlay buttons
+       (10005), or their headers render on top of the fullscreen video.
+       Panels/menus opened from the control bar are children of this
+       element, so they still stack above the video inside it. */
+    z-index: 10020 !important;
     background: #000 !important;
     margin: 0 !important;
     padding: 0 !important;
