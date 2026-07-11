@@ -99,11 +99,56 @@ export class PlaylistProcessor {
     }
 
     /**
+     * Throw a descriptive error when a plain-HTTP URL is requested from an
+     * HTTPS page. Browsers block these requests (mixed content) before CORS
+     * is even evaluated, so the generic "CORS Error" message is misleading.
+     * @param {string} urlString
+     */
+    static _assertNotMixedContent(urlString) {
+        if (typeof window === 'undefined' || window.location.protocol !== 'https:') return;
+
+        let protocol;
+        try {
+            protocol = new URL(urlString).protocol;
+        } catch {
+            return;
+        }
+
+        if (protocol === 'http:') {
+            throw new Error(
+                'Mixed Content: this link uses http:// but JellyJump is running over https://, ' +
+                'so the browser blocks the request. Serve the file over HTTPS, or run JellyJump ' +
+                'from a non-HTTPS origin (desktop app or a local server).'
+            );
+        }
+    }
+
+    /**
+     * Probe a URL with an opaque (no-cors) request to tell "server reachable
+     * but missing CORS headers" apart from "server unreachable".
+     * @param {string} url
+     * @returns {Promise<boolean>} True if the server responded at all
+     */
+    static async _isReachableNoCors(url) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        try {
+            await fetch(url, { method: 'HEAD', mode: 'no-cors', signal: controller.signal });
+            return true;
+        } catch {
+            return false;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
+    /**
      * Parse and transform an M3U playlist from URL
      * @param {string} url - URL to the M3U playlist
      * @returns {Promise<Object[]>} Array of prepared items
      */
     static async importM3U(url) {
+        this._assertNotMixedContent(url);
         try {
             // Fetch and parse the M3U playlist
             const channels = await M3UParser.fetchAndParse(url);
@@ -259,6 +304,8 @@ export class PlaylistProcessor {
         const urlLower = url.toLowerCase();
         const urlObj = new URL(url);
 
+        this._assertNotMixedContent(url);
+
         // 1. Detect M3U/IPTV Playlist
         const isM3UPlaylist = urlLower.endsWith('.m3u') ||
             (urlLower.includes('.m3u') && !urlLower.includes('.m3u8'));
@@ -333,11 +380,27 @@ export class PlaylistProcessor {
 
         // 4. Regular Video File
         try {
-            const response = await fetch(url, { method: 'HEAD' });
+            let response = await fetch(url, { method: 'HEAD' });
+
+            // Some servers reject HEAD; retry with a 1-byte ranged GET before giving up
+            if (!response.ok && (response.status === 405 || response.status === 501)) {
+                response = await fetch(url, { headers: { 'Range': 'bytes=0-0' } });
+                response.body?.cancel?.();
+            }
+
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}${response.statusText ? ' ' + response.statusText : ''} for this link.`);
+            }
+
             const contentType = response.headers.get('content-type') || 'video/mp4';
 
             const urlPath = urlObj.pathname;
-            const filename = urlPath.split('/').pop() || 'remote-video.mp4';
+            let filename = urlPath.split('/').pop() || 'remote-video.mp4';
+            try {
+                filename = decodeURIComponent(filename);
+            } catch {
+                // Keep the encoded name if the URL contains invalid escapes
+            }
 
             return {
                 title: filename,
@@ -352,7 +415,16 @@ export class PlaylistProcessor {
             };
         } catch (e) {
             if (e.name === 'TypeError') {
-                throw new Error('CORS Error: Cannot access this URL. The server must allow cross-origin requests.');
+                if (await this._isReachableNoCors(url)) {
+                    throw new Error(
+                        'CORS Error: the server hosting this file is reachable but does not allow ' +
+                        'cross-origin requests. Enable CORS on it (send an ' +
+                        '"Access-Control-Allow-Origin" header) and try again.'
+                    );
+                }
+                throw new Error(
+                    'Cannot reach this server. Check that the link is correct and accessible from this device.'
+                );
             }
             throw e;
         }

@@ -41,7 +41,7 @@ export const UrlUploadMenu = {
             const url = input.value.trim();
             const isValid = this._isValidUrl(url);
             addBtn.disabled = !isValid;
-            errorDiv.style.display = 'none';
+            errorDiv.classList.add('hidden');
         };
 
         input.addEventListener('input', validate);
@@ -52,11 +52,13 @@ export const UrlUploadMenu = {
             if (!url) return;
 
             // Update UI to loading state
+            // Note: .hidden is display:none !important, so it must be toggled
+            // via classList - inline style.display cannot override it.
             input.disabled = true;
             addBtn.disabled = true;
             modal.closeBtn.disabled = true;
-            loadingDiv.style.display = 'flex';
-            errorDiv.style.display = 'none';
+            loadingDiv.classList.remove('hidden');
+            errorDiv.classList.add('hidden');
 
             try {
                 // Delegate the business logic to playlist
@@ -64,15 +66,15 @@ export const UrlUploadMenu = {
                 modal.close();
             } catch (error) {
                 Logger.error('UrlUploadMenu: Add failed', error);
-                
+
                 // Revert UI state on error
                 input.disabled = false;
                 addBtn.disabled = false;
                 modal.closeBtn.disabled = false;
-                loadingDiv.style.display = 'none';
-                
+                loadingDiv.classList.add('hidden');
+
                 errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
+                errorDiv.classList.remove('hidden');
             }
         };
 
