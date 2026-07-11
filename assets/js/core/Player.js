@@ -461,8 +461,18 @@ export class CorePlayer {
         this.sourceUrl = url;
         try {
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            if (autoplay && isMobile && !this.config.muted) {
-                Logger.log('[Player] Mobile Autoplay requested - enforcing muted playback');
+            // Pre-emptively mute ONLY the autoplay iOS will actually block:
+            // no transient user activation AND an audio pipeline never yet
+            // unlocked by a gesture. Gesture-driven loads (tapping a playlist
+            // item or Add Video) are allowed to play sound, and once the
+            // context has been unlocked, video switches keep it. If a resume
+            // still fails later, play()'s timeout fallback mutes and arms
+            // restore-on-interaction, so nothing is left silently broken.
+            const gestureActive = typeof navigator !== 'undefined' && navigator.userActivation
+                ? navigator.userActivation.isActive
+                : false;
+            if (autoplay && isMobile && !this.config.muted && !gestureActive && !this.isAudioInitialized) {
+                Logger.log('[Player] Mobile autoplay without user activation - enforcing muted playback');
                 this.config.muted = true;
                 // The AudioContext/gainNode survive across loads, so the flag
                 // alone doesn't silence anything - sync the gain or the icon
@@ -480,6 +490,13 @@ export class CorePlayer {
             if (isHls) this.isLive = true;
 
             await this._cleanupForLoad();
+
+            // cleanup's pause() suspended the AudioContext; wake it now while
+            // the tap's transient activation is still valid (same race as the
+            // seek path), so play() below finds it already running.
+            if (autoplay && this.audioContext) {
+                this.audioContext.resume().catch(() => { });
+            }
 
             this._setLoading(true);
             Logger.log(`Loading media: ${url}`);
