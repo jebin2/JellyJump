@@ -141,14 +141,34 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
                 player.frameRate = 30;
             }
 
+            const displayWidth = await player.videoTrack.getDisplayWidth();
+            const displayHeight = await player.videoTrack.getDisplayHeight();
+
+            // Cap the render resolution. The playback canvas is a software
+            // surface (willReadFrequently, for filters/screenshots), so
+            // rasterizing e.g. a 4K portrait iPhone recording at full size
+            // pushes ~33MB of pixels per frame through the CPU - phones
+            // stall into a black/frozen picture while audio keeps going.
+            // The sink is capped too, so decoded frames are downscaled once
+            // on the GPU. Screenshots read from the sink and therefore top
+            // out at this resolution as well - keep the desktop cap high.
+            const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            const maxLongSide = isMobileDevice ? 1280 : 2560;
+            const longSide = Math.max(displayWidth, displayHeight);
+            const scale = longSide > maxLongSide ? maxLongSide / longSide : 1;
+            const renderWidth = Math.max(2, Math.round((displayWidth * scale) / 2) * 2);
+            const renderHeight = Math.max(2, Math.round((displayHeight * scale) / 2) * 2);
+
             player.videoSink = new MediaBunny.CanvasSink(player.videoTrack, {
                 poolSize: isHls ? 6 : 2,
-                fit: 'contain'
+                fit: 'contain',
+                width: renderWidth,
+                height: renderHeight
             });
-            
-            player.canvas.width = await player.videoTrack.getDisplayWidth();
-            player.canvas.height = await player.videoTrack.getDisplayHeight();
-            Logger.log(`[MediaLifecycle] Video dimensions: ${player.canvas.width}x${player.canvas.height}`);
+
+            player.canvas.width = renderWidth;
+            player.canvas.height = renderHeight;
+            Logger.log(`[MediaLifecycle] Video dimensions: ${displayWidth}x${displayHeight}, rendering at ${renderWidth}x${renderHeight}`);
         } else {
             Logger.log('[MediaLifecycle] No video track found - enabling Audio Mode');
             player.isAudioMode = true;
