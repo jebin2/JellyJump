@@ -461,9 +461,18 @@ export class CorePlayer {
         this.sourceUrl = url;
         try {
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            if (autoplay && isMobile) {
+            if (autoplay && isMobile && !this.config.muted) {
                 Logger.log('[Player] Mobile Autoplay requested - enforcing muted playback');
                 this.config.muted = true;
+                // The AudioContext/gainNode survive across loads, so the flag
+                // alone doesn't silence anything - sync the gain or the icon
+                // shows muted while audio keeps playing.
+                this._syncAudioGain();
+                // Mark as auto-muted so the first user interaction restores
+                // audio instead of leaving the video silent until a manual
+                // unmute. Skipped when the user muted deliberately (guard
+                // above): auto-restore must not override their choice.
+                this._wasMutedForAutoplay = true;
                 this._updateVolumeUI();
             }
 
