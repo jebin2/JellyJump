@@ -249,17 +249,27 @@
     }
 
     .video-section {
-        height: 56.25vw;
-        /* 16:9 Aspect Ratio */
         border-right: none;
         border-bottom: 2px solid var(--accent-primary);
         background: #000;
         transition: height 0.3s ease;
     }
 
-    /* Fixed Mode on Mobile: Expand to full height */
+    /* Stable 16:9 letterbox regardless of each video's aspect ratio; the
+       35vh cap keeps it from eating the screen in landscape orientation.
+       Any video shape letterboxes inside via the canvas's object-fit:
+       contain. Two classes on purpose: the player runtime adds
+       .jellyjump-container (height:100%) to this same element, and this
+       must out-rank it no matter how the build orders the stylesheets. */
+    .player-layout > .video-section {
+        height: min(56.25vw, 35vh);
+    }
+
+    /* Fixed Mode on Mobile: Expand to full height.
+       dvh tracks iOS Safari's collapsing URL bar; vh is the fallback. */
     .video-section.mode-fixed {
         height: 100vh;
+        height: 100dvh;
         border-bottom: none;
     }
 

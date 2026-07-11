@@ -61,27 +61,10 @@
     gap: 8px;
 }
 
-/* Mobile Responsive Styles */
-@media (max-width: 768px) {
-    .player-layout {
-        flex-direction: column;
-        height: auto;
-    }
-
-    .video-section {
-        width: 100%;
-        height: auto;
-        flex: none;
-    }
-
-    .playlist-section {
-        width: 100%;
-        height: 40vh;
-        /* Shorter on mobile to give more room to video */
-        flex: none;
-        overflow-y: auto;
-    }
-}
+/* Mobile layout lives in player_page.css only. A legacy flexbox-era block
+   here used to set .video-section{height:auto}, which tied the player's
+   height to each video's aspect ratio whenever bundling reordered the
+   stylesheets - keep a single source of truth. */
 
 /* Accessibility Focus Styles */
 .playlist-item:focus-visible,
