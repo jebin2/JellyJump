@@ -43,20 +43,35 @@ export function togglePlayerFullscreen(player) {
         return;
     }
 
+    // CSS-fallback fullscreen active? This toggle is an exit request.
+    if (player.container.classList.contains('fullscreen-fallback')) {
+        exitFallbackFullscreen(player);
+        player._updateFullscreenUI();
+        return;
+    }
+
     if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
         if (player.container.requestFullscreen) {
+            // iPhone Safari/standalone PWAs expose requestFullscreen but can
+            // reject it - fall back to CSS fullscreen instead of giving up.
             player.container.requestFullscreen().catch(err => {
-                Logger.error(`Error attempting to enable fullscreen: ${err.message}`);
+                Logger.warn(`Native fullscreen rejected (${err.message}), using CSS fallback`);
+                enterFallbackFullscreen(player);
+                player._updateFullscreenUI();
             });
         } else if (player.container.webkitRequestFullscreen) {
-            player.container.webkitRequestFullscreen();
+            try {
+                player.container.webkitRequestFullscreen();
+            } catch (err) {
+                Logger.warn(`webkit fullscreen failed (${err.message}), using CSS fallback`);
+                enterFallbackFullscreen(player);
+            }
         } else if (player.container.mozRequestFullScreen) {
             player.container.mozRequestFullScreen();
         } else if (player.container.msRequestFullscreen) {
             player.container.msRequestFullscreen();
         } else {
-            player.container.classList.toggle('fullscreen-fallback');
-            document.body.classList.toggle('fullscreen-active');
+            enterFallbackFullscreen(player);
         }
     } else {
         if (document.exitFullscreen) {
@@ -68,9 +83,18 @@ export function togglePlayerFullscreen(player) {
         } else if (document.msExitFullscreen) {
             document.msExitFullscreen();
         }
-        player.container.classList.remove('fullscreen-fallback');
-        document.body.classList.remove('fullscreen-active');
+        exitFallbackFullscreen(player);
     }
 
     player._updateFullscreenUI();
+}
+
+function enterFallbackFullscreen(player) {
+    player.container.classList.add('fullscreen-fallback');
+    document.body.classList.add('fullscreen-active');
+}
+
+function exitFallbackFullscreen(player) {
+    player.container.classList.remove('fullscreen-fallback');
+    document.body.classList.remove('fullscreen-active');
 }
