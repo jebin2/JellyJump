@@ -259,16 +259,25 @@ export class Playlist {
      * Handle FileList from input or drop
      * @param {FileList} files 
      */
-    handleFiles(files) {
+    async handleFiles(files) {
         if (!files || files.length === 0) return;
 
         const newItems = this.processor.processFiles(files);
-        
+
         if (newItems.length === 0) {
             Toast.show('Please select valid video or audio files.', 3000, true);
             return;
         }
 
+        // On phones, oversized videos are gated BEFORE they enter the
+        // playlist: the user can convert to 1080p inside the prompt (the
+        // optimized copy is what gets added) or add the original as-is.
+        try {
+            const { OptimizeMenu } = await import('../menus/features/OptimizeMenu.js');
+            await OptimizeMenu.interceptNewItems(newItems);
+        } catch (e) {
+            Logger.warn('[Playlist] Optimize gate failed, adding originals:', e);
+        }
 
         this.addItems(newItems);
         this._processMetadata(newItems);
@@ -381,24 +390,9 @@ export class Playlist {
     async _processMetadata(items) {
         await this.processor.processMetadata(
             items,
-            (item) => {
-                this._updateItemUI(item);
-                this._maybeOfferOptimize(item);
-            },
+            (item) => this._updateItemUI(item),
             () => this._saveState()
         );
-    }
-
-    /**
-     * On phones, offer a one-time 1080p optimization for local videos too
-     * large to play smoothly (fire-and-forget; no-op on desktop).
-     * @private
-     */
-    _maybeOfferOptimize(item) {
-        if (!item || !item.videoInfo) return;
-        import('../menus/features/OptimizeMenu.js')
-            .then(({ OptimizeMenu }) => OptimizeMenu.maybeOffer(item, this))
-            .catch((e) => Logger.warn('[Playlist] Optimize offer failed:', e));
     }
 
     async _ensureMetadata(item) {
