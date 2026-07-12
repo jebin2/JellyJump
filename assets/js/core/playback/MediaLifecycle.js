@@ -144,18 +144,17 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
             const displayWidth = await player.videoTrack.getDisplayWidth();
             const displayHeight = await player.videoTrack.getDisplayHeight();
 
-            // Cap the render resolution. The playback canvas is a software
-            // surface (willReadFrequently, for filters/screenshots), so
-            // rasterizing e.g. a 4K portrait iPhone recording at full size
-            // pushes ~33MB of pixels per frame through the CPU - phones
-            // stall into a black/frozen picture while audio keeps going.
-            // The sink is capped too, so decoded frames are downscaled once
-            // on the GPU. Screenshots read from the sink and therefore top
-            // out at this resolution as well - desktop allows full 4K so
-            // playback and screenshots are untouched there; the cap only
-            // guards against beyond-4K sources.
+            // Cap the render resolution on phones only. The playback canvas
+            // is a software surface (willReadFrequently, for filters and
+            // screenshots), so rasterizing e.g. a 4K portrait iPhone
+            // recording at full size pushes ~33MB of pixels per frame
+            // through the CPU - phones stall into a black/frozen picture
+            // while audio keeps going. The sink is capped too, so decoded
+            // frames are downscaled once on the GPU, and phone screenshots
+            // top out at the cap. Desktop is uncapped: it always renders
+            // and screenshots at the source's native resolution.
             const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            const maxLongSide = isMobileDevice ? 1280 : 3840;
+            const maxLongSide = isMobileDevice ? 1280 : Infinity;
             const longSide = Math.max(displayWidth, displayHeight);
             const scale = longSide > maxLongSide ? maxLongSide / longSide : 1;
             const renderWidth = Math.max(2, Math.round((displayWidth * scale) / 2) * 2);
