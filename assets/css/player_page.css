@@ -265,12 +265,40 @@
         height: min(56.25vw, 35vh);
     }
 
-    /* Fixed Mode on Mobile: Expand to full height.
-       dvh tracks iOS Safari's collapsing URL bar; vh is the fallback. */
-    .video-section.mode-fixed {
-        height: 100vh;
-        height: 100dvh;
-        border-bottom: none;
+    /* Pinned controls on mobile: the video box keeps its normal size, the
+       control bar docks in-flow right below it, and the playlist keeps the
+       rest of the screen. A bigger video is fullscreen's job, not the
+       pin's. Extra specificity on purpose: the runtime adds
+       .jellyjump-container (height:100%) to this same element and must
+       never outrank these, regardless of stylesheet order. */
+    .player-layout > .video-section.mode-fixed {
+        height: auto;
+    }
+
+    .player-layout > .video-section.mode-fixed .jellyjump-video-wrapper {
+        flex: none;
+        /* -2px matches the unpinned content box exactly (there the section's
+           2px bottom border eats into the same min() height), so toggling
+           the pin never shifts the canvas by even a pixel. */
+        height: calc(min(56.25vw, 35vh) - 2px);
+    }
+
+    /* In fullscreen (fallback or native) the video must fill again even
+       while pinned. Kept as separate rules: an unsupported pseudo-class
+       would invalidate a grouped selector list. */
+    .player-layout > .video-section.mode-fixed.fullscreen-fallback .jellyjump-video-wrapper {
+        flex: 1;
+        height: auto;
+    }
+
+    .player-layout > .video-section.mode-fixed:fullscreen .jellyjump-video-wrapper {
+        flex: 1;
+        height: auto;
+    }
+
+    .player-layout > .video-section.mode-fixed:-webkit-full-screen .jellyjump-video-wrapper {
+        flex: 1;
+        height: auto;
     }
 
     .playlist-section {
