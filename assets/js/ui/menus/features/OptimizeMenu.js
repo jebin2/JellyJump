@@ -160,23 +160,24 @@ export const OptimizeMenu = {
      * @private
      */
     async _convert(item, srcW, srcH, onPct) {
-        const scale = this.TARGET / Math.max(srcW, srcH);
-        const width = Math.max(2, Math.round((srcW * scale) / 2) * 2);
-        const height = Math.max(2, Math.round((srcH * scale) / 2) * 2);
+        // Constrain only the long side; mediabunny derives the other
+        // dimension from the source aspect ratio, so the original ratio is
+        // preserved exactly (no independent rounding, no fill-stretching).
+        const resolution = srcW >= srcH ? { width: this.TARGET } : { height: this.TARGET };
 
         // Prefer H.264/MP4 (hardware-encoded on iPhones); fall back to
         // VP9/WebM where no AVC encoder is available.
         const useAvc = await MediaBunny.canEncodeVideo('avc');
         const format = useAvc ? 'mp4' : 'webm';
 
-        Logger.log(`[Optimize] ${item.title}: ${srcW}x${srcH} -> ${width}x${height} (${format})`);
+        Logger.log(`[Optimize] ${item.title}: ${srcW}x${srcH} -> long side ${this.TARGET} (${format})`);
 
         let lastPct = -1;
         const blob = await MediaProcessor.process({
             source: item.file,
             format,
             quality: 80,
-            resolution: { width, height },
+            resolution,
             onProgress: (p) => {
                 const pct = Math.round(p * 100);
                 if (pct !== lastPct) {
