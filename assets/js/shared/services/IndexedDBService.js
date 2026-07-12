@@ -183,7 +183,8 @@ export class IndexedDBService {
                         fileSize: item.fileSize,
                         fileType: item.fileType,
                         mimeType: item.mimeType,
-                        localPath: item.localPath
+                        localPath: item.localPath,
+                        optimizeDeclined: item.optimizeDeclined
                     };
 
                     playlistStore.put(storedItem);
