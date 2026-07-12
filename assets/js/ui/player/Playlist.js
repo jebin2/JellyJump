@@ -381,9 +381,24 @@ export class Playlist {
     async _processMetadata(items) {
         await this.processor.processMetadata(
             items,
-            (item) => this._updateItemUI(item),
+            (item) => {
+                this._updateItemUI(item);
+                this._maybeOfferOptimize(item);
+            },
             () => this._saveState()
         );
+    }
+
+    /**
+     * On phones, offer a one-time 1080p optimization for local videos too
+     * large to play smoothly (fire-and-forget; no-op on desktop).
+     * @private
+     */
+    _maybeOfferOptimize(item) {
+        if (!item || !item.videoInfo) return;
+        import('../menus/features/OptimizeMenu.js')
+            .then(({ OptimizeMenu }) => OptimizeMenu.maybeOffer(item, this))
+            .catch((e) => Logger.warn('[Playlist] Optimize offer failed:', e));
     }
 
     async _ensureMetadata(item) {
