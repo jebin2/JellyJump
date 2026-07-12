@@ -116,15 +116,34 @@ export async function process({
             (typeof quality === 'string' && quality !== 'high');
         const videoConfig = {};
 
+        // Bitrate must budget for the OUTPUT pixel count. When downscaling
+        // (e.g. 4K -> 1080p) the source bitrate is scaled by the pixel
+        // ratio first, otherwise the output carries 4K-class bitrate at
+        // 1080p and barely shrinks.
+        let outputWidth = originalWidth;
+        let outputHeight = originalHeight;
+        if (resolution) {
+            const aspect = originalWidth / originalHeight;
+            outputWidth = resolution.width || Math.round(resolution.height * aspect);
+            outputHeight = resolution.height || Math.round(resolution.width / aspect);
+        }
+        const pixelRatio = Math.min(1, (outputWidth * outputHeight) / (originalWidth * originalHeight));
+        const outputPixels = outputWidth * outputHeight;
+        const scaledSourceBitrate = originalBitrate * pixelRatio;
+
         if (format === 'prores') {
             // ProRes always re-encodes; only the desktop app has an encoder for it.
             videoConfig.codec = 'prores';
             videoConfig.bitrate = needsBitrateControl
-                ? getBitrate(quality, originalWidth * originalHeight, originalBitrate)
+                ? getBitrate(quality, outputPixels, scaledSourceBitrate)
                 : MediaBunny.QUALITY_VERY_HIGH;
         } else if (needsBitrateControl) {
             videoConfig.codec = (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc';
-            videoConfig.bitrate = getBitrate(quality, originalWidth * originalHeight, originalBitrate);
+            videoConfig.bitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
+        }
+
+        if (videoConfig.bitrate && typeof videoConfig.bitrate === 'number') {
+            Logger.log(`[TranscodeService] Target: ${outputWidth}x${outputHeight} @ ${(videoConfig.bitrate / 1000000).toFixed(2)} Mbps (pixel ratio ${pixelRatio.toFixed(3)})`);
         }
 
         // Resolution / Rotation dimensions
