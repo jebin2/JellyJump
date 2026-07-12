@@ -151,9 +151,11 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
             // stall into a black/frozen picture while audio keeps going.
             // The sink is capped too, so decoded frames are downscaled once
             // on the GPU. Screenshots read from the sink and therefore top
-            // out at this resolution as well - keep the desktop cap high.
+            // out at this resolution as well - desktop allows full 4K so
+            // playback and screenshots are untouched there; the cap only
+            // guards against beyond-4K sources.
             const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            const maxLongSide = isMobileDevice ? 1280 : 2560;
+            const maxLongSide = isMobileDevice ? 1280 : 3840;
             const longSide = Math.max(displayWidth, displayHeight);
             const scale = longSide > maxLongSide ? maxLongSide / longSide : 1;
             const renderWidth = Math.max(2, Math.round((displayWidth * scale) / 2) * 2);
