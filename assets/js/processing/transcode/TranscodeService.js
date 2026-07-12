@@ -129,9 +129,12 @@ export async function process({
 
         // Resolution / Rotation dimensions
         if (resolution) {
-            videoConfig.width = resolution.width;
-            videoConfig.height = resolution.height;
-            videoConfig.fit = 'fill';
+            // A single dimension lets mediabunny derive the other from the
+            // source aspect ratio - exact ratio preservation. fit is only
+            // valid (and only needed) when both dimensions are forced.
+            if (resolution.width) videoConfig.width = resolution.width;
+            if (resolution.height) videoConfig.height = resolution.height;
+            if (resolution.width && resolution.height) videoConfig.fit = 'fill';
         } else if (rotate && Math.abs(rotate) % 180 === 90) {
             videoConfig.width = originalHeight;
             videoConfig.height = originalWidth;
@@ -148,7 +151,12 @@ export async function process({
             };
         }
 
-        const needsRotation = rotate || flip || nativeRotation !== 0;
+        // Native (metadata) rotation is handled by mediabunny itself: decoded
+        // samples arrive display-oriented and the conversion carries the
+        // orientation through. Hand-baking it in the frame processor rotated
+        // frames a second time and center-cropped resized output (rotated,
+        // distorted videos). Only user-requested edits need the processor.
+        const needsRotation = rotate || flip;
         if (removeBackgroundOptions || watermarkItems || blur || needsRotation) {
             videoConfig.process = buildFrameProcessor({
                 removeBackgroundOptions, watermarkItems, watermarkImages,
