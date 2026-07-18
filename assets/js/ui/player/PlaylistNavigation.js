@@ -17,7 +17,7 @@ export class PlaylistNavigation {
      */
     playNext() {
         if (!this._canGoNext()) return;
-        this.playlist.playItem(this.playlist.activeIndex + 1);
+        this.playlist.selectItem(this.playlist.activeIndex + 1, true);
     }
 
     /**
@@ -25,7 +25,7 @@ export class PlaylistNavigation {
      */
     playPrevious() {
         if (!this._canGoPrevious()) return;
-        this.playlist.playItem(this.playlist.activeIndex - 1);
+        this.playlist.selectItem(this.playlist.activeIndex - 1, true);
     }
 
     /**
