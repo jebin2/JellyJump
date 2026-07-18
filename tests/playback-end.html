@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Playback End Test</title>
+    <style>body { font-family: monospace; background: #111; color: #ddd; padding: 16px; } pre { white-space: pre-wrap; } #player-container { width: 640px; height: 360px; }</style>
+</head>
+<body>
+<h3>Playback end-of-video behavior test</h3>
+<pre id="log">starting…</pre>
+<div id="player-container"></div>
+<script type="module">
+    /**
+     * Verifies the player stops cleanly at end of video: the clock must not
+     * run past the duration and onEnded must fire exactly once. Dev-only
+     * page; open http://localhost:8080/tests/playback-end.html or drive it
+     * headlessly and grep the console for the contract below.
+     *
+     * Console output contract:
+     *   "PLAYEND: <line>"        progress
+     *   "PLAYEND-RESULT: ..."    PASS | FAIL <reason>
+     */
+    import { MediaBunny, ensureEncoders } from '/assets/js/core/MediaBunny.js';
+
+    const logEl = document.getElementById('log');
+    const log = (m) => { logEl.textContent += '\n' + m; console.log('PLAYEND:', m); };
+    const finish = (m) => { log(m); console.log('PLAYEND-RESULT: ' + m); };
+    logEl.textContent = '';
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // 2-second 30fps video-only MP4 with a frame counter burned in
+    async function makeTestVideo(seconds = 2, fps = 30) {
+        await ensureEncoders();
+        const W = 320, H = 180;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        const output = new MediaBunny.Output({
+            format: new MediaBunny.Mp4OutputFormat(),
+            target: new MediaBunny.BufferTarget(),
+        });
+        const source = new MediaBunny.VideoSampleSource({ codec: 'avc', bitrate: 1_000_000 });
+        output.addVideoTrack(source);
+        await output.start();
+
+        const total = seconds * fps;
+        for (let i = 0; i < total; i++) {
+            ctx.fillStyle = `hsl(${(i * 7) % 360}, 60%, 40%)`;
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = '#fff';
+            ctx.font = '48px monospace';
+            ctx.fillText(String(i), 20, 100);
+            const frame = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+            const sample = new MediaBunny.VideoSample(frame);
+            await source.add(sample);
+            sample.close?.();
+        }
+        await output.finalize();
+        return new Blob([output.target.buffer], { type: 'video/mp4' });
+    }
+
+    try {
+        // Load the player templates the same way player-main.js does
+        const tpl = document.createElement('div');
+        tpl.style.display = 'none';
+        for (const f of ['playlist-templates', 'screenshot-templates', 'player-templates']) {
+            tpl.innerHTML += await (await fetch(`/assets/templates/${f}.html?v=2`)).text();
+        }
+        document.body.appendChild(tpl);
+
+        const { CorePlayer } = await import('/assets/js/core/Player.js');
+        const player = window.player = new CorePlayer('player-container', {
+            autoplay: false, muted: true, mode: 'player',
+        });
+
+        let endedCount = 0;
+        player.onEnded = () => { endedCount++; log(`onEnded fired (count=${endedCount}) at currentTime=${player.currentTime.toFixed(2)}`); };
+
+        log('generating 2s test video…');
+        const blob = await makeTestVideo(2, 30);
+        log(`test video: ${(blob.size / 1024).toFixed(1)} KB`);
+
+        await player.load(URL.createObjectURL(blob), true);
+        log(`loaded — duration=${player.duration.toFixed(2)}s, isPlaying=${player.isPlaying}`);
+        if (!player.isPlaying) { await player.play(); log('kicked play()'); }
+
+        // Wait for the end (2s video + generous margin)
+        const deadline = performance.now() + 20_000;
+        while (endedCount === 0 && performance.now() < deadline) await sleep(100);
+
+        if (endedCount === 0) {
+            finish(`FAIL — onEnded never fired within 20s (currentTime=${player.currentTime.toFixed(2)}, duration=${player.duration.toFixed(2)}, isPlaying=${player.isPlaying})`);
+        } else {
+            // The clock must stop: sample twice, 1.2s apart
+            const t1 = player.currentTime;
+            await sleep(1200);
+            const t2 = player.currentTime;
+            log(`post-end: isPlaying=${player.isPlaying}, t1=${t1.toFixed(3)}, t2=${t2.toFixed(3)}, duration=${player.duration.toFixed(3)}`);
+
+            if (player.isPlaying) finish('FAIL — still isPlaying after end');
+            else if (t2 > player.duration + 0.5) finish(`FAIL — clock ran past duration (${t2.toFixed(2)} > ${player.duration.toFixed(2)})`);
+            else if (Math.abs(t2 - t1) > 0.05) finish(`FAIL — clock still advancing after end (${t1.toFixed(3)} → ${t2.toFixed(3)})`);
+            else if (endedCount !== 1) finish(`FAIL — onEnded fired ${endedCount} times (expected 1)`);
+            else finish('PASS');
+        }
+    } catch (e) {
+        console.error(e);
+        finish(`FAIL — ${e?.message || e}`);
+    }
+</script>
+</body>
+</html>

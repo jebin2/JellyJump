@@ -93,8 +93,26 @@ export function startPlayerRenderLoop(player) {
 
             player.trigger('timeupdate', { currentTime: player.currentTime });
 
-            if (!player.isLive && playbackTime >= player.duration) {
-                // ... (existing end logic)
+            if (!player.isLive && player.duration > 0 && playbackTime >= player.duration) {
+                if (player.loopMode === 'one') {
+                    player._seekTo(0);
+                    return; // _seekTo resumes playback and restarts this loop
+                }
+                // Reached the end: stop and notify (playlist auto-advances)
+                player.pause();
+                player.playbackTimeAtStart = player.duration;
+                player.currentTime = player.duration;
+                player._updateProgress();
+                if (player.onEnded) player.onEnded();
+                return; // pause stopped the loop; play() restarts it
+            }
+
+            // Loop A-B: jump back to start marker when reaching the end marker
+            if (!player.isLive && player.loopMode === 'one' && player.loopStart !== null && player.loopEnd !== null) {
+                if (playbackTime >= player.loopEnd) {
+                    player._seekTo(player.loopStart);
+                    return; // _seekTo resumes playback and restarts this loop
+                }
             }
 
             if (!player.isLive && !player.nextFrame && player.videoFrameIterator) {

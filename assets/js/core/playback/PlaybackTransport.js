@@ -85,6 +85,23 @@ export async function playPlayer(player) {
         return; // IMPORTANT: Prevent VOD logic below from clobbering the live loop
     }
 
+    // After a long pause the browser may reclaim the video decoder, wedging the
+    // old iterator: its pending next() never resolves, so video freezes while
+    // audio (restarted on every play) keeps going. Drop the stale iterator
+    // WITHOUT awaiting return() — a wedged async generator queues return()
+    // behind the stuck next(), which would hang this whole play() call — and
+    // let the restart below spin up a fresh decoder at the same position.
+    const pausedForSec = player._pausedAtWall ? (performance.now() - player._pausedAtWall) / 1000 : 0;
+    if (pausedForSec > 10 && player.videoFrameIterator && !player.isLive) {
+        Logger.log(`[Play] Resuming after ${pausedForSec.toFixed(0)}s pause — restarting video iterator (decoder may be reclaimed)`);
+        const stale = player.videoFrameIterator;
+        player.videoFrameIterator = null;
+        player.nextFrame = null;
+        player._isFetchingFrame = false; // a stuck fetch exits on asyncId mismatch
+        Promise.resolve(stale.return?.()).catch(() => {});
+    }
+    player._pausedAtWall = null;
+
     const currentPosition = player._getPlaybackTime();
     if (player.duration > 1.0 && currentPosition >= player.duration - 0.5) {
         Logger.log(`[Play] Resetting to start (position=${currentPosition.toFixed(2)}, duration=${player.duration.toFixed(2)})`);
@@ -150,6 +167,7 @@ export function pausePlayer(player, showOverlay = true) {
         player.playbackTimeAtStart = calculatedTime;
     }
     player.isPlaying = false;
+    player._pausedAtWall = performance.now();
     player._clearAutoHideTimer();
 
     player._updatePlayPauseUI();

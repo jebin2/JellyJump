@@ -104,6 +104,10 @@ export class Playlist {
             () => this.playNext()
         );
 
+        // Auto-advance when the current item ends (no-op on the last item,
+        // so playback simply stops at the end of the playlist)
+        this.player.onEnded = () => this.playNext();
+
         this.player.setPlayCallback(() => {
             if (this.items.length > 0 && this.activeIndex === -1) {
                 ConfirmDialog.alert({
