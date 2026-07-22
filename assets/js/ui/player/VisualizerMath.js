@@ -1,6 +1,7 @@
 /**
  * Visualizer Math Utilities
- * Handles beat detection, pitch estimation, and physics-based spawning logic.
+ * Pure audio-analysis helpers: beat detection and pitch estimation.
+ * Scene/spawn logic lives in the renderer, not here.
  */
 export class VisualizerMath {
     /**
@@ -69,83 +70,6 @@ export class VisualizerMath {
 
         if (bestOffset === -1 || bestCorr < 0.01) return 0;
         return sampleRate / bestOffset;
-    }
-
-    /**
-     * Spawn a lightning bolt based on intensity
-     */
-    spawnLightningBolt(intensity = 1) {
-        const v = this.visualizer;
-        const width = v.canvas.width;
-        const height = v.canvas.height;
-        if (!width || !height) return;
-
-        const points = [];
-        const startX = width * (0.18 + Math.random() * 0.64);
-        const maxY = height * (0.45 + Math.random() * 0.2);
-        const segments = 7 + Math.floor(Math.random() * 5);
-        const dy = maxY / segments;
-        let x = startX;
-        let y = 0;
-        points.push({ x, y });
-
-        for (let i = 0; i < segments; i++) {
-            x += (Math.random() - 0.5) * (35 + intensity * 20);
-            y += dy;
-            points.push({ x, y });
-        }
-
-        const forks = [];
-        const forkCount = 1 + Math.floor(Math.random() * 3);
-        for (let f = 0; f < forkCount; f++) {
-            const startIndex = 1 + Math.floor(Math.random() * (points.length - 3));
-            const start = points[startIndex];
-            const fork = [{ x: start.x, y: start.y }];
-            const forkSeg = 2 + Math.floor(Math.random() * 3);
-            let fx = start.x;
-            let fy = start.y;
-            for (let s = 0; s < forkSeg; s++) {
-                fx += (Math.random() - 0.5) * (42 + intensity * 14) + (Math.random() > 0.5 ? 14 : -14);
-                fy += dy * (0.45 + Math.random() * 0.45);
-                fork.push({ x: fx, y: fy });
-            }
-            forks.push(fork);
-        }
-
-        v.lightningBolts.push({
-            points,
-            forks,
-            cloudX: startX,
-            cloudY: height * (0.12 + Math.random() * 0.12),
-            alpha: 0.5 + Math.min(0.45, intensity * 0.3),
-            glow: 0.55 + intensity * 0.4,
-            width: 1.2 + intensity * 1.6
-        });
-
-        if (v.lightningBolts.length > 4) v.lightningBolts.shift();
-    }
-
-    /**
-     * Spawn an expanding pulse ring
-     */
-    spawnPulseRing(x, y, scale = 1) {
-        const v = this.visualizer;
-        const px = x ?? (v.canvas.width * (0.2 + Math.random() * 0.6));
-        const py = y ?? (v.canvas.height * 0.9);
-
-        v.pulseRings.push({
-            x: px,
-            y: py,
-            radius: Math.max(8, Math.min(v.canvas.width, v.canvas.height) * 0.026 * scale),
-            speed: (1.4 + v.bassLevel * 4.6) * scale,
-            alpha: (0.28 + v.bassLevel * 0.28) * scale,
-            width: 1 + v.rmsLevel * 1.6,
-            flatten: 0.28 + Math.random() * 0.18
-        });
-
-        if (v.pulseRings.length > 40) {
-            v.pulseRings.shift();
-        }
     }
 
     /**

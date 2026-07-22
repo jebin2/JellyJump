@@ -1,6 +1,6 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { VisualizerRenderer } from './VisualizerRenderer.js';
-import { VisualizerCharacters } from './VisualizerCharacters.js';
+import { VisualizerShapes } from './VisualizerShapes.js';
 import { VisualizerMath } from './VisualizerMath.js';
 
 /**
@@ -8,7 +8,8 @@ import { VisualizerMath } from './VisualizerMath.js';
  * Features:
  * - Adaptive beat detection (low-end energy + spectral flux)
  * - Pitch estimation via autocorrelation
- * - Weather-themed scene (rain, lightning, walking character)
+ * - Night sky scene: a twinkling star field that pulses with the music,
+ *   plus shooting stars spawned at random and more often on strong beats
  */
 export class AudioVisualizer {
     constructor(canvas) {
@@ -17,7 +18,7 @@ export class AudioVisualizer {
 
         // Modularized helpers
         this.renderer = new VisualizerRenderer(this);
-        this.characters = new VisualizerCharacters(this);
+        this.shapes = new VisualizerShapes(this);
         this.math = new VisualizerMath(this);
 
         this.isRunning = false;
@@ -38,33 +39,20 @@ export class AudioVisualizer {
         this.currentPitchHz = 0;
         this.pitchSmoothedHz = 0;
         this.lastBeatAt = 0;
+        this.beatKick = 0;
 
         // History for beat detection
         this.energyHistory = [];
         this.fluxHistory = [];
 
-        // Scene State (Managed by Renderer/Characters)
-        this.clouds = [];
-        this.raindrops = [];
-        this.lightningBolts = [];
-        this.pulseRings = [];
-        this.trees = [];
-        this.publicChairs = [];
-        this.sceneComposition = {};
+        // Scene state (populated by the renderer)
+        this.stars = [];
+        this.shootingStars = [];
         this.sceneWidth = 0;
         this.sceneHeight = 0;
 
         this.simTime = 0;
         this.simulatedMode = false;
-        this.lightningCooldownMs = 1200;
-        this.lastLightningAt = 0;
-
-        this.woman = {
-            x: -150, y: 0,
-            height: 180, speed: 1.15,
-            frame: 0, state: "walking_to_balloon",
-            waitTimer: 0, hasBalloon: false
-        };
 
         Logger.log("[AudioVisualizer] Created");
     }
@@ -183,14 +171,9 @@ export class AudioVisualizer {
         const now = performance.now();
         const beat = this.math.detectBeat(this.bassLevel, flux, now);
 
+        this.beatKick *= 0.88;
         if (beat) {
-            if (now - this.lastLightningAt > this.lightningCooldownMs && Math.random() < 0.85) {
-                this.math.spawnLightningBolt(this.bassLevel);
-                this.lastLightningAt = now;
-            }
-            if (this.frameCounter % 3 === 0) {
-                this.math.spawnPulseRing();
-            }
+            this.beatKick = Math.min(1, this.beatKick + 0.6 + this.bassLevel * 0.4);
         }
 
         if (this.frameCounter % 4 === 0) {
@@ -201,6 +184,7 @@ export class AudioVisualizer {
         }
 
         this.frameCounter++;
+        this.simTime += 0.016;
     }
 
     /**
@@ -213,12 +197,13 @@ export class AudioVisualizer {
         this.midLevel = 0.1 + Math.sin(this.simTime * 1.2) * 0.05;
         this.trebleLevel = 0.05 + Math.sin(this.simTime * 2.1) * 0.03;
         this.rmsLevel = this.bassLevel * 0.8;
+        this.beatKick *= 0.88;
 
         if (Math.sin(this.simTime * 1.7) > 0.98) {
             const now = performance.now();
-            if (now - this.lastLightningAt > 2000) {
-                if (Math.random() < 0.5) this.math.spawnLightningBolt(0.7);
-                this.lastLightningAt = now;
+            if (now - this.lastBeatAt > 1500) {
+                this.lastBeatAt = now;
+                this.beatKick = Math.min(1, this.beatKick + 0.6);
             }
         }
     }
@@ -232,11 +217,10 @@ export class AudioVisualizer {
         const height = this.canvas.height;
         if (!width || !height) return;
 
-        if (this.sceneWidth !== width || this.sceneHeight !== height || this.raindrops.length === 0) {
+        if (this.sceneWidth !== width || this.sceneHeight !== height) {
             this.renderer.initScene(width, height);
         }
 
-        this.woman.y = height * 0.92;
         this.renderer.draw(width, height);
     }
 
