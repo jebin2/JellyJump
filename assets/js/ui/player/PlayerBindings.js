@@ -32,8 +32,19 @@ export function attachPlayerBindings(player) {
         });
 
         if (player.config.controls.thumbnails) {
-            player.ui.progressContainer.addEventListener('mousemove', (e) => player._handleThumbnailHover(e));
-            player.ui.progressContainer.addEventListener('mouseleave', () => player._handleThumbnailLeave());
+            // Pointer events instead of mouse events: on touch devices a tap
+            // fires an emulated mousemove (showing the preview) but never a
+            // mouseleave, so the popup used to stick on screen. Real mice
+            // still get hover previews; touch never opens one, and any
+            // lingering popup is closed when the finger lifts.
+            player.ui.progressContainer.addEventListener('pointermove', (e) => {
+                if (e.pointerType === 'mouse') player._handleThumbnailHover(e);
+            });
+            player.ui.progressContainer.addEventListener('pointerleave', () => player._handleThumbnailLeave());
+            player.ui.progressContainer.addEventListener('pointerup', (e) => {
+                if (e.pointerType !== 'mouse') player._handleThumbnailLeave();
+            });
+            player.ui.progressContainer.addEventListener('pointercancel', () => player._handleThumbnailLeave());
         }
     }
 

@@ -145,7 +145,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
                 poolSize: isHls ? 6 : 2,
                 fit: 'contain'
             });
-            
+
             player.canvas.width = await player.videoTrack.getDisplayWidth();
             player.canvas.height = await player.videoTrack.getDisplayHeight();
             Logger.log(`[MediaLifecycle] Video dimensions: ${player.canvas.width}x${player.canvas.height}`);

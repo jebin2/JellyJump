@@ -61,27 +61,10 @@
     gap: 8px;
 }
 
-/* Mobile Responsive Styles */
-@media (max-width: 768px) {
-    .player-layout {
-        flex-direction: column;
-        height: auto;
-    }
-
-    .video-section {
-        width: 100%;
-        height: auto;
-        flex: none;
-    }
-
-    .playlist-section {
-        width: 100%;
-        height: 40vh;
-        /* Shorter on mobile to give more room to video */
-        flex: none;
-        overflow-y: auto;
-    }
-}
+/* Mobile layout lives in player_page.css only. A legacy flexbox-era block
+   here used to set .video-section{height:auto}, which tied the player's
+   height to each video's aspect ratio whenever bundling reordered the
+   stylesheets - keep a single source of truth. */
 
 /* Accessibility Focus Styles */
 .playlist-item:focus-visible,
@@ -630,6 +613,27 @@ button:focus-visible {
     z-index: 20;
     box-shadow: var(--shadow-md) var(--accent-primary);
     font-family: var(--font-mono);
+}
+
+/* On phones the panels/menus are anchored inside the video section, which
+   is only ~56vw tall with overflow:hidden - anything taller gets clipped.
+   Present them as viewport-fixed bottom sheets instead (fixed escapes the
+   container's clipping; z-index must clear the playlist's 10000). */
+@media (max-width: 768px) {
+
+    .jellyjump-panel,
+    .jellyjump-menu {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
+        bottom: 12px;
+        width: min(92vw, 340px);
+        max-height: 70vh;
+        max-height: 70dvh;
+        overflow-y: auto;
+        z-index: 10010;
+    }
 }
 
 .jellyjump-panel-header {
@@ -1643,7 +1647,11 @@ button:focus-visible {
     width: 100dvw !important;
     height: 100vh !important;
     height: 100dvh !important;
-    z-index: 9999 !important;
+    /* Above the playlist section (z-index 10000) and its overlay buttons
+       (10005), or their headers render on top of the fullscreen video.
+       Panels/menus opened from the control bar are children of this
+       element, so they still stack above the video inside it. */
+    z-index: 10020 !important;
     background: #000 !important;
     margin: 0 !important;
     padding: 0 !important;

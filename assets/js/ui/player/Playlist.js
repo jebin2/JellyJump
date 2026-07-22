@@ -175,16 +175,30 @@ export class Playlist {
                     if (indexToRestore >= 0 && indexToRestore < this.items.length) {
                         const itemToRestore = this.items[indexToRestore];
 
-                        Logger.log('[Playlist] Restoring item:', itemToRestore.title, {
-                            isLocal: itemToRestore.isLocal,
-                            hasFile: !!itemToRestore.file,
-                            url: itemToRestore.url,
-                            localPath: itemToRestore.localPath
-                        });
+                        // Crash-loop breaker: if the load guard from the
+                        // previous session was never cleared, that session
+                        // died (e.g. iOS jetsam on a heavy 4K file) while
+                        // loading this very item. Auto-restoring it would
+                        // crash again on every launch ("A problem repeatedly
+                        // occurred"), so skip it - the item stays in the
+                        // playlist and can still be tapped manually.
+                        const guard = this._readLoadGuard();
+                        if (guard && guard.id === itemToRestore.id) {
+                            this._clearLoadGuard();
+                            Logger.warn('[Playlist] Not auto-restoring', itemToRestore.title, '- the previous session crashed while loading it');
+                            Toast.show(`Skipped auto-loading "${itemToRestore.title}" - it crashed the app last time. Tap it to retry.`, 6000, true);
+                        } else {
+                            Logger.log('[Playlist] Restoring item:', itemToRestore.title, {
+                                isLocal: itemToRestore.isLocal,
+                                hasFile: !!itemToRestore.file,
+                                url: itemToRestore.url,
+                                localPath: itemToRestore.localPath
+                            });
 
-                        // Don't auto-play on restore, just load
-                        // Use selectItem to handle on-demand loading
-                        await this.selectItem(indexToRestore, false);
+                            // Don't auto-play on restore, just load
+                            // Use selectItem to handle on-demand loading
+                            await this.selectItem(indexToRestore, false);
+                        }
                     }
                 }
             } else {
@@ -208,6 +222,34 @@ export class Playlist {
     }
 
     /**
+     * Crash-loop breaker guard: set while an item's media is loading and
+     * cleared on success. If it survives to the next launch, that load
+     * killed the page and the item must not be auto-restored.
+     * @private
+     */
+    _setLoadGuard(item) {
+        try {
+            localStorage.setItem('jellyjump-load-guard', JSON.stringify({ id: item.id, at: Date.now() }));
+        } catch (e) { /* storage full/blocked - guard is best-effort */ }
+    }
+
+    /** @private */
+    _clearLoadGuard() {
+        try {
+            localStorage.removeItem('jellyjump-load-guard');
+        } catch (e) { /* ignore */ }
+    }
+
+    /** @private */
+    _readLoadGuard() {
+        try {
+            return JSON.parse(localStorage.getItem('jellyjump-load-guard'));
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
      * Save only playback progress (optimized for frequent calls)
      * @private
      */
@@ -221,16 +263,25 @@ export class Playlist {
      * Handle FileList from input or drop
      * @param {FileList} files 
      */
-    handleFiles(files) {
+    async handleFiles(files) {
         if (!files || files.length === 0) return;
 
         const newItems = this.processor.processFiles(files);
-        
+
         if (newItems.length === 0) {
             Toast.show('Please select valid video or audio files.', 3000, true);
             return;
         }
 
+        // On phones, oversized videos are gated BEFORE they enter the
+        // playlist: the user can convert to 1080p inside the prompt (the
+        // optimized copy is what gets added) or add the original as-is.
+        try {
+            const { OptimizeMenu } = await import('../menus/features/OptimizeMenu.js');
+            await OptimizeMenu.interceptNewItems(newItems);
+        } catch (e) {
+            Logger.warn('[Playlist] Optimize gate failed, adding originals:', e);
+        }
 
         this.addItems(newItems);
         this._processMetadata(newItems);
@@ -894,6 +945,12 @@ export class Playlist {
                 }
             }
 
+            // Mark this item as "loading" so a hard crash during the load
+            // (WebKit killing the page on a too-heavy file) is detectable on
+            // the next launch and the item is not auto-restored into a
+            // crash loop. Cleared once the player has the media loaded.
+            this._setLoadGuard(video);
+
             // Handle streams (HLS/Live) - load directly without MediaMetadata processing
             if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {
                 video.isStream = true; // Mark for metadata prefetch skip
@@ -920,6 +977,7 @@ export class Playlist {
                 // Update item metadata after stream loads
                 this._updateStreamItemMetadata(video, index);
 
+                this._clearLoadGuard();
                 this._saveState();
                 return;
             }
@@ -978,6 +1036,7 @@ export class Playlist {
                     }
 
                     // Auto-remove and skip to next
+                    this._clearLoadGuard();
                     Logger.warn(`File not found: ${video.title}. Removing and skipping.`);
 
                     // 1. Data Removal (handles activeIndex adjustment)
@@ -1019,6 +1078,8 @@ export class Playlist {
 
             // Load video with saved subtitles (if any) - pass isAudio for audio files
             await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null, { isAudio: video.isAudio });
+
+            this._clearLoadGuard();
 
             // [NEW] Auto-load matched subtitle file/path
             if (video.subtitleFile || video.subtitlePath) {

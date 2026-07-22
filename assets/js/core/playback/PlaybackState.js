@@ -95,6 +95,20 @@ export async function seekPlayerTo(player, time) {
     const wasPlaying = player.isPlaying;
     if (wasPlaying) player.pause(false);
 
+    // Re-resume the context NOW, while still inside the tap's user-gesture
+    // window. pause() suspends it, and by the time play() tries to resume
+    // (after the async iterator rebuild), iOS no longer counts the tap as
+    // a gesture - resume stalls, the timeout fallback auto-mutes, and the
+    // video resumes silent until the next tap restores it.
+    // NOT gated on wasPlaying: bar seeks arrive here from playerScrubStart,
+    // which already paused (so wasPlaying is false) - the context still
+    // needs waking for the play() that playerScrubEnd issues. Resuming a
+    // running context is a no-op, and with playback paused there are no
+    // scheduled buffers, so this can't make a paused player audible.
+    if (player.audioContext) {
+        player.audioContext.resume().catch(() => { });
+    }
+
     player.playbackTimeAtStart = Math.max(0, Math.min(player.duration, time));
     player.currentTime = player.playbackTimeAtStart;
     player._updateProgress();
@@ -125,6 +139,13 @@ export function playerScrubStart(player, e) {
     player.scrubWasPlaying = player.isPlaying;
 
     if (player.isPlaying) player.pause(false);
+
+    // Wake the context pause() just suspended while we are guaranteed to be
+    // inside the input event (scrub start is always user input), so the
+    // play() on scrub end finds it running instead of stalling on iOS.
+    if (player.scrubWasPlaying && player.audioContext) {
+        player.audioContext.resume().catch(() => { });
+    }
 
     player._seek(e);
 
