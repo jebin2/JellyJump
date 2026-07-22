@@ -114,6 +114,8 @@ export class VisualizerRenderer {
             speed: 0.25 + Math.random() * 0.9,
             trebleWeight: Math.random(),
             flicker: 0,
+            sparkleLife: Infinity,
+            sparkleMaxLife: 0,
             color: pickStarColor(),
         };
     }
@@ -186,12 +188,23 @@ export class VisualizerRenderer {
             const radius = star.baseRadius * (1 + v.beatKick * 0.3 * star.trebleWeight);
             v.shapes.drawStar(star.x, star.y, radius, Math.max(0.1, Math.min(1.3, brightness)), star.color);
 
-            // Only the medium/bright tier of stars ever sparkles — real
-            // diffraction spikes only show up on stars bright enough to
-            // bloom. Size scales with brightness and gets a big kick on beat.
-            if (star.baseRadius > 1.0 && brightness > 0.75) {
-                const spikeSize = radius * (7 + v.beatKick * 9);
-                v.shapes.drawSparkleCross(star.x, star.y, spikeSize, brightness - 0.5, star.color);
+            // Sparkle ignition is an independent random roll per star per
+            // frame — not gated to a fixed size tier — so it's a different
+            // random handful of stars each time, not always the same ones.
+            // Bigger stars are just somewhat more likely to catch it. Once
+            // lit, it's a slow burn: a smooth rise-then-fall envelope over
+            // ~1.5-2.5s, not an instant flash.
+            star.sparkleLife++;
+            const igniteChance = 0.00025 + v.beatKick * 0.012;
+            if (star.sparkleLife > star.sparkleMaxLife && Math.random() < igniteChance * (0.4 + star.baseRadius * 0.5)) {
+                star.sparkleLife = 0;
+                star.sparkleMaxLife = 90 + Math.random() * 60;
+            }
+
+            if (star.sparkleLife < star.sparkleMaxLife) {
+                const envelope = Math.sin(Math.PI * star.sparkleLife / star.sparkleMaxLife);
+                const spikeSize = radius * (6 + star.baseRadius * 3) * envelope;
+                v.shapes.drawSparkleCross(star.x, star.y, spikeSize, envelope, star.color);
             }
         }
     }
