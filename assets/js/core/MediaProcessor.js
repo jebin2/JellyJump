@@ -12,6 +12,7 @@ import {
 } from '../processing/tracks/TrackExtractionService.js';
 import { createSlideshowVideo as createSlideshowVideoMedia } from '../processing/slideshow/SlideshowService.js';
 import { merge as mergeVideosMedia } from '../processing/merge/MergeService.js';
+import { combineAudioVideo as combineAudioVideoMedia } from '../processing/combine/CombineAVService.js';
 import { buildFrameProcessor as buildMediaFrameProcessor, applyChromaKey as applyMediaChromaKey } from '../processing/frame/FrameProcessorService.js';
 import { process as transcodeMedia } from '../processing/transcode/TranscodeService.js';
 import { canUseWorker, runInWorker } from '../processing/worker/WorkerClient.js';
@@ -202,6 +203,10 @@ export class MediaProcessor {
 
     static async merge(options) {
         return mergeVideosMedia(options);
+    }
+
+    static async combineAudioVideo(options) {
+        return combineAudioVideoMedia(options);
     }
 
     static applyChromaKey(imageData, colors, bgType, bgColor) {

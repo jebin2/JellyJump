@@ -50,6 +50,14 @@ export class ToolsMenu {
                 </div>
                 <span class="tools-tile-label">Slideshow</span>
             </button>
+            <button class="tools-tile" data-action="combine-av" title="Combine Audio/Video">
+                <div class="tools-tile-icon">
+                    <svg width="24" height="24" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-audio"></use>
+                    </svg>
+                </div>
+                <span class="tools-tile-label">Combine A/V</span>
+            </button>
             <button class="tools-tile tools-tile-danger" data-action="reset" title="Reset App">
                 <div class="tools-tile-icon">
                     <svg width="24" height="24" fill="currentColor">
@@ -80,6 +88,9 @@ export class ToolsMenu {
                 } else if (action === 'slideshow') {
                     const { SlideshowMenu } = await import('./SlideshowMenu.js');
                     SlideshowMenu.init(playlist);
+                } else if (action === 'combine-av') {
+                    const { CombineAVMenu } = await import('./CombineAVMenu.js');
+                    CombineAVMenu.init(playlist);
                 } else if (action === 'reset') {
                     if (confirm('Reset the app? This will clear all data and reload.')) {
                         try {

@@ -19,6 +19,7 @@ export default defineConfig({
             '/npm/mediabunny@1.43.1/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/mediabunny@1.45.3/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/mediabunny@1.50.4/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
+            '/npm/mediabunny@1.51.0/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/worker_threads/+esm': resolve(__dirname, 'assets/js/lib/worker-threads-stub.js'),
         }
     },

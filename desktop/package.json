@@ -72,12 +72,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "mediabunny": "^1.50.4",
-    "@mediabunny/server": "^1.50.4"
+    "@mediabunny/server": "^1.51.0",
+    "mediabunny": "^1.51.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
     "electron": "^39.2.4",
-    "electron-builder": "^26.0.12",
-    "@electron/rebuild": "^3.7.1"
+    "electron-builder": "^26.0.12"
   }
 }

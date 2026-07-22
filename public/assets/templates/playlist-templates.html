@@ -904,6 +904,72 @@
     </div>
 </template>
 
+<!-- Combine Audio/Video Modal Content Template -->
+<template id="combine-av-modal-content-template">
+    <div class="combine-av-container">
+        <div class="combine-empty-state hidden text-center p-md text-muted text-sm italic mb-md">
+            Need at least one video file and a second file to pull audio from.
+        </div>
+
+        <div class="flex flex-col gap-md">
+            <div class="flex flex-col gap-xs">
+                <div class="text-xs text-secondary font-mono uppercase">Video From</div>
+                <select class="mb-select w-full combine-video-select"></select>
+            </div>
+
+            <div class="flex flex-col gap-xs">
+                <div class="text-xs text-secondary font-mono uppercase">Audio From</div>
+                <select class="mb-select w-full combine-audio-select"></select>
+            </div>
+
+            <div class="flex flex-col gap-xs">
+                <div class="text-xs text-secondary font-mono uppercase">Output Format</div>
+                <select class="mb-select w-full combine-format-select">
+                    <option value="mp4">MP4</option>
+                    <option value="webm">WebM</option>
+                    <option value="mov">MOV</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Combine Audio/Video Modal Footer Template -->
+<template id="combine-av-modal-footer-template">
+    <div class="flex-between w-full h-full gap-md items-center">
+        <div class="flex-1 flex items-center">
+            <div class="progress-section hidden flex items-center gap-sm w-full">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Combining...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small combine-btn" title="Combine" aria-label="Combine" disabled>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-audio"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
 
 
 <!-- GIF Creation Content Template -->
