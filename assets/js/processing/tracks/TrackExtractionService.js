@@ -216,6 +216,9 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
             case 'mp3':
                 outputFormat = new MediaBunny.Mp3OutputFormat();
                 break;
+            case 'aac':
+                outputFormat = new MediaBunny.AdtsOutputFormat();
+                break;
             case 'wav':
                 outputFormat = new MediaBunny.WavOutputFormat();
                 break;
@@ -231,16 +234,20 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
             target: new MediaBunny.BufferTarget()
         });
 
-        const codecList = format === 'flac' ? ['flac'] : ['aac', 'opus', 'mp3'];
-        const supportedCodecs = await MediaBunny.getEncodableAudioCodecs(codecList);
-        if (supportedCodecs.length === 0) {
-            throw new Error('No supported audio codecs found');
+        // Pick a codec the target container can actually hold: MP3 only accepts
+        // mp3 and WAV only accepts PCM, so a fixed list would hand them AAC and
+        // the muxer would reject it. Asking the format keeps this correct for
+        // every container without a lookup table to maintain.
+        const codec = await MediaBunny.getFirstEncodableAudioCodec(outputFormat.getSupportedAudioCodecs());
+        if (!codec) {
+            throw new Error(`No encodable audio codec for ${format} output`);
         }
 
-        const audioSourceConfig = format === 'flac'
-            ? { codec: supportedCodecs[0] }
-            : { codec: supportedCodecs[0], quality: new MediaBunny.Quality({ bitrate: AUDIO_BITRATE_BPS }) };
-        audioSource = new MediaBunny.AudioSampleSource(audioSourceConfig);
+        // Bitrate is meaningless for lossless and PCM codecs.
+        const isLossless = codec === 'flac' || MediaBunny.PCM_AUDIO_CODECS.includes(codec);
+        audioSource = new MediaBunny.AudioSampleSource(isLossless
+            ? { codec }
+            : { codec, quality: new MediaBunny.Quality({ bitrate: AUDIO_BITRATE_BPS }) });
         output.addAudioTrack(audioSource);
         await output.start();
 

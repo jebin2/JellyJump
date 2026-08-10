@@ -134,12 +134,19 @@
         await check('merge two clips',
             () => merge({ inputs: [clip, clip], format: 'mp4' }), { video: true });
 
-        // TrackExtractionService (re-encode path). Uses m4a: the 'mp3'/'wav'
-        // formats pick a codec their container can't hold — a pre-existing bug
-        // unrelated to encoding quality, so it isn't exercised here.
-        await check('extract audio track with speed (m4a)',
-            () => extractTrackWithSpeed({ source: clip, trackIndex: 0, trackType: 'audio', format: 'm4a', speed: 1.5 }),
-            { audio: true });
+        // TrackExtractionService re-encode path, every audio container it can
+        // emit. MP3 and WAV regressed here before: the codec was picked from a
+        // fixed list instead of from the container, so both got handed AAC.
+        for (const fmt of ['m4a', 'mp3', 'wav', 'flac', 'aac']) {
+            await check(`extract audio track with speed (${fmt})`,
+                () => extractTrackWithSpeed({ source: clip, trackIndex: 0, trackType: 'audio', format: fmt, speed: 1.5 }),
+                { audio: true });
+        }
+
+        // ...and the video branch of the same service
+        await check('extract video track with speed (mp4)',
+            () => extractTrackWithSpeed({ source: clip, trackIndex: 0, trackType: 'video', format: 'mp4', speed: 1.5 }),
+            { video: true });
 
         log('');
         log(`SUMMARY: ${pass} passed, ${fail} failed`);
