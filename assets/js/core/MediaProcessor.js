@@ -17,12 +17,31 @@ import { buildFrameProcessor as buildMediaFrameProcessor, applyChromaKey as appl
 import { process as transcodeMedia } from '../processing/transcode/TranscodeService.js';
 import { canUseWorker, runInWorker } from '../processing/worker/WorkerClient.js';
 
+// Above this, a job is too big to be quietly rerun on the main thread: doing so
+// locks the UI for the entire encode (hours, for a multi-GB payload) and tends
+// to take the tab's memory with it.
+const INLINE_FALLBACK_MAX_BYTES = 64 * 1024 * 1024;
+
+/** Total bytes of the media inputs in an options bag, across op shapes. */
+function payloadBytes(options) {
+    const sources = [options?.blob, options?.source, ...(options?.inputs ?? [])];
+    let total = 0;
+    for (const s of sources) {
+        if (s && typeof s.size === 'number') total += s.size;
+    }
+    return total;
+}
+
 /**
- * Run an operation in the media worker when available (browser), falling
- * back to the main thread if the worker itself fails to start or crashes.
- * Genuine processing errors are rethrown, not retried.
+ * Run an operation in the media worker when available (browser), falling back
+ * to the main thread only when that is actually safe. Genuine processing
+ * errors are rethrown, not retried.
  * On desktop the inline path is always used: processing there goes through
  * @mediabunny/server's FFmpeg threads, which need Node in the renderer.
+ *
+ * A worker that dies partway through a large job has almost certainly run out
+ * of memory. Rerunning it inline would then freeze the UI for the whole encode
+ * and likely OOM the tab as well, so large jobs fail loudly instead.
  */
 async function dispatch(op, options, inlineFn) {
     if (!canUseWorker()) {
@@ -31,11 +50,20 @@ async function dispatch(op, options, inlineFn) {
     try {
         return await runInWorker(op, options);
     } catch (error) {
-        if (error.isWorkerCrash) {
+        if (!error.isWorkerCrash) throw error;
+
+        const bytes = payloadBytes(options);
+        if (error.workerNeverStarted || bytes <= INLINE_FALLBACK_MAX_BYTES) {
             Logger.warn(`[MediaProcessor] Worker unavailable for ${op}, running on main thread:`, error.message);
             return inlineFn(options);
         }
-        throw error;
+
+        const mb = (bytes / 1048576).toFixed(0);
+        Logger.error(`[MediaProcessor] Worker died during ${op} on a ${mb} MB payload — not retrying on the main thread`);
+        throw new Error(
+            `The media worker stopped while processing ${mb} MB, most likely out of memory. ` +
+            `Retrying on the main thread would freeze the app, so the operation was stopped.`
+        );
     }
 }
 

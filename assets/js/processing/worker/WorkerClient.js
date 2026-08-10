@@ -11,6 +11,11 @@ let worker = null;
 let nextId = 1;
 const pending = new Map();
 let idleTimer = null;
+// Whether the current worker instance has ever replied. Separates "the worker
+// never came up" (safe to rerun the job on the main thread) from "the worker
+// died partway through a job" (usually out of memory on a large payload, where
+// rerunning inline would freeze the UI instead).
+let workerBooted = false;
 
 // Terminate the worker after it sits idle, releasing its entire heap
 // (parsed codec bundles plus any residue from the last conversion).
@@ -30,6 +35,7 @@ function scheduleIdleShutdown() {
 }
 
 function handleMessage(event) {
+    workerBooted = true;
     const { id, type, value, error } = event.data;
     const entry = pending.get(id);
     if (!entry) return;
@@ -53,6 +59,9 @@ function handleCrash(event) {
     Logger.error('[MediaWorker] Worker crashed:', event.message || event);
     const crashError = new Error('Media worker crashed' + (event.message ? `: ${event.message}` : ''));
     crashError.isWorkerCrash = true;
+    // A worker that never replied failed to start (bad URL, CSP, import error);
+    // one that had been answering died mid-job.
+    crashError.workerNeverStarted = !workerBooted;
 
     for (const entry of pending.values()) {
         entry.reject(crashError);
@@ -61,10 +70,12 @@ function handleCrash(event) {
 
     worker?.terminate();
     worker = null; // next request spawns a fresh worker
+    workerBooted = false;
 }
 
 function getWorker() {
     if (!worker) {
+        workerBooted = false;
         worker = new Worker(new URL('./media-worker.js', import.meta.url), { type: 'module' });
         worker.onmessage = handleMessage;
         worker.onerror = handleCrash;
@@ -110,7 +121,10 @@ export function runInWorker(op, options = {}) {
             getWorker().postMessage({ id, op, options: cloneable });
         } catch (error) {
             pending.delete(id);
-            error.isWorkerCrash = true; // e.g. non-cloneable options, CSP-blocked worker
+            // e.g. non-cloneable options, CSP-blocked worker — nothing ran, so
+            // the main thread can safely take over.
+            error.isWorkerCrash = true;
+            error.workerNeverStarted = true;
             reject(error);
         }
     });

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Worker Dispatch Test</title>
+    <style>body { font-family: monospace; background: #111; color: #ddd; padding: 16px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h3>Worker dispatch diagnostic</h3>
+<pre id="log">starting…</pre>
+<script type="module">
+    /**
+     * Answers one question: does an encrypt job actually reach the media
+     * worker, or does it silently fall back to the main thread (which freezes
+     * the UI for the duration)? Probes the pieces independently so a failure
+     * points at a cause instead of just "it ran inline".
+     *
+     * Console output contract:
+     *   "WDISP: <line>"
+     *   "WDISP-RESULT: PASS|FAIL"
+     */
+    const logEl = document.getElementById('log');
+    const log = (m) => { logEl.textContent += '\n' + m; console.log('WDISP:', m); };
+    logEl.textContent = '';
+
+    let fail = 0;
+    const bad = (m) => { log('FAIL — ' + m); fail++; };
+    const ok  = (m) => log('ok   — ' + m);
+
+    try {
+        // 1. Is a FileSystemFileHandle structured-cloneable to a worker?
+        //    showSaveFilePicker needs a user gesture, but an OPFS handle is the
+        //    same interface and exercises the same serialization path.
+        const root = await navigator.storage.getDirectory();
+        const handle = await root.getFileHandle('wdisp-probe.bin', { create: true });
+        log(`got a real FileSystemFileHandle: ${handle.constructor.name}`);
+
+        const probe = new Worker(URL.createObjectURL(new Blob([`
+            self.onmessage = (e) => {
+                const h = e.data.fileHandle;
+                self.postMessage({
+                    got: !!h,
+                    kind: h && h.constructor && h.constructor.name,
+                    hasCreateWritable: !!(h && typeof h.createWritable === 'function'),
+                });
+            };
+        `], { type: 'text/javascript' })), { type: 'module' });
+
+        const cloneResult = await new Promise((resolve) => {
+            probe.onmessage = (e) => resolve({ ok: true, ...e.data });
+            try {
+                probe.postMessage({ fileHandle: handle });
+            } catch (err) {
+                resolve({ ok: false, error: `${err.name}: ${err.message}` });
+            }
+            setTimeout(() => resolve({ ok: false, error: 'timeout' }), 5000);
+        });
+        probe.terminate();
+
+        if (!cloneResult.ok) bad(`FileSystemFileHandle is NOT cloneable to a worker — ${cloneResult.error}`);
+        else ok(`FileSystemFileHandle cloned to worker (kind=${cloneResult.kind}, createWritable=${cloneResult.hasCreateWritable})`);
+
+        // 2. Does canUseWorker() say yes in this environment?
+        const { canUseWorker } = await import('/assets/js/processing/worker/WorkerClient.js');
+        if (!canUseWorker()) bad('canUseWorker() returned false in a plain browser');
+        else ok('canUseWorker() = true');
+
+        // 3. Does the real media worker module load and answer at all?
+        const realWorker = new Worker(new URL('/assets/js/processing/worker/media-worker.js', location.href), { type: 'module' });
+        const bootResult = await new Promise((resolve) => {
+            realWorker.onmessage = (e) => resolve({ ok: true, data: e.data });
+            realWorker.onerror = (e) => resolve({ ok: false, error: e.message || 'worker onerror' });
+            // Unknown op: a loaded worker answers with an error message rather
+            // than dying, which is exactly the liveness signal we want.
+            realWorker.postMessage({ id: 1, op: '__ping__', options: {} });
+            setTimeout(() => resolve({ ok: false, error: 'timeout — worker never replied' }), 20000);
+        });
+        realWorker.terminate();
+        if (!bootResult.ok) bad(`media-worker.js did not boot: ${bootResult.error}`);
+        else ok(`media-worker.js booted and replied: ${JSON.stringify(bootResult.data)}`);
+
+        const { MediaProcessor } = await import('/assets/js/core/MediaProcessor.js');
+
+        // 4. Crash handling. Runs before anything spawns the shared worker, so
+        //    the stand-ins below are what WorkerClient actually constructs.
+        //    A worker that dies mid-job on a large payload must NOT be quietly
+        //    retried on the main thread — that is the freeze. One that never
+        //    started is safe to run inline.
+        const RealWorker = window.Worker;
+
+        // Boots (answers once), then dies — a mid-job crash, e.g. OOM.
+        class DiesMidJobWorker {
+            constructor() { this.onmessage = null; this.onerror = null; }
+            postMessage(msg) {
+                if (msg?.type === 'cancel') return;
+                setTimeout(() => this.onmessage?.({ data: { id: msg.id, type: 'progress', value: 0.1 } }), 0);
+                setTimeout(() => this.onerror?.({ message: 'simulated out-of-memory' }), 20);
+            }
+            terminate() {}
+        }
+        // 64 MB is the cutoff; 80 MB must refuse to fall back. It carries a
+        // fileHandle so an inline fallback would genuinely start encoding
+        // (caught by the timeout) rather than bailing on the in-RAM limit.
+        const bigBlob = new Blob([new Uint8Array(80 * 1024 * 1024)], { type: 'video/mp4' });
+        window.Worker = DiesMidJobWorker;
+        let bigErr = null, bigFinished = false;
+        try {
+            await Promise.race([
+                MediaProcessor.encryptPlatform(bigBlob, 'pw', { filename: 'big.mp4', mimeType: 'video/mp4', fileHandle: handle })
+                    .then(() => { bigFinished = true; }),
+                new Promise((_, rj) => setTimeout(() => rj(new Error('__timeout__')), 25000)),
+            ]);
+        } catch (e) { bigErr = e; }
+        window.Worker = RealWorker;
+
+        if (bigFinished) bad('large payload silently completed after a worker crash — it ran on the main thread');
+        else if (bigErr?.message === '__timeout__') bad('large payload hung after a worker crash — it is grinding on the main thread');
+        else if (!/would freeze|out of memory/i.test(bigErr?.message || '')) bad(`large payload failed, but not with the guard error: ${bigErr?.message}`);
+        else ok(`large payload after mid-job crash refused inline fallback: "${bigErr.message}"`);
+
+        // Small payload, job never dispatched -> must still fall back and
+        // succeed. Fail the postMessage itself rather than swapping the Worker
+        // class, so mediabunny's own internal workers still work once the
+        // inline path takes over; it restores itself on the way out.
+        const smallBlob = new Blob([new Uint8Array(4096).fill(3)], { type: 'application/octet-stream' });
+        const realPost = Worker.prototype.postMessage;
+        let injected = false;
+        Worker.prototype.postMessage = function (msg, ...rest) {
+            if (!injected && msg?.op === 'encryptPlatform') {
+                injected = true;
+                Worker.prototype.postMessage = realPost;
+                const e = new Error('simulated non-cloneable options');
+                e.name = 'DataCloneError';
+                throw e;
+            }
+            return realPost.call(this, msg, ...rest);
+        };
+        let smallErr = null, smallOut;
+        try {
+            smallOut = await MediaProcessor.encryptPlatform(smallBlob, 'pw', {
+                filename: 'small.bin', mimeType: 'application/octet-stream',
+            });
+        } catch (e) { smallErr = e; }
+        Worker.prototype.postMessage = realPost;
+        if (!injected) bad('the simulated dispatch failure never fired');
+
+        if (smallErr) bad(`small payload should have fallen back inline, but threw: ${smallErr.message}`);
+        else if (!(smallOut instanceof Blob)) bad('small payload fallback produced no blob');
+        else ok(`small payload fell back to the main thread and completed (${(smallOut.size / 1024).toFixed(0)} KB)`);
+
+        // 5. The real thing: does encryptPlatform reach the worker? Spy on
+        //    postMessage so we observe dispatch rather than infer it.
+        const seen = [];
+        const origPost = Worker.prototype.postMessage;
+        Worker.prototype.postMessage = function (msg, ...rest) {
+            if (msg && msg.op) seen.push(msg.op);
+            return origPost.call(this, msg, ...rest);
+        };
+
+        const payload = new Blob([new Uint8Array(2048).fill(7)], { type: 'application/octet-stream' });
+
+        let threw = null;
+        try {
+            await MediaProcessor.encryptPlatform(payload, 'pw-test-123', {
+                filename: 'probe.bin', mimeType: 'application/octet-stream',
+            });
+        } catch (e) { threw = e; }
+        Worker.prototype.postMessage = origPost;
+
+        if (threw) log(`note: encrypt threw (${threw.message}) — dispatch is still what we're measuring`);
+        if (!seen.includes('encryptPlatform')) bad(`encryptPlatform never reached the worker (ops seen: ${JSON.stringify(seen)}) — it ran on the main thread`);
+        else ok(`encryptPlatform dispatched to worker (ops seen: ${JSON.stringify(seen)})`);
+
+        // 5. The actual large-file path: opts carries a fileHandle, nested one
+        //    level inside the cloned payload. This is what the 1 GB run does.
+        seen.length = 0;
+        Worker.prototype.postMessage = function (msg, ...rest) {
+            if (msg && msg.op) seen.push(msg.op);
+            return origPost.call(this, msg, ...rest);
+        };
+        let threw2 = null;
+        try {
+            await MediaProcessor.encryptPlatform(payload, 'pw-test-123', {
+                filename: 'probe.bin', mimeType: 'application/octet-stream', fileHandle: handle,
+            });
+        } catch (e) { threw2 = e; }
+        Worker.prototype.postMessage = origPost;
+
+        if (threw2) log(`note: streamed encrypt threw (${threw2.name}: ${threw2.message})`);
+        if (!seen.includes('encryptPlatform')) bad(`encryptPlatform WITH fileHandle never reached the worker (ops seen: ${JSON.stringify(seen)}) — this is the large-file path, and it ran on the main thread`);
+        else ok(`encryptPlatform WITH fileHandle dispatched to worker (ops seen: ${JSON.stringify(seen)})`);
+
+        await root.removeEntry('wdisp-probe.bin').catch(() => {});
+
+        log('');
+        console.log('WDISP-RESULT: ' + (fail === 0 ? 'PASS' : 'FAIL'));
+    } catch (e) {
+        console.error(e);
+        log('harness error: ' + (e?.message || e));
+        console.log('WDISP-RESULT: FAIL');
+    }
+</script>
+</body>
+</html>
