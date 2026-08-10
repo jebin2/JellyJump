@@ -471,6 +471,18 @@ button:focus-visible {
     font-weight: bold;
 }
 
+/* Listed but unusable, e.g. an audio track in a codec the browser can't decode */
+.jellyjump-menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    color: var(--text-secondary);
+}
+
+.jellyjump-menu-item.disabled:hover {
+    background-color: transparent;
+    color: var(--text-secondary);
+}
+
 .jellyjump-btn.active {
     color: var(--accent-primary);
 }

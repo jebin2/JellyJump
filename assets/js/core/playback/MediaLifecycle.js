@@ -1,6 +1,36 @@
 import { MediaBunny } from '../MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
 
+/**
+ * Choose an audio track the browser can actually decode.
+ *
+ * The container's primary track is often one WebCodecs has no decoder for —
+ * BluRay rips typically list DTS or TrueHD first with an AC-3 or AAC track
+ * behind it. Taking the primary track unconditionally gave those files video
+ * with permanent silence, even though a playable track was sitting right
+ * there. Prefer the primary track, then fall back to the first decodable one.
+ *
+ * @returns {Promise<Object|null>} null when nothing is decodable (video still plays)
+ */
+export async function pickDecodableAudioTrack(input) {
+    const primary = await input.getPrimaryAudioTrack();
+    if (primary && await primary.canDecode()) return primary;
+
+    const tracks = await input.getAudioTracks();
+    for (const track of tracks) {
+        if (track === primary) continue;
+        if (await track.canDecode()) {
+            Logger.warn(`[MediaLifecycle] Primary audio track (${primary?.codec ?? 'unknown codec'}) can't be decoded here — using ${track.codec} (${track.languageCode || 'und'}) instead`);
+            return track;
+        }
+    }
+
+    if (tracks.length > 0) {
+        Logger.warn(`[MediaLifecycle] No decodable audio track (${tracks.length} present) — playing video without sound`);
+    }
+    return null;
+}
+
 export function clearPlayerCanvas(player) {
     if (player.ctx && player.canvas) {
         player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
@@ -158,11 +188,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         }
 
         Logger.log('[MediaLifecycle] Fetching primary audio track...');
-        player.audioTrack = await player.input.getPrimaryAudioTrack();
-        if (!player.audioTrack) {
-            const audioTracks = await player.input.getAudioTracks();
-            if (audioTracks.length > 0) player.audioTrack = audioTracks[0];
-        }
+        player.audioTrack = await pickDecodableAudioTrack(player.input);
 
         if (player.audioTrack) {
             Logger.log(`[MediaLifecycle] Audio track found: ${player.audioTrack.codec}`);

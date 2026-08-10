@@ -194,10 +194,19 @@ export class PlayerSubtitles {
         p.ui.audioContainer.style.display = 'block';
         const template = document.getElementById('player-menu-item-template');
 
+        // Codecs the browser can't decode (DTS, TrueHD, …) are still listed —
+        // hiding them makes tracks silently vanish — but marked, so picking one
+        // isn't unexplained silence.
+        const decodable = await Promise.all(tracks.map(t => t.canDecode().catch(() => false)));
+
         tracks.forEach((track, index) => {
             const item = template.content.cloneNode(true).querySelector('.jellyjump-menu-item');
-            item.textContent = track.languageCode || `Track ${index + 1}`;
+            const label = track.languageCode || `Track ${index + 1}`;
+            item.textContent = decodable[index]
+                ? label
+                : `${label} — ${track.codec || 'unsupported'} (not supported)`;
             item.dataset.value = track.id;
+            if (!decodable[index]) item.classList.add('disabled');
             if (p.audioTrack && p.audioTrack.id === track.id) item.classList.add('active');
             p.ui.audioMenu.appendChild(item);
         });

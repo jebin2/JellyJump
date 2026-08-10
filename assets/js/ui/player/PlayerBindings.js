@@ -161,6 +161,8 @@ export function attachPlayerBindings(player) {
         player.ui.audioMenu.addEventListener('click', (e) => {
             const item = e.target.closest('.jellyjump-menu-item');
             if (!item) return;
+            // Undecodable codec: selecting it would just mute playback
+            if (item.classList.contains('disabled')) return;
 
             const trackId = parseInt(item.dataset.value);
             player._switchAudioTrack(trackId);

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>File Playability Probe</title>
+    <style>body { font-family: monospace; background: #111; color: #ddd; padding: 16px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h3>Playability probe</h3>
+<pre id="log">starting…</pre>
+<script type="module">
+    /**
+     * Reports whether a given media file will actually play in this app: what
+     * the demuxer sees, which tracks the browser can decode with the plugins
+     * this app registers, which audio track the player would auto-select, and
+     * whether a real frame/sample decodes.
+     *
+     * Usage: /tests/probe-file.html?url=/some-file.mkv
+     */
+    import { MediaBunny } from '/assets/js/core/MediaBunny.js';
+
+    const logEl = document.getElementById('log');
+    const log = (m) => { logEl.textContent += '\n' + m; console.log('PROBE:', m); };
+    logEl.textContent = '';
+
+    try {
+        const url = new URLSearchParams(location.search).get('url');
+        log(`file: ${url}`);
+
+        const input = new MediaBunny.Input({
+            source: new MediaBunny.UrlSource(url),
+            formats: MediaBunny.ALL_FORMATS,
+        });
+
+        const format = await input.getFormat();
+        log(`container: ${format?.name ?? format}`);
+        log(`duration: ${(await input.computeDuration()).toFixed(1)}s`);
+
+        const vTracks = await input.getVideoTracks();
+        const aTracks = await input.getAudioTracks();
+        log(`tracks: ${vTracks.length} video, ${aTracks.length} audio`);
+        log('');
+
+        for (const t of vTracks) {
+            const dec = await t.canDecode();
+            log(`VIDEO id=${t.id} codec=${t.codec} ${t.displayWidth}x${t.displayHeight} — canDecode=${dec ? 'YES' : 'NO'}`);
+        }
+        for (const t of aTracks) {
+            const dec = await t.canDecode();
+            log(`AUDIO id=${t.id} codec=${t.codec} ch=${t.numberOfChannels} ${t.sampleRate}Hz lang=${t.languageCode || 'und'} — canDecode=${dec ? 'YES' : 'NO'}`);
+        }
+        log('');
+
+        // What the player actually selects, via the real selection function
+        const { pickDecodableAudioTrack } = await import('/assets/js/core/playback/MediaLifecycle.js');
+        const primaryV = await input.getPrimaryVideoTrack();
+        const primaryA = await input.getPrimaryAudioTrack();
+        const chosenA = await pickDecodableAudioTrack(input);
+        log(`container's primary audio: ${primaryA?.codec ?? 'unknown'} (id=${primaryA?.id}) canDecode=${primaryA ? await primaryA.canDecode() : 'n/a'}`);
+        log(`player selects: video=${primaryV?.codec ?? 'none'}, audio=${chosenA?.codec ?? 'NONE (silent)'} (id=${chosenA?.id ?? '-'}, lang=${chosenA?.languageCode ?? '-'})`);
+        if (chosenA && !(await chosenA.canDecode())) log('  !! selected an audio track that cannot be decoded');
+        log('');
+
+        // Actually decode, since capability checks can still lie
+        if (primaryV && await primaryV.canDecode()) {
+            const sink = new MediaBunny.CanvasSink(primaryV); // same sink the player uses
+            const t0 = performance.now();
+            const it = sink.canvases(0);
+            const frame = (await it.next()).value;
+            await it.return?.();
+            log(frame
+                ? `decoded a real video frame in ${(performance.now() - t0).toFixed(0)}ms (${frame.canvas.width}x${frame.canvas.height})`
+                : 'video decode produced no frame');
+        }
+
+        for (const t of aTracks) {
+            if (!(await t.canDecode())) { log(`audio ${t.codec}: skipped, not decodable`); continue; }
+            try {
+                const sink = new MediaBunny.AudioBufferSink(t);
+                const it = sink.buffers(0);
+                const buf = (await it.next()).value;
+                await it.return?.();
+                log(`audio ${t.codec}: decoded a real buffer (${buf?.buffer?.duration?.toFixed(3) ?? '?'}s)`);
+            } catch (e) {
+                log(`audio ${t.codec}: decode threw — ${e.message}`);
+            }
+        }
+
+        log('');
+        console.log('PROBE-DONE');
+    } catch (e) {
+        console.error(e);
+        log('ERROR: ' + (e?.message || e));
+        console.log('PROBE-DONE');
+    }
+</script>
+</body>
+</html>
