@@ -131,19 +131,27 @@ export async function process({
         const outputPixels = outputWidth * outputHeight;
         const scaledSourceBitrate = originalBitrate * pixelRatio;
 
+        // Held separately from videoConfig.quality purely so the log below can
+        // report the number: a Quality wraps it and doesn't expose it back.
+        let targetBitrate = null;
+
         if (format === 'prores') {
             // ProRes always re-encodes; only the desktop app has an encoder for it.
             videoConfig.codec = 'prores';
-            videoConfig.bitrate = needsBitrateControl
-                ? getBitrate(quality, outputPixels, scaledSourceBitrate)
-                : MediaBunny.QUALITY_VERY_HIGH;
+            if (needsBitrateControl) {
+                targetBitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
+                videoConfig.quality = new MediaBunny.Quality({ bitrate: targetBitrate });
+            } else {
+                videoConfig.quality = MediaBunny.QUALITY_VERY_HIGH;
+            }
         } else if (needsBitrateControl) {
             videoConfig.codec = (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc';
-            videoConfig.bitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
+            targetBitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
+            videoConfig.quality = new MediaBunny.Quality({ bitrate: targetBitrate });
         }
 
-        if (videoConfig.bitrate && typeof videoConfig.bitrate === 'number') {
-            Logger.log(`[TranscodeService] Target: ${outputWidth}x${outputHeight} @ ${(videoConfig.bitrate / 1000000).toFixed(2)} Mbps (pixel ratio ${pixelRatio.toFixed(3)})`);
+        if (targetBitrate) {
+            Logger.log(`[TranscodeService] Target: ${outputWidth}x${outputHeight} @ ${(targetBitrate / 1000000).toFixed(2)} Mbps (pixel ratio ${pixelRatio.toFixed(3)})`);
         }
 
         // Resolution / Rotation dimensions

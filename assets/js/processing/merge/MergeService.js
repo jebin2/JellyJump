@@ -161,7 +161,7 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
 
         canvasSource = new MediaBunny.CanvasSource(canvas, {
             codec: format === 'webm' ? 'vp9' : 'avc',
-            bitrate: MediaBunny.QUALITY_HIGH,
+            quality: MediaBunny.QUALITY_HIGH,
         });
 
         output.addVideoTrack(canvasSource);
@@ -187,7 +187,7 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
         if (audioCodec) {
             audioSource = new MediaBunny.AudioSampleSource({
                 codec: audioCodec,
-                bitrate: audioBitrate
+                quality: new MediaBunny.Quality({ bitrate: audioBitrate }),
             });
             output.addAudioTrack(audioSource);
             Logger.log(`[MergeService] Audio output: ${targetChannels} channels @ ${targetSampleRate}Hz`);

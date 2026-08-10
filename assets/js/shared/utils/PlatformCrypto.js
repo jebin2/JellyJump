@@ -479,7 +479,7 @@ export class PlatformCrypto {
 
         const videoSampleSource = new MediaBunny.VideoSampleSource({
             codec:   'avc',
-            bitrate: MediaBunny.QUALITY_HIGH,
+            quality: MediaBunny.QUALITY_HIGH,
             ...(hwEncode ? { hardwareAcceleration: 'prefer-hardware' } : {}),
         });
 
@@ -488,7 +488,10 @@ export class PlatformCrypto {
         if (!supportedAudioCodecs.length) throw new Error('JJC4: no encodable audio codec');
         const audioCodec = supportedAudioCodecs[0];
 
-        const audioSource = new MediaBunny.AudioSampleSource({ codec: audioCodec, bitrate: 128_000 });
+        const audioSource = new MediaBunny.AudioSampleSource({
+            codec: audioCodec,
+            quality: new MediaBunny.Quality({ bitrate: 128_000 }),
+        });
 
         output.addVideoTrack(videoSampleSource);
         output.addAudioTrack(audioSource);

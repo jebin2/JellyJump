@@ -259,7 +259,7 @@ export async function createSlideshowVideo({
 
         canvasSource = new MediaBunny.CanvasSource(canvas, {
             codec: 'avc',
-            bitrate: MediaBunny.QUALITY_HIGH,
+            quality: MediaBunny.QUALITY_HIGH,
         });
         output.addVideoTrack(canvasSource);
 
@@ -270,7 +270,7 @@ export async function createSlideshowVideo({
                 if (supportedCodecs.length > 0) {
                     audioSource = new MediaBunny.AudioSampleSource({
                         codec: supportedCodecs[0],
-                        bitrate: AUDIO_BITRATE_BPS
+                        quality: new MediaBunny.Quality({ bitrate: AUDIO_BITRATE_BPS }),
                     });
                     output.addAudioTrack(audioSource);
                 }

@@ -72,13 +72,13 @@ export async function processHls({ source, quality = 100, onProgress }) {
 
         const videoConfig = availableTiers
             .filter(t => t.height <= originalHeight)
-            .map(t => ({ codec: 'avc', height: t.height, bitrate: t.quality }));
+            .map(t => ({ codec: 'avc', height: t.height, quality: t.quality }));
 
         if (videoConfig.length === 0) {
             videoConfig.push({ codec: 'avc' });
         }
 
-        const audioConfig = [{ codec: 'aac', bitrate: MediaBunny.QUALITY_HIGH }];
+        const audioConfig = [{ codec: 'aac', quality: MediaBunny.QUALITY_HIGH }];
 
         currentConversion = await MediaBunny.Conversion.init({ input, output, tracks: 'primary', video: videoConfig, audio: audioConfig });
 

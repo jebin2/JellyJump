@@ -124,7 +124,7 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
 
         canvasSource = new MediaBunny.VideoSampleSource({
             codec: 'avc',
-            bitrate: MediaBunny.QUALITY_HIGH,
+            quality: MediaBunny.QUALITY_HIGH,
         });
         output.addVideoTrack(canvasSource);
 
@@ -135,7 +135,7 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
                 if (supportedCodecs.length > 0) {
                     audioSource = new MediaBunny.AudioSampleSource({
                         codec: supportedCodecs[0],
-                        bitrate: AUDIO_BITRATE_BPS
+                        quality: new MediaBunny.Quality({ bitrate: AUDIO_BITRATE_BPS }),
                     });
                     output.addAudioTrack(audioSource);
                 }
@@ -251,7 +251,7 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
 
         canvasSource = new MediaBunny.VideoSampleSource({
             codec: 'avc',
-            bitrate: MediaBunny.QUALITY_HIGH,
+            quality: MediaBunny.QUALITY_HIGH,
         });
         output.addVideoTrack(canvasSource);
 
@@ -264,7 +264,7 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
                     try {
                         audioSource = new MediaBunny.AudioSampleSource({
                             codec: supportedCodecs[0],
-                            bitrate: AUDIO_BITRATE_BPS
+                            quality: new MediaBunny.Quality({ bitrate: AUDIO_BITRATE_BPS }),
                         });
                         output.addAudioTrack(audioSource);
                         Logger.log('[MediaProcessor] Audio track added (experimental speed sync)');

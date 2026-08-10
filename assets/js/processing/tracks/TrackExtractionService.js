@@ -155,7 +155,7 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
 
             canvasSource = new MediaBunny.CanvasSource(canvas, {
                 codec: format === 'webm' ? 'vp9' : 'avc',
-                bitrate: MediaBunny.QUALITY_HIGH,
+                quality: MediaBunny.QUALITY_HIGH,
             });
 
             output.addVideoTrack(canvasSource);
@@ -239,7 +239,7 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
 
         const audioSourceConfig = format === 'flac'
             ? { codec: supportedCodecs[0] }
-            : { codec: supportedCodecs[0], bitrate: AUDIO_BITRATE_BPS };
+            : { codec: supportedCodecs[0], quality: new MediaBunny.Quality({ bitrate: AUDIO_BITRATE_BPS }) };
         audioSource = new MediaBunny.AudioSampleSource(audioSourceConfig);
         output.addAudioTrack(audioSource);
         await output.start();

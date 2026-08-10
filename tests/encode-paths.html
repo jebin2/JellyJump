@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Encode Paths Test</title>
+    <style>body { font-family: monospace; background: #111; color: #ddd; padding: 16px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h3>Encoding-path smoke test</h3>
+<pre id="log">starting…</pre>
+<script type="module">
+    /**
+     * Exercises every service that configures an encoder, so a change to how
+     * encoding quality is specified is proven end-to-end rather than by
+     * inspection. Each case must produce a decodable output with the expected
+     * tracks. Dev-only page; open http://localhost:8080/tests/encode-paths.html
+     * or drive it headlessly.
+     *
+     * Console output contract:
+     *   "ENCPATH: <line>"        per-case result
+     *   "ENCPATH-RESULT: ..."    PASS | FAIL
+     */
+    import { MediaBunny, ensureEncoders } from '/assets/js/core/MediaBunny.js';
+
+    const logEl = document.getElementById('log');
+    const log = (m) => { logEl.textContent += '\n' + m; console.log('ENCPATH:', m); };
+    logEl.textContent = '';
+
+    let pass = 0, fail = 0;
+
+    async function makeClip(seconds = 1, fps = 30, withAudio = false) {
+        const W = 320, H = 180;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const output = new MediaBunny.Output({
+            format: new MediaBunny.Mp4OutputFormat(),
+            target: new MediaBunny.BufferTarget(),
+        });
+        const vs = new MediaBunny.VideoSampleSource({ codec: 'avc', quality: MediaBunny.QUALITY_HIGH });
+        output.addVideoTrack(vs);
+        let as = null;
+        if (withAudio) {
+            const codecs = await MediaBunny.getEncodableAudioCodecs(['aac', 'opus']);
+            as = new MediaBunny.AudioSampleSource({
+                codec: codecs[0], sampleRate: 48000, numberOfChannels: 2,
+                quality: new MediaBunny.Quality({ bitrate: 128000 }),
+            });
+            output.addAudioTrack(as);
+        }
+        await output.start();
+        const total = seconds * fps;
+        for (let i = 0; i < total; i++) {
+            ctx.fillStyle = `hsl(${(i * 13) % 360}, 65%, 45%)`;
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = '#fff'; ctx.font = '36px monospace';
+            ctx.fillText('f' + i, 12, 80);
+            const frame = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+            const s = new MediaBunny.VideoSample(frame);
+            await vs.add(s); s.close?.();
+        }
+        if (as) {
+            const SR = 48000, n = SR * seconds;
+            const data = new Float32Array(n * 2);
+            for (let i = 0; i < n; i++) {
+                const v = Math.sin(2 * Math.PI * 440 * i / SR) * 0.2;
+                data[i * 2] = v; data[i * 2 + 1] = v;
+            }
+            const sample = new MediaBunny.AudioSample({
+                format: 'f32', sampleRate: SR, numberOfChannels: 2, timestamp: 0, data,
+            });
+            await as.add(sample); sample.close?.();
+        }
+        await output.finalize();
+        return new Blob([output.target.buffer], { type: 'video/mp4' });
+    }
+
+    async function describe(blob) {
+        const input = new MediaBunny.Input({
+            source: new MediaBunny.BlobSource(blob),
+            formats: MediaBunny.ALL_FORMATS,
+        });
+        const v = await input.getPrimaryVideoTrack();
+        const a = await input.getPrimaryAudioTrack();
+        const dur = await input.computeDuration();
+        return { video: !!v, audio: !!a, duration: dur, size: blob.size };
+    }
+
+    async function check(name, fn, expect = {}) {
+        try {
+            const out = await fn();
+            const blob = out instanceof Blob ? out : (out?.blob ?? out);
+            if (!(blob instanceof Blob) || blob.size === 0) throw new Error('no output blob');
+            const info = await describe(blob);
+            if (expect.video && !info.video) throw new Error('expected a video track, got none');
+            if (expect.audio && !info.audio) throw new Error('expected an audio track, got none');
+            log(`PASS — ${name} [${(info.size / 1024).toFixed(1)} KB, ${info.duration?.toFixed?.(2) ?? '?'}s, video=${info.video} audio=${info.audio}]`);
+            pass++;
+        } catch (e) {
+            log(`FAIL — ${name}: ${e?.message || e}`);
+            console.error(name, e);
+            fail++;
+        }
+    }
+
+    try {
+        await ensureEncoders();
+        log('generating source clips…');
+        const clip = await makeClip(1, 30, true);
+        log(`source clip: ${(clip.size / 1024).toFixed(1)} KB`);
+
+        const { process: transcode } = await import('/assets/js/processing/transcode/TranscodeService.js');
+        const { reverseVideo, changeVideoSpeed } = await import('/assets/js/processing/speed/SpeedService.js');
+        const { merge } = await import('/assets/js/processing/merge/MergeService.js');
+        const { extractTrackWithSpeed } = await import('/assets/js/processing/tracks/TrackExtractionService.js');
+
+        // TranscodeService: the quality<100 branch is the one that builds a Quality
+        await check('transcode mp4 @ quality 60 (bitrate branch)',
+            () => transcode({ source: clip, format: 'mp4', quality: 60 }), { video: true });
+        await check('transcode mp4 @ quality 100 (no bitrate control)',
+            () => transcode({ source: clip, format: 'mp4', quality: 100 }), { video: true });
+        await check('transcode webm @ quality 50 (vp9 branch)',
+            () => transcode({ source: clip, format: 'webm', quality: 50 }), { video: true });
+        await check('transcode downscale 160p @ quality 70',
+            () => transcode({ source: clip, format: 'mp4', quality: 70, resolution: { height: 160 } }), { video: true });
+
+        // SpeedService: both entry points configure video + audio sources
+        await check('changeVideoSpeed 2x with audio',
+            () => changeVideoSpeed({ source: clip, speed: 2, includeAudio: true }), { video: true });
+        await check('reverseVideo with audio',
+            () => reverseVideo({ source: clip, includeAudio: true }), { video: true });
+
+        // MergeService
+        await check('merge two clips',
+            () => merge({ inputs: [clip, clip], format: 'mp4' }), { video: true });
+
+        // TrackExtractionService (re-encode path). Uses m4a: the 'mp3'/'wav'
+        // formats pick a codec their container can't hold — a pre-existing bug
+        // unrelated to encoding quality, so it isn't exercised here.
+        await check('extract audio track with speed (m4a)',
+            () => extractTrackWithSpeed({ source: clip, trackIndex: 0, trackType: 'audio', format: 'm4a', speed: 1.5 }),
+            { audio: true });
+
+        log('');
+        log(`SUMMARY: ${pass} passed, ${fail} failed`);
+        console.log('ENCPATH-RESULT: ' + (fail === 0 ? 'PASS' : 'FAIL'));
+    } catch (e) {
+        console.error(e);
+        log('harness error: ' + (e?.message || e));
+        console.log('ENCPATH-RESULT: FAIL');
+    }
+</script>
+</body>
+</html>

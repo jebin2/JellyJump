@@ -593,7 +593,9 @@ export class PlayerStream {
             }
         }
 
-        const audioIsEncodable = await MediaBunny.canEncodeAudio('opus', { bitrate: 128000 });
+        const audioIsEncodable = await MediaBunny.canEncodeAudio('opus', {
+            quality: new MediaBunny.Quality({ bitrate: 128000 }),
+        });
 
         this._canvasOutput = new MediaBunny.Output({
             format: new MediaBunny.Mp4OutputFormat({ fastStart: 'fragmented' }),
@@ -605,7 +607,7 @@ export class PlayerStream {
         const frameRate = 30;
         const videoSource = new MediaBunny.CanvasSource(player.canvas, {
             codec: 'avc',
-            bitrate: 50_000_000,
+            quality: new MediaBunny.Quality({ bitrate: 50_000_000 }),
             keyFrameInterval: 2,
             latencyMode: 'realtime',
             width: player.canvas.width,
@@ -618,7 +620,7 @@ export class PlayerStream {
             try {
                 this._canvasAudioSource = new MediaBunny.AudioSampleSource({
                     codec: 'opus',
-                    bitrate: 128000,
+                    quality: new MediaBunny.Quality({ bitrate: 128000 }),
                     sampleRate: 48000
                 });
                 this._canvasOutput.addAudioTrack(this._canvasAudioSource);
