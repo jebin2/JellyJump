@@ -20,6 +20,14 @@ export default defineConfig({
             '/npm/mediabunny@1.45.3/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/mediabunny@1.50.4/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/mediabunny@1.51.0/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
+            // The @mediabunny/* plugin bundles pin their peer import to whatever
+            // mediabunny version was current when jsDelivr built them, which lags
+            // the plugin's own version — 1.53.0 plugins import mediabunny@1.52.3.
+            // That peer specifier is the one that must alias, so keep both.
+            '/npm/mediabunny@1.52.1/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
+            '/npm/mediabunny@1.52.2/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
+            '/npm/mediabunny@1.52.3/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
+            '/npm/mediabunny@1.53.0/+esm': resolve(__dirname, 'assets/js/lib/mediabunny.js'),
             '/npm/worker_threads/+esm': resolve(__dirname, 'assets/js/lib/worker-threads-stub.js'),
         }
     },
