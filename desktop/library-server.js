@@ -24,7 +24,15 @@ const libraryIndex = require('./library-index');
 
 let server = null;
 let shareToken = null;
-let allowedOrigins = ['https://jellyjump.voidall.com'];
+// The hosted app, plus local dev origins so this can be exercised before it is
+// deployed. Localhost only helps a page served from the viewer's own machine,
+// which is already as trusted as the browser itself.
+let allowedOrigins = [
+    'https://jellyjump.voidall.com',
+    'http://localhost:8080', 'http://127.0.0.1:8080',
+    'http://localhost:5173', 'http://127.0.0.1:5173',
+    'http://localhost:5199', 'http://127.0.0.1:5199',
+];
 let serverName = 'JellyJump';
 
 /** Constant-time compare, so a token cannot be guessed a character at a time. */

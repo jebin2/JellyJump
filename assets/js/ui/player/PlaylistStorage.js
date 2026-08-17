@@ -39,12 +39,17 @@ export class PlaylistStorage {
     static savePlaylist(items, activeIndex, currentTime = 0) {
         const storage = new StorageService();
 
-        // 1. Filter out transient items (don't save to DB): "Live Camera", and
-        // scan results, which are rediscovered on launch. A home directory can
-        // hold thousands of videos, and on desktop this write rewrites
-        // jellyjump.json in full — persisting them would turn every reorder
-        // into a multi-megabyte write and bury the user's own playlist.
-        const persistentItems = items.filter(item => !item.isWebcam && !item.isDiscovered);
+        // 1. Filter out transient items (don't save to DB): "Live Camera", scan
+        // results, and shared libraries.
+        //
+        // Scan results are rediscovered on launch, and a home directory can hold
+        // thousands of videos — on desktop this write rewrites jellyjump.json in
+        // full, so persisting them would turn every reorder into a
+        // multi-megabyte write and bury the user's own playlist.
+        //
+        // Shared-library items live on another machine, so a saved copy would
+        // come back as broken entries whenever it is off or the link is revoked.
+        const persistentItems = items.filter(item => !item.isWebcam && !item.isDiscovered && !item.isRemoteLibrary);
 
         // Save playlist items
         storage.savePlaylist(persistentItems);

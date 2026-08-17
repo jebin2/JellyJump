@@ -19,6 +19,7 @@ import { PlaylistNavigation } from './PlaylistNavigation.js';
 import { PlaylistProcessor } from "../../shared/services/PlaylistProcessor.js";
 import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
 import { ShareState } from '../../shared/services/ShareState.js';
+import { looksLikeShareLink, probe as probeRemoteLibrary, fetchItems as fetchRemoteItems } from '../../shared/services/RemoteLibrary.js';
 
 // Folder that scan results are grouped under in the playlist tree.
 const DISCOVERED_FOLDER = 'Discovered';
@@ -1212,8 +1213,11 @@ export class Playlist {
                             // Direct playback
                             video.blob_url = video.url;
 
-                            // Trigger background cache
-                            MediaMetadata.cacheInBackground(video, () => {
+                            // Not for shared libraries: caching downloads the
+                            // whole file, which defeats streaming a multi-GB
+                            // movie over the network and fills storage with a
+                            // copy of someone else's library.
+                            if (!video.isRemoteLibrary) MediaMetadata.cacheInBackground(video, () => {
                                 Logger.log(`[Playlist] Background cache complete for: ${video.title}`);
                                 this._saveState();
                             });
@@ -1450,6 +1454,18 @@ export class Playlist {
      */
     async _handleUrlUpload(url) {
         try {
+            // A share link is a library, not a media file. Handing it to the
+            // normal path makes the demuxer fetch a web page and fail with
+            // "unsupported or unrecognizable format", which says nothing useful.
+            if (looksLikeShareLink(url)) {
+                const info = await probeRemoteLibrary(url);
+                if (info.ok) {
+                    await this._addRemoteLibrary(url, info);
+                    return;
+                }
+                Logger.log(`[Playlist] Not a JellyJump library (${info.error}), treating as a media URL`);
+            }
+
             const result = await this.processor.processUrl(url);
 
             // Handle M3U/IPTV Playlist result
@@ -1472,6 +1488,31 @@ export class Playlist {
         } catch (error) {
             throw error;
         }
+    }
+
+    /**
+     * Add every file from a shared library.
+     *
+     * Not persisted: the files live on the other machine, so a saved copy would
+     * reappear as broken entries whenever that machine is off or the link has
+     * been revoked. Re-paste the link to get them back.
+     * @private
+     */
+    async _addRemoteLibrary(url, info) {
+        const items = await fetchRemoteItems(url);
+        if (items.length === 0) {
+            Toast.show(`${info.name} has no videos to share`, 4000);
+            return;
+        }
+
+        for (const item of items) {
+            if (!item.id) item.id = generateId();
+        }
+        this.state.addItems(items);
+        this.render();
+        this._updatePlayerNavigationState();
+        Toast.show(`Added ${items.length} file${items.length === 1 ? '' : 's'} from ${info.name}`);
+        Logger.log(`[Playlist] Added remote library ${info.name} (${items.length} items)`);
     }
 
     /**
