@@ -106,9 +106,17 @@ async function regenerateToken() {
  * @param {Function} deps.readShareToken  - () => Promise<string|null>
  * @param {Function} deps.writeShareToken - (token) => Promise<void>
  */
-function registerShareIpc({ assertTrustedIpcEvent, readShareToken, writeShareToken }) {
+/**
+ * Point sharing at where the token is stored. Separate from IPC registration so
+ * headless mode, which registers no IPC at all, can still share.
+ */
+function configureTokens({ readShareToken, writeShareToken }) {
     readToken = readShareToken;
     writeToken = writeShareToken;
+}
+
+function registerShareIpc({ assertTrustedIpcEvent, readShareToken, writeShareToken }) {
+    configureTokens({ readShareToken, writeShareToken });
 
     const guarded = (fn) => async (event, ...args) => {
         try {
@@ -134,4 +142,4 @@ async function stopSharing() {
     if (shareState.enabled) await disable();
 }
 
-module.exports = { registerShareIpc, stopSharing };
+module.exports = { registerShareIpc, configureTokens, enable, disable, describe, stopSharing };

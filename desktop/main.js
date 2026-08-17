@@ -332,7 +332,15 @@ app.whenReady().then(async () => {
     // A flag means the user wants an answer, not an app — most likely over SSH,
     // where the share link is otherwise unreadable. Handled before any window
     // exists so nothing flashes up on the remote machine's display.
-    if (await handleCliArgs(process.argv, configPath)) {
+    const mode = await handleCliArgs(process.argv, configPath);
+    if (mode === 'exit') {
+        app.quit();
+        return;
+    }
+    if (mode === 'headless') {
+        // No window at all, so this works on a box with no desktop session.
+        const { runHeadless } = require('./headless');
+        process.exitCode = await runHeadless(configPath);
         app.quit();
         return;
     }

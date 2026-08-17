@@ -7,6 +7,7 @@
  *
  * These run before any window is created and exit without one.
  *
+ *   jellyjump --no-gui        scan, share, print the link, keep running
  *   jellyjump --share-link    print the current share link
  *   jellyjump --share-status  whether sharing is on, and why not if it is off
  *   jellyjump --help
@@ -24,6 +25,7 @@ const HTTPS_PORT = 8443;
 const USAGE = `JellyJump
 
   jellyjump                  start the app
+  jellyjump --no-gui         share the library with no window, and keep running
   jellyjump --share-link     print the library share link
   jellyjump --share-status   report whether the library is reachable
   jellyjump --help           this message
@@ -75,27 +77,32 @@ async function shareStatus(configPath) {
 
 /**
  * Handle a CLI flag if one was given.
- * @returns {Promise<boolean>} true when the process should exit without a window
+ * @returns {Promise<'exit'|'headless'|null>} what the caller should do next:
+ *   'exit' when the answer has been printed, 'headless' to run without a
+ *   window, null to start the app normally
  */
 async function handleCliArgs(argv, configPath) {
     const args = argv.slice(1);
 
     if (args.includes('--help') || args.includes('-h')) {
         console.log(USAGE);
-        return true;
+        return 'exit';
+    }
+    if (args.includes('--no-gui') || args.includes('--headless')) {
+        return 'headless';
     }
     if (args.includes('--share-link')) {
         const result = await shareLink(configPath);
         console.log(result.message);
         process.exitCode = result.ok ? 0 : 1;
-        return true;
+        return 'exit';
     }
     if (args.includes('--share-status')) {
         const result = await shareStatus(configPath);
         console.log(result.message);
-        return true;
+        return 'exit';
     }
-    return false;
+    return null;
 }
 
 module.exports = { handleCliArgs, USAGE };

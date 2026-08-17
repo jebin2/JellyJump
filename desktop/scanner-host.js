@@ -95,4 +95,31 @@ function stopScanner() {
     scannerProcess = null;
 }
 
-module.exports = { registerScannerIpc, stopScanner };
+/**
+ * Run a scan and resolve when it finishes, for callers with no renderer to
+ * relay to — headless mode, where the scan has to be driven from here because
+ * there is no window to ask for it.
+ * @returns {Promise<{found: number, scanned: number}>}
+ */
+function runScan({ roots, onPhase } = {}) {
+    return new Promise((resolve, reject) => {
+        const scanner = getScanner();
+
+        const onMessage = (message) => {
+            if (message?.type === 'phase') onPhase?.(message);
+            if (message?.type === 'done') {
+                scanner.removeListener('message', onMessage);
+                resolve(message);
+            }
+            if (message?.type === 'error') {
+                scanner.removeListener('message', onMessage);
+                reject(new Error(message.message));
+            }
+        };
+
+        scanner.on('message', onMessage);
+        scanner.postMessage({ type: 'scan', roots });
+    });
+}
+
+module.exports = { registerScannerIpc, stopScanner , runScan };
