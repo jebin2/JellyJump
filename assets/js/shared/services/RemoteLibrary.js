@@ -96,3 +96,46 @@ export async function fetchItems(rawUrl) {
         remoteServer: serverName,
     }));
 }
+
+const SAVED_LINKS_KEY = 'jellyjump-remote-libraries';
+
+/**
+ * Share links to restore on next load.
+ *
+ * The link is saved rather than the items it produced. Items point at another
+ * machine, so a saved copy comes back stale — files renamed or deleted there
+ * would linger here as entries that fail when clicked. Re-fetching from the
+ * link gives whatever is actually on the other machine now, and costs one
+ * request.
+ *
+ * The link contains the token, so this is a credential at rest. It sits beside
+ * the rest of the app's local state, which is the same exposure as the saved
+ * playlist itself.
+ */
+export function savedLinks() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(SAVED_LINKS_KEY));
+        return Array.isArray(raw) ? raw : [];
+    } catch {
+        return [];
+    }
+}
+
+export function rememberLink(rawUrl) {
+    const links = savedLinks();
+    if (links.includes(rawUrl)) return;
+    links.push(rawUrl);
+    try {
+        localStorage.setItem(SAVED_LINKS_KEY, JSON.stringify(links));
+    } catch {
+        // Storage full or blocked; the library still works this session.
+    }
+}
+
+export function forgetLink(rawUrl) {
+    try {
+        localStorage.setItem(SAVED_LINKS_KEY, JSON.stringify(savedLinks().filter(l => l !== rawUrl)));
+    } catch {
+        // Nothing to do; it simply stays remembered.
+    }
+}

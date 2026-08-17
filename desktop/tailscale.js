@@ -110,8 +110,53 @@ async function canServeWithoutSudo() {
     }
 }
 
+/**
+ * Whether `tailscale serve` is currently fronting the given port, and what it
+ * points at. Read from Tailscale rather than from app state, so it stays true
+ * even for a mapping the app did not create or failed to clean up.
+ */
+async function serveStatus(httpsPort) {
+    const result = await run(['serve', 'status', '--json']);
+    if (!result.ok) return { active: false };
+
+    try {
+        const config = JSON.parse(result.stdout);
+        const key = Object.keys(config.Web || {}).find((k) => k.endsWith(`:${httpsPort}`));
+        if (!key) return { active: false };
+        const handlers = config.Web[key]?.Handlers || {};
+        const target = Object.values(handlers)[0]?.Proxy || null;
+        return { active: true, target };
+    } catch {
+        return { active: false };
+    }
+}
+
+/** Whether something is listening on the local port a serve mapping targets. */
+function isLocalPortListening(proxyTarget) {
+    let port;
+    try {
+        port = Number(new URL(proxyTarget).port);
+    } catch {
+        return Promise.resolve(false);
+    }
+    if (!port) return Promise.resolve(false);
+
+    return new Promise((resolve) => {
+        const socket = new (require('net').Socket)();
+        const done = (value) => { socket.destroy(); resolve(value); };
+        socket.setTimeout(1500);
+        socket.once('connect', () => done(true));
+        socket.once('timeout', () => done(false));
+        socket.once('error', () => done(false));
+        socket.connect(port, '127.0.0.1');
+    });
+}
+
 function shareUrl({ dnsName, httpsPort, token }) {
     return `https://${dnsName}:${httpsPort}/?token=${token}`;
 }
 
-module.exports = { status, startServe, stopServe, canServeWithoutSudo, shareUrl };
+module.exports = {
+    status, startServe, stopServe, canServeWithoutSudo, shareUrl,
+    serveStatus, isLocalPortListening,
+};

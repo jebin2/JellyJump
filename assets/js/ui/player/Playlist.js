@@ -19,7 +19,10 @@ import { PlaylistNavigation } from './PlaylistNavigation.js';
 import { PlaylistProcessor } from "../../shared/services/PlaylistProcessor.js";
 import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
 import { ShareState } from '../../shared/services/ShareState.js';
-import { looksLikeShareLink, probe as probeRemoteLibrary, fetchItems as fetchRemoteItems } from '../../shared/services/RemoteLibrary.js';
+import {
+    looksLikeShareLink, probe as probeRemoteLibrary, fetchItems as fetchRemoteItems,
+    savedLinks as savedRemoteLinks, rememberLink as rememberRemoteLink, forgetLink as forgetRemoteLink,
+} from '../../shared/services/RemoteLibrary.js';
 
 // Folder that scan results are grouped under in the playlist tree.
 const DISCOVERED_FOLDER = 'Discovered';
@@ -76,7 +79,9 @@ export class Playlist {
         window.addEventListener('beforeunload', this._beforeUnloadHandler);
 
         // Load saved data, then fill in what a scan finds on disk
-        this._loadSavedPlaylist().then(() => this._startMediaScan());
+        this._loadSavedPlaylist()
+            .then(() => this._restoreRemoteLibraries())
+            .then(() => this._startMediaScan());
 
         // Sharing can already be on from a previous session, so reflect it
         // on the Tools button without waiting for the menu to be opened.
@@ -964,6 +969,14 @@ export class Playlist {
             return;
         }
 
+        // Removing a shared library's folder means "I do not want this
+        // library", so stop restoring it on the next load too — otherwise it
+        // reappears and looks like the removal did not take.
+        for (const source of new Set(itemsToRemove.map(i => i.remoteSource).filter(Boolean))) {
+            forgetRemoteLink(source);
+            Logger.log('[Playlist] Forgot shared library:', source.split('?')[0]);
+        }
+
         // Active Item Check
         const activeItem = this.state.getActiveItem();
         const isActiveRemoved = activeItem && (activeItem.path || '').startsWith(prefix);
@@ -1509,10 +1522,43 @@ export class Playlist {
             if (!item.id) item.id = generateId();
         }
         this.state.addItems(items);
+        rememberRemoteLink(url);
         this.render();
         this._updatePlayerNavigationState();
         Toast.show(`Added ${items.length} file${items.length === 1 ? '' : 's'} from ${info.name}`);
         Logger.log(`[Playlist] Added remote library ${info.name} (${items.length} items)`);
+    }
+
+    /**
+     * Re-add shared libraries that were added in an earlier session.
+     *
+     * The link is what persists, not the items: they live on another machine,
+     * so a saved copy would come back stale — files renamed or deleted there
+     * would linger as entries that fail when clicked. Re-fetching costs one
+     * request and gives whatever is actually there now.
+     *
+     * A library whose machine is unreachable is left out rather than failing
+     * the load, and the link is kept: the laptop is usually just off.
+     * @private
+     */
+    async _restoreRemoteLibraries() {
+        const links = savedRemoteLinks();
+        if (links.length === 0) return;
+
+        for (const link of links) {
+            try {
+                const items = await fetchRemoteItems(link);
+                for (const item of items) {
+                    if (!item.id) item.id = generateId();
+                }
+                if (items.length > 0) this.state.addItems(items);
+                Logger.log(`[Playlist] Restored shared library (${items.length} items)`);
+            } catch (error) {
+                Logger.warn('[Playlist] Shared library unavailable, keeping the link:', error.message);
+            }
+        }
+        this.render();
+        this._updatePlayerNavigationState();
     }
 
     /**

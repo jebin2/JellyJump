@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { registerScannerIpc } = require('./scanner-host');
 const { registerShareIpc } = require('./share-host');
+const { handleCliArgs } = require('./cli');
 
 // Required on Linux AppImage: kernel user-namespace sandboxing is often
 // unavailable (restricted sysctl), which causes the network service to crash
@@ -123,7 +124,20 @@ ipcMain.handle('read-config', async (event) => {
 ipcMain.handle('write-config', async (event, data) => {
     try {
         assertTrustedIpcEvent(event);
-        await fs.promises.writeFile(configPath, JSON.stringify(data, null, 2), 'utf8');
+        // Merge rather than replace. The renderer only knows about its own keys,
+        // but the file also holds main-process state — the share token above
+        // all. Writing the renderer's object wholesale erased that token on
+        // every save, and since the playlist saves once a second during
+        // playback, sharing would hand out a brand new token afterwards and
+        // silently break every link already pasted on another device.
+        let existing = {};
+        try {
+            existing = JSON.parse(await fs.promises.readFile(configPath, 'utf8'));
+        } catch {
+            // No config yet, or unreadable; this write creates it.
+        }
+        const merged = { ...existing, ...data };
+        await fs.promises.writeFile(configPath, JSON.stringify(merged, null, 2), 'utf8');
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
@@ -314,7 +328,15 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    // A flag means the user wants an answer, not an app — most likely over SSH,
+    // where the share link is otherwise unreadable. Handled before any window
+    // exists so nothing flashes up on the remote machine's display.
+    if (await handleCliArgs(process.argv, configPath)) {
+        app.quit();
+        return;
+    }
+
     createWindow();
 
     app.on('activate', () => {
