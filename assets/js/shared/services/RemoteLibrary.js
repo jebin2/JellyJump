@@ -90,5 +90,9 @@ export async function fetchItems(rawUrl) {
         // Grouped under the server so remote files are visibly not local ones.
         path: [serverName, item.folder, item.name].filter(Boolean).join('/'),
         remoteId: item.id,
+        // Lets the folder offer a refresh: the listing is a snapshot, and the
+        // other machine keeps scanning after it was taken.
+        remoteSource: rawUrl,
+        remoteServer: serverName,
     }));
 }

@@ -132,7 +132,8 @@ export class PlaylistRenderer {
             current.items.push({ ...item, originalIndex: index });
         });
 
-        this.tagM3UFolders(root);
+        this.tagCommonSource(root, 'm3uSource');
+        this.tagCommonSource(root, 'remoteSource');
 
         const finalizeNode = (node) => {
             const childrenFolders = Object.values(node.children)
@@ -150,17 +151,24 @@ export class PlaylistRenderer {
         return root;
     }
 
-    tagM3UFolders(node) {
+    /**
+     * Tag a folder with a source when every item beneath it shares one, so the
+     * folder can offer an action for that source. Used for M3U playlists and
+     * for shared libraries, which need the same question answered.
+     * @param {Object} node
+     * @param {string} field - item property holding the source
+     */
+    tagCommonSource(node, field) {
         let commonSource = undefined;
 
         for (const item of node.items) {
-            if (!item.m3uSource) {
+            if (!item[field]) {
                 commonSource = null;
                 break;
             }
             if (commonSource === undefined) {
-                commonSource = item.m3uSource;
-            } else if (commonSource !== item.m3uSource) {
+                commonSource = item[field];
+            } else if (commonSource !== item[field]) {
                 commonSource = null;
                 break;
             }
@@ -168,7 +176,7 @@ export class PlaylistRenderer {
 
         if (commonSource !== null) {
             for (const child of Object.values(node.children)) {
-                const childSource = this.tagM3UFolders(child);
+                const childSource = this.tagCommonSource(child, field);
                 if (childSource === null) {
                     commonSource = null;
                 } else {
@@ -181,12 +189,12 @@ export class PlaylistRenderer {
             }
         } else {
             for (const child of Object.values(node.children)) {
-                this.tagM3UFolders(child);
+                this.tagCommonSource(child, field);
             }
         }
 
         if (commonSource && commonSource !== undefined) {
-            node.m3uSource = commonSource;
+            node[field] = commonSource;
         }
 
         return commonSource === undefined ? null : commonSource;
@@ -265,6 +273,25 @@ export class PlaylistRenderer {
             };
             header.insertBefore(validateBtn, removeBtn);
             removeBtn.style.marginLeft = '5px';
+        }
+
+        // Only on the library's own folder. Nested folders share the source, so
+        // they would all get one, and reloading the whole library from inside a
+        // subfolder reads as reloading just that subfolder.
+        const isLibraryRoot = folderData.remoteSource && !folderData.path.includes('/');
+        if (isLibraryRoot) {
+            const refreshBtn = document.createElement('button');
+            refreshBtn.className = 'playlist-action-btn folder-refresh-btn';
+            refreshBtn.title = 'Reload this library';
+            refreshBtn.setAttribute('aria-label', `Reload ${folderData.name}`);
+            refreshBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-loop"></use></svg>';
+            refreshBtn.onclick = (e) => {
+                e.stopPropagation();
+                refreshBtn.classList.add('spinning');
+                p.refreshRemoteLibrary(folderData.remoteSource)
+                    .finally(() => refreshBtn.classList.remove('spinning'));
+            };
+            header.insertBefore(refreshBtn, removeBtn);
         }
 
         const isExpanded = p.expandedFolders.has(folderData.path);

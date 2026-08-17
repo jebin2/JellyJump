@@ -81,6 +81,22 @@ const ranged = await fetch(item.url, { headers: { Range: 'bytes=4-9' } });
 check(ranged.status === 206 && await ranged.text() === '456789',
     'and serves ranges, so seeking works');
 
+console.log('\nreloading a library');
+// The listing is a snapshot; the other machine keeps scanning. Reload must pick
+// up new files without disturbing what is already listed or playing.
+const before = await remote.fetchItems(shareLink);
+const ep2 = path.join(root, 'Series', 'ep2.mp4');
+writeFileSync(ep2, body);
+index.addBatch([{ path: ep2, name: 'ep2.mp4', size: body.length, mtime: Date.now(), ext: '.mp4' }]);
+
+const after = await remote.fetchItems(shareLink);
+check(after.length === before.length + 1, `a new file shows up on reload (${before.length} -> ${after.length})`);
+
+const stableIds = before.every(b => after.some(a => a.remoteId === b.remoteId));
+check(stableIds, 'existing items keep their remoteId, so playback is not torn out');
+check(before.every(b => b.remoteSource === shareLink),
+    'items carry the source, which is what the folder reload button uses');
+
 console.log('\nthe reported failure');
 // Pasting the link previously fetched this and handed it to the demuxer.
 const asMedia = await fetch(shareLink);

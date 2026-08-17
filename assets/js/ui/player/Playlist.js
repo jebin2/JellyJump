@@ -1516,6 +1516,55 @@ export class Playlist {
     }
 
     /**
+     * Re-fetch a shared library.
+     *
+     * The listing is a snapshot, and the other machine keeps scanning after it
+     * was taken, so this is how new files appear without re-pasting the link.
+     *
+     * Items are matched by remoteId, which is stable across scans: an item that
+     * is still there keeps its object, so whatever is playing is not torn out
+     * from under the player.
+     * @param {string} source - the share link the library came from
+     */
+    async refreshRemoteLibrary(source) {
+        try {
+            const fresh = await fetchRemoteItems(source);
+            const existing = this.state.items.filter(i => i.remoteSource === source);
+            const byRemoteId = new Map(existing.map(i => [i.remoteId, i]));
+
+            let added = 0;
+            const merged = fresh.map((item) => {
+                const previous = byRemoteId.get(item.remoteId);
+                if (previous) return previous;
+                added++;
+                item.id = generateId();
+                return item;
+            });
+            const removed = existing.length - (fresh.length - added);
+
+            const others = this.state.items.filter(i => i.remoteSource !== source);
+            this.state.setItems([...others, ...merged]);
+            this.render();
+            this._updatePlayerNavigationState();
+
+            if (added === 0 && removed === 0) {
+                Toast.show('Library is up to date');
+            } else {
+                const parts = [];
+                if (added) parts.push(`${added} added`);
+                if (removed > 0) parts.push(`${removed} gone`);
+                Toast.show(`Library reloaded — ${parts.join(', ')}`);
+            }
+            Logger.log(`[Playlist] Reloaded remote library: ${added} added, ${removed} removed`);
+        } catch (error) {
+            Logger.error('[Playlist] Could not reload remote library:', error);
+            // The other machine is usually just off or asleep; the items already
+            // listed stay, since they will work again when it is back.
+            Toast.show('Could not reach that library — is the other machine on?', 5000, true);
+        }
+    }
+
+    /**
      * Handle M3U/IPTV Playlist Import
      * Parses the M3U file and adds channels grouped by category as folders
      * @param {string} url - URL to the M3U playlist

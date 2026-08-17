@@ -1043,6 +1043,23 @@
     font-size: 0.7rem;
 }
 
+/* Reload button on a shared-library folder. Spins only while a reload is in
+   flight, so the icon reports progress rather than decorating the header. */
+.folder-refresh-btn.spinning svg {
+    animation: folder-refresh-spin 0.9s linear infinite;
+}
+
+@keyframes folder-refresh-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .folder-refresh-btn.spinning svg {
+        animation: none;
+        opacity: 0.5;
+    }
+}
+
 /* The Share tile while sharing is on. The Tools button pulses too, but the
    open grid covers it, so the state has to be visible here as well. */
 .tools-tile.sharing-active {
