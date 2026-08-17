@@ -17,6 +17,10 @@ import { PlaylistState } from './PlaylistState.js';
 import { PlaylistUI } from './PlaylistUI.js';
 import { PlaylistNavigation } from './PlaylistNavigation.js';
 import { PlaylistProcessor } from "../../shared/services/PlaylistProcessor.js";
+import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
+
+// Folder that scan results are grouped under in the playlist tree.
+const DISCOVERED_FOLDER = 'Discovered';
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
@@ -65,8 +69,8 @@ export class Playlist {
         };
         window.addEventListener('beforeunload', this._beforeUnloadHandler);
 
-        // Load saved data
-        this._loadSavedPlaylist();
+        // Load saved data, then fill in what a scan finds on disk
+        this._loadSavedPlaylist().then(() => this._startMediaScan());
 
         // Setup player error callback
         if (this.player) {
@@ -144,6 +148,109 @@ export class Playlist {
         this._updateUI();
         this._updatePlayerNavigationState();
         Logger.log('[Playlist] Playback stopped - select a video to play');
+    }
+
+    /**
+     * Scan the user's media folders and list what turns up under a "Discovered"
+     * folder in the playlist.
+     *
+     * These are ordinary playlist items and reuse the whole existing flow —
+     * the folder tree is derived from item.path, so nesting them under
+     * DISCOVERED_FOLDER is all it takes to group them. They are flagged
+     * isDiscovered so PlaylistStorage leaves them out of the saved playlist:
+     * a scan can turn up thousands of files, and they come back on next launch
+     * anyway.
+     * @private
+     */
+    async _startMediaScan() {
+        if (!DiscoveredMedia.isSupported()) return;
+        // The browser scanner needs a user gesture and a directory pick, so it
+        // is started from the UI rather than on load.
+        if (!window.electronAPI?.isElectron) return;
+
+        this._discovered = new DiscoveredMedia();
+        this._discovered.subscribe((event) => {
+            if (event.type === 'batch') this.addDiscoveredItems(event.files);
+            if (event.type === 'error') Logger.warn('[Playlist] Media scan failed:', event.error);
+        });
+        try {
+            await this._discovered.scan();
+        } catch (error) {
+            Logger.warn('[Playlist] Media scan failed:', error);
+        }
+    }
+
+    /**
+     * Merge scan results into the playlist.
+     * Deliberately does not go through addItems(): that selects and may
+     * autoplay the first item added, which would hijack playback every time a
+     * batch streams in.
+     * @param {Array} files - scan records ({ path, name, size, mtime })
+     */
+    addDiscoveredItems(files) {
+        if (!files || files.length === 0) return;
+
+        const known = new Set(this.state.items.map(i => i.localPath).filter(Boolean));
+        const newItems = [];
+
+        for (const file of files) {
+            if (known.has(file.path)) continue; // already in the playlist, curated or not
+            known.add(file.path);
+            newItems.push(this._buildDiscoveredItem(file));
+        }
+
+        if (newItems.length === 0) return;
+        this.state.addItems(newItems);
+        this.render();
+        this._updatePlayerNavigationState();
+    }
+
+    /**
+     * Turn a scan record into a playlist item.
+     * Cheap by design: no metadata probe and no thumbnail, so a scan of
+     * thousands of files stays fast. Duration fills in through the normal
+     * on-demand path once an item is actually opened.
+     * @private
+     */
+    _buildDiscoveredItem(file) {
+        const ext = file.ext?.replace('.', '') || '';
+        const mimeType = ext === 'mkv' ? 'video/x-matroska'
+            : ext === 'webm' ? 'video/webm'
+            : ext === 'ogv' ? 'video/ogg'
+            : 'video/mp4';
+
+        return {
+            title: file.name,
+            url: '',                  // created on demand from localPath
+            duration: '',             // unknown until opened; no probe here
+            thumbnail: '',
+            isLocal: true,
+            isAudio: false,
+            isDiscovered: true,       // keeps it out of the saved playlist
+            needsReload: false,
+            file: null,
+            fileSize: file.size,
+            fileType: mimeType,
+            mimeType,
+            path: this._discoveredPath(file.path),
+            localPath: file.path,
+            id: generateId()
+        };
+    }
+
+    /**
+     * Virtual path that places a discovered file in the folder tree, e.g.
+     * /home/u/Videos/Trip/clip.mp4 -> Discovered/Videos/Trip/clip.mp4
+     * PlaylistRenderer builds folders by splitting this on "/".
+     * @private
+     */
+    _discoveredPath(absolutePath) {
+        const parts = absolutePath.split('/').filter(Boolean);
+        // Drop the leading home-directory segments; what matters to the user is
+        // the media folder the file sits in, not where their home lives.
+        const home = parts.indexOf('home');
+        const meaningful = home !== -1 ? parts.slice(home + 2) : parts;
+        return [DISCOVERED_FOLDER, ...meaningful].join('/');
     }
 
     /**

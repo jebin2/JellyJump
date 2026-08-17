@@ -30,6 +30,7 @@
      */
     import { DiscoveredMedia } from '/assets/js/shared/services/DiscoveredMedia.js';
     import { PlaylistStorage } from '/assets/js/ui/player/PlaylistStorage.js';
+    import { StorageService } from '/assets/js/shared/services/StorageService.js';
 
     const logEl = document.getElementById('log');
     const log = (m) => { logEl.textContent += '\n' + m; console.log('SCAN:', m); };
@@ -115,6 +116,43 @@
             const savedPaths = new Set((saved?.items ?? saved ?? []).map(i => i?.localPath).filter(Boolean));
             const leaked = items.filter(i => savedPaths.has(i.path));
             check(leaked.length === 0, `discovered files stayed out of the saved playlist (${leaked.length} leaked)`);
+            log('');
+
+            // Discovered files are ordinary playlist items grouped under a
+            // folder, so they must render through the normal tree and still be
+            // excluded when the playlist is persisted.
+            log('playlist integration');
+            const { PlaylistRenderer } = await import('/assets/js/ui/player/PlaylistRenderer.js');
+
+            const curated = { id: 'curated-1', title: 'Kept.mp4', path: 'Kept.mp4', localPath: '/tmp/Kept.mp4' };
+            const asItems = items.map((f, n) => ({
+                id: `d-${n}`,
+                title: f.name,
+                path: `Discovered/${f.name}`,
+                localPath: f.path,
+                isDiscovered: true,
+            }));
+            const mixed = [curated, ...asItems];
+
+            const tree = new PlaylistRenderer({ state: {}, expandedFolders: new Set() }).buildTree(mixed);
+            const discoveredFolder = tree.children?.['Discovered'];
+            check(!!discoveredFolder, 'a "Discovered" folder appears in the playlist tree');
+            check(discoveredFolder?.items.length === asItems.length,
+                `folder holds every discovered file (${discoveredFolder?.items.length ?? 0} of ${asItems.length})`);
+            check(tree.items.some(i => i.id === 'curated-1'),
+                'curated items stay at the top level, outside the folder');
+
+            // The filter that keeps jellyjump.json small.
+            let written = null;
+            const realSave = StorageService.prototype.savePlaylist;
+            StorageService.prototype.savePlaylist = function (list) { written = list; };
+            try {
+                PlaylistStorage.savePlaylist(mixed, 0, 0);
+            } finally {
+                StorageService.prototype.savePlaylist = realSave;
+            }
+            check(written?.length === 1 && written[0].id === 'curated-1',
+                `only the curated item is persisted (${written?.length ?? 0} of ${mixed.length})`);
 
             log('');
             log(`${pass} passed, ${fail} failed`);

@@ -77,7 +77,10 @@ export class DiscoveredMedia {
                 for (const file of files) {
                     this._byPath.set(file.path, file);
                 }
-                this._emit({ type: 'batch', added: files.length, total: this._byPath.size });
+                // Subscribers get the batch itself, not just a count: rereading
+                // the whole list on every batch would be quadratic on a large
+                // scan, and consumers only need what just arrived.
+                this._emit({ type: 'batch', files, added: files.length, total: this._byPath.size });
             },
             onDone: (summary) => {
                 this._lastSummary = summary;
