@@ -198,7 +198,11 @@ export class PlaylistRenderer {
         const status = document.createElement('span');
         status.className = 'folder-scan-status';
         if (state.scanning) {
-            status.textContent = 'scanning…';
+            // Naming the pass explains why results keep arriving after the
+            // obvious folders are done, and why the second one takes longer.
+            status.textContent = state.phase === 2
+                ? 'scanning home folder…'
+                : 'scanning media folders…';
             status.classList.add('scanning');
         } else if (state.failed) {
             status.textContent = 'scan failed';

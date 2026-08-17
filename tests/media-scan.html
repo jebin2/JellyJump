@@ -225,9 +225,12 @@
                 };
             };
 
-            const running = renderStatus({ scanning: true, found: 12 });
-            check(running.text.includes('scanning'), `running scan says so ("${running.text}")`);
+            const running = renderStatus({ scanning: true, found: 12, phase: 1 });
+            check(running.text.includes('media folders'), `pass 1 names itself ("${running.text}")`);
             check(running.cancels === 1, 'a running scan can be cancelled');
+
+            const homePass = renderStatus({ scanning: true, found: 600, phase: 2 });
+            check(homePass.text.includes('home'), `pass 2 names itself ("${homePass.text}")`);
 
             const finished = renderStatus({ scanning: false, found: 12, failed: false });
             check(finished.text === '', 'a finished scan adds no label — the count says it');

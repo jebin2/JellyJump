@@ -172,9 +172,12 @@ export class Playlist {
         this.scanState = { scanning: true, found: 0, failed: false };
 
         this._discovered.subscribe((event) => {
+            if (event.type === 'phase') {
+                this.scanState = { ...this.scanState, phase: event.phase };
+                this.render();
+            }
             if (event.type === 'batch') {
                 this.scanState.found = event.total;
-                // addDiscoveredItems re-renders, which redraws the header too.
                 this.addDiscoveredItems(event.files);
             }
             if (event.type === 'error') {
@@ -235,8 +238,26 @@ export class Playlist {
 
         if (newItems.length === 0) return;
         this.state.addItems(newItems);
-        this.render();
-        this._updatePlayerNavigationState();
+        this._renderDiscoveredSoon();
+    }
+
+    /**
+     * Coalesce redraws while a scan streams in.
+     *
+     * The home pass delivers many batches, and each render rebuilds the folder
+     * tree over every item in the playlist — redrawing per batch makes that
+     * cost grow with the list it is already building. One frame's delay is
+     * imperceptible and collapses a burst of batches into a single rebuild.
+     * @private
+     */
+    _renderDiscoveredSoon() {
+        if (this._discoveredRenderQueued) return;
+        this._discoveredRenderQueued = true;
+        requestAnimationFrame(() => {
+            this._discoveredRenderQueued = false;
+            this.render();
+            this._updatePlayerNavigationState();
+        });
     }
 
     /**

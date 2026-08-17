@@ -15,6 +15,7 @@
  *   in   { type: 'scan', roots?: string[] }   start a scan
  *   in   { type: 'cancel' }                   stop the current scan
  *   out  { type: 'started', roots }
+ *   out  { type: 'phase', phase, roots }      1 = media folders, 2 = home
  *   out  { type: 'batch', files: [...] }      streamed, never one big array
  *   out  { type: 'done', found, scanned, cancelled, elapsedMs }
  *   out  { type: 'error', message }
@@ -31,8 +32,10 @@ const VIDEO_EXTENSIONS = new Set([
     '.flv', '.ts', '.m2ts', '.mts', '.3gp', '.ogv',
 ]);
 
-// Directory names that are never worth descending into. Phase 1 only visits
-// media folders, but those still collect the odd project checkout or cache.
+// Directory names never worth descending into. This matters most on the home
+// pass, which would otherwise spend the bulk of its time inside dependency
+// trees and caches. Dotfolders are skipped wholesale by the walker, so these
+// are the ones that are not hidden.
 const SKIP_DIRECTORIES = new Set([
     'node_modules', '.git', '.svn', '.hg', '.cache', '.npm', '.venv',
     '__pycache__', 'Library', 'AppData', 'System Volume Information',
@@ -153,7 +156,33 @@ async function* walk(root, visited, counters) {
     }
 }
 
-async function scan(roots) {
+/**
+ * Scan in two passes when no explicit roots are given:
+ *
+ *   1. the conventional media folders — small, high signal, results in a moment
+ *   2. everything else under the home directory
+ *
+ * Ordered this way so the files most likely to be wanted appear first, rather
+ * than after a full-tree walk. Both passes share one visited set, which is what
+ * keeps pass 2 from re-walking the folders pass 1 already covered: their
+ * resolved paths are already marked, so the walker skips them as it descends.
+ */
+function scanPhases(explicitRoots) {
+    if (explicitRoots && explicitRoots.length > 0) {
+        return [{ phase: 1, roots: explicitRoots }];
+    }
+    const media = defaultRoots();
+    const phases = [{ phase: 1, roots: media }];
+    try {
+        const home = fs.statSync(os.homedir()).isDirectory() ? os.homedir() : null;
+        if (home) phases.push({ phase: 2, roots: [home] });
+    } catch {
+        // No readable home directory; the media folders are all there is.
+    }
+    return phases;
+}
+
+async function scan(explicitRoots) {
     const started = Date.now();
     const visited = new Set();
     const counters = { scanned: 0 };
@@ -168,26 +197,34 @@ async function scan(roots) {
         lastFlush = Date.now();
     };
 
-    send({ type: 'started', roots });
+    const phases = scanPhases(explicitRoots);
+    send({ type: 'started', roots: phases.flatMap(p => p.roots) });
 
-    for (const root of roots) {
+    for (const { phase, roots } of phases) {
         if (cancelled) break;
-        let resolvedRoot;
-        try {
-            resolvedRoot = await fs.promises.realpath(root);
-        } catch {
-            continue;
-        }
-        if (visited.has(resolvedRoot)) continue;
-        visited.add(resolvedRoot);
+        send({ type: 'phase', phase, roots });
 
-        for await (const file of walk(resolvedRoot, visited, counters)) {
-            batch.push(file);
-            found++;
-            if (batch.length >= BATCH_SIZE || Date.now() - lastFlush >= BATCH_INTERVAL_MS) {
-                flush();
+        for (const root of roots) {
+            if (cancelled) break;
+            let resolvedRoot;
+            try {
+                resolvedRoot = await fs.promises.realpath(root);
+            } catch {
+                continue;
+            }
+            if (visited.has(resolvedRoot)) continue;
+            visited.add(resolvedRoot);
+
+            for await (const file of walk(resolvedRoot, visited, counters)) {
+                batch.push(file);
+                found++;
+                if (batch.length >= BATCH_SIZE || Date.now() - lastFlush >= BATCH_INTERVAL_MS) {
+                    flush();
+                }
             }
         }
+        // Pass 1's results should land before the long pass starts.
+        flush();
     }
 
     flush();
@@ -214,10 +251,10 @@ process.parentPort.on('message', async (event) => {
     scanning = true;
     cancelled = false;
     try {
-        const roots = Array.isArray(message.roots) && message.roots.length > 0
-            ? message.roots
-            : defaultRoots();
-        await scan(roots);
+        // Passed through as-is: scan() decides between an explicit-roots scan
+        // and the default two-pass one. Resolving the defaults here would make
+        // every scan look explicit and silently skip the home pass.
+        await scan(Array.isArray(message.roots) ? message.roots : null);
     } catch (error) {
         send({ type: 'error', message: error?.message || String(error) });
     } finally {

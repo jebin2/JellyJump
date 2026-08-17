@@ -82,6 +82,10 @@ export class DiscoveredMedia {
                 // scan, and consumers only need what just arrived.
                 this._emit({ type: 'batch', files, added: files.length, total: this._byPath.size });
             },
+            onPhase: (phase) => {
+                this._phase = phase;
+                this._emit({ type: 'phase', phase, total: this._byPath.size });
+            },
             onDone: (summary) => {
                 this._lastSummary = summary;
                 this._emit({ type: 'done', summary, total: this._byPath.size });
