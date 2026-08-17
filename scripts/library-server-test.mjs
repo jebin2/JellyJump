@@ -58,6 +58,17 @@ check((await fetch(`${base}/api/library?token=${TOKEN}`)).status === 200,
 check((await fetch(`${base}/api/library`, { headers: auth })).status === 200,
     'the token is accepted as a bearer header');
 
+console.log('\nthe share link itself');
+// The generated link points at "/", so this is the path a user hits first.
+// It 404'd before, which read as the whole feature being broken.
+const landing = await fetch(`${base}/?token=${TOKEN}`);
+check(landing.status === 200, `opening the link works (${landing.status})`);
+check((landing.headers.get('content-type') || '').includes('text/html'),
+    'the link renders a page rather than JSON');
+const landingBody = await landing.text();
+check(landingBody.includes('Add Link'), 'the page says what to do with the link');
+check((await fetch(`${base}/`)).status === 401, 'the link still requires the token');
+
 console.log('\nlisting');
 const listing = await (await fetch(`${base}/api/library`, { headers: auth })).json();
 check(Array.isArray(listing.items) && listing.items.length === 2, `lists the indexed files (${listing.items.length})`);
