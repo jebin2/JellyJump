@@ -206,6 +206,33 @@ export class Playlist {
     }
 
     /**
+     * Promote a discovered file into the saved playlist.
+     *
+     * Clearing isDiscovered is what makes it persist; moving it out of the
+     * Discovered folder path is what stops it looking like a scan result that
+     * will disappear. Both are needed — leaving the path alone would keep it
+     * filed under a folder whose whole meaning is "not kept".
+     * @param {string} id
+     */
+    keepDiscoveredItem(id) {
+        const index = this.state.items.findIndex(i => i.id === id);
+        if (index === -1) return;
+
+        const item = this.state.items[index];
+        if (!item.isDiscovered) return;
+
+        delete item.isDiscovered;
+        // Top level, matching how a file added through the open dialog looks.
+        item.path = item.title;
+
+        this._saveState();
+        this.render();
+        this._updatePlayerNavigationState();
+        Toast.show(`Kept "${item.title}" in your playlist`);
+        Logger.log('[Playlist] Kept discovered item:', item.title);
+    }
+
+    /**
      * Turn a scan record into a playlist item.
      * Cheap by design: no metadata probe and no thumbnail, so a scan of
      * thousands of files stays fast. Duration fills in through the normal

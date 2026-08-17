@@ -565,6 +565,33 @@
     color: var(--accent-primary);
 }
 
+/* Scan results: kept slightly dimmer than saved items, since they are
+   transient until the user keeps one. */
+.playlist-item.discovered-item .playlist-title {
+    color: var(--text-secondary);
+}
+
+.playlist-keep-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease, color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playlist-item:hover .playlist-keep-btn {
+    opacity: 1;
+}
+
+.playlist-keep-btn:hover {
+    color: var(--accent-primary);
+}
+
 /* -----------------------------------------
    Merge Modal Grid Layout - Revamped
    ----------------------------------------- */

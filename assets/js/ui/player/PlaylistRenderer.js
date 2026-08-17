@@ -349,8 +349,17 @@ export class PlaylistRenderer {
 
         itemEl.addEventListener('click', (e) => {
             if (e.target.closest('.playlist-remove-btn') || e.target.closest('.playlist-download-btn')) return;
+            if (e.target.closest('.playlist-keep-btn')) return;
             p.selectItem(getCurrentIndex());
         });
+
+        const keepBtn = itemEl.querySelector('.playlist-keep-btn');
+        if (keepBtn) {
+            keepBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                p.keepDiscoveredItem(itemEl.dataset.id);
+            });
+        }
 
         const downloadBtn = itemEl.querySelector('.playlist-download-btn');
         if (downloadBtn) {
@@ -518,6 +527,22 @@ export class PlaylistRenderer {
         if (item.error) itemEl.classList.add('error');
         if (item.isBroken) itemEl.classList.add('playlist-item--broken');
         if (item.isWebcam) itemEl.classList.add('recording-item');
+
+        // Scan results are not saved, so they need a way to be kept. Added here
+        // rather than to the template because every other item would have to
+        // hide it, and only discovered items can be promoted.
+        if (item.isDiscovered) {
+            itemEl.classList.add('discovered-item');
+            const actions = itemEl.querySelector('.playlist-actions');
+            if (actions) {
+                const keepBtn = document.createElement('button');
+                keepBtn.className = 'playlist-keep-btn';
+                keepBtn.title = 'Keep in playlist';
+                keepBtn.setAttribute('aria-label', `Keep ${item.title || 'this video'} in playlist`);
+                keepBtn.innerHTML = '<svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-plus"></use></svg>';
+                actions.insertBefore(keepBtn, actions.firstChild);
+            }
+        }
 
         if (item.thumbnail) {
             thumbnail.style.backgroundImage = `url(${item.thumbnail})`;
