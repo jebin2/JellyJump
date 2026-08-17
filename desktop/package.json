@@ -26,11 +26,14 @@
     "files": [
       "main.js",
       "preload.js",
+      "scanner.js",
+      "scanner-host.js",
       "package.json",
       "build/**/*"
     ],
     "asarUnpack": [
       "preload.js",
+      "scanner.js",
       "node_modules/node-av/**/*"
     ],
     "publish": {
@@ -58,8 +61,7 @@
       "target": [
         "nsis",
         "portable"
-      ],
-      "icon": "build/icons/icon.ico"
+      ]
     },
     "nsis": {
       "artifactName": "JellyJump.Setup.${ext}"
