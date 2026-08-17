@@ -81,8 +81,21 @@ export class ToolsMenu {
         // Sharing serves this machine's scanned library, so it only means
         // anything on the desktop app; in a browser there is nothing to serve.
         const { ShareMenu } = await import('./ShareMenu.js');
+        const shareTile = content.querySelector('[data-action="share"]');
         if (!ShareMenu.isSupported()) {
-            content.querySelector('[data-action="share"]')?.remove();
+            shareTile?.remove();
+        } else if (shareTile) {
+            // The Tools button pulses while sharing, but once this grid is open
+            // it covers the button — so the tile has to carry the state too, or
+            // the sign disappears exactly when the user comes looking for it.
+            const { ShareState } = await import('../../../shared/services/ShareState.js');
+            const applySharing = (sharing) => {
+                shareTile.classList.toggle('sharing-active', sharing);
+                const label = shareTile.querySelector('.tools-tile-label');
+                if (label) label.textContent = sharing ? 'Sharing' : 'Share Library';
+            };
+            applySharing(ShareState.isSharing);
+            ShareState.refresh().then(applySharing);
         }
 
         // Handle tile clicks

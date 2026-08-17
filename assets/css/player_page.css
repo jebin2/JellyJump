@@ -1043,6 +1043,24 @@
     font-size: 0.7rem;
 }
 
+/* The Share tile while sharing is on. The Tools button pulses too, but the
+   open grid covers it, so the state has to be visible here as well. */
+.tools-tile.sharing-active {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    animation: pulse-sharing 2s ease-in-out infinite;
+}
+
+.tools-tile.sharing-active svg {
+    fill: var(--accent-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tools-tile.sharing-active {
+        animation: none;
+    }
+}
+
 /* Sharing active state for tools button. Sharing outlives the menu that starts
    it, so this is the only persistent sign that the library is being served.
    Accent rather than danger: recording owns the alarming colour, and sharing is
