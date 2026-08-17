@@ -61,7 +61,12 @@ export async function getMetadata(source) {
                 codedHeight: videoTrack.codedHeight,
                 codec: videoTrackInfo.codec,
                 rotation: videoTrack.rotation || 0,
-                hasHDR: false
+                hasHDR: false,
+                // Whether this browser can actually decode it. Determined here
+                // because the track is already open — asking later would mean
+                // reopening the file just to answer it. HEVC is the common case:
+                // the desktop lists it happily and nothing can play it.
+                decodable: await videoTrack.canDecode().catch(() => false)
             };
 
             try {
@@ -83,7 +88,11 @@ export async function getMetadata(source) {
                 codec: audioTrackInfo.codec,
                 channels: audioTrackInfo.channels,
                 sampleRate: audioTrackInfo.sampleRate,
-                languageCode: audioTrackInfo.language
+                languageCode: audioTrackInfo.language,
+                // Undecodable audio is not fatal — the video still plays silent,
+                // and the player already falls back to another track when there
+                // is one — so this is reported rather than treated as an error.
+                decodable: await audioTrackInfo._track?.canDecode().catch(() => false) ?? false
             };
         }
 

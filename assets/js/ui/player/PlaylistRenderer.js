@@ -592,6 +592,21 @@ export class PlaylistRenderer {
         }
     }
 
+    /**
+     * Short label for a codec this browser cannot decode, or null.
+     * Video is the blocking case; undecodable audio only costs sound, and the
+     * player already tries other audio tracks before giving up.
+     */
+    unsupportedReason(item) {
+        if (item.videoInfo && item.videoInfo.decodable === false) {
+            return `${(item.videoInfo.codec || 'video').toUpperCase()} not supported`;
+        }
+        if (item.audioInfo && item.audioInfo.decodable === false) {
+            return `${(item.audioInfo.codec || 'audio').toUpperCase()} audio not supported`;
+        }
+        return null;
+    }
+
     createItemHTML(item, index) {
         const template = document.getElementById('playlist-item-template');
         const clone = template.content.cloneNode(true);
@@ -609,6 +624,20 @@ export class PlaylistRenderer {
         if (item.error) itemEl.classList.add('error');
         if (item.isBroken) itemEl.classList.add('playlist-item--broken');
         if (item.isWebcam) itemEl.classList.add('recording-item');
+
+        // Codecs this browser cannot decode are marked rather than hidden: the
+        // file is really there, and on desktop the same library plays it, so a
+        // missing row would look like the scan lost it. Only known once metadata
+        // has been read — an unprobed item is not claimed to be either way.
+        const unsupported = this.unsupportedReason(item);
+        if (unsupported) {
+            itemEl.classList.add('playlist-item--unsupported');
+            const badge = document.createElement('span');
+            badge.className = 'playlist-unsupported-badge';
+            badge.textContent = unsupported;
+            badge.title = `${unsupported} — this browser has no decoder for it`;
+            itemEl.querySelector('.playlist-info')?.appendChild(badge);
+        }
 
         // Scan results are not saved, so they need a way to be kept. Added here
         // rather than to the template because every other item would have to

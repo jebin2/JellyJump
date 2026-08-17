@@ -1043,6 +1043,29 @@
     font-size: 0.7rem;
 }
 
+/* Files this browser has no decoder for. Dimmed and badged rather than hidden:
+   the file exists, and on desktop the same library plays it, so removing the row
+   would look like the scan lost it. */
+.playlist-item--unsupported .playlist-title {
+    opacity: 0.55;
+}
+
+.playlist-unsupported-badge {
+    display: inline-block;
+    margin-top: 2px;
+    padding: 1px 6px;
+    font-size: 0.7rem;
+    line-height: 1.5;
+    border-radius: 3px;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-dark, var(--bg-secondary));
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Reload button on a shared-library folder. Spins only while a reload is in
    flight, so the icon reports progress rather than decorating the header. */
 .folder-refresh-btn.spinning svg {
