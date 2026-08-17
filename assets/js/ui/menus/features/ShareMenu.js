@@ -72,6 +72,13 @@ export class ShareMenu {
         }
 
         if (!state.enabled) {
+            // A failed start reports why here. Without this the button flips to
+            // "Starting…" and straight back, which looks like nothing happened
+            // at all rather than like something went wrong.
+            if (state.reason) {
+                body.appendChild(this._note(state.reason, 'error'));
+                Logger.warn('[Share] Could not start sharing:', state.reason);
+            }
             body.appendChild(this._note(
                 `Share ${state.itemCount} scanned file${state.itemCount === 1 ? '' : 's'} with other `
                 + 'devices on your tailnet. Nothing is served until you turn this on.',
