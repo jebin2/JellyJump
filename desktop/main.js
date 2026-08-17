@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { registerScannerIpc } = require('./scanner-host');
 
 // Required on Linux AppImage: kernel user-namespace sandboxing is often
 // unavailable (restricted sysctl), which causes the network service to crash
@@ -223,6 +224,11 @@ ipcMain.handle('open-file-dialog', async (event, options = {}) => {
         return { success: false, error: error.message };
     }
 });
+
+// The scanner runs in its own utilityProcess (see desktop/scanner.js): a tree
+// walk here would block the event loop serving every IPC call and window event,
+// and one in a renderer would die with the window.
+registerScannerIpc({ assertTrustedIpcEvent, normalizeUserFilePath });
 
 // ============================================
 // Window Creation

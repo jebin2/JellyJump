@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Media Scan Test</title>
+    <style>body { font-family: monospace; background: #111; color: #ddd; padding: 16px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h3>Media scanner</h3>
+<pre id="log">starting…</pre>
+<script type="module">
+    /**
+     * Exercises the scanner end to end on desktop: renderer → IPC → the scanner
+     * utilityProcess → streamed batches back. Asserts the things that are easy
+     * to get wrong and invisible when they are — that results actually stream
+     * rather than arriving in one lump at the end, that the main thread stays
+     * responsive while a real tree is walked, and that discovered files stay out
+     * of the saved playlist.
+     *
+     * Set ?root=/some/dir to scan a specific folder instead of the platform's
+     * media folders — the runner uses this so the result does not depend on
+     * whatever happens to be in the developer's home directory.
+     *
+     * Dev-only page. In the browser the scanner needs a user gesture and a
+     * directory pick, so this page reports that and stops.
+     *
+     * Console output contract:
+     *   "SCAN: <line>"        per-check result
+     *   "SCAN-RESULT: ..."    PASS | FAIL
+     */
+    import { DiscoveredMedia } from '/assets/js/shared/services/DiscoveredMedia.js';
+    import { PlaylistStorage } from '/assets/js/ui/player/PlaylistStorage.js';
+
+    const logEl = document.getElementById('log');
+    const log = (m) => { logEl.textContent += '\n' + m; console.log('SCAN:', m); };
+    logEl.textContent = '';
+
+    let pass = 0, fail = 0;
+    const check = (ok, label) => {
+        if (ok) { pass++; log(`  PASS  ${label}`); }
+        else { fail++; log(`  FAIL  ${label}`); }
+    };
+
+    try {
+        const isElectron = !!window.electronAPI?.isElectron;
+        log(`runtime: ${isElectron ? 'Electron desktop' : 'browser'}`);
+
+        if (!isElectron) {
+            log('browser scanner needs a user gesture and a picked directory — nothing to assert headlessly');
+            check(DiscoveredMedia.isSupported() === (typeof window.showDirectoryPicker === 'function'),
+                'browser support reported honestly');
+            log('');
+            log(`${pass} passed, ${fail} failed`);
+            console.log(`SCAN-RESULT: ${fail === 0 ? 'PASS' : 'FAIL'} (${pass} passed, ${fail} failed)`);
+        } else {
+            const root = new URLSearchParams(location.search).get('root');
+            log(root ? `scanning: ${root}` : 'scanning: platform media folders');
+            log('');
+
+            check(DiscoveredMedia.isSupported(), 'scanner is available on desktop');
+
+            const discovered = new DiscoveredMedia();
+            const batches = [];
+            discovered.subscribe((event) => {
+                if (event.type === 'batch') batches.push(event.added);
+            });
+
+            // A scan that blocks the main thread would be a scan running in the
+            // wrong process, which is the whole reason for the utilityProcess.
+            let ticks = 0;
+            const started = performance.now();
+            const timer = setInterval(() => ticks++, 20);
+
+            const done = await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('scan did not finish within 120s')), 120_000);
+                const off = discovered.subscribe((event) => {
+                    if (event.type === 'done') { clearTimeout(timeout); off(); resolve(event.summary); }
+                    if (event.type === 'error') { clearTimeout(timeout); off(); reject(event.error); }
+                });
+                discovered.scan(root ? { roots: [root] } : {});
+            });
+
+            clearInterval(timer);
+            const elapsed = performance.now() - started;
+            const blockedRatio = Math.max(0, 1 - (ticks * 20) / elapsed);
+
+            log(`  found ${done.found} video(s) in ${done.scanned} file(s), ${done.elapsedMs}ms`);
+            log(`  batches received: ${batches.length}`);
+            log(`  main thread blocked: ${(blockedRatio * 100).toFixed(0)}% of the time`);
+
+            check(done.found > 0, `scan found videos (${done.found})`);
+            check(discovered.size === done.found, `store holds every result (${discovered.size} of ${done.found})`);
+            check(batches.length > 0, 'results arrived in batches while scanning');
+            check(blockedRatio < 0.1, `main thread blocked under 10% (was ${(blockedRatio * 100).toFixed(0)}%)`);
+
+            const items = discovered.items;
+            const shaped = items.every(i => i.path && i.name && typeof i.size === 'number' && typeof i.mtime === 'number');
+            check(shaped, 'every record has path, name, size and mtime');
+            check(items.every(i => i.size > 0), 'no zero-byte results');
+            check(new Set(items.map(i => i.path)).size === items.length, 'no duplicate paths');
+
+            // Re-scanning the same roots must converge, not accumulate.
+            const sizeAfterFirst = discovered.size;
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('rescan did not finish')), 120_000);
+                const off = discovered.subscribe((event) => {
+                    if (event.type === 'done') { clearTimeout(timeout); off(); resolve(); }
+                });
+                discovered.scan(root ? { roots: [root] } : {});
+            });
+            check(discovered.size === sizeAfterFirst, `rescan is idempotent (${discovered.size} vs ${sizeAfterFirst})`);
+
+            // The point of keeping this separate.
+            const saved = await PlaylistStorage.loadPlaylist();
+            const savedPaths = new Set((saved?.items ?? saved ?? []).map(i => i?.localPath).filter(Boolean));
+            const leaked = items.filter(i => savedPaths.has(i.path));
+            check(leaked.length === 0, `discovered files stayed out of the saved playlist (${leaked.length} leaked)`);
+
+            log('');
+            log(`${pass} passed, ${fail} failed`);
+            console.log(`SCAN-RESULT: ${fail === 0 ? 'PASS' : 'FAIL'} (${pass} passed, ${fail} failed)`);
+        }
+    } catch (e) {
+        console.error(e);
+        log('ERROR: ' + (e?.message || e));
+        console.log('SCAN-RESULT: FAIL (threw)');
+    }
+</script>
+</body>
+</html>
