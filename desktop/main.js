@@ -14,7 +14,15 @@ if (process.platform === 'linux') {
     app.commandLine.appendSwitch('no-sandbox');
     app.commandLine.appendSwitch('disable-dev-shm-usage');
     app.commandLine.appendSwitch('disable-features', 'NetworkServiceSandbox');
-    app.commandLine.appendSwitch('in-process-gpu');
+
+    // Packaged only: in-process-gpu segfaults on launch on ordinary desktop
+    // Linux (reproduced on Wayland/Mesa here — removing just this switch makes
+    // the app start normally). It exists for the AppImage case, where the GPU
+    // zygote cannot spawn, so it stays there and is kept out of `npm start`,
+    // which otherwise cannot run at all.
+    if (app.isPackaged) {
+        app.commandLine.appendSwitch('in-process-gpu');
+    }
 }
 
 const configPath = path.join(app.getPath('userData'), 'jellyjump.json');
