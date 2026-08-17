@@ -200,6 +200,10 @@
 .playlist-content {
     flex: 1;
     overflow-y: auto;
+    /* Nested folders indent per level, so a deep tree pushes items past the
+       right edge; hidden clipped them with no way to scroll across. The
+       renderer sets this inline too, which is the value that actually applies. */
+    overflow-x: auto;
     padding: var(--space-md);
     position: relative;
     /* For drag overlay if needed */
@@ -515,8 +519,10 @@
 
 /* Nested Playlist Children (Drawer) */
 .playlist-children {
-    padding-left: 10px;
-    margin-left: 12px;
+    /* 22px per level ate the width fast on nested trees; 14px still reads as a
+       clear step against the border line. */
+    padding-left: 6px;
+    margin-left: 8px;
     /* max-height: 280px; */
     overflow-y: auto;
     overflow-x: hidden;

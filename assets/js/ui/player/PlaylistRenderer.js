@@ -29,7 +29,13 @@ export class PlaylistRenderer {
         p.container.innerHTML = '';
         p.container.scrollTop = 0;
         p.container.style.overflowY = 'auto';
-        p.container.style.overflowX = 'hidden';
+        // Not 'hidden': that silently clipped rows indented past the right edge.
+        // Set inline rather than in CSS because the inline value wins, so the
+        // stylesheet alone could not fix it.
+        // Note this only helps content that reaches this element — each
+        // .playlist-children level is its own scroll container and clips first,
+        // so very deep trees still need the depth cap to stay reachable.
+        p.container.style.overflowX = 'auto';
 
         if (p.searchQuery) {
             this.renderSearchResults(p.searchQuery);
@@ -582,6 +588,9 @@ export class PlaylistRenderer {
         // hide it, and only discovered items can be promoted.
         if (item.isDiscovered) {
             itemEl.classList.add('discovered-item');
+            // The folder path is capped for width, so the full location is only
+            // available here.
+            if (item.localPath) itemEl.title = item.localPath;
             const actions = itemEl.querySelector('.playlist-actions');
             if (actions) {
                 const keepBtn = document.createElement('button');

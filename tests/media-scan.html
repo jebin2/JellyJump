@@ -203,6 +203,32 @@
             check(knownPaths.has(target.localPath), 'a rescan will skip it as already present');
             log('');
 
+            // Every folder level indents, so an uncapped filesystem path pushes
+            // rows off the right edge where they cannot be reached.
+            log('deep paths stay navigable');
+            const deep = '/home/u/Videos/a/b/c/d/e/f/g/h/i/j/clip.mp4';
+            const mapped = Playlist.prototype._discoveredPath.call({}, deep);
+            const depth = mapped.split('/').length - 1; // folders above the file
+            log(`  ${deep}`);
+            log(`  -> ${mapped}`);
+            check(depth <= 5, `nesting is capped (${depth} folder levels)`);
+            check(mapped.endsWith('clip.mp4'), 'the filename survives capping');
+            check(mapped.startsWith('Discovered/Videos/'),
+                'the origin folder is kept, so grouping still means something');
+
+            // Two deep files can now map to the same display path; they must
+            // still both exist, since identity comes from localPath.
+            const other = Playlist.prototype._discoveredPath.call({}, '/home/u/Videos/a/b/c/d/x/other.mp4');
+            const collided = [
+                { id: 'x1', path: mapped, localPath: deep, isDiscovered: true },
+                { id: 'x2', path: other, localPath: '/home/u/Videos/a/b/c/d/x/other.mp4', isDiscovered: true },
+            ];
+            const collidedTree = new PlaylistRenderer({ state: {}, expandedFolders: new Set() }).buildTree(collided);
+            const flatten = (node) => (node.items?.length ?? 0)
+                + Object.values(node.children ?? {}).reduce((n, c) => n + flatten(c), 0);
+            check(flatten(collidedTree) === 2, 'files sharing a capped path both survive');
+            log('');
+
             // The header is the only place a running scan is visible, so each
             // state has to render distinguishably.
             log('scan status on the folder header');

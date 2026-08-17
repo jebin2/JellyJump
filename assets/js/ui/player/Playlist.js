@@ -22,6 +22,10 @@ import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
 // Folder that scan results are grouped under in the playlist tree.
 const DISCOVERED_FOLDER = 'Discovered';
 
+// How many folder levels a discovered file may nest under that. Each level
+// indents, so an uncapped filesystem path can push rows off the right edge.
+const MAX_DISCOVERED_DEPTH = 3;
+
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
 
@@ -332,7 +336,20 @@ export class Playlist {
         // the media folder the file sits in, not where their home lives.
         const home = parts.indexOf('home');
         const meaningful = home !== -1 ? parts.slice(home + 2) : parts;
-        return [DISCOVERED_FOLDER, ...meaningful].join('/');
+
+        const name = meaningful[meaningful.length - 1];
+        let folders = meaningful.slice(0, -1);
+
+        // Cap the nesting. A home scan reaches genuinely deep trees, and every
+        // level costs indent width — past a handful the rows run off the edge.
+        // Keeping the outermost folders preserves where the file came from,
+        // which is what makes the grouping useful; the rest is on the item's
+        // localPath if it is ever needed.
+        if (folders.length > MAX_DISCOVERED_DEPTH) {
+            folders = folders.slice(0, MAX_DISCOVERED_DEPTH);
+        }
+
+        return [DISCOVERED_FOLDER, ...folders, name].join('/');
     }
 
     /**
