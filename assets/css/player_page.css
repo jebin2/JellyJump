@@ -897,6 +897,9 @@
 
 .share-note--error {
     color: var(--accent-danger, #e5534b);
+    /* Failure messages may carry a command on its own line; without this the
+       user is told to run something that renders as one unreadable run-on. */
+    white-space: pre-wrap;
 }
 
 /* The link is a bearer credential, so the caution about it should not read as

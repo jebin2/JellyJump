@@ -9,6 +9,7 @@
  * working; regenerating it is what revokes every link that was handed out.
  */
 const crypto = require('crypto');
+const os = require('os');
 const { app, ipcMain } = require('electron');
 const libraryServer = require('./library-server');
 const libraryIndex = require('./library-index');
@@ -60,13 +61,16 @@ async function enable() {
     const served = await tailscale.startServe({ localPort: port, httpsPort: HTTPS_PORT });
     if (!served.ok) {
         await libraryServer.stop();
-        const sudoHint = await tailscale.canServeWithoutSudo()
-            ? ''
-            : ' (try: tailscale set --operator=$USER)';
-        shareState = {
-            enabled: false, url: null, dnsName: ts.dnsName,
-            reason: `Could not start tailscale serve: ${served.error}${sudoHint}`,
-        };
+        // By far the most common cause, and the one a user cannot guess: until
+        // an operator is set, Tailscale only lets root publish a service, so
+        // the app is refused. Name the exact command — with sudo, which it does
+        // need, and the real username rather than a $USER that will not expand
+        // when it is read out of a dialog.
+        const reason = await tailscale.canServeWithoutSudo()
+            ? `Could not start sharing: ${served.error}`
+            : 'JellyJump does not have permission to publish on your tailnet yet. '
+              + `Run this once in a terminal, then try again:\n\n    sudo tailscale set --operator=${os.userInfo().username}`;
+        shareState = { enabled: false, url: null, dnsName: ts.dnsName, reason };
         return describe();
     }
 
