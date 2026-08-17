@@ -85,12 +85,17 @@ function getWorker() {
 
 /**
  * Whether processing should be offloaded to the worker.
- * Desktop runs processing in the renderer: @mediabunny/server needs Node,
- * which is unavailable inside a web worker.
+ *
+ * Desktop used to be excluded, on the premise that its processing went through
+ * @mediabunny/server's FFmpeg codecs and so had to stay in the renderer where
+ * Node is available. That premise was wrong: the server backend registers into
+ * its own bundled copy of mediabunny and never reaches this app's instance (see
+ * core/MediaBunny.js), so desktop has always been running the same WebCodecs
+ * backend as the browser — just on the main thread, freezing the UI for the
+ * length of every encode. There is nothing left for the renderer to provide.
  */
 export function canUseWorker() {
-    const isDesktop = typeof window !== 'undefined' && window.electronAPI?.isElectron;
-    return !isDesktop && typeof Worker !== 'undefined';
+    return typeof Worker !== 'undefined';
 }
 
 /**

@@ -35,9 +35,9 @@ function payloadBytes(options) {
 /**
  * Run an operation in the media worker when available (browser), falling back
  * to the main thread only when that is actually safe. Genuine processing
- * errors are rethrown, not retried.
- * On desktop the inline path is always used: processing there goes through
- * @mediabunny/server's FFmpeg threads, which need Node in the renderer.
+ * errors are rethrown, not retried. This covers desktop as well as the browser:
+ * both run the same WebCodecs backend, so neither has a reason to encode on the
+ * main thread.
  *
  * A worker that dies partway through a large job has almost certainly run out
  * of memory. Rerunning it inline would then freeze the UI for the whole encode

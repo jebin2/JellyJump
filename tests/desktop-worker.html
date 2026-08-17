@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Worker Offload Test</title>
+    <style>body { font-family: monospace; background: #111; color: #ddd; padding: 16px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h3>Worker offload / codec registration</h3>
+<pre id="log">starting…</pre>
+<script type="module">
+    /**
+     * Proves the two things desktop used to get wrong. The same assertions must
+     * hold in the browser and in Electron, since both now take the same path:
+     *
+     *   1. Heavy processing goes to the media worker, so the main thread keeps
+     *      running. Measured against a heartbeat during a real JJC4 encrypt —
+     *      the Reed-Solomon and frame-building work there is plain synchronous
+     *      JS, so it is what actually pins the main thread. (A WebCodecs
+     *      transcode is a poor probe: its encoder already runs off-thread, so
+     *      it stays responsive either way.)
+     *   2. The audio encoders actually exist. Desktop previously registered the
+     *      server backend, which silently no-ops, and skipped the browser
+     *      plugins on the strength of it — leaving no AAC/MP3/FLAC encoder.
+     *
+     * Add ?inline=1 to run the same job on the main thread instead, which is
+     * what desktop used to do; the responsiveness check should then fail.
+     *
+     * Dev-only page; open http://localhost:8080/tests/desktop-worker.html or
+     * drive it headlessly.
+     *
+     * Console output contract:
+     *   "WOFF: <line>"        per-check result
+     *   "WOFF-RESULT: ..."    PASS | FAIL
+     */
+    import { MediaBunny, ensureEncoders } from '/assets/js/core/MediaBunny.js';
+    import { canUseWorker } from '/assets/js/processing/worker/WorkerClient.js';
+    import { MediaProcessor } from '/assets/js/core/MediaProcessor.js';
+
+    const logEl = document.getElementById('log');
+    const log = (m) => { logEl.textContent += '\n' + m; console.log('WOFF:', m); };
+    logEl.textContent = '';
+
+    const forceInline = new URLSearchParams(location.search).has('inline');
+
+    let pass = 0, fail = 0;
+    const check = (ok, label) => {
+        if (ok) { pass++; log(`  PASS  ${label}`); }
+        else { fail++; log(`  FAIL  ${label}`); }
+    };
+
+    const TICK_MS = 20;
+
+    /**
+     * Runs fn while a timer ticks every TICK_MS, and reports how much of the
+     * wall time the main thread was too busy to service it. A job that has
+     * genuinely left the main thread leaves the heartbeat almost untouched.
+     */
+    async function withHeartbeat(fn) {
+        const started = performance.now();
+        let ticks = 0;
+        let last = started;
+        let worstGapMs = 0;
+        const timer = setInterval(() => {
+            const now = performance.now();
+            ticks++;
+            worstGapMs = Math.max(worstGapMs, now - last);
+            last = now;
+        }, TICK_MS);
+        try {
+            const value = await fn();
+            const elapsed = performance.now() - started;
+            // 1.0 = the main thread was never free; 0 = fully responsive.
+            const blockedRatio = Math.max(0, 1 - (ticks * TICK_MS) / elapsed);
+            return { value, elapsed, worstGapMs, blockedRatio };
+        } finally {
+            clearInterval(timer);
+        }
+    }
+
+    try {
+        const isElectron = !!window.electronAPI?.isElectron;
+        log(`runtime: ${isElectron ? 'Electron desktop' : 'browser'}${forceInline ? ' (forced inline)' : ''}`);
+        log('');
+
+        log('worker availability');
+        check(canUseWorker(), 'canUseWorker() is true in this runtime');
+        log('');
+
+        log('audio encoders');
+        await ensureEncoders();
+        const audio = await MediaBunny.getEncodableAudioCodecs();
+        log(`  encodable: ${audio.join(', ')}`);
+        for (const codec of ['aac', 'mp3', 'flac', 'opus']) {
+            check(audio.includes(codec), `${codec} is encodable`);
+        }
+        log('');
+
+        log('main thread stays responsive during a JJC4 encrypt');
+        // getRandomValues caps at 64 KB per call, so fill in chunks.
+        const bytes = new Uint8Array(96 * 1024);
+        for (let off = 0; off < bytes.length; off += 65536) {
+            crypto.getRandomValues(bytes.subarray(off, Math.min(off + 65536, bytes.length)));
+        }
+        const payload = new Blob([bytes]);
+        const run = forceInline
+            ? async () => {
+                const { PlatformCrypto } = await import('/assets/js/shared/utils/PlatformCrypto.js');
+                return PlatformCrypto.encrypt(payload, 'test-password', { filename: 'probe.bin' });
+            }
+            : () => MediaProcessor.encryptPlatform(payload, 'test-password', { filename: 'probe.bin' });
+
+        // Whether the job crossed into the worker is the thing being asserted,
+        // and it is observable directly. Timing is only reported: how much a
+        // main-thread run hurts scales with payload size, so any threshold on
+        // it would be arbitrary at test sizes and meaningless at real ones.
+        const dispatched = [];
+        const realPostMessage = Worker.prototype.postMessage;
+        Worker.prototype.postMessage = function (msg, ...rest) {
+            if (msg?.op) dispatched.push(msg.op);
+            return realPostMessage.call(this, msg, ...rest);
+        };
+
+        let carrier, elapsed, worstGapMs, blockedRatio;
+        try {
+            ({ value: carrier, elapsed, worstGapMs, blockedRatio } = await withHeartbeat(run));
+        } finally {
+            Worker.prototype.postMessage = realPostMessage;
+        }
+
+        log(`  job took ${(elapsed / 1000).toFixed(1)}s`);
+        log(`  worst single stall: ${worstGapMs.toFixed(0)} ms`);
+        log(`  main thread blocked: ${(blockedRatio * 100).toFixed(0)}% of the time`);
+        check(carrier && carrier.size > 0, 'encrypt produced a carrier');
+        check(dispatched.includes('encryptPlatform'), `encrypt ran in the worker (ops seen: ${dispatched.join(', ') || 'none'})`);
+        log('');
+
+        log(`${pass} passed, ${fail} failed`);
+        console.log(`WOFF-RESULT: ${fail === 0 ? 'PASS' : 'FAIL'} (${pass} passed, ${fail} failed)`);
+    } catch (e) {
+        console.error(e);
+        log('ERROR: ' + (e?.message || e));
+        console.log('WOFF-RESULT: FAIL (threw)');
+    }
+</script>
+</body>
+</html>

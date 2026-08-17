@@ -1,9 +1,8 @@
 /**
- * Media processing worker (browser only).
+ * Media processing worker.
  * Runs the heavy demux/decode/encode/mux pipelines off the main thread so
- * playback and UI stay responsive during conversions. The desktop app never
- * uses this worker: its processing runs in the renderer where
- * @mediabunny/server provides FFmpeg-backed codecs via Node.
+ * playback and UI stay responsive during conversions. Used by the desktop app
+ * as well as the browser — both run the same WebCodecs backend.
  *
  * Importing core/MediaBunny.js here registers the browser codec plugins in
  * this worker's own mediabunny instance.
