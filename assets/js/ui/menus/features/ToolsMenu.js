@@ -58,6 +58,14 @@ export class ToolsMenu {
                 </div>
                 <span class="tools-tile-label">Combine A/V</span>
             </button>
+            <button class="tools-tile" data-action="share" title="Share Library">
+                <div class="tools-tile-icon">
+                    <svg width="24" height="24" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-link"></use>
+                    </svg>
+                </div>
+                <span class="tools-tile-label">Share Library</span>
+            </button>
             <button class="tools-tile tools-tile-danger" data-action="reset" title="Reset App">
                 <div class="tools-tile-icon">
                     <svg width="24" height="24" fill="currentColor">
@@ -69,6 +77,13 @@ export class ToolsMenu {
         `;
 
         modal.setBody(content);
+
+        // Sharing serves this machine's scanned library, so it only means
+        // anything on the desktop app; in a browser there is nothing to serve.
+        const { ShareMenu } = await import('./ShareMenu.js');
+        if (!ShareMenu.isSupported()) {
+            content.querySelector('[data-action="share"]')?.remove();
+        }
 
         // Handle tile clicks
         content.querySelectorAll('.tools-tile').forEach(tile => {
@@ -91,6 +106,8 @@ export class ToolsMenu {
                 } else if (action === 'combine-av') {
                     const { CombineAVMenu } = await import('./CombineAVMenu.js');
                     CombineAVMenu.init(playlist);
+                } else if (action === 'share') {
+                    ShareMenu.show();
                 } else if (action === 'reset') {
                     if (confirm('Reset the app? This will clear all data and reload.')) {
                         try {

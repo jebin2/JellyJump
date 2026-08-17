@@ -879,6 +879,91 @@
     gap: 12px;
 }
 
+/* -----------------------------------------
+   Share Library menu
+   ----------------------------------------- */
+.share-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.share-note {
+    margin: 0;
+    font-size: 0.9em;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.share-note--error {
+    color: var(--accent-danger, #e5534b);
+}
+
+/* The link is a bearer credential, so the caution about it should not read as
+   ordinary body text. */
+.share-note--warn {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--accent-primary);
+    padding: 10px 12px;
+    border-radius: 4px;
+}
+
+.share-link-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.share-link {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    font-family: monospace;
+    font-size: 0.85em;
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-dark, var(--bg-secondary));
+    border-radius: 6px;
+}
+
+.share-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.share-btn {
+    padding: 10px 16px;
+    border: 1px solid var(--border-dark, var(--bg-secondary));
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.share-btn:hover:not(:disabled) {
+    border-color: var(--accent-primary);
+}
+
+.share-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.share-btn--primary {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .share-btn {
+        transition: none;
+    }
+}
+
 .tools-tile {
     display: flex;
     flex-direction: column;
