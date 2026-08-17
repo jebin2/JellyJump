@@ -32,6 +32,43 @@ const VIDEO_EXTENSIONS = new Set([
     '.flv', '.ts', '.m2ts', '.mts', '.3gp', '.ogv',
 ]);
 
+// Extensions that are not only video. ".ts" is MPEG transport stream and also
+// TypeScript, and a home directory holds thousands of the latter — including
+// generated ones like CMake's compiler_depend.ts. Extension alone would list
+// source files as videos, so these are confirmed by content.
+const AMBIGUOUS_EXTENSIONS = new Set(['.ts']);
+
+// MPEG-TS is 188-byte packets, each starting with this sync byte. Three in a row
+// at the right stride is conclusive enough and needs only the first 377 bytes.
+const TS_SYNC_BYTE = 0x47;
+const TS_PACKET_SIZE = 188;
+const TS_SYNC_CHECKS = 3;
+const TS_PROBE_BYTES = TS_PACKET_SIZE * (TS_SYNC_CHECKS - 1) + 1;
+
+/**
+ * Whether a file with an ambiguous extension really is video.
+ * Cheap by design: a size check rules out source files for free, and only what
+ * survives that is opened.
+ */
+async function looksLikeTransportStream(filePath, size) {
+    if (size < TS_PROBE_BYTES) return false;
+
+    let handle;
+    try {
+        handle = await fs.promises.open(filePath, 'r');
+        const { buffer, bytesRead } = await handle.read(Buffer.alloc(TS_PROBE_BYTES), 0, TS_PROBE_BYTES, 0);
+        if (bytesRead < TS_PROBE_BYTES) return false;
+        for (let i = 0; i < TS_SYNC_CHECKS; i++) {
+            if (buffer[i * TS_PACKET_SIZE] !== TS_SYNC_BYTE) return false;
+        }
+        return true;
+    } catch {
+        return false;
+    } finally {
+        await handle?.close().catch(() => {});
+    }
+}
+
 // Directory names never worth descending into. This matters most on the home
 // pass, which would otherwise spend the bulk of its time inside dependency
 // trees and caches. Dotfolders are skipped wholesale by the walker, so these
@@ -142,6 +179,10 @@ async function* walk(root, visited, counters) {
             try {
                 const stat = await fs.promises.stat(full);
                 if (!stat.isFile() || stat.size === 0) continue;
+                if (AMBIGUOUS_EXTENSIONS.has(ext)
+                    && !(await looksLikeTransportStream(full, stat.size))) {
+                    continue;
+                }
                 yield {
                     path: full,
                     name: entry.name,
