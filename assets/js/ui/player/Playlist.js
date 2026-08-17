@@ -18,6 +18,7 @@ import { PlaylistUI } from './PlaylistUI.js';
 import { PlaylistNavigation } from './PlaylistNavigation.js';
 import { PlaylistProcessor } from "../../shared/services/PlaylistProcessor.js";
 import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
+import { ShareState } from '../../shared/services/ShareState.js';
 
 // Folder that scan results are grouped under in the playlist tree.
 const DISCOVERED_FOLDER = 'Discovered';
@@ -75,6 +76,10 @@ export class Playlist {
 
         // Load saved data, then fill in what a scan finds on disk
         this._loadSavedPlaylist().then(() => this._startMediaScan());
+
+        // Sharing can already be on from a previous session, so reflect it
+        // on the Tools button without waiting for the menu to be opened.
+        ShareState.refresh();
 
         // Setup player error callback
         if (this.player) {

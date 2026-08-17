@@ -1043,6 +1043,32 @@
     font-size: 0.7rem;
 }
 
+/* Sharing active state for tools button. Sharing outlives the menu that starts
+   it, so this is the only persistent sign that the library is being served.
+   Accent rather than danger: recording owns the alarming colour, and sharing is
+   a deliberate state, not a warning. */
+#mb-tools.sharing-active {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+    animation: pulse-sharing 2s ease-in-out infinite;
+}
+
+/* Recording is the more urgent state and wins the button outright. */
+#mb-tools.sharing-active.recording-active {
+    animation: pulse-recording 1s ease-in-out infinite;
+}
+
+@keyframes pulse-sharing {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #mb-tools.sharing-active {
+        animation: none;
+    }
+}
+
 /* Recording active state for tools button */
 #mb-tools.recording-active {
     color: white;

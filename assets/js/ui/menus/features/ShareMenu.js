@@ -1,6 +1,7 @@
 import { Modal } from '../../Modal.js';
 import { Toast } from '../../../shared/utils/Toast.js';
 import { Logger } from '../../../shared/utils/Logger.js';
+import { ShareState } from '../../../shared/services/ShareState.js';
 
 /**
  * Share Menu
@@ -46,6 +47,9 @@ export class ShareMenu {
      * @param {Function} rerender
      */
     static _render(body, state, rerender) {
+        // Sharing outlives this modal, so the Tools button is what tells
+        // the user it is still on after the menu closes.
+        ShareState.update(state);
         body.textContent = '';
 
         if (state.error) {
