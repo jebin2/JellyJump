@@ -169,15 +169,49 @@ export class Playlist {
         if (!window.electronAPI?.isElectron) return;
 
         this._discovered = new DiscoveredMedia();
+        this.scanState = { scanning: true, found: 0, failed: false };
+
         this._discovered.subscribe((event) => {
-            if (event.type === 'batch') this.addDiscoveredItems(event.files);
-            if (event.type === 'error') Logger.warn('[Playlist] Media scan failed:', event.error);
+            if (event.type === 'batch') {
+                this.scanState.found = event.total;
+                // addDiscoveredItems re-renders, which redraws the header too.
+                this.addDiscoveredItems(event.files);
+            }
+            if (event.type === 'error') {
+                Logger.warn('[Playlist] Media scan failed:', event.error);
+                this.scanState = { scanning: false, found: this.scanState.found, failed: true };
+                this.render();
+            }
+            if (event.type === 'done') {
+                this.scanState = {
+                    scanning: false,
+                    found: event.total,
+                    failed: false,
+                    cancelled: event.summary?.cancelled ?? false,
+                };
+                this.render();
+            }
         });
+
         try {
             await this._discovered.scan();
         } catch (error) {
             Logger.warn('[Playlist] Media scan failed:', error);
+            this.scanState = { scanning: false, found: this.scanState.found, failed: true };
+            this.render();
         }
+    }
+
+    /** Folder that scan results are grouped under, for the renderer. */
+    get discoveredFolderName() {
+        return DISCOVERED_FOLDER;
+    }
+
+    /** Stop an in-flight scan. Whatever was already found stays listed. */
+    async cancelMediaScan() {
+        if (!this._discovered) return;
+        await this._discovered.cancel();
+        Logger.log('[Playlist] Media scan cancelled by user');
     }
 
     /**

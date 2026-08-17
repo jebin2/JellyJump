@@ -565,6 +565,37 @@
     color: var(--accent-primary);
 }
 
+.folder-scan-status {
+    margin-left: 8px;
+    font-size: 0.8em;
+    opacity: 0.7;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.folder-scan-status.failed {
+    color: var(--accent-danger, #e5534b);
+    opacity: 1;
+}
+
+/* Pulses rather than spins: there is no spinner element here, and a moving
+   glyph next to a growing count reads as two things changing at once. */
+.folder-scan-status.scanning {
+    animation: scan-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes scan-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .folder-scan-status.scanning {
+        animation: none;
+        opacity: 0.7;
+    }
+}
+
 /* Scan results: kept slightly dimmer than saved items, since they are
    transient until the user keeps one. */
 .playlist-item.discovered-item .playlist-title {

@@ -186,6 +186,44 @@ export class PlaylistRenderer {
         return commonSource === undefined ? null : commonSource;
     }
 
+    /**
+     * Show scan progress on the Discovered folder header: a status label while
+     * a scan is running, plus a cancel button, and a note if it ended early or
+     * failed. Nothing here changes what is listed — only what the user is told.
+     */
+    decorateScanStatus(folderData, header, folderName, removeBtn) {
+        const p = this.playlist;
+        const state = p.scanState;
+
+        const status = document.createElement('span');
+        status.className = 'folder-scan-status';
+        if (state.scanning) {
+            status.textContent = 'scanning…';
+            status.classList.add('scanning');
+        } else if (state.failed) {
+            status.textContent = 'scan failed';
+            status.classList.add('failed');
+        } else if (state.cancelled) {
+            status.textContent = 'stopped';
+        } else {
+            return; // finished cleanly: the plain count says everything
+        }
+        folderName.appendChild(status);
+
+        if (!state.scanning) return;
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'playlist-action-btn folder-scan-cancel-btn';
+        cancelBtn.title = 'Stop scanning';
+        cancelBtn.setAttribute('aria-label', 'Stop scanning for media');
+        cancelBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-close"></use></svg>';
+        cancelBtn.onclick = (e) => {
+            e.stopPropagation();
+            p.cancelMediaScan();
+        };
+        header.insertBefore(cancelBtn, removeBtn);
+    }
+
     createFolderElement(folderData) {
         const p = this.playlist;
         const template = document.getElementById('playlist-folder-header-template');
@@ -248,6 +286,13 @@ export class PlaylistRenderer {
             countSpan.style.whiteSpace = 'nowrap';
             countSpan.style.flexShrink = '0';
             folderName.appendChild(countSpan);
+        }
+
+        // The scan runs in another process and streams results in, so without
+        // this the Discovered folder just silently grows and there is no way to
+        // tell a scan from a finished one.
+        if (folderData.path === p.discoveredFolderName && p.scanState) {
+            this.decorateScanStatus(folderData, header, folderName, removeBtn);
         }
 
         const info = header.querySelector('.playlist-folder-info');

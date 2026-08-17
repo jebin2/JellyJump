@@ -201,6 +201,43 @@
             // A rescan must not resurrect it as a discovered duplicate.
             const knownPaths = new Set(fake.state.items.map(i => i.localPath).filter(Boolean));
             check(knownPaths.has(target.localPath), 'a rescan will skip it as already present');
+            log('');
+
+            // The header is the only place a running scan is visible, so each
+            // state has to render distinguishably.
+            log('scan status on the folder header');
+            const renderStatus = (scanState) => {
+                const renderer = new PlaylistRenderer({
+                    discoveredFolderName: 'Discovered',
+                    scanState,
+                    cancelMediaScan() {},
+                });
+                const header = document.createElement('div');
+                const nameEl = document.createElement('div');
+                const removeBtn = document.createElement('button');
+                header.appendChild(nameEl);
+                header.appendChild(removeBtn);
+                renderer.decorateScanStatus({ path: 'Discovered' }, header, nameEl, removeBtn);
+                return {
+                    text: nameEl.querySelector('.folder-scan-status')?.textContent ?? '',
+                    cancels: header.querySelectorAll('.folder-scan-cancel-btn').length,
+                    failed: !!nameEl.querySelector('.folder-scan-status.failed'),
+                };
+            };
+
+            const running = renderStatus({ scanning: true, found: 12 });
+            check(running.text.includes('scanning'), `running scan says so ("${running.text}")`);
+            check(running.cancels === 1, 'a running scan can be cancelled');
+
+            const finished = renderStatus({ scanning: false, found: 12, failed: false });
+            check(finished.text === '', 'a finished scan adds no label — the count says it');
+            check(finished.cancels === 0, 'and offers no cancel');
+
+            const stopped = renderStatus({ scanning: false, found: 5, cancelled: true });
+            check(stopped.text === 'stopped', `a cancelled scan is marked ("${stopped.text}")`);
+
+            const broken = renderStatus({ scanning: false, found: 0, failed: true });
+            check(broken.failed && broken.text === 'scan failed', `a failed scan is marked ("${broken.text}")`);
 
             log('');
             log(`${pass} passed, ${fail} failed`);
