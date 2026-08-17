@@ -15,7 +15,8 @@
  *   in   { type: 'scan', roots?: string[] }   start a scan
  *   in   { type: 'cancel' }                   stop the current scan
  *   out  { type: 'started', roots }
- *   out  { type: 'phase', phase, roots }      1 = media folders, 2 = home
+ *   out  { type: 'phase', phase, roots }      1 = media folders, 2 = drives,
+ *                                            3 = home
  *   out  { type: 'batch', files: [...] }      streamed, never one big array
  *   out  { type: 'done', found, scanned, cancelled, elapsedMs }
  *   out  { type: 'error', message }
@@ -91,8 +92,8 @@ const send = (message) => process.parentPort.postMessage(message);
 
 /**
  * The conventional media folders for this platform, filtered to those that
- * actually exist. Phase 2 (the full home walk) will exclude these so nothing
- * is visited twice.
+ * actually exist. The later home walk excludes these so nothing is visited
+ * twice.
  */
 function defaultRoots() {
     const home = os.homedir();
@@ -198,27 +199,87 @@ async function* walk(root, visited, counters) {
 }
 
 /**
- * Scan in two passes when no explicit roots are given:
+ * Mounted volumes: external drives, USB sticks, network shares.
+ *
+ * A media library very often lives on one of these rather than in the home
+ * directory, and nothing under the home tree would ever reach them. Each
+ * mount is listed as its own root instead of walking the parent, so an empty
+ * placeholder directory costs nothing.
+ */
+function mountedVolumeRoots() {
+    const roots = [];
+
+    if (process.platform === 'win32') {
+        // Drive letters, skipping C: which is the system drive the home pass
+        // already covers.
+        for (let code = 'D'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code++) {
+            const drive = `${String.fromCharCode(code)}:\\`;
+            try {
+                if (fs.statSync(drive).isDirectory()) roots.push(drive);
+            } catch {
+                // Not present, which is the normal case for most letters.
+            }
+        }
+        return roots;
+    }
+
+    // Where Linux and macOS put mounts. The user-scoped ones are where desktop
+    // environments actually mount removable media.
+    const parents = [
+        '/mnt', '/media', '/Volumes',
+        path.join('/media', os.userInfo().username ?? ''),
+        path.join('/run/media', os.userInfo().username ?? ''),
+    ];
+
+    for (const parent of parents) {
+        let entries;
+        try {
+            entries = fs.readdirSync(parent, { withFileTypes: true });
+        } catch {
+            continue; // absent on this platform, or not readable
+        }
+        for (const entry of entries) {
+            if (entry.name.startsWith('.')) continue;
+            const full = path.join(parent, entry.name);
+            try {
+                if (fs.statSync(full).isDirectory()) roots.push(full);
+            } catch {
+                // A stale or disconnected mount; skip rather than hang on it.
+            }
+        }
+    }
+    return roots;
+}
+
+/**
+ * Scan in three passes when no explicit roots are given:
  *
  *   1. the conventional media folders — small, high signal, results in a moment
- *   2. everything else under the home directory
+ *   2. mounted volumes — where a media library most often actually lives
+ *   3. everything else under the home directory
  *
- * Ordered this way so the files most likely to be wanted appear first, rather
- * than after a full-tree walk. Both passes share one visited set, which is what
- * keeps pass 2 from re-walking the folders pass 1 already covered: their
- * resolved paths are already marked, so the walker skips them as it descends.
+ * Ordered so the files most likely to be wanted appear first, rather than after
+ * a full-tree walk; the home pass is both the slowest and the noisiest, so it
+ * goes last. All passes share one visited set, which is what stops a later pass
+ * re-walking what an earlier one covered: those resolved paths are already
+ * marked, so the walker skips them as it descends.
  */
 function scanPhases(explicitRoots) {
     if (explicitRoots && explicitRoots.length > 0) {
         return [{ phase: 1, roots: explicitRoots }];
     }
-    const media = defaultRoots();
-    const phases = [{ phase: 1, roots: media }];
+
+    const phases = [{ phase: 1, roots: defaultRoots() }];
+
+    const volumes = mountedVolumeRoots();
+    if (volumes.length > 0) phases.push({ phase: 2, roots: volumes });
+
     try {
-        const home = fs.statSync(os.homedir()).isDirectory() ? os.homedir() : null;
-        if (home) phases.push({ phase: 2, roots: [home] });
+        if (fs.statSync(os.homedir()).isDirectory()) {
+            phases.push({ phase: 3, roots: [os.homedir()] });
+        }
     } catch {
-        // No readable home directory; the media folders are all there is.
+        // No readable home directory; the other passes are all there is.
     }
     return phases;
 }

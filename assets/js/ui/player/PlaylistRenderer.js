@@ -214,8 +214,8 @@ export class PlaylistRenderer {
         if (state.scanning) {
             // Naming the pass explains why results keep arriving after the
             // obvious folders are done, and why the second one takes longer.
-            status.textContent = state.phase === 2
-                ? 'scanning home folder…'
+            status.textContent = state.phase === 3 ? 'scanning home folder…'
+                : state.phase === 2 ? 'scanning drives…'
                 : 'scanning media folders…';
             status.classList.add('scanning');
         } else if (state.failed) {
