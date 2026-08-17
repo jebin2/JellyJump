@@ -17,12 +17,17 @@ if (process.platform === 'linux') {
     app.commandLine.appendSwitch('disable-dev-shm-usage');
     app.commandLine.appendSwitch('disable-features', 'NetworkServiceSandbox');
 
-    // Packaged only: in-process-gpu segfaults on launch on ordinary desktop
-    // Linux (reproduced on Wayland/Mesa here — removing just this switch makes
-    // the app start normally). It exists for the AppImage case, where the GPU
-    // zygote cannot spawn, so it stays there and is kept out of `npm start`,
-    // which otherwise cannot run at all.
-    if (app.isPackaged) {
+    // disable-gpu-sandbox addresses the same failure in-process-gpu was added
+    // for — a GPU process that cannot spawn under a restricted sandbox —
+    // without forcing GPU work into the main process.
+    app.commandLine.appendSwitch('disable-gpu-sandbox');
+
+    // in-process-gpu is opt-in now because it is destructive on an ordinary
+    // desktop: measured on Wayland/Mesa, the packaged app emitted ~34,700 GPU
+    // raster and EGL errors in 30 seconds against 1 without it, and it
+    // segfaults outright in an unpackaged run. Kept behind a flag so a machine
+    // that genuinely needs it can still ask.
+    if (process.env.JELLYJUMP_IN_PROCESS_GPU === '1') {
         app.commandLine.appendSwitch('in-process-gpu');
     }
 }
