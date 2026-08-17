@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { registerScannerIpc } = require('./scanner-host');
+const { registerShareIpc } = require('./share-host');
 
 // Required on Linux AppImage: kernel user-namespace sandboxing is often
 // unavailable (restricted sysctl), which causes the network service to crash
@@ -237,6 +238,31 @@ ipcMain.handle('open-file-dialog', async (event, options = {}) => {
 // walk here would block the event loop serving every IPC call and window event,
 // and one in a renderer would die with the window.
 registerScannerIpc({ assertTrustedIpcEvent, normalizeUserFilePath });
+
+// Library sharing is off until switched on: no server, no token, nothing
+// served. The token lives in the same config file as everything else, so a link
+// already pasted on another device survives a restart.
+registerShareIpc({
+    assertTrustedIpcEvent,
+    readShareToken: async () => {
+        try {
+            const data = JSON.parse(await fs.promises.readFile(configPath, 'utf8'));
+            return data.shareToken || null;
+        } catch {
+            return null;
+        }
+    },
+    writeShareToken: async (token) => {
+        let data = {};
+        try {
+            data = JSON.parse(await fs.promises.readFile(configPath, 'utf8'));
+        } catch {
+            // No config yet; the token is the first thing to go in it.
+        }
+        data.shareToken = token;
+        await fs.promises.writeFile(configPath, JSON.stringify(data, null, 2), 'utf8');
+    },
+});
 
 // ============================================
 // Window Creation

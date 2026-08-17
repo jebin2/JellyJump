@@ -9,6 +9,7 @@
 const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain, utilityProcess } = require('electron');
+const libraryIndex = require('./library-index');
 
 let scannerProcess = null;
 let scannerWindow = null;
@@ -32,7 +33,15 @@ function getScanner() {
     if (scannerProcess) return scannerProcess;
 
     scannerProcess = utilityProcess.fork(scannerPath(), [], { serviceName: 'JellyJumpScanner' });
-    scannerProcess.on('message', relay);
+
+    scannerProcess.on('message', (message) => {
+        // Keep a copy in the main process. The renderer's list is unreachable
+        // from the HTTP server, and rescanning just to answer requests would
+        // walk the whole tree twice.
+        if (message?.type === 'started') libraryIndex.setRoots(message.roots);
+        if (message?.type === 'batch') libraryIndex.addBatch(message.files);
+        relay(message);
+    });
 
     // A scanner that dies must not leave the renderer waiting forever, so its
     // exit is reported as a terminal event of the scan itself.
