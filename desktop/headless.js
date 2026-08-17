@@ -13,7 +13,6 @@ const fs = require('fs');
 const { app } = require('electron');
 const { runScan, stopScanner } = require('./scanner-host');
 const share = require('./share-host');
-const libraryIndex = require('./library-index');
 
 const PHASE_NAMES = { 1: 'media folders', 2: 'drives', 3: 'home directory' };
 
@@ -47,44 +46,45 @@ async function runHeadless(configPath) {
     // leaving the scanner process orphaned.
     const shutdown = installSignalHandlers();
 
-    console.log('Scanning for media…');
-    try {
-        let found = 0;
-        let lastReport = Date.now();
-        // Raced against shutdown: stopping kills the scanner, so runScan would
-        // never settle and the process would hang instead of exiting.
-        const result = await Promise.race([shutdown.whenStopped.then(() => null), runScan({
-            onPhase: (m) => console.log(`  ${PHASE_NAMES[m.phase] || `pass ${m.phase}`}…`),
-            onBatch: (count) => {
-                // Some passes run for a long time with nothing to say. Silence
-                // on a terminal reads as a hang, which is what makes people
-                // interrupt a scan that was working.
-                found += count;
-                if (Date.now() - lastReport >= 3000) {
-                    lastReport = Date.now();
-                    console.log(`    ${found} so far…`);
-                }
-            },
-        })]);
-        if (!result || shutdown.requested) return 0;
-        console.log(`Found ${result.found} video${result.found === 1 ? '' : 's'} in ${result.scanned} files (${(result.elapsedMs / 1000).toFixed(1)}s)`);
-    } catch (error) {
-        console.error(`Scan failed: ${error.message}`);
-        return 1;
-    }
-
+    // Sharing starts before the scan, not after it. The link is the thing the
+    // user came for and it does not depend on the scan: the server answers from
+    // the index, which the scanner fills as it goes. Waiting for a full walk
+    // before printing anything is what makes people interrupt it.
     const state = await share.enable();
     if (!state.enabled) {
         // The reason is the whole value of this path: on a headless box the
         // usual cause is Tailscale permissions, and the message names the fix.
-        console.error(`\nCould not start sharing.\n${state.reason || state.tailscaleReason || 'Unknown reason'}`);
+        console.error(`Could not start sharing.\n${state.reason || state.tailscaleReason || 'Unknown reason'}`);
         return 1;
     }
 
-    console.log(`\nSharing ${libraryIndex.size()} files.\n\n    ${state.url}\n`);
+    console.log(`Sharing.\n\n    ${state.url}\n`);
     console.log('Paste that into Add Link in JellyJump on any device on your tailnet.');
     console.log('This link is a credential — anyone with it and tailnet access can play your library.');
-    console.log('\nRunning. Press Ctrl+C to stop sharing and exit.');
+    console.log('\nScanning for media — the library fills in as it goes, so reload it there to see more.');
+
+    let found = 0;
+    let lastReport = Date.now();
+    runScan({
+        onPhase: (m) => console.log(`  ${PHASE_NAMES[m.phase] || `pass ${m.phase}`}…`),
+        onBatch: (count) => {
+            // Silence on a terminal reads as a hang, which is what makes
+            // someone interrupt a scan that was working.
+            found += count;
+            if (Date.now() - lastReport >= 3000) {
+                lastReport = Date.now();
+                console.log(`    ${found} found…`);
+            }
+        },
+    }).then((result) => {
+        if (shutdown.requested) return;
+        console.log(`\nScan complete: ${result.found} video${result.found === 1 ? '' : 's'} in ${result.scanned} files (${(result.elapsedMs / 1000).toFixed(1)}s)`);
+        console.log('Running. Press Ctrl+C to stop sharing and exit.');
+    }).catch((error) => {
+        if (!shutdown.requested) console.error(`Scan failed: ${error.message}`);
+    });
+
+    console.log('Press Ctrl+C to stop sharing and exit.\n');
 
     return shutdown.whenStopped;
 }
