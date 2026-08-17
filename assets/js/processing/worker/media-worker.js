@@ -14,6 +14,19 @@ import { reverseVideo, changeVideoSpeed } from '../speed/SpeedService.js';
 import { PlatformCrypto } from '../../shared/utils/PlatformCrypto.js';
 
 const OPS = {
+    /**
+     * Codec support as this worker sees it, for the offload tests. Loads the
+     * encoder plugins first, exactly as every encoding path here does — without
+     * that the answer would describe a worker no real job ever runs in.
+     */
+    codecSupport: async () => {
+        const { MediaBunny, ensureEncoders } = await import('../../core/MediaBunny.js');
+        await ensureEncoders();
+        return {
+            video: await MediaBunny.getEncodableVideoCodecs(),
+            audio: await MediaBunny.getEncodableAudioCodecs(),
+        };
+    },
     process: transcode,
     processHls,
     reverseVideo,

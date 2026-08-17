@@ -19,9 +19,10 @@
      *      JS, so it is what actually pins the main thread. (A WebCodecs
      *      transcode is a poor probe: its encoder already runs off-thread, so
      *      it stays responsive either way.)
-     *   2. The audio encoders actually exist. Desktop previously registered the
-     *      server backend, which silently no-ops, and skipped the browser
-     *      plugins on the strength of it — leaving no AAC/MP3/FLAC encoder.
+     *   2. The audio encoders actually exist, in the renderer and in the worker.
+     *      Desktop previously registered the server backend, which silently
+     *      no-ops, and skipped the browser plugins on the strength of it —
+     *      leaving no AAC/MP3/FLAC encoder anywhere.
      *
      * Add ?inline=1 to run the same job on the main thread instead, which is
      * what desktop used to do; the responsiveness check should then fail.
@@ -34,7 +35,7 @@
      *   "WOFF-RESULT: ..."    PASS | FAIL
      */
     import { MediaBunny, ensureEncoders } from '/assets/js/core/MediaBunny.js';
-    import { canUseWorker } from '/assets/js/processing/worker/WorkerClient.js';
+    import { canUseWorker, runInWorker } from '/assets/js/processing/worker/WorkerClient.js';
     import { MediaProcessor } from '/assets/js/core/MediaProcessor.js';
 
     const logEl = document.getElementById('log');
@@ -48,6 +49,30 @@
         if (ok) { pass++; log(`  PASS  ${label}`); }
         else { fail++; log(`  FAIL  ${label}`); }
     };
+
+    /** A short real clip to push through the worker's encode path. */
+    async function makeClip(seconds = 2, fps = 30) {
+        const W = 320, H = 180;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const output = new MediaBunny.Output({
+            format: new MediaBunny.Mp4OutputFormat(),
+            target: new MediaBunny.BufferTarget(),
+        });
+        const vs = new MediaBunny.VideoSampleSource({ codec: 'avc', quality: MediaBunny.QUALITY_HIGH });
+        output.addVideoTrack(vs);
+        await output.start();
+        for (let i = 0; i < seconds * fps; i++) {
+            ctx.fillStyle = `hsl(${(i * 7) % 360}, 70%, 45%)`;
+            ctx.fillRect(0, 0, W, H);
+            const frame = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+            const s = new MediaBunny.VideoSample(frame);
+            await vs.add(s); s.close?.();
+        }
+        await output.finalize();
+        return new Blob([output.target.buffer], { type: 'video/mp4' });
+    }
 
     const TICK_MS = 20;
 
@@ -94,6 +119,32 @@
         for (const codec of ['aac', 'mp3', 'flac', 'opus']) {
             check(audio.includes(codec), `${codec} is encodable`);
         }
+        log('');
+
+        // The worker registers codecs in its own mediabunny instance, so having
+        // them in the renderer proves nothing about the place conversions and
+        // track extraction actually run.
+        log('audio encoders, in the worker');
+        // Bounded: a worker that fails to come up would otherwise leave this
+        // hanging with nothing to show for it.
+        const workerCodecs = await Promise.race([
+            runInWorker('codecSupport', {}),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('worker did not answer within 60s')), 60_000)),
+        ]);
+        log(`  worker video: ${workerCodecs.video.join(', ')}`);
+        log(`  worker audio: ${workerCodecs.audio.filter(c => !c.startsWith('pcm-')).join(', ')}`);
+        for (const codec of ['aac', 'mp3', 'flac', 'opus']) {
+            check(workerCodecs.audio.includes(codec), `worker can encode ${codec}`);
+        }
+        log('');
+
+        log('a real transcode completes in the worker');
+        const clip = await makeClip();
+        const transcoded = await Promise.race([
+            MediaProcessor.process({ source: clip, format: 'mp4', quality: 'medium' }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('transcode did not finish within 60s')), 60_000)),
+        ]);
+        check(transcoded && transcoded.size > 0, `worker transcode produced output (${(transcoded?.size / 1024).toFixed(0)} KB)`);
         log('');
 
         log('main thread stays responsive during a JJC4 encrypt');
