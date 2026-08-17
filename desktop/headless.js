@@ -42,11 +42,31 @@ async function runHeadless(configPath) {
         writeShareToken: async (token) => writeConfig(configPath, { shareToken: token }),
     });
 
+    // Registered before anything long-running starts. The scan can take a while
+    // on a slow disk, and Ctrl+C during it used to kill the process outright,
+    // leaving the scanner process orphaned.
+    const shutdown = installSignalHandlers();
+
     console.log('Scanning for media…');
     try {
-        const result = await runScan({
+        let found = 0;
+        let lastReport = Date.now();
+        // Raced against shutdown: stopping kills the scanner, so runScan would
+        // never settle and the process would hang instead of exiting.
+        const result = await Promise.race([shutdown.whenStopped.then(() => null), runScan({
             onPhase: (m) => console.log(`  ${PHASE_NAMES[m.phase] || `pass ${m.phase}`}…`),
-        });
+            onBatch: (count) => {
+                // Some passes run for a long time with nothing to say. Silence
+                // on a terminal reads as a hang, which is what makes people
+                // interrupt a scan that was working.
+                found += count;
+                if (Date.now() - lastReport >= 3000) {
+                    lastReport = Date.now();
+                    console.log(`    ${found} so far…`);
+                }
+            },
+        })]);
+        if (!result || shutdown.requested) return 0;
         console.log(`Found ${result.found} video${result.found === 1 ? '' : 's'} in ${result.scanned} files (${(result.elapsedMs / 1000).toFixed(1)}s)`);
     } catch (error) {
         console.error(`Scan failed: ${error.message}`);
@@ -66,24 +86,37 @@ async function runHeadless(configPath) {
     console.log('This link is a credential — anyone with it and tailnet access can play your library.');
     console.log('\nRunning. Press Ctrl+C to stop sharing and exit.');
 
-    return new Promise((resolve) => {
-        let stopping = false;
-        const shutdown = async (signal) => {
-            if (stopping) return;
-            stopping = true;
-            console.log(`\nStopping (${signal})…`);
-            // Leaving the tailscale serve mapping behind would keep pointing at
-            // a port nothing is listening on, which looks like it still works.
-            await share.stopSharing().catch(() => {});
-            stopScanner();
-            console.log('Stopped sharing.');
-            resolve(0);
-        };
+    return shutdown.whenStopped;
+}
 
-        process.on('SIGINT', () => shutdown('SIGINT'));
-        process.on('SIGTERM', () => shutdown('SIGTERM'));
-        app.on('before-quit', () => shutdown('quit'));
-    });
+/**
+ * Stop cleanly on Ctrl+C, whatever stage we are at.
+ *
+ * Leaving the tailscale serve mapping behind would keep pointing at a port
+ * nothing is listening on, which from outside looks identical to working.
+ * @returns {{requested: boolean, whenStopped: Promise<number>}}
+ */
+function installSignalHandlers() {
+    const state = { requested: false };
+    let resolveStopped;
+    state.whenStopped = new Promise((resolve) => { resolveStopped = resolve; });
+
+    let stopping = false;
+    const stop = async (signal) => {
+        if (stopping) return;
+        stopping = true;
+        state.requested = true;
+        console.log(`\nStopping (${signal})…`);
+        await share.stopSharing().catch(() => {});
+        stopScanner();
+        console.log('Stopped.');
+        resolveStopped(0);
+    };
+
+    process.on('SIGINT', () => stop('SIGINT'));
+    process.on('SIGTERM', () => stop('SIGTERM'));
+    app.on('before-quit', () => stop('quit'));
+    return state;
 }
 
 module.exports = { runHeadless };

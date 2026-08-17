@@ -101,12 +101,13 @@ function stopScanner() {
  * there is no window to ask for it.
  * @returns {Promise<{found: number, scanned: number}>}
  */
-function runScan({ roots, onPhase } = {}) {
+function runScan({ roots, onPhase, onBatch } = {}) {
     return new Promise((resolve, reject) => {
         const scanner = getScanner();
 
         const onMessage = (message) => {
             if (message?.type === 'phase') onPhase?.(message);
+            if (message?.type === 'batch') onBatch?.(message.files.length);
             if (message?.type === 'done') {
                 scanner.removeListener('message', onMessage);
                 resolve(message);
