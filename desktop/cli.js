@@ -22,6 +22,15 @@ const tailscale = require('./tailscale');
 
 const HTTPS_PORT = 8443;
 
+// Electron and Chromium switches that are legitimately passed through to the
+// runtime rather than being ours to interpret.
+const PASSTHROUGH_SWITCHES = new Set([
+    '--no-sandbox', '--disable-gpu', '--disable-gpu-sandbox', '--in-process-gpu',
+    '--enable-logging', '--disable-dev-shm-usage', '--user-data-dir',
+    '--remote-debugging-port', '--ozone-platform', '--ozone-platform-hint',
+    '--trace-warnings', '--inspect', '--inspect-brk', '--lang',
+]);
+
 const USAGE = `JellyJump
 
   jellyjump                  start the app
@@ -102,6 +111,18 @@ async function handleCliArgs(argv, configPath) {
         console.log(result.message);
         return 'exit';
     }
+    // An option we do not know is an error, not a reason to open a window.
+    // Silently launching the GUI is how someone discovers their build predates
+    // a flag: they run --no-gui, a window appears, and nothing says why.
+    const unknown = args.filter((a) => a.startsWith('--') && !PASSTHROUGH_SWITCHES.has(a.split('=')[0]));
+    if (unknown.length > 0) {
+        console.error(`Unknown option: ${unknown.join(' ')}\n`);
+        console.error('This build may be older than that option — the list below is what it supports.\n');
+        console.error(USAGE);
+        process.exitCode = 1;
+        return 'exit';
+    }
+
     return null;
 }
 
