@@ -1,9 +1,60 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { registerScannerIpc } = require('./scanner-host');
 const { registerShareIpc } = require('./share-host');
 const { handleCliArgs, isTerminalInvocation } = require('./cli');
+
+function hasOzoneSwitch(argv) {
+    return argv.some((arg) => arg.startsWith('--ozone-platform'));
+}
+
+/**
+ * Re-run ourselves with a windowing backend that needs no display.
+ *
+ * app.commandLine.appendSwitch cannot do this: by the time the main script
+ * runs, Chromium has already selected and initialized the ozone platform, so
+ * the switch is read too late and ignored. Measured from a bare environment
+ * (the SSH case) against the packaged build — appendSwitch and
+ * ELECTRON_OZONE_PLATFORM_HINT both still died in aura; only a switch present
+ * on the command line at exec time worked. A machine with a desktop session
+ * hides this, because ozone then picks Wayland and succeeds anyway.
+ *
+ * spawnSync rather than spawn: this process must not reach `ready`, and
+ * blocking the event loop is what guarantees it cannot.
+ *
+ * Signals therefore cannot be forwarded — a handler here cannot run while
+ * spawnSync blocks (measured: it fires only after the call returns). So the two
+ * signals are handled differently on purpose:
+ *
+ *   SIGINT  — ignored here. Ctrl+C already reaches the child directly through
+ *             the terminal's process group, and ignoring it keeps this process
+ *             alive to relay the child's shutdown output in the right order.
+ *   SIGTERM — left at its default, so `kill` and `systemctl stop` do kill this
+ *             process. The child notices its wrapper is gone (JELLYJUMP_WRAPPER_PID)
+ *             and shuts down cleanly rather than being orphaned.
+ */
+function relaunchWithoutDisplay() {
+    const { spawnSync } = require('child_process');
+    process.on('SIGINT', () => {});
+    const child = spawnSync(
+        process.execPath,
+        // --disable-gpu because nothing is ever drawn, and without it ANGLE
+        // still tries to open the X display it does not have, printing an
+        // error per attempt around our output.
+        [...process.argv.slice(1), '--ozone-platform=headless', '--disable-gpu'],
+        {
+            stdio: 'inherit',
+            // Named rather than inferred from ppid: `nohup jellyjump --no-gui &`
+            // is a legitimate way to run this, and there the parent shell is
+            // *meant* to go away. Only this wrapper's death means anything.
+            env: { ...process.env, JELLYJUMP_WRAPPER_PID: String(process.pid) },
+        }
+    );
+    // 128 + signal is the shell's own convention for a signalled exit.
+    process.exit(child.status ?? (child.signal ? 128 + os.constants.signals[child.signal] : 1));
+}
 
 // Chosen here, at the top of the file, because by the time `ready` fires the
 // windowing backend has already been picked — and on a machine reached over SSH
@@ -11,11 +62,8 @@ const { handleCliArgs, isTerminalInvocation } = require('./cli');
 // aura aborts the process with SIGSEGV before any of our code runs. That killed
 // every flag on exactly the machine the flags exist for.
 const wantsTerminal = isTerminalInvocation(process.argv);
-if (process.platform === 'linux' && wantsTerminal) {
-    app.commandLine.appendSwitch('ozone-platform', 'headless');
-    // Nothing is drawn, and without this the GPU process still tries to bring
-    // up EGL against a display that is not there, failing noisily on the way.
-    app.disableHardwareAcceleration();
+if (process.platform === 'linux' && wantsTerminal && !hasOzoneSwitch(process.argv)) {
+    relaunchWithoutDisplay();  // never returns
 }
 
 // A GUI asked for where no display exists is the same crash, and it is worth

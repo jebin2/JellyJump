@@ -13,6 +13,7 @@ const libraryIndex = require('./library-index');
 
 let scannerProcess = null;
 let scannerWindow = null;
+let stoppingScanner = false;
 
 function scannerPath() {
     let scriptPath = path.join(__dirname, 'scanner.js');
@@ -47,10 +48,17 @@ function getScanner() {
     // exit is reported as a terminal event of the scan itself.
     scannerProcess.on('exit', (code) => {
         scannerProcess = null;
-        if (code !== 0) {
+        if (code === 0) return;
+
+        // Deferred, because a Ctrl+C reaches the scanner directly — it shares
+        // our process group — and kills it before our own signal handler gets
+        // to run. Judging it immediately would report every clean shutdown as a
+        // crash. The delay costs nothing when the scanner really has died.
+        setTimeout(() => {
+            if (stoppingScanner) return;
             console.error('[Scanner] Exited with code', code);
             relay({ type: 'error', message: `Scanner stopped unexpectedly (code ${code})` });
-        }
+        }, 100);
     });
 
     return scannerProcess;
@@ -91,6 +99,7 @@ function registerScannerIpc({ assertTrustedIpcEvent, normalizeUserFilePath }) {
 }
 
 function stopScanner() {
+    stoppingScanner = true;
     scannerProcess?.kill();
     scannerProcess = null;
 }

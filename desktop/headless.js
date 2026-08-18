@@ -110,6 +110,9 @@ function installSignalHandlers(configPath) {
         if (stopping) return;
         stopping = true;
         state.requested = true;
+        // Before the awaits below: this is what tells the scanner host that an
+        // exiting scanner is expected rather than a crash.
+        stopScanner();
         console.log(`\nStopping (${signal})…`);
         await share.stopSharing().catch(() => {});
         stopScanner();
@@ -121,6 +124,24 @@ function installSignalHandlers(configPath) {
     process.on('SIGINT', () => stop('SIGINT'));
     process.on('SIGTERM', () => stop('SIGTERM'));
     app.on('before-quit', () => stop('quit'));
+
+    // On Linux this process is usually a re-exec of a thin wrapper (see
+    // relaunchWithoutDisplay in main.js), and that wrapper cannot forward
+    // signals to us. `kill` therefore lands on it, not here — so watch for it
+    // going away and treat that as the stop request it was.
+    const wrapperPid = Number(process.env.JELLYJUMP_WRAPPER_PID);
+    if (wrapperPid) {
+        const watchdog = setInterval(() => {
+            try {
+                process.kill(wrapperPid, 0);
+            } catch {
+                clearInterval(watchdog);
+                stop('parent stopped');
+            }
+        }, 1000);
+        watchdog.unref();
+    }
+
     return state;
 }
 
