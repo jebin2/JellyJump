@@ -17,7 +17,8 @@
     "test:rs": "node scripts/rs-selftest.mjs && node scripts/shard-pipeline-test.mjs",
     "test:server": "node scripts/library-server-test.mjs",
     "test:remote": "node scripts/remote-library-test.mjs",
-    "test:share": "npm run test:server && npm run test:remote"
+    "test:cli": "node scripts/cli-test.mjs",
+    "test:share": "npm run test:server && npm run test:remote && npm run test:cli"
   },
   "devDependencies": {
     "vite": "^8.0.0"

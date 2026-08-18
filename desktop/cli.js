@@ -85,6 +85,23 @@ async function shareStatus(configPath) {
 }
 
 /**
+ * Whether this invocation wants an answer on the terminal rather than a window.
+ *
+ * Must be answerable synchronously and without Electron: it is consulted at the
+ * top of main.js, before `ready`, because that is the last moment at which the
+ * windowing backend can still be chosen. An unknown option counts — it prints an
+ * error, which needs no display either.
+ * @returns {boolean}
+ */
+function isTerminalInvocation(argv) {
+    return argv.slice(1).some((arg) => {
+        if (arg === '-h') return true;
+        if (!arg.startsWith('--')) return false;
+        return !PASSTHROUGH_SWITCHES.has(arg.split('=')[0]);
+    });
+}
+
+/**
  * Handle a CLI flag if one was given.
  * @returns {Promise<'exit'|'headless'|null>} what the caller should do next:
  *   'exit' when the answer has been printed, 'headless' to run without a
@@ -126,4 +143,4 @@ async function handleCliArgs(argv, configPath) {
     return null;
 }
 
-module.exports = { handleCliArgs, USAGE };
+module.exports = { handleCliArgs, isTerminalInvocation, USAGE };

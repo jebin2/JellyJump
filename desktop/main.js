@@ -3,7 +3,30 @@ const path = require('path');
 const fs = require('fs');
 const { registerScannerIpc } = require('./scanner-host');
 const { registerShareIpc } = require('./share-host');
-const { handleCliArgs } = require('./cli');
+const { handleCliArgs, isTerminalInvocation } = require('./cli');
+
+// Chosen here, at the top of the file, because by the time `ready` fires the
+// windowing backend has already been picked — and on a machine reached over SSH
+// there is none. Electron defaults to the X11 backend, finds no $DISPLAY, and
+// aura aborts the process with SIGSEGV before any of our code runs. That killed
+// every flag on exactly the machine the flags exist for.
+const wantsTerminal = isTerminalInvocation(process.argv);
+if (process.platform === 'linux' && wantsTerminal) {
+    app.commandLine.appendSwitch('ozone-platform', 'headless');
+    // Nothing is drawn, and without this the GPU process still tries to bring
+    // up EGL against a display that is not there, failing noisily on the way.
+    app.disableHardwareAcceleration();
+}
+
+// A GUI asked for where no display exists is the same crash, and it is worth
+// saying so: the segfault above gives no hint that --no-gui is what was wanted.
+if (process.platform === 'linux' && !wantsTerminal
+    && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
+    console.error('No display found — JellyJump cannot open a window here.\n\n'
+        + 'If you are connected over SSH, run it without a window instead:\n\n'
+        + '    jellyjump --no-gui\n');
+    process.exit(1);
+}
 
 // Required on Linux AppImage: kernel user-namespace sandboxing is often
 // unavailable (restricted sysctl), which causes the network service to crash
