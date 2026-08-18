@@ -4,7 +4,40 @@ const fs = require('fs');
 const os = require('os');
 const { registerScannerIpc } = require('./scanner-host');
 const { registerShareIpc } = require('./share-host');
-const { handleCliArgs, isTerminalInvocation } = require('./cli');
+const { handleCliArgs, isTerminalInvocation, isQueryInvocation } = require('./cli');
+
+/**
+ * Answer a read-only flag as plain Node, with no Chromium at all.
+ *
+ * --version, --share-status and --help read a file and shell out to tailscale;
+ * none of that needs a browser process. Starting one is what produced "Invalid
+ * file descriptor to ICU data received" in the AppImage: its runtime unmounts
+ * the squashfs as soon as we exit, and a Chromium child still initializing at
+ * that moment loses icudtl.dat underneath it. Measured — the .deb and the
+ * extracted binary, which have no mount to lose, never printed it, and no
+ * combination of --no-zygote / --disable-gpu / --disable-crash-reporter
+ * suppressed it.
+ *
+ * The two things only Electron knows are handed down, so a Node-mode answer
+ * cannot drift from what the app itself would report.
+ */
+function runQueryAsNode() {
+    const { spawnSync } = require('child_process');
+    const child = spawnSync(
+        process.execPath,
+        [path.join(__dirname, 'cli-node.js'), ...process.argv.slice(1)],
+        {
+            stdio: 'inherit',
+            env: {
+                ...process.env,
+                ELECTRON_RUN_AS_NODE: '1',
+                JELLYJUMP_CONFIG: path.join(app.getPath('userData'), 'jellyjump.json'),
+                JELLYJUMP_VERSION: app.getVersion(),
+            },
+        }
+    );
+    process.exit(child.status ?? 1);
+}
 
 function hasOzoneSwitch(argv) {
     return argv.some((arg) => arg.startsWith('--ozone-platform'));
@@ -62,8 +95,10 @@ function relaunchWithoutDisplay() {
 // aura aborts the process with SIGSEGV before any of our code runs. That killed
 // every flag on exactly the machine the flags exist for.
 const wantsTerminal = isTerminalInvocation(process.argv);
-if (process.platform === 'linux' && wantsTerminal && !hasOzoneSwitch(process.argv)) {
-    relaunchWithoutDisplay();  // never returns
+if (process.platform === 'linux' && wantsTerminal) {
+    // Neither of these returns.
+    if (isQueryInvocation(process.argv)) runQueryAsNode();
+    else if (!hasOzoneSwitch(process.argv)) relaunchWithoutDisplay();
 }
 
 // A GUI asked for where no display exists is the same crash, and it is worth

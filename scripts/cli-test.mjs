@@ -13,7 +13,7 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { isTerminalInvocation, USAGE } = require('../desktop/cli.js');
+const { isTerminalInvocation, isQueryInvocation, USAGE } = require('../desktop/cli.js');
 
 let pass = 0, fail = 0;
 const check = (ok, label) => {
@@ -50,6 +50,19 @@ check(isTerminalInvocation(argv('--no-sandbox', '--share-link')) === true,
 console.log('\nthe executable path itself is never read as a flag');
 check(isTerminalInvocation(['--headless-looking-name']) === false,
     'argv[0] is skipped even when it looks like a flag');
+
+// Read-only flags run as plain Node, with no Chromium. Misclassifying --no-gui
+// as one of them would strand it without utilityProcess, app, or IPC.
+console.log('\nread-only flags need no browser process');
+for (const flag of ['--version', '-v', '--share-status', '--help', '-h', '--bogus']) {
+    check(isQueryInvocation(argv(flag)) === true, `${flag} can answer as plain Node`);
+}
+for (const flag of ['--no-gui', '--headless']) {
+    check(isQueryInvocation(argv(flag)) === false, `${flag} still needs Electron`);
+}
+check(isQueryInvocation(argv('--no-gui', '--share-status')) === false,
+    'a run that shares is never treated as read-only, whatever else is passed');
+check(isQueryInvocation(argv()) === false, 'an ordinary launch is not a query');
 
 console.log('\nusage text stays in step with what is classified');
 for (const flag of ['--no-gui', '--share-status', '--version', '--help']) {

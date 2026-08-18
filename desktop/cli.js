@@ -102,6 +102,17 @@ function isTerminalInvocation(argv) {
 }
 
 /**
+ * Whether this invocation only reads and prints — no window, no scan, no
+ * sharing. Those can run as plain Node, with no Chromium at all.
+ * @returns {boolean}
+ */
+function isQueryInvocation(argv) {
+    if (!isTerminalInvocation(argv)) return false;
+    const args = argv.slice(1);
+    return !args.includes('--no-gui') && !args.includes('--headless');
+}
+
+/**
  * Handle a CLI flag if one was given.
  * @returns {Promise<'exit'|'headless'|null>} what the caller should do next:
  *   'exit' when the answer has been printed, 'headless' to run without a
@@ -117,7 +128,9 @@ async function handleCliArgs(argv, configPath) {
     if (args.includes('--version') || args.includes('-v')) {
         // The answer to "is the thing I just installed the thing I downloaded",
         // which until now could only be guessed at from which flags existed.
-        console.log(require('electron').app.getVersion());
+        // Passed in when this runs as plain Node, where require('electron')
+        // yields a path rather than the API.
+        console.log(process.env.JELLYJUMP_VERSION || require('electron').app.getVersion());
         return 'exit';
     }
     if (args.includes('--no-gui') || args.includes('--headless')) {
@@ -153,4 +166,4 @@ async function handleCliArgs(argv, configPath) {
     return null;
 }
 
-module.exports = { handleCliArgs, isTerminalInvocation, USAGE };
+module.exports = { handleCliArgs, isTerminalInvocation, isQueryInvocation, USAGE };
