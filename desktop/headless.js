@@ -41,10 +41,14 @@ async function runHeadless(configPath) {
         writeShareToken: async (token) => writeConfig(configPath, { shareToken: token }),
     });
 
+    // Recorded so a later GUI launch can say what is holding the lock, and
+    // name the process to stop. Without it that launch just dies silently.
+    writeConfig(configPath, { headlessPid: process.pid });
+
     // Registered before anything long-running starts. The scan can take a while
     // on a slow disk, and Ctrl+C during it used to kill the process outright,
     // leaving the scanner process orphaned.
-    const shutdown = installSignalHandlers();
+    const shutdown = installSignalHandlers(configPath);
 
     // Sharing starts before the scan, not after it. The link is the thing the
     // user came for and it does not depend on the scan: the server answers from
@@ -96,7 +100,7 @@ async function runHeadless(configPath) {
  * nothing is listening on, which from outside looks identical to working.
  * @returns {{requested: boolean, whenStopped: Promise<number>}}
  */
-function installSignalHandlers() {
+function installSignalHandlers(configPath) {
     const state = { requested: false };
     let resolveStopped;
     state.whenStopped = new Promise((resolve) => { resolveStopped = resolve; });
@@ -109,6 +113,7 @@ function installSignalHandlers() {
         console.log(`\nStopping (${signal})…`);
         await share.stopSharing().catch(() => {});
         stopScanner();
+        writeConfig(configPath, { headlessPid: null });
         console.log('Stopped.');
         resolveStopped(0);
     };

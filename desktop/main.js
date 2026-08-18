@@ -57,6 +57,23 @@ if (process.platform === 'linux') {
 
 const configPath = path.join(app.getPath('userData'), 'jellyjump.json');
 
+/**
+ * The pid of a headless instance that is actually still alive, if there is one.
+ * The recorded pid can be stale — a `kill -9` leaves no chance to clear it — so
+ * it is checked rather than trusted.
+ * @returns {number|null}
+ */
+function runningHeadlessPid() {
+    try {
+        const { headlessPid } = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (!headlessPid) return null;
+        process.kill(headlessPid, 0);
+        return headlessPid;
+    } catch {
+        return null;
+    }
+}
+
 function isTrustedIpcEvent(event) {
     const frameUrl = event.senderFrame?.url;
     if (!frameUrl) return false;
@@ -386,6 +403,25 @@ app.whenReady().then(async () => {
             app.exit(1);
             return;
         }
+
+        // A GUI launch normally raises the window the other instance owns. When
+        // that instance is headless there is no window to raise, so this would
+        // exit silently and look like the app was broken — say what is holding
+        // it, and name the process to stop.
+        const headlessPid = runningHeadlessPid();
+        if (headlessPid) {
+            const message = 'JellyJump is sharing this library without a window '
+                + `(started with --no-gui, process ${headlessPid}).\n\n`
+                + 'Stop it first — Ctrl+C in that terminal, or:\n\n'
+                + `    kill ${headlessPid}`;
+            // Both, because this launch may have come from a terminal or from a
+            // desktop icon, and neither one sees the other's output.
+            console.error(`JellyJump is already running.\n${message}\n`);
+            require('electron').dialog.showErrorBox('JellyJump is already running', message);
+            app.exit(1);
+            return;
+        }
+
         app.quit();
         return;
     }
