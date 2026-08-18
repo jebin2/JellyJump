@@ -41,6 +41,16 @@ jobs:
           cp -r dist/* desktop/build/
         shell: bash
 
+      # The tag is the source of truth for the version. Without this the
+      # version in package.json is whatever was committed, so every release
+      # reported the same number — nothing in an installed build said which
+      # one it was, and apt saw no upgrade to perform.
+      - name: Stamp Version From Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: ./desktop
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+        shell: bash
+
       - name: Install Desktop Dependencies
         working-directory: ./desktop
         run: npm install

@@ -39,6 +39,7 @@ const USAGE = `JellyJump
   jellyjump                  start the app
   jellyjump --no-gui         share the library with no window, and keep running
   jellyjump --share-status   whether the library is being shared, and the link
+  jellyjump --version        which build this is
   jellyjump --help           this message
 
 The share link is a credential: anyone with it and access to your tailnet can
@@ -94,7 +95,7 @@ async function shareStatus(configPath) {
  */
 function isTerminalInvocation(argv) {
     return argv.slice(1).some((arg) => {
-        if (arg === '-h') return true;
+        if (arg === '-h' || arg === '-v') return true;
         if (!arg.startsWith('--')) return false;
         return !PASSTHROUGH_SWITCHES.has(arg.split('=')[0]);
     });
@@ -111,6 +112,12 @@ async function handleCliArgs(argv, configPath) {
 
     if (args.includes('--help') || args.includes('-h')) {
         console.log(USAGE);
+        return 'exit';
+    }
+    if (args.includes('--version') || args.includes('-v')) {
+        // The answer to "is the thing I just installed the thing I downloaded",
+        // which until now could only be guessed at from which flags existed.
+        console.log(require('electron').app.getVersion());
         return 'exit';
     }
     if (args.includes('--no-gui') || args.includes('--headless')) {
