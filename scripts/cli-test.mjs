@@ -25,9 +25,11 @@ const check = (ok, label) => {
 const argv = (...args) => ['/opt/JellyJump/jellyjump', ...args];
 
 console.log('\nflags that need a terminal, not a display');
-for (const flag of ['--no-gui', '--headless', '--share-link', '--share-status', '--help', '-h']) {
+for (const flag of ['--no-gui', '--headless', '--share-status', '--help', '-h']) {
     check(isTerminalInvocation(argv(flag)) === true, `${flag} is a terminal invocation`);
 }
+// Removed, but it shipped — it must print an explanation, not open a window.
+check(isTerminalInvocation(argv('--share-link')) === true, '--share-link still answers on the terminal');
 
 console.log('\nan unknown option prints an error, which needs no display either');
 check(isTerminalInvocation(argv('--share-lnik')) === true, 'a typo does not try to open a window');
@@ -50,9 +52,10 @@ check(isTerminalInvocation(['--headless-looking-name']) === false,
     'argv[0] is skipped even when it looks like a flag');
 
 console.log('\nusage text stays in step with what is classified');
-for (const flag of ['--no-gui', '--share-link', '--share-status', '--help']) {
+for (const flag of ['--no-gui', '--share-status', '--help']) {
     check(USAGE.includes(flag), `${flag} is documented in --help`);
 }
+check(!USAGE.includes('--share-link'), 'a removed flag is not advertised');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

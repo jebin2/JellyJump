@@ -7,15 +7,15 @@
  *
  * These run before any window is created and exit without one.
  *
- *   jellyjump --no-gui        scan, share, print the link, keep running
- *   jellyjump --share-link    print the current share link
- *   jellyjump --share-status  whether sharing is on, and why not if it is off
+ *   jellyjump --no-gui        share, print the link, scan, keep running
+ *   jellyjump --share-status  whether sharing is on, and the link
  *   jellyjump --help
  *
- * Printing the link does not require sharing to be running: the token is
- * stored and the address comes from Tailscale, so the link can be read and
- * saved before it is ever switched on. It only *works* while the app is
- * running with sharing enabled, which --share-status reports.
+ * --share-status carries the link rather than a separate --share-link,
+ * because the link on its own is misleading: it can always be built (the token
+ * is stored, the address comes from Tailscale) but it only *works* while an
+ * instance is running with sharing on. Printing it next to that state is the
+ * honest answer to "what is my link".
  */
 const fs = require('fs');
 const tailscale = require('./tailscale');
@@ -31,12 +31,14 @@ const PASSTHROUGH_SWITCHES = new Set([
     '--trace-warnings', '--inspect', '--inspect-brk', '--lang',
 ]);
 
+// Flags that existed in a shipped build, so someone may have one in a script.
+const REPLACED_SWITCHES = { '--share-link': '--share-status' };
+
 const USAGE = `JellyJump
 
   jellyjump                  start the app
   jellyjump --no-gui         share the library with no window, and keep running
-  jellyjump --share-link     print the library share link
-  jellyjump --share-status   report whether the library is reachable
+  jellyjump --share-status   whether the library is being shared, and the link
   jellyjump --help           this message
 
 The share link is a credential: anyone with it and access to your tailnet can
@@ -50,20 +52,6 @@ function readToken(configPath) {
     }
 }
 
-async function shareLink(configPath) {
-    const token = readToken(configPath);
-    if (!token) {
-        return { ok: false, message: 'No share link yet — open JellyJump and start sharing once to create one.' };
-    }
-
-    const status = await tailscale.status();
-    if (!status.available) {
-        return { ok: false, message: `Cannot build the link: ${status.reason}` };
-    }
-
-    return { ok: true, message: tailscale.shareUrl({ dnsName: status.dnsName, httpsPort: HTTPS_PORT, token }) };
-}
-
 async function shareStatus(configPath) {
     const lines = [];
     const status = await tailscale.status();
@@ -73,7 +61,6 @@ async function shareStatus(configPath) {
     // library, and it survives independently of whether the app is running.
     const serve = await tailscale.serveStatus(HTTPS_PORT);
     lines.push(`serving:   ${serve.active ? `yes, on port ${HTTPS_PORT}` : 'no'}`);
-    lines.push(`token:     ${readToken(configPath) ? 'present' : 'not created yet'}`);
 
     if (serve.active && serve.target) {
         // A mapping left behind by a killed app points at a port nothing is
@@ -81,6 +68,18 @@ async function shareStatus(configPath) {
         const reachable = await tailscale.isLocalPortListening(serve.target);
         lines.push(`backend:   ${reachable ? 'reachable' : `NOT reachable (${serve.target}) — the app is probably not running`}`);
     }
+
+    // Last, so it is the easiest line to select and copy — and printed after
+    // the state above, which is what says whether it will actually work.
+    const token = readToken(configPath);
+    if (!token) {
+        lines.push('link:      none yet — run jellyjump --no-gui once to create one');
+    } else if (!status.available) {
+        lines.push(`link:      cannot be built: ${status.reason}`);
+    } else {
+        lines.push(`link:      ${tailscale.shareUrl({ dnsName: status.dnsName, httpsPort: HTTPS_PORT, token })}`);
+    }
+
     return { ok: true, message: lines.join('\n') };
 }
 
@@ -117,17 +116,21 @@ async function handleCliArgs(argv, configPath) {
     if (args.includes('--no-gui') || args.includes('--headless')) {
         return 'headless';
     }
-    if (args.includes('--share-link')) {
-        const result = await shareLink(configPath);
-        console.log(result.message);
-        process.exitCode = result.ok ? 0 : 1;
-        return 'exit';
-    }
     if (args.includes('--share-status')) {
         const result = await shareStatus(configPath);
         console.log(result.message);
         return 'exit';
     }
+    // A flag that used to exist gets its own answer. The generic message below
+    // blames an old build, which is exactly backwards here.
+    for (const [gone, replacement] of Object.entries(REPLACED_SWITCHES)) {
+        if (args.includes(gone)) {
+            console.error(`${gone} has been replaced by ${replacement}, which prints the link along with whether it currently works.`);
+            process.exitCode = 1;
+            return 'exit';
+        }
+    }
+
     // An option we do not know is an error, not a reason to open a window.
     // Silently launching the GUI is how someone discovers their build predates
     // a flag: they run --no-gui, a window appears, and nothing says why.

@@ -362,9 +362,44 @@ app.whenReady().then(async () => {
     // exists so nothing flashes up on the remote machine's display.
     const mode = await handleCliArgs(process.argv, configPath);
     if (mode === 'exit') {
+        // app.exit, not app.quit: quit exits 0 regardless of process.exitCode,
+        // so a failed --share-status or a rejected option would report success
+        // to anything checking $?.
+        app.exit(process.exitCode || 0);
+        return;
+    }
+    // Only one instance may run, because sharing is machine-wide state, not
+    // per-process: the second instance binds its own local port and points the
+    // tailnet address at itself, taking the library over silently — and when it
+    // exits it tears the mapping down, leaving the first instance running and
+    // convinced it is still sharing while every link is dead. Two full disk
+    // scans at once is the smaller half of the problem.
+    //
+    // Requested here rather than at the top of the file so --share-status and
+    // --help still answer while an instance is running; those only read.
+    if (!app.requestSingleInstanceLock()) {
+        if (mode === 'headless') {
+            console.error('JellyJump is already running on this machine.\n\n'
+                + 'Only one instance can share the library — a second would take over the\n'
+                + 'tailnet address, and stop sharing for the first when it exits.\n\n'
+                + '    jellyjump --share-status    whether it is sharing, and the link\n');
+            app.exit(1);
+            return;
+        }
         app.quit();
         return;
     }
+
+    // A second launch of the GUI now lands here instead of opening a rival
+    // window, so it raises the one already open.
+    app.on('second-instance', () => {
+        const [existing] = BrowserWindow.getAllWindows();
+        if (existing) {
+            if (existing.isMinimized()) existing.restore();
+            existing.focus();
+        }
+    });
+
     if (mode === 'headless') {
         // No window at all, so this works on a box with no desktop session.
         const { runHeadless } = require('./headless');
