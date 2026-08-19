@@ -41,9 +41,6 @@ export default defineConfig({
                 player: resolve(__dirname, 'player.html'),
                 embed: resolve(__dirname, 'embed.html'),
             },
-            // @mediabunny/server is a Node.js-only package loaded at runtime via
-            // require() in the Electron renderer. Exclude it from the Vite bundle.
-            external: ['@mediabunny/server'],
         },
     },
 

@@ -426,7 +426,7 @@ function createWindow() {
         backgroundColor: '#0a0a0a'
     });
 
-    // The renderer has Node access (required by @mediabunny/server), so it must
+    // The renderer still runs with Node integration on, so it must
     // never display remote content: open external links in the system browser,
     // block popups, and refuse any navigation away from the bundled files.
     win.webContents.setWindowOpenHandler(({ url }) => {

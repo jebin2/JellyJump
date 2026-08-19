@@ -1,4 +1,4 @@
-import { MediaBunny } from '../MediaBunny.js';
+import { MediaBunny, ensureDecodersFor } from '../MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
 
 /**
@@ -10,13 +10,19 @@ import { Logger } from '../../shared/utils/Logger.js';
  * with permanent silence, even though a playable track was sitting right
  * there. Prefer the primary track, then fall back to the first decodable one.
  *
+ * DTS is now decodable too, but only once its plugin is loaded, so the tracks
+ * are inspected before anything is asked whether it can decode — otherwise the
+ * answer would be no for the very files the plugin exists for.
+ *
  * @returns {Promise<Object|null>} null when nothing is decodable (video still plays)
  */
 export async function pickDecodableAudioTrack(input) {
+    const tracks = await input.getAudioTracks();
+    await ensureDecodersFor(tracks);
+
     const primary = await input.getPrimaryAudioTrack();
     if (primary && await primary.canDecode()) return primary;
 
-    const tracks = await input.getAudioTracks();
     for (const track of tracks) {
         if (track === primary) continue;
         if (await track.canDecode()) {

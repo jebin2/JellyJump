@@ -30,8 +30,7 @@
     ],
     "asarUnpack": [
       "preload.js",
-      "scanner.js",
-      "node_modules/node-av/**/*"
+      "scanner.js"
     ],
     "publish": {
       "provider": "github",
@@ -70,10 +69,6 @@
   "keywords": [],
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {
-    "@mediabunny/server": "^1.55.1",
-    "mediabunny": "^1.55.1"
-  },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
     "electron": "^39.2.4",

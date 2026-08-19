@@ -1,10 +1,15 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureDecodersFor } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
 
 async function getTrackDetails(input) {
     const videoTracks = await input.getVideoTracks();
     const audioTracks = await input.getAudioTracks();
+
+    // This panel reports whether each track is decodable, so the on-demand
+    // decoders have to be loaded before it asks — otherwise it says no about a
+    // DTS track the player would go on to play perfectly well.
+    await ensureDecodersFor(audioTracks);
 
     const formatTrackInfo = async (tracks) => {
         return Promise.all(tracks.map(async (track) => {

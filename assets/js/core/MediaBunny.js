@@ -1,22 +1,22 @@
 /**
  * MediaBunny Library Wrapper
- * Registers codec backends for both runtimes:
- *   - Desktop (Electron): tries @mediabunny/server — FFmpeg-backed via Node.
- *   - Everywhere: the WebCodecs-based browser plugins.
  *
- * Decoders (AC-3, ProRes) register eagerly — playback needs them the moment a
- * track is opened. The encoder plugins (~1.6 MB minified) load on demand via
- * ensureEncoders(), which every encoding service awaits before it starts.
+ * One set of WebCodecs-based plugins, used identically on desktop and in the
+ * browser. Desktop once tried @mediabunny/server (FFmpeg via Node) first; that
+ * was removed because it never worked — the package requires its own copy of
+ * mediabunny from node_modules, so registering into it left this module's
+ * instance untouched, which mediabunny itself reported with a "loaded twice"
+ * warning and which the encodable-codec list confirmed was identical before and
+ * after the call. It also dragged in node-av, ~170 MB of the desktop installer,
+ * to do nothing.
  *
- * Nothing here trusts the server import to have worked. @mediabunny/server
- * requires its own copy of mediabunny from node_modules, so registering into it
- * leaves this module's instance untouched — mediabunny says as much with its
- * "loaded twice" warning, and the encodable-codec list is provably identical
- * before and after the call. Treating a successful require() as a live backend
- * meant desktop skipped the browser plugins and ended up with no AAC/MP3/FLAC
- * encoder and no AC-3/ProRes decoder at all. So the browser plugins always
- * register, and ensureEncoders() asks what can actually be encoded rather than
- * inferring it from which import succeeded.
+ * What loads when:
+ *   eagerly     AC-3 and ProRes decoders — playback needs them the moment a
+ *               track is opened.
+ *   on demand   the MP3/FLAC/AAC encoders (~1.6 MB) via ensureEncoders(), and
+ *               the DTS decoder (~1.6 MB) via ensureDtsDecoder(). Both are
+ *               awaited by the code that needs them, so a library with no DTS
+ *               in it never pays for the decoder.
  */
 
 import * as MediaBunny from '../lib/mediabunny.js';
@@ -29,21 +29,46 @@ if (!Logger.isEnabled()) {
     MediaBunny.Logging.level = MediaBunny.LogLevel.Errors;
 }
 
-const isDesktop = typeof window !== 'undefined' && window.electronAPI?.isElectron;
-
-if (isDesktop) {
-    try {
-        const { registerMediabunnyServer } = require('@mediabunny/server');
-        registerMediabunnyServer();
-    } catch (e) {
-        Logger.warn('[MediaBunny] @mediabunny/server unavailable:', e.message);
-    }
-}
-
 registerAc3Decoder();
 registerProresDecoder();
 
 let encodersPromise = null;
+let dtsPromise = null;
+
+/**
+ * Load and register the DTS decoder.
+ *
+ * DTS is the audio codec on Blu-ray discs, so it is the primary track on a
+ * great many rips, and WebCodecs has no decoder for it — those files played as
+ * video with permanent silence unless another audio track happened to be
+ * present. Loaded on demand rather than eagerly because the decoder is ~1.6 MB
+ * and most libraries never hit a DTS track at all.
+ */
+export function ensureDtsDecoder() {
+    if (!dtsPromise) {
+        dtsPromise = import('../lib/mediabunny-dts.js')
+            .then(({ registerDtsDecoder }) => registerDtsDecoder())
+            .catch((error) => {
+                dtsPromise = null; // allow retry on transient load failure
+                throw error;
+            });
+    }
+    return dtsPromise;
+}
+
+/**
+ * Register any on-demand decoder these tracks need, before asking whether they
+ * can be decoded. Answering that question without this reports DTS as
+ * undecodable and is self-fulfilling: nothing ever loads the decoder.
+ * @param {Array<{codec: string}>} tracks
+ */
+export async function ensureDecodersFor(tracks) {
+    if (tracks.some((track) => track?.codec === 'dts')) {
+        await ensureDtsDecoder().catch((error) => {
+            Logger.warn('[MediaBunny] DTS decoder failed to load:', error.message);
+        });
+    }
+}
 
 /**
  * Load and register the MP3/FLAC/AAC encoder plugins.

@@ -59,8 +59,9 @@ export class ConvertMenu {
             },
         });
 
-        // ProRes encoding is only available where a ProRes encoder is registered
-        // (the desktop app via @mediabunny/server); the browser can only decode it.
+        // ProRes encoding is only available where a ProRes encoder is
+        // registered; the plugin we ship decodes it but does not encode it, so
+        // this asks rather than assuming.
         const proresItem = formatMenu.querySelector('[data-value="prores"]');
         if (proresItem) {
             MediaBunny.canEncodeVideo('prores').then((supported) => {
