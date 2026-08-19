@@ -1,6 +1,12 @@
-const { ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
-window.electronAPI = {
+// Exposed through contextBridge rather than assigned onto `window`: the
+// renderer runs with context isolation on, so preload and page globals are
+// separate worlds and a plain assignment here would never be visible there.
+// Everything below crosses as structured-cloneable values (plain objects,
+// strings, ArrayBuffers) or as proxied functions, both of which the bridge
+// supports.
+contextBridge.exposeInMainWorld('electronAPI', {
     isElectron: true,
 
     readFile: (filePath) => ipcRenderer.invoke('read-file', filePath),
@@ -27,4 +33,4 @@ window.electronAPI = {
         ipcRenderer.on('media-scan-event', listener);
         return () => ipcRenderer.removeListener('media-scan-event', listener);
     },
-};
+});

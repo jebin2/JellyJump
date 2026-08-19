@@ -415,8 +415,8 @@ function createWindow() {
         width: 1280,
         height: 720,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            nodeIntegration: false,
+            contextIsolation: true,
             webSecurity: true,
             preload: preloadPath
         },
@@ -426,9 +426,10 @@ function createWindow() {
         backgroundColor: '#0a0a0a'
     });
 
-    // The renderer still runs with Node integration on, so it must
-    // never display remote content: open external links in the system browser,
-    // block popups, and refuse any navigation away from the bundled files.
+    // Node integration is off and the renderer's only channel to the main
+    // process is the preload bridge, but it is still meant to display nothing
+    // but the bundled files: open external links in the system browser, block
+    // popups, and refuse any navigation away from file://.
     win.webContents.setWindowOpenHandler(({ url }) => {
         if (url.startsWith('https://') || url.startsWith('http://')) {
             shell.openExternal(url);
