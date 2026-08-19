@@ -51,6 +51,7 @@ import {
     cyclePlayerSpeed,
     stepPlayerFrame,
     seekPlayerTo,
+    requestPlayerSeek,
     playerSeek,
     playerScrubStart,
     playerScrubMove,
@@ -448,6 +449,7 @@ export class CorePlayer {
     _cycleSpeed(direction) { cyclePlayerSpeed(this, direction); }
     _stepFrame(direction) { stepPlayerFrame(this, direction); }
     async _seekTo(time) { return seekPlayerTo(this, time); }
+    _requestSeek(time) { requestPlayerSeek(this, time); }
     _seek(e) { playerSeek(this, e); }
     _onScrubStart(e) { playerScrubStart(this, e); }
     _onScrubMove(e) { playerScrubMove(this, e); }

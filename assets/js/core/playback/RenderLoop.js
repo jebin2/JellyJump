@@ -7,6 +7,10 @@ export async function updatePlayerNextFrame(player) {
     const currentIterator = player.videoFrameIterator;
     player._isFetchingFrame = true;
 
+    // The newest frame the loop skipped for being behind the clock, kept so the
+    // canvas can be brought up to date once without showing the ones before it.
+    let lateFrame = null;
+
     try {
         while (true) {
             // Re-check conditions after each potential await
@@ -38,24 +42,32 @@ export async function updatePlayerNextFrame(player) {
 
             const playbackTime = player._getPlaybackTime();
             if (newNextFrame.timestamp <= playbackTime) {
-                // Drop late frames immediately to keep up
-                if (player.ctx && player.canvas) {
-                    player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
-                    player.ctx.drawImage(newNextFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-                }
+                // Late frame: skip it. Held rather than drawn — painting every
+                // frame on the way past is what a fast-forward looks like, and
+                // when the iterator is far behind (after a seek) that is a
+                // visible scrub through everything in between. Only the last
+                // one is worth showing, and only if nothing current turns up.
+                lateFrame = newNextFrame;
 
                 if (!player._isMediaReady) {
                     player._isMediaReady = true;
                     if (player.isPlaying) player._resumeRecordingSmartPause();
                 }
-
-                if (player.afterFrameRenderCallbacks.length > 0) {
-                    player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
-                }
             } else {
                 player.nextFrame = newNextFrame;
                 break;
             }
+        }
+
+        // Nothing current to show, but the loop went past something: paint the
+        // last one so the canvas lands on the caught-up picture rather than
+        // holding whatever was there before. Skipped when a current frame was
+        // found — the render loop is about to draw that instead.
+        if (lateFrame && !player.nextFrame && player.asyncId === currentAsyncId
+            && player.ctx && player.canvas) {
+            player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
+            player.ctx.drawImage(lateFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+            player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
         }
     } catch (e) {
         if (player.asyncId === currentAsyncId) {

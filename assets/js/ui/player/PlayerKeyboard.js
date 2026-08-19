@@ -23,9 +23,12 @@ export class PlayerKeyboard {
                 p._restoreAutoplayAudio('Keyboard play');
                 p.togglePlay();
                 break;
+            // The four relative-seek keys go through _requestSeek rather than
+            // _seekTo: these are the ones people hold down, and the OS repeats
+            // them far faster than a seek can complete.
             case 'j':
                 e.preventDefault();
-                p._seekTo(Math.max(0, p.currentTime - 10));
+                p._requestSeek(p.currentTime - 10);
                 break;
             case 'l':
                 if (e.shiftKey) {
@@ -33,16 +36,16 @@ export class PlayerKeyboard {
                     p.clearLoopMarkers();
                 } else {
                     e.preventDefault();
-                    p._seekTo(Math.min(p.duration, p.currentTime + 10));
+                    p._requestSeek(p.currentTime + 10);
                 }
                 break;
             case 'arrowleft':
                 e.preventDefault();
-                p._seekTo(Math.max(0, p.currentTime - 5));
+                p._requestSeek(p.currentTime - 5);
                 break;
             case 'arrowright':
                 e.preventDefault();
-                p._seekTo(Math.min(p.duration, p.currentTime + 5));
+                p._requestSeek(p.currentTime + 5);
                 break;
             case 'home':
                 e.preventDefault();

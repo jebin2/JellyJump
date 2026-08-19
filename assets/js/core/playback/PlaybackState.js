@@ -127,6 +127,46 @@ export async function seekPlayerTo(player, time) {
     }
 }
 
+/**
+ * Seek to a position that may be superseded before it lands.
+ *
+ * Every _seekTo tears down and rebuilds the video iterator — a decoder spin-up
+ * from the nearest key frame — which takes far longer than the gap between
+ * repeat events from a held arrow key or a dragged scrub bar. Firing one per
+ * event floods the pipeline with concurrent decoders and, worse, leaves a
+ * backlog that keeps landing after the input stops: the video goes on
+ * forwarding for a moment after the key is released.
+ *
+ * So only the newest requested position is kept, and seeks run one at a time.
+ * A held key settles on its final position one seek after release instead of
+ * replaying every step of the hold.
+ */
+export function requestPlayerSeek(player, time) {
+    const target = Math.max(0, Math.min(player.duration, time));
+
+    // Move the clock and the bar now. The decode is coalesced, so without this
+    // the position would sit still for the whole hold and then jump — and each
+    // repeat would measure its step from a stale currentTime, so holding the
+    // key would crawl instead of scanning.
+    player._pendingSeekTime = target;
+    player.currentTime = target;
+    player._updateProgress();
+
+    if (player._seekLoopActive) return;
+    player._seekLoopActive = true;
+    (async () => {
+        try {
+            while (player._pendingSeekTime != null) {
+                const next = player._pendingSeekTime;
+                player._pendingSeekTime = null;
+                await player._seekTo(next);
+            }
+        } finally {
+            player._seekLoopActive = false;
+        }
+    })();
+}
+
 export function playerSeek(player, e) {
     const rect = player.ui.progressContainer.getBoundingClientRect();
     let pos = (e.clientX - rect.left) / rect.width;
@@ -160,27 +200,9 @@ export function playerScrubMove(player, e) {
     if (!player.isScrubbing) return;
     e.preventDefault();
 
-    // Coalesce scrub seeks: every seek tears down and rebuilds the video
-    // iterator (a decoder spin-up from the nearest key frame), so running one
-    // per mousemove floods the pipeline with concurrent decoders. Remember
-    // only the newest requested position and seek serially.
     const rect = player.ui.progressContainer.getBoundingClientRect();
     const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    player._pendingScrubTime = pos * player.duration;
-
-    if (player._scrubSeekActive) return;
-    player._scrubSeekActive = true;
-    (async () => {
-        try {
-            while (player._pendingScrubTime != null) {
-                const time = player._pendingScrubTime;
-                player._pendingScrubTime = null;
-                await player._seekTo(time);
-            }
-        } finally {
-            player._scrubSeekActive = false;
-        }
-    })();
+    requestPlayerSeek(player, pos * player.duration);
 }
 
 export function playerScrubEnd(player, e) {

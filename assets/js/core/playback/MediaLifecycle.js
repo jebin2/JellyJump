@@ -273,14 +273,19 @@ export function resetPlayerUI(player) {
 export async function startPlayerVideoIterator(player) {
     if (!player.videoSink) return;
 
-    if (player._isFetchingFrame) {
-        Logger.debug('[VideoIterator] Skipping startVideoIterator - already fetching');
-        return;
-    }
-    player._isFetchingFrame = true;
-
+    // Bump the generation first, which is what actually stops whatever else is
+    // in flight: every await in here and in updateNextFrame re-checks asyncId
+    // and bails when it has moved on.
+    //
+    // This used to return early while a frame fetch was in flight, which is the
+    // one case that matters — a seek arriving mid-catch-up. Refusing to rebuild
+    // there left the old iterator sitting at the old position, and the catch-up
+    // loop then ground all the way forward to the seek target one frame at a
+    // time. That is the "picture keeps fast-forwarding after the key is
+    // released" symptom: a seek must always win.
     player.asyncId++;
     const currentAsyncId = player.asyncId;
+    player._isFetchingFrame = true;
 
     let firstFrame = null;
     let secondFrame = null;
@@ -315,7 +320,9 @@ export async function startPlayerVideoIterator(player) {
             }
         }
     } finally {
-        player._isFetchingFrame = false;
+        // Only if we are still the current generation: a newer start has taken
+        // ownership of the flag and must not have it cleared out from under it.
+        if (player.asyncId === currentAsyncId) player._isFetchingFrame = false;
     }
 }
 
