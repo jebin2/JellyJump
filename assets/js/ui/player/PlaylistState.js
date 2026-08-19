@@ -30,7 +30,12 @@ export class PlaylistState {
     }
 
     addItems(newItems) {
-        this.items.push(...newItems);
+        if (!newItems?.length) return;
+        // Appended one at a time rather than push(...newItems): spreading makes
+        // every item an argument, and a shared library can hold tens of
+        // thousands of files — past the engine's argument limit, where the
+        // whole add fails with "Maximum call stack size exceeded".
+        for (const item of newItems) this.items.push(item);
     }
 
     insertItem(index, item) {
