@@ -124,9 +124,13 @@ export class Playlist {
             () => this.playNext()
         );
 
-        // Auto-advance when the current item ends (no-op on the last item,
-        // so playback simply stops at the end of the playlist)
+        // Auto-advance when the current item ends. On the last item this stops,
+        // unless the loop mode is 'playlist', where it wraps to the first.
         this.player.onEnded = () => this.playNext();
+
+        // Changing the loop mode changes whether a next item exists, so the
+        // prev/next buttons have to be re-evaluated when it does.
+        this.player.on('loopmodechange', () => this._updatePlayerNavigationState());
 
         this.player.setPlayCallback(() => {
             if (this.items.length > 0 && this.activeIndex === -1) {

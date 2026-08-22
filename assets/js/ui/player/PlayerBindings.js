@@ -216,6 +216,11 @@ export function attachPlayerBindings(player) {
                     player.ui.loopAbSection.style.display = player.loopMode === 'one' ? 'block' : 'none';
                 }
                 player._updateLoopUI();
+                // Whether there is a next item depends on this: in playlist-loop
+                // mode the last item has one. Announced rather than assumed, so
+                // the prev/next buttons are not left stale until something else
+                // happens to refresh them.
+                player.trigger('loopmodechange', { loopMode: player.loopMode });
             });
         });
 

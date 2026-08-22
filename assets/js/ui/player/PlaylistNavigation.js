@@ -13,19 +13,47 @@ export class PlaylistNavigation {
     }
 
     /**
-     * Play next item in playlist
+     * Whether the playlist is set to loop as a whole.
+     *
+     * 'one' is not this: that repeats the current file and is handled in the
+     * render loop, which seeks back to zero without ever ending the item.
+     * @private
      */
-    playNext() {
-        if (!this._canGoNext()) return;
-        this.playlist.selectItem(this.playlist.activeIndex + 1, true);
+    _isLoopingPlaylist() {
+        return this.playlist.player?.loopMode === 'playlist' && this.playlist.items.length > 0;
     }
 
     /**
-     * Play previous item in playlist
+     * Play next item in playlist.
+     *
+     * Wraps in playlist-loop mode. Without this that mode did nothing at all:
+     * the end of the last item fell through to the same stop as 'off', so the
+     * setting was indistinguishable from having it off.
+     */
+    playNext() {
+        const p = this.playlist;
+        if (p.activeIndex < 0) return;
+
+        if (p.activeIndex < p.items.length - 1) {
+            p.selectItem(p.activeIndex + 1, true);
+        } else if (this._isLoopingPlaylist()) {
+            p.selectItem(0, true);
+        }
+    }
+
+    /**
+     * Play previous item in playlist. Wraps to the last in playlist-loop mode,
+     * so the ends join up in both directions rather than only forwards.
      */
     playPrevious() {
-        if (!this._canGoPrevious()) return;
-        this.playlist.selectItem(this.playlist.activeIndex - 1, true);
+        const p = this.playlist;
+        if (p.activeIndex < 0) return;
+
+        if (p.activeIndex > 0) {
+            p.selectItem(p.activeIndex - 1, true);
+        } else if (this._isLoopingPlaylist()) {
+            p.selectItem(p.items.length - 1, true);
+        }
     }
 
     /**
@@ -126,11 +154,15 @@ export class PlaylistNavigation {
     }
 
     /**
-     * Check if previous exists
+     * Check if previous exists. In playlist-loop mode the first item has one:
+     * the last. The buttons would otherwise sit greyed out while auto-advance
+     * wrapped anyway, which reads as the control being broken.
      * @private
      */
     _canGoPrevious() {
-        return this.playlist.activeIndex > 0;
+        const p = this.playlist;
+        if (p.activeIndex < 0) return false;
+        return p.activeIndex > 0 || this._isLoopingPlaylist();
     }
 
     /**
@@ -138,6 +170,8 @@ export class PlaylistNavigation {
      * @private
      */
     _canGoNext() {
-        return this.playlist.activeIndex >= 0 && this.playlist.activeIndex < this.playlist.items.length - 1;
+        const p = this.playlist;
+        if (p.activeIndex < 0) return false;
+        return p.activeIndex < p.items.length - 1 || this._isLoopingPlaylist();
     }
 }
