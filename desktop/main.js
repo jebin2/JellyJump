@@ -483,7 +483,8 @@ app.whenReady().then(async () => {
             console.error('JellyJump is already running on this machine.\n\n'
                 + 'Only one instance can share the library — a second would take over the\n'
                 + 'tailnet address, and stop sharing for the first when it exits.\n\n'
-                + '    jellyjump --share-status    whether it is sharing, and the link\n');
+                + '    jellyjump --share-status    whether it is sharing, and the link\n'
+                + '    jellyjump --stop            stop the instance that is running\n');
             app.exit(1);
             return;
         }
@@ -497,7 +498,7 @@ app.whenReady().then(async () => {
             const message = 'JellyJump is sharing this library without a window '
                 + `(started with --no-gui, process ${headlessPid}).\n\n`
                 + 'Stop it first — Ctrl+C in that terminal, or:\n\n'
-                + `    kill ${headlessPid}`;
+                + '    jellyjump --stop';
             // Both, because this launch may have come from a terminal or from a
             // desktop icon, and neither one sees the other's output.
             console.error(`JellyJump is already running.\n${message}\n`);

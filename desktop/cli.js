@@ -9,6 +9,7 @@
  *
  *   jellyjump --no-gui        share, print the link, scan, keep running
  *   jellyjump --share-status  whether sharing is on, and the link
+ *   jellyjump --stop          stop an instance started with --no-gui
  *   jellyjump --help
  *
  * --share-status carries the link rather than a separate --share-link,
@@ -39,6 +40,7 @@ const USAGE = `JellyJump
   jellyjump                  start the app
   jellyjump --no-gui         share the library with no window, and keep running
   jellyjump --share-status   whether the library is being shared, and the link
+  jellyjump --stop           stop an instance started with --no-gui
   jellyjump --version        which build this is
   jellyjump --help           this message
 
@@ -82,6 +84,106 @@ async function shareStatus(configPath) {
     }
 
     return { ok: true, message: lines.join('\n') };
+}
+
+/**
+ * Stop an instance started with --no-gui.
+ *
+ * Exists because the alternative was reading `ps` output: a headless instance
+ * is two processes (a thin wrapper and the re-exec that does the work), and
+ * `pkill -f jellyjump` also matches anything else with the name in its command
+ * line — a terminal multiplexer session, an editor holding the file open.
+ *
+ * SIGTERM, not SIGKILL: the headless process handles it, and that handler is
+ * what tears down `tailscale serve`, stops the scanner, and clears its own pid
+ * from the config. Killing it outright leaves the tailnet mapping pointing at a
+ * port nothing listens on, which looks identical to working until a link is
+ * tried. The wrapper is not signalled at all — it is blocked in spawnSync and
+ * exits on its own once the process it is waiting for is gone.
+ */
+async function stopHeadless(configPath) {
+    let pid = null;
+    try {
+        pid = JSON.parse(fs.readFileSync(configPath, 'utf8')).headlessPid || null;
+    } catch {
+        // No config yet, or unreadable: nothing was ever recorded to stop.
+    }
+
+    if (!pid) {
+        return { ok: true, message: 'Not running — nothing was started with --no-gui.' };
+    }
+
+    const clearRecord = () => {
+        try {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            config.headlessPid = null;
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+        } catch {
+            // Best effort. A stale pid is checked before it is trusted anyway.
+        }
+    };
+
+    if (!isAlive(pid)) {
+        clearRecord();
+        return { ok: true, message: `Not running — cleared a stale record of process ${pid}.` };
+    }
+
+    // A recorded pid can be reused by an unrelated process after a kill -9 or a
+    // long uptime, and signalling a stranger because of our own stale bookkeeping
+    // is not a mistake worth risking. Where the check cannot be made it returns
+    // null and the pid is trusted, which is where this started.
+    if (looksLikeJellyJump(pid) === false) {
+        clearRecord();
+        return { ok: true, message: `Not running — process ${pid} belongs to something else now. Cleared the stale record.` };
+    }
+
+    try {
+        process.kill(pid, 'SIGTERM');
+    } catch (error) {
+        return { ok: false, message: `Could not stop process ${pid}: ${error.message}` };
+    }
+
+    // Waited for rather than assumed: the handler stops sharing and the scanner
+    // before it exits, and reporting success while that is still in flight is
+    // how a follow-up --share-status contradicts what this just printed.
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline) {
+        if (!isAlive(pid)) return { ok: true, message: `Stopped (process ${pid}).` };
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    return {
+        ok: false,
+        message: `Process ${pid} did not stop within 15s.\n\n`
+            + 'It may be finishing a scan. To force it:\n\n'
+            + `    kill -9 ${pid}\n\n`
+            + 'That skips the clean shutdown, so `tailscale serve` will stay configured —\n'
+            + 'check with `jellyjump --share-status` afterwards.',
+    };
+}
+
+/** Whether a pid exists. Signal 0 tests for the process without touching it. */
+function isAlive(pid) {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        // EPERM means it exists and belongs to someone else, which is still alive.
+        return error.code === 'EPERM';
+    }
+}
+
+/**
+ * Whether a pid is one of ours, where the system can say.
+ * @returns {boolean|null} null when it cannot be determined
+ */
+function looksLikeJellyJump(pid) {
+    try {
+        return fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').toLowerCase().includes('jellyjump');
+    } catch {
+        // No procfs (macOS, Windows) or no permission to read it.
+        return null;
+    }
 }
 
 /**
@@ -141,6 +243,16 @@ async function handleCliArgs(argv, configPath) {
         console.log(result.message);
         return 'exit';
     }
+    if (args.includes('--stop')) {
+        const result = await stopHeadless(configPath);
+        if (result.ok) {
+            console.log(result.message);
+        } else {
+            console.error(result.message);
+            process.exitCode = 1;
+        }
+        return 'exit';
+    }
     // A flag that used to exist gets its own answer. The generic message below
     // blames an old build, which is exactly backwards here.
     for (const [gone, replacement] of Object.entries(REPLACED_SWITCHES)) {
@@ -166,4 +278,4 @@ async function handleCliArgs(argv, configPath) {
     return null;
 }
 
-module.exports = { handleCliArgs, isTerminalInvocation, isQueryInvocation, USAGE };
+module.exports = { handleCliArgs, isTerminalInvocation, isQueryInvocation, stopHeadless, USAGE };
