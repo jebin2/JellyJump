@@ -114,14 +114,22 @@ export class InfoMenu {
                     }
                 });
 
-                // Store raw metadata for "Copy All"
-                modal.body.dataset.rawInfo = JSON.stringify(metadata);
+                // Store raw metadata for "Copy All". Guarded because close()
+                // nulls the modal's references, and everything here runs after
+                // an await — closing the dialog while it is still reading a
+                // file threw on this line instead.
+                if (modal.body) modal.body.dataset.rawInfo = JSON.stringify(metadata);
 
                 return; // Done for stream
             }
 
             // Ensure metadata is cached
             await playlist._ensureMetadata(item);
+
+            // Reading a file can take a while — long enough for the user to
+            // close the dialog, and on an unreadable file long enough to give
+            // up on it. Nothing below has anywhere to write once that happens.
+            if (!modal.overlay) return;
 
             // Build metadata from cached data
             const formatBytes = (bytes, decimals = 1) => {
@@ -429,8 +437,9 @@ export class InfoMenu {
                 }
             });
 
-            // Store raw metadata for "Copy All"
-            modal.body.dataset.rawInfo = JSON.stringify(metadata);
+            // Store raw metadata for "Copy All". See the note on the stream
+            // path above: the modal may have been closed during the read.
+            if (modal.body) modal.body.dataset.rawInfo = JSON.stringify(metadata);
 
             // Show metadata section if at least one tag exists
             const hasAnyMeta = metaTags.title || metaTags.artist || metaTags.album || metaTags.date || metaTags.comment || metaTags.genre || metaTags.track || metaTags.encoder || coverArtUrl;
