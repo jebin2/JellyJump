@@ -64,20 +64,46 @@ export class PlaylistRenderer {
         this.setupInfiniteScroll(p.container, resultsNode);
     }
 
+    /**
+     * Render a node's contents in batches, loading more as the end comes into
+     * view.
+     *
+     * Driven by a sentinel at the end rather than by a scroll event on the
+     * container. Only the outer list actually scrolls: a folder drawer has
+     * overflow-y set but no height cap, so it grows to fit its contents and
+     * never fires a scroll event of its own. Keying off that event stranded
+     * every folder at its first batch — a folder labelled (293) listed 50 rows
+     * and no amount of scrolling produced the rest.
+     *
+     * An IntersectionObserver asks the question that actually matters — has the
+     * end of the list become visible — and answers it correctly whichever
+     * ancestor happens to be the scrolling one, since clipping by a scroll
+     * container counts as not intersecting.
+     */
     setupInfiniteScroll(container, node) {
         container.dataset.renderedCount = '0';
 
-        container.addEventListener('scroll', () => {
-            const scrollTop = container.scrollTop;
-            const scrollHeight = container.scrollHeight;
-            const clientHeight = container.clientHeight;
+        const sentinel = document.createElement('div');
+        // Zero-height would sit exactly on the boundary and read as visible in
+        // some layouts before the user has scrolled anywhere near it.
+        sentinel.style.height = '1px';
+        sentinel.setAttribute('aria-hidden', 'true');
+        container.appendChild(sentinel);
 
-            if (scrollTop + clientHeight >= scrollHeight - 100) {
-                this.renderBatch(container, node);
-            }
-        }, { passive: true });
+        // rootMargin pre-loads the next batch just before the end is reached,
+        // so scrolling does not stop at a blank edge while a batch builds.
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) this.renderBatch(container, node);
+        }, { rootMargin: '200px' });
+
+        // Held on the element so it is collected with it: render() replaces the
+        // container's contents wholesale, and a module-level registry would keep
+        // observers for detached nodes alive.
+        container._batchSentinel = sentinel;
+        container._batchObserver = observer;
 
         this.renderBatch(container, node);
+        observer.observe(sentinel);
     }
 
     renderBatch(container, node) {
@@ -100,8 +126,32 @@ export class PlaylistRenderer {
             }
         });
 
-        container.appendChild(fragment);
-        container.dataset.renderedCount = (currentCount + nextBatch.length).toString();
+        const sentinel = container._batchSentinel;
+        if (sentinel?.parentNode === container) {
+            container.insertBefore(fragment, sentinel);
+        } else {
+            container.appendChild(fragment);
+        }
+
+        const rendered = currentCount + nextBatch.length;
+        container.dataset.renderedCount = rendered.toString();
+
+        const observer = container._batchObserver;
+        if (!observer || !sentinel) return;
+
+        if (rendered >= total) {
+            observer.disconnect();
+            sentinel.remove();
+            container._batchObserver = null;
+            container._batchSentinel = null;
+        } else {
+            // The sentinel may still be on screen — a batch that does not fill
+            // the viewport leaves it visible, and an observer only reports
+            // changes, so staying visible would report nothing. Re-observing
+            // forces a fresh check and pulls the next batch in.
+            observer.unobserve(sentinel);
+            observer.observe(sentinel);
+        }
     }
 
     buildTree(items) {
