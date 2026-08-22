@@ -106,6 +106,14 @@ export class PlaylistRenderer {
         observer.observe(sentinel);
     }
 
+    /** Stop watching for more: everything this container holds is on screen. */
+    finishBatching(container) {
+        container._batchObserver?.disconnect();
+        container._batchSentinel?.remove();
+        container._batchObserver = null;
+        container._batchSentinel = null;
+    }
+
     renderBatch(container, node) {
         if (!node.allContent) return;
 
@@ -113,7 +121,10 @@ export class PlaylistRenderer {
         const currentCount = parseInt(container.dataset.renderedCount || '0');
         const total = node.allContent.length;
 
-        if (currentCount >= total) return;
+        // Nothing left, including an empty folder that never had anything: tidy
+        // up rather than returning and leaving an observer watching a sentinel
+        // that will never have a batch to pull in.
+        if (currentCount >= total) return this.finishBatching(container);
 
         const nextBatch = node.allContent.slice(currentCount, currentCount + BATCH_SIZE);
 
@@ -140,10 +151,7 @@ export class PlaylistRenderer {
         if (!observer || !sentinel) return;
 
         if (rendered >= total) {
-            observer.disconnect();
-            sentinel.remove();
-            container._batchObserver = null;
-            container._batchSentinel = null;
+            this.finishBatching(container);
         } else {
             // The sentinel may still be on screen — a batch that does not fill
             // the viewport leaves it visible, and an observer only reports
@@ -454,13 +462,18 @@ export class PlaylistRenderer {
             p.removeFolder(folderData.path);
         };
 
-        if (isExpanded) {
-            setTimeout(() => {
-                if (!childrenContainer.dataset.renderedCount && childrenContainer.isConnected) {
-                    this.setupInfiniteScroll(childrenContainer, folderData);
-                }
-            }, 0);
-        }
+        // Filled now, not on a later tick. This used to defer to setTimeout(0)
+        // and skip the work if the element had been detached by then — which
+        // races with anything that re-renders: land a render between creating
+        // this element and the timeout firing, and the folder stays open and
+        // empty until something else re-renders it. Rare when a render happened
+        // once per playlist change, routine now that a library streams in and
+        // re-renders while the user is reading it.
+        //
+        // Nothing needed the delay: the observer inside can watch a sentinel
+        // that is not in the document yet, and this whole subtree is attached
+        // in the same tick.
+        if (isExpanded) this.setupInfiniteScroll(childrenContainer, folderData);
 
         return wrapper;
     }
