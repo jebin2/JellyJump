@@ -13,7 +13,7 @@ export default defineConfig({
         // Array form so the jsDelivr specifier can be matched by pattern. The
         // @mediabunny/* plugin bundles pin their peer import to whatever
         // mediabunny version was current when jsDelivr built them, which lags
-        // the plugin's own version — the 1.55.1 plugins import mediabunny@1.55.0.
+        // the plugin's own version — the 1.55.2 plugins import mediabunny@1.55.0.
         // That peer specifier is the one that has to resolve to our copy, and
         // matching it by version meant adding a line for every release and a
         // failed build for whichever one was forgotten.

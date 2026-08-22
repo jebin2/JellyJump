@@ -22,17 +22,18 @@ set -euo pipefail
 OUT="assets/js/lib"
 mkdir -p "$OUT"
 
-MEDIABUNNY_VERSION="1.53.0"
+MEDIABUNNY_VERSION="1.55.2"
 GIFJS_VERSION="0.2.0"
 
 # name|url|sha256
 LIBS=(
-    "mediabunny.js|https://cdn.jsdelivr.net/npm/mediabunny@${MEDIABUNNY_VERSION}/+esm|ef5152b37becffd19cda503e0ac3af329fe8cf6d651bb5f3c0d7505f60e10e8a"
-    "mediabunny-mp3-encoder.js|https://cdn.jsdelivr.net/npm/@mediabunny/mp3-encoder@${MEDIABUNNY_VERSION}/+esm|4e83b3af15bbba4ea3489e57206cdb23c0c4fba82bcedc5f3f2aab80aee7c601"
-    "mediabunny-ac3.js|https://cdn.jsdelivr.net/npm/@mediabunny/ac3@${MEDIABUNNY_VERSION}/+esm|72b3715b4c68db0c44ba5a19e32a3e882173f33daaa9a853b504b1981c62160f"
-    "mediabunny-flac-encoder.js|https://cdn.jsdelivr.net/npm/@mediabunny/flac-encoder@${MEDIABUNNY_VERSION}/+esm|37fe4963829c0cdff0bb8ee9bf4116d5da734b24a3f7c3b56bcfe69ee832146a"
-    "mediabunny-aac-encoder.js|https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@${MEDIABUNNY_VERSION}/+esm|defe15765bc463ef0ef48a4aab6deca436030de04e93598f73c18fe89113647d"
-    "mediabunny-prores.js|https://cdn.jsdelivr.net/npm/@mediabunny/prores@${MEDIABUNNY_VERSION}/+esm|aaaf919098f30770b49e6cd124a474b225f0a1f119484a46a9988360676320de"
+    "mediabunny.js|https://cdn.jsdelivr.net/npm/mediabunny@${MEDIABUNNY_VERSION}/+esm|3e5368c1b28153478ce32fa14234fb5fdd3882c058d9ddc81b70f88c2aec4396"
+    "mediabunny-mp3-encoder.js|https://cdn.jsdelivr.net/npm/@mediabunny/mp3-encoder@${MEDIABUNNY_VERSION}/+esm|c71d1b1ac8dd760980d6535270e19bfd0c88ad6ac4417a0d062a03165d015e35"
+    "mediabunny-ac3.js|https://cdn.jsdelivr.net/npm/@mediabunny/ac3@${MEDIABUNNY_VERSION}/+esm|188a83af55374b1bb392289d15a5765befa381603b642237d1d26ea3976271fb"
+    "mediabunny-flac-encoder.js|https://cdn.jsdelivr.net/npm/@mediabunny/flac-encoder@${MEDIABUNNY_VERSION}/+esm|eaf4d53ca488ef6386450e09a848b31e3f3bae6cbd2b705ba02d172d169eb877"
+    "mediabunny-aac-encoder.js|https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@${MEDIABUNNY_VERSION}/+esm|9084aa77540b7bdf3f54881b0871620eec603af9a5f3cba205a7eca2421bbdfd"
+    "mediabunny-prores.js|https://cdn.jsdelivr.net/npm/@mediabunny/prores@${MEDIABUNNY_VERSION}/+esm|65ee2cfd1f719da1e28096c73370a6bdcd2ae6f1608058898833f0c743bc8d85"
+    "mediabunny-dts.js|https://cdn.jsdelivr.net/npm/@mediabunny/dts@${MEDIABUNNY_VERSION}/+esm|4605de9721988c86b37709830de5a57d01fa9729128e5dbb10d11836de4ad6b6"
     "gif.js|https://cdn.jsdelivr.net/npm/gif.js@${GIFJS_VERSION}/+esm|f9396fea5aed6ddfc7dfba99fb3cb0cc1940a5d3dc0626d8d5bc2d13c7605dc7"
     "gif.worker.js|https://cdn.jsdelivr.net/npm/gif.js@${GIFJS_VERSION}/dist/gif.worker.js|ca9e3048557ec05d619e18b83403cd3669c88939e5fa2d6034ce7625d445970d"
 )
