@@ -208,6 +208,70 @@ function streamFile(req, res, entry) {
     stream.pipe(res);
 }
 
+/**
+ * The listing again, but as NDJSON the client can render while it arrives.
+ *
+ * /api/library answers in one piece, so a client sees nothing at all until the
+ * last byte lands — a library of tens of thousands of files is megabytes, and
+ * over a tailnet that is a wait staring at an empty panel. Here the first line
+ * carries the library's name and total, then one file per line, so the folder
+ * can be on screen and filling before the request finishes.
+ *
+ * Line-delimited rather than a JSON array because a partial array is not
+ * parseable: the client would have to buffer the whole thing to read any of it,
+ * which is the problem being fixed.
+ *
+ * /api/library stays as it is — a client from an older build asks for that one,
+ * and this endpoint simply 404s for it, which it already handles.
+ */
+function streamLibrary(req, res) {
+    const items = libraryIndex.list();
+
+    res.writeHead(200, {
+        'Content-Type': 'application/x-ndjson; charset=utf-8',
+        'Cache-Control': 'no-store',
+        // Nothing in the chain should sit on this waiting to fill a buffer;
+        // arriving early is the entire point.
+        'X-Accel-Buffering': 'no',
+    });
+    if (req.method === 'HEAD') return res.end();
+
+    res.write(`${JSON.stringify({ name: serverName, count: items.length })}\n`);
+
+    // Written in chunks rather than a line at a time: one write per file makes
+    // tens of thousands of syscalls, and one write for everything rebuilds the
+    // single blob this exists to avoid.
+    const CHUNK = 500;
+    let index = 0;
+    let aborted = false;
+
+    // A client that navigates away or gives up mid-listing leaves this writing
+    // to a dead socket, which happens routinely — the same reason streamFile
+    // guards its aborts. Node tolerates the writes and the end() that follows,
+    // but there is no reason to build another megabyte of payload for a socket
+    // that is gone, and the 'error' listener keeps a failed write from
+    // surfacing as an unhandled event on the response.
+    res.on('close', () => { aborted = true; });
+    res.on('error', () => { aborted = true; });
+
+    const pump = () => {
+        while (!aborted && index < items.length) {
+            const slice = items.slice(index, index + CHUNK);
+            index += slice.length;
+            const payload = slice.map((item) => JSON.stringify(item)).join('\n') + '\n';
+            // Respect backpressure: a slow client would otherwise have the whole
+            // listing queued in this process's memory.
+            if (!res.write(payload)) {
+                res.once('drain', pump);
+                return;
+            }
+        }
+        if (!aborted) res.end();
+    };
+
+    pump();
+}
+
 function handle(req, res) {
     let url;
     try {
@@ -244,6 +308,10 @@ function handle(req, res) {
 
     if (url.pathname === '/api/library') {
         return sendJson(res, 200, { name: serverName, items: libraryIndex.list() });
+    }
+
+    if (url.pathname === '/api/library/stream') {
+        return streamLibrary(req, res);
     }
 
     const stream = /^\/api\/stream\/([a-f0-9]{16})$/.exec(url.pathname);

@@ -21,6 +21,7 @@ import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
 import { ShareState } from '../../shared/services/ShareState.js';
 import {
     looksLikeShareLink, probe as probeRemoteLibrary, fetchItems as fetchRemoteItems,
+    fetchItemsStreaming as fetchRemoteItemsStreaming,
     savedLinks as savedRemoteLinks, rememberLink as rememberRemoteLink, forgetLink as forgetRemoteLink,
 } from '../../shared/services/RemoteLibrary.js';
 
@@ -1463,9 +1464,12 @@ export class Playlist {
     /**
      * Handle URL Upload logic
      * @private
-     * @param {string} url 
+     * @param {string} url
+     * @param {Function} [onFirstItems] - called as soon as something is on
+     *   screen, so a dialog waiting on this can get out of the way. A shared
+     *   library keeps streaming after it fires.
      */
-    async _handleUrlUpload(url) {
+    async _handleUrlUpload(url, onFirstItems) {
         try {
             // A share link is a library, not a media file. Handing it to the
             // normal path makes the demuxer fetch a web page and fail with
@@ -1473,7 +1477,7 @@ export class Playlist {
             if (looksLikeShareLink(url)) {
                 const info = await probeRemoteLibrary(url);
                 if (info.ok) {
-                    await this._addRemoteLibrary(url, info);
+                    await this._addRemoteLibrary(url, info, onFirstItems);
                     return;
                 }
                 Logger.log(`[Playlist] Not a JellyJump library (${info.error}), treating as a media URL`);
@@ -1511,22 +1515,55 @@ export class Playlist {
      * been revoked. Re-paste the link to get them back.
      * @private
      */
-    async _addRemoteLibrary(url, info) {
-        const items = await fetchRemoteItems(url);
-        if (items.length === 0) {
+    async _addRemoteLibrary(url, info, onFirstItems) {
+        // Filled as the listing streams in rather than after it finishes: a
+        // large library is megabytes, and waiting for all of it left the
+        // playlist empty for the whole download with nothing to show for it.
+        let total = 0;
+        let lastRender = 0;
+
+        const result = await fetchRemoteItemsStreaming(url, (batch) => {
+            for (const item of batch) {
+                if (!item.id) item.id = generateId();
+            }
+            this.state.addItems(batch);
+            const isFirst = total === 0;
+            total += batch.length;
+
+            // render() rebuilds the whole tree, so it is throttled: on a big
+            // library the download would otherwise be spent re-rendering. The
+            // final render below is what guarantees the last batch shows.
+            const now = Date.now();
+            if (isFirst || now - lastRender > 400) {
+                lastRender = now;
+                this.render();
+            }
+            // Only once the first batch is actually rendered, so whatever was
+            // covering the playlist gets out of the way of something to see.
+            if (isFirst) onFirstItems?.();
+        });
+
+        if (result.total === 0) {
             Toast.show(`${info.name} has no videos to share`, 4000);
             return;
         }
 
-        for (const item of items) {
-            if (!item.id) item.id = generateId();
-        }
-        this.state.addItems(items);
         rememberRemoteLink(url);
         this.render();
         this._updatePlayerNavigationState();
-        Toast.show(`Added ${items.length} file${items.length === 1 ? '' : 's'} from ${info.name}`);
-        Logger.log(`[Playlist] Added remote library ${info.name} (${items.length} items)`);
+
+        if (result.complete) {
+            Toast.show(`Added ${total} file${total === 1 ? '' : 's'} from ${info.name}`);
+        } else {
+            // Said plainly rather than passed off as a finished library: the
+            // files that did arrive work, and reload fetches the rest.
+            Toast.show(
+                `Added ${total} of ${result.expected ?? '?'} files from ${info.name} — the connection dropped. `
+                + 'Use the reload button on the folder to get the rest.',
+                6000, true,
+            );
+        }
+        Logger.log(`[Playlist] Added remote library ${info.name} (${total} items, complete=${result.complete})`);
     }
 
     /**
@@ -1547,12 +1584,24 @@ export class Playlist {
 
         for (const link of links) {
             try {
-                const items = await fetchRemoteItems(link);
-                for (const item of items) {
-                    if (!item.id) item.id = generateId();
-                }
-                if (items.length > 0) this.state.addItems(items);
-                Logger.log(`[Playlist] Restored shared library (${items.length} items)`);
+                // Streamed for the same reason adding one is: this runs at
+                // startup, and waiting for a whole large library first would
+                // hold the playlist empty exactly when the user is looking at
+                // it. An incomplete result is not treated as an error — what
+                // arrived is real, and the folder's reload button gets the rest.
+                let lastRender = 0;
+                const result = await fetchRemoteItemsStreaming(link, (batch) => {
+                    for (const item of batch) {
+                        if (!item.id) item.id = generateId();
+                    }
+                    this.state.addItems(batch);
+                    const now = Date.now();
+                    if (now - lastRender > 400) {
+                        lastRender = now;
+                        this.render();
+                    }
+                });
+                Logger.log(`[Playlist] Restored shared library (${result.total} items, complete=${result.complete})`);
             } catch (error) {
                 Logger.warn('[Playlist] Shared library unavailable, keeping the link:', error.message);
             }

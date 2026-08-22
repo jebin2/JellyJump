@@ -75,7 +75,15 @@ export async function fetchItems(rawUrl) {
 
     Logger.log(`[RemoteLibrary] ${items.length} item(s) from ${serverName}`);
 
-    return items.map((item) => ({
+    return items.map((item) => shapeItem(item, url, token, serverName, rawUrl));
+}
+
+/**
+ * One listing entry as a playlist item. Shared by both fetch paths so a
+ * streamed library and a whole-response one are indistinguishable afterwards.
+ */
+function shapeItem(item, url, token, serverName, rawUrl) {
+    return {
         title: item.name,
         // The stream URL carries the token: mediabunny's UrlSource issues its
         // own range requests and cannot attach headers to them.
@@ -94,7 +102,148 @@ export async function fetchItems(rawUrl) {
         // other machine keeps scanning after it was taken.
         remoteSource: rawUrl,
         remoteServer: serverName,
-    }));
+    };
+}
+
+/**
+ * Fetch the listing progressively, handing over each batch as it arrives.
+ *
+ * fetchItems waits for the whole response, so nothing appears until the last
+ * byte lands. A library of tens of thousands of files is megabytes, and over a
+ * tailnet that is a long stare at an empty playlist for a request that was
+ * always going to succeed.
+ *
+ * The host is a different machine on whatever build it happens to be running,
+ * so the streaming endpoint may simply not be there. Anything other than a
+ * readable NDJSON stream — a 404 from an older host, an unreachable one, a
+ * captive portal answering 200 with a login page — falls back to fetchItems,
+ * which either succeeds or throws an error worth showing. Callers do not have
+ * to care which path ran.
+ *
+ * @param {string} rawUrl
+ * @param {(items: Array) => void} onBatch - called with each batch, in order
+ * @returns {Promise<{total: number, expected: number|null, complete: boolean}>}
+ *   how many arrived, how many the host said it had, and whether the stream
+ *   ended where it should have. A caller that added items as they arrived needs
+ *   `complete` to know whether what it is showing is the whole library.
+ */
+export async function fetchItemsStreaming(rawUrl, onBatch) {
+    const url = new URL(rawUrl);
+    const token = url.searchParams.get('token');
+    const endpoint = `${url.origin}/api/library/stream?token=${encodeURIComponent(token)}`;
+
+    const wholeResponse = async () => {
+        const all = await fetchItems(rawUrl);
+        if (all.length) onBatch(all);
+        return { total: all.length, expected: all.length, complete: true };
+    };
+
+    let response;
+    try {
+        response = await fetch(endpoint);
+    } catch {
+        // Unreachable host, blocked mixed content, CORS. The plain endpoint
+        // fails the same way and reports it properly, so let it.
+        return wholeResponse();
+    }
+
+    if (!response.ok || !response.body) return wholeResponse();
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let header = null;
+    let total = 0;
+    let batch = [];
+
+    const flush = () => {
+        if (!batch.length) return;
+        onBatch(batch);
+        batch = [];
+    };
+
+    // Set when the first line is not a library header, meaning whatever
+    // answered is not speaking NDJSON. Checked here rather than only after the
+    // chunk so that not one item from a bogus stream is ever handed over — the
+    // fallback would then add them a second time.
+    let bogus = false;
+
+    const consume = (line) => {
+        if (bogus || !line) return;
+        let parsed;
+        try {
+            parsed = JSON.parse(line);
+        } catch {
+            // Mid-stream this is a truncated line from a host that died; on the
+            // first line it means this is not our NDJSON at all.
+            if (!header) bogus = true;
+            return;
+        }
+        if (!header) {
+            if (typeof parsed?.count !== 'number') {
+                bogus = true;
+                return;
+            }
+            header = parsed;
+            return;
+        }
+        batch.push(shapeItem(parsed, url, token, header.name || url.hostname, rawUrl));
+        total++;
+        // Handed over in batches rather than per item: the caller re-renders on
+        // each one, and a render per file would spend the whole download
+        // rebuilding the tree.
+        if (batch.length >= 250) flush();
+    };
+
+    let complete = false;
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let newline;
+            while ((newline = buffer.indexOf('\n')) !== -1) {
+                consume(buffer.slice(0, newline));
+                buffer = buffer.slice(newline + 1);
+            }
+
+            // A proxy or captive portal answering 200 with a page. Nothing has
+            // been handed over, so the plain endpoint can still be tried
+            // cleanly — stop reading the rest of whatever this is.
+            if (bogus) {
+                reader.cancel().catch(() => {});
+                Logger.warn('[RemoteLibrary] Streaming endpoint did not answer with a library, falling back');
+                return wholeResponse();
+            }
+
+            flush();
+        }
+        consume(buffer.trim());
+        flush();
+        complete = true;
+    } catch (error) {
+        // The connection dropped partway. What arrived is real and already
+        // handed over, so it is kept rather than discarded — but the caller is
+        // told this is not the whole library, because silently showing a
+        // fraction of someone's files as if it were all of them is worse than
+        // saying so.
+        flush();
+        Logger.warn(`[RemoteLibrary] Listing stopped after ${total} item(s):`, error?.message || error);
+    }
+
+    // A response short enough to end inside the first chunk reaches here rather
+    // than the in-loop check above.
+    if (bogus || !header) return wholeResponse();
+
+    const expected = typeof header.count === 'number' ? header.count : null;
+    // The host keeps scanning while it serves, so arriving with more than the
+    // header promised is normal and not a truncation.
+    if (complete && expected !== null && total < expected) complete = false;
+
+    Logger.log(`[RemoteLibrary] ${total} item(s) streamed from ${header?.name || url.hostname}`
+        + (complete ? '' : ` (incomplete, expected ${expected ?? '?'})`));
+    return { total, expected, complete };
 }
 
 const SAVED_LINKS_KEY = 'jellyjump-remote-libraries';

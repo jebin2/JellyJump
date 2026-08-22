@@ -60,11 +60,28 @@ export const UrlUploadMenu = {
             loadingDiv.classList.remove('hidden');
             errorDiv.classList.add('hidden');
 
+            // A shared library streams in, so it has something to show long
+            // before it is finished. Closing on the first files means the user
+            // watches the playlist fill instead of this dialog's spinner; the
+            // rest keeps arriving behind it. Guarded because a failure after
+            // this point must not try to revert a dialog that is already gone.
+            let closed = false;
+            const closeEarly = () => {
+                if (closed) return;
+                closed = true;
+                modal.close();
+            };
+
             try {
                 // Delegate the business logic to playlist
-                await playlist._handleUrlUpload(url);
-                modal.close();
+                await playlist._handleUrlUpload(url, closeEarly);
+                closeEarly();
             } catch (error) {
+                if (closed) {
+                    Logger.error('UrlUploadMenu: Add failed after the dialog closed', error);
+                    Toast.show(`Could not finish adding that link: ${error.message}`, 5000, true);
+                    return;
+                }
                 Logger.error('UrlUploadMenu: Add failed', error);
 
                 // Revert UI state on error
