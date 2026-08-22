@@ -52,6 +52,7 @@ import {
     stepPlayerFrame,
     seekPlayerTo,
     requestPlayerSeek,
+    completePlayerMedia,
     playerSeek,
     playerScrubStart,
     playerScrubMove,
@@ -450,6 +451,7 @@ export class CorePlayer {
     _stepFrame(direction) { stepPlayerFrame(this, direction); }
     async _seekTo(time) { return seekPlayerTo(this, time); }
     _requestSeek(time) { requestPlayerSeek(this, time); }
+    _completeMedia() { completePlayerMedia(this); }
     _seek(e) { playerSeek(this, e); }
     _onScrubStart(e) { playerScrubStart(this, e); }
     _onScrubMove(e) { playerScrubMove(this, e); }

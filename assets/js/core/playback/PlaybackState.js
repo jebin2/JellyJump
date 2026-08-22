@@ -87,6 +87,31 @@ export function stepPlayerFrame(player, direction) {
     player._seekTo(Math.max(0, Math.min(player.duration, newTime)));
 }
 
+/**
+ * The current item is over: stop, sit exactly on the end, and tell whoever is
+ * listening — which is how the playlist advances.
+ *
+ * Shared with the render loop rather than living only there. Reaching the end
+ * by playing into it and reaching it by seeking to it are the same event, and
+ * when only the loop knew about it a seek to the end wedged: playback was not
+ * resumed (there is nothing left to play) and nothing ended the item either, so
+ * it sat paused on the last frame. The next play() then saw a position at the
+ * end and restarted from zero, which is what that looked like from outside.
+ */
+export function completePlayerMedia(player) {
+    // 'one' means repeat this item, so the end is not an end at all.
+    if (player.loopMode === 'one') {
+        player._seekTo(0);
+        return;
+    }
+
+    player.pause();
+    player.playbackTimeAtStart = player.duration;
+    player.currentTime = player.duration;
+    player._updateProgress();
+    if (player.onEnded) player.onEnded();
+}
+
 export async function seekPlayerTo(player, time) {
     Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${player._vodAnchorWall?.toFixed(3)}, vodAnchorContent=${player._vodAnchorContent?.toFixed(3)}, playbackTime=${player._getPlaybackTime().toFixed(3)}`);
 
@@ -122,7 +147,23 @@ export async function seekPlayerTo(player, time) {
         player._setLoading(false);
     }
 
-    if (wasPlaying && player.playbackTimeAtStart < player.duration) {
+    // Seeking to the end of something that was playing ends it, exactly as
+    // playing into the end would. There is nothing left to resume, and the
+    // render loop cannot notice on its own because it only checks while
+    // playing — which this no longer is.
+    const landedAtEnd = !player.isLive
+        && player.duration > 0
+        && player.playbackTimeAtStart >= player.duration;
+
+    if (wasPlaying && landedAtEnd) {
+        // Anything still queued belongs to the item being left, not to whatever
+        // the playlist moves on to.
+        player._pendingSeekTime = null;
+        completePlayerMedia(player);
+        return;
+    }
+
+    if (wasPlaying) {
         await player.play();
     }
 }
