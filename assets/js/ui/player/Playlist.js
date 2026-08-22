@@ -1611,6 +1611,81 @@ export class Playlist {
     }
 
     /**
+     * Show a shared library's details, including the link it came from.
+     *
+     * The link is not otherwise recoverable from the app: adding a library
+     * shows the files and nothing else, and the URL lives in localStorage where
+     * the user cannot reach it. Getting it back meant going to the machine that
+     * shared it, which is the one machine they may not be sitting at.
+     *
+     * The link carries the token, so this is showing a credential. It is shown
+     * rather than copied silently: the user should see what is going on the
+     * clipboard, and the clipboard API can be refused, in which case selecting
+     * the text is the fallback.
+     * @param {string} source - the share link the library came from
+     */
+    showRemoteLibraryInfo(source) {
+        const items = this.items.filter(i => i.remoteSource === source);
+        const serverName = items[0]?.remoteServer || 'Shared library';
+
+        let origin = source;
+        try { origin = new URL(source).origin; } catch { /* show it as given */ }
+
+        const modal = new DialogModal({ maxWidth: '520px' });
+        modal.setTitle(serverName);
+
+        // Same column layout the share dialog uses: the .share-* pieces below
+        // are spaced by its gap and overlap without it.
+        const body = document.createElement('div');
+        body.className = 'share-menu';
+
+        const note = document.createElement('p');
+        note.className = 'share-note';
+        note.textContent = `${items.length} file${items.length === 1 ? '' : 's'} from ${origin}. `
+            + 'Paste this link into Add Link on another device to open the same library there.';
+        body.appendChild(note);
+
+        const row = document.createElement('div');
+        row.className = 'share-link-row';
+
+        const link = document.createElement('input');
+        link.type = 'text';
+        link.readOnly = true;
+        link.className = 'share-link';
+        link.value = source;
+        link.addEventListener('focus', () => link.select());
+        row.appendChild(link);
+
+        const copy = document.createElement('button');
+        copy.className = 'share-btn share-btn--primary';
+        copy.textContent = 'Copy';
+        copy.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(source);
+                Toast.show('Link copied');
+            } catch {
+                // Refused clipboard: selecting it still lets them copy by hand
+                // rather than leaving them with no way to get the link.
+                link.select();
+                Toast.show('Press Ctrl+C to copy the selected link', 4000);
+            }
+            copy.textContent = 'Copied';
+            setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+        });
+        row.appendChild(copy);
+        body.appendChild(row);
+
+        const warn = document.createElement('p');
+        warn.className = 'share-note share-note--warn';
+        warn.textContent = 'Anyone with this link can browse and play that library. Treat it like a password.';
+        body.appendChild(warn);
+
+        modal.setBody(body);
+        modal.open();
+        link.focus();
+    }
+
+    /**
      * Handle M3U/IPTV Playlist Import
      * Parses the M3U file and adds channels grouped by category as folders
      * @param {string} url - URL to the M3U playlist

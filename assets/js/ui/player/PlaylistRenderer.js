@@ -330,6 +330,25 @@ export class PlaylistRenderer {
         // subfolder reads as reloading just that subfolder.
         const isLibraryRoot = folderData.remoteSource && !folderData.path.includes('/');
         if (isLibraryRoot) {
+            // The link is otherwise unrecoverable from here: it went into
+            // localStorage when the library was added and nothing shows it
+            // again, so getting it back meant walking over to the machine that
+            // shared it.
+            const infoBtn = document.createElement('button');
+            infoBtn.className = 'playlist-action-btn folder-info-btn';
+            infoBtn.title = 'Library details and share link';
+            infoBtn.setAttribute('aria-label', `Details for ${folderData.name}`);
+            infoBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-info"></use></svg>';
+            infoBtn.onclick = (e) => {
+                e.stopPropagation();
+                p.showRemoteLibraryInfo(folderData.remoteSource);
+            };
+            // Two icons side by side otherwise touch: the action buttons carry
+            // no styling of their own, which is why the M3U branch below spaces
+            // its pair the same way.
+            infoBtn.style.marginRight = '5px';
+            header.insertBefore(infoBtn, removeBtn);
+
             const refreshBtn = document.createElement('button');
             refreshBtn.className = 'playlist-action-btn folder-refresh-btn';
             refreshBtn.title = 'Reload this library';
