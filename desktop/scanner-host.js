@@ -41,6 +41,10 @@ function getScanner() {
         // walk the whole tree twice.
         if (message?.type === 'started') libraryIndex.setRoots(message.roots);
         if (message?.type === 'batch') libraryIndex.addBatch(message.files);
+        // A link list is deliberately not added to the index. The index is the
+        // sharing allowlist — anything in it can be fetched over the share link
+        // by id — and a playlist file is not something to serve. Its contents
+        // are YouTube links, which the renderer turns into playlist entries.
         relay(message);
     });
 

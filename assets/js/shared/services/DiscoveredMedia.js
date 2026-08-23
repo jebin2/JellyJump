@@ -82,6 +82,11 @@ export class DiscoveredMedia {
                 // scan, and consumers only need what just arrived.
                 this._emit({ type: 'batch', files, added: files.length, total: this._byPath.size });
             },
+            onLinkList: (file) => {
+                // Its own event, not a batch: a link list is a playlist to
+                // expand, not a file that was found.
+                this._emit({ type: 'linklist', file });
+            },
             onPhase: (phase) => {
                 this._phase = phase;
                 this._emit({ type: 'phase', phase, total: this._byPath.size });

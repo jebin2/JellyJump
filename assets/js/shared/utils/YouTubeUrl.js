@@ -116,3 +116,36 @@ export async function fetchYouTubeInfo(id) {
 export function thumbnailUrl(id) {
     return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 }
+
+/**
+ * A playlist item for a YouTube video.
+ *
+ * One builder for both ways in — a pasted link and a line in a .jjlist — so the
+ * shape cannot drift between them. `extra` carries whatever the caller knows
+ * that the other does not, such as which file a line came from.
+ *
+ * @param {{id: string, start?: number}} video
+ * @param {string} url - the link as written, kept so the item can be reopened
+ * @param {Object} [options]
+ * @param {string} [options.title] - a known title; the id is used until one is
+ * @param {string} [options.thumbnail]
+ * @param {string} [options.path] - where it sits in the playlist tree
+ * @param {Object} [options.extra]
+ */
+export function buildYouTubeItem(video, url, { title, thumbnail, path, extra } = {}) {
+    const name = title || `YouTube ${video.id}`;
+    return {
+        title: name,
+        url,
+        duration: '',
+        thumbnail: thumbnail || thumbnailUrl(video.id),
+        isLocal: false,
+        isStream: false,
+        isYouTube: true,
+        youtubeId: video.id,
+        youtubeStart: video.start || 0,
+        needsReload: false,
+        path: path || name,
+        ...extra,
+    };
+}

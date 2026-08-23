@@ -18,6 +18,9 @@
  *   out  { type: 'phase', phase, roots }      1 = media folders, 2 = drives,
  *                                            3 = home
  *   out  { type: 'batch', files: [...] }      streamed, never one big array
+ *   out  { type: 'linklist', file }           a .jjlist and its text, relayed
+ *                                             to the renderer but never added
+ *                                             to the shared index
  *   out  { type: 'done', found, scanned, cancelled, elapsedMs }
  *   out  { type: 'error', message }
  */
@@ -38,6 +41,17 @@ const VIDEO_EXTENSIONS = new Set([
 // generated ones like CMake's compiler_depend.ts. Extension alone would list
 // source files as videos, so these are confirmed by content.
 const AMBIGUOUS_EXTENSIONS = new Set(['.ts']);
+
+// Our own link-list files. Deliberately our own extension rather than .txt: a
+// media drive holds recovery codes and password exports, and any rule that
+// opens text files to see whether they are interesting opens those too. Nothing
+// but .jjlist is ever read.
+const LINK_LIST_EXTENSION = '.jjlist';
+
+// A hand-written playlist is small. The cap is not about disk — it is what
+// stops a file that happens to carry this extension from being read into memory
+// and posted across the process boundary.
+const LINK_LIST_MAX_BYTES = 256 * 1024;
 
 // MPEG-TS is 188-byte packets, each starting with this sync byte. Three in a row
 // at the right stride is conclusive enough and needs only the first 377 bytes.
@@ -175,6 +189,29 @@ async function* walk(root, visited, counters) {
             // Extension first: it rules out the overwhelming majority without
             // a syscall, and stat() is the expensive part of this loop.
             const ext = path.extname(entry.name).toLowerCase();
+
+            if (ext === LINK_LIST_EXTENSION) {
+                // Sent as text, not parsed here: the parser lives in the
+                // renderer's shared module and having a second copy in this
+                // process is how the two drift apart.
+                try {
+                    const stat = await fs.promises.stat(full);
+                    if (stat.isFile() && stat.size > 0 && stat.size <= LINK_LIST_MAX_BYTES) {
+                        yield {
+                            kind: 'linklist',
+                            path: full,
+                            name: entry.name,
+                            mtime: stat.mtimeMs,
+                            text: await fs.promises.readFile(full, 'utf8'),
+                        };
+                    }
+                } catch {
+                    // Unreadable or vanished; a playlist file is not worth
+                    // failing a scan over.
+                }
+                continue;
+            }
+
             if (!VIDEO_EXTENSIONS.has(ext)) continue;
 
             try {
@@ -318,6 +355,12 @@ async function scan(explicitRoots) {
             visited.add(resolvedRoot);
 
             for await (const file of walk(resolvedRoot, visited, counters)) {
+                if (file.kind === 'linklist') {
+                    // Not counted as a find: it is a playlist, and the count
+                    // reported to the user means videos.
+                    send({ type: 'linklist', file });
+                    continue;
+                }
                 batch.push(file);
                 found++;
                 if (batch.length >= BATCH_SIZE || Date.now() - lastFlush >= BATCH_INTERVAL_MS) {

@@ -30,7 +30,7 @@ export class DesktopMediaScanner {
      * @param {Function} [handlers.onError] - called with an Error
      * @param {string[]} [handlers.roots] - defaults to the platform's media folders
      */
-    async scan({ onBatch, onDone, onError, onPhase, roots } = {}) {
+    async scan({ onBatch, onLinkList, onDone, onError, onPhase, roots } = {}) {
         if (this._scanning) return;
         this._scanning = true;
 
@@ -52,6 +52,9 @@ export class DesktopMediaScanner {
                     break;
                 case 'batch':
                     onBatch?.(event.files);
+                    break;
+                case 'linklist':
+                    onLinkList?.(event.file);
                     break;
                 case 'done':
                     Logger.log(`[Scanner] Found ${event.found} video(s) in ${event.scanned} file(s), ${event.elapsedMs}ms`);

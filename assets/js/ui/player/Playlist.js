@@ -12,7 +12,8 @@ import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
 import { formatTime, generateId, sanitizeFilename } from '../../shared/utils/mediaUtils.js';
-import { parseYouTubeUrl, fetchYouTubeInfo } from '../../shared/utils/YouTubeUrl.js';
+import { parseYouTubeUrl, fetchYouTubeInfo, buildYouTubeItem } from '../../shared/utils/YouTubeUrl.js';
+import { parseLinkListFile, linkListFolderName } from '../../shared/utils/LinkListFile.js';
 import { PlaylistRenderer } from './PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
 import { PlaylistUI } from './PlaylistUI.js';
@@ -201,6 +202,9 @@ export class Playlist {
                 this.scanState.found = event.total;
                 this.addDiscoveredItems(event.files);
             }
+            if (event.type === 'linklist') {
+                this.addLinkListItems(event.file);
+            }
             if (event.type === 'error') {
                 Logger.warn('[Playlist] Media scan failed:', event.error);
                 this.scanState = { scanning: false, found: this.scanState.found, failed: true };
@@ -259,6 +263,94 @@ export class Playlist {
 
         if (newItems.length === 0) return;
         this.state.addItems(newItems);
+        this._renderDiscoveredSoon();
+    }
+
+    /**
+     * Expand a .jjlist the scan found into playlist entries.
+     *
+     * The file becomes a folder named after it, with one YouTube item per line
+     * beneath — so a hand-written list of links reads like any other folder of
+     * videos.
+     *
+     * The file itself is never added: it is a playlist, not something to play,
+     * and it is deliberately absent from the shared index so it cannot be
+     * fetched over a share link either.
+     *
+     * Titles come from the file when it names them. A line that is only a URL
+     * is listed by its id straight away and its real title filled in behind,
+     * because waiting on a lookup per line would leave the folder empty for as
+     * long as the network takes.
+     * @param {{path: string, name: string, text: string}} file
+     */
+    addLinkListItems(file) {
+        const entries = parseLinkListFile(file.text);
+        if (entries.length === 0) return;
+
+        // Named after the file, without the extension — the extension is how
+        // the app recognises it, not something the user needs to read.
+        const folder = linkListFolderName(file.name);
+
+        // Keyed on the video, not the URL, and matching how the parser dedupes
+        // within a file: the same video written as youtu.be one day and
+        // watch?v= the next is one entry, not two.
+        const key = (id, start) => `${id}@${start || 0}`;
+        const known = new Set(
+            this.state.items
+                .filter(i => i.linkListPath === file.path)
+                .map(i => key(i.youtubeId, i.youtubeStart))
+        );
+
+        const newItems = [];
+        for (const entry of entries) {
+            if (known.has(key(entry.id, entry.start))) continue;
+            known.add(key(entry.id, entry.start));
+
+            newItems.push({
+                id: generateId(),
+                ...buildYouTubeItem(entry, entry.url, {
+                    title: entry.name,
+                    path: `${folder}/${entry.name || entry.id}`,
+                    extra: {
+                        // Where it came from, so re-reading updates rather than
+                        // duplicates — and which lines still need a title.
+                        linkListPath: file.path,
+                        linkListFolder: folder,
+                        needsTitle: !entry.name,
+                    },
+                }),
+            });
+        }
+
+        if (newItems.length === 0) return;
+
+        this.state.addItems(newItems);
+        this._renderDiscoveredSoon();
+        Logger.log(`[Playlist] ${newItems.length} link(s) from ${file.name}`);
+
+        this._fillMissingYouTubeTitles(newItems);
+    }
+
+    /**
+     * Look up titles for entries the file did not name.
+     *
+     * One request each, and only for the unnamed ones — a file that names its
+     * videos costs nothing. Failures are left alone: the id is a poor title but
+     * a working entry, and a video that will not play is not the lookup's
+     * business.
+     * @private
+     */
+    async _fillMissingYouTubeTitles(items) {
+        const unnamed = items.filter(i => i.needsTitle);
+        if (unnamed.length === 0) return;
+
+        for (const item of unnamed) {
+            const info = await fetchYouTubeInfo(item.youtubeId);
+            if (!info?.title || info.title === `YouTube ${item.youtubeId}`) continue;
+            item.title = info.title;
+            item.path = `${item.linkListFolder}/${info.title}`;
+            delete item.needsTitle;
+        }
         this._renderDiscoveredSoon();
     }
 
@@ -1700,19 +1792,10 @@ export class Playlist {
     async _addYouTubeVideo(url, parsed) {
         const info = await fetchYouTubeInfo(parsed.id);
 
-        this.addItem({
+        this.addItem(buildYouTubeItem(parsed, url, {
             title: info.title,
-            url,
-            duration: '',
             thumbnail: info.thumbnail,
-            isLocal: false,
-            isStream: false,
-            isYouTube: true,
-            youtubeId: parsed.id,
-            youtubeStart: parsed.start || 0,
-            needsReload: false,
-            path: info.title,
-        });
+        }));
 
         this._saveState();
         this.render();
