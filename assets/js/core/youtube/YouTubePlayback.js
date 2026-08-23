@@ -84,6 +84,13 @@ export async function loadPlayerYouTube(player, video, autoplay) {
             // volume, mute and speed are pushed once it can accept them.
             syncYouTubeAudio(player);
             if (player.playbackRate !== 1) player.youtube?.setRate(player.playbackRate);
+
+            // Asked again, out loud. autoplay in the URL is a request the
+            // player may quietly decline — a second video loads into a fresh
+            // iframe that never saw the tap which started the first, and it
+            // sits on a still frame. Calling play once it is ready costs
+            // nothing when autoplay already worked.
+            if (autoplay) player.youtube?.play();
         },
         onDuration: (duration) => {
             player.duration = duration;
