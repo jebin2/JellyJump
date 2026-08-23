@@ -66,6 +66,10 @@ export async function loadPlayerYouTube(player, video, autoplay) {
     // Flagged the same way the decode path flags it, so the first interaction
     // restores the sound rather than leaving it silently muted.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    // Remembered before muting: the sound is turned back on the moment the
+    // video is actually playing, so the mute lasts a fraction of a second
+    // rather than until the user reaches for the control on every video.
+    player._youtubeWantsSound = !player.config.muted;
     if (autoplay && isMobile && !player.config.muted) {
         player.config.muted = true;
         player._wasMutedForAutoplay = true;
@@ -101,6 +105,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
                 player.isPlaying = true;
                 player._updatePlayPauseUI();
                 startYouTubeTicker(player);
+                unmuteOncePlaying(player);
             } else if (state === 'paused') {
                 player.isPlaying = false;
                 player._updatePlayPauseUI();
@@ -190,4 +195,36 @@ export function syncYouTubeAudio(player) {
     if (player.engine !== 'youtube' || !player.youtube) return;
     player.youtube.setMuted(player.config.muted || player.config.volume === 0);
     player.youtube.setVolume(player.config.volume);
+}
+
+/**
+ * Turn the sound back on once the video is genuinely playing.
+ *
+ * Muting is what gets autoplay past a phone, but leaving it muted means
+ * reaching for the control on every video — and the restriction is on
+ * *starting* with sound, not on unmuting something already playing.
+ *
+ * If the browser disagrees and pauses rather than unmutes, that is recovered
+ * from: muted and playing beats unmuted and stopped. Checked rather than
+ * assumed, because which browsers allow this differs and a silent failure here
+ * would look like the video simply stopping for no reason.
+ */
+function unmuteOncePlaying(player) {
+    if (!player._wasMutedForAutoplay || !player._youtubeWantsSound) return;
+    // Once per video: a video that pauses and resumes must not fight this again.
+    player._youtubeWantsSound = false;
+
+    player._restoreAutoplayAudio('YouTube started playing');
+
+    setTimeout(() => {
+        if (player.engine !== 'youtube' || !player.youtube) return;
+        if (player.isPlaying) return; // unmuting was allowed
+
+        Logger.log('[YouTube] Unmuting stopped playback; staying muted');
+        player.config.muted = true;
+        player._wasMutedForAutoplay = true;
+        player._syncAudioGain();
+        player._updateVolumeUI();
+        player.youtube.play();
+    }, 500);
 }
