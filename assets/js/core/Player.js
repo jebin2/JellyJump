@@ -69,6 +69,12 @@ import {
     startPlayerRenderLoop,
     updatePlayerNextFrame
 } from './playback/RenderLoop.js';
+import { parseYouTubeUrl } from '../shared/utils/YouTubeUrl.js';
+import {
+    loadPlayerYouTube,
+    teardownPlayerYouTube,
+    syncYouTubeAudio
+} from './youtube/YouTubePlayback.js';
 import {
     createStreamController,
     installStreamStateProxies
@@ -132,6 +138,14 @@ export class CorePlayer {
         this.loopStart = null;
         this.loopEnd = null;
         this.animationFrameId = null;
+
+        // Which pipeline is playing. 'mediabunny' decodes and paints frames
+        // itself; 'youtube' hands the video to YouTube's iframe and can only
+        // drive it. Features ask capabilities rather than testing this, so a
+        // third engine later does not mean editing every menu again.
+        this.engine = 'mediabunny';
+        this.capabilities = { canvasFrames: true, audioGraph: true };
+        this.youtube = null;
 
         this.controlBarMode = options.controlBarMode || CONTROL_BAR_MODE_DEFAULT;
         this.autoHideTimer = null;
@@ -416,7 +430,13 @@ export class CorePlayer {
     // ─── Audio ───────────────────────────────────────────────────────────────────
     _initAudio() { initPlayerAudio(this); }
     _cleanupAudio() { cleanupPlayerAudioMode(this); }
-    _syncAudioGain() { syncPlayerAudioGain(this); }
+    _syncAudioGain() {
+        // Every volume and mute change funnels through here, so this is the one
+        // place the embed needs telling — branching in setVolume and toggleMute
+        // separately would be the same fix written twice.
+        if (this.engine === 'youtube') return syncYouTubeAudio(this);
+        return syncPlayerAudioGain(this);
+    }
     async _closeAudioContext() { return closePlayerAudioContext(this); }
     async _suspendAudioContext() { return suspendPlayerAudioContext(this); }
     _stopQueuedAudio() { stopPlayerQueuedAudio(this); }
@@ -435,7 +455,12 @@ export class CorePlayer {
     _clearCanvas() { clearPlayerCanvas(this); }
     _disposeMediaBunnyResources() { disposeMediaBunnyResources(this); }
     async reset() { return resetPlayer(this); }
-    async _cleanupForLoad() { return cleanupPlayerForLoad(this); }
+    async _cleanupForLoad() {
+        // Always, not only when leaving YouTube: this runs before every load,
+        // and an iframe left mounted would sit on top of the next video.
+        teardownPlayerYouTube(this);
+        return cleanupPlayerForLoad(this);
+    }
     async _setupMediaTracks(url, isHls) { return setupPlayerMediaTracks(this, url, isHls); }
     async _handleHLSState() { return handlePlayerHlsState(this); }
     resetUI() { resetPlayerUI(this); }
@@ -449,7 +474,15 @@ export class CorePlayer {
     togglePlay() { togglePlayerPlay(this); }
     _cycleSpeed(direction) { cyclePlayerSpeed(this, direction); }
     _stepFrame(direction) { stepPlayerFrame(this, direction); }
-    async _seekTo(time) { return seekPlayerTo(this, time); }
+    async _seekTo(time) {
+        if (this.engine === 'youtube') {
+            this.youtube?.seek(time);
+            this.currentTime = Math.max(0, time);
+            this._updateProgress();
+            return;
+        }
+        return seekPlayerTo(this, time);
+    }
     _requestSeek(time) { requestPlayerSeek(this, time); }
     _completeMedia() { completePlayerMedia(this); }
     _seek(e) { playerSeek(this, e); }
@@ -490,10 +523,22 @@ export class CorePlayer {
                 this._updateVolumeUI();
             }
 
-            const isHls = StreamDetector.detect(url) === StreamDetector.TYPE_HLS;
+            const youtube = parseYouTubeUrl(url);
+            const isHls = !youtube && StreamDetector.detect(url) === StreamDetector.TYPE_HLS;
             if (isHls) this.isLive = true;
 
             await this._cleanupForLoad();
+
+            // A YouTube link has no media stream to demux, so the whole track
+            // setup below does not apply — YouTube's own player takes over the
+            // picture and the sound.
+            if (youtube) {
+                this.currentVideoId = videoId || url;
+                this._setLoading(true);
+                await loadPlayerYouTube(this, youtube, autoplay);
+                Logger.log('Media loaded successfully (youtube)');
+                return;
+            }
 
             // cleanup's pause() suspended the AudioContext; wake it now while
             // the tap's transient activation is still valid (same race as the
@@ -527,13 +572,26 @@ export class CorePlayer {
     }
 
     // ─── Play ────────────────────────────────────────────────────────────────────
-    async play() { return playPlayer(this); }
+    async play() {
+        if (this.engine === 'youtube') { this.youtube?.play(); return; }
+        return playPlayer(this);
+    }
 
     // ─── Pause ───────────────────────────────────────────────────────────────────
-    pause(showOverlay = true) { return pausePlayer(this, showOverlay); }
+    pause(showOverlay = true) {
+        if (this.engine === 'youtube') { this.youtube?.pause(); return; }
+        return pausePlayer(this, showOverlay);
+    }
 
     // ─── Playback Rate ───────────────────────────────────────────────────────────
-    async setPlaybackRate(rate) { return setPlayerPlaybackRate(this, rate); }
+    async setPlaybackRate(rate) {
+        if (this.engine === 'youtube') {
+            this.playbackRate = rate;
+            this.youtube?.setRate(rate);
+            return;
+        }
+        return setPlayerPlaybackRate(this, rate);
+    }
 
     // ─── Volume / Mute ───────────────────────────────────────────────────────────
     get volume() { return this.config.volume; }

@@ -8,6 +8,16 @@ import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
  * Info Menu Handler
  * Displays video metadata information
  */
+/** mm:ss / h:mm:ss, for the one duration this path can know. */
+function formatDuration(seconds) {
+    const total = Math.floor(seconds || 0);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
 export class InfoMenu {
     /**
      * Initialize and open Video Info modal
@@ -42,6 +52,56 @@ export class InfoMenu {
         try {
             // For streams, we can't use MediaBunny to extract metadata from a file
             // So we skip ensureMetadata and populate what we know
+            // A YouTube item is a link. Everything below reads the media itself,
+            // which here means fetching a watch page and handing HTML to the
+            // demuxer — so it reported nothing useful and fell back to looking
+            // like a local file. What can honestly be said about it is said here.
+            if (item.isYouTube) {
+                const player = playlist.player;
+                const isPlaying = player?.engine === 'youtube' && player?.duration > 0;
+
+                const metadata = {
+                    source: item.url || 'Unknown',
+                    filename: item.title,
+                    format: 'YouTube',
+                    mimeType: 'text/html',
+                    size: 'N/A',
+                    duration: isPlaying ? formatDuration(player.duration) : 'N/A',
+
+                    metaTitle: item.title || 'N/A',
+                    metaArtist: 'N/A',
+                    metaAlbum: 'N/A',
+                    metaDate: 'N/A',
+                    metaComment: `Video ID ${item.youtubeId}`
+                        + (item.youtubeStart ? `, starts at ${item.youtubeStart}s` : ''),
+
+                    // Everything below belongs to YouTube's player, which does
+                    // not report it and whose frames cannot be inspected.
+                    videoCodec: 'N/A', videoCodecString: 'N/A', resolution: 'N/A',
+                    aspectRatio: 'N/A', codedResolution: 'N/A', fps: 'N/A',
+                    frameCount: 'N/A', videoBitrate: 'N/A', rotation: 'N/A',
+                    hdr: 'N/A', colorSpace: 'N/A', videoTrackCount: '',
+                    audioCodec: 'N/A', audioCodecString: 'N/A', channels: 'N/A',
+                    sampleRate: 'N/A', audioBitrate: 'N/A', language: 'N/A',
+                    audioTrackCount: '',
+                };
+
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (contentEl) contentEl.classList.remove('hidden');
+
+                Object.keys(metadata).forEach(key => {
+                    const el = modalContent.querySelector(`[data-key="${key}"]`);
+                    if (!el) return;
+                    el.textContent = metadata[key];
+                    const btn = el.parentElement.querySelector('.copy-btn');
+                    if (btn) btn.dataset.value = metadata[key];
+                    if (key === 'source') el.title = metadata[key];
+                });
+
+                if (modal.body) modal.body.dataset.rawInfo = JSON.stringify(metadata);
+                return;
+            }
+
             if (item.isStream || item.isLive) {
                 const isPlaying = playlist.player && playlist.player.src === item.url;
                 let resolution = 'N/A';

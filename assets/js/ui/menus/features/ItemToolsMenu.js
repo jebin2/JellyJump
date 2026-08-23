@@ -55,7 +55,15 @@ export const ItemToolsMenu = {
             { action: 'info', icon: 'icon-info', label: 'Info' }
         ];
 
-        const tools = isRestricted ? streamTools : videoTools;
+        // A YouTube item is a link, not a file. Every tool above works on media
+        // data this item does not have, and recording is no use either: the
+        // video plays inside a cross-origin iframe the canvas never sees. Info
+        // is the one thing that still means something.
+        const youtubeTools = [
+            { action: 'info', icon: 'icon-info', label: 'Info' }
+        ];
+
+        const tools = item.isYouTube ? youtubeTools : (isRestricted ? streamTools : videoTools);
 
         // Create tools grid content
         const content = document.createElement('div');

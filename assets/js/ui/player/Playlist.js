@@ -12,6 +12,7 @@ import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
 import { formatTime, generateId, sanitizeFilename } from '../../shared/utils/mediaUtils.js';
+import { parseYouTubeUrl, fetchYouTubeInfo } from '../../shared/utils/YouTubeUrl.js';
 import { PlaylistRenderer } from './PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
 import { PlaylistUI } from './PlaylistUI.js';
@@ -1182,6 +1183,18 @@ export class Playlist {
             this._setLoadGuard(video);
 
             // Handle streams (HLS/Live) - load directly without MediaMetadata processing
+            // YouTube goes straight to the player, which hands it to YouTube's
+            // iframe. Everything below this — caching, metadata extraction,
+            // thumbnail generation — assumes a fetchable media file, and a
+            // watch page is not one: the cache path would download HTML and the
+            // demuxer would reject it.
+            if (video.isYouTube) {
+                await this.player.load(video.url, autoplay, video.id, null);
+                this._clearLoadGuard();
+                this._saveState();
+                return;
+            }
+
             if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {
                 video.isStream = true; // Mark for metadata prefetch skip
 
@@ -1478,6 +1491,15 @@ export class Playlist {
             // A share link is a library, not a media file. Handing it to the
             // normal path makes the demuxer fetch a web page and fail with
             // "unsupported or unrecognizable format", which says nothing useful.
+            // A YouTube page is not a media file either: the demuxer would
+            // fetch HTML and fail with "unsupported or unrecognizable format".
+            const youtube = parseYouTubeUrl(url);
+            if (youtube) {
+                await this._addYouTubeVideo(url, youtube);
+                onFirstItems?.();
+                return;
+            }
+
             if (looksLikeShareLink(url)) {
                 const info = await probeRemoteLibrary(url);
                 if (info.ok) {
@@ -1661,6 +1683,42 @@ export class Playlist {
             // listed stay, since they will work again when it is back.
             Toast.show('Could not reach that library — is the other machine on?', 5000, true);
         }
+    }
+
+    /**
+     * Add a YouTube video as a playlist item.
+     *
+     * The item carries the watch URL, not a media URL — there is nothing to
+     * fetch. The player recognises it on load and hands it to YouTube's own
+     * iframe player.
+     *
+     * Title and thumbnail come from oEmbed so the row reads like any other
+     * entry. That lookup is allowed to fail: an unreachable oEmbed says nothing
+     * about whether the video will play, so the item is added either way.
+     * @private
+     */
+    async _addYouTubeVideo(url, parsed) {
+        const info = await fetchYouTubeInfo(parsed.id);
+
+        this.addItem({
+            title: info.title,
+            url,
+            duration: '',
+            thumbnail: info.thumbnail,
+            isLocal: false,
+            isStream: false,
+            isYouTube: true,
+            youtubeId: parsed.id,
+            youtubeStart: parsed.start || 0,
+            needsReload: false,
+            path: info.title,
+        });
+
+        this._saveState();
+        this.render();
+        this._updatePlayerNavigationState();
+        this.selectItem(this.items.length - 1, true);
+        Logger.log(`[Playlist] Added YouTube video ${parsed.id}: ${info.title}`);
     }
 
     /**

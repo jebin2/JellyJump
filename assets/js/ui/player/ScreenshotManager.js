@@ -1,3 +1,4 @@
+import { Toast } from "../../shared/utils/Toast.js";
 import { Logger } from "../../shared/utils/Logger.js";
 import { Modal } from "../Modal.js";
 import { formatTime } from "../../shared/utils/mediaUtils.js";
@@ -49,6 +50,17 @@ export class ScreenshotManager {
      * Capture current video frame as screenshot
      */
     async capture() {
+        // Nothing can be read out of a cross-origin embed, and the canvas is
+        // still there holding whatever was last drawn — so without this a
+        // screenshot of a YouTube video saves a blank or stale frame rather
+        // than failing honestly. Reachable from the keyboard even while the
+        // control bar is hidden, which is why the guard is here and not on the
+        // button.
+        if (this.player.capabilities && !this.player.capabilities.canvasFrames) {
+            Toast.show('Screenshots are not available for a YouTube video — its frames belong to YouTube.', 4000);
+            return;
+        }
+
         const isStreamMode = this.player.isStreamMode;
         const hasMediaBunny = this.player.videoSink && this.player.videoTrack;
         const hasCanvas = this.player.canvas && this.player.ctx;

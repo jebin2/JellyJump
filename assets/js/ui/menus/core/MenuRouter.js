@@ -1,4 +1,22 @@
 import { Logger } from "../../../shared/utils/Logger.js";
+import { Toast } from "../../../shared/utils/Toast.js";
+
+/**
+ * Actions that read the item's own media data — decoding it, re-encoding it,
+ * or writing a new file from it.
+ *
+ * A YouTube item has no media data: it is a link, and the video is played by
+ * YouTube inside an iframe that cannot be read from. Left ungated, these open a
+ * dialog that can only fail once it tries to demux a watch page.
+ *
+ * 'info' is deliberately absent — it reads the item, not the media, and is
+ * useful for a YouTube entry too.
+ */
+const NEEDS_MEDIA_FILE = new Set([
+    'convert', 'trim', 'multicut', 'resize', 'crop', 'create-gif', 'reverse',
+    'speed', 'remove-bg', 'watermark', 'blur', 'rotate', 'record', 'merge',
+    'detect-cuts', 'detect-motion', 'encrypt', 'download-manage',
+]);
 
 /**
  * Menu Router
@@ -17,6 +35,15 @@ export class MenuRouter {
 
         if (!item) {
             Logger.error(`MenuRouter: Invalid index ${index}`);
+            return;
+        }
+
+        // Refused here rather than in each menu: one list beats eighteen
+        // guards, and a tool that opens only to fail is worse than one that
+        // says why up front.
+        if (item.isYouTube && NEEDS_MEDIA_FILE.has(action)) {
+            Logger.log(`MenuRouter: "${action}" is not available for a YouTube item`);
+            Toast.show('That tool needs the video file. A YouTube video plays through YouTube, so there is no file to work on.', 5000);
             return;
         }
 
