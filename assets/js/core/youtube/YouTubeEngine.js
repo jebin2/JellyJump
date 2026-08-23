@@ -75,6 +75,7 @@ export class YouTubeEngine {
      * @param {string} options.videoId
      * @param {number} [options.start] - seconds to begin at
      * @param {boolean} [options.autoplay]
+     * @param {boolean} [options.muted] - start muted, which is what lets a phone autoplay
      * @param {Function} [options.onReady] - the embed is ready to be driven
      * @param {Function} [options.onDuration] - (seconds) once the length is known
      * @param {Function} [options.onStateChange] - ('playing'|'paused'|'ended'|'buffering')
@@ -172,6 +173,10 @@ export class YouTubeEngine {
             // moment it plays.
             playsinline: '1',
             autoplay: this.options.autoplay ? '1' : '0',
+            // Set in the URL, not through the API afterwards: a phone decides
+            // whether to allow autoplay when the player starts, and by the time
+            // mute() could be called it has already refused.
+            mute: this.options.muted ? '1' : '0',
             start: String(Math.max(0, Math.floor(this.options.start || 0))),
             rel: '0',
             modestbranding: '1',

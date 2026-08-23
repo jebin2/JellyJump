@@ -57,11 +57,27 @@ export async function loadPlayerYouTube(player, video, autoplay) {
     player.currentTime = video.start || 0;
     player.isPlaying = false;
 
+    // Muted autoplay is the only autoplay a phone allows, and unlike the
+    // decode pipeline a tap does not help: the gesture does not cross into a
+    // cross-origin iframe, so even "the user just tapped this item" is not
+    // enough for YouTube to start with sound. Starting muted is the difference
+    // between playing and sitting on a still frame.
+    //
+    // Flagged the same way the decode path flags it, so the first interaction
+    // restores the sound rather than leaving it silently muted.
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (autoplay && isMobile && !player.config.muted) {
+        player.config.muted = true;
+        player._wasMutedForAutoplay = true;
+        player._updateVolumeUI();
+    }
+
     player.youtube = new YouTubeEngine({
         mount,
         videoId: video.id,
         start: video.start,
         autoplay,
+        muted: player.config.muted,
         onReady: () => {
             player._setLoading(false);
             // The embed starts at its own defaults, so the player's current
