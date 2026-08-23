@@ -14,7 +14,7 @@
  *   GET /                         page explaining the link, for a human who
  *                                 opens it in a browser
  *   GET /api/info                 { name, count } — cheap reachability check
- *   GET /api/library              listing
+ *   GET /api/library              listing, plus any .jjlist files as text
  *   GET /api/stream/:id           the file, with Range support
  */
 const http = require('http');
@@ -238,6 +238,13 @@ function streamLibrary(req, res) {
 
     res.write(`${JSON.stringify({ name: serverName, count: items.length })}\n`);
 
+    // Link lists first, and each on its own line rather than inside the header:
+    // a header that carries them grows with them, and the point of this endpoint
+    // is that a client can act on the first line immediately.
+    for (const list of libraryIndex.listLinkLists()) {
+        res.write(`${JSON.stringify({ kind: 'linklist', ...list })}\n`);
+    }
+
     // Written in chunks rather than a line at a time: one write per file makes
     // tens of thousands of syscalls, and one write for everything rebuilds the
     // single blob this exists to avoid.
@@ -307,7 +314,13 @@ function handle(req, res) {
     }
 
     if (url.pathname === '/api/library') {
-        return sendJson(res, 200, { name: serverName, items: libraryIndex.list() });
+        return sendJson(res, 200, {
+            name: serverName,
+            items: libraryIndex.list(),
+            // Sent as text for the client to parse, so the rules for reading a
+            // link list live in one module rather than one per process.
+            linkLists: libraryIndex.listLinkLists(),
+        });
     }
 
     if (url.pathname === '/api/library/stream') {

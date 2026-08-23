@@ -44,6 +44,14 @@ index.addBatch([
     { path: escapePath, name: 'escape.mp4', size: 10, mtime: Date.now(), ext: '.mp4' },
 ]);
 
+const listPath = path.join(root, 'songs.jjlist');
+index.addLinkList({
+    path: listPath,
+    name: 'songs.jjlist',
+    mtime: Date.now(),
+    text: 'A Song : https://www.youtube.com/watch?v=8scL5oJX6CM\nhttps://youtu.be/1PukR-byRZg\n',
+});
+
 const TOKEN = 'a'.repeat(64);
 const { port } = await server.start({ token: TOKEN, origins: ['https://jellyjump.voidall.com'] });
 const base = `http://127.0.0.1:${port}`;
@@ -117,6 +125,27 @@ check((cors.headers.get('access-control-expose-headers') || '').includes('Conten
     'exposes Content-Range, without which seeking cannot work');
 const foreign = await fetch(`${base}/api/library`, { headers: { ...auth, Origin: 'https://evil.example' } });
 check(!foreign.headers.get('access-control-allow-origin'), 'does not allow an unknown origin');
+
+console.log('link lists travel with the listing');
+const withLists = await (await fetch(`${base}/api/library`, { headers: auth })).json();
+check(Array.isArray(withLists.linkLists) && withLists.linkLists.length === 1,
+    'a .jjlist appears in the listing');
+check(withLists.linkLists[0].name === 'songs.jjlist' && withLists.linkLists[0].text.includes('8scL5oJX6CM'),
+    'as its name and its text, for the client to parse');
+check(!withLists.linkLists[0].path, 'without its path, which is not the client\'s business');
+check(!withLists.items.some(i => i.name.endsWith('.jjlist')),
+    'and never as a file in the listing');
+
+const streamed = await (await fetch(`${base}/api/library/stream`, { headers: auth })).text();
+const lines = streamed.trim().split('\n').map(JSON.parse);
+check(lines.filter(l => l.kind === 'linklist').length === 1, 'and on its own line when streamed');
+check(lines[1]?.kind === 'linklist', 'ahead of the files, so it lands with the first batch');
+
+// The point of keeping link lists out of the file index: a playlist file is not
+// something to serve, and the index is what /api/stream answers from.
+console.log('a link list is not fetchable');
+check((await fetch(`${base}/api/stream/${index.idFor(listPath)}`, { headers: auth })).status === 404,
+    'its id resolves to nothing, so it cannot be downloaded');
 
 await server.stop();
 rmSync(tmp, { recursive: true, force: true });

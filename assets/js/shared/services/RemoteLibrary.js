@@ -1,4 +1,6 @@
 import { Logger } from '../utils/Logger.js';
+import { parseLinkListFile, linkListFolderName } from '../utils/LinkListFile.js';
+import { buildYouTubeItem } from '../utils/YouTubeUrl.js';
 
 /**
  * RemoteLibrary
@@ -72,10 +74,38 @@ export async function fetchItems(rawUrl) {
     const data = await response.json();
     const serverName = data.name || url.hostname;
     const items = Array.isArray(data.items) ? data.items : [];
+    const lists = Array.isArray(data.linkLists) ? data.linkLists : [];
 
-    Logger.log(`[RemoteLibrary] ${items.length} item(s) from ${serverName}`);
+    const shaped = items.map((item) => shapeItem(item, url, token, serverName, rawUrl));
+    for (const list of lists) shaped.push(...shapeLinkList(list, serverName, rawUrl));
 
-    return items.map((item) => shapeItem(item, url, token, serverName, rawUrl));
+    Logger.log(`[RemoteLibrary] ${shaped.length} item(s) from ${serverName}`);
+
+    return shaped;
+}
+
+/**
+ * A .jjlist from the other machine, as playlist items.
+ *
+ * The host sends the file's text rather than parsed entries, so the rules for
+ * reading one live in a single module instead of being restated in a process
+ * that cannot import it. These play through YouTube like any other YouTube
+ * item — there is no file on the other machine to stream, and nothing is
+ * fetched from it for them.
+ */
+function shapeLinkList(list, serverName, rawUrl) {
+    const folder = linkListFolderName(list.name || 'Links');
+
+    return parseLinkListFile(list.text).map((entry) => buildYouTubeItem(entry, entry.url, {
+        title: entry.name,
+        path: [serverName, folder, entry.name || entry.id].join('/'),
+        extra: {
+            // Grouped with the rest of the library, so the folder's reload and
+            // remove act on these too.
+            remoteSource: rawUrl,
+            remoteServer: serverName,
+        },
+    }));
 }
 
 /**
@@ -185,6 +215,12 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
                 return;
             }
             header = parsed;
+            return;
+        }
+        if (parsed?.kind === 'linklist') {
+            const expanded = shapeLinkList(parsed, header.name || url.hostname, rawUrl);
+            batch.push(...expanded);
+            total += expanded.length;
             return;
         }
         batch.push(shapeItem(parsed, url, token, header.name || url.hostname, rawUrl));

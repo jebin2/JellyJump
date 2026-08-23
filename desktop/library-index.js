@@ -17,6 +17,21 @@ const path = require('path');
 
 /** @type {Map<string, {id, path, name, size, mtime, ext}>} */
 const byId = new Map();
+
+/**
+ * Link lists, kept apart from the files on purpose.
+ *
+ * byId doubles as the sharing allowlist — resolveServable answers from it, so
+ * anything in there can be fetched by id. A .jjlist must never be fetchable, so
+ * it lives here instead and is only ever sent as text inside the listing.
+ *
+ * The text is shipped rather than parsed because the parser is the renderer's
+ * ESM module and this is a CommonJS process: a second copy here is how the two
+ * would drift.
+ *
+ * @type {Map<string, {path, name, text, mtime}>}
+ */
+const linkListsByPath = new Map();
 /** Resolved roots the scan was allowed to walk, for the containment check. */
 let scanRoots = [];
 
@@ -49,8 +64,24 @@ function addBatch(files) {
     }
 }
 
+function addLinkList(file) {
+    if (!file?.path || typeof file.text !== 'string') return;
+    linkListsByPath.set(file.path, {
+        path: file.path,
+        name: file.name,
+        text: file.text,
+        mtime: file.mtime,
+    });
+}
+
+/** For a client: the name and contents, never the path. */
+function listLinkLists() {
+    return [...linkListsByPath.values()].map((l) => ({ name: l.name, text: l.text }));
+}
+
 function clear() {
     byId.clear();
+    linkListsByPath.clear();
 }
 
 function size() {
@@ -111,4 +142,7 @@ function resolveServable(id) {
     return { ...entry, realPath: real, size: stat.size };
 }
 
-module.exports = { addBatch, setRoots, clear, list, size, resolveServable, idFor };
+module.exports = {
+    addBatch, addLinkList, setRoots, clear, list, listLinkLists, size,
+    resolveServable, idFor,
+};

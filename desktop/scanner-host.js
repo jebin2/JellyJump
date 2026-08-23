@@ -41,10 +41,10 @@ function getScanner() {
         // walk the whole tree twice.
         if (message?.type === 'started') libraryIndex.setRoots(message.roots);
         if (message?.type === 'batch') libraryIndex.addBatch(message.files);
-        // A link list is deliberately not added to the index. The index is the
-        // sharing allowlist — anything in it can be fetched over the share link
-        // by id — and a playlist file is not something to serve. Its contents
-        // are YouTube links, which the renderer turns into playlist entries.
+        // Kept apart from the file index on purpose: that index is the sharing
+        // allowlist and anything in it can be fetched by id, which a playlist
+        // file must never be. This is only ever sent as text inside a listing.
+        if (message?.type === 'linklist') libraryIndex.addLinkList(message.file);
         relay(message);
     });
 
