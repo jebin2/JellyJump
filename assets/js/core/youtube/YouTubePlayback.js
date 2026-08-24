@@ -69,6 +69,8 @@ export async function loadPlayerYouTube(player, video, autoplay) {
     // time and lands back on muted. See YouTubeEngine.canLoadAnother.
     if (player.youtube?.canLoadAnother(mount)) {
         player.youtube.setVisible(true);
+        // Armed before asking, so the playing event can cancel it.
+        if (autoplay) watchYouTubeAutoplay(player);
         player.youtube.load({ videoId: video.id, start: video.start, autoplay });
         player._setLoading(false);
         syncYouTubeAudio(player);
@@ -108,7 +110,10 @@ export async function loadPlayerYouTube(player, video, autoplay) {
             // iframe that never saw the tap which started the first, and it
             // sits on a still frame. Calling play once it is ready costs
             // nothing when autoplay already worked.
-            if (autoplay) player.youtube?.play();
+            if (autoplay) {
+                watchYouTubeAutoplay(player);
+                player.youtube?.play();
+            }
         },
         onDuration: (duration) => {
             player.duration = duration;
@@ -116,14 +121,22 @@ export async function loadPlayerYouTube(player, video, autoplay) {
         },
         onStateChange: (state) => {
             if (state === 'playing') {
+                cancelYouTubeAutoplayRetry(player);
                 player.isPlaying = true;
                 player._updatePlayPauseUI();
                 startYouTubeTicker(player);
                 unmuteOncePlaying(player);
+            } else if (state === 'buffering') {
+                // Buffering means the request was accepted and the video is on
+                // its way, so the watchdog has nothing to recover — without
+                // this, a slow connection looks exactly like a refusal and a
+                // perfectly good video gets muted for being late.
+                cancelYouTubeAutoplayRetry(player);
             } else if (state === 'paused') {
                 player.isPlaying = false;
                 player._updatePlayPauseUI();
             } else if (state === 'ended') {
+                cancelYouTubeAutoplayRetry(player);
                 player.isPlaying = false;
                 player._updatePlayPauseUI();
                 stopYouTubeTicker(player);
@@ -196,6 +209,7 @@ export function stopYouTubeTicker(player) {
 export function suspendPlayerYouTube(player) {
     if (!player.youtube) return;
 
+    cancelYouTubeAutoplayRetry(player);
     stopYouTubeTicker(player);
     player.youtube.pause();
     player.youtube.setVisible(false);
@@ -210,6 +224,7 @@ export function suspendPlayerYouTube(player) {
 export function teardownPlayerYouTube(player) {
     if (player.engine !== 'youtube' && !player.youtube) return;
 
+    cancelYouTubeAutoplayRetry(player);
     stopYouTubeTicker(player);
     player.youtube?.destroy();
     player.youtube = null;
@@ -229,6 +244,66 @@ export function syncYouTubeAudio(player) {
     if (player.engine !== 'youtube' || !player.youtube) return;
     player.youtube.setMuted(player.config.muted || player.config.volume === 0);
     player.youtube.setVolume(player.config.volume);
+}
+
+/**
+ * How long to give an autoplay request before treating it as refused.
+ *
+ * Long enough that a slow start is not mistaken for a refusal, short enough
+ * that a video which is never going to start does not just sit there.
+ */
+const AUTOPLAY_RETRY_MS = 1500;
+
+/**
+ * Notice an autoplay that never started, and retry it muted.
+ *
+ * Every way of starting a video ends in a request the browser may decline, and
+ * a decline looks like nothing at all happening — no error, no event, a still
+ * frame. Only one of those paths used to be covered: a phone got muted up
+ * front because that case was known to fail, while a reused embed and a
+ * desktop load simply assumed the request was honoured.
+ *
+ * So rather than predicting which situations need muting, this asks for what
+ * the user wants and falls back only when the browser actually says no. The
+ * mute is recorded as owed, which routes into unmuteOncePlaying — the sound
+ * comes back the moment it is allowed.
+ */
+function watchYouTubeAutoplay(player) {
+    cancelYouTubeAutoplayRetry(player);
+
+    player._youtubeAutoplayRetry = setTimeout(() => {
+        player._youtubeAutoplayRetry = null;
+        if (player.engine !== 'youtube' || !player.youtube) return;
+        if (player.isPlaying) return; // it started; nothing to recover
+
+        // Muting is what a refusal is usually about, so it is the first thing
+        // to give up — but only when the mute would be this code's doing.
+        // Re-asking an already-muted player still costs nothing and sometimes
+        // catches an embed that was simply not ready the first time.
+        if (!player.config.muted) {
+            Logger.log('[YouTube] Autoplay was refused; retrying muted');
+            player.config.muted = true;
+            player._wasMutedForAutoplay = true;
+            player._syncAudioGain();
+            player._updateVolumeUI();
+        } else {
+            Logger.log('[YouTube] Autoplay did not start; asking again');
+        }
+
+        player.youtube.play();
+    }, AUTOPLAY_RETRY_MS);
+}
+
+/**
+ * Stop waiting on an autoplay request — it started, it ended, or the user
+ * decided otherwise. Exported because pausing is the user overruling the
+ * retry, and a watchdog that fires afterwards would restart a video they
+ * deliberately stopped.
+ */
+export function cancelYouTubeAutoplayRetry(player) {
+    if (!player._youtubeAutoplayRetry) return;
+    clearTimeout(player._youtubeAutoplayRetry);
+    player._youtubeAutoplayRetry = null;
 }
 
 /**

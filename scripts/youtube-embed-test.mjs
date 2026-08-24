@@ -82,6 +82,7 @@ class StubPlayer {
         this.state = 'idle';
         this.loads = [];
         this.unmuteAttempts = 0;
+        this.muteCalls = 0;
         this.destroyed = false;
         ytConfig.created.push(this);
         setTimeout(() => this.events.onReady?.(), 0);
@@ -89,7 +90,13 @@ class StubPlayer {
     loadVideoById(request) { this.loads.push({ ...request, autoplay: true }); this.play(); }
     cueVideoById(request) { this.loads.push({ ...request, autoplay: false }); }
     playVideo() { this.play(); }
+    /** Accepted, but slow — the case a watchdog must not mistake for refusal. */
+    buffer() { this.state = 'buffering'; this.events.onStateChange?.({ data: 3 }); }
     play() {
+        // A browser that refuses unmuted autoplay does exactly this: nothing.
+        // No error, no event, no state change — which is what makes it worth
+        // a watchdog rather than an error handler.
+        if (this.config.refuseUnmutedAutoplay && !this.muted) return;
         this.state = 'playing';
         this.events.onStateChange?.({ data: 1 });
     }
@@ -102,7 +109,7 @@ class StubPlayer {
     getDuration() { return 120; }
     setVolume() { }
     setPlaybackRate() { }
-    mute() { this.muted = true; }
+    mute() { this.muteCalls = (this.muteCalls || 0) + 1; this.muted = true; }
     unMute() {
         this.unmuteAttempts = (this.unmuteAttempts || 0) + 1;
         if (this.config.refuseUnmute) return;
@@ -113,8 +120,8 @@ class StubPlayer {
     destroy() { this.destroyed = true; }
 }
 
-function installYT({ refuseUnmute = false, pauseOnUnmute = false } = {}) {
-    ytConfig = { created: [], refuseUnmute, pauseOnUnmute };
+function installYT({ refuseUnmute = false, pauseOnUnmute = false, refuseUnmutedAutoplay = false } = {}) {
+    ytConfig = { created: [], refuseUnmute, pauseOnUnmute, refuseUnmutedAutoplay };
     global.window.YT = { Player: StubPlayer };
     return ytConfig.created;
 }
@@ -357,6 +364,136 @@ check('the embed is not reused after being moved to a different container', asyn
 
     assert.equal(created.length, 2, 'a fresh embed was built for the new container');
     assert.equal(created[0].loads.length, 0, 'the stale embed was not driven');
+});
+
+// The watchdog waits 1.5s before deciding an autoplay was refused.
+const AFTER_RETRY = 2200;
+
+check('a reused embed that will not autoplay unmuted recovers as well', async () => {
+    installDom();
+    const created = installYT({ refuseUnmutedAutoplay: true });
+    const modules = await loadModules();
+    const { loadPlayerYouTube, suspendPlayerYouTube } = modules;
+    const player = await makePlayer(modules);
+
+    // The first video settles the way the desktop case does: muted to start,
+    // then unmuted once it is running.
+    await loadPlayerYouTube(player, { id: 'first', start: 0 }, true);
+    await wait(AFTER_RETRY);
+    assert.equal(player.isPlaying, true);
+    assert.equal(created[0].muted, false, 'the first video has sound');
+
+    // Which leaves the second video asking for an unmuted start on a frame
+    // that refuses them — the path that had no fallback at all.
+    suspendPlayerYouTube(player);
+    await loadPlayerYouTube(player, { id: 'second', start: 0 }, true);
+    await wait(50);
+    assert.equal(player.isPlaying, false, 'the request was silently declined');
+
+    await wait(AFTER_RETRY);
+    assert.equal(created.length, 1, 'still the same embed');
+    assert.equal(player.isPlaying, true, 'the watchdog got it playing');
+    assert.equal(created[0].muted, false, 'and the sound came back');
+});
+
+check('a fresh embed on desktop recovers a refused autoplay, sound and all', async () => {
+    installDom(); // desktop UA: nothing is muted up front
+    const created = installYT({ refuseUnmutedAutoplay: true });
+    const modules = await loadModules();
+    const { loadPlayerYouTube } = modules;
+    const player = await makePlayer(modules);
+
+    await loadPlayerYouTube(player, { id: 'first', start: 0 }, true);
+    await wait(50);
+    assert.equal(player.isPlaying, false, 'it sat there');
+
+    // Muting is what gets it started; the sound comes back straight after,
+    // because unmuting something already playing is a different question from
+    // starting it with sound. Ending up playing *and* audible is the point.
+    await wait(AFTER_RETRY);
+    assert.equal(player.isPlaying, true, 'the watchdog got it playing');
+    assert.equal(created[0].muted, false, 'and the sound came back');
+    assert.equal(player.config.muted, false);
+    assert.equal(player._wasMutedForAutoplay, false, 'nothing still owed');
+});
+
+check('a video that starts normally is never touched by the watchdog', async () => {
+    installDom();
+    const created = installYT();
+    const modules = await loadModules();
+    const { loadPlayerYouTube } = modules;
+    const player = await makePlayer(modules);
+
+    await loadPlayerYouTube(player, { id: 'first', start: 0 }, true);
+    await wait(AFTER_RETRY);
+
+    assert.equal(player.isPlaying, true);
+    assert.equal(created[0].muted, false, 'sound was never given up');
+    assert.equal(player.config.muted, false);
+    assert.equal(player._wasMutedForAutoplay, false);
+});
+
+check('a slow video is left to buffer, not muted for being late', async () => {
+    installDom();
+    // Nothing starts promptly here, so the watchdog is genuinely pending —
+    // the buffering event is the only thing that can call it off.
+    const created = installYT({ refuseUnmutedAutoplay: true });
+    const modules = await loadModules();
+    const { loadPlayerYouTube } = modules;
+    const player = await makePlayer(modules);
+
+    await loadPlayerYouTube(player, { id: 'first', start: 0 }, true);
+    await wait(50);
+    assert.equal(player.isPlaying, false, 'the watchdog is still pending');
+    created[0].buffer(); // accepted, still loading
+
+    await wait(AFTER_RETRY);
+    // The end state alone cannot tell: a mute the watchdog applies is undone
+    // straight afterwards. Whether it ever gave up the sound is the question.
+    assert.equal(created[0].muteCalls, 0, 'a slow start is not a refusal');
+    assert.equal(created[0].muted, false);
+    assert.equal(player.config.muted, false);
+    assert.equal(player._wasMutedForAutoplay, false);
+});
+
+check('a video loaded without autoplay is left alone', async () => {
+    installDom();
+    const created = installYT({ refuseUnmutedAutoplay: true });
+    const modules = await loadModules();
+    const { loadPlayerYouTube, suspendPlayerYouTube } = modules;
+    const player = await makePlayer(modules);
+
+    player.config.muted = true;
+    await loadPlayerYouTube(player, { id: 'first', start: 0 }, true);
+    await wait(50);
+    player.config.muted = false;
+    suspendPlayerYouTube(player);
+
+    await loadPlayerYouTube(player, { id: 'second', start: 0 }, false);
+    await wait(AFTER_RETRY);
+
+    // Not starting is the point of a cued video, so there is nothing to fix.
+    assert.equal(player.isPlaying, false, 'it was not started behind the scenes');
+    assert.equal(created[0].muted, false, 'and the sound was not given up');
+});
+
+check('pausing overrules a pending retry', async () => {
+    installDom();
+    const created = installYT({ refuseUnmutedAutoplay: true });
+    const modules = await loadModules();
+    const { loadPlayerYouTube, cancelYouTubeAutoplayRetry } = modules;
+    const player = await makePlayer(modules);
+
+    await loadPlayerYouTube(player, { id: 'first', start: 0 }, true);
+    await wait(50);
+
+    // What Player.pause() does on the YouTube branch.
+    cancelYouTubeAutoplayRetry(player);
+    player.youtube.pause();
+
+    await wait(AFTER_RETRY);
+    assert.equal(player.isPlaying, false, 'it stayed stopped');
+    assert.equal(created[0].muted, false, 'and nothing was muted behind their back');
 });
 
 // ─── Run ─────────────────────────────────────────────────────────────────────

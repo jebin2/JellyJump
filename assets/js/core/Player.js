@@ -72,6 +72,7 @@ import {
 import { parseYouTubeUrl } from '../shared/utils/YouTubeUrl.js';
 import {
     loadPlayerYouTube,
+    cancelYouTubeAutoplayRetry,
     suspendPlayerYouTube,
     teardownPlayerYouTube,
     syncYouTubeAudio
@@ -592,7 +593,13 @@ export class CorePlayer {
 
     // ─── Pause ───────────────────────────────────────────────────────────────────
     pause(showOverlay = true) {
-        if (this.engine === 'youtube') { this.youtube?.pause(); return; }
+        if (this.engine === 'youtube') {
+            // Pausing overrules a pending autoplay retry: without this, a video
+            // stopped within the retry window would start itself again.
+            cancelYouTubeAutoplayRetry(this);
+            this.youtube?.pause();
+            return;
+        }
         return pausePlayer(this, showOverlay);
     }
 
