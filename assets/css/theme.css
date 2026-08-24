@@ -177,6 +177,13 @@ html {
      and deliberate pinch-zoom keep working; also removes the 300ms
      tap delay on controls. */
   touch-action: manipulation;
+  /* Scrolling a list on a phone reached the document underneath once the list
+     hit its end, and a pull-down there is the browser's reload gesture — so
+     browsing a library kept arming a refresh mid-scroll. `contain` stops an
+     overscroll chaining out of whatever is being scrolled; the bounce still
+     happens, it just no longer reaches the page. Vertical only: horizontal
+     is left alone so a back-swipe still works. */
+  overscroll-behavior-y: contain;
 }
 
 /* iOS Safari force-zooms the page when a focused text field's font-size

@@ -197,6 +197,16 @@
     gap: var(--space-xs);
 }
 
+/* The library's scrollers, kept from chaining into the page behind them.
+   A nested folder is its own scroll area, so without this a flick that runs
+   past the end of one carries on scrolling whatever contains it — and at the
+   top of the page that gesture is the browser's reload. */
+.playlist-content,
+.playlist-children,
+.scroll-list {
+    overscroll-behavior: contain;
+}
+
 .playlist-content {
     flex: 1;
     overflow-y: auto;
