@@ -72,6 +72,7 @@ import {
 import { parseYouTubeUrl } from '../shared/utils/YouTubeUrl.js';
 import {
     loadPlayerYouTube,
+    suspendPlayerYouTube,
     teardownPlayerYouTube,
     syncYouTubeAudio
 } from './youtube/YouTubePlayback.js';
@@ -454,11 +455,18 @@ export class CorePlayer {
     // ─── Media Lifecycle ─────────────────────────────────────────────────────────
     _clearCanvas() { clearPlayerCanvas(this); }
     _disposeMediaBunnyResources() { disposeMediaBunnyResources(this); }
-    async reset() { return resetPlayer(this); }
+    async reset() {
+        // A reset is the end of playback, not a step between two videos, so
+        // the kept-alive embed goes with it.
+        teardownPlayerYouTube(this);
+        return resetPlayer(this);
+    }
     async _cleanupForLoad() {
         // Always, not only when leaving YouTube: this runs before every load,
-        // and an iframe left mounted would sit on top of the next video.
-        teardownPlayerYouTube(this);
+        // and a playing iframe left visible would sit on top of the next video.
+        // Suspended rather than destroyed — load() destroys it once it knows
+        // the next video is not another YouTube link.
+        suspendPlayerYouTube(this);
         return cleanupPlayerForLoad(this);
     }
     async _setupMediaTracks(url, isHls) { return setupPlayerMediaTracks(this, url, isHls); }
@@ -528,6 +536,11 @@ export class CorePlayer {
             if (isHls) this.isLive = true;
 
             await this._cleanupForLoad();
+
+            // The embed is kept alive across YouTube videos and only dropped
+            // here, where what comes next is finally known — leaving it would
+            // park a hidden cross-origin iframe behind a local file.
+            if (!youtube) teardownPlayerYouTube(this);
 
             // A YouTube link has no media stream to demux, so the whole track
             // setup below does not apply — YouTube's own player takes over the

@@ -57,19 +57,33 @@ export async function loadPlayerYouTube(player, video, autoplay) {
     player.currentTime = video.start || 0;
     player.isPlaying = false;
 
-    // Muted autoplay is the only autoplay a phone allows, and unlike the
-    // decode pipeline a tap does not help: the gesture does not cross into a
-    // cross-origin iframe, so even "the user just tapped this item" is not
-    // enough for YouTube to start with sound. Starting muted is the difference
-    // between playing and sitting on a still frame.
-    //
-    // Flagged the same way the decode path flags it, so the first interaction
-    // restores the sound rather than leaving it silently muted.
+    // Whether the user wants sound, which is not the same as whether the
+    // player is muted right now: a mute this code applied to get autoplay past
+    // the browser must not read back as "they asked for silence" on the next
+    // video, or one refusal makes every later video permanently silent.
+    player._youtubeWantsSound = !player.config.muted || !!player._wasMutedForAutoplay;
+
+    // Reuse before creating. A video handed to the embed that is already there
+    // inherits that frame's user activation, so once sound has been allowed
+    // once it keeps working; a fresh iframe per video throws that away every
+    // time and lands back on muted. See YouTubeEngine.canLoadAnother.
+    if (player.youtube?.canLoadAnother(mount)) {
+        player.youtube.setVisible(true);
+        player.youtube.load({ videoId: video.id, start: video.start, autoplay });
+        player._setLoading(false);
+        syncYouTubeAudio(player);
+        if (player.playbackRate !== 1) player.youtube.setRate(player.playbackRate);
+        Logger.log(`[YouTube] Reused embed for ${video.id}`);
+        return;
+    }
+
+    // Muted autoplay is the only autoplay a phone allows on a frame it has
+    // never seen touched, and unlike the decode pipeline a tap does not help:
+    // the gesture does not cross into a cross-origin iframe, so even "the user
+    // just tapped this item" is not enough for YouTube to start with sound.
+    // Starting muted is the difference between playing and sitting on a still
+    // frame — and it is undone as soon as the video is genuinely playing.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    // Remembered before muting: the sound is turned back on the moment the
-    // video is actually playing, so the mute lasts a fraction of a second
-    // rather than until the user reaches for the control on every video.
-    player._youtubeWantsSound = !player.config.muted;
     if (autoplay && isMobile && !player.config.muted) {
         player.config.muted = true;
         player._wasMutedForAutoplay = true;
@@ -170,8 +184,28 @@ export function stopYouTubeTicker(player) {
 }
 
 /**
+ * Stop the current video and get out of the way, keeping the embed.
+ *
+ * Called from the player's cleanup, which runs before every load and cannot
+ * know yet what is being loaded. Nothing is destroyed here because the next
+ * video may be another YouTube link, and dropping the iframe would drop the
+ * frame's user activation with it — the reason sound stopped surviving past
+ * the first video. The caller destroys it once it knows the next load is not
+ * YouTube.
+ */
+export function suspendPlayerYouTube(player) {
+    if (!player.youtube) return;
+
+    stopYouTubeTicker(player);
+    player.youtube.pause();
+    player.youtube.setVisible(false);
+    player.isPlaying = false;
+    applyYouTubeMode(player, false);
+}
+
+/**
  * Put everything back as it was, so the next load takes the normal path.
- * Called from the player's cleanup, which runs before every load.
+ * Called once the player knows it is not loading another YouTube video.
  */
 export function teardownPlayerYouTube(player) {
     if (player.engine !== 'youtube' && !player.youtube) return;
@@ -218,13 +252,27 @@ function unmuteOncePlaying(player) {
 
     setTimeout(() => {
         if (player.engine !== 'youtube' || !player.youtube) return;
-        if (player.isPlaying) return; // unmuting was allowed
 
-        Logger.log('[YouTube] Unmuting stopped playback; staying muted');
+        // Asked, not inferred. "Still playing" is true both when unmuting
+        // worked and when the embed ignored it, so reading playback alone
+        // reports success for a video that is silently still muted — which is
+        // exactly the state this exists to get out of.
+        const stillMuted = player.youtube.isMuted();
+        if (!player.isPlaying) {
+            Logger.log('[YouTube] Unmuting stopped playback; staying muted');
+        } else if (stillMuted === true) {
+            Logger.log('[YouTube] Embed refused to unmute; staying muted');
+        } else {
+            return; // unmuting was allowed, or the embed cannot say
+        }
+
+        // The mute stays a mute *this code* applied, never a preference: the
+        // flag is what tells the next video, and the next user interaction,
+        // that sound is still owed.
         player.config.muted = true;
         player._wasMutedForAutoplay = true;
         player._syncAudioGain();
         player._updateVolumeUI();
-        player.youtube.play();
+        if (!player.isPlaying) player.youtube.play();
     }, 500);
 }

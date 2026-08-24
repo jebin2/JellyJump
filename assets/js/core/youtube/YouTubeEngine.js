@@ -87,6 +87,53 @@ export class YouTubeEngine {
         this.host = null;
         this.destroyed = false;
         this.duration = 0;
+        this.videoId = options.videoId;
+    }
+
+    /**
+     * Whether this embed can be handed another video instead of being replaced.
+     *
+     * This is what keeps sound working past the first video. A browser tracks
+     * user activation per frame, so a brand-new iframe has none — it has never
+     * been touched, and a tap on the page outside it does not count. Every
+     * video getting its own iframe therefore starts from the most restricted
+     * state the browser has, which is muted. Loading into the frame that is
+     * already there keeps whatever the user has granted it.
+     *
+     * @param {HTMLElement} mount - where the caller wants the video
+     */
+    canLoadAnother(mount) {
+        return !this.destroyed
+            && this.host?.parentElement === mount
+            && typeof this.player?.loadVideoById === 'function';
+    }
+
+    /**
+     * Play a different video in this same embed.
+     * @param {{videoId: string, start?: number, autoplay?: boolean}} next
+     */
+    load(next) {
+        if (!this.canLoadAnother(this.host?.parentElement)) return false;
+
+        this.videoId = next.videoId;
+        this.duration = 0;
+
+        const request = {
+            videoId: next.videoId,
+            startSeconds: Math.max(0, Math.floor(next.start || 0)),
+        };
+        // cue leaves it ready but not started, which is what a non-autoplay
+        // load means; load starts it.
+        if (next.autoplay) this.player.loadVideoById(request);
+        else this.player.cueVideoById(request);
+
+        this._resolveDuration();
+        return true;
+    }
+
+    /** Hide without tearing down, so the embed can be reused for the next video. */
+    setVisible(visible) {
+        if (this.host) this.host.style.display = visible ? '' : 'none';
     }
 
     async mount() {
@@ -224,6 +271,16 @@ export class YouTubeEngine {
 
     setVolume(value01) { this.player?.setVolume?.(Math.round(Math.max(0, Math.min(1, value01)) * 100)); }
     setMuted(muted) { muted ? this.player?.mute?.() : this.player?.unMute?.(); }
+    /**
+     * What the embed is actually doing, which is not always what it was asked
+     * to do: unMute() is a request a phone can ignore outright, and inferring
+     * success from "it is still playing" cannot tell that apart from working.
+     * @returns {boolean|null} null when the embed cannot be asked yet
+     */
+    isMuted() {
+        if (typeof this.player?.isMuted !== 'function') return null;
+        try { return this.player.isMuted(); } catch { return null; }
+    }
     setRate(rate) { this.player?.setPlaybackRate?.(rate); }
 
     destroy() {
