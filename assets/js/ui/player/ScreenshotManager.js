@@ -61,13 +61,9 @@ export class ScreenshotManager {
             return;
         }
 
+        const isStreamMode = this.player.isStreamMode;
         const hasMediaBunny = this.player.videoSink && this.player.videoTrack;
         const hasCanvas = this.player.canvas && this.player.ctx;
-        // Whatever is on the canvas is the only frame available when nothing is
-        // demuxing the file: a webcam has no file at all, and the native engine
-        // leaves the decoding to the browser and paints the result here. Both
-        // give a real frame, just not one that can be re-seeked for.
-        const canvasIsTheOnlySource = this.player.isStreamMode || this.player.engine === 'native';
 
         if (!hasMediaBunny && !hasCanvas) {
             Logger.warn('No video loaded');
@@ -81,7 +77,7 @@ export class ScreenshotManager {
             let dataUrl;
             let timestamp;
 
-            if (canvasIsTheOnlySource && hasCanvas) {
+            if (isStreamMode && hasCanvas) {
                 dataUrl = this.player.canvas.toDataURL('image/png');
                 timestamp = this.player.currentTime || 0;
             } else if (hasMediaBunny) {

@@ -18,9 +18,8 @@
     "test:server": "node scripts/library-server-test.mjs",
     "test:remote": "node scripts/remote-library-test.mjs",
     "test:cli": "node scripts/cli-test.mjs",
-    "test:share": "npm run test:server && npm run test:remote && npm run test:cli && npm run test:youtube && npm run test:native && npm run test:linklist",
+    "test:share": "npm run test:server && npm run test:remote && npm run test:cli && npm run test:youtube && npm run test:linklist",
     "test:youtube": "node scripts/youtube-url-test.mjs && node scripts/youtube-embed-test.mjs",
-    "test:native": "node scripts/native-engine-test.mjs",
     "test:linklist": "node scripts/linklist-test.mjs && node scripts/linklist-scan-test.mjs"
   },
   "devDependencies": {

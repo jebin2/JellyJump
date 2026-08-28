@@ -75,27 +75,6 @@ function createPcmSink(estimatedFrames) {
 }
 
 /**
- * Demux the file just for this, when playback is not already doing it.
- *
- * The native engine hands the file to the browser instead of demuxing it, so
- * there are no tracks lying around to transcribe from. Opening one here costs
- * nothing until it is needed and keeps transcription working on every engine,
- * rather than making the fast playback path quietly lose a feature.
- */
-async function openInputForTranscription(player) {
-    if (!player.sourceUrl) return null;
-    try {
-        return new MediaBunny.Input({
-            source: new MediaBunny.UrlSource(player.sourceUrl),
-            formats: MediaBunny.ALL_FORMATS,
-        });
-    } catch (error) {
-        Logger.warn('[Subtitles] Could not open the file for transcription:', error);
-        return null;
-    }
-}
-
-/**
  * Extract the whole audio track as one 16kHz mono Float32Array.
  *
  * @param {object} player
@@ -103,8 +82,7 @@ async function openInputForTranscription(player) {
  * @returns {Promise<Float32Array>}
  */
 async function extractPcm(player, onProgress) {
-    const input = player.input || await openInputForTranscription(player);
-    const tracks = input ? await input.getAudioTracks() : [];
+    const tracks = player.input ? await player.input.getAudioTracks() : [];
     const track = player.audioTrack || tracks[0];
     if (!track) throw new Error('This media has no audio track to transcribe.');
 

@@ -1415,15 +1415,7 @@ export class Playlist {
             };
 
             // Load video with saved subtitles (if any) - pass isAudio for audio files
-            // title and mimeType are for the player's engine choice and for the
-            // lock screen: a blob: URL carries neither a name nor a type, so
-            // without these every file would look unidentifiable and go to the
-            // decoder, and the OS media controls would have nothing to show.
-            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null, {
-                isAudio: video.isAudio,
-                title: video.title,
-                mimeType: video.mimeType || video.fileType,
-            });
+            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null, { isAudio: video.isAudio });
 
             this._clearLoadGuard();
 
