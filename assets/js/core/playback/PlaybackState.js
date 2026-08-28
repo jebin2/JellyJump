@@ -2,6 +2,12 @@ import { Logger } from '../../shared/utils/Logger.js';
 
 
 export function getPlayerPlaybackTime(player) {
+    // The element is the clock when it is the one playing: reading anything
+    // else would drift away from the audio the user is actually hearing.
+    if (player.engine === 'native' && player.native) {
+        return player.native.getTime();
+    }
+
     if (player.isStreamMode && player.streamVideo) {
         return player.streamVideo.currentTime;
     }

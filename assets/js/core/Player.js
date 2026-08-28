@@ -45,6 +45,13 @@ import {
     handlePlayerInitialFrame
 } from './playback/MediaLifecycle.js';
 import {
+    canPlayNatively,
+    loadPlayerNative,
+    suspendPlayerNative,
+    teardownPlayerNative,
+    syncNativeAudio
+} from './native/NativePlayback.js';
+import {
     getPlayerPlaybackTime,
     handlePlayerVisibilityChange,
     togglePlayerPlay,
@@ -143,11 +150,15 @@ export class CorePlayer {
 
         // Which pipeline is playing. 'mediabunny' decodes and paints frames
         // itself; 'youtube' hands the video to YouTube's iframe and can only
-        // drive it. Features ask capabilities rather than testing this, so a
-        // third engine later does not mean editing every menu again.
+        // drive it; 'native' hands the file to a <video> element and paints
+        // what comes out, which is the only one of the three that keeps playing
+        // when the page stops being animated. Features ask capabilities rather
+        // than testing this, so a fourth engine later does not mean editing
+        // every menu again.
         this.engine = 'mediabunny';
         this.capabilities = { canvasFrames: true, audioGraph: true };
         this.youtube = null;
+        this.native = null;
 
         this.controlBarMode = options.controlBarMode || CONTROL_BAR_MODE_DEFAULT;
         this.autoHideTimer = null;
@@ -437,6 +448,7 @@ export class CorePlayer {
         // place the embed needs telling — branching in setVolume and toggleMute
         // separately would be the same fix written twice.
         if (this.engine === 'youtube') return syncYouTubeAudio(this);
+        if (this.engine === 'native') return syncNativeAudio(this);
         return syncPlayerAudioGain(this);
     }
     async _closeAudioContext() { return closePlayerAudioContext(this); }
@@ -458,16 +470,18 @@ export class CorePlayer {
     _disposeMediaBunnyResources() { disposeMediaBunnyResources(this); }
     async reset() {
         // A reset is the end of playback, not a step between two videos, so
-        // the kept-alive embed goes with it.
+        // the kept-alive embed and element go with it.
         teardownPlayerYouTube(this);
+        teardownPlayerNative(this);
         return resetPlayer(this);
     }
     async _cleanupForLoad() {
-        // Always, not only when leaving YouTube: this runs before every load,
-        // and a playing iframe left visible would sit on top of the next video.
-        // Suspended rather than destroyed — load() destroys it once it knows
-        // the next video is not another YouTube link.
+        // Always, not only when leaving the engine in question: this runs
+        // before every load, and a still-playing iframe or element left visible
+        // would sit on top of the next video. Suspended rather than destroyed —
+        // load() drops whichever one the next video turns out not to need.
         suspendPlayerYouTube(this);
+        suspendPlayerNative(this);
         return cleanupPlayerForLoad(this);
     }
     async _setupMediaTracks(url, isHls) { return setupPlayerMediaTracks(this, url, isHls); }
@@ -488,6 +502,15 @@ export class CorePlayer {
             this.youtube?.seek(time);
             this.currentTime = Math.max(0, time);
             this._updateProgress();
+            return;
+        }
+        if (this.engine === 'native') {
+            this.native?.seek(time);
+            this.currentTime = Math.max(0, time);
+            this._updateProgress();
+            // The frame is not drawn here: the element has not decoded the new
+            // position yet, so this would paint the one already on screen. The
+            // engine repaints when the seek actually lands.
             return;
         }
         return seekPlayerTo(this, time);
@@ -536,12 +559,20 @@ export class CorePlayer {
             const isHls = !youtube && StreamDetector.detect(url) === StreamDetector.TYPE_HLS;
             if (isHls) this.isLive = true;
 
+            // Whether the browser should be offered this file directly. Decided
+            // before the cleanup below so the element can be kept for another
+            // file that qualifies, the same way the embed is.
+            const useNative = !youtube && !isHls && !this.isStreamMode
+                && canPlayNatively(url, options.mimeType);
+
             await this._cleanupForLoad();
 
-            // The embed is kept alive across YouTube videos and only dropped
-            // here, where what comes next is finally known — leaving it would
-            // park a hidden cross-origin iframe behind a local file.
+            // The embed and the element are kept alive across videos of their
+            // own kind and only dropped here, where what comes next is finally
+            // known — leaving one would park a hidden iframe, or a video still
+            // holding a decoder, behind the next file.
             if (!youtube) teardownPlayerYouTube(this);
+            if (!useNative) teardownPlayerNative(this);
 
             // A YouTube link has no media stream to demux, so the whole track
             // setup below does not apply — YouTube's own player takes over the
@@ -552,6 +583,32 @@ export class CorePlayer {
                 await loadPlayerYouTube(this, youtube, autoplay);
                 Logger.log('Media loaded successfully (youtube)');
                 return;
+            }
+
+            // A file the browser can play natively goes to a <video> element
+            // rather than through the decoder. It is the same picture — the
+            // element is painted onto the same canvas — but the browser owns
+            // the playing, so it carries on with the screen off and appears on
+            // the lock screen. Only what the browser is confident about comes
+            // here; everything else falls through to the decoder below, and so
+            // does anything that turns out not to load after all.
+            if (useNative) {
+                this.currentVideoId = videoId || url;
+                this._setLoading(true);
+                Logger.log(`Loading media natively: ${url}`);
+
+                const loaded = await loadPlayerNative(this, url, autoplay, {
+                    title: options.title,
+                    artwork: options.artwork,
+                });
+
+                if (loaded) {
+                    if (savedSubtitles?.length > 0) this._restoreSavedSubtitles(savedSubtitles);
+                    this._updateSubtitleMenu();
+                    Logger.log('Media loaded successfully (native)');
+                    return;
+                }
+                Logger.log('Native playback declined the file; using the decoder');
             }
 
             // cleanup's pause() suspended the AudioContext; wake it now while
@@ -588,6 +645,15 @@ export class CorePlayer {
     // ─── Play ────────────────────────────────────────────────────────────────────
     async play() {
         if (this.engine === 'youtube') { this.youtube?.play(); return; }
+        if (this.engine === 'native') {
+            // Swallowed rather than thrown: a refusal here is the browser
+            // declining, not a fault, and the element's own events put the UI
+            // back into a paused state.
+            if (!this.native) return;
+            return this.native.play().catch((error) => {
+                Logger.log(`[Native] play() was refused: ${error?.message || error}`);
+            });
+        }
         return playPlayer(this);
     }
 
@@ -600,6 +666,10 @@ export class CorePlayer {
             this.youtube?.pause();
             return;
         }
+        if (this.engine === 'native') {
+            this.native?.pause();
+            return;
+        }
         return pausePlayer(this, showOverlay);
     }
 
@@ -608,6 +678,11 @@ export class CorePlayer {
         if (this.engine === 'youtube') {
             this.playbackRate = rate;
             this.youtube?.setRate(rate);
+            return;
+        }
+        if (this.engine === 'native') {
+            this.playbackRate = rate;
+            this.native?.setRate(rate);
             return;
         }
         return setPlayerPlaybackRate(this, rate);

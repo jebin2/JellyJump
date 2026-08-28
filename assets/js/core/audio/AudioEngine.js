@@ -97,10 +97,11 @@ export function closePlayerAudioBufferIteratorSoon(player) {
 
 export function restorePlayerAutoplayAudio(player, sourceLabel) {
     if (!player._wasMutedForAutoplay) return false;
-    // gainNode is this pipeline's output. Another engine has its own and never
-    // builds one — requiring it here meant a video muted to get autoplay past
-    // the browser could never be unmuted again.
-    if (player.engine !== 'youtube' && !player.gainNode) return false;
+    // gainNode is this pipeline's output. Every other engine has its own and
+    // never builds one — requiring it here meant a video muted to get autoplay
+    // past the browser could never be unmuted again. Named as the one engine
+    // that does need it, so a later engine is not silently caught by it.
+    if (player.engine === 'mediabunny' && !player.gainNode) return false;
 
     Logger.log(`[Autoplay] ${sourceLabel}, restoring audio...`);
     player.config.muted = false;

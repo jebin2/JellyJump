@@ -116,8 +116,40 @@ export function togglePlayerAudioPanel(player) {
     const isVisible = player.ui.audioPanel.style.display !== 'none';
     player.ui.audioPanel.style.display = isVisible ? 'none' : 'block';
     if (!isVisible) {
+        applyPlayerEqAvailability(player);
         syncPlayerEqSliders(player);
         player._updateVolumeUI();
+    }
+}
+
+/**
+ * Turn the equaliser off when there is no audio graph to equalise.
+ *
+ * The filters are nodes in a Web Audio graph, and not every engine plays
+ * through one — a video the browser is playing itself goes straight to the
+ * output, which is exactly what lets it carry on with the screen off. Volume
+ * and mute still work, so the panel is still worth opening; only the sliders
+ * that genuinely cannot do anything are turned off, and they say why rather
+ * than moving and having no effect.
+ */
+export function applyPlayerEqAvailability(player) {
+    const available = player.capabilities?.audioGraph !== false;
+    const panel = player.ui.audioPanel;
+    if (!panel) return;
+
+    for (const slider of panel.querySelectorAll('.eq-slider, .eq-preset-btn, #mb-reset-eq-btn')) {
+        slider.disabled = !available;
+    }
+    panel.classList.toggle('eq-unavailable', !available);
+
+    let note = panel.querySelector('.eq-unavailable-note');
+    if (!available && !note) {
+        note = document.createElement('p');
+        note.className = 'eq-unavailable-note';
+        note.textContent = 'The equaliser is off for this video so it can keep playing with the screen off.';
+        panel.querySelector('.eq-sliders')?.before(note);
+    } else if (available && note) {
+        note.remove();
     }
 }
 

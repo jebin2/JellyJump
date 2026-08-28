@@ -3574,3 +3574,19 @@ body.fullscreen-active {
         animation: none;
     }
 }
+/* The equaliser, off for a video the browser is playing itself: those filters
+   are Web Audio nodes, and that playback does not go through a graph — which is
+   the trade that keeps it running with the screen off. Dimmed rather than
+   hidden, so the controls do not appear and disappear between videos. */
+.jellyjump-eq-panel.eq-unavailable .eq-sliders,
+.jellyjump-eq-panel.eq-unavailable .eq-presets,
+.jellyjump-eq-panel.eq-unavailable .eq-actions {
+    opacity: 0.45;
+}
+
+.eq-unavailable-note {
+    margin: 0 0 10px;
+    font-size: 11px;
+    line-height: 1.4;
+    opacity: 0.75;
+}
