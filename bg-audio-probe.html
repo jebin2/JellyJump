@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Background Audio Probe</title>
+<link rel="manifest" href="./bg-audio-probe.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+    :root { color-scheme: dark; }
+    body {
+        margin: 0; padding: 16px 16px 48px;
+        background: #0a0f14; color: #e6f1ef;
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    h1 { font-size: 19px; margin: 0 0 4px; color: #00d9a5; }
+    p.sub { margin: 0 0 20px; color: #7f9a95; font-size: 13px; }
+    fieldset { border: 2px solid #1d2a31; border-radius: 8px; margin: 0 0 16px; padding: 12px; }
+    legend { color: #00d9a5; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; padding: 0 6px; }
+    button {
+        font: inherit; font-weight: 600;
+        background: #00d9a5; color: #04231c; border: none;
+        border-radius: 6px; padding: 12px 18px; margin: 4px 6px 4px 0;
+        cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    button.ghost { background: #16232a; color: #b9d3ce; }
+    button:disabled { opacity: .4; }
+    label.radio { display: inline-block; margin-right: 16px; padding: 6px 0; }
+    input[type=file] { max-width: 100%; color: #b9d3ce; }
+    #verdict {
+        border-radius: 8px; padding: 14px; margin: 0 0 16px;
+        background: #16232a; border-left: 5px solid #3d4f57;
+        font-weight: 600; white-space: pre-wrap;
+    }
+    #verdict.pass { border-left-color: #00d9a5; background: #06251e; }
+    #verdict.fail { border-left-color: #ff5c7a; background: #2a1119; }
+    #verdict.partial { border-left-color: #ffc247; background: #2a2211; }
+    #log {
+        font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: #060d11; border: 1px solid #1d2a31; border-radius: 8px;
+        padding: 10px; height: 240px; overflow-y: auto; white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .env { font-size: 12px; color: #7f9a95; margin-top: 4px; }
+    .env b { color: #b9d3ce; font-weight: 600; }
+    #stage { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; left: -9999px; }
+</style>
+</head>
+<body>
+
+<h1>Background audio probe</h1>
+<p class="sub">Does a media element keep playing when the screen goes off? Answered from the media clock, not from listening.</p>
+
+<div id="verdict">Pick an element type, start playback, then lock the screen or switch apps for ~15 seconds and come back.</div>
+
+<fieldset>
+    <legend>1 · Element</legend>
+    <label class="radio"><input type="radio" name="kind" value="audio" checked> &lt;audio&gt;</label>
+    <label class="radio"><input type="radio" name="kind" value="video"> &lt;video&gt;</label>
+    <div class="env">iOS treats these differently. Test both — that is the whole point.</div>
+</fieldset>
+
+<fieldset>
+    <legend>2 · Source</legend>
+    <button id="btn-tone">Use generated 5-min beep</button>
+    <div style="margin-top:10px"><input type="file" id="file" accept="audio/*,video/*"></div>
+    <div class="env">The beep needs no library file and is obvious through a pocket.</div>
+</fieldset>
+
+<fieldset>
+    <legend>3 · Play</legend>
+    <button id="btn-play" disabled>Play</button>
+    <button id="btn-pause" class="ghost" disabled>Pause</button>
+    <button id="btn-clear" class="ghost">Clear log</button>
+</fieldset>
+
+<div id="log"></div>
+<div class="env" id="env"></div>
+<div id="stage"></div>
+
+<script>
+(function () {
+    'use strict';
+
+    var logEl = document.getElementById('log');
+    var verdictEl = document.getElementById('verdict');
+    var stage = document.getElementById('stage');
+    var btnPlay = document.getElementById('btn-play');
+    var btnPause = document.getElementById('btn-pause');
+    var t0 = Date.now();
+
+    function stamp() {
+        var s = (Date.now() - t0) / 1000;
+        return ('     ' + s.toFixed(2)).slice(-8);
+    }
+
+    function log(msg) {
+        logEl.textContent += stamp() + '  ' + msg + '\n';
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function verdict(text, cls) {
+        verdictEl.textContent = text;
+        verdictEl.className = cls || '';
+    }
+
+    // ---- environment -------------------------------------------------------
+
+    var standalone = (window.navigator.standalone === true) ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+
+    document.getElementById('env').innerHTML =
+        'Mode: <b>' + (standalone ? 'standalone PWA' : 'browser tab') + '</b> · ' +
+        'Media Session: <b>' + ('mediaSession' in navigator ? 'yes' : 'no') + '</b> · ' +
+        'Isolated: <b>' + (window.crossOriginIsolated ? 'yes' : 'no') + '</b>';
+
+    log('mode=' + (standalone ? 'standalone-pwa' : 'browser-tab'));
+    if (!standalone) {
+        log('WARNING: not running as an installed PWA. Add to Home Screen and');
+        log('         open from the icon, or this tests a tab instead.');
+    }
+
+    // ---- source ------------------------------------------------------------
+
+    var sourceUrl = null;
+    var sourceName = null;
+
+    function setSource(url, name) {
+        if (sourceUrl && sourceUrl.indexOf('blob:') === 0) URL.revokeObjectURL(sourceUrl);
+        sourceUrl = url;
+        sourceName = name;
+        btnPlay.disabled = false;
+        log('source ready: ' + name);
+    }
+
+    // A 5-minute mono WAV that beeps for 150ms every 2s. Audible from a pocket,
+    // and its silence is just as recognisable as its sound.
+    function buildBeepWav(seconds) {
+        var rate = 8000;
+        var frames = rate * seconds;
+        var bytes = 44 + frames * 2;
+        var buf = new ArrayBuffer(bytes);
+        var view = new DataView(buf);
+
+        function str(off, s) { for (var i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); }
+        str(0, 'RIFF'); view.setUint32(4, bytes - 8, true); str(8, 'WAVE');
+        str(12, 'fmt '); view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+        view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+        view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+        str(36, 'data'); view.setUint32(40, frames * 2, true);
+
+        for (var i = 0; i < frames; i++) {
+            var t = i / rate;
+            var phase = t % 2;
+            var v = 0;
+            if (phase < 0.15) {
+                // Fade the edges so it clicks less and stays easy on the ear.
+                var env = Math.min(1, phase / 0.02, (0.15 - phase) / 0.02);
+                v = Math.sin(2 * Math.PI * 440 * t) * env * 0.35;
+            }
+            view.setInt16(44 + i * 2, v * 32767, true);
+        }
+        return new Blob([buf], { type: 'audio/wav' });
+    }
+
+    document.getElementById('btn-tone').addEventListener('click', function () {
+        log('generating 5-minute beep track...');
+        var blob = buildBeepWav(300);
+        setSource(URL.createObjectURL(blob), 'generated beep (' + Math.round(blob.size / 1024) + ' KB)');
+    });
+
+    document.getElementById('file').addEventListener('change', function (e) {
+        var f = e.target.files && e.target.files[0];
+        if (f) setSource(URL.createObjectURL(f), f.name);
+    });
+
+    document.getElementById('btn-clear').addEventListener('click', function () {
+        logEl.textContent = '';
+        t0 = Date.now();
+    });
+
+    // ---- the element -------------------------------------------------------
+
+    var el = null;
+    var elKind = null;
+
+    function wantedKind() {
+        var r = document.querySelector('input[name=kind]:checked');
+        return r ? r.value : 'audio';
+    }
+
+    // Rebuilding only when the type actually changes: a reused element keeps its
+    // user activation, which is exactly what lets playback survive backgrounding.
+    function ensureElement() {
+        var kind = wantedKind();
+        if (el && elKind === kind) return el;
+
+        if (el) { el.pause(); el.removeAttribute('src'); el.load(); el.remove(); }
+
+        el = document.createElement(kind);
+        elKind = kind;
+        el.setAttribute('playsinline', '');
+        el.setAttribute('webkit-playsinline', '');
+        el.preload = 'auto';
+        el.controls = false;
+        stage.appendChild(el);
+
+        ['play', 'pause', 'ended', 'stalled', 'waiting', 'suspend', 'error'].forEach(function (name) {
+            el.addEventListener(name, function () {
+                log('event ' + name + '  t=' + el.currentTime.toFixed(2));
+                if (name === 'error' && el.error) log('  error code=' + el.error.code);
+            });
+        });
+
+        log('created <' + kind + '>');
+        return el;
+    }
+
+    document.querySelectorAll('input[name=kind]').forEach(function (r) {
+        r.addEventListener('change', function () { log('element type -> ' + wantedKind()); });
+    });
+
+    // ---- media session -----------------------------------------------------
+
+    function setMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+        try {
+            navigator.mediaSession.metadata = new window.MediaMetadata({
+                title: 'Background probe',
+                artist: 'JellyJump',
+                album: sourceName || '',
+                artwork: [{ src: './icon-512.png', sizes: '512x512', type: 'image/png' }]
+            });
+            navigator.mediaSession.setActionHandler('play', function () {
+                log('mediaSession: play from OS controls');
+                el && el.play();
+            });
+            navigator.mediaSession.setActionHandler('pause', function () {
+                log('mediaSession: pause from OS controls');
+                el && el.pause();
+            });
+            log('media session registered (check the lock screen)');
+        } catch (err) {
+            log('media session failed: ' + err.message);
+        }
+    }
+
+    // ---- transport ---------------------------------------------------------
+
+    btnPlay.addEventListener('click', function () {
+        var e = ensureElement();
+        if (e.src !== sourceUrl) { e.src = sourceUrl; log('src assigned'); }
+        e.play().then(function () {
+            log('play() resolved');
+            btnPause.disabled = false;
+            setMediaSession();
+            verdict('Playing. Now lock the screen or switch apps for ~15 seconds, then come back here.', '');
+        }).catch(function (err) {
+            log('play() REFUSED: ' + err.name + ' - ' + err.message);
+            verdict('play() was refused: ' + err.message, 'fail');
+        });
+    });
+
+    btnPause.addEventListener('click', function () { el && el.pause(); });
+
+    // ---- the actual measurement -------------------------------------------
+
+    var hiddenAtWall = 0;
+    var hiddenAtMedia = 0;
+    var wasPlayingWhenHidden = false;
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            if (!el) { log('hidden (nothing loaded)'); return; }
+            hiddenAtWall = Date.now();
+            hiddenAtMedia = el.currentTime;
+            wasPlayingWhenHidden = !el.paused;
+            log('--- HIDDEN --- media t=' + hiddenAtMedia.toFixed(2) +
+                ' playing=' + wasPlayingWhenHidden);
+            return;
+        }
+
+        log('--- VISIBLE ---');
+        if (!el || !hiddenAtWall) return;
+
+        var wall = (Date.now() - hiddenAtWall) / 1000;
+        var media = el.currentTime - hiddenAtMedia;
+        var ratio = wall > 0 ? media / wall : 0;
+
+        log('  wall clock away : ' + wall.toFixed(2) + 's');
+        log('  media advanced  : ' + media.toFixed(2) + 's');
+        log('  ratio           : ' + ratio.toFixed(3));
+        log('  paused now      : ' + el.paused);
+
+        if (!wasPlayingWhenHidden) {
+            verdict('Not playing when you left, so nothing was measured.\nStart playback first, then background the app.', '');
+        } else if (wall < 5) {
+            verdict('Away for only ' + wall.toFixed(1) + 's — too short to trust.\nTry again and stay away for at least 15 seconds.', '');
+        } else if (ratio >= 0.9) {
+            verdict('KEPT PLAYING.\n<' + elKind + '> advanced ' + media.toFixed(1) +
+                's while you were away for ' + wall.toFixed(1) + 's.\nBackground playback works here.', 'pass');
+        } else if (media < 0.5) {
+            verdict('STOPPED IMMEDIATELY.\n<' + elKind + '> advanced ' + media.toFixed(2) +
+                's across ' + wall.toFixed(1) + 's away.\nThis platform suspends it on backgrounding.', 'fail');
+        } else {
+            verdict('PARTIAL — played ' + media.toFixed(1) + 's of ' + wall.toFixed(1) +
+                's away.\nIt ran for a while, then was suspended. Check the log for the pause event.', 'partial');
+        }
+    });
+
+    // ?auto=1 runs the source+play steps without a tap, so the page can be
+    // driven headlessly (with --autoplay-policy=no-user-gesture-required).
+    // It cannot test backgrounding — only a real device can — but it proves the
+    // generated track decodes and the element starts.
+    if (/[?&]auto=1/.test(location.search)) {
+        log('auto mode: generating source and playing');
+        document.getElementById('btn-tone').click();
+        setTimeout(function () { btnPlay.click(); }, 50);
+        setInterval(function () {
+            if (el) log('tick t=' + el.currentTime.toFixed(2) + ' paused=' + el.paused);
+        }, 400);
+    }
+
+    log('probe ready');
+})();
+</script>
+</body>
+</html>

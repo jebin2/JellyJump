@@ -40,6 +40,10 @@ export default defineConfig({
                 main: resolve(__dirname, 'index.html'),
                 player: resolve(__dirname, 'player.html'),
                 embed: resolve(__dirname, 'embed.html'),
+                // Temporary diagnostic page (bg-audio-probe.html): measures whether a
+                // media element survives backgrounding on a given device. Remove
+                // this input and the file once the question is settled.
+                bgAudioProbe: resolve(__dirname, 'bg-audio-probe.html'),
             },
         },
     },
