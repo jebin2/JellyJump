@@ -59,14 +59,18 @@
     <legend>1 · Element</legend>
     <label class="radio"><input type="radio" name="kind" value="audio" checked> &lt;audio&gt;</label>
     <label class="radio"><input type="radio" name="kind" value="video"> &lt;video&gt;</label>
-    <div class="env">iOS treats these differently. Test both — that is the whole point.</div>
+    <label class="radio"><input type="radio" name="kind" value="webaudio"> Web Audio (what JellyJump uses today)</label>
+    <div class="env">The first two hand playback to the browser. The third schedules buffers from
+    JavaScript exactly the way <code>AudioEngine.js</code> does, never more than ~2s ahead — so it
+    fails in the background if and only if our current pipeline would.</div>
 </fieldset>
 
 <fieldset>
     <legend>2 · Source</legend>
     <button id="btn-tone">Use generated 5-min beep</button>
     <div style="margin-top:10px"><input type="file" id="file" accept="audio/*,video/*"></div>
-    <div class="env">The beep needs no library file and is obvious through a pocket.</div>
+    <div class="env">The beep needs no library file and is obvious through a pocket.
+    Web Audio mode synthesises its own and needs nothing here.</div>
 </fieldset>
 
 <fieldset>
@@ -182,26 +186,31 @@
         t0 = Date.now();
     });
 
-    // ---- the element -------------------------------------------------------
+    // ---- engines -----------------------------------------------------------
+    //
+    // Three of them behind one interface, so the measurement below does not care
+    // which is running: start(), stop(), clock() in seconds played, playing().
 
-    var el = null;
-    var elKind = null;
+    var mode = null;
+    var el = null;                 // <audio>/<video> modes
+    var ctx = null, gain = null;   // webaudio mode
+    var schedTimer = null, nextTime = 0, mediaPos = 0, ctxAnchor = 0;
+    var scheduled = 0, scheduledWhileHidden = 0;
 
     function wantedKind() {
         var r = document.querySelector('input[name=kind]:checked');
         return r ? r.value : 'audio';
     }
 
-    // Rebuilding only when the type actually changes: a reused element keeps its
-    // user activation, which is exactly what lets playback survive backgrounding.
-    function ensureElement() {
-        var kind = wantedKind();
-        if (el && elKind === kind) return el;
+    // --- element modes ---
 
-        if (el) { el.pause(); el.removeAttribute('src'); el.load(); el.remove(); }
+    // Rebuilt only when the type actually changes: a reused element keeps its
+    // user activation, which is part of what lets playback survive backgrounding.
+    function ensureElement(kind) {
+        if (el && mode === kind) return el;
+        if (el) { el.pause(); el.removeAttribute('src'); el.load(); el.remove(); el = null; }
 
         el = document.createElement(kind);
-        elKind = kind;
         el.setAttribute('playsinline', '');
         el.setAttribute('webkit-playsinline', '');
         el.preload = 'auto';
@@ -214,13 +223,95 @@
                 if (name === 'error' && el.error) log('  error code=' + el.error.code);
             });
         });
-
         log('created <' + kind + '>');
         return el;
     }
 
+    // --- web audio mode ---
+
+    // The same beep pattern as the WAV, rendered on demand for one slice of the
+    // timeline, so both paths sound identical and silence means the same thing.
+    function sliceBuffer(pos, dur) {
+        var rate = ctx.sampleRate;
+        var frames = Math.round(dur * rate);
+        var buf = ctx.createBuffer(1, frames, rate);
+        var out = buf.getChannelData(0);
+        for (var i = 0; i < frames; i++) {
+            var t = pos + i / rate;
+            var phase = t % 2;
+            if (phase < 0.15) {
+                var env = Math.min(1, phase / 0.02, (0.15 - phase) / 0.02);
+                out[i] = Math.sin(2 * Math.PI * 440 * t) * env * 0.35;
+            }
+        }
+        return buf;
+    }
+
+    var SLICE = 0.5;
+    var LEAD = 2.0;   // AudioEngine.js throttles to ~2s ahead; match it.
+
+    function pump() {
+        if (!ctx) return;
+        var guard = 0;
+        while (nextTime < ctx.currentTime + LEAD && guard++ < 20) {
+            var src = ctx.createBufferSource();
+            src.buffer = sliceBuffer(mediaPos, SLICE);
+            src.connect(gain);
+            src.start(nextTime);
+            nextTime += SLICE;
+            mediaPos += SLICE;
+            scheduled++;
+            if (document.hidden) scheduledWhileHidden++;
+        }
+        schedTimer = setTimeout(pump, 250);
+    }
+
+    function startWebAudio() {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) { log('no AudioContext in this browser'); return Promise.reject(new Error('unsupported')); }
+        if (!ctx) {
+            ctx = new AC();
+            gain = ctx.createGain();
+            gain.connect(ctx.destination);
+            log('AudioContext created, rate=' + ctx.sampleRate);
+        }
+        return ctx.resume().then(function () {
+            ctxAnchor = ctx.currentTime;
+            nextTime = ctx.currentTime + 0.1;
+            mediaPos = 0;
+            scheduled = 0;
+            scheduledWhileHidden = 0;
+            pump();
+            log('web audio scheduling started, state=' + ctx.state);
+        });
+    }
+
+    function stopWebAudio() {
+        if (schedTimer) { clearTimeout(schedTimer); schedTimer = null; }
+        if (ctx) ctx.suspend();
+    }
+
+    // --- unified interface ---
+
+    // The clock each engine actually plays by. For web audio that is
+    // audioContext.currentTime, which is exactly what getPlayerPlaybackTime()
+    // in PlaybackState.js reads -- so this measures our real clock, not a proxy.
+    function clock() {
+        if (mode === 'webaudio') return ctx ? ctx.currentTime - ctxAnchor : 0;
+        return el ? el.currentTime : 0;
+    }
+
+    function playing() {
+        if (mode === 'webaudio') return !!ctx && ctx.state === 'running' && !!schedTimer;
+        return !!el && !el.paused;
+    }
+
     document.querySelectorAll('input[name=kind]').forEach(function (r) {
-        r.addEventListener('change', function () { log('element type -> ' + wantedKind()); });
+        r.addEventListener('change', function () {
+            var k = wantedKind();
+            log('mode -> ' + k);
+            btnPlay.disabled = (k !== 'webaudio') && !sourceUrl;
+        });
     });
 
     // ---- media session -----------------------------------------------------
@@ -229,19 +320,13 @@
         if (!('mediaSession' in navigator)) return;
         try {
             navigator.mediaSession.metadata = new window.MediaMetadata({
-                title: 'Background probe',
+                title: 'Background probe (' + mode + ')',
                 artist: 'JellyJump',
-                album: sourceName || '',
+                album: sourceName || 'synthesised',
                 artwork: [{ src: './icon-512.png', sizes: '512x512', type: 'image/png' }]
             });
-            navigator.mediaSession.setActionHandler('play', function () {
-                log('mediaSession: play from OS controls');
-                el && el.play();
-            });
-            navigator.mediaSession.setActionHandler('pause', function () {
-                log('mediaSession: pause from OS controls');
-                el && el.pause();
-            });
+            navigator.mediaSession.setActionHandler('play', function () { log('mediaSession: play'); doPlay(); });
+            navigator.mediaSession.setActionHandler('pause', function () { log('mediaSession: pause'); doPause(); });
             log('media session registered (check the lock screen)');
         } catch (err) {
             log('media session failed: ' + err.message);
@@ -250,64 +335,97 @@
 
     // ---- transport ---------------------------------------------------------
 
-    btnPlay.addEventListener('click', function () {
-        var e = ensureElement();
+    function doPlay() {
+        mode = wantedKind();
+
+        if (mode === 'webaudio') {
+            startWebAudio().then(function () {
+                btnPause.disabled = false;
+                setMediaSession();
+                verdict('Playing through Web Audio. Lock the screen for ~20s, then come back.', '');
+            }).catch(function (err) {
+                log('web audio failed: ' + err.message);
+                verdict('Web Audio could not start: ' + err.message, 'fail');
+            });
+            return;
+        }
+
+        if (!sourceUrl) { log('pick a source first'); return; }
+        var e = ensureElement(mode);
         if (e.src !== sourceUrl) { e.src = sourceUrl; log('src assigned'); }
         e.play().then(function () {
             log('play() resolved');
             btnPause.disabled = false;
             setMediaSession();
-            verdict('Playing. Now lock the screen or switch apps for ~15 seconds, then come back here.', '');
+            verdict('Playing through <' + mode + '>. Lock the screen for ~20s, then come back.', '');
         }).catch(function (err) {
             log('play() REFUSED: ' + err.name + ' - ' + err.message);
             verdict('play() was refused: ' + err.message, 'fail');
         });
-    });
+    }
 
-    btnPause.addEventListener('click', function () { el && el.pause(); });
+    function doPause() {
+        if (mode === 'webaudio') stopWebAudio();
+        else if (el) el.pause();
+        log('paused');
+    }
+
+    btnPlay.addEventListener('click', doPlay);
+    btnPause.addEventListener('click', doPause);
 
     // ---- the actual measurement -------------------------------------------
 
     var hiddenAtWall = 0;
     var hiddenAtMedia = 0;
+    var hiddenScheduled = 0;
     var wasPlayingWhenHidden = false;
 
     document.addEventListener('visibilitychange', function () {
         if (document.hidden) {
-            if (!el) { log('hidden (nothing loaded)'); return; }
+            if (!mode) { log('hidden (nothing started)'); return; }
             hiddenAtWall = Date.now();
-            hiddenAtMedia = el.currentTime;
-            wasPlayingWhenHidden = !el.paused;
-            log('--- HIDDEN --- media t=' + hiddenAtMedia.toFixed(2) +
-                ' playing=' + wasPlayingWhenHidden);
+            hiddenAtMedia = clock();
+            hiddenScheduled = scheduled;
+            scheduledWhileHidden = 0;
+            wasPlayingWhenHidden = playing();
+            log('--- HIDDEN --- clock=' + hiddenAtMedia.toFixed(2) + ' playing=' + wasPlayingWhenHidden);
             return;
         }
 
         log('--- VISIBLE ---');
-        if (!el || !hiddenAtWall) return;
+        if (!mode || !hiddenAtWall) return;
 
         var wall = (Date.now() - hiddenAtWall) / 1000;
-        var media = el.currentTime - hiddenAtMedia;
+        var media = clock() - hiddenAtMedia;
         var ratio = wall > 0 ? media / wall : 0;
 
+        log('  engine          : ' + mode);
         log('  wall clock away : ' + wall.toFixed(2) + 's');
-        log('  media advanced  : ' + media.toFixed(2) + 's');
+        log('  clock advanced  : ' + media.toFixed(2) + 's');
         log('  ratio           : ' + ratio.toFixed(3));
-        log('  paused now      : ' + el.paused);
+
+        if (mode === 'webaudio') {
+            // Separates "the page was frozen" from "the context was suspended":
+            // no buffers scheduled means JavaScript itself stopped running.
+            log('  buffers while hidden: ' + (scheduled - hiddenScheduled));
+            log('  context state       : ' + (ctx ? ctx.state : 'none'));
+        } else {
+            log('  paused now      : ' + (el ? el.paused : 'n/a'));
+        }
 
         if (!wasPlayingWhenHidden) {
             verdict('Not playing when you left, so nothing was measured.\nStart playback first, then background the app.', '');
         } else if (wall < 5) {
-            verdict('Away for only ' + wall.toFixed(1) + 's — too short to trust.\nTry again and stay away for at least 15 seconds.', '');
+            verdict('Away for only ' + wall.toFixed(1) + 's — too short to trust.\nTry again and stay away at least 15 seconds.', '');
         } else if (ratio >= 0.9) {
-            verdict('KEPT PLAYING.\n<' + elKind + '> advanced ' + media.toFixed(1) +
-                's while you were away for ' + wall.toFixed(1) + 's.\nBackground playback works here.', 'pass');
+            verdict('KEPT PLAYING (' + mode + ')\nadvanced ' + media.toFixed(1) + 's while away ' +
+                wall.toFixed(1) + 's.', 'pass');
         } else if (media < 0.5) {
-            verdict('STOPPED IMMEDIATELY.\n<' + elKind + '> advanced ' + media.toFixed(2) +
-                's across ' + wall.toFixed(1) + 's away.\nThis platform suspends it on backgrounding.', 'fail');
+            verdict('STOPPED IMMEDIATELY (' + mode + ')\nadvanced ' + media.toFixed(2) + 's across ' +
+                wall.toFixed(1) + 's away.', 'fail');
         } else {
-            verdict('PARTIAL — played ' + media.toFixed(1) + 's of ' + wall.toFixed(1) +
-                's away.\nIt ran for a while, then was suspended. Check the log for the pause event.', 'partial');
+            verdict('PARTIAL (' + mode + ')\nplayed ' + media.toFixed(1) + 's of ' + wall.toFixed(1) +
+                's away, then stopped.\nThat is the buffer draining, not playback continuing.', 'partial');
         }
     });
 
@@ -316,11 +434,16 @@
     // It cannot test backgrounding — only a real device can — but it proves the
     // generated track decodes and the element starts.
     if (/[?&]auto=1/.test(location.search)) {
+        var forced = /[?&]kind=([a-z]+)/.exec(location.search);
+        if (forced) {
+            var radio = document.querySelector('input[name=kind][value=' + forced[1] + ']');
+            if (radio) { radio.checked = true; log('auto mode: forced kind=' + forced[1]); }
+        }
         log('auto mode: generating source and playing');
-        document.getElementById('btn-tone').click();
-        setTimeout(function () { btnPlay.click(); }, 50);
+        if (wantedKind() !== 'webaudio') document.getElementById('btn-tone').click();
+        setTimeout(function () { doPlay(); }, 50);
         setInterval(function () {
-            if (el) log('tick t=' + el.currentTime.toFixed(2) + ' paused=' + el.paused);
+            if (mode) log('tick clock=' + clock().toFixed(2) + ' playing=' + playing());
         }, 400);
     }
 
