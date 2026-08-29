@@ -16,7 +16,7 @@
     "sim:jjc3": "bash scripts/jjc3-sim.sh",
     "test:rs": "node scripts/rs-selftest.mjs && node scripts/shard-pipeline-test.mjs",
     "test:server": "node scripts/library-server-test.mjs",
-    "test:remote": "node scripts/remote-library-test.mjs",
+    "test:remote": "node scripts/remote-library-test.mjs && node scripts/remote-library-load-test.mjs",
     "test:cli": "node scripts/cli-test.mjs",
     "test:share": "npm run test:server && npm run test:remote && npm run test:cli && npm run test:youtube && npm run test:linklist",
     "test:youtube": "node scripts/youtube-url-test.mjs && node scripts/youtube-embed-test.mjs",

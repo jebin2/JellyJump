@@ -7,6 +7,9 @@ export class PlaylistState {
         this.items = [];
         this.activeIndex = -1;
         this.expandedFolders = new Set();
+        // Share links whose listing is still downloading. The folder row shows
+        // a spinner instead of an expand arrow while its source is in here.
+        this.loadingRemoteSources = new Set();
         this.searchQuery = '';
         this.isLoading = true;
     }
@@ -93,6 +96,7 @@ export class PlaylistState {
         this.items = [];
         this.activeIndex = -1;
         this.expandedFolders.clear();
+        this.loadingRemoteSources.clear();
         this.searchQuery = '';
         this.isLoading = false;
     }

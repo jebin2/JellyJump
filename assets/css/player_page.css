@@ -1312,3 +1312,33 @@
         transition: none;
     }
 }
+
+/* A shared library whose listing is still downloading. The expand arrow is
+   replaced by a spinner rather than disabled: an arrow that does nothing when
+   clicked is worse than no arrow, and the row is not openable until the
+   listing is complete. font-size:0 hides the arrow glyph while leaving
+   currentColor for the ring. */
+.playlist-toggle.loading {
+    width: 8px;
+    height: 8px;
+    font-size: 0;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    opacity: 0.7;
+    transform: none;
+    transition: none;
+    animation: library-load-spin 0.7s linear infinite;
+}
+
+/* Local rather than the `spin` in player.css, matching folder-refresh-spin
+   above: this file does not rely on another stylesheet's keyframes. */
+@keyframes library-load-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .playlist-toggle.loading {
+        animation: none;
+    }
+}

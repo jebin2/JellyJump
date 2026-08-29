@@ -46,6 +46,24 @@ export class PlaylistRenderer {
         this.updateUI();
     }
 
+    /**
+     * Update a still-downloading library's count without rebuilding anything.
+     *
+     * This is what a render per batch used to do, and the reason it was worth
+     * removing: render() drops the DOM and the scroll position with it, so the
+     * list could not be used while a library loaded.
+     * @param {string} source - the share link the library came from
+     * @param {number} count - items received so far
+     */
+    updateRemoteLibraryProgress(source, count) {
+        const p = this.playlist;
+        const wrapper = p.container?.querySelector(
+            `.playlist-folder[data-remote-source="${CSS.escape(source)}"]`
+        );
+        const countSpan = wrapper?.querySelector('.folder-count');
+        if (countSpan) countSpan.textContent = `(${count})`;
+    }
+
     renderSearchResults(query) {
         const p = this.playlist;
         const filtered = p.items
@@ -337,6 +355,11 @@ export class PlaylistRenderer {
         // they would all get one, and reloading the whole library from inside a
         // subfolder reads as reloading just that subfolder.
         const isLibraryRoot = folderData.remoteSource && !folderData.path.includes('/');
+        // Its listing is still downloading. The row is a progress indicator for
+        // now, not something to open: the drawer would fill under the user's
+        // hands, and the render that ends the download would reset it anyway.
+        const isLoadingLibrary = !!isLibraryRoot
+            && !!p.state.loadingRemoteSources?.has(folderData.remoteSource);
         if (isLibraryRoot) {
             // The link is otherwise unrecoverable from here: it went into
             // localStorage when the library was added and nothing shows it
@@ -372,7 +395,11 @@ export class PlaylistRenderer {
         }
 
         const isExpanded = p.expandedFolders.has(folderData.path);
-        if (isExpanded) {
+        if (isLoadingLibrary) {
+            // Replaced rather than disabled: an arrow that does nothing when
+            // clicked is worse than no arrow.
+            toggle.classList.add('loading');
+        } else if (isExpanded) {
             toggle.classList.add('expanded');
         }
 
@@ -391,8 +418,9 @@ export class PlaylistRenderer {
         folderName.style.alignItems = 'center';
         folderName.appendChild(nameSpan);
 
-        if (count > 0) {
+        if (count > 0 || isLoadingLibrary) {
             const countSpan = document.createElement('span');
+            countSpan.className = 'folder-count';
             countSpan.textContent = `(${count})`;
             countSpan.style.opacity = '0.7';
             countSpan.style.fontSize = '0.9em';
@@ -400,6 +428,16 @@ export class PlaylistRenderer {
             countSpan.style.whiteSpace = 'nowrap';
             countSpan.style.flexShrink = '0';
             folderName.appendChild(countSpan);
+        }
+
+        if (isLoadingLibrary) {
+            // Deliberately not the pulsing .scanning treatment used for a disk
+            // scan: the spinner on the toggle is already the moving part, and
+            // two things animating beside a climbing count reads as noise.
+            const status = document.createElement('span');
+            status.className = 'folder-scan-status';
+            status.textContent = 'loading…';
+            folderName.appendChild(status);
         }
 
         // The scan runs in another process and streams results in, so without
@@ -427,6 +465,7 @@ export class PlaylistRenderer {
         const wrapper = document.createElement('div');
         wrapper.className = 'playlist-folder';
         wrapper.dataset.path = folderData.path;
+        if (isLibraryRoot) wrapper.dataset.remoteSource = folderData.remoteSource;
         wrapper.appendChild(header);
         wrapper.appendChild(childrenContainer);
 
@@ -447,14 +486,16 @@ export class PlaylistRenderer {
             }
         };
 
+        // Guarded rather than left unwired, so a later change here cannot
+        // quietly reopen the drawer mid-download.
         header.onclick = (e) => {
             e.stopPropagation();
-            toggleDrawer();
+            if (!isLoadingLibrary) toggleDrawer();
         };
 
         info.onclick = (e) => {
             e.stopPropagation();
-            toggleDrawer();
+            if (!isLoadingLibrary) toggleDrawer();
         };
 
         removeBtn.onclick = (e) => {

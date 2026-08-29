@@ -12,6 +12,7 @@ import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
 import { formatTime, generateId, sanitizeFilename } from '../../shared/utils/mediaUtils.js';
+import { streamLibraryInto } from '../../shared/services/RemoteLibraryLoad.js';
 import { parseYouTubeUrl, fetchYouTubeInfo, buildYouTubeItem } from '../../shared/utils/YouTubeUrl.js';
 import { parseLinkListFile, linkListFolderName } from '../../shared/utils/LinkListFile.js';
 import { PlaylistRenderer } from './PlaylistRenderer.js';
@@ -1626,6 +1627,29 @@ export class Playlist {
     }
 
     /**
+     * Pull a shared library's listing into the playlist.
+     *
+     * Both callers -- adding a link and restoring saved ones at startup -- want
+     * the same thing, and used to carry their own copy of the batch loop and
+     * its render throttle. The policy lives in one place now, because the
+     * throttle was the bug: see RemoteLibraryLoad.js.
+     * @private
+     */
+    _streamRemoteLibrary(url, onAnnounce) {
+        return streamLibraryInto(url, {
+            fetchStreaming: fetchRemoteItemsStreaming,
+            addItems: (batch) => this.state.addItems(batch),
+            render: () => this.render(),
+            setLoading: (source, loading) => {
+                if (loading) this.state.loadingRemoteSources.add(source);
+                else this.state.loadingRemoteSources.delete(source);
+            },
+            onProgress: (source, count) => this.renderer.updateRemoteLibraryProgress(source, count),
+            onAnnounce,
+        });
+    }
+
+    /**
      * Add every file from a shared library.
      *
      * Not persisted: the files live on the other machine, so a saved copy would
@@ -1634,32 +1658,12 @@ export class Playlist {
      * @private
      */
     async _addRemoteLibrary(url, info, onFirstItems) {
-        // Filled as the listing streams in rather than after it finishes: a
-        // large library is megabytes, and waiting for all of it left the
-        // playlist empty for the whole download with nothing to show for it.
-        let total = 0;
-        let lastRender = 0;
-
-        const result = await fetchRemoteItemsStreaming(url, (batch) => {
-            for (const item of batch) {
-                if (!item.id) item.id = generateId();
-            }
-            this.state.addItems(batch);
-            const isFirst = total === 0;
-            total += batch.length;
-
-            // render() rebuilds the whole tree, so it is throttled: on a big
-            // library the download would otherwise be spent re-rendering. The
-            // final render below is what guarantees the last batch shows.
-            const now = Date.now();
-            if (isFirst || now - lastRender > 400) {
-                lastRender = now;
-                this.render();
-            }
-            // Only once the first batch is actually rendered, so whatever was
-            // covering the playlist gets out of the way of something to see.
-            if (isFirst) onFirstItems?.();
-        });
+        // The listing streams in, but it is deliberately not rendered as it
+        // arrives -- see RemoteLibraryLoad.js. The folder shows up once with a
+        // spinner, its count ticks up in place, and the tree is rebuilt only
+        // when the listing is complete.
+        const result = await this._streamRemoteLibrary(url, onFirstItems);
+        const total = result.streamed;
 
         if (result.total === 0) {
             Toast.show(`${info.name} has no videos to share`, 4000);
@@ -1667,7 +1671,6 @@ export class Playlist {
         }
 
         rememberRemoteLink(url);
-        this.render();
         this._updatePlayerNavigationState();
 
         if (result.complete) {
@@ -1707,18 +1710,7 @@ export class Playlist {
                 // hold the playlist empty exactly when the user is looking at
                 // it. An incomplete result is not treated as an error — what
                 // arrived is real, and the folder's reload button gets the rest.
-                let lastRender = 0;
-                const result = await fetchRemoteItemsStreaming(link, (batch) => {
-                    for (const item of batch) {
-                        if (!item.id) item.id = generateId();
-                    }
-                    this.state.addItems(batch);
-                    const now = Date.now();
-                    if (now - lastRender > 400) {
-                        lastRender = now;
-                        this.render();
-                    }
-                });
+                const result = await this._streamRemoteLibrary(link);
                 Logger.log(`[Playlist] Restored shared library (${result.total} items, complete=${result.complete})`);
             } catch (error) {
                 Logger.warn('[Playlist] Shared library unavailable, keeping the link:', error.message);
