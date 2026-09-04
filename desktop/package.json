@@ -1,0 +1,77 @@
+{
+  "name": "jellyjump",
+  "version": "0.3.0",
+  "description": "JellyJump Video Player",
+  "author": "Jebin <jebin@example.com>",
+  "homepage": "https://github.com/jebin/JellyJump",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jebin/JellyJump.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "rebuild": "electron-rebuild"
+  },
+  "build": {
+    "appId": "com.jellyjump.app",
+    "productName": "JellyJump",
+    "artifactName": "JellyJump.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "icon": "build/assets/icons/jelly_jump_logo.png",
+    "files": [
+      "*.js",
+      "package.json",
+      "build/**/*"
+    ],
+    "asarUnpack": [
+      "preload.js",
+      "scanner.js"
+    ],
+    "publish": {
+      "provider": "github",
+      "releaseType": "draft"
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Video"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.video",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "JellyJump.Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "JellyJump.Portable.${ext}"
+    }
+  },
+  "keywords": [],
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
+    "electron": "^39.2.4",
+    "electron-builder": "^26.0.12"
+  }
+}

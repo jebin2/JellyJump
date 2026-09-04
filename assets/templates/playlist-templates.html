@@ -1,0 +1,2385 @@
+<!-- Playlist Templates -->
+<!-- All HTML templates for the playlist component -->
+<!-- These are cloned and populated with data in Playlist.js -->
+
+<!-- Unified Progress Status Template (Clone into footer status area) -->
+<template id="progress-status-template">
+    <div class="progress-section hidden flex items-center gap-sm">
+        <div class="spinner-sm"></div>
+        <span class="progress-status text-sm font-mono">Processing...</span>
+        <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+    </div>
+    <div class="error-message hidden text-danger text-sm"></div>
+    <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+</template>
+
+<!-- Playlist Item Template -->
+<template id="playlist-item-template">
+    <div class="playlist-item" data-index="" tabindex="0" role="button">
+        <div class="playlist-thumbnail"></div>
+        <div class="playlist-info">
+            <div class="playlist-title"></div>
+            <div class="playlist-duration"></div>
+        </div>
+        <div class="playlist-actions">
+            <button class="playlist-download-btn" title="Download video" aria-label="Download">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </button>
+            <button class="playlist-remove-btn" title="Remove" aria-label="Remove">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-trash"></use>
+                </svg>
+            </button>
+            <button class="playlist-settings-btn" title="Tools" aria-label="Video tools">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-sliders"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Modal Shell Template -->
+
+<!-- Common Process Footer Template - Configurable via FooterHelper.js -->
+<template id="common-process-footer-template">
+    <div class="process-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="process-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small primary-action-btn" title="" aria-label="">
+                <svg width="16" height="16" fill="currentColor">
+                    <use class="action-icon-use" href=""></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+
+<!-- Conversion Content Template -->
+<template id="conversion-content-template">
+    <!-- Format Selection -->
+    <div class="format-selection flex-start mb-lg">
+        <div class="text-secondary text-sm font-mono whitespace-nowrap">SELECT FORMAT:</div>
+        <div class="jellyjump-menu-btn-container">
+            <div class="mb-select jellyjump-menu-btn" id="conversion-format-btn" aria-haspopup="true"
+                aria-expanded="false">
+                <span>Original</span>
+            </div>
+            <div class="jellyjump-menu" id="conversion-format-menu" role="menu">
+                <div class="jellyjump-menu-item active" data-value="keep" role="menuitem">
+                    <span class="menu-label text-primary font-bold">Original</span>
+                    <span class="text-xs text-secondary ml-auto">Keep Format</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item" data-value="mp4" role="menuitem">
+                    <span class="menu-label font-bold">MP4</span>
+                    <span class="text-xs text-secondary ml-auto">H.264 / AAC</span>
+                </div>
+                <div class="jellyjump-menu-item" data-value="webm" role="menuitem">
+                    <span class="menu-label font-bold">WebM</span>
+                    <span class="text-xs text-secondary ml-auto">VP9 / Opus</span>
+                </div>
+                <div class="jellyjump-menu-item" data-value="mov" role="menuitem">
+                    <span class="menu-label font-bold">MOV</span>
+                    <span class="text-xs text-secondary ml-auto">QuickTime</span>
+                </div>
+                <div class="jellyjump-menu-item disabled" data-value="prores" role="menuitem"
+                    title="ProRes encoding requires the desktop app">
+                    <span class="menu-label font-bold">MOV</span>
+                    <span class="text-xs text-secondary ml-auto">ProRes</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item disabled" data-value="avi" role="menuitem" title="Coming Soon">
+                    <span class="menu-label">AVI</span>
+                    <span class="text-xs text-secondary ml-auto">Legacy</span>
+                </div>
+                <div class="jellyjump-menu-item" data-value="mkv" role="menuitem">
+                    <span class="menu-label font-bold">MKV</span>
+                    <span class="text-xs text-secondary ml-auto">Matroska</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item" data-value="flac" role="menuitem">
+                    <span class="menu-label font-bold">FLAC</span>
+                    <span class="text-xs text-secondary ml-auto">Audio Only</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item" data-value="hls" role="menuitem">
+                    <span class="menu-label font-bold">HLS</span>
+                    <span class="text-xs text-secondary ml-auto">Stream (.zip)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quality Slider (Always Visible) -->
+    <div class="quality-section">
+        <div class="flex-between mb-sm">
+            <span class="text-secondary text-sm font-mono">QUALITY:</span>
+            <span class="quality-value text-sm font-bold">Original (100%)</span>
+        </div>
+        <input type="range" class="quality-slider" min="1" max="100" step="1" value="100">
+        <div class="flex-between mt-xs text-xs text-secondary">
+            <span>Low</span>
+            <span>Medium</span>
+            <span>High</span>
+            <span>Original</span>
+        </div>
+        <div class="estimated-reduction text-xs text-accent mt-sm">No size reduction</div>
+    </div>
+
+    <!-- HLS Cloud Upload (shown only when HLS format is selected) -->
+    <div class="hls-cloud-section hidden mt-lg">
+        <div class="text-secondary text-sm font-mono mb-sm">UPLOAD TO CLOUD:</div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">HF TOKEN:</label>
+            <input type="password" class="hf-token-input mb-input w-full text-sm" placeholder="hf_..." autocomplete="off" spellcheck="false">
+        </div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">DATASET REPO:</label>
+            <input type="text" class="hf-repo-input mb-input w-full text-sm" placeholder="username/my-videos" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">FOLDER <span class="text-secondary font-normal">(optional)</span>:</label>
+            <input type="text" class="hf-folder-input mb-input w-full text-sm" placeholder="e.g. movie-title" spellcheck="false">
+        </div>
+        <button class="hf-upload-btn btn jellyjump-btn-small w-full text-sm" disabled>
+            Upload to Hugging Face
+        </button>
+        <div class="hf-progress-section hidden flex items-center gap-sm mt-sm">
+            <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary"></div>
+            <span class="text-sm font-mono text-secondary">Uploading...</span>
+            <span class="hf-progress-pct text-sm font-bold text-accent">0%</span>
+        </div>
+        <div class="hf-error-message hidden text-danger text-sm mt-sm"></div>
+        <div class="hf-success-section hidden mt-sm">
+            <div class="text-success text-sm font-bold mb-sm flex items-center gap-sm">
+                <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-check"></use></svg>
+                Upload complete!
+            </div>
+            <div class="text-xs text-secondary font-mono mb-sm">M3U8 URL:</div>
+            <div class="flex gap-sm mb-sm">
+                <input type="text" class="hf-result-url mb-input w-full text-xs font-mono" readonly>
+                <button class="hf-copy-btn btn jellyjump-btn-small" title="Copy URL" aria-label="Copy URL">
+                    <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-copy"></use></svg>
+                </button>
+                <button class="hf-play-btn btn jellyjump-btn-small" title="Play in JellyJump" aria-label="Play">
+                    <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-play"></use></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Conversion Footer Template -->
+
+
+<!-- Folder Header Template -->
+<template id="playlist-folder-header-template">
+    <div class="playlist-folder-header">
+        <div class="playlist-folder-info">
+            <span class="playlist-toggle">▶</span>
+            <span class="folder-icon">📁</span>
+            <span class="folder-name"></span>
+        </div>
+        <button class="playlist-remove-btn folder-remove-btn" title="Remove Folder" aria-label="Remove folder">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-trash"></use>
+            </svg>
+        </button>
+    </div>
+</template>
+
+<!-- Empty Playlist Template -->
+<template id="playlist-empty-template">
+    <div class="playlist-placeholder">
+        <p>No videos in playlist.</p>
+    </div>
+</template>
+
+
+
+<!-- Playlist Header Controls Template -->
+<template id="playlist-header-controls-template">
+    <div class="playlist-header-main">
+        <div class="playlist-header-top">
+            <div class="playlist-title-text">Playlist</div>
+            <button class="sidebar-collapse-btn" id="sidebar-toggle-btn" aria-label="Collapse sidebar"
+                aria-expanded="true" title="Collapse sidebar (Ctrl+B)">
+                ▶
+            </button>
+        </div>
+        <div class="playlist-controls">
+            <button class="jellyjump-btn-small" id="mb-scroll-to-playing" title="Scroll to Playing">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-target"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-files" title="Add Files">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-plus"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-folder" title="Add Folder">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-folder"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-url" title="Add from URL">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-link"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-tools" title="Tools">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-sliders"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+    <div class="playlist-search-bar">
+        <div class="playlist-search-wrapper">
+            <svg width="14" height="14" fill="currentColor" class="search-icon">
+                <use href="assets/icons/sprite.svg#icon-search"></use>
+            </svg>
+            <input type="text" id="mb-playlist-search-input" placeholder="Search playlist..."
+                class="playlist-search-input">
+            <button class="search-clear-btn hidden" id="mb-playlist-search-clear" title="Clear Search">
+                <svg width="12" height="12" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-close"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Video Placeholder SVG Template -->
+<template id="video-placeholder-template">
+    <svg width="24" height="24" fill="#666">
+        <use href="assets/icons/sprite.svg#icon-video-placeholder"></use>
+    </svg>
+</template>
+
+<!-- Loading Spinner Template -->
+<template id="loading-spinner-template">
+    <svg width="16" height="16" fill="currentColor" class="spinner-rotate">
+        <use href="assets/icons/sprite.svg#icon-loading"></use>
+    </svg>
+</template>
+
+<!-- Missing File Status Text Template -->
+<template id="missing-file-status-template">
+    <span class="mb-modal-error-text"> (Missing File)</span>
+</template>
+
+<!-- URL Upload Modal Template -->
+<!-- URL Upload Content Template -->
+<template id="url-upload-content-template">
+    <div class="mb-input-group">
+        <label for="url-input">Video URL</label>
+        <input type="url" id="url-input" placeholder="https://example.com/video.mp4" class="mb-input">
+        <div class="text-xs text-secondary mt-xs">
+            Supported: HLS (.m3u8), MP4, WebM, MOV, M3U Playlists
+        </div>
+    </div>
+    <div class="mb-modal-error hidden"></div>
+    <div class="mb-modal-loading hidden">
+        <svg width="16" height="16" fill="currentColor" class="spinner-rotate">
+            <use href="assets/icons/sprite.svg#icon-loading"></use>
+        </svg>
+        <span>Fetching video...</span>
+    </div>
+</template>
+
+<!-- URL Upload Footer Template -->
+<template id="url-upload-footer-template">
+    <div class="flex justify-end w-full">
+        <button class="btn jellyjump-btn-small mb-modal-add" disabled>Add Video</button>
+    </div>
+</template>
+
+<!-- Trim Content Template -->
+<template id="trim-content-template">
+    <!-- Loading State -->
+    <div class="trim-loading flex flex-col items-center justify-center p-xl text-muted" style="grid-column: 1 / -1;">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Loading video info...</span>
+    </div>
+
+    <div class="trim-content hidden" style="display: contents;">
+        <!-- Left Panel: Video Player -->
+        <div class="modal-video-panel">
+            <div id="trim-player-container" class="aspect-video bg-black rounded overflow-hidden relative">
+            </div>
+        </div>
+
+        <!-- Right Panel: Inputs -->
+        <div class="modal-controls-panel">
+            <div class="tool-card">
+                <div class="tool-card-times">
+                    <div class="tool-card-input">
+                        <label>Start</label>
+                        <input type="text" id="trim-start-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="trim-set-start-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
+                    <div class="tool-card-input">
+                        <label>End</label>
+                        <input type="text" id="trim-end-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="trim-set-end-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
+                </div>
+                <div class="tool-card-info">Duration: <span class="trim-duration">00:00:00</span></div>
+                <label class="checkbox-option mt-sm" title="Skip re-encoding — snaps start/end to nearest keyframe. Instant processing.">
+                    <input type="checkbox" id="trim-lossless-toggle">
+                    <span class="checkbox-label text-sm">⚡ Lossless (fast, keyframe-snapped)</span>
+                </label>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- MultiCut Content Template -->
+<template id="multicut-content-template">
+    <div class="multicut-loading flex flex-col items-center justify-center p-xl text-muted"
+        style="grid-column: 1 / -1;">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Loading video info...</span>
+    </div>
+
+    <div class="multicut-content hidden" style="display: contents;">
+        <div class="modal-video-panel">
+            <div id="multicut-player-container" class="aspect-video bg-black rounded overflow-hidden relative">
+            </div>
+        </div>
+
+        <div class="modal-controls-panel">
+            <button id="multicut-add-clip-btn" class="jellyjump-btn-large w-full mb-md">+ Add Segments</button>
+
+            <div class="duration-display bg-tertiary p-sm rounded border border-border mb-md">
+                <span class="text-xs text-secondary font-mono block mb-xs">REMAINING DURATION</span>
+                <span class="multicut-total-duration text-accent font-bold text-lg">00:00:00</span>
+            </div>
+
+            <div id="multicut-clips-list" class="tool-cards-list">
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Trim Footer Template -->
+
+
+<!-- Track Management Modal Template -->
+<template id="track-management-modal-template">
+    <div class="mb-modal-overlay">
+        <div class="mb-modal mb-modal-large" role="dialog" aria-modal="true">
+            <div class="mb-modal-header">
+                <h3 class="mb-modal-title">Video & Audio Tracks</h3>
+                <button class="mb-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="mb-modal-body mb-modal-body-scrollable">
+                <div class="source-filename text-sm text-muted mb-md font-mono break-all"></div>
+
+                <!-- Loading State -->
+                <div class="tracks-loading flex flex-col items-center justify-center p-xl text-muted">
+                    <div
+                        class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+                    </div>
+                    <span>Scanning media tracks...</span>
+                </div>
+
+                <div class="tracks-content hidden">
+                    <div class="track-section video-tracks-section">
+                        <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                            <span>📹 Video Tracks</span>
+                            <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+                        </h4>
+                        <div class="track-list video-track-list grid gap-sm">
+                            <!-- Video tracks injected here -->
+                            <div class="no-tracks-message text-muted text-sm italic hidden">No video tracks available
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="track-section audio-tracks-section mt-lg">
+                        <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                            <span>🎵 Audio Tracks</span>
+                            <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+                        </h4>
+                        <div class="track-list audio-track-list grid gap-sm">
+                            <!-- Audio tracks injected here -->
+                            <div class="no-tracks-message text-muted text-sm italic hidden">No audio tracks available
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Track Management Content Template -->
+<template id="track-management-content-template">
+    <div class="source-filename text-sm text-muted mb-md font-mono break-all"></div>
+
+    <!-- Loading State -->
+    <div class="tracks-loading flex flex-col items-center justify-center p-xl text-muted">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Scanning media tracks...</span>
+    </div>
+
+    <div class="tracks-content hidden">
+        <div class="track-section video-tracks-section">
+            <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                <span>📹 Video Tracks</span>
+                <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+            </h4>
+            <div class="track-list video-track-list grid gap-sm">
+                <!-- Video tracks injected here -->
+                <div class="no-tracks-message text-muted text-sm italic hidden">No video tracks available
+                </div>
+            </div>
+        </div>
+
+        <div class="track-section audio-tracks-section mt-lg">
+            <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                <span>🎵 Audio Tracks</span>
+                <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+            </h4>
+            <div class="track-list audio-track-list grid gap-sm">
+                <!-- Audio tracks injected here -->
+                <div class="no-tracks-message text-muted text-sm italic hidden">No audio tracks available
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Track Management Footer Template -->
+<template id="track-management-footer-template">
+    <div class="track-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="track-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono text-primary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <!-- No redundant close button here -->
+        </div>
+    </div>
+</template>
+
+<!-- Detection Content Template (Motion/Cuts) -->
+<template id="detection-content-template">
+    <div class="detection-content flex flex-col h-[50vh] max-h-[500px]">
+        <div class="flex-none pb-sm border-b border-white/10">
+            <p class="mb-sm truncate text-secondary text-sm">Target: <strong
+                    class="target-filename text-primary">--</strong></p>
+
+            <!-- Sensitivity Slider (for CutDetection - hidden by MotionDetection) -->
+            <div class="quality-section sensitivity-section hidden">
+                <div class="flex-between mb-sm">
+                    <span class="text-secondary text-sm font-mono">SENSITIVITY:</span>
+                    <span class="sensitivity-value text-sm font-bold">Medium</span>
+                </div>
+                <input type="range" class="quality-slider sensitivity-slider" min="1" max="3" step="1" value="2">
+                <div class="flex-between mt-xs text-xs text-secondary">
+                    <span>High</span>
+                    <span>Medium</span>
+                    <span>Low</span>
+                </div>
+            </div>
+
+            <!-- Status Area (for progress display) -->
+            <div class="detection-status-area bg-tertiary/50 p-sm rounded mt-sm">
+                <div class="flex-between mb-xs">
+                    <span class="status-text text-sm font-mono text-secondary">Initializing...</span>
+                    <span class="status-percent text-sm font-bold text-accent">0%</span>
+                </div>
+                <div class="progress-bar-container h-1.5 bg-black rounded overflow-hidden">
+                    <div
+                        class="progress-bar-fill bg-primary h-full w-0 transition-all duration-300 shadow-[0_0_8px_var(--color-primary)]">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="detected-items-list flex-auto overflow-y-auto p-sm space-y-xs min-h-0 bg-secondary/30 mt-sm rounded border border-white/5 custom-scrollbar">
+            <div class="flex-center flex-col gap-sm h-full text-muted italic status-placeholder py-xl">
+                <span class="text-sm">Adjust sensitivity and click Detect</span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Detection Footer Template -->
+<template id="detection-footer-template">
+    <div class="detection-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="detection-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <button class="detect-btn btn jellyjump-btn-small" title="Detect" aria-label="Detect">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-search"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Scene Detection Settings Template (kept for backward compat, but now empty) -->
+<template id="scene-detection-settings-template">
+    <div class="detection-settings"></div>
+</template>
+
+<template id="track-card-template">
+    <div class="track-card tool-card">
+        <div class="tool-card-header">
+            <span class="track-title tool-card-title">Track #<span class="track-index">1</span></span>
+            <div class="track-actions flex gap-xs items-center">
+                <!-- Speed Menu -->
+                <div class="jellyjump-menu-btn mb-speed-dropdown-container">
+                    <button class="btn jellyjump-btn-small mb-speed-dropdown-btn" data-speed-btn aria-label="Speed"
+                        aria-haspopup="true" aria-expanded="false" title="Playback Speed">
+                        1x
+                    </button>
+                    <div class="jellyjump-menu mb-speed-dropdown" data-speed-menu role="menu">
+                        <div class="jellyjump-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x</div>
+                        <div class="jellyjump-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x</div>
+                        <div class="jellyjump-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
+                        <div class="jellyjump-menu-item active" data-value="1" role="menuitem" tabindex="0">1x</div>
+                        <div class="jellyjump-menu-item" data-value="1.25" role="menuitem" tabindex="0">1.25x</div>
+                        <div class="jellyjump-menu-item" data-value="1.5" role="menuitem" tabindex="0">1.5x</div>
+                        <div class="jellyjump-menu-item" data-value="1.75" role="menuitem" tabindex="0">1.75x</div>
+                        <div class="jellyjump-menu-item" data-value="2" role="menuitem" tabindex="0">2x</div>
+                    </div>
+                </div>
+                <button class="btn jellyjump-btn-small download-track-btn" title="Download Track">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-download"></use>
+                    </svg>
+                </button>
+                <button class="btn jellyjump-btn-small add-to-playlist-btn" title="Add to Playlist">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-plus"></use>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="tool-card-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="tool-card-input">
+                <label>Codec</label>
+                <span class="meta-codec meta-details text-sm">—</span>
+            </div>
+            <div class="tool-card-input">
+                <label>Details</label>
+                <span class="meta-details text-sm">—</span>
+            </div>
+            <div class="tool-card-input">
+                <label>Language</label>
+                <span class="meta-language text-sm">—</span>
+            </div>
+        </div>
+        <div class="progress-container hidden flex items-center gap-xs text-primary mt-xs">
+            <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+            </div>
+            <span class="text-xs font-bold">Extracting...</span>
+        </div>
+    </div>
+</template><!-- Resize Content Template -->
+<template id="resize-content-template">
+    <div class="source-info mb-lg p-sm bg-tertiary rounded flex-between items-center">
+        <div class="flex flex-col">
+            <span class="text-xs text-secondary font-mono">CURRENT RESOLUTION</span>
+            <span class="current-resolution text-sm font-bold text-primary">Checking...</span>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-xs text-secondary font-mono">ASPECT RATIO</span>
+            <span class="current-aspect-ratio text-sm font-bold text-accent">--:--</span>
+        </div>
+    </div>
+
+    <!-- Dimension Inputs -->
+    <div class="tool-card mb-lg">
+        <div class="tool-card-header">
+            <span class="tool-card-title">Dimensions</span>
+        </div>
+        <div class="dimension-inputs-container">
+            <div class="tool-card-input">
+                <label for="resize-width">WIDTH (px)</label>
+                <input type="number" id="resize-width" class="mb-input font-mono text-center" placeholder="1920"
+                    min="128" max="7680" step="2">
+            </div>
+            <div class="aspect-lock-container flex flex-col items-center justify-end">
+                <button class="aspect-lock-btn btn jellyjump-btn-primary p-xs rounded aspect-lock-btn-container"
+                    title="Lock Aspect Ratio" aria-pressed="true">
+                    <svg width="20" height="20" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-link"></use>
+                    </svg>
+                </button>
+            </div>
+            <div class="tool-card-input">
+                <label for="resize-height">HEIGHT (px)</label>
+                <input type="number" id="resize-height" class="mb-input font-mono text-center" placeholder="1080"
+                    min="128" max="7680" step="2">
+            </div>
+        </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="presets-container mb-lg">
+        <label class="text-xs text-secondary font-mono mb-xs block">PRESETS</label>
+        <div class="presets-grid">
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="1080p">1080p (FHD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="720p">720p (HD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="480p">480p (SD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="360p">360p</button>
+        </div>
+</template>
+
+<!-- Resize Footer Template -->
+
+
+<!-- Crop Content Template -->
+<template id="crop-content-template">
+    <!-- Left Panel: Video Preview with Crop Box -->
+    <div class="modal-video-panel">
+        <!-- Wrapper for positioning (overlay is sibling, not child of player) -->
+        <div class="crop-preview-wrapper" style="position: relative;">
+            <!-- Player Container (CorePlayer renders here) -->
+            <div id="crop-player-container" class="crop-player-container"></div>
+            <!-- Crop Overlay (sibling to player, positioned over it via CSS) -->
+            <div class="crop-overlay" data-crop-overlay>
+                <div class="crop-box" data-crop-box>
+                    <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
+                    <div class="crop-handle crop-handle-n" data-handle="n"></div>
+                    <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
+                    <div class="crop-handle crop-handle-e" data-handle="e"></div>
+                    <div class="crop-handle crop-handle-se" data-handle="se"></div>
+                    <div class="crop-handle crop-handle-s" data-handle="s"></div>
+                    <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
+                    <div class="crop-handle crop-handle-w" data-handle="w"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Crop Coordinates -->
+    <div class="modal-controls-panel">
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-card-title">Crop Position</span>
+            </div>
+            <div class="crop-coords-grid tool-card-grid">
+                <div class="tool-card-input">
+                    <label for="crop-left">LEFT (px)</label>
+                    <input type="number" id="crop-left" class="mb-input font-mono text-center" min="0" step="1"
+                        value="0">
+                </div>
+                <div class="tool-card-input">
+                    <label for="crop-top">TOP (px)</label>
+                    <input type="number" id="crop-top" class="mb-input font-mono text-center" min="0" step="1"
+                        value="0">
+                </div>
+            </div>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-card-title">Crop Size</span>
+            </div>
+            <div class="crop-coords-grid tool-card-grid">
+                <div class="tool-card-input">
+                    <label for="crop-width">WIDTH (px)</label>
+                    <input type="number" id="crop-width" class="mb-input font-mono text-center" min="64" step="2"
+                        value="0">
+                </div>
+                <div class="tool-card-input">
+                    <label for="crop-height">HEIGHT (px)</label>
+                    <input type="number" id="crop-height" class="mb-input font-mono text-center" min="64" step="2"
+                        value="0">
+                </div>
+            </div>
+            <div class="tool-card-info">Drag the corners to adjust the crop area</div>
+        </div>
+    </div>
+</template>
+
+<!-- Crop Footer Template -->
+
+
+<!-- Merge Modal Content Template -->
+<template id="merge-modal-content-template">
+    <div class="merge-container">
+        <!-- Two-Column Grid for Video Selection -->
+        <div class="merge-grid-container">
+            <!-- Left Column: Available Videos -->
+            <div class="available-videos-section available-section">
+                <h4 class="text-sm font-bold mb-sm flex-between section-header">
+                    <span>Available Videos</span>
+                    <span class="text-xs text-muted selection-count">0 selected</span>
+                </h4>
+                <div
+                    class="available-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs scroll-list">
+                    <!-- Items injected here -->
+                    <div class="empty-state text-center p-md text-muted text-sm italic">No videos available</div>
+                </div>
+            </div>
+
+            <!-- Right Column: Selected Videos (Order) -->
+            <div class="selected-videos-section selected-section">
+                <h4 class="text-sm font-bold mb-sm section-header">
+                    Merge Order
+                    (Drag to Reorder)</h4>
+                <div
+                    class="selected-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs scroll-list">
+                    <!-- Selected items injected here -->
+                    <div
+                        class="empty-selection-state text-center p-md text-muted text-sm italic h-full flex items-center justify-center">
+                        Select videos from the left to merge
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merge Options (Outside Grid) -->
+        <div class="merge-options">
+            <!-- Merge Options (Flex Single Line) -->
+            <!-- Merge Options (Flex Single Line) -->
+            <div class="merge-options flex gap-lg items-end mb-md w-full">
+                <!-- Target Resolution -->
+                <div class="resolution-options flex flex-col gap-xs" style="flex: 3;">
+                    <div class="text-xs text-secondary font-mono uppercase text-nowrap">Target Resolution</div>
+                    <div class="flex items-center gap-xs">
+                        <input type="number" id="merge-width"
+                            class="mb-input font-mono text-center w-full p-1 box-border" placeholder="W" min="128"
+                            max="7680" step="2" style="height: 36px;">
+                        <span class="text-secondary font-bold select-none">&times;</span>
+                        <input type="number" id="merge-height"
+                            class="mb-input font-mono text-center w-full p-1 box-border" placeholder="H" min="128"
+                            max="7680" step="2" style="height: 36px;">
+                    </div>
+                    <div class="text-[10px] text-muted truncate max-w-[200px] min-h-[15px]">
+                        <span class="max-resolution-hint">Detecting...</span>
+                    </div>
+                </div>
+
+                <!-- Scale Mode -->
+                <div class="scale-options flex flex-col gap-xs" style="flex: 3;">
+                    <div class="text-xs text-secondary font-mono uppercase text-nowrap">Scale Mode</div>
+                    <select class="mb-select w-full py-0 px-2 text-sm scale-select box-border" style="height: 36px;">
+                        <option value="proportional">Scale Proportionally</option>
+                        <option value="center">Keep Original Size</option>
+                        <option value="fill">Scale to Fill</option>
+                    </select>
+                </div>
+
+                <!-- Background Color -->
+                <div class="bg-color-options flex flex-col gap-xs" style="flex: 1;">
+                    <div class="text-xs text-secondary font-mono uppercase text-nowrap">Bg Color</div>
+                    <div class="flex items-center">
+                        <input type="color" id="merge-bg-color"
+                            class="w-full rounded border border-border cursor-pointer p-0 box-border" value="#000000"
+                            title="Background Color" style="height: 36px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Options -->
+
+        </div>
+    </div>
+
+    <!-- Progress Section (Hidden by default) -->
+
+</template>
+
+<!-- Merge Modal Footer Template -->
+<template id="merge-modal-footer-template">
+    <div class="flex-between w-full h-full gap-md items-center">
+        <!-- Progress & Messages (Left) -->
+        <div class="flex-1 flex items-center">
+            <div class="progress-section hidden flex items-center gap-sm w-full">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Merging...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small merge-btn" title="Merge" aria-label="Merge" disabled>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-copy"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+
+<!-- Merge Item Template -->
+<template id="merge-item-template">
+    <div class="merge-item flex items-center gap-sm p-xs rounded hover:bg-tertiary cursor-pointer border border-transparent mb-xs"
+        draggable="true">
+        <div class="item-thumb w-8 h-8 bg-black rounded overflow-hidden flex-shrink-0">
+            <!-- Thumb or placeholder -->
+        </div>
+        <div class="item-info flex-1 merge-item__info">
+            <div class="item-title text-sm font-bold merge-item__title"></div>
+            <div class="item-meta text-xs text-muted">
+                <span class="item-dur"></span>
+            </div>
+        </div>
+        <button class="remove-item-btn text-muted hover:text-danger merge-item__remove" title="Remove">
+            &times;
+        </button>
+    </div>
+</template>
+
+<!-- Combine Audio/Video Modal Content Template -->
+<template id="combine-av-modal-content-template">
+    <div class="combine-av-container">
+        <div class="combine-empty-state hidden text-center p-md text-muted text-sm italic mb-md">
+            Need at least one video file and a second file to pull audio from.
+        </div>
+
+        <div class="flex flex-col gap-md">
+            <div class="flex flex-col gap-xs">
+                <div class="text-xs text-secondary font-mono uppercase">Video From</div>
+                <select class="mb-select w-full combine-video-select"></select>
+            </div>
+
+            <div class="flex flex-col gap-xs">
+                <div class="text-xs text-secondary font-mono uppercase">Audio From</div>
+                <select class="mb-select w-full combine-audio-select"></select>
+            </div>
+
+            <div class="flex flex-col gap-xs">
+                <div class="text-xs text-secondary font-mono uppercase">Output Format</div>
+                <select class="mb-select w-full combine-format-select">
+                    <option value="mp4">MP4</option>
+                    <option value="webm">WebM</option>
+                    <option value="mov">MOV</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Combine Audio/Video Modal Footer Template -->
+<template id="combine-av-modal-footer-template">
+    <div class="flex-between w-full h-full gap-md items-center">
+        <div class="flex-1 flex items-center">
+            <div class="progress-section hidden flex items-center gap-sm w-full">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Combining...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small combine-btn" title="Combine" aria-label="Combine" disabled>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-audio"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+
+
+<!-- GIF Creation Content Template -->
+<template id="gif-content-template">
+    <!-- Loading State -->
+    <div class="gif-loading flex flex-col items-center justify-center p-xl text-muted" style="grid-column: 1 / -1;">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Loading video info...</span>
+    </div>
+
+    <div class="gif-content hidden" style="display: contents;">
+        <!-- Left Panel: Video Player -->
+        <div class="modal-video-panel">
+            <div id="gif-player-container" class="aspect-video bg-black rounded overflow-hidden relative">
+            </div>
+
+            <!-- GIF Preview Section (shows after generation) -->
+            <div class="gif-preview-section hidden mt-sm">
+                <div class="gif-preview-container border border-border rounded p-sm bg-tertiary flex justify-center">
+                    <img class="gif-preview-image" src="" alt="GIF preview"
+                        style="max-width: 100%; height: auto; max-height: 200px;">
+                </div>
+                <div class="text-xs text-muted mt-xs">
+                    GIF size: <span class="gif-file-size">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Controls -->
+        <div class="modal-controls-panel">
+            <div class="tool-card mb-md">
+                <div class="tool-card-times">
+                    <div class="tool-card-input">
+                        <label>Start</label>
+                        <input type="text" id="gif-start-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="gif-set-start-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
+                    <div class="tool-card-input">
+                        <label>End</label>
+                        <input type="text" id="gif-end-input" class="mb-input font-mono" placeholder="0:00.000">
+                        <button id="gif-set-end-btn" class="jellyjump-btn-small">Set</button>
+                    </div>
+                </div>
+                <div class="tool-card-info">Duration: <span class="gif-duration">00:00:00</span></div>
+            </div>
+
+            <!-- Validation Error -->
+            <div class="time-validation-error hidden text-danger text-sm"></div>
+
+            <!-- GIF Settings -->
+            <div class="gif-settings">
+                <label class="text-xs text-secondary font-mono mb-xs block">GIF SETTINGS</label>
+
+                <!-- Frame Rate -->
+                <div class="setting-group mb-sm">
+                    <label class="text-xs font-bold mb-xs block">Frame Rate</label>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full" id="gif-fps-btn" aria-haspopup="true"
+                            aria-expanded="false">
+                            <span>15 FPS (Recommended)</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="gif-fps-menu" role="menu">
+                            <div class="jellyjump-menu-item" data-value="5" role="menuitem">
+                                <span class="menu-label text-sm">5 FPS (Smallest)</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="10" role="menuitem">
+                                <span class="menu-label text-sm">10 FPS (Smooth)</span>
+                            </div>
+                            <div class="jellyjump-menu-item active" data-value="15" role="menuitem">
+                                <span class="menu-label text-sm font-bold">15 FPS (Recommended)</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="20" role="menuitem">
+                                <span class="menu-label text-sm">20 FPS (Very smooth)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Size -->
+                <div class="setting-group mb-sm">
+                    <label class="text-xs font-bold mb-xs block">Size</label>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full" id="gif-size-btn" aria-haspopup="true"
+                            aria-expanded="false">
+                            <span>480p</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="gif-size-menu" role="menu">
+                            <div class="jellyjump-menu-item" data-value="original" role="menuitem">
+                                <span class="menu-label text-sm">Original Size</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="720" role="menuitem">
+                                <span class="menu-label text-sm">720p</span>
+                            </div>
+                            <div class="jellyjump-menu-item active" data-value="480" role="menuitem">
+                                <span class="menu-label text-sm font-bold">480p</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="360" role="menuitem">
+                                <span class="menu-label text-sm">360p</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quality -->
+                <div class="setting-group">
+                    <div class="flex-between mb-xs">
+                        <span class="text-xs font-bold">Quality</span>
+                        <span id="gif-quality-value" class="text-xs font-bold">High</span>
+                    </div>
+                    <input type="range" class="quality-slider" id="gif-quality" min="40" max="100" step="20" value="80">
+                    <div class="flex-between mt-xs text-[10px] text-secondary">
+                        <span>Low</span>
+                        <span>Medium</span>
+                        <span>High</span>
+                        <span>Original</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- GIF Footer Template -->
+
+
+<template id="info-content-template">
+    <div class="info-loading flex flex-col items-center justify-center py-xl">
+        <div class="loading-spinner mb-md"></div>
+        <div class="text-secondary">Loading video information...</div>
+    </div>
+    <div class="info-modal-content hidden">
+        <!-- File Properties -->
+        <div class="info-section">
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-file"></use>
+                </svg>
+                <h3 class="info-section-title">File Properties</h3>
+            </div>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Source</span>
+                    <div class="info-value-group">
+                        <span class="info-value truncate" data-key="source" title="" style="max-width: 220px;">Local
+                            File</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="source">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Filename</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="filename">video.mp4</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="filename">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Format</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="format">MP4</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="format">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">MIME Type</span>
+                    <div class="info-value-group">
+                        <span class="info-value font-mono text-xs" data-key="mimeType">video/mp4</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="mimeType">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Size</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="size">12.5 MB</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="size">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Duration</span>
+                    <div class="info-value-group">
+                        <span class="info-value font-mono" data-key="duration">--:--:--</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="duration">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metadata Tags (hidden if no metadata) -->
+        <div class="info-section info-section-metadata hidden" data-section="metadata">
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-tag"></use>
+                </svg>
+                <h3 class="info-section-title">Metadata Tags</h3>
+            </div>
+            <div class="info-grid">
+                <div class="info-row" data-row="metaTitle">
+                    <span class="info-label">Title</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaTitle">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaTitle">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaArtist">
+                    <span class="info-label">Artist</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaArtist">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaArtist">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaAlbum">
+                    <span class="info-label">Album</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaAlbum">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaAlbum">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaDate">
+                    <span class="info-label">Date</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaDate">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaDate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaComment">
+                    <span class="info-label">Comment</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaComment">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaComment">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaGenre">
+                    <span class="info-label">Genre</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaGenre">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaGenre">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaTrack">
+                    <span class="info-label">Track #</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaTrack">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaTrack">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row" data-row="metaEncoder">
+                    <span class="info-label">Encoder</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="metaEncoder">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="metaEncoder">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- Cover Art -->
+                <div class="info-row info-row-cover hidden" data-row="coverArt">
+                    <span class="info-label">Cover Art</span>
+                    <div class="info-value-group">
+                        <img class="info-cover-art" data-key="coverArt" src="" alt="Cover Art"
+                            style="max-width: 80px; max-height: 80px; border-radius: 4px; display: none;" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Stream -->
+        <div class="info-section">
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-video"></use>
+                </svg>
+                <h3 class="info-section-title">Video Stream</h3>
+                <span class="info-track-count text-muted text-xs" data-key="videoTrackCount"></span>
+            </div>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Codec</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="videoCodec">H.264</span>
+                        <span class="info-value-sub font-mono text-xs text-muted"
+                            data-key="videoCodecString">avc1.4d401f</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="videoCodec">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Codec Params</span>
+                    <div class="info-value-group">
+                        <span class="info-value font-mono text-xs text-muted" data-key="videoCodecParam">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="videoCodecParam">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Decode Support</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="videoCanDecode">—</span>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Resolution</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="resolution">1920x1080</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="resolution">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Aspect Ratio</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="aspectRatio">16:9</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="aspectRatio">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Pixel Aspect Ratio</span>
+                    <div class="info-value-group">
+                        <span class="info-value text-muted" data-key="pixelAspectRatio">1:1</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="pixelAspectRatio">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Coded Resolution</span>
+                    <div class="info-value-group">
+                        <span class="info-value text-muted" data-key="codedResolution">1920x1088</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="codedResolution">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Frame Rate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="fps">30 fps</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="fps">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Frame Count</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="frameCount">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="frameCount">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Bitrate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="videoBitrate">5.2 Mbps</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="videoBitrate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Rotation</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="rotation">0°</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="rotation">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">HDR</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="hdr">No</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="hdr">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Color Space</span>
+                    <div class="info-value-group">
+                        <span class="info-value text-muted" data-key="colorSpace">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="colorSpace">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Stream -->
+        <div class="info-section">
+            <div class="info-section-header">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-headphones"></use>
+                </svg>
+                <h3 class="info-section-title">Audio Stream</h3>
+                <span class="info-track-count text-muted text-xs" data-key="audioTrackCount"></span>
+            </div>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Codec</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="audioCodec">AAC</span>
+                        <span class="info-value-sub font-mono text-xs text-muted"
+                            data-key="audioCodecString">mp4a.40.2</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="audioCodec">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Codec Params</span>
+                    <div class="info-value-group">
+                        <span class="info-value font-mono text-xs text-muted" data-key="audioCodecParam">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="audioCodecParam">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Decode Support</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="audioCanDecode">—</span>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Channels</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="channels">Stereo (2)</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="channels">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Sample Rate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="sampleRate">48 kHz</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="sampleRate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Bitrate</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="audioBitrate">—</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="audioBitrate">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Language</span>
+                    <div class="info-value-group">
+                        <span class="info-value" data-key="language">English (eng)</span>
+                        <button class="info-copy-btn copy-btn" title="Copy" data-copy="language">
+                            <svg width="12" height="12" fill="currentColor">
+                                <use href="assets/icons/sprite.svg#icon-copy"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Info Footer Template -->
+<template id="info-footer-template">
+    <div class="info-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="info-footer-status flex-1">
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Copied to clipboard</span>
+            </div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <button class="btn jellyjump-btn-small copy-all-btn" title="Copy All Info" aria-label="Copy All Info">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-copy"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Reverse Content Template -->
+<template id="reverse-content-template">
+    <div class="source-info mb-md">
+        <span class="text-secondary text-sm font-mono">SOURCE:</span>
+        <div class="source-filename text-base font-bold truncate" title=""></div>
+        <div class="source-details text-xs text-muted mt-xs">
+            <span class="source-duration"></span> • <span class="source-resolution"></span>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="reverse-loading flex flex-col items-center justify-center p-xl text-muted">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Loading video info...</span>
+    </div>
+
+    <div class="reverse-content hidden">
+        <div class="info-text mb-lg p-sm bg-tertiary rounded text-sm text-secondary">
+            Adjust playback speed or reverse the video.
+        </div>
+
+        <!-- Direction Options -->
+        <div class="direction-selection mb-lg">
+            <div class="text-xs font-bold uppercase text-secondary tracking-wider mb-sm">Playback Direction</div>
+            <div class="radio-group flex gap-md">
+                <label class="radio-option">
+                    <input type="radio" name="direction" value="forward" checked class="hidden">
+                    <div class="radio-label">
+                        <span class="format-name">Forward</span>
+                        <span class="format-desc">Normal Playback</span>
+                    </div>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="direction" value="reverse" class="hidden">
+
+                    <div class="radio-label">
+                        <span class="format-name">Reverse</span>
+                        <span class="format-desc">Backwards Playback</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Audio Options -->
+        <div class="options-group mb-lg">
+            <div class="text-xs text-secondary font-mono mb-sm">AUDIO OPTIONS</div>
+            <label class="checkbox-option mb-sm">
+                <input type="checkbox" name="includeAudio" id="reverse-include-audio" checked>
+
+                <span class="checkbox-label text-sm">Include Audio</span>
+            </label>
+        </div>
+
+        <!-- Speed Options -->
+        <!-- Playback Speed -->
+        <div class="setting-group mb-lg">
+            <div class="flex justify-between items-center mb-sm">
+                <span class="text-xs font-bold uppercase text-secondary tracking-wider">Playback Speed</span>
+                <span class="speed-display text-xs font-bold text-primary">1.0x</span>
+            </div>
+            <input type="range" class="quality-slider speed-slider w-full" min="0.25" max="4" step="0.25" value="1">
+            <div class="flex-between mt-xs text-xs text-secondary">
+                <span>0.25x</span>
+                <span>4x</span>
+            </div>
+        </div>
+
+        <!-- Processing Info -->
+        <div class="processing-info mb-lg hidden">
+            <div class="warning-message p-sm border-warning text-warning text-sm mb-sm hidden" id="long-video-warning">
+                ⚠️ Long video detected. Processing may take several minutes.
+            </div>
+        </div>
+
+    </div>
+</template>
+
+<!-- Reverse Footer Template -->
+
+
+<!-- Remove Background Content Template -->
+<template id="remove-bg-content-template">
+    <!-- Left Panel: Video Player -->
+    <div class="modal-video-panel">
+        <div id="remove-bg-player-container" class="bg-black rounded overflow-hidden relative">
+        </div>
+    </div>
+
+    <!-- Right Panel: Controls -->
+    <div class="modal-controls-panel">
+        <!-- Tools Section -->
+        <div class="tools-section mb-md p-sm bg-tertiary rounded flex-between items-center">
+            <span class="text-xs text-secondary font-bold">TOOLS</span>
+            <div class="flex gap-md items-center">
+                <label class="checkbox-option flex items-center cursor-pointer select-none">
+                    <input type="checkbox" id="live-preview-toggle" checked>
+
+                    <span class="checkbox-label text-xs text-secondary ml-xs">Live Preview</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Background Options -->
+        <div class="bg-options-section">
+            <div class="section-title text-sm font-bold text-secondary mb-sm">BACKGROUND</div>
+            <div class="flex flex-col gap-sm">
+                <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                    <input type="radio" name="bg-type" value="transparent" checked>
+
+                    <span class="text-sm">Transparent</span>
+                </label>
+                <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                    <input type="radio" name="bg-type" value="custom">
+
+                    <span class="text-sm">Custom Color</span>
+                    <div class="flex items-center gap-xs ml-auto">
+                        <input type="color" id="custom-bg-color" value="#ffffff"
+                            class="w-8 h-8 p-0 border-0 rounded cursor-pointer" disabled>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Color Picker Section -->
+        <div class="color-picker-section" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
+            <div class="selected-colors-list tool-cards-list mb-sm bg-tertiary p-sm rounded border border-border"
+                style="min-height: 0; flex: 1;">
+                <div class="empty-state text-xs text-muted text-center py-md">
+                    Click on the video to pick colors.
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Remove Background Footer Template -->
+
+
+<!-- Color Item Template -->
+<template id="color-item-template">
+    <div class="tool-card color-item flex gap-md items-center">
+        <!-- Left: Color Info -->
+        <div class="flex flex-col items-center gap-xs min-w-[60px]">
+            <div class="color-swatch border border-border shadow-sm flex-shrink-0 mb-0"
+                style="width: 32px; height: 32px;"></div>
+            <div class="color-hex font-mono text-xs font-bold">#000000</div>
+            <button class="tool-card-remove remove-color-btn p-xs hover:text-danger transition-colors"
+                title="Remove color">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-trash"></use>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Right: Sliders -->
+        <div class="flex-1 grid gap-sm w-full">
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Sim</span>
+                <input type="range" class="quality-slider similarity-slider flex-1" min="0" max="100" value="40">
+                <span class="similarity-value font-mono w-8 text-right text-primary">0.40</span>
+            </div>
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Smooth</span>
+                <input type="range" class="quality-slider smoothness-slider flex-1" min="0" max="100" value="8">
+                <span class="smoothness-value font-mono w-8 text-right text-primary">0.08</span>
+            </div>
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Spill</span>
+                <input type="range" class="quality-slider spill-slider flex-1" min="0" max="100" value="10">
+                <span class="spill-value font-mono w-8 text-right text-primary">0.10</span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Speed Menu Templates -->
+
+
+
+
+<!-- Watermark Content Template -->
+<template id="watermark-content-template">
+    <!-- Left Panel: Video Preview (built dynamically by setupEditor) -->
+    <div class="modal-video-panel">
+    </div>
+
+    <!-- Right Panel: Watermark Controls -->
+    <div class="modal-controls-panel">
+        <label class="toggle-switch" style="flex-shrink: 0; padding: 4px 0;">
+            <span class="toggle-label label-left">LIVE PREVIEW</span>
+            <input type="checkbox" id="wm-live-preview-toggle" checked>
+            <span class="toggle-slider"></span>
+        </label>
+
+        <label class="text-xs text-secondary font-mono mb-xs block" style="flex-shrink: 0;">WATERMARK AREAS</label>
+        <div id="watermark-areas-list" class="tool-cards-list">
+            <div class="empty-state text-center py-xl text-muted text-xs italic">No watermarks added. Draw on the video
+                to add a watermark.</div>
+        </div>
+    </div>
+</template>
+
+<!-- Watermark Footer Template -->
+
+
+<!-- Watermark Item Template -->
+<template id="watermark-item-template">
+    <div class="watermark-item tool-card" style="cursor: pointer;">
+        <!-- Header: Title + Remove -->
+        <div class="tool-card-header">
+            <span class="wm-item-title tool-card-title">Watermark</span>
+            <button class="remove-wm-btn tool-card-remove">✕</button>
+        </div>
+
+        <!-- Time: Start / End -->
+        <div class="tool-card-times">
+            <div class="tool-card-input">
+                <label>Start</label>
+                <input type="text" class="mb-input font-mono wm-start-time" placeholder="0:00.000">
+                <button class="set-current-start jellyjump-btn-small">Set</button>
+            </div>
+            <div class="tool-card-input">
+                <label>End</label>
+                <input type="text" class="mb-input font-mono wm-end-time" placeholder="0:00.000">
+                <button class="set-current-end jellyjump-btn-small">Set</button>
+            </div>
+        </div>
+
+        <!-- Type Toggle -->
+        <div style="margin-bottom: 8px;">
+            <label class="toggle-switch" style="padding: 2px 0;">
+                <span class="toggle-label label-left active-text" style="font-size: 11px;">TEXT</span>
+                <input type="checkbox" class="wm-item-type-toggle">
+                <span class="toggle-slider"></span>
+                <span class="toggle-label label-right" style="font-size: 11px;">IMAGE</span>
+            </label>
+        </div>
+
+        <!-- Text Controls -->
+        <div class="wm-item-text-group" style="margin-bottom: 8px;">
+            <div class="tool-card-input">
+                <input type="text" class="mb-input wm-item-text" placeholder="Watermark text" value="Watermark">
+                <input type="color" class="wm-item-color" value="#ffffff">
+            </div>
+        </div>
+
+        <!-- Image Controls (hidden by default) -->
+        <div class="wm-item-image-group hidden" style="margin-bottom: 8px;">
+            <input type="file" class="mb-input wm-item-image mb-input-file-choose"
+                style="width: 100%; font-size: 0.85em;" accept="image/png,image/jpeg,image/webp">
+        </div>
+
+        <!-- Opacity -->
+        <div style="margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="text-xs text-secondary font-mono">Opacity</span>
+                <span class="wm-item-opacity-value text-xs font-bold">100%</span>
+            </div>
+            <input type="range" class="quality-slider wm-item-opacity" style="width: 100%;" min="10" max="100"
+                value="100">
+        </div>
+
+        <!-- Position & Size: 2x2 grid -->
+        <div class="tool-card-grid">
+            <div class="tool-card-input">
+                <label>X</label>
+                <input type="number" class="mb-input font-mono text-center wm-x" min="0" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>Y</label>
+                <input type="number" class="mb-input font-mono text-center wm-y" min="0" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>W</label>
+                <input type="number" class="mb-input font-mono text-center wm-width" min="1" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>H</label>
+                <input type="number" class="mb-input font-mono text-center wm-height" min="1" step="1" value="0">
+            </div>
+        </div>
+    </div>
+</template>
+<!-- Blur Content Template (Split Layout) -->
+<template id="blur-content-template">
+    <!-- Left Panel: Video Preview with Blur Overlay -->
+    <div class="modal-video-panel">
+        <!-- Built dynamically by BoxEditorUtils.setupEditor() -->
+    </div>
+
+    <!-- Right Panel: Blur Controls -->
+    <div class="modal-controls-panel">
+        <div style="flex-shrink: 0;">
+            <div class="flex-between mb-xs">
+                <label class="text-xs text-secondary font-mono" for="blur-intensity">BLUR INTENSITY</label>
+                <span id="blur-intensity-value" class="text-xs font-bold">15px</span>
+            </div>
+            <input type="range" id="blur-intensity" class="quality-slider w-full" min="1" max="40" value="15">
+        </div>
+
+        <label class="toggle-switch" style="flex-shrink: 0; padding: 4px 0;">
+            <span class="toggle-label label-left">LIVE PREVIEW</span>
+            <input type="checkbox" id="live-preview-toggle" checked>
+            <span class="toggle-slider"></span>
+        </label>
+
+        <label class="text-xs text-secondary font-mono mb-xs block" style="flex-shrink: 0;">BLUR AREAS</label>
+        <div id="blur-areas-list" class="tool-cards-list">
+            <div class="empty-state text-center py-xl text-muted text-xs italic">No blur areas added. Draw on the video
+                to add a blur area.</div>
+        </div>
+    </div>
+</template>
+
+<!-- Blur Footer Template -->
+
+
+<!-- Blur Item Template -->
+<template id="blur-item-template">
+    <div class="blur-item tool-card" style="cursor: pointer;">
+        <!-- Header: Title + Remove -->
+        <div class="tool-card-header">
+            <span class="blur-item-title tool-card-title">Blur Area</span>
+            <button class="remove-blur-btn tool-card-remove">✕</button>
+        </div>
+
+        <!-- Time: Start / End -->
+        <div class="tool-card-times">
+            <div class="tool-card-input">
+                <label>Start</label>
+                <input type="text" class="mb-input font-mono blur-start-time" placeholder="0:00.000">
+                <button class="set-current-start jellyjump-btn-small">Set</button>
+            </div>
+            <div class="tool-card-input">
+                <label>End</label>
+                <input type="text" class="mb-input font-mono blur-end-time" placeholder="0:00.000">
+                <button class="set-current-end jellyjump-btn-small">Set</button>
+            </div>
+        </div>
+
+        <!-- Position & Size: 2x2 grid -->
+        <div class="tool-card-grid">
+            <div class="tool-card-input">
+                <label>X</label>
+                <input type="number" class="mb-input font-mono text-center blur-x" min="0" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>Y</label>
+                <input type="number" class="mb-input font-mono text-center blur-y" min="0" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>W</label>
+                <input type="number" class="mb-input font-mono text-center blur-width" min="1" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>H</label>
+                <input type="number" class="mb-input font-mono text-center blur-height" min="1" step="1" value="0">
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Record Options Modal Template -->
+<template id="screen-record-options-modal-template">
+    <div class="mb-modal-overlay">
+        <div class="mb-modal" role="dialog" aria-modal="true">
+            <div class="mb-modal-header">
+                <h3 class="mb-modal-title">Recording Options</h3>
+                <button class="mb-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="mb-modal-body">
+                <div id="screen-record-options">
+                    <div class="options-group mb-lg">
+                        <!-- Source Constraint (Top) -->
+                        <div class="mb-md">
+                            <label class="radio-option flex items-center cursor-pointer mb-sm p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="record-entire-screen" value="monitor" class="mr-sm" checked>
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Record Entire Screen</span>
+                                    <span class="block text-xs text-secondary">Capture everything on your display.</span>
+                                </div>
+                            </label>
+                            <label class="radio-option flex items-center cursor-pointer mb-sm p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="prefer-current-tab" value="browser" class="mr-sm">
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Record this tab only</span>
+                                    <span class="block text-xs text-secondary">Only records content in this browser tab.</span>
+                                </div>
+                            </label>
+                            <label class="radio-option flex items-center cursor-pointer p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="record-other" value="other" class="mr-sm">
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Other</span>
+                                    <span class="block text-xs text-secondary">Choose a window, app, or tab from the picker.</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Capture Audio Checkbox -->
+                        <label class="checkbox-option flex items-center mb-sm cursor-pointer">
+                            <input type="checkbox" id="capture-audio" class="mr-sm">
+                            <span class="block text-sm font-bold text-primary">Record Microphone</span>
+                        </label>
+
+                        <!-- Microphone Selector (shown when capture-audio is checked) -->
+                        <div id="mic-selector-container" style="display: none;" class="mb-md pl-md">
+                            <select id="mic-device-select" class="mb-select w-full">
+                                <option value="">Loading microphones...</option>
+                            </select>
+
+                            <!-- Echo Cancellation Toggle -->
+                            <label class="checkbox-option flex items-center mt-sm cursor-pointer">
+                                <input type="checkbox" id="disable-echo-cancel" class="mr-sm">
+                                <div>
+                                    <span class="block text-xs text-primary">Include system audio</span>
+                                    <span class="block text-xs text-secondary">Record audio playing through speakers
+                                        (music, videos). Use headphones to avoid echo.</span>
+                                </div>
+                            </label>
+
+                            <a href="https://webcammictest.com/mic/" target="_blank" rel="noopener noreferrer"
+                                class="text-xs text-accent hover-underline mt-xs inline-block">🎙️ Test your
+                                microphone: https://webcammictest.com/mic/</a>
+                        </div>
+
+                        <!-- Enable Facecam Checkbox -->
+                        <label class="checkbox-option flex items-center mb-md cursor-pointer">
+                            <input type="checkbox" id="enable-facecam" class="mr-sm">
+                            <span class="block text-sm font-bold text-primary">Enable Facecam</span>
+                        </label>
+
+                        <div id="facecam-options" style="display: none;"
+                            class="pl-md border-l-2 border-border-light ml-xs">
+                            <!-- Global PiP (Visible when Unchecked) -->
+                            <label class="radio-option option-pip flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="pip" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">Global PiP (Recommended)</span>
+                                    <span class="block text-xs text-secondary">Floating window, visible over all apps.
+                                        (Requires "Always on Top")</span>
+                                </div>
+                            </label>
+
+                            <!-- Popup Window (Visible when Unchecked) -->
+                            <label class="radio-option option-popup flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="popup" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">Popup Window</span>
+                                    <span class="block text-xs text-secondary">Separate popup window. Alternative for
+                                        Linux.</span>
+                                </div>
+                            </label>
+
+                            <!-- In-Page Bubble (Visible when Checked) -->
+                            <label class="radio-option option-in-page flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="in-page" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">In-Page Bubble</span>
+                                    <span class="block text-xs text-secondary">Draggable bubble, only visible inside
+                                        this
+                                        tab.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info text-xs mb-lg" id="facecam-hint">
+                        <strong>Tip:</strong> If the Facecam hides behind other windows, try right-clicking it and
+                        selecting
+                        "Always on Top".
+                    </div>
+                </div>
+
+            </div>
+            <div class="mb-modal-footer flex justify-end gap-sm">
+                <button class="jellyjump-btn-secondary mb-modal-cancel">Cancel</button>
+                <button class="jellyjump-btn-primary mb-modal-start">Start Recording</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Rotate Content Template -->
+<template id="rotate-content-template">
+    <!-- Left Panel: Video Preview -->
+    <div class="modal-video-panel">
+        <!-- Built dynamically by BoxEditorUtils.setupEditor() -->
+    </div>
+
+    <!-- Right Panel: Rotate Controls -->
+    <div class="modal-controls-panel">
+        <div class="rotate-controls flex flex-col gap-md p-md">
+            <!-- Rotation -->
+            <div class="control-group">
+                <label class="text-xs text-secondary font-mono mb-sm block">ROTATION</label>
+                <div class="flex gap-sm">
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="rotate-left" title="Rotate Left (-90°)">
+                        <svg width="24" height="24" fill="currentColor" style="transform: scaleX(-1);">
+                            <use href="assets/icons/sprite.svg#icon-rotate-cw"></use>
+                        </svg>
+                        <span class="text-xs">-90°</span>
+                    </button>
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="rotate-right" title="Rotate Right (+90°)">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-rotate-cw"></use>
+                        </svg>
+                        <span class="text-xs">+90°</span>
+                    </button>
+                </div>
+                <div class="text-center mt-sm">
+                    <span class="text-xs text-secondary">Current: </span>
+                    <span class="rotation-value text-sm font-bold text-primary">0°</span>
+                </div>
+            </div>
+
+            <div class="w-full h-px bg-border my-sm"></div>
+
+            <!-- Flip -->
+            <div class="control-group">
+                <label class="text-xs text-secondary font-mono mb-sm block">FLIP</label>
+                <div class="flex gap-sm">
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="flip-h" title="Flip Horizontal">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-flip-h"></use>
+                        </svg>
+                        <span class="text-xs">Horizontal</span>
+                    </button>
+                    <button class="jellyjump-btn-secondary flex-1 py-sm flex-center flex-col gap-xs"
+                        data-action="flip-v" title="Flip Vertical">
+                        <svg width="24" height="24" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-flip-v"></use>
+                        </svg>
+                        <span class="text-xs">Vertical</span>
+                    </button>
+                </div>
+                <div class="text-center mt-sm">
+                    <span class="text-xs text-secondary">State: </span>
+                    <span class="flip-value text-sm font-bold text-primary">None</span>
+                </div>
+            </div>
+
+            <div class="w-full h-px bg-border my-sm"></div>
+
+            <!-- Reset -->
+            <button class="jellyjump-btn-secondary w-full py-sm" data-action="reset">
+                Reset All
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Encrypt/Decrypt Content Template -->
+<template id="encrypt-content-template">
+    <!-- Mode Toggle -->
+    <div class="encrypt-mode-section mb-lg">
+        <label class="toggle-switch encrypt-mode-toggle">
+            <span class="toggle-label label-left">Encrypt</span>
+            <input type="checkbox" class="encrypt-mode-checkbox">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label label-right">Decrypt</span>
+        </label>
+    </div>
+
+    <!-- Password Input -->
+    <div class="encrypt-password-section mb-md">
+        <label class="text-secondary text-sm font-mono mb-sm block">PASSWORD:</label>
+        <input type="password" class="encrypt-password jellyjump-input w-full" placeholder="Enter password"
+            autocomplete="off">
+    </div>
+
+    <!-- Confirm Password (encrypt only) -->
+    <div class="encrypt-confirm-section mb-md">
+        <label class="text-secondary text-sm font-mono mb-sm block">CONFIRM PASSWORD:</label>
+        <input type="password" class="encrypt-confirm jellyjump-input w-full" placeholder="Confirm password"
+            autocomplete="off">
+    </div>
+
+    <!-- Password Hint (encrypt only) -->
+    <div class="encrypt-hint-section mb-md">
+        <label class="text-secondary text-sm font-mono mb-sm block">HINT (optional):</label>
+        <input type="text" class="encrypt-hint jellyjump-input w-full" placeholder="Password hint" autocomplete="off"
+            maxlength="200">
+    </div>
+
+    <!-- Hint Display (decrypt only, shown if hint exists) -->
+    <div class="encrypt-hint-display hidden mb-md">
+        <span class="text-secondary text-sm font-mono">HINT:</span>
+        <span class="encrypt-hint-value text-sm" style="color: var(--accent-primary); margin-left: 6px;"></span>
+    </div>
+
+    <!-- Protection mode (auto-selected by file size, encrypt only) -->
+    <div class="encrypt-platform-section mb-md">
+        <div class="flex items-center gap-sm mb-xs">
+            <span class="encrypt-platform-label text-xs font-mono" style="color:var(--accent-primary);letter-spacing:0.05em;">RE-ENCODING RESISTANT</span>
+        </div>
+        <p class="encrypt-platform-info text-xs text-secondary">
+            Encrypted data is embedded in the carrier video's pixel strip and audio track —
+            survives platform re-encoding (Twitter, YouTube, Telegram, etc).<br>
+            Estimated output length:
+            <span class="encrypt-platform-duration font-mono" style="color:var(--accent-primary);">—</span>.
+            Larger files produce longer videos.
+        </p>
+    </div>
+
+    <!-- Info -->
+    <div class="encrypt-info text-xs text-secondary">
+        <p class="encrypt-info-text"></p>
+        <p class="mt-xs" style="opacity:0.7;">No password recovery — remember your password.</p>
+    </div>
+</template>
+
+<!-- Slideshow Content Template -->
+<template id="slideshow-content-template">
+    <div class="slideshow-container">
+
+        <!-- Dropzone -->
+        <div class="slideshow-dropzone" role="button" tabindex="0" aria-label="Upload images">
+            <svg width="32" height="32" fill="currentColor" style="opacity:0.5; margin-bottom:8px;">
+                <use href="assets/icons/sprite.svg#icon-image"></use>
+            </svg>
+            <p class="text-sm text-secondary">Drag &amp; drop images here or <span class="slideshow-browse-link"
+                    style="color:var(--accent-primary);cursor:pointer;text-decoration:underline;">browse</span></p>
+            <p class="text-xs text-muted mt-xs">PNG, JPG, GIF, WebP, BMP — add multiple at once</p>
+            <input type="file" class="slideshow-file-input" accept="image/*" multiple style="display:none;">
+        </div>
+
+        <!-- Image List -->
+        <div class="slideshow-image-list hidden">
+            <div class="slideshow-list-header flex-between mb-xs">
+                <span class="text-xs text-secondary font-mono">IMAGES <span
+                        class="slideshow-count text-accent font-bold">0</span></span>
+                <button class="slideshow-add-more-btn jellyjump-btn-small" title="Add more images">
+                    <svg width="14" height="14" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-plus"></use>
+                    </svg>
+                    <span>Add More</span>
+                </button>
+            </div>
+            <!-- Table header -->
+            <div class="slideshow-table-header slideshow-row-grid text-xs text-muted font-mono px-xs py-xs">
+                <span></span><!-- drag -->
+                <span></span><!-- thumb -->
+                <span>FILE</span>
+                <span class="text-center">DURATION</span>
+                <span></span><!-- remove -->
+            </div>
+            <div class="slideshow-items-list"></div>
+        </div>
+
+        <!-- Settings -->
+        <div class="slideshow-settings mt-md">
+            <label class="text-xs text-secondary font-mono mb-sm block">TRANSITION</label>
+
+            <div class="slideshow-transition-row flex gap-md items-start mb-sm flex-wrap">
+                <!-- Transition type -->
+                <div class="setting-group" style="flex:2; min-width:130px;">
+                    <label class="text-xs font-bold mb-xs block">Type</label>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full slideshow-transition-btn"
+                            id="slideshow-transition-btn" aria-haspopup="true" aria-expanded="false">
+                            <span>Cut</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="slideshow-transition-menu" role="menu">
+                            <div class="jellyjump-menu-item active" data-value="cut" role="menuitem">
+                                <span class="menu-label text-sm font-bold">Cut</span>
+                                <span class="text-xs text-secondary ml-auto">Instant</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="crossfade" role="menuitem">
+                                <span class="menu-label text-sm">Crossfade</span>
+                                <span class="text-xs text-secondary ml-auto">Blend</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="slide-left" role="menuitem">
+                                <span class="menu-label text-sm">Slide Left</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="slide-right" role="menuitem">
+                                <span class="menu-label text-sm">Slide Right</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="slide-up" role="menuitem">
+                                <span class="menu-label text-sm">Slide Up</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="slide-down" role="menuitem">
+                                <span class="menu-label text-sm">Slide Down</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="fade-to-black" role="menuitem">
+                                <span class="menu-label text-sm">Fade to Black</span>
+                                <span class="text-xs text-secondary ml-auto">Cinematic</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="wipe-left" role="menuitem">
+                                <span class="menu-label text-sm">Wipe Left</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="wipe-right" role="menuitem">
+                                <span class="menu-label text-sm">Wipe Right</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="zoom-out" role="menuitem">
+                                <span class="menu-label text-sm">Zoom Out</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="flip" role="menuitem">
+                                <span class="menu-label text-sm">Flip</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="zoom" role="menuitem">
+                                <span class="menu-label text-sm">Zoom</span>
+                                <span class="text-xs text-secondary ml-auto">Ken Burns</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transition duration -->
+                <div class="slideshow-transition-duration-wrap setting-group"
+                    style="flex:3; min-width:150px; display:none;">
+                    <div class="flex-between mb-xs">
+                        <label class="text-xs font-bold">Duration</label>
+                        <span class="slideshow-trans-dur-val text-xs font-bold text-accent">0.5s</span>
+                    </div>
+                    <input type="range" class="quality-slider slideshow-trans-dur-slider w-full" min="0.3" max="2.0"
+                        step="0.1" value="0.5">
+                    <div class="flex-between mt-xs text-xs text-secondary">
+                        <span>0.3s</span>
+                        <span>1.0s</span>
+                        <span>2.0s</span>
+                    </div>
+                </div>
+
+                <!-- Output FPS -->
+                <div class="setting-group" style="flex:2; min-width:120px;">
+                    <label class="text-xs font-bold mb-xs block">Output FPS</label>
+                    <div class="jellyjump-menu-btn-container">
+                        <div class="mb-select jellyjump-menu-btn w-full slideshow-fps-btn" id="slideshow-fps-btn"
+                            aria-haspopup="true" aria-expanded="false">
+                            <span>30 fps</span>
+                        </div>
+                        <div class="jellyjump-menu w-full" id="slideshow-fps-menu" role="menu">
+                            <div class="jellyjump-menu-item" data-value="24" role="menuitem">
+                                <span class="menu-label text-sm">24 fps</span>
+                                <span class="text-xs text-secondary ml-auto">Cinematic</span>
+                            </div>
+                            <div class="jellyjump-menu-item active" data-value="30" role="menuitem">
+                                <span class="menu-label text-sm font-bold">30 fps</span>
+                                <span class="text-xs text-secondary ml-auto">Standard</span>
+                            </div>
+                            <div class="jellyjump-menu-item" data-value="60" role="menuitem">
+                                <span class="menu-label text-sm">60 fps</span>
+                                <span class="text-xs text-secondary ml-auto">Smooth</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Music -->
+            <label class="text-xs text-secondary font-mono mb-sm block mt-md">BACKGROUND MUSIC <span
+                    class="text-muted font-normal">(optional)</span></label>
+            <div class="slideshow-music-row flex gap-sm items-center flex-wrap">
+                <label class="jellyjump-btn-small cursor-pointer flex-shrink-0 flex items-center gap-xs">
+                    <svg width="14" height="14" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-audio"></use>
+                    </svg>
+                    <span>Choose File</span>
+                    <input type="file" class="slideshow-music-input" accept="audio/*" style="display:none;">
+                </label>
+                <span class="slideshow-music-name text-sm text-muted flex-1 truncate" style="min-width:0;">No file
+                    selected</span>
+                <button class="slideshow-music-clear jellyjump-btn-small hidden" title="Remove music">
+                    <svg width="14" height="14" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-close"></use>
+                    </svg>
+                </button>
+            </div>
+            <!-- Audio trim (shown after file selected) -->
+            <div class="slideshow-audio-trim hidden mt-sm">
+                <div class="flex-between mb-xs">
+                    <label class="text-xs text-secondary font-mono">TRIM</label>
+                    <div class="flex items-center gap-sm">
+                        <span class="slideshow-trim-times text-xs font-bold text-accent"></span>
+                        <button class="slideshow-audio-play jellyjump-btn-small" title="Preview selection">
+                            <svg width="14" height="14" fill="currentColor">
+                                <use class="slideshow-play-icon" href="assets/icons/sprite.svg#icon-play"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="slideshow-dual-range">
+                    <div class="slideshow-range-track">
+                        <div class="slideshow-range-fill"></div>
+                    </div>
+                    <input type="range" class="slideshow-audio-start" min="0" step="0.01" value="0">
+                    <input type="range" class="slideshow-audio-end" min="0" step="0.01" value="0">
+                </div>
+                <div class="flex-between text-xs text-secondary mt-xs">
+                    <span class="slideshow-audio-start-label">0:00</span>
+                    <span class="slideshow-audio-end-label">0:00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Slideshow Image Item Template -->
+<template id="slideshow-image-item-template">
+    <div class="slideshow-item slideshow-row-grid items-center px-xs py-xs rounded border border-transparent"
+        draggable="true">
+        <!-- Drag handle -->
+        <div class="slideshow-item-drag text-muted"
+            style="cursor:grab; user-select:none; font-size:16px; text-align:center; line-height:1;">&#8597;</div>
+        <!-- Thumbnail -->
+        <div style="width:52px;height:48px;background:#000;border-radius:3px;overflow:hidden;">
+            <img style="width:100%;height:100%;object-fit:cover;" alt="">
+        </div>
+        <!-- Filename -->
+        <div class="slideshow-item-name text-sm truncate" style="min-width:0;"></div>
+        <!-- Duration -->
+        <div class="flex items-center justify-center gap-xs">
+            <input type="text" class="slideshow-item-duration font-mono" value="3" placeholder="3">
+            <span class="text-xs text-secondary flex-shrink-0">s</span>
+        </div>
+        <!-- Remove -->
+        <button class="slideshow-item-remove text-muted" title="Remove"
+            style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center;justify-content:center;border-radius:3px;width:100%;">
+            <svg width="14" height="14" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-close"></use>
+            </svg>
+        </button>
+    </div>
+</template>

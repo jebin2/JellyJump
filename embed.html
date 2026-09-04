@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https: http:; media-src 'self' blob: data: https: http:; connect-src * blob: data:; worker-src 'self' blob:; font-src 'self' data:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JellyJump - Embed</title>
+    <link rel="icon" href="./assets/jelly_jump_logo-qiMeMAa9.png">
+
+    <!-- CSS (reuse existing) -->
+
+    <style>
+        /* Embed-specific overrides */
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .embed-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Hide elements not needed in embed */
+        .jellyjump-help-overlay {
+            display: none !important;
+        }
+
+        /* Error state */
+        .embed-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #fff;
+            font-family: system-ui, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .embed-error h2 {
+            margin: 0 0 10px;
+            font-size: 1.2rem;
+        }
+
+        .embed-error p {
+            margin: 0;
+            opacity: 0.7;
+            font-size: 0.9rem;
+        }
+    </style>
+  <script type="module" crossorigin src="./assets/embed-DRoRR9Z_.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/reload-on-stale-chunks-CwR7lFTA.js">
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-DDNUbuXK.js">
+  <link rel="stylesheet" crossorigin href="./assets/reload-on-stale-chunks-J5Z_78tk.css">
+  <link rel="stylesheet" crossorigin href="./assets/screenshot-DVWsojW6.css">
+</head>
+
+<body>
+    <div class="embed-container" id="player-container">
+        <!-- CorePlayer will be injected here -->
+    </div>
+
+    <!-- Hidden Download Anchor (for screenshot) -->
+    <a id="mb-download-link" style="display: none;"></a>
+
+
+</body>
+
+</html>

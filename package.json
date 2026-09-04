@@ -1,0 +1,32 @@
+{
+  "name": "jellyjump",
+  "version": "0.3.0",
+  "description": "JellyJump Media Player",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "quality": "node scripts/quality-check.mjs",
+    "verify:libs": "bash download_libs.sh verify",
+    "check": "npm run quality && npm run verify:libs && npm run build",
+    "clean": "rm -rf dist",
+    "build:desktop": "./build-desktop.sh",
+    "sim:jjc3": "bash scripts/jjc3-sim.sh",
+    "test:rs": "node scripts/rs-selftest.mjs && node scripts/shard-pipeline-test.mjs",
+    "test:server": "node scripts/library-server-test.mjs",
+    "test:remote": "node scripts/remote-library-test.mjs && node scripts/remote-library-load-test.mjs",
+    "test:cli": "node scripts/cli-test.mjs",
+    "test:share": "npm run test:server && npm run test:remote && npm run test:cli && npm run test:youtube && npm run test:linklist",
+    "test:youtube": "node scripts/youtube-url-test.mjs && node scripts/youtube-embed-test.mjs",
+    "test:linklist": "node scripts/linklist-test.mjs && node scripts/linklist-scan-test.mjs"
+  },
+  "devDependencies": {
+    "vite": "^8.0.0"
+  },
+  "dependencies": {
+    "@huggingface/hub": "^2.13.0",
+    "@huggingface/transformers": "^4.2.0"
+  }
+}
