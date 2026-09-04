@@ -104,6 +104,14 @@ function shapeLinkList(list, serverName, rawUrl) {
             // remove act on these too.
             remoteSource: rawUrl,
             remoteServer: serverName,
+            // These belong to the other machine's library exactly as its video
+            // files do, and this is the flag that keeps a library out of local
+            // storage. Without it they were the one part of a shared library
+            // that got saved: on the next launch they came back from the
+            // database and were then fetched again, so the folder was already
+            // on screen before the listing started -- no loading row, and every
+            // entry listed twice once it finished.
+            isRemoteLibrary: true,
         },
     }));
 }

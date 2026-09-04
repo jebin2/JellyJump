@@ -83,10 +83,26 @@ export class Playlist {
         };
         window.addEventListener('beforeunload', this._beforeUnloadHandler);
 
-        // Load saved data, then fill in what a scan finds on disk
-        this._loadSavedPlaylist()
-            .then(() => this._restoreRemoteLibraries())
-            .then(() => this._startMediaScan());
+        // Load saved data, then fill in what a scan finds on disk.
+        //
+        // Three stages, each guarded on its own. Chained bare, one rejection
+        // cancelled everything after it and went nowhere -- an unhandled
+        // rejection with no message and a playlist that had simply stopped
+        // filling, which is indistinguishable from there being nothing to fill
+        // it with.
+        (async () => {
+            for (const [what, stage] of [
+                ['load the saved playlist', () => this._loadSavedPlaylist()],
+                ['restore shared libraries', () => this._restoreRemoteLibraries()],
+                ['scan for media', () => this._startMediaScan()],
+            ]) {
+                try {
+                    await stage();
+                } catch (error) {
+                    Logger.error(`[Playlist] Startup: failed to ${what}:`, error);
+                }
+            }
+        })();
 
         // Sharing can already be on from a previous session, so reflect it
         // on the Tools button without waiting for the menu to be opened.

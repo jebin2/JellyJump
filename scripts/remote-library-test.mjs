@@ -97,6 +97,35 @@ check(stableIds, 'existing items keep their remoteId, so playback is not torn ou
 check(before.every(b => b.remoteSource === shareLink),
     'items carry the source, which is what the folder reload button uses');
 
+console.log('\na .jjlist inside a shared library');
+// Its entries are YouTube items rather than files on the other machine, which
+// is what made them slip past the rule that a shared library is never saved
+// locally. Saved, they came back on the next launch and were then fetched
+// again: the folder was on screen before the listing began, with no loading
+// row, and every entry in it listed twice.
+const listPath = path.join(root, 'Watch later.jjlist');
+const listText = 'Clip one : https://www.youtube.com/watch?v=dQw4w9WgXcQ\n'
+    + 'https://youtu.be/9bZkp7q19f0\n';
+writeFileSync(listPath, listText);
+// Kept apart from the indexed files on purpose: a .jjlist is served as text and
+// must never be fetchable through /api/stream.
+index.addLinkList({
+    path: listPath, name: 'Watch later.jjlist', text: listText, mtime: Date.now(),
+});
+
+const withList = await remote.fetchItems(shareLink);
+const fromList = withList.filter(i => i.isYouTube);
+check(fromList.length === 2, `both entries arrive as items (${fromList.length})`);
+check(fromList.every(i => i.remoteSource === shareLink),
+    'they carry the source, so the folder acts on them too');
+check(fromList.every(i => i.isRemoteLibrary === true),
+    'and are marked as the shared library they came from, which is what keeps them unsaved');
+
+// The rule they have to satisfy, stated the way PlaylistStorage states it.
+const persisted = withList.filter(i => !i.isWebcam && !i.isDiscovered && !i.isRemoteLibrary);
+check(persisted.length === 0,
+    `nothing from a shared library is written to local storage (${persisted.length} would be)`);
+
 console.log('\nthe reported failure');
 // Pasting the link previously fetched this and handed it to the demuxer.
 const asMedia = await fetch(shareLink);
