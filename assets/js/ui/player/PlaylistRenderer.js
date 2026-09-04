@@ -87,9 +87,9 @@ export class PlaylistRenderer {
      * view.
      *
      * Driven by a sentinel at the end rather than by a scroll event on the
-     * container. Only the outer list actually scrolls: a folder drawer has
-     * overflow-y set but no height cap, so it grows to fit its contents and
-     * never fires a scroll event of its own. Keying off that event stranded
+     * container. Only the outer list actually scrolls: a folder drawer grows to
+     * fit its contents and never fires a scroll event of its own, whatever its
+     * overflow is set to. Keying off that event stranded
      * every folder at its first batch — a folder labelled (293) listed 50 rows
      * and no amount of scrolling produced the rest.
      *

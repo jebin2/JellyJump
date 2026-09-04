@@ -198,11 +198,11 @@
 }
 
 /* The library's scrollers, kept from chaining into the page behind them.
-   A nested folder is its own scroll area, so without this a flick that runs
-   past the end of one carries on scrolling whatever contains it — and at the
-   top of the page that gesture is the browser's reload. */
+   Without this a flick that runs past the end of the list carries on scrolling
+   whatever contains it — and at the top of the page that gesture is the
+   browser's reload. Only elements that really scroll belong here: a drawer
+   listed here too, and swallowed every gesture over an open folder. */
 .playlist-content,
-.playlist-children,
 .scroll-list {
     overscroll-behavior: contain;
 }
@@ -533,31 +533,17 @@
        clear step against the border line. */
     padding-left: 6px;
     margin-left: 8px;
-    /* max-height: 280px; */
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* No overflow of its own. A drawer has no height cap, so `overflow-y: auto`
+       here made it a scroll container that could never scroll -- and once
+       overscroll-behavior stopped it chaining outwards, every wheel and swipe
+       over an open folder was swallowed and the library would not move.
+       Letting it grow puts the scrolling back on .playlist-content, the one
+       element that is actually height-bound. `overflow-x` is gone for the same
+       reason it is `auto` rather than `hidden` on the parent: hidden clipped
+       rows indented past the right edge with no way to reach them. */
     /* Vertical Indent Line - Green Theme */
     border-left: 1px solid var(--accent-primary);
     background: transparent;
-}
-
-/* Custom Scrollbar for Drawers (Themed) */
-.playlist-children::-webkit-scrollbar {
-    width: 8px;
-}
-
-.playlist-children::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
-    border-left: 1px solid var(--border-dark);
-}
-
-.playlist-children::-webkit-scrollbar-thumb {
-    background: var(--accent-primary);
-    border: 2px solid var(--bg-secondary);
-}
-
-.playlist-children::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-secondary);
 }
 
 .playlist-download-btn {
