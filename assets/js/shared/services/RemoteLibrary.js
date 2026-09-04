@@ -297,6 +297,20 @@ const SAVED_LINKS_KEY = 'jellyjump-remote-libraries';
  * the rest of the app's local state, which is the same exposure as the saved
  * playlist itself.
  */
+/**
+ * The machine a share link points at, for saying which library is missing
+ * without putting its token on screen — the link is a credential.
+ * @param {string} rawUrl
+ * @returns {string}
+ */
+export function hostOf(rawUrl) {
+    try {
+        return new URL(rawUrl).host;
+    } catch {
+        return 'that machine';
+    }
+}
+
 export function savedLinks() {
     try {
         const raw = JSON.parse(localStorage.getItem(SAVED_LINKS_KEY));

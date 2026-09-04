@@ -1,8 +1,15 @@
 import { Logger } from '../../shared/utils/Logger.js';
 
+/** Key for the outer list in the batch-depth map, which is otherwise by path. */
+const ROOT_LIST = '\u0000root';
+
 export class PlaylistRenderer {
     constructor(playlist) {
         this.playlist = playlist;
+        /** Batch depths captured just before a teardown, replayed during it. */
+        this._pendingBatchDepths = null;
+        /** The query the DOM on screen belongs to; a different one is a new list. */
+        this._renderedQuery = null;
     }
 
     render() {
@@ -26,8 +33,14 @@ export class PlaylistRenderer {
 
         const tree = this.buildTree(p.items);
 
+        // render() is a teardown: innerHTML = '' takes the scroll position and
+        // every open drawer's batch progress with it, so any change to the
+        // playlist -- a file added, an item removed, metadata arriving -- used
+        // to fling the user back to the top of a list they were reading. Both
+        // are captured here and put back below.
+        const position = this._capturePosition();
+
         p.container.innerHTML = '';
-        p.container.scrollTop = 0;
         p.container.style.overflowY = 'auto';
         // Not 'hidden': that silently clipped rows indented past the right edge.
         // Set inline rather than in CSS because the inline value wins, so the
@@ -40,10 +53,56 @@ export class PlaylistRenderer {
         if (p.searchQuery) {
             this.renderSearchResults(p.searchQuery);
         } else {
-            this.setupInfiniteScroll(p.container, tree);
+            this.setupInfiniteScroll(p.container, tree, ROOT_LIST);
         }
 
+        this._restorePosition(position);
         this.updateUI();
+    }
+
+    /**
+     * What the user's place in the list consists of, read off the DOM that is
+     * about to be destroyed.
+     *
+     * Scroll offset alone is not enough. The list renders in batches of 50, so
+     * a rebuild starts 50 rows deep however far down the user was -- restoring
+     * a scrollTop of 4000 against 50 rows of content just lands at the bottom
+     * of a short list. The batch depths have to come back first, which is why
+     * they are collected per drawer and replayed as each one is built.
+     * @returns {{scrollTop: number, sameList: boolean}}
+     * @private
+     */
+    _capturePosition() {
+        const p = this.playlist;
+        const depths = new Map();
+
+        const rootDepth = parseInt(p.container.dataset.renderedCount || '0');
+        if (rootDepth > 0) depths.set(ROOT_LIST, rootDepth);
+
+        for (const folder of p.container.querySelectorAll('.playlist-folder[data-path]')) {
+            // Direct child only: a nested folder's drawer is its own entry.
+            const drawer = folder.querySelector(':scope > .playlist-children');
+            const depth = parseInt(drawer?.dataset.renderedCount || '0');
+            if (depth > 0) depths.set(folder.dataset.path, depth);
+        }
+
+        // Searching replaces the list with a different one, so the place the
+        // user held in the old list means nothing in the new one. Same going
+        // back the other way, when the query is cleared.
+        const sameList = p.searchQuery === this._renderedQuery;
+        this._pendingBatchDepths = sameList ? depths : null;
+
+        return { scrollTop: sameList ? p.container.scrollTop : 0, sameList };
+    }
+
+    /** @private */
+    _restorePosition({ scrollTop }) {
+        const p = this.playlist;
+        this._pendingBatchDepths = null;
+        this._renderedQuery = p.searchQuery;
+        // Assigned even when zero: a fresh list belongs at the top, and the
+        // container is reused rather than replaced.
+        p.container.scrollTop = scrollTop;
     }
 
     /**
@@ -98,7 +157,7 @@ export class PlaylistRenderer {
      * ancestor happens to be the scrolling one, since clipping by a scroll
      * container counts as not intersecting.
      */
-    setupInfiniteScroll(container, node) {
+    setupInfiniteScroll(container, node, restoreKey = null) {
         container.dataset.renderedCount = '0';
 
         const sentinel = document.createElement('div');
@@ -121,7 +180,32 @@ export class PlaylistRenderer {
         container._batchObserver = observer;
 
         this.renderBatch(container, node);
+        this._replayBatchDepth(container, node, restoreKey);
         observer.observe(sentinel);
+    }
+
+    /**
+     * Rebuild a list to the depth it had before the teardown.
+     *
+     * Only ever catches up to what was already on screen, and renderBatch stops
+     * itself once the node runs out, so this cannot render more than the list
+     * holds. The cost is the cost the browser was already carrying a moment
+     * ago -- these are the same rows, built again.
+     * @private
+     */
+    _replayBatchDepth(container, node, restoreKey) {
+        if (restoreKey === null) return;
+        const target = this._pendingBatchDepths?.get(restoreKey);
+        if (!target) return;
+
+        // The observer is nulled by finishBatching, which is the signal that
+        // there is nothing further to render -- a shorter list than last time.
+        while (container._batchObserver
+            && parseInt(container.dataset.renderedCount || '0') < target) {
+            const before = container.dataset.renderedCount;
+            this.renderBatch(container, node);
+            if (container.dataset.renderedCount === before) break;
+        }
     }
 
     /** Stop watching for more: everything this container holds is on screen. */
@@ -514,7 +598,7 @@ export class PlaylistRenderer {
         // Nothing needed the delay: the observer inside can watch a sentinel
         // that is not in the document yet, and this whole subtree is attached
         // in the same tick.
-        if (isExpanded) this.setupInfiniteScroll(childrenContainer, folderData);
+        if (isExpanded) this.setupInfiniteScroll(childrenContainer, folderData, folderData.path);
 
         return wrapper;
     }

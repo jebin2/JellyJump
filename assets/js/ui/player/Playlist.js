@@ -26,6 +26,7 @@ import {
     looksLikeShareLink, probe as probeRemoteLibrary, fetchItems as fetchRemoteItems,
     fetchItemsStreaming as fetchRemoteItemsStreaming,
     savedLinks as savedRemoteLinks, rememberLink as rememberRemoteLink, forgetLink as forgetRemoteLink,
+    hostOf,
 } from '../../shared/services/RemoteLibrary.js';
 
 // Folder that scan results are grouped under in the playlist tree.
@@ -1613,9 +1614,12 @@ export class Playlist {
             // Add item to playlist
             this.addItem(result);
 
-            // Process metadata if it's a regular file
+            // Process metadata if it's a regular file. Through the same helper
+            // every other caller uses: it patches the one row whose thumbnail
+            // and duration arrived, where this used to rebuild the whole tree
+            // and throw away the reader's place in it.
             if (!result.isStream) {
-                PlaylistProcessor.processMetadata([result], (item) => this.render());
+                this._processMetadata([result]);
             }
 
             // Always select and play the new item
@@ -1703,6 +1707,8 @@ export class Playlist {
         const links = savedRemoteLinks();
         if (links.length === 0) return;
 
+        const unreachable = [];
+
         for (const link of links) {
             try {
                 // Streamed for the same reason adding one is: this runs at
@@ -1712,10 +1718,30 @@ export class Playlist {
                 // arrived is real, and the folder's reload button gets the rest.
                 const result = await this._streamRemoteLibrary(link);
                 Logger.log(`[Playlist] Restored shared library (${result.total} items, complete=${result.complete})`);
+                if (result.total === 0) {
+                    unreachable.push({ link, reason: 'the host answered with nothing' });
+                }
             } catch (error) {
                 Logger.warn('[Playlist] Shared library unavailable, keeping the link:', error.message);
+                unreachable.push({ link, reason: error.message || 'unreachable' });
             }
         }
+
+        // Said out loud rather than left in the console. A library that fails to
+        // come back leaves no folder and no reload button, so the only thing on
+        // screen is a playlist that is quietly missing everything the user
+        // added last session — indistinguishable from the app having lost it.
+        if (unreachable.length > 0) {
+            const names = unreachable.map(u => hostOf(u.link)).join(', ');
+            const why = unreachable[0].reason;
+            Toast.show(
+                `Couldn't reach ${unreachable.length === 1 ? 'the shared library on' : 'shared libraries on'} `
+                + `${names} (${why}). The link${unreachable.length === 1 ? ' is' : 's are'} kept — `
+                + 'add it again or reload once the machine is back.',
+                8000, true,
+            );
+        }
+
         this.render();
         this._updatePlayerNavigationState();
     }
