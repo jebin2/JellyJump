@@ -1,4 +1,5 @@
 import { AnimatedImage } from '../../shared/utils/AnimatedImage.js';
+import { decodeVideoSticker } from '../../shared/utils/VideoFrames.js';
 import { Logger } from '../../shared/utils/Logger.js';
 
 /**
@@ -98,14 +99,24 @@ export class StickerLayer {
             // Decoded against the frame's width, not the sticker's: the
             // sticker's is a thing the user drags, and a decode per drag is
             // the work this design exists to avoid.
-            sticker.media = await AnimatedImage.load(file, this.player.canvas?.width || 1280);
+            const frameWidth = this.player.canvas?.width || 1280;
+            // A video goes through the demuxer; ImageDecoder handles images
+            // only, and would fail all the way down to a blank sticker. This
+            // is the path a transparent WebM from Remove Background takes.
+            sticker.media = file.type?.startsWith('video/')
+                ? await decodeVideoSticker(file, frameWidth)
+                : await AnimatedImage.load(file, frameWidth);
             sticker.aspect = sticker.media.width / sticker.media.height || 1;
             this._syncBoxes();
             this._repaintIfPaused();
             return sticker;
         } catch (error) {
-            Logger.warn('[Stickers] Could not decode that image:', error);
+            Logger.warn('[Stickers] Could not decode that file:', error);
             this.remove(sticker.id);
+            // A video says why -- too long, no video track, nothing decodable
+            // -- and those are worth putting in front of the reader rather
+            // than leaving a sticker that silently never appeared.
+            if (file.type?.startsWith('video/')) throw error;
             return null;
         }
     }
@@ -143,8 +154,8 @@ export class StickerLayer {
         if (!response.ok) throw new Error(`${url.host} answered ${response.status}.`);
 
         const blob = await response.blob();
-        if (!blob.type.startsWith('image/')) {
-            throw new Error(`That link is ${blob.type || 'not an image'}, not a picture.`);
+        if (!blob.type.startsWith('image/') && !blob.type.startsWith('video/')) {
+            throw new Error(`That link is ${blob.type || 'not an image'}, not a picture or a clip.`);
         }
         return this.addFile(blob);
     }

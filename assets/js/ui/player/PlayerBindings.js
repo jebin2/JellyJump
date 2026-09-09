@@ -341,7 +341,12 @@ export function attachPlayerBindings(player) {
                 const file = e.target.files?.[0];
                 // Cleared straight away so the same file can be picked twice.
                 e.target.value = '';
-                if (file) await player.stickers?.addFile(file);
+                if (!file) return;
+                try {
+                    await player.stickers?.addFile(file);
+                } catch (error) {
+                    Toast.show(error.message, 5000, true);
+                }
             });
         }
 

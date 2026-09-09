@@ -192,6 +192,21 @@ console.log('\nan animation is decoded to fit a memory budget');
     check(one.frames >= 1 && one.keepEvery >= 1, 'a single enormous frame still yields a usable plan');
 }
 
+// --- video as a sticker -------------------------------------------------------
+
+console.log('\na clip that cannot be used says so');
+{
+    globalThis.HTMLVideoElement = { prototype: {} };   // no requestVideoFrameCallback
+    const { decodeVideoSticker } = await import('../assets/js/shared/utils/VideoFrames.js');
+    let message = null;
+    try {
+        await decodeVideoSticker(new Blob([], { type: 'video/webm' }), 1280);
+    } catch (e) { message = e.message; }
+    check(/cannot take a clip/i.test(message || ''),
+        `a browser without per-frame callbacks is told plainly (${message})`);
+    check(/image or GIF/i.test(message || ''), 'and told what will work instead');
+}
+
 // --- the clock ---------------------------------------------------------------
 
 console.log('\nan animation follows the video, not the wall clock');
