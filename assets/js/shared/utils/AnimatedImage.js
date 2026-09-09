@@ -24,8 +24,60 @@
  * than expensive.
  */
 const DECODE_FRACTION = 0.5;
+
+/**
+ * The ceiling on what one animation may hold, decoded.
+ *
+ * Width alone is not a memory bound: the cost is frames x width x height, and
+ * a tall GIF with a long loop sails past a width cap untouched. A real
+ * 270x480 GIF of 103 frames is 259KB on disk and 53MB decoded -- and because
+ * it is narrower than the width cap, the cap did nothing at all.
+ */
+const MAX_DECODED_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Resolution is given up before frames are: a sticker is small on screen, so
+ * softness is much less visible than a stutter. Below this width it stops
+ * shrinking and starts dropping frames instead.
+ */
+const MIN_DECODE_WIDTH = 96;
+
 /** A frame with no stated duration. GIF's own default is 100ms. */
 const DEFAULT_FRAME_MS = 100;
+
+/**
+ * How to decode an animation so that it fits the budget.
+ *
+ * Pure arithmetic, kept apart from the decoding so the policy can be tested
+ * against awkward real files without a decoder.
+ *
+ * @param {{frameCount: number, width: number, height: number, frameWidth: number}} source
+ * @returns {{scale: number, keepEvery: number, frames: number, bytes: number}}
+ */
+export function decodePlan({ frameCount, width, height, frameWidth }) {
+    const bytesAt = (scale, frames) =>
+        Math.max(1, Math.round(width * scale)) * Math.max(1, Math.round(height * scale)) * 4 * frames;
+
+    // Start from the width cap, which is about looking right rather than fitting.
+    let scale = Math.min(1, (frameWidth * DECODE_FRACTION) / width);
+
+    // Then shrink -- but only to the point where a sticker would start to look
+    // bad. Past that, frames are the cheaper thing to give up.
+    if (bytesAt(scale, frameCount) > MAX_DECODED_BYTES) {
+        const fitting = Math.sqrt(MAX_DECODED_BYTES / (width * height * 4 * frameCount));
+        scale = Math.min(scale, Math.max(fitting, MIN_DECODE_WIDTH / width), 1);
+    }
+
+    // Still over: keep every nth frame.
+    let keepEvery = 1;
+    while (keepEvery < frameCount
+        && bytesAt(scale, Math.ceil(frameCount / keepEvery)) > MAX_DECODED_BYTES) {
+        keepEvery++;
+    }
+
+    const frames = Math.ceil(frameCount / keepEvery);
+    return { scale, keepEvery, frames, bytes: bytesAt(scale, frames) };
+}
 
 export class AnimatedImage {
     /**
@@ -68,23 +120,44 @@ export class AnimatedImage {
             const track = decoder.tracks.selectedTrack;
             if (!track || track.frameCount <= 1) return still();
 
+            // Decoded once to learn the source's size, which the track does
+            // not carry and the plan needs.
+            const first = await decoder.decode({ frameIndex: 0 });
+            const plan = decodePlan({
+                frameCount: track.frameCount,
+                width: first.image.displayWidth,
+                height: first.image.displayHeight,
+                frameWidth,
+            });
+            const resizeWidth = Math.max(1, Math.round(first.image.displayWidth * plan.scale));
+            const resizeHeight = Math.max(1, Math.round(first.image.displayHeight * plan.scale));
+            first.image.close();
+
             const frames = [];
             const durations = [];
+            let carried = 0;
             for (let i = 0; i < track.frameCount; i++) {
                 const { image } = await decoder.decode({ frameIndex: i });
-                const scale = Math.min(1, (frameWidth * DECODE_FRACTION) / image.displayWidth);
+                // VideoFrame durations are microseconds, and may be absent.
+                const ms = image.duration ? image.duration / 1000 : DEFAULT_FRAME_MS;
                 try {
+                    if (i % plan.keepEvery !== 0) {
+                        // Dropped, but its time is not: it is carried onto the
+                        // frame that is kept, so the loop still runs to length.
+                        carried += ms;
+                        continue;
+                    }
                     frames.push(await createImageBitmap(image, {
-                        resizeWidth: Math.max(1, Math.round(image.displayWidth * scale)),
-                        resizeHeight: Math.max(1, Math.round(image.displayHeight * scale)),
-                        resizeQuality: 'medium',
+                        resizeWidth, resizeHeight, resizeQuality: 'medium',
                     }));
-                    // VideoFrame durations are microseconds, and may be absent.
-                    durations.push(image.duration ? image.duration / 1000 : DEFAULT_FRAME_MS);
+                    durations.push(ms + carried);
+                    carried = 0;
                 } finally {
                     image.close();
                 }
             }
+            if (carried > 0 && durations.length > 0) durations[durations.length - 1] += carried;
+
             return new AnimatedImage(frames, durations);
         } catch {
             // A format ImageDecoder will not take is still worth showing as a

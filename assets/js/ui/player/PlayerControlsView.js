@@ -120,6 +120,8 @@ function initFiltersPanel(player) {
     player.ui.stickerGrid = q('#mb-sticker-grid');
     player.ui.stickerFileInput = q('#mb-sticker-file');
     player.ui.stickerClearBtn = q('#mb-sticker-clear');
+    player.ui.stickerUrlInput = q('#mb-sticker-url');
+    player.ui.stickerUrlAdd = q('#mb-sticker-url-add');
 
     // The built-in set is glyphs, so the grid is built here rather than
     // shipped as markup — and there are no image files to load or cache.

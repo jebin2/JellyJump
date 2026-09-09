@@ -158,6 +158,40 @@ console.log('\na still image is one frame, and never asks for a decoder');
     check(one.frameAt(99999) !== undefined, 'and answers for any time without arithmetic on zero');
 }
 
+// --- decode budget -----------------------------------------------------------
+
+console.log('\nan animation is decoded to fit a memory budget');
+{
+    const { decodePlan } = await import('../assets/js/shared/utils/AnimatedImage.js');
+    const mb = plan => plan.bytes / 1024 / 1024;
+
+    // A real GIF from Giphy: 270x480, 103 frames, 259KB on disk. Narrower than
+    // the width cap, so the width cap does nothing -- this is the file that
+    // showed a width bound is not a memory bound.
+    const butterfly = decodePlan({ frameCount: 103, width: 270, height: 480, frameWidth: 1280 });
+    check(mb(butterfly) <= 16,
+        `103 frames of 270x480 fit in ${mb(butterfly).toFixed(1)}MB, not the 53.4MB they take untouched`);
+    check(butterfly.keepEvery === 1,
+        'and all 103 frames are kept: resolution went first, because a stutter shows more than softness');
+    check(Math.round(270 * butterfly.scale) >= 96,
+        `at a width no smaller than the floor (${Math.round(270 * butterfly.scale)}px)`);
+
+    // The ordinary case must be untouched by any of this.
+    const small = decodePlan({ frameCount: 9, width: 512, height: 512, frameWidth: 640 });
+    check(small.keepEvery === 1 && Math.abs(small.scale - 320 / 512) < 1e-9,
+        'a short GIF still decodes at the width cap, with nothing dropped');
+
+    // Big enough that shrinking alone cannot pay for it.
+    const huge = decodePlan({ frameCount: 600, width: 1920, height: 1080, frameWidth: 1280 });
+    check(mb(huge) <= 16, `600 frames of 1080p fit too (${mb(huge).toFixed(1)}MB)`);
+    check(huge.keepEvery > 1, `by dropping frames once the floor is reached (every ${huge.keepEvery})`);
+    check(Math.round(1920 * huge.scale) >= 96, 'never below the width floor');
+
+    // A degenerate file must not produce a plan that decodes nothing.
+    const one = decodePlan({ frameCount: 1, width: 4000, height: 4000, frameWidth: 320 });
+    check(one.frames >= 1 && one.keepEvery >= 1, 'a single enormous frame still yields a usable plan');
+}
+
 // --- the clock ---------------------------------------------------------------
 
 console.log('\nan animation follows the video, not the wall clock');

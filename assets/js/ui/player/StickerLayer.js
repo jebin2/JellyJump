@@ -110,6 +110,45 @@ export class StickerLayer {
         }
     }
 
+    /**
+     * Add a sticker from a link.
+     *
+     * Fetched rather than pointed at with an <img>: what comes back is a blob,
+     * which is same-origin, so the canvas is never tainted. A cross-origin
+     * image drawn directly would taint it and take the recording and the
+     * screenshots down with it -- silently, since a tainted canvas throws only
+     * when something tries to read it back.
+     *
+     * @param {string} rawUrl
+     * @returns {Promise<Object|null>} the new sticker
+     * @throws {Error} with a message meant for the user
+     */
+    async addFromUrl(rawUrl) {
+        let url;
+        try { url = new URL(String(rawUrl).trim()); } catch { throw new Error('That does not look like a link.'); }
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+            throw new Error('Only http and https links can be loaded.');
+        }
+
+        let response;
+        try {
+            // Credentials omitted deliberately: this is a public image, and the
+            // page should not hand cookies to whatever host is typed in here.
+            response = await fetch(url.href, { mode: 'cors', credentials: 'omit' });
+        } catch {
+            // A CORS refusal and a network failure are indistinguishable from
+            // in here, by design, so the message covers both.
+            throw new Error(`Couldn't load from ${url.host} — it may not allow other sites to fetch its images.`);
+        }
+        if (!response.ok) throw new Error(`${url.host} answered ${response.status}.`);
+
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) {
+            throw new Error(`That link is ${blob.type || 'not an image'}, not a picture.`);
+        }
+        return this.addFile(blob);
+    }
+
     remove(id) {
         const i = this.stickers.findIndex(s => s.id === id);
         if (i === -1) return;

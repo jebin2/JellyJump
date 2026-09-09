@@ -1,4 +1,5 @@
 import { parseTime } from '../../shared/utils/mediaUtils.js';
+import { Toast } from '../../shared/utils/Toast.js';
 
 export function attachPlayerBindings(player) {
     if (player.config.controls.playPause && player.ui.playBtn) {
@@ -378,6 +379,26 @@ export function attachPlayerBindings(player) {
                 const value = parseInt(e.target.value, 10);
                 player.decorations?.setDensity(value);
                 if (player.ui.densityValue) player.ui.densityValue.textContent = String(value);
+            });
+        }
+
+        if (player.ui.stickerUrlAdd && player.ui.stickerUrlInput) {
+            const addFromUrl = async () => {
+                const value = player.ui.stickerUrlInput.value.trim();
+                if (!value) return;
+                try {
+                    if (await player.stickers?.addFromUrl(value)) player.ui.stickerUrlInput.value = '';
+                } catch (error) {
+                    // The message is written for the reader; a link that will
+                    // not load is not something to leave in the console.
+                    Toast.show(error.message, 5000, true);
+                }
+            };
+            player.ui.stickerUrlAdd.addEventListener('click', addFromUrl);
+            player.ui.stickerUrlInput.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                addFromUrl();
             });
         }
 
