@@ -1,0 +1,87 @@
+<!-- Screenshot Templates -->
+<!-- HTML templates for the screenshot functionality -->
+
+<!-- Screenshot Button Template -->
+<template id="screenshot-button-template">
+    <button class="jellyjump-btn" id="mb-screenshot-btn" aria-label="Take Screenshot" title="Screenshot (S)">
+        <svg width="24" height="24" fill="currentColor">
+            <use href="assets/icons/sprite.svg#icon-camera"></use>
+        </svg>
+    </button>
+</template>
+
+<!-- Screenshot Content Template -->
+<template id="screenshot-content-template">
+    <!-- Loading State -->
+    <div class="screenshot-loading flex flex-col items-center justify-center p-xl text-muted hidden"
+        style="grid-column: 1 / -1;">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Capturing frame...</span>
+    </div>
+
+    <div class="screenshot-content" style="display: contents;">
+        <!-- Left Panel: Screenshot Preview -->
+        <div class="modal-video-panel">
+            <div class="screenshot-preview-area">
+                <img class="jellyjump-screenshot-preview" id="mb-screenshot-preview"
+                    alt="Screenshot preview" />
+            </div>
+        </div>
+
+        <!-- Right Panel: Controls -->
+        <div class="modal-controls-panel">
+            <!-- Timestamp Display -->
+            <div class="time-card bg-tertiary p-sm rounded">
+                <span class="text-xs text-secondary font-mono block mb-xs">TIMESTAMP</span>
+                <span class="jellyjump-screenshot-timestamp text-primary font-bold text-lg"
+                    id="mb-screenshot-timestamp">--:--</span>
+            </div>
+
+            <!-- Frame Navigation -->
+            <div class="bg-tertiary p-sm rounded">
+                <span class="text-xs text-secondary font-mono block mb-xs">FRAME NAVIGATION</span>
+                <div class="flex gap-sm mt-sm">
+                    <button class="btn jellyjump-btn-small flex-1" id="mb-screenshot-prev"
+                        title="Previous Frame (Left Arrow)">
+                        <svg width="16" height="16" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-chevron-left"></use>
+                        </svg>
+                    </button>
+                    <button class="btn jellyjump-btn-small flex-1" id="mb-screenshot-next"
+                        title="Next Frame (Right Arrow)">
+                        <svg width="16" height="16" fill="currentColor">
+                            <use href="assets/icons/sprite.svg#icon-chevron-right"></use>
+                        </svg>
+                    </button>
+                </div>
+                <span class="text-xs text-secondary font-mono block mt-xs text-center">Use arrow keys (±1 frame)</span>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Screenshot Footer Template -->
+<template id="screenshot-footer-template">
+    <div class="screenshot-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="screenshot-footer-status flex-1">
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Screenshot ready!</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold">Extraction failed</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small download-btn" id="mb-screenshot-download"
+                title="Download Screenshot" aria-label="Download Screenshot" download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+        </div>
+    </div>
+</template>
