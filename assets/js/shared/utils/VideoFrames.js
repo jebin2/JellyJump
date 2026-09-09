@@ -28,11 +28,17 @@ import { AnimatedImage, decodePlan } from './AnimatedImage.js';
 const MAX_STICKER_SECONDS = 30;
 
 /**
- * Played faster than real time, since capture is per presented frame and a
- * short clip loses nothing by it: measured, 4x returned the same frame count
- * as 1x. It only bounds how long the wait can get.
+ * Played at normal speed, because faster loses frames.
+ *
+ * Capture is per *presented* frame, and the compositor presents fewer of them
+ * when the clip runs fast: measured on a two-second 15fps clip, 1x captured 23
+ * frames and 4x captured 11 of the same ~29. An earlier reading that said 4x
+ * cost nothing came from a one-second clip where both runs hit the harness
+ * timeout rather than finishing, so neither number meant anything.
+ *
+ * The wait is bounded by the 30s clip limit instead.
  */
-const CAPTURE_RATE = 4;
+const CAPTURE_RATE = 1;
 
 /** A stuck decode must not hang the caller for ever. */
 const CAPTURE_TIMEOUT_MS = 20000;

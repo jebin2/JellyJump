@@ -3,6 +3,7 @@ import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput, getBitrate } from '../shared/InputFactory.js';
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
+import { recordTransparentWebM } from './AlphaRecorder.js';
 
 /**
  * Process video (transcode, trim, resize, crop, etc.)
@@ -90,6 +91,28 @@ export async function process({
             } catch (e) {
                 Logger.warn('[TranscodeService] Could not get first timestamp for blur:', e);
             }
+        }
+
+        // Transparency cannot survive the WebCodecs encoder everything else
+        // goes through -- Chrome reports alpha:'keep' unsupported for every
+        // WebM codec -- so it takes a different road entirely. Awaited rather
+        // than returned, because the finally below disposes the input this
+        // still needs to read.
+        if (removeBackgroundOptions && removeBackgroundOptions.bgType === 'transparent') {
+            if (!firstTimestamp) {
+                try {
+                    firstTimestamp = await videoTrack.getFirstTimestamp();
+                } catch (e) {
+                    Logger.warn('[TranscodeService] Could not get first timestamp:', e);
+                }
+            }
+            return await recordTransparentWebM({
+                input, videoTrack,
+                width: originalWidth, height: originalHeight, nativeRotation,
+                removeBackgroundOptions, watermarkItems, watermarkImages, blur,
+                firstTimestamp,
+                onProgress,
+            });
         }
 
         // Configure Output Format
