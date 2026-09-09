@@ -689,6 +689,27 @@ export class CorePlayer {
         }
     }
 
+    /**
+     * The clock that animated overlays run on.
+     *
+     * A file has a timeline, so its decorations must follow that rather than
+     * the wall clock: otherwise seeking backwards does not take them back with
+     * you, playing the same file twice gives different results, and a
+     * screenshot -- which re-composites the frame and reads the clock again --
+     * saves a different moment of the animation than the one on screen.
+     *
+     * A camera or a live stream has no timeline to be consistent with, so
+     * there the wall clock is the only sensible answer. Paused, a file's
+     * decorations hold still along with the picture, which is what makes the
+     * screenshot match.
+     *
+     * @returns {number} milliseconds
+     */
+    overlayTimeMs() {
+        if (this.isStreamMode) return performance.now();
+        return (this.currentTime || 0) * 1000;
+    }
+
     // ─── Frame presentation ──────────────────────────────────────────────────────
 
     /**

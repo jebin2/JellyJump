@@ -44,10 +44,12 @@ function makePlayer(canvasW = 1280, canvasH = 720) {
         getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 450 }) };
     const callbacks = [];
     return {
-        canvas, callbacks,
+        canvas, callbacks, currentTime: 0, isStreamMode: false,
         container: { querySelector: sel => (sel === '.jellyjump-video-wrapper' ? wrapper : null) },
         addRenderCallback: cb => callbacks.push(cb),
         removeRenderCallback: cb => callbacks.splice(callbacks.indexOf(cb), 1),
+        // The real rule, copied from Player.overlayTimeMs.
+        overlayTimeMs() { return this.isStreamMode ? 1e9 : this.currentTime * 1000; },
     };
 }
 
@@ -138,6 +140,42 @@ console.log('\na still image is one frame, and never asks for a decoder');
     const one = new AnimatedImage([{ width: 8, height: 8, close() {} }], [100]);
     check(one.animated === false, 'a single frame is not animated');
     check(one.frameAt(99999) !== undefined, 'and answers for any time without arithmetic on zero');
+}
+
+// --- the clock ---------------------------------------------------------------
+
+console.log('\nan animation follows the video, not the wall clock');
+{
+    const player = makePlayer();
+    const layer = new StickerLayer(player);
+    const s = layer.addEmoji('x');
+    s.kind = 'image';
+    // Three frames of 100ms: which one is asked for says which clock was read.
+    const frames = ['a', 'b', 'c'].map(id => ({ id, width: 10, height: 10, close() {} }));
+    s.media = new AnimatedImage(frames, [100, 100, 100]);
+
+    const frameAt = (t) => {
+        player.currentTime = t;
+        const ctx = recordingCtx();
+        player.callbacks[0](player.canvas, ctx);
+        return ctx.calls.find(c => c.op === 'drawImage').args[0].id;
+    };
+
+    check(frameAt(0.15) === 'b', 'at 0.15s into the file, the second frame');
+    check(frameAt(0.25) === 'c', 'at 0.25s, the third');
+    check(frameAt(0.15) === 'b', 'and seeking back to 0.15s gives the second again');
+
+    // Twice at the same timestamp is the same picture -- which is what makes a
+    // screenshot match the frame it was taken from.
+    check(frameAt(0.05) === frameAt(0.05), 'the same timestamp always draws the same frame');
+
+    // A camera has no timeline to be consistent with, so currentTime must
+    // stop mattering entirely -- which frame the wall clock lands on is not
+    // something to assert, but that it ignores the timeline is.
+    player.isStreamMode = true;
+    check(frameAt(0.15) === frameAt(0.25),
+        'a camera ignores currentTime and reads the wall clock instead');
+    layer.destroy();
 }
 
 // --- screenshots -------------------------------------------------------------

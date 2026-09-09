@@ -160,7 +160,10 @@ export class StickerLayer {
     /** @private */
     _draw(canvas, ctx) {
         if (!this.stickers.length) return;
-        const now = performance.now();
+        // The video's own clock, not the wall clock, so a GIF sticker seeks
+        // with the picture and a screenshot catches the frame you were
+        // actually looking at.
+        const now = this.player.overlayTimeMs?.() ?? performance.now();
 
         for (const s of this.stickers) {
             const w = s.w * canvas.width;
