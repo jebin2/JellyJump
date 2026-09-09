@@ -237,15 +237,16 @@ export class StickerLayer {
      * @param {HTMLCanvasElement} canvas
      * @param {CanvasRenderingContext2D} ctx
      */
-    drawInto(canvas, ctx) { this._draw(canvas, ctx); }
+    drawInto(canvas, ctx, timeMs) { this._draw(canvas, ctx, timeMs); }
 
     /** @private */
-    _draw(canvas, ctx) {
+    _draw(canvas, ctx, timeMs) {
         if (!this.stickers.length) return;
         // The video's own clock, not the wall clock, so a GIF sticker seeks
         // with the picture and a screenshot catches the frame you were
-        // actually looking at.
-        const now = this.player.overlayTimeMs?.() ?? performance.now();
+        // actually looking at. An export passes the time in instead: it is
+        // rendering a frame that belongs to a moment, not to now.
+        const now = timeMs ?? this.player.overlayTimeMs?.() ?? performance.now();
 
         for (const s of this.stickers) {
             const w = s.w * canvas.width;

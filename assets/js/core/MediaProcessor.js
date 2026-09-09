@@ -86,6 +86,15 @@ export class MediaProcessor {
         if (options.removeBackgroundOptions?.bgType === 'transparent') {
             return transcodeMedia(options);
         }
+        // And so does an export carrying the on-screen effects. Two reasons,
+        // either alone sufficient: the layers are live objects that cannot be
+        // cloned to a worker, and the SVG-backed FX resolve against filter
+        // definitions in the document. Measured, url(#jj-fx-matrix) turns a
+        // detached canvas green-only but leaves an OffscreenCanvas untouched
+        // -- in a worker those effects would go missing with no error at all.
+        if (options.overlays) {
+            return transcodeMedia(options);
+        }
         return dispatch('process', options, transcodeMedia);
     }
 

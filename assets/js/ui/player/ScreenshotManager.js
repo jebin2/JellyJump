@@ -2,6 +2,7 @@ import { Toast } from "../../shared/utils/Toast.js";
 import { Logger } from "../../shared/utils/Logger.js";
 import { Modal } from "../Modal.js";
 import { formatTime } from "../../shared/utils/mediaUtils.js";
+import { composeFrame, hasOverlays } from "./OverlayCompositor.js";
 
 /**
  * Screenshot Manager
@@ -71,7 +72,7 @@ export class ScreenshotManager {
         // lives on the element and has to be put back on here.
         const needsColour = !!filters && !filters.canvasMode && filters.isActive();
         const needsOverlays = !stickersAlreadyDrawn
-            && ((stickers?.stickers.length > 0) || !!decorations?.isActive());
+            && hasOverlays({ stickers, decorations });
         if (!needsColour && !needsOverlays) return source.toDataURL('image/png');
 
         const out = document.createElement('canvas');
@@ -79,16 +80,14 @@ export class ScreenshotManager {
         out.height = source.height;
         const ctx = out.getContext('2d');
 
-        if (needsColour) filters.bakeInto(ctx, source, out.width, out.height);
-        else ctx.drawImage(source, 0, 0, out.width, out.height);
-
-        if (needsOverlays) {
-            // The order the render callbacks run in: rain behind the stickers,
-            // border in front of the lot.
-            decorations?.drawBehind(out, ctx);
-            stickers?.drawInto(out, ctx);
-            decorations?.drawFront(out, ctx);
-        }
+        // Through the same compositor the export uses, so a screenshot and a
+        // rendered file cannot disagree about what was on screen.
+        composeFrame(ctx, source, out.width, out.height, {
+            filters, bakeColour: needsColour,
+            stickers: needsOverlays ? stickers : null,
+            decorations: needsOverlays ? decorations : null,
+            timeMs: this.player.overlayTimeMs?.(),
+        });
 
         return out.toDataURL('image/png');
     }

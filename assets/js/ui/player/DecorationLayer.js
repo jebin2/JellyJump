@@ -95,21 +95,25 @@ export class DecorationLayer {
         if (player.videoTrack) player._extractAndDrawFrame?.(player.currentTime);
     }
 
-    /** @private */
-    _clock() {
-        return (this.player.overlayTimeMs?.() ?? performance.now()) / 1000;
+    /**
+     * Seconds on the video's timeline. An export passes the moment in, because
+     * it is rendering a frame that belongs to a time, not to now.
+     * @private
+     */
+    _clock(timeMs) {
+        return (timeMs ?? this.player.overlayTimeMs?.() ?? performance.now()) / 1000;
     }
 
     // --- passes ----------------------------------------------------------
 
     /** The pass that goes on before the stickers. */
-    drawBehind(canvas, ctx) {
-        if (this.rain) this.drawRain(canvas, ctx);
+    drawBehind(canvas, ctx, timeMs) {
+        if (this.rain) this.drawRain(canvas, ctx, timeMs);
     }
 
     /** The pass that goes on after them, so the border frames everything. */
-    drawFront(canvas, ctx) {
-        if (this.border) this.drawBorder(canvas, ctx);
+    drawFront(canvas, ctx, timeMs) {
+        if (this.border) this.drawBorder(canvas, ctx, timeMs);
     }
 
     /**
@@ -117,18 +121,18 @@ export class DecorationLayer {
      * for tests; a screenshot with stickers calls the two passes either side
      * of them, the way the render callbacks do.
      */
-    drawInto(canvas, ctx) {
-        this.drawBehind(canvas, ctx);
-        this.drawFront(canvas, ctx);
+    drawInto(canvas, ctx, timeMs) {
+        this.drawBehind(canvas, ctx, timeMs);
+        this.drawFront(canvas, ctx, timeMs);
     }
 
     // --- rain ------------------------------------------------------------
 
     /** @private */
-    drawRain(canvas, ctx) {
+    drawRain(canvas, ctx, timeMs) {
         const preset = RAIN_PRESETS[this.rain];
         if (!preset) return;
-        const t = this._clock();
+        const t = this._clock(timeMs);
         const { width: W, height: H } = canvas;
 
         ctx.save();
@@ -161,10 +165,10 @@ export class DecorationLayer {
     // --- border ----------------------------------------------------------
 
     /** @private */
-    drawBorder(canvas, ctx) {
+    drawBorder(canvas, ctx, timeMs) {
         const preset = BORDER_PRESETS[this.border];
         if (!preset) return;
-        const t = this._clock();
+        const t = this._clock(timeMs);
         const { width: W, height: H } = canvas;
         const inset = Math.max(4, W * 0.012);
 

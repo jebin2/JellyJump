@@ -4,6 +4,7 @@ import { createMediaBunnyInput, getBitrate } from '../shared/InputFactory.js';
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
 import { recordTransparentWebM } from './AlphaRecorder.js';
+import { buildOverlayStage } from '../../ui/player/OverlayCompositor.js';
 
 /**
  * Process video (transcode, trim, resize, crop, etc.)
@@ -22,6 +23,7 @@ export async function process({
     blur = null, 
     rotate = 0, 
     flip = null, 
+    overlays = null,
     onProgress 
 }) {
     Logger.log('[TranscodeService] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions, watermark, blur });
@@ -85,7 +87,7 @@ export async function process({
 
         // Get first timestamp for blur/watermark time calculations
         let firstTimestamp = 0;
-        if (blur || watermarkItems) {
+        if (blur || watermarkItems || overlays) {
             try {
                 firstTimestamp = await videoTrack.getFirstTimestamp();
             } catch (e) {
@@ -207,7 +209,7 @@ export async function process({
         // frames a second time and center-cropped resized output (rotated,
         // distorted videos). Only user-requested edits need the processor.
         const needsRotation = rotate || flip;
-        if (removeBackgroundOptions || watermarkItems || blur || needsRotation) {
+        if (removeBackgroundOptions || watermarkItems || blur || needsRotation || overlays) {
             videoConfig.process = buildFrameProcessor({
                 removeBackgroundOptions, watermarkItems, watermarkImages,
                 blur, rotate, flip, nativeRotation,
@@ -215,6 +217,23 @@ export async function process({
                 rotatedOutputWidth: videoConfig.width,
                 rotatedOutputHeight: videoConfig.height
             });
+        }
+
+        // Everything the viewer had on screen, put into the pixels. Wrapped
+        // around whatever the processor already does rather than replacing it,
+        // so an export can trim, key a background and carry stickers in one
+        // decode/encode pass instead of several.
+        //
+        // Driven by each frame's own timestamp, never by the wall clock: that
+        // is what makes the file agree with the preview it came from.
+        if (overlays) {
+            const drawFrame = videoConfig.process;
+            const stage = buildOverlayStage(overlays);
+            videoConfig.process = (sample) => {
+                const canvas = drawFrame(sample);
+                stage(canvas, (sample.timestamp - firstTimestamp) * 1000);
+                return canvas;
+            };
         }
 
         // Initialize Conversion
