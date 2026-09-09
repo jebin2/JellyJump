@@ -65,12 +65,14 @@ export class ScreenshotManager {
     _composite(source, { stickersAlreadyDrawn }) {
         const filters = this.player.videoFilters;
         const stickers = this.player.stickers;
+        const decorations = this.player.decorations;
 
         // In canvas mode the colour is already in the pixels; in CSS mode it
         // lives on the element and has to be put back on here.
         const needsColour = !!filters && !filters.canvasMode && filters.isActive();
-        const needsStickers = !stickersAlreadyDrawn && (stickers?.stickers.length > 0);
-        if (!needsColour && !needsStickers) return source.toDataURL('image/png');
+        const needsOverlays = !stickersAlreadyDrawn
+            && ((stickers?.stickers.length > 0) || !!decorations?.isActive());
+        if (!needsColour && !needsOverlays) return source.toDataURL('image/png');
 
         const out = document.createElement('canvas');
         out.width = source.width;
@@ -80,7 +82,13 @@ export class ScreenshotManager {
         if (needsColour) filters.bakeInto(ctx, source, out.width, out.height);
         else ctx.drawImage(source, 0, 0, out.width, out.height);
 
-        if (needsStickers) stickers.drawInto(out, ctx);
+        if (needsOverlays) {
+            // The order the render callbacks run in: rain behind the stickers,
+            // border in front of the lot.
+            decorations?.drawBehind(out, ctx);
+            stickers?.drawInto(out, ctx);
+            decorations?.drawFront(out, ctx);
+        }
 
         return out.toDataURL('image/png');
     }

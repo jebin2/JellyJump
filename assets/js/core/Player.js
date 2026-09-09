@@ -798,6 +798,11 @@ export class CorePlayer {
             this.stickers = null;
         }
 
+        if (this.decorations) {
+            this.decorations.destroy?.();
+            this.decorations = null;
+        }
+
         if (this.canvas) {
             this.canvas.remove();
             this.canvas = null;

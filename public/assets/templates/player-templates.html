@@ -264,6 +264,25 @@
                     <button class="jellyjump-btn-text" id="mb-sticker-clear">Remove all</button>
                 </div>
             </div>
+            <div class="filter-presets filter-motions">
+                <span class="filter-presets-label">Motion <em>applies to the last sticker you touched</em></span>
+                <div class="filter-preset-grid" id="mb-motion-grid"></div>
+            </div>
+            <div class="filter-presets filter-borders">
+                <span class="filter-presets-label">Borders</span>
+                <div class="filter-preset-grid" id="mb-border-grid"></div>
+            </div>
+            <div class="filter-presets filter-rain">
+                <span class="filter-presets-label">Rain</span>
+                <div class="filter-preset-grid" id="mb-rain-grid"></div>
+                <div class="filter-slider-group">
+                    <label for="mb-rain-density">
+                        <span>How much</span>
+                        <span class="filter-value" id="mb-density-value">60</span>
+                    </label>
+                    <input type="range" id="mb-rain-density" min="5" max="300" value="60" class="filter-slider">
+                </div>
+            </div>
             <div class="filter-actions">
                 <button class="jellyjump-btn-text" id="mb-reset-filters-btn">Reset All</button>
             </div>

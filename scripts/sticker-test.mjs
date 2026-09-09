@@ -53,11 +53,27 @@ function makePlayer(canvasW = 1280, canvasH = 720) {
     };
 }
 
+/**
+ * Records draws with the transform folded in, so an assertion about where a
+ * sticker landed keeps meaning what it meant before motions existed: drawing
+ * at (0,0) after translating to (320,360) is drawing at (320,360).
+ */
 const recordingCtx = () => {
     const calls = [];
-    return { calls, save() {}, restore() {}, globalAlpha: 1, font: '', textBaseline: '',
-        fillText(...a) { calls.push({ op: 'fillText', args: a }); },
-        drawImage(...a) { calls.push({ op: 'drawImage', args: a }); } };
+    const stack = [];
+    let tx = 0, ty = 0, scale = 1, rotate = 0;
+    return {
+        calls, globalAlpha: 1, font: '', textBaseline: '',
+        save() { stack.push([tx, ty, scale, rotate]); },
+        restore() { [tx, ty, scale, rotate] = stack.pop() || [0, 0, 1, 0]; },
+        translate(x, y) { tx += x; ty += y; },
+        scale(x) { scale *= x; },
+        rotate(r) { rotate += r; },
+        fillText(t, x, y) { calls.push({ op: 'fillText', args: [t, tx + x, ty + y], scale, rotate }); },
+        drawImage(img, x, y, w, h) {
+            calls.push({ op: 'drawImage', args: [img, tx + x, ty + y, w, h], scale, rotate });
+        },
+    };
 };
 
 // --- geometry ---------------------------------------------------------------

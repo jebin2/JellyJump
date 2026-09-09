@@ -344,6 +344,43 @@ export function attachPlayerBindings(player) {
             });
         }
 
+        // Motion applies to the selected sticker; borders and rain are
+        // one-of-each, so the buttons behave as a toggle group.
+        const motionButtons = player.container.querySelectorAll('[data-motion]');
+        motionButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                player.stickers?.setMotion(btn.dataset.motion);
+                const active = player.stickers?.stickers.find(
+                    s => s.id === player.stickers.selectedId)?.motion;
+                motionButtons.forEach(b => b.classList.toggle('active', b.dataset.motion === active));
+                btn.blur();
+            });
+        });
+
+        const toggleGroup = (selector, attr, apply, current) => {
+            const buttons = player.container.querySelectorAll(selector);
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const key = btn.dataset[attr];
+                    apply(current() === key ? null : key);
+                    buttons.forEach(b => b.classList.toggle('active', b.dataset[attr] === current()));
+                    btn.blur();
+                });
+            });
+        };
+        toggleGroup('[data-border]', 'border',
+            v => player.decorations?.setBorder(v), () => player.decorations?.border);
+        toggleGroup('[data-rain]', 'rain',
+            v => player.decorations?.setRain(v), () => player.decorations?.rain);
+
+        if (player.ui.rainDensity) {
+            player.ui.rainDensity.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value, 10);
+                player.decorations?.setDensity(value);
+                if (player.ui.densityValue) player.ui.densityValue.textContent = String(value);
+            });
+        }
+
         if (player.ui.stickerClearBtn) {
             player.ui.stickerClearBtn.addEventListener('click', () => player.stickers?.clear());
         }

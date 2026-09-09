@@ -1,5 +1,6 @@
 import { VideoFilters } from './VideoFilters.js';
-import { StickerLayer, STICKER_EMOJI } from './StickerLayer.js';
+import { StickerLayer, STICKER_EMOJI, STICKER_MOTIONS } from './StickerLayer.js';
+import { DecorationLayer, BORDER_PRESETS, RAIN_PRESETS } from './DecorationLayer.js';
 import { Toast } from '../../shared/utils/Toast.js';
 
 export function createPlayerControls(player) {
@@ -128,8 +129,33 @@ function initFiltersPanel(player) {
             .join('');
     }
 
+    player.ui.motionGrid = q('#mb-motion-grid');
+    player.ui.borderGrid = q('#mb-border-grid');
+    player.ui.rainGrid = q('#mb-rain-grid');
+    player.ui.rainDensity = q('#mb-rain-density');
+    player.ui.densityValue = q('#mb-density-value');
+
+    const fill = (grid, entries, attr) => {
+        if (!grid) return;
+        grid.innerHTML = entries
+            .map(([key, label]) => `<button class="filter-preset-btn" ${attr}="${key}">${label}</button>`)
+            .join('');
+    };
+    fill(player.ui.motionGrid,
+        Object.entries(STICKER_MOTIONS).map(([k, m]) => [k, m.label]), 'data-motion');
+    fill(player.ui.borderGrid,
+        Object.entries(BORDER_PRESETS).map(([k, b]) => [k, b.label]), 'data-border');
+    fill(player.ui.rainGrid,
+        Object.entries(RAIN_PRESETS).map(([k, r]) => [k, r.label]), 'data-rain');
+
     player.videoFilters = new VideoFilters(player);
+
+    // Order matters and is the only reason these three lines are apart: the
+    // overlay callbacks run in the order they are added, so the rain goes on
+    // behind the stickers and the border in front of everything.
+    player.decorations = new DecorationLayer(player);
     player.stickers = new StickerLayer(player);
+    player.decorations.registerFrontPass();
     player.videoFilters.onBakeFallback = (label, ms) => {
         // Only reachable in camera mode, and worth interrupting for: the
         // effect is still on screen but the recording will not have it, and

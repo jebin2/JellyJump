@@ -23,6 +23,38 @@ export const STICKER_EMOJI = [
     '😎', '🥳', '🤍', '💫', '🎈', '🎀', '🍓', '🧁',
 ];
 
+/**
+ * Motions a placed sticker can be given. Each is a function of time, for the
+ * same reason the falling decorations are: a sticker that bobs must bob to
+ * the same place every time the video reaches that moment.
+ *
+ * Returned as a transform rather than applied, so the draw stays in one place.
+ * @type {Object<string, {label: string, at: (t: number) => {dx: number, dy: number, scale: number, rotate: number}}>}
+ */
+export const STICKER_MOTIONS = {
+    bob: {
+        label: '↕ Bob',
+        at: t => ({ dx: 0, dy: Math.sin(t * 2.4) * 0.12, scale: 1, rotate: 0 }),
+    },
+    pulse: {
+        label: '💓 Pulse',
+        // Sharper on the beat than a sine, so a thumbs-up reads as a thump.
+        at: t => ({ dx: 0, dy: 0, scale: 1 + Math.pow(Math.max(0, Math.sin(t * 3)), 3) * 0.22, rotate: 0 }),
+    },
+    spin: {
+        label: '🔄 Spin',
+        at: t => ({ dx: 0, dy: 0, scale: 1, rotate: t * 1.8 }),
+    },
+    wobble: {
+        label: '🙃 Wobble',
+        at: t => ({ dx: 0, dy: 0, scale: 1, rotate: Math.sin(t * 3.2) * 0.28 }),
+    },
+    drift: {
+        label: '🎈 Float',
+        at: t => ({ dx: Math.sin(t * 0.9) * 0.06, dy: Math.cos(t * 1.3) * 0.05, scale: 1, rotate: Math.sin(t) * 0.1 }),
+    },
+};
+
 /** A new sticker's width, as a fraction of the frame. */
 const DEFAULT_WIDTH = 0.22;
 /** Nothing smaller than this can still be grabbed on a phone. */
@@ -168,21 +200,49 @@ export class StickerLayer {
         for (const s of this.stickers) {
             const w = s.w * canvas.width;
             const h = w / (s.aspect || 1);
-            const x = s.x * canvas.width;
-            const y = s.y * canvas.height;
+            const motion = STICKER_MOTIONS[s.motion]?.at(now / 1000);
+            const x = (s.x + (motion?.dx || 0)) * canvas.width;
+            const y = (s.y + (motion?.dy || 0)) * canvas.height;
 
             ctx.save();
             ctx.globalAlpha = s.opacity;
+
+            // Scale and spin happen about the sticker's middle; the outline
+            // stays put, marking where the sticker lives rather than where
+            // this instant of its motion has put it.
+            if (motion && (motion.scale !== 1 || motion.rotate !== 0)) {
+                ctx.translate(x + w / 2, y + h / 2);
+                ctx.rotate(motion.rotate);
+                ctx.scale(motion.scale, motion.scale);
+                ctx.translate(-w / 2, -h / 2);
+            } else {
+                ctx.translate(x, y);
+            }
+
             if (s.kind === 'emoji') {
-                // Sized by height so the glyph fills the box the handles show.
+                // fillText, not a cached sprite: a sticker can be half the
+                // frame wide, where a 96px sprite would be visibly soft, and
+                // there are only ever a handful of them.
                 ctx.font = `${h}px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
                 ctx.textBaseline = 'top';
-                ctx.fillText(s.value, x, y);
+                ctx.fillText(s.value, 0, 0);
             } else if (s.media) {
-                ctx.drawImage(s.media.frameAt(now), x, y, w, h);
+                ctx.drawImage(s.media.frameAt(now), 0, 0, w, h);
             }
             ctx.restore();
         }
+    }
+
+    /**
+     * Give the selected sticker a motion, or clear it.
+     * @param {string|null} name - a key of STICKER_MOTIONS
+     */
+    setMotion(name) {
+        const sticker = this.stickers.find(s => s.id === this.selectedId)
+            || this.stickers[this.stickers.length - 1];
+        if (!sticker) return;
+        sticker.motion = (sticker.motion === name || !STICKER_MOTIONS[name]) ? null : name;
+        this._repaintIfPaused();
     }
 
     // --- placement -------------------------------------------------------

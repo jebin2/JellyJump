@@ -3690,3 +3690,16 @@ body.fullscreen-active {
 .sticker-add-file {
     cursor: pointer;
 }
+
+/* The label's aside — which sticker a motion will land on. */
+.filter-presets-label em {
+    font-style: normal;
+    opacity: 0.6;
+    font-size: 11px;
+}
+
+.filter-motions .filter-preset-btn,
+.filter-borders .filter-preset-btn,
+.filter-rain .filter-preset-btn {
+    font-size: 12px;
+}
