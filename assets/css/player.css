@@ -3574,3 +3574,94 @@ body.fullscreen-active {
         animation: none;
     }
 }
+/* -----------------------------------------
+   Stickers (camera only)
+   ----------------------------------------- */
+
+/* The stickers themselves are painted into the canvas, so they end up in the
+   recording. Everything here is the placement furniture, which must not: a
+   selection outline drawn on the canvas would be recorded with the sticker. */
+.jellyjump-sticker-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.jellyjump-sticker-layer.editing {
+    pointer-events: auto;
+}
+
+.jellyjump-sticker-box {
+    position: absolute;
+    display: none;
+    border: 1px dashed rgba(255, 255, 255, 0.85);
+    border-radius: 4px;
+    /* The drag target is the box, so it must take the pointer even though the
+       layer above it does not. */
+    cursor: grab;
+    touch-action: none;
+}
+
+.jellyjump-sticker-layer.editing .jellyjump-sticker-box {
+    display: block;
+}
+
+.jellyjump-sticker-box.selected {
+    border-color: var(--accent-primary, #4ade80);
+    border-style: solid;
+}
+
+.jellyjump-sticker-handle,
+.jellyjump-sticker-remove {
+    position: absolute;
+    /* 28px: a finger target, not a mouse one. The camera is used on a phone. */
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent-primary, #4ade80);
+    border: 2px solid rgba(0, 0, 0, 0.55);
+    box-sizing: border-box;
+    touch-action: none;
+}
+
+.jellyjump-sticker-handle {
+    right: -14px;
+    bottom: -14px;
+    cursor: nwse-resize;
+}
+
+.jellyjump-sticker-remove {
+    left: -14px;
+    top: -14px;
+    padding: 0;
+    color: #000;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+/* Camera only: elsewhere the frame is not drawn through the canvas this layer
+   paints onto, so a sticker would show on screen and be missing from the file. */
+.filter-stickers {
+    display: none;
+}
+
+.filter-stickers.active {
+    display: block;
+}
+
+.filter-stickers .sticker-btn {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.sticker-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.sticker-add-file {
+    cursor: pointer;
+}

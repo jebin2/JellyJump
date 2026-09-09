@@ -21,7 +21,7 @@
     "test:share": "npm run test:server && npm run test:remote && npm run test:cli && npm run test:youtube && npm run test:linklist",
     "test:youtube": "node scripts/youtube-url-test.mjs && node scripts/youtube-embed-test.mjs",
     "test:linklist": "node scripts/linklist-test.mjs && node scripts/linklist-scan-test.mjs",
-    "test:camera": "node scripts/camera-effects-test.mjs"
+    "test:camera": "node scripts/camera-effects-test.mjs && node scripts/sticker-test.mjs"
   },
   "devDependencies": {
     "vite": "^8.0.0"

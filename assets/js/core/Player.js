@@ -738,6 +738,12 @@ export class CorePlayer {
             this.videoFilters = null;
         }
 
+        if (this.stickers) {
+            // Holds decoded GIF frames, which outlive the reference to them.
+            this.stickers.destroy?.();
+            this.stickers = null;
+        }
+
         if (this.canvas) {
             this.canvas.remove();
             this.canvas = null;

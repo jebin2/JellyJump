@@ -1,4 +1,5 @@
 import { VideoFilters } from './VideoFilters.js';
+import { StickerLayer, STICKER_EMOJI } from './StickerLayer.js';
 import { Toast } from '../../shared/utils/Toast.js';
 
 export function createPlayerControls(player) {
@@ -114,7 +115,21 @@ function initFiltersPanel(player) {
     player.ui.invertValue = q('#mb-invert-value');
     player.ui.resetFiltersBtn = q('#mb-reset-filters-btn');
     player.ui.closeFilterPanelBtn = q('.jellyjump-filter-panel .jellyjump-close-btn');
+    player.ui.stickerSection = q('.filter-stickers');
+    player.ui.stickerGrid = q('#mb-sticker-grid');
+    player.ui.stickerFileInput = q('#mb-sticker-file');
+    player.ui.stickerClearBtn = q('#mb-sticker-clear');
+
+    // The built-in set is glyphs, so the grid is built here rather than
+    // shipped as markup — and there are no image files to load or cache.
+    if (player.ui.stickerGrid) {
+        player.ui.stickerGrid.innerHTML = STICKER_EMOJI
+            .map(ch => `<button class="filter-preset-btn sticker-btn" data-sticker="${ch}">${ch}</button>`)
+            .join('');
+    }
+
     player.videoFilters = new VideoFilters(player);
+    player.stickers = new StickerLayer(player);
     player.videoFilters.onBakeFallback = (label, ms) => {
         // Only reachable in camera mode, and worth interrupting for: the
         // effect is still on screen but the recording will not have it, and

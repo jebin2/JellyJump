@@ -432,6 +432,12 @@ export class PlayerStream {
 
         if (player.screenshotManager?.ui?.btn) controls.push(player.screenshotManager.ui.btn);
 
+        // Stickers are camera-only: elsewhere the frame is not drawn through
+        // the canvas this layer paints, so they would show and not record.
+        player.ui.stickerSection?.classList.toggle('active', isWebcamMode);
+        player.stickers?.setEditing(isWebcamMode);
+        if (!isWebcamMode) player.stickers?.clear();
+
         controls.forEach(control => control?.classList.toggle('webcam-mode-hidden', isWebcamMode));
 
         if (isWebcamMode) {

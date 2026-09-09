@@ -326,6 +326,28 @@ export function attachPlayerBindings(player) {
             });
         });
 
+        // Stickers. Only offered while the camera is on, because that is the
+        // only path whose frames are drawn through the canvas the layer paints.
+        player.container.querySelectorAll('.sticker-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                player.stickers?.addEmoji(btn.dataset.sticker);
+                btn.blur();
+            });
+        });
+
+        if (player.ui.stickerFileInput) {
+            player.ui.stickerFileInput.addEventListener('change', async (e) => {
+                const file = e.target.files?.[0];
+                // Cleared straight away so the same file can be picked twice.
+                e.target.value = '';
+                if (file) await player.stickers?.addFile(file);
+            });
+        }
+
+        if (player.ui.stickerClearBtn) {
+            player.ui.stickerClearBtn.addEventListener('click', () => player.stickers?.clear());
+        }
+
         if (player.ui.resetFiltersBtn) {
             player.ui.resetFiltersBtn.addEventListener('click', () => {
                 player.videoFilters.reset();
