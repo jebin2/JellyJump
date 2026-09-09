@@ -664,6 +664,41 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    /* The panel is anchored to the bottom of the video area and grows upward,
+       so a tall one runs off the top of the window rather than being clipped:
+       with the sliders, presets, FX and stickers all open it measured 1053px
+       tall with its top at -323px, putting the header and the brightness
+       slider out of reach. Bounded here rather than on the panel itself
+       because the panel is shown with an inline `display: block`, which a
+       percentage height has nothing to resolve against.
+
+       The content scrolls and the header does not, so the title and close
+       button stay put. */
+    max-height: 60vh;
+    max-height: 60dvh;
+    overflow-y: auto;
+    /* Safe here, unlike on a folder drawer: this is a popup over the video,
+       and a flick that runs past its end has nothing behind it that should
+       move instead. */
+    overscroll-behavior: contain;
+}
+
+.jellyjump-panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.jellyjump-panel-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.jellyjump-panel-content::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 3px;
+}
+
+.jellyjump-panel-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--accent-primary-rgb), 0.8);
 }
 
 .jellyjump-close-btn {
