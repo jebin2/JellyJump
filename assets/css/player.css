@@ -3676,16 +3676,6 @@ body.fullscreen-active {
     cursor: pointer;
 }
 
-/* Camera only: elsewhere the frame is not drawn through the canvas this layer
-   paints onto, so a sticker would show on screen and be missing from the file. */
-.filter-stickers {
-    display: none;
-}
-
-.filter-stickers.active {
-    display: block;
-}
-
 .filter-stickers .sticker-btn {
     font-size: 20px;
     line-height: 1;

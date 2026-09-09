@@ -65,9 +65,7 @@ export async function updatePlayerNextFrame(player) {
         // found — the render loop is about to draw that instead.
         if (lateFrame && !player.nextFrame && player.asyncId === currentAsyncId
             && player.ctx && player.canvas) {
-            player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
-            player.ctx.drawImage(lateFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-            player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
+            player.presentFrame(lateFrame.canvas, { clear: true });
         }
     } catch (e) {
         if (player.asyncId === currentAsyncId) {
@@ -127,12 +125,7 @@ export function startPlayerRenderLoop(player) {
 
             if (player.nextFrame) {
                 if (player.nextFrame.timestamp <= playbackTime) {
-                    player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
-                    player.ctx.drawImage(player.nextFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-
-                    if (player.afterFrameRenderCallbacks.length > 0) {
-                        player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
-                    }
+                    player.presentFrame(player.nextFrame.canvas, { clear: true });
 
                     player.nextFrame = null;
                     player._updateNextFrame();

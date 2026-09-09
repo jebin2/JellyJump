@@ -12,7 +12,7 @@ export function handlePlayerDocumentClick(player, e) {
     }
     if (player.ui.filterPanel && player.ui.filtersBtn &&
         !player.ui.filtersBtn.contains(e.target) && !player.ui.filterPanel.contains(e.target)) {
-        player.ui.filterPanel.style.display = 'none';
+        setPlayerFilterPanelOpen(player, false);
     }
     if (player.ui.audioPanel && player.ui.audioSettingsBtn &&
         !player.ui.audioSettingsBtn.contains(e.target) && !player.ui.audioPanel.contains(e.target)) {
@@ -45,13 +45,23 @@ export function updatePlayerSpeedMenu(player) {
     }
 }
 
+/**
+ * The one place the filter panel opens and closes.
+ *
+ * Sticker outlines follow it. They are placement furniture, so they belong on
+ * screen exactly while the panel that places them is open -- not over a video
+ * you are only watching, and not gone while you are arranging one.
+ */
+export function setPlayerFilterPanelOpen(player, open) {
+    if (!player.ui.filterPanel) return;
+    player.ui.filterPanel.style.display = open ? 'block' : 'none';
+    player.stickers?.setEditing(open);
+    if (open) syncPlayerFilterSliders(player);
+}
+
 export function togglePlayerFilterPanel(player) {
     if (!player.ui.filterPanel) return;
-    const isVisible = player.ui.filterPanel.style.display !== 'none';
-    player.ui.filterPanel.style.display = isVisible ? 'none' : 'block';
-    if (!isVisible) {
-        syncPlayerFilterSliders(player);
-    }
+    setPlayerFilterPanelOpen(player, player.ui.filterPanel.style.display === 'none');
 }
 
 export function togglePlayerSpeedPanel(player) {

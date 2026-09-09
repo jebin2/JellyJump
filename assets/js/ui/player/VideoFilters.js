@@ -303,11 +303,34 @@ export class VideoFilters {
             return;
         }
 
-        const key = this.effect;
-        const eff = (key && !this._bakeUnaffordable.has(key)) ? this.effects[key] : null;
-        const timing = eff && HEAVY_EFFECTS.has(key) && this._bakeProbe;
+        // An effect this machine could not afford is left to CSS; baking it
+        // every frame is what the probe exists to prevent.
+        const key = (this.effect && !this._bakeUnaffordable.has(this.effect)) ? this.effect : null;
+        const timing = key && HEAVY_EFFECTS.has(key) && this._bakeProbe;
         const started = timing ? performance.now() : 0;
 
+        this._paint(ctx, source, w, h, key);
+
+        if (timing) this._recordBakeSample(performance.now() - started);
+    }
+
+    /**
+     * Every effect baked in, whatever the mode and whatever the machine can
+     * afford per frame. For a still taken once -- a screenshot -- where the
+     * per-frame cost that governs `drawFrame` does not apply.
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {CanvasImageSource} source
+     * @param {number} w
+     * @param {number} h
+     */
+    bakeInto(ctx, source, w, h) {
+        this._paint(ctx, source, w, h, this.effect);
+    }
+
+    /** @private */
+    _paint(ctx, source, w, h, effectKey) {
+        const eff = effectKey ? this.effects[effectKey] : null;
         const filter = this._canvasFilter(eff);
 
         if (eff?.pixelate) {
@@ -319,8 +342,6 @@ export class VideoFilters {
         }
 
         if (eff?.overlay) this._drawOverlay(ctx, w, h, eff.overlay);
-
-        if (timing) this._recordBakeSample(performance.now() - started);
     }
 
     /**

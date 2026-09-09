@@ -33,7 +33,7 @@ const makeEl = () => {
     };
     return el;
 };
-globalThis.document = { createElement: makeEl };
+globalThis.document = { createElement: makeEl, getElementById: () => ({}), body: makeEl() };
 globalThis.ResizeObserver = undefined;
 
 const { StickerLayer } = await import('../assets/js/ui/player/StickerLayer.js');
@@ -138,6 +138,79 @@ console.log('\na still image is one frame, and never asks for a decoder');
     const one = new AnimatedImage([{ width: 8, height: 8, close() {} }], [100]);
     check(one.animated === false, 'a single frame is not animated');
     check(one.frameAt(99999) !== undefined, 'and answers for any time without arithmetic on zero');
+}
+
+// --- screenshots -------------------------------------------------------------
+
+console.log('\na screenshot saves what was on screen');
+{
+    const { ScreenshotManager } = await import('../assets/js/ui/player/ScreenshotManager.js');
+    const composite = ScreenshotManager.prototype._composite;
+
+    const madeCanvases = [];
+    const realCreate = globalThis.document.createElement;
+    globalThis.document.createElement = () => {
+        const el = realCreate();
+        el.width = 0; el.height = 0;
+        el.ops = [];
+        el.getContext = () => ({
+            filter: 'none', globalAlpha: 1, imageSmoothingEnabled: true, font: '', textBaseline: '',
+            save() {}, restore() {}, translate() {}, scale() {},
+            createLinearGradient: () => ({ addColorStop() {} }),
+            createRadialGradient: () => ({ addColorStop() {} }),
+            createPattern: () => ({}),
+            fillRect() {}, fillText(...a) { el.ops.push({ op: 'fillText', args: a }); },
+            // The filter at the moment of the draw is the whole point here:
+            // recording only that a draw happened cannot tell a composited
+            // screenshot from an untouched one.
+            drawImage(...a) { el.ops.push({ op: 'drawImage', filter: this.filter, args: a }); },
+        });
+        el.toDataURL = () => 'data:composited';
+        madeCanvases.push(el);
+        return el;
+    };
+
+    const sourceFrame = { width: 1920, height: 1080, toDataURL: () => 'data:untouched' };
+
+    // Nothing to add: the frame is saved as it was decoded, with no copy.
+    const bare = composite.call({ player: { videoFilters: null, stickers: null } },
+        sourceFrame, { stickersAlreadyDrawn: false });
+    check(bare === 'data:untouched', 'an unfiltered, stickerless frame is saved untouched');
+
+    // A filtered file: the decoded frame is clean, so the colour has to go on.
+    const player = makePlayer(1280, 720);
+    const layer = new StickerLayer(player);
+    layer.addEmoji('🌸');
+    const { VideoFilters } = await import('../assets/js/ui/player/VideoFilters.js');
+    const filters = new VideoFilters(null);
+    filters.canvas = makeEl();
+    filters.canvas.style = {};
+    filters.applyPreset('sepia');
+
+    madeCanvases.length = 0;
+    const shot = composite.call({ player: { videoFilters: filters, stickers: layer } },
+        sourceFrame, { stickersAlreadyDrawn: false });
+    const out = madeCanvases[0];
+    check(shot === 'data:composited', 'a filtered frame is composited instead');
+    check(out.width === 1920 && out.height === 1080,
+        `at the file's own resolution, not the player canvas's (${out.width}x${out.height})`);
+    const composited = out.ops.find(o => o.op === 'drawImage');
+    check(composited?.filter?.includes('sepia(1)'),
+        `the frame is drawn through the colour that was on the element (${composited?.filter})`);
+    check(out.ops.some(o => o.op === 'fillText'), 'and the sticker goes on over it');
+
+    // The camera: its canvas already carries both, so nothing is re-drawn.
+    madeCanvases.length = 0;
+    filters.setCanvasMode(true);
+    const live = composite.call({ player: { videoFilters: filters, stickers: layer } },
+        { width: 640, height: 480, toDataURL: () => 'data:live-canvas' },
+        { stickersAlreadyDrawn: true });
+    check(live === 'data:live-canvas',
+        'the camera canvas is saved as-is — the effects and stickers are already in it');
+    check(madeCanvases.length === 0, 'with no second canvas allocated');
+
+    globalThis.document.createElement = realCreate;
+    layer.destroy();
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

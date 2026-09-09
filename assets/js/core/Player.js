@@ -689,6 +689,39 @@ export class CorePlayer {
         }
     }
 
+    // ─── Frame presentation ──────────────────────────────────────────────────────
+
+    /**
+     * Put one frame on screen. The single way anything reaches the canvas:
+     * decoded file frames, live frames and the camera all come through here.
+     *
+     * It exists because the three steps -- draw the frame, apply the effects,
+     * run whatever draws over it -- were hand-copied at nine call sites, and a
+     * copy that forgets the third step is invisible until someone tries to
+     * draw over that path. The camera was one such copy, and three sites in
+     * the live loop still were.
+     *
+     * @param {CanvasImageSource} source
+     * @param {{clear?: boolean}} [options] - clear first, for sources that may
+     *   not cover the canvas (a resolution change mid-stream leaves a border
+     *   of the previous frame otherwise).
+     */
+    presentFrame(source, { clear = false } = {}) {
+        if (!source || !this.ctx || !this.canvas) return;
+
+        if (clear) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        if (this.videoFilters) {
+            this.videoFilters.drawFrame(this.ctx, source, this.canvas.width, this.canvas.height);
+        } else {
+            this.ctx.drawImage(source, 0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        for (const cb of this.afterFrameRenderCallbacks) {
+            try { cb(this.canvas, this.ctx); } catch (e) { Logger.warn('After-frame callback error:', e); }
+        }
+    }
+
     // ─── Render Callbacks ────────────────────────────────────────────────────────
     addRenderCallback(callback) {
         if (typeof callback === 'function') {

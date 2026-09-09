@@ -47,6 +47,45 @@ export class ScreenshotManager {
     }
 
     /**
+     * A frame with everything that was on screen over it.
+     *
+     * A screenshot of a file does not come from the player canvas -- it is
+     * decoded fresh from the sink, at the file's own resolution, so it arrives
+     * clean. Without this, filtering a video and taking a screenshot saved the
+     * unfiltered original, and a sticker you had placed was simply absent.
+     *
+     * Nothing is copied when there is nothing to add, so an unfiltered
+     * screenshot still costs exactly one toDataURL.
+     *
+     * @param {HTMLCanvasElement} source
+     * @param {{stickersAlreadyDrawn: boolean}} options
+     * @returns {string} a PNG data URL
+     * @private
+     */
+    _composite(source, { stickersAlreadyDrawn }) {
+        const filters = this.player.videoFilters;
+        const stickers = this.player.stickers;
+
+        // In canvas mode the colour is already in the pixels; in CSS mode it
+        // lives on the element and has to be put back on here.
+        const needsColour = !!filters && !filters.canvasMode && filters.isActive();
+        const needsStickers = !stickersAlreadyDrawn && (stickers?.stickers.length > 0);
+        if (!needsColour && !needsStickers) return source.toDataURL('image/png');
+
+        const out = document.createElement('canvas');
+        out.width = source.width;
+        out.height = source.height;
+        const ctx = out.getContext('2d');
+
+        if (needsColour) filters.bakeInto(ctx, source, out.width, out.height);
+        else ctx.drawImage(source, 0, 0, out.width, out.height);
+
+        if (needsStickers) stickers.drawInto(out, ctx);
+
+        return out.toDataURL('image/png');
+    }
+
+    /**
      * Capture current video frame as screenshot
      */
     async capture() {
@@ -78,7 +117,9 @@ export class ScreenshotManager {
             let timestamp;
 
             if (isStreamMode && hasCanvas) {
-                dataUrl = this.player.canvas.toDataURL('image/png');
+                // The player canvas already has the stickers on it: the render
+                // loop draws them into every frame it presents.
+                dataUrl = this._composite(this.player.canvas, { stickersAlreadyDrawn: true });
                 timestamp = this.player.currentTime || 0;
             } else if (hasMediaBunny) {
                 const frame = await this.player.videoSink.getCanvas(this.player.currentTime);
@@ -86,7 +127,7 @@ export class ScreenshotManager {
                     Logger.error('Failed to capture frame');
                     return;
                 }
-                dataUrl = frame.canvas.toDataURL('image/png');
+                dataUrl = this._composite(frame.canvas, { stickersAlreadyDrawn: false });
                 timestamp = frame.timestamp;
             } else {
                 Logger.error('No capture method available');
@@ -195,7 +236,7 @@ export class ScreenshotManager {
             const frame = await this.player.videoSink.getCanvas(seekTime);
             if (!frame || !frame.canvas) return;
 
-            const dataUrl = frame.canvas.toDataURL('image/png');
+            const dataUrl = this._composite(frame.canvas, { stickersAlreadyDrawn: false });
             this.ui.preview.src = dataUrl;
             this.screenshotDataUrl = dataUrl;
             this.screenshotTimestamp = frame.timestamp;

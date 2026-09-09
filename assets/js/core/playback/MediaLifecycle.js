@@ -314,10 +314,7 @@ export async function startPlayerVideoIterator(player) {
         player.nextFrame = secondFrame;
 
         if (firstFrame) {
-            player.ctx.drawImage(firstFrame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-            if (player.afterFrameRenderCallbacks.length > 0) {
-                player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
-            }
+            player.presentFrame(firstFrame.canvas);
         }
     } finally {
         // Only if we are still the current generation: a newer start has taken
@@ -334,10 +331,7 @@ export async function extractAndDrawPlayerFrame(player, timestamp) {
     const frame = result.value;
 
     if (frame) {
-        player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
-        if (player.afterFrameRenderCallbacks.length > 0) {
-            player.afterFrameRenderCallbacks.forEach(cb => cb(player.canvas, player.ctx));
-        }
+        player.presentFrame(frame.canvas);
     }
 
     await iterator.return();

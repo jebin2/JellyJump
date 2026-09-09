@@ -69,6 +69,7 @@ export class StickerLayer {
             sticker.media = await AnimatedImage.load(file, this.player.canvas?.width || 1280);
             sticker.aspect = sticker.media.width / sticker.media.height || 1;
             this._syncBoxes();
+            this._repaintIfPaused();
             return sticker;
         } catch (error) {
             Logger.warn('[Stickers] Could not decode that image:', error);
@@ -86,6 +87,7 @@ export class StickerLayer {
         this.stickers.splice(i, 1);
         if (this.selectedId === id) this.selectedId = null;
         this._syncBoxes();
+        this._repaintIfPaused();
     }
 
     clear() {
@@ -93,6 +95,7 @@ export class StickerLayer {
         this.stickers = [];
         this.selectedId = null;
         this._syncBoxes();
+        this._repaintIfPaused();
     }
 
     /** Show the outlines and let them be dragged. */
@@ -112,6 +115,22 @@ export class StickerLayer {
         this._boxes.clear();
     }
 
+    /**
+     * Redraw the frame that is already on screen.
+     *
+     * While playing, the next frame carries the change along. Paused, nothing
+     * redraws -- and placing stickers is mostly something you do paused, so
+     * without this a sticker you just added or dragged stayed invisible until
+     * you hit play.
+     * @private
+     */
+    _repaintIfPaused() {
+        const player = this.player;
+        if (player.isPlaying) return;
+        if (player.isStreamMode) { player._renderStreamFrame?.(); return; }
+        if (player.videoTrack) player._extractAndDrawFrame?.(player.currentTime);
+    }
+
     /** @private */
     _add(props) {
         const sticker = {
@@ -121,10 +140,22 @@ export class StickerLayer {
         this.stickers.push(sticker);
         this.selectedId = sticker.id;
         this._syncBoxes();
+        this._repaintIfPaused();
         return sticker;
     }
 
     // --- drawing ---------------------------------------------------------
+
+    /**
+     * Draw the stickers onto any canvas, at whatever size it is. Used for a
+     * screenshot, which composites a freshly decoded frame at the file's own
+     * resolution rather than the player canvas's -- the positions are
+     * fractions of the frame, so they land in the same place either way.
+     *
+     * @param {HTMLCanvasElement} canvas
+     * @param {CanvasRenderingContext2D} ctx
+     */
+    drawInto(canvas, ctx) { this._draw(canvas, ctx); }
 
     /** @private */
     _draw(canvas, ctx) {
@@ -281,6 +312,7 @@ export class StickerLayer {
                 sticker.y = Math.max(-0.25, Math.min(0.95, from.y + dy));
             }
             this._positionBoxes();
+            this._repaintIfPaused();
         };
         const up = () => {
             this._overlay.removeEventListener('pointermove', move);

@@ -186,6 +186,38 @@ console.log('\nan effect the machine cannot afford is dropped to preview, out lo
         'while staying on screen through CSS, where the compositor does the work');
 }
 
+console.log('\na still bakes everything, whatever the mode');
+{
+    // A screenshot of a file is decoded fresh from the sink, so it arrives
+    // without the effects that are sitting on the canvas element. bakeInto is
+    // how they are put back -- and it must not care which mode is active or
+    // what the machine could afford to bake per frame.
+    const canvas = makeCanvas(), ctx = makeCtx();
+    const f = filtersOn(canvas);
+    f.applyPreset('vivid');
+    f.applyEffect('matrix');
+    check(f.canvasMode === false, 'playback is in CSS mode, where drawFrame does not bake');
+
+    f.drawFrame(ctx, SOURCE, 1280, 720);
+    check(drawn(ctx)[0].filter === 'none', 'so a played frame is drawn plain');
+
+    const still = makeCtx();
+    f.bakeInto(still, SOURCE, 1280, 720);
+    const baked = drawn(still)[0].filter;
+    check(baked.includes('url(#jj-fx-matrix)') && baked.includes('saturate(1.4)'),
+        `while the still gets the effect and the preset (${baked})`);
+}
+{
+    const f = filtersOn(makeCanvas());
+    f.setCanvasMode(true);
+    f.applyEffect('robot');
+    f._bakeUnaffordable.add('robot');
+    const still = makeCtx();
+    f.bakeInto(still, SOURCE, 1280, 720);
+    check(drawn(still)[0].filter.includes('url(#jj-fx-robot)'),
+        'even an effect too slow to bake per frame is in the still, which is taken once');
+}
+
 console.log('\nleaving the camera puts playback back as it was');
 {
     const canvas = makeCanvas(), ctx = makeCtx();

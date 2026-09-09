@@ -295,26 +295,11 @@ export class PlayerStream {
         if (!this.streamVideo || !player.ctx || !player.canvas) return;
         if (this.streamVideo.readyState < 2) return;
 
-        // Through VideoFilters rather than straight to the context. In CSS
-        // mode that is the same single drawImage as before; in canvas mode
-        // (the camera) the effects are baked in here, which is the only place
-        // the recorder can see them -- it reads canvas pixels, and a CSS
-        // filter on the canvas element is composited long after that.
-        if (player.videoFilters) {
-            player.videoFilters.drawFrame(
-                player.ctx, this.streamVideo, player.canvas.width, player.canvas.height,
-            );
-        } else {
-            player.ctx.drawImage(this.streamVideo, 0, 0, player.canvas.width, player.canvas.height);
-        }
+        player.presentFrame(this.streamVideo);
 
         if (!this._isMediaReady) {
             this._isMediaReady = true;
             if (player.isPlaying) this.resumeRecordingSmartPause();
-        }
-
-        for (const cb of player.afterFrameRenderCallbacks) {
-            try { cb(player.canvas, player.ctx); } catch (e) { Logger.warn('After-frame callback error:', e); }
         }
     }
 
@@ -432,11 +417,6 @@ export class PlayerStream {
 
         if (player.screenshotManager?.ui?.btn) controls.push(player.screenshotManager.ui.btn);
 
-        // Stickers are camera-only: elsewhere the frame is not drawn through
-        // the canvas this layer paints, so they would show and not record.
-        player.ui.stickerSection?.classList.toggle('active', isWebcamMode);
-        player.stickers?.setEditing(isWebcamMode);
-        if (!isWebcamMode) player.stickers?.clear();
 
         controls.forEach(control => control?.classList.toggle('webcam-mode-hidden', isWebcamMode));
 
@@ -886,8 +866,7 @@ export class PlayerStream {
                     player._hasSnappedAnchor = true;
                     Logger.log(`[Live] Anchor snapped to first frame — content=${frame.timestamp.toFixed(3)}, wall=${this._liveAnchorWall.toFixed(3)}`);
                     
-                    player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
-                    player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                    player.presentFrame(frame.canvas, { clear: true });
                     startAudio();
                 }
 
@@ -931,7 +910,7 @@ export class PlayerStream {
                         }
 
                         if (!isBackground) {
-                            player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                            player.presentFrame(frame.canvas);
                         }
                         continue;
                     }
@@ -953,21 +932,17 @@ export class PlayerStream {
                             });
                         }
 
-                        player.ctx.clearRect(0, 0, player.canvas.width, player.canvas.height);
-                        player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                        player.presentFrame(frame.canvas, { clear: true });
                         drawnCount++;
 
                         if (drawnCount % 120 === 0) {
                             Logger.log(`[Live:Video] Sync status — late=${((player.audioContext.currentTime - targetWall) * 1000).toFixed(1)}ms, drawn=${drawnCount}, total=${frameCount}`);
                         }
 
-                        for (const cb of player.afterFrameRenderCallbacks) {
-                            try { cb(player.canvas, player.ctx); } catch (e) { }
-                        }
                     }
                 } else {
                     if (!isBackground) {
-                        player.ctx.drawImage(frame.canvas, 0, 0, player.canvas.width, player.canvas.height);
+                        player.presentFrame(frame.canvas);
                         await new Promise(r => requestAnimationFrame(r));
                     } else {
                         await new Promise(r => setTimeout(r, 100));
