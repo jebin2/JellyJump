@@ -47,6 +47,11 @@ export class PlayerStream {
         this.isStreamMode = false;
         this.isWebcamMode = false;
         this.isLive = false;
+        // The other way out of the camera: loading a file never reaches
+        // stopWebcamStreamMode. Left on, canvas mode would keep suppressing
+        // the CSS filters that playback draws with, and the filter panel
+        // would look broken for the rest of the session.
+        this.player.videoFilters?.setCanvasMode(false);
 
         if (this.streamVideo && this.streamVideo.srcObject) {
             Logger.log('[Player] Clearing webcam stream in load()');
@@ -268,8 +273,11 @@ export class PlayerStream {
                 this.stopStreamRenderLoop();
                 return;
             }
-            player.ctx.drawImage(this.streamVideo, 0, 0, player.canvas.width, player.canvas.height);
-            this._isMediaReady = true;
+            // Through renderStreamFrame rather than a second copy of it. This
+            // loop used to draw the frame itself, which meant the camera was
+            // the one render path in the app that never ran
+            // afterFrameRenderCallbacks -- so nothing could draw over it.
+            this.renderStreamFrame();
             this.streamRenderLoopId = requestAnimationFrame(render);
         };
         this.streamRenderLoopId = requestAnimationFrame(render);
@@ -287,7 +295,18 @@ export class PlayerStream {
         if (!this.streamVideo || !player.ctx || !player.canvas) return;
         if (this.streamVideo.readyState < 2) return;
 
-        player.ctx.drawImage(this.streamVideo, 0, 0, player.canvas.width, player.canvas.height);
+        // Through VideoFilters rather than straight to the context. In CSS
+        // mode that is the same single drawImage as before; in canvas mode
+        // (the camera) the effects are baked in here, which is the only place
+        // the recorder can see them -- it reads canvas pixels, and a CSS
+        // filter on the canvas element is composited long after that.
+        if (player.videoFilters) {
+            player.videoFilters.drawFrame(
+                player.ctx, this.streamVideo, player.canvas.width, player.canvas.height,
+            );
+        } else {
+            player.ctx.drawImage(this.streamVideo, 0, 0, player.canvas.width, player.canvas.height);
+        }
 
         if (!this._isMediaReady) {
             this._isMediaReady = true;
@@ -408,7 +427,7 @@ export class PlayerStream {
             player.ui.volumeSlider, player.ui.muteBtn,
             player.ui.ccBtn, player.ui.speedBtn,
             player.ui.audioBtn, player.ui.audioSettingsBtn,
-            player.ui.filtersBtn, player.ui.loopBtn
+            player.ui.loopBtn
         ];
 
         if (player.screenshotManager?.ui?.btn) controls.push(player.screenshotManager.ui.btn);
@@ -416,7 +435,10 @@ export class PlayerStream {
         controls.forEach(control => control?.classList.toggle('webcam-mode-hidden', isWebcamMode));
 
         if (isWebcamMode) {
-            player.ui.filterPanel?.classList.remove('visible');
+            // The filters button stays: its effects are baked into the frame
+            // in camera mode, so what you see is what gets recorded. It was
+            // hidden while they were CSS-only, when turning one on would have
+            // changed the preview and left the recording untouched.
             player.ui.audioPanel?.classList.remove('visible');
             player.ui.loopPanel?.classList.remove('visible');
         }
@@ -532,6 +554,7 @@ export class PlayerStream {
         this.isWebcamMode = true;
         player.isPlaying = true;
         this.showStreamVideo();
+        player.videoFilters?.setCanvasMode(true);
         this.setWebcamModeControls(true);
         player._setLoading(false);
 
@@ -552,6 +575,7 @@ export class PlayerStream {
     }
 
     stopWebcamStreamMode() {
+        this.player.videoFilters?.setCanvasMode(false);
         if (this.streamVideo) {
             this.streamVideo.srcObject = null;
             this.streamVideo.pause();

@@ -1,14 +1,25 @@
 /**
- * VideoFilters - Manages preview-only visual effects for the video canvas.
+ * VideoFilters - visual effects for the video canvas, in one of two modes.
  *
- * Everything here is display-only (it never touches decoded frame pixels, so
- * screenshots/exports stay clean):
+ * CSS mode (playback, the default) is display-only: it never touches decoded
+ * frame pixels, so screenshots and exports of a file stay clean.
  *  - Numeric adjustments + colour presets  -> CSS `filter` string on the canvas
  *  - "Fun" FX (robot/comic/thermal/...)     -> SVG filters referenced via CSS
  *  - Scanlines / vignette / grain           -> a pointer-events:none overlay div
  *  - Pixelate                               -> a low-res overlay <canvas> that the
  *                                              browser upscales nearest-neighbour
  *  - Psychedelic                            -> a CSS keyframe hue animation
+ *
+ * Canvas mode (the camera) draws the same effects into the 2D context instead,
+ * through `drawFrame`. It has to: the webcam recorder wraps the canvas in a
+ * MediaBunny CanvasSource, which reads canvas *pixels*, while a CSS filter on
+ * the canvas *element* is composited afterwards and never reaches them. In CSS
+ * mode the recording would come out plain while the preview looked filtered.
+ *
+ * The effect definitions below are shared by both modes -- `ctx.filter` accepts
+ * the same `url(#jj-fx-*)` references CSS does. Only the three effects that are
+ * not a filter string (pixelate, psychedelic, the overlay div) need a canvas
+ * equivalent, and each is written beside its CSS counterpart.
  */
 
 // Inline SVG filter defs, injected once per document. Referenced from CSS as
@@ -69,6 +80,24 @@ const EFFECTS = {
     psychedelic: { label: 'Psychedelic', css: [], psychedelic: true },
 };
 
+/**
+ * Effects built on a per-pixel convolution. Measured at 1280x720: ~2.5ms a
+ * frame on a GPU, but 163ms with canvas acceleration off -- a 16.7ms budget
+ * blown ten times over, which would drop the camera to a slideshow. So they
+ * are timed on the machine actually running them rather than assumed, and
+ * dropped to preview-only if that machine cannot afford them.
+ */
+const HEAVY_EFFECTS = new Set(['robot', 'emboss']);
+
+/** A baked effect may take this much of a frame before it is judged too slow. */
+const BAKE_BUDGET_MS = 8;
+/** Frames timed before judging, after discarding warm-up (shader compiles). */
+const BAKE_PROBE_FRAMES = 24;
+const BAKE_PROBE_WARMUP = 6;
+
+/** CSS `.fx-scanlines` is a 4px cycle; matched here so both modes look alike. */
+const SCANLINE_CYCLE = 4;
+
 export class VideoFilters {
     /**
      * @param {Object} player - the CorePlayer (needs .canvas, .container, frame hook)
@@ -105,8 +134,33 @@ export class VideoFilters {
 
         this.effects = EFFECTS;
 
+        /** Draw effects into the 2D context instead of onto the element. */
+        this.canvasMode = false;
+        /** Effects this machine proved too slow to bake; preview-only instead. */
+        this._bakeUnaffordable = new Set();
+        this._bakeProbe = null;
+        /** Called with (label, msPerFrame) when an effect is dropped to preview. */
+        this.onBakeFallback = null;
+        this._pixelBuffer = null;
+        this._scanlines = null;
+
         this._ensureSvgDefs();
         this._ensureFx();
+    }
+
+    /**
+     * Switch between drawing effects onto the element (playback) and into the
+     * context (camera, where the recorder reads pixels).
+     * @param {boolean} enabled
+     */
+    setCanvasMode(enabled) {
+        const on = !!enabled;
+        if (on === this.canvasMode) return;
+        this.canvasMode = on;
+        // A mode change must not leave the other mode's output behind, or the
+        // effect is applied twice -- once in the pixels, once over them.
+        if (on) this._startBakeProbe();
+        this._apply();
     }
 
     // --- numeric setters -------------------------------------------------
@@ -135,6 +189,7 @@ export class VideoFilters {
     applyEffect(name) {
         if (!this.effects[name]) return;
         this.effect = (this.effect === name) ? null : name;
+        this._startBakeProbe();
         this._apply();
     }
 
@@ -174,29 +229,14 @@ export class VideoFilters {
     }
 
     // --- rendering -------------------------------------------------------
-    _apply() {
-        if (!this.canvas) return;
-        const eff = this.effect ? this.effects[this.effect] : null;
 
-        // Overlay (scanlines / vignette / grain)
-        if (this._overlay) {
-            this._overlay.className = 'jellyjump-fx-overlay' + (eff?.overlay ? ` fx-${eff.overlay}` : '');
-        }
-
-        // Pixelate overlay canvas
-        this._setPixelate(eff?.pixelate || 0);
-
-        // Psychedelic runs as a CSS keyframe animation on `filter`, so we must
-        // NOT set an inline filter (inline would override the animation).
-        if (eff?.psychedelic) {
-            this.canvas.classList.add('jj-fx-psychedelic');
-            this.canvas.style.filter = '';
-            return;
-        }
-        this.canvas.classList.remove('jj-fx-psychedelic');
-
+    /**
+     * The numeric adjustments, as filter tokens. Shared by both modes: the
+     * same string is valid on `element.style.filter` and on `ctx.filter`.
+     * @private
+     */
+    _adjustmentTokens() {
         const tokens = [];
-        if (eff?.css) tokens.push(...eff.css);
         if (this.brightness !== 100) tokens.push(`brightness(${this.brightness / 100})`);
         if (this.contrast !== 100) tokens.push(`contrast(${this.contrast / 100})`);
         if (this.saturation !== 100) tokens.push(`saturate(${this.saturation / 100})`);
@@ -205,8 +245,217 @@ export class VideoFilters {
         if (this.hueRotate !== 0) tokens.push(`hue-rotate(${this.hueRotate}deg)`);
         if (this.blur > 0) tokens.push(`blur(${this.blur}px)`);
         if (this.invert > 0) tokens.push(`invert(${this.invert / 100})`);
+        return tokens;
+    }
+
+    _apply() {
+        if (!this.canvas) return;
+        const eff = this.effect ? this.effects[this.effect] : null;
+
+        // What stays on the element. In canvas mode that is nothing the
+        // recorder can already see -- only an effect this machine turned out
+        // to be too slow to bake, which is preview-only by definition.
+        const cssEff = this.canvasMode
+            ? (this.effect && this._bakeUnaffordable.has(this.effect) ? eff : null)
+            : eff;
+
+        // Overlay (scanlines / vignette / grain)
+        if (this._overlay) {
+            this._overlay.className = 'jellyjump-fx-overlay' + (cssEff?.overlay ? ` fx-${cssEff.overlay}` : '');
+        }
+
+        // Pixelate overlay canvas
+        this._setPixelate(cssEff?.pixelate || 0);
+
+        // Psychedelic runs as a CSS keyframe animation on `filter`, so we must
+        // NOT set an inline filter (inline would override the animation).
+        if (cssEff?.psychedelic) {
+            this.canvas.classList.add('jj-fx-psychedelic');
+            this.canvas.style.filter = '';
+            return;
+        }
+        this.canvas.classList.remove('jj-fx-psychedelic');
+
+        const tokens = [];
+        if (cssEff?.css) tokens.push(...cssEff.css);
+        // In canvas mode the adjustments are baked, so applying them here too
+        // would double them on screen.
+        if (!this.canvasMode) tokens.push(...this._adjustmentTokens());
 
         this.canvas.style.filter = tokens.length ? tokens.join(' ') : 'none';
+    }
+
+    // --- canvas mode -----------------------------------------------------
+
+    /**
+     * Draw one frame, with every affordable effect baked into the pixels.
+     * The single drawImage the render loop already made, plus a `ctx.filter`
+     * on it -- no second buffer and no extra pass in the common case.
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {CanvasImageSource} source
+     * @param {number} w
+     * @param {number} h
+     */
+    drawFrame(ctx, source, w, h) {
+        if (!this.canvasMode) {
+            ctx.drawImage(source, 0, 0, w, h);
+            return;
+        }
+
+        const key = this.effect;
+        const eff = (key && !this._bakeUnaffordable.has(key)) ? this.effects[key] : null;
+        const timing = eff && HEAVY_EFFECTS.has(key) && this._bakeProbe;
+        const started = timing ? performance.now() : 0;
+
+        const filter = this._canvasFilter(eff);
+
+        if (eff?.pixelate) {
+            this._drawPixelated(ctx, source, w, h, eff.pixelate, filter);
+        } else {
+            ctx.filter = filter;
+            ctx.drawImage(source, 0, 0, w, h);
+            ctx.filter = 'none';
+        }
+
+        if (eff?.overlay) this._drawOverlay(ctx, w, h, eff.overlay);
+
+        if (timing) this._recordBakeSample(performance.now() - started);
+    }
+
+    /**
+     * The filter string for a baked frame. Psychedelic is a CSS keyframe
+     * animation in the other mode; here it is driven off the clock instead,
+     * which also stops it drifting from the frames being recorded.
+     * @private
+     */
+    _canvasFilter(eff) {
+        const tokens = [];
+        if (eff?.psychedelic) {
+            const deg = Math.round(((performance.now() % 4000) / 4000) * 360);
+            tokens.push(`hue-rotate(${deg}deg)`, 'saturate(1.6)');
+        } else if (eff?.css) {
+            tokens.push(...eff.css);
+        }
+        tokens.push(...this._adjustmentTokens());
+        return tokens.length ? tokens.join(' ') : 'none';
+    }
+
+    /**
+     * Down then up with smoothing off — the canvas equivalent of the low-res
+     * overlay element. The colour work happens on the small draw, where it is
+     * cheapest.
+     * @private
+     */
+    _drawPixelated(ctx, source, w, h, level, filter) {
+        const bw = Math.max(8, Math.round(w / level));
+        const bh = Math.max(8, Math.round(h / level));
+        if (!this._pixelBuffer) {
+            this._pixelBuffer = document.createElement('canvas');
+            this._pixelBufferCtx = this._pixelBuffer.getContext('2d');
+        }
+        const buf = this._pixelBuffer, bctx = this._pixelBufferCtx;
+        if (buf.width !== bw || buf.height !== bh) { buf.width = bw; buf.height = bh; }
+
+        bctx.filter = filter;
+        bctx.drawImage(source, 0, 0, bw, bh);
+        bctx.filter = 'none';
+
+        const smoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(buf, 0, 0, w, h);
+        ctx.imageSmoothingEnabled = smoothing;
+    }
+
+    /**
+     * The scanline / vignette overlay, drawn rather than layered as a div.
+     * Both reproduce `.jellyjump-fx-overlay` in player.css, including the
+     * flicker keyframes, so the two modes look the same.
+     * @private
+     */
+    _drawOverlay(ctx, w, h, kind) {
+        if (kind === 'scanlines') {
+            // Scaled to how big the canvas is *displayed*: the CSS version's
+            // 4px cycle is in screen pixels, and at 720p backing resolution an
+            // unscaled cycle would come out twice as fine as it looks now.
+            const shown = this.canvas?.clientWidth || w;
+            const cycle = Math.max(2, Math.round(SCANLINE_CYCLE * (w / shown)));
+            const pattern = this._scanlinePattern(ctx, cycle);
+            if (!pattern) return;
+            const phase = (performance.now() % 3000) / 3000;
+            const stepped = Math.floor(phase * 60) / 60;
+            ctx.save();
+            ctx.globalAlpha = 0.9 + 0.1 * (1 - Math.abs(stepped * 2 - 1));
+            ctx.fillStyle = pattern;
+            ctx.fillRect(0, 0, w, h);
+            ctx.restore();
+            return;
+        }
+        if (kind === 'vignette') {
+            ctx.save();
+            ctx.translate(w / 2, h / 2);
+            ctx.scale(w / 2, h / 2);
+            const g = ctx.createRadialGradient(0, 0, 0.45, 0, 0, 1);
+            g.addColorStop(0, 'rgba(0,0,0,0)');
+            g.addColorStop(1, 'rgba(0,0,0,0.55)');
+            ctx.fillStyle = g;
+            ctx.fillRect(-1, -1, 2, 2);
+            ctx.restore();
+        }
+    }
+
+    /** @private */
+    _scanlinePattern(ctx, cycle) {
+        if (this._scanlines?.cycle !== cycle) {
+            const tile = document.createElement('canvas');
+            tile.width = 1;
+            tile.height = cycle;
+            const tctx = tile.getContext('2d');
+            // The stops of the repeating-linear-gradient in player.css, as
+            // fractions of the cycle: clear for half, ramping to 0.28, solid.
+            const g = tctx.createLinearGradient(0, 0, 0, cycle);
+            g.addColorStop(0, 'rgba(0,0,0,0)');
+            g.addColorStop(0.5, 'rgba(0,0,0,0)');
+            g.addColorStop(0.75, 'rgba(0,0,0,0.28)');
+            g.addColorStop(1, 'rgba(0,0,0,0.28)');
+            tctx.fillStyle = g;
+            tctx.fillRect(0, 0, 1, cycle);
+            this._scanlines = { cycle, pattern: ctx.createPattern(tile, 'repeat') };
+        }
+        return this._scanlines.pattern;
+    }
+
+    // --- affordability probe ---------------------------------------------
+
+    /** @private */
+    _startBakeProbe() {
+        this._bakeProbe = (this.canvasMode && this.effect && HEAVY_EFFECTS.has(this.effect)
+            && !this._bakeUnaffordable.has(this.effect))
+            ? { key: this.effect, skip: BAKE_PROBE_WARMUP, times: [] }
+            : null;
+    }
+
+    /** @private */
+    _recordBakeSample(ms) {
+        const probe = this._bakeProbe;
+        if (!probe || probe.key !== this.effect) return;
+        if (probe.skip > 0) { probe.skip--; return; }
+
+        probe.times.push(ms);
+        if (probe.times.length < BAKE_PROBE_FRAMES) return;
+
+        this._bakeProbe = null;
+        const sorted = probe.times.slice().sort((a, b) => a - b);
+        const median = sorted[sorted.length >> 1];
+        if (median <= BAKE_BUDGET_MS) return;
+
+        // Too slow to bake here. Keep the effect on screen through CSS, where
+        // the compositor does the work, and say that the recording will not
+        // have it -- silently dropping either the effect or the frame rate
+        // would both be worse than saying which.
+        this._bakeUnaffordable.add(probe.key);
+        this._apply();
+        this.onBakeFallback?.(this.effects[probe.key]?.label || probe.key, median);
     }
 
     // --- fun-fx plumbing -------------------------------------------------
@@ -271,5 +520,8 @@ export class VideoFilters {
         }
         this._overlay?.remove();
         this._pixelCanvas?.remove();
+        this._pixelBuffer = null;
+        this._pixelBufferCtx = null;
+        this._scanlines = null;
     }
 }

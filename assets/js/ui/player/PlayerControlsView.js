@@ -1,4 +1,5 @@
 import { VideoFilters } from './VideoFilters.js';
+import { Toast } from '../../shared/utils/Toast.js';
 
 export function createPlayerControls(player) {
     const mount = (id) => {
@@ -114,6 +115,16 @@ function initFiltersPanel(player) {
     player.ui.resetFiltersBtn = q('#mb-reset-filters-btn');
     player.ui.closeFilterPanelBtn = q('.jellyjump-filter-panel .jellyjump-close-btn');
     player.videoFilters = new VideoFilters(player);
+    player.videoFilters.onBakeFallback = (label, ms) => {
+        // Only reachable in camera mode, and worth interrupting for: the
+        // effect is still on screen but the recording will not have it, and
+        // that is not something you can see while recording.
+        Toast.show(
+            `${label} is too slow to record on this device (${ms.toFixed(0)}ms a frame), `
+            + 'so it stays on the preview only. The recording will not have it.',
+            7000, true,
+        );
+    };
 }
 
 function initEqualizerPanel(player) {
