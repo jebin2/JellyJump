@@ -187,11 +187,9 @@ export async function process({
             if (resolution.width) videoConfig.width = resolution.width;
             if (resolution.height) videoConfig.height = resolution.height;
             if (resolution.width && resolution.height) videoConfig.fit = 'fill';
-        } else if (rotate && Math.abs(rotate) % 180 === 90) {
-            videoConfig.width = originalHeight;
-            videoConfig.height = originalWidth;
-            videoConfig.fit = 'fill';
         }
+        // No manual dimension swap for quarter turns: Mediabunny's width and
+        // height are post-rotation, so it sizes the output itself.
 
         // Crop
         if (crop) {
@@ -203,19 +201,48 @@ export async function process({
             };
         }
 
-        // Native (metadata) rotation is handled by mediabunny itself: decoded
-        // samples arrive display-oriented and the conversion carries the
-        // orientation through. Hand-baking it in the frame processor rotated
-        // frames a second time and center-cropped resized output (rotated,
-        // distorted videos). Only user-requested edits need the processor.
-        const needsRotation = rotate || flip;
-        if (removeBackgroundOptions || watermarkItems || blur || needsRotation || overlays) {
+        // Rotation and flipping are Mediabunny's job as of 1.57, and handing
+        // them over removes the last hand-rolled transform here.
+        //
+        // Mediabunny's `rotate` is documented as applying on top of whatever
+        // rotation the input file already carries, which is the behaviour
+        // wanted here.
+        //
+        // By inspection -- not measurement -- the old path looked like the
+        // same trap the comment above this block describes for native
+        // rotation: the processor was handed `nativeRotation` and re-applied
+        // it to samples that, per that comment, already arrive display
+        // oriented. I could not build a fixture carrying rotation metadata to
+        // confirm it (this ffmpeg bakes the rotation instead of tagging it),
+        // so it is recorded as a reading of the code, not a measured fact.
+        // Note the processor is still handed `nativeRotation` below for the
+        // watermark, blur and background paths, so if that reading is right,
+        // those combinations still have it.
+        //
+        // Mediabunny flips horizontally only, after rotating. A vertical flip
+        // is that same horizontal flip composed with a half turn, and flipping
+        // both ways is just a half turn -- so the two-axis flip this app
+        // offers maps onto it exactly, with no third case.
+        const flipH = !!flip?.horizontal;
+        const flipV = !!flip?.vertical;
+        const halfTurn = flipV ? 180 : 0;
+        const rotation = (((rotate || 0) + halfTurn) % 360 + 360) % 360;
+        if (rotation) videoConfig.rotate = rotation;
+        if (flipH !== flipV) videoConfig.flip = true;
+        if (rotation || flipH || flipV) {
+            // Kept baked into the pixels, as it always has been. Mediabunny
+            // would rather write orientation metadata and copy the packets --
+            // faster and lossless, but it only looks right in players that
+            // honour the metadata, and these files get downloaded and opened
+            // elsewhere.
+            videoConfig.allowTransformationMetadata = false;
+        }
+
+        if (removeBackgroundOptions || watermarkItems || blur || overlays) {
             videoConfig.process = buildFrameProcessor({
                 removeBackgroundOptions, watermarkItems, watermarkImages,
-                blur, rotate, flip, nativeRotation,
+                blur, rotate: 0, flip: null, nativeRotation,
                 originalWidth, originalHeight, firstTimestamp,
-                rotatedOutputWidth: videoConfig.width,
-                rotatedOutputHeight: videoConfig.height
             });
         }
 
