@@ -1,7 +1,27 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
-import { createMediaBunnyInput, shortVideoCodec, shortAudioCodec } from '../shared/InputFactory.js';
+import { createMediaBunnyInput } from '../shared/InputFactory.js';
 
+/**
+ * Trim without re-encoding, through Mediabunny's copy conversion.
+ *
+ * This used to copy packets by hand, and it could only start the output at a
+ * key frame -- so a trim landing mid-GOP silently began early. Measured on a
+ * clip with key frames every two seconds, asking for 3s-5s produced a three
+ * second file whose first frame was the source's frame at 2.0s: a whole
+ * second of footage the user had cut off, handed back to them anyway.
+ *
+ * Mediabunny 1.56 made copy conversions work for arbitrary trim ranges by
+ * writing an edit list, so the file may still *contain* the packets back to
+ * the preceding key frame while playing from exactly where it was asked to.
+ * The same request now yields a two second file starting at exactly 3.0s,
+ * pixel-identical to the source frame there.
+ *
+ * @param {Blob|File|string} source
+ * @param {{start: number, end: number}} trim
+ * @param {(progress: number) => void} [onProgress]
+ * @returns {Promise<Blob>}
+ */
 export async function losslessTrim({ source, trim, onProgress }) {
     Logger.log('[MediaProcessor] Starting lossless trim...', trim);
 
@@ -9,75 +29,35 @@ export async function losslessTrim({ source, trim, onProgress }) {
     try {
         input = createMediaBunnyInput(source);
 
-        const videoTrack = await input.getPrimaryVideoTrack();
-        if (!videoTrack) throw new Error('No video track found');
+        const output = new MediaBunny.Output({
+            format: new MediaBunny.Mp4OutputFormat(),
+            target: new MediaBunny.BufferTarget(),
+        });
 
-        const audioTracks = await input.getAudioTracks();
-        const audioTrack = audioTracks[0] ?? null;
+        const conversion = await MediaBunny.Conversion.init({
+            input,
+            output,
+            trim,
+            copy: {
+                // 'preferred', not 'forced': forced discards any track it
+                // cannot copy, which would hand back a silent video rather
+                // than one whose audio was re-encoded.
+                mode: 'preferred',
+                // Never drop media that was asked for. The region may be
+                // widened to the preceding key frame to make the copy
+                // possible; the edit list hides that on playback.
+                boundaryPolicy: 'expand',
+                // shiftTolerance is left at its default of 0, which keeps
+                // output timestamps exactly aligned with the input's.
+            },
+        });
 
-        const { start: trimStart, end: trimEnd } = trim;
-        const duration = trimEnd - trimStart;
+        if (onProgress) conversion.onProgress = onProgress;
 
-        const videoSink = new MediaBunny.EncodedPacketSink(videoTrack);
-        let startKeyPacket = await videoSink.getKeyPacket(trimStart);
-        if (!startKeyPacket) startKeyPacket = await videoSink.getFirstKeyPacket();
-        if (!startKeyPacket) throw new Error('No keyframe found in video');
-
-        const startOffset = startKeyPacket.timestamp;
-
-        const videoDecoderConfig = await videoTrack.getDecoderConfig();
-        if (!videoDecoderConfig) throw new Error('Could not get video decoder config');
-
-        const target = new MediaBunny.BufferTarget();
-        const output = new MediaBunny.Output({ format: new MediaBunny.Mp4OutputFormat(), target });
-
-        const videoPacketSource = new MediaBunny.EncodedVideoPacketSource(shortVideoCodec(videoDecoderConfig.codec));
-        output.addVideoTrack(videoPacketSource);
-
-        let audioPacketSource = null;
-        let audioDecoderConfig = null;
-        if (audioTrack) {
-            audioDecoderConfig = await audioTrack.getDecoderConfig();
-            if (audioDecoderConfig) {
-                audioPacketSource = new MediaBunny.EncodedAudioPacketSource(shortAudioCodec(audioDecoderConfig.codec));
-                output.addAudioTrack(audioPacketSource);
-            }
-        }
-
-        await output.start();
-
-        let firstVideo = true;
-        for await (const packet of videoSink.packets(startKeyPacket)) {
-            if (packet.timestamp >= trimEnd) break;
-            const shiftedTs = packet.timestamp - startOffset;
-            const shifted = packet.clone({ timestamp: shiftedTs });
-            await videoPacketSource.add(shifted, firstVideo ? { decoderConfig: videoDecoderConfig } : undefined);
-            firstVideo = false;
-            onProgress?.(Math.min((shiftedTs / duration) * 0.85, 0.85));
-        }
-        videoPacketSource.close();
-
-        if (audioTrack && audioPacketSource && audioDecoderConfig) {
-            const audioSink = new MediaBunny.EncodedPacketSink(audioTrack);
-            const audioStartPacket = await audioSink.getPacket(startOffset) ?? await audioSink.getFirstPacket();
-            if (audioStartPacket) {
-                let firstAudio = true;
-                for await (const packet of audioSink.packets(audioStartPacket)) {
-                    if (packet.timestamp >= trimEnd) break;
-                    const shiftedTs = packet.timestamp - startOffset;
-                    if (shiftedTs < 0) continue;
-                    const shifted = packet.clone({ timestamp: shiftedTs });
-                    await audioPacketSource.add(shifted, firstAudio ? { decoderConfig: audioDecoderConfig } : undefined);
-                    firstAudio = false;
-                }
-            }
-            audioPacketSource.close();
-        }
-
-        await output.finalize();
+        await conversion.execute();
         onProgress?.(1);
 
-        return new Blob([target.buffer], { type: 'video/mp4' });
+        return new Blob([output.target.buffer], { type: 'video/mp4' });
     } finally {
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('losslessTrim: dispose error', e); }

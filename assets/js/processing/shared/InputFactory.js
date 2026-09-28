@@ -33,23 +33,3 @@ export function getBitrate(quality, pixelCount, sourceBitrate = 0) {
 
     return Math.floor(targetBitrate);
 }
-
-export function shortVideoCodec(fullCodec = '') {
-    const c = fullCodec.toLowerCase();
-    if (c.startsWith('avc')) return 'avc';
-    if (c.startsWith('hev') || c.startsWith('hvc')) return 'hevc';
-    if (c.startsWith('vp09') || c.startsWith('vp9')) return 'vp9';
-    if (c.startsWith('av01') || c.startsWith('av1')) return 'av1';
-    if (c.startsWith('vp08') || c.startsWith('vp8')) return 'vp8';
-    return fullCodec;
-}
-
-export function shortAudioCodec(fullCodec = '') {
-    const c = fullCodec.toLowerCase();
-    if (c.startsWith('mp4a') || c === 'aac') return 'aac';
-    if (c === 'opus') return 'opus';
-    if (c === 'mp3' || c.startsWith('mp3') || c === '.mp3') return 'mp3';
-    if (c === 'flac') return 'flac';
-    if (c === 'ac-3' || c === 'ac3') return 'ac3';
-    return fullCodec;
-}
