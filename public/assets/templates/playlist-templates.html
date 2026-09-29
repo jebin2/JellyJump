@@ -355,7 +355,7 @@
                     </div>
                 </div>
                 <div class="tool-card-info">Duration: <span class="trim-duration">00:00:00</span></div>
-                <label class="checkbox-option mt-sm" title="Skip re-encoding — snaps start/end to nearest keyframe. Instant processing.">
+                <label class="checkbox-option mt-sm" title="Skip re-encoding. The cut is exact either way; this just avoids rebuilding the picture.">
                     <input type="checkbox" id="trim-lossless-toggle">
                     <span class="checkbox-label text-sm">⚡ Lossless (fast, keyframe-snapped)</span>
                 </label>
@@ -2381,5 +2381,43 @@
                 <use href="assets/icons/sprite.svg#icon-close"></use>
             </svg>
         </button>
+    </div>
+</template>
+
+<!-- Export with the on-screen effects baked into the file -->
+<template id="export-fx-content-template">
+    <div class="modal-controls-panel">
+        <div class="flex flex-col gap-md p-md">
+            <div class="control-group">
+                <label class="text-xs text-secondary font-mono mb-sm block">BAKED INTO THE FILE</label>
+                <ul class="export-fx-summary flex flex-col gap-xs text-sm"></ul>
+                <p class="export-fx-empty hidden text-xs text-muted">
+                    Nothing is applied yet. Open the filter panel on the player and add a
+                    colour effect, a sticker, a border or some rain, then come back.
+                </p>
+            </div>
+
+            <div class="w-full h-px bg-border my-sm"></div>
+
+            <div class="control-group">
+                <label class="text-xs text-secondary font-mono mb-sm block">RANGE</label>
+                <div class="tool-card-times">
+                    <div class="tool-card-input">
+                        <label>Start</label>
+                        <input type="text" id="export-fx-start" class="mb-input font-mono" placeholder="0:00.000">
+                    </div>
+                    <div class="tool-card-input">
+                        <label>End</label>
+                        <input type="text" id="export-fx-end" class="mb-input font-mono" placeholder="0:00.000">
+                    </div>
+                </div>
+                <p class="text-xs text-muted mt-sm">Leave these alone to export the whole video.</p>
+            </div>
+
+            <p class="export-fx-note text-xs text-muted">
+                Re-encodes the video, so it takes a while and the picture is rebuilt rather
+                than copied. The audio is carried over untouched.
+            </p>
+        </div>
     </div>
 </template>

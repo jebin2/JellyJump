@@ -15,7 +15,7 @@ import { Toast } from "../../../shared/utils/Toast.js";
 const NEEDS_MEDIA_FILE = new Set([
     'convert', 'trim', 'multicut', 'resize', 'crop', 'create-gif', 'reverse',
     'speed', 'remove-bg', 'watermark', 'blur', 'rotate', 'record', 'merge',
-    'detect-cuts', 'detect-motion', 'encrypt', 'download-manage',
+    'detect-cuts', 'detect-motion', 'encrypt', 'download-manage', 'export-fx',
 ]);
 
 /**
@@ -59,6 +59,11 @@ export class MenuRouter {
             case 'trim': {
                 const { TrimMenu } = await import('../features/TrimMenu.js');
                 await TrimMenu.init(item, playlist);
+                break;
+            }
+            case 'export-fx': {
+                const { ExportMenu } = await import('../features/ExportMenu.js');
+                await ExportMenu.init(item, playlist);
                 break;
             }
             case 'multicut': {

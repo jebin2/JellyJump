@@ -60,6 +60,11 @@ export const FOOTER_CONFIGS = {
         icon: 'icon-scissors',
         title: 'Trim'
     },
+    exportFx: {
+        actionClass: 'export-fx-btn',
+        icon: 'icon-download',
+        title: 'Export'
+    },
     resize: {
         actionClass: 'resize-btn',
         icon: 'icon-maximize',

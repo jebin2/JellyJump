@@ -44,6 +44,7 @@ export const ItemToolsMenu = {
             { action: 'watermark', icon: 'icon-watermark', label: 'Watermark' },
             { action: 'rotate', icon: 'icon-rotate-cw', label: 'Rotate' },
             { action: 'blur', icon: 'icon-blur', label: 'Blur' },
+            { action: 'export-fx', icon: 'icon-filter', label: 'Export FX' },
             { action: 'detect-cuts', icon: 'icon-scenes', label: 'Scenes' },
             { action: 'detect-motion', icon: 'icon-motion', label: 'Motion' },
             { action: 'encrypt', icon: 'icon-lock', label: 'Encrypt/Decrypt' },
