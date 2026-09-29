@@ -1,0 +1,2 @@
+var e=globalThis.location?.hostname??``,t=e===`localhost`||e===`127.0.0.1`||e.startsWith(`192.168.`),n={isEnabled(){return t},log(...e){t&&console.log(...e)},warn(...e){t&&console.warn(...e)},error(...e){console.error(...e)},debug(...e){t&&console.debug(...e)},info(...e){t&&console.info(...e)},group(e){t&&console.group(e)},groupEnd(){t&&console.groupEnd()},tagged(e,...n){t&&console.log(`[${e}]`,...n)}};export{n as t};
+//# sourceMappingURL=Logger-C6IhgouS.js.map
