@@ -737,16 +737,6 @@ export class Playlist {
     }
 
     /**
-     * Get video duration using MediaBunny
-     * @param {File|string} resource - File object or URL string
-     * @returns {Promise<number>}
-     * @private
-     */
-    async _getVideoDuration(resource) {
-        return await MediaMetadata.getVideoDuration(resource);
-    }
-
-    /**
      * Prefetch metadata for a video asynchronously (non-blocking)
      * This improves UX when user opens Video Info or uses operations
      * @param {Object} item - Playlist item
@@ -1985,17 +1975,6 @@ export class Playlist {
 
         // Store reference for recording state updates
         this._toolsBtn = toolsBtn;
-    }
-
-    /**
-     * Get formatted metadata for a file
-     * @param {Blob} blob
-     * @param {string} filename
-     * @returns {Promise<Object>}
-     * @private
-     */
-    async _getFormattedMetadata(blob, filename) {
-        return await MediaMetadata.getFormattedMetadata(blob, filename);
     }
 
 
