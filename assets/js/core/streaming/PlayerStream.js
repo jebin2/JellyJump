@@ -1,5 +1,6 @@
 import { MediaBunny } from '../MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
+import { RecordingClock } from './RecordingClock.js';
 
 export class PlayerStream {
     constructor(player) {
@@ -34,16 +35,15 @@ export class PlayerStream {
         this._canvasAudioSource = null;
         this._canvasReadyForMoreFrames = true;
         this._canvasLastFrameNumber = -1;
-        this._canvasRecordedDuration = 0;
-        this._lastFrameWallTime = null;
-        this._resetRecordingClock = false;
+        // How far into the recording we are, in played time rather than wall
+        // time. Lives in its own module because it is the most timing-sensitive
+        // thing here and could not be tested while it was spread across these
+        // fields. _canvasRecordingPausedTime, _canvasPauseStartTime and
+        // _canvasStartTime went with it: all three were written and never read.
+        this._recordingClock = new RecordingClock();
         this._recordingAudioContext = null;
         this._audioStreamSource = null;
         this._audioProcessor = null;
-        this._audioRecordedDuration = 0;
-        this._canvasRecordingPausedTime = 0;
-        this._canvasPauseStartTime = null;
-        this._canvasStartTime = null;
         this._canvasCaptureInterval = null;
     }
 
@@ -133,7 +133,7 @@ export class PlayerStream {
         if (this._recordingAudioContext && this._recordingAudioContext.state === 'running') {
             this._recordingAudioContext.suspend();
         }
-        this._resetRecordingClock = true;
+        this._recordingClock.markDiscontinuity();
     }
 
     pauseStream(showOverlay) {
@@ -593,15 +593,10 @@ export class PlayerStream {
         this._canvasAudioSource = null;
         this._canvasReadyForMoreFrames = true;
         this._canvasLastFrameNumber = -1;
-        this._canvasRecordedDuration = 0;
-        this._lastFrameWallTime = performance.now();
-        this._resetRecordingClock = true;
+        this._recordingClock.start(performance.now());
         this._recordingAudioContext = null;
         this._audioStreamSource = null;
         this._audioProcessor = null;
-        this._audioRecordedDuration = 0;
-        this._canvasRecordingPausedTime = 0;
-        this._canvasPauseStartTime = null;
 
         let audioTrack = options.audioTrack;
         if (!audioTrack && this.streamVideo?.srcObject) {
@@ -648,17 +643,16 @@ export class PlayerStream {
                 this._audioProcessor = this._recordingAudioContext.createScriptProcessor(4096, 2, 2);
 
                 this._audioProcessor.onaudioprocess = (e) => {
-                    if (!this._isCanvasRecording || this._resetRecordingClock || !this._isMediaReady) return;
+                    if (!this._isCanvasRecording || !this._isMediaReady) return;
 
                     const inputBuffer = e.inputBuffer;
-                    const timestamp = this._audioRecordedDuration;
-                    this._audioRecordedDuration += inputBuffer.duration;
+                    const currentTimestamp = this._recordingClock.nextAudioTimestamp(inputBuffer.duration);
 
                     try {
-                        const currentTimestamp = Number(timestamp);
-                        if (isNaN(currentTimestamp)) {
-                            Logger.warn('[Record] Timestamp is NaN, resetting to 0');
-                            this._audioRecordedDuration = 0;
+                        // null covers both cases the inline version handled: a
+                        // buffer arriving while the clock is unanchored, and a
+                        // timestamp that had gone non-finite.
+                        if (currentTimestamp === null) {
                             return;
                         }
 
@@ -689,7 +683,6 @@ export class PlayerStream {
         }
 
         await this._canvasOutput.start();
-        this._canvasStartTime = performance.now();
 
         if (!player.isPlaying && this._canvasAudioSource) {
             try {
@@ -706,20 +699,15 @@ export class PlayerStream {
             if (!this._isCanvasRecording || !player.isPlaying || !this._isMediaReady) return;
             if (!this._canvasReadyForMoreFrames) return;
 
-            const now = performance.now();
-            if (this._resetRecordingClock) {
-                this._lastFrameWallTime = now;
-                this._resetRecordingClock = false;
-                return;
-            }
-
-            const delta = (now - this._lastFrameWallTime) / 1000;
-            this._lastFrameWallTime = now;
-            this._canvasRecordedDuration += delta;
+            // null means this frame is the one re-anchoring the clock after a
+            // pause, so it is skipped rather than written at a timestamp that
+            // would carry the pause into the file.
+            const timestamp = this._recordingClock.nextVideoTimestamp(performance.now());
+            if (timestamp === null) return;
 
             this._canvasReadyForMoreFrames = false;
             try {
-                await videoSource.add(this._canvasRecordedDuration, 1 / frameRate);
+                await videoSource.add(timestamp, 1 / frameRate);
             } catch (e) {
                 Logger.warn('Frame add error', e);
             }
@@ -734,7 +722,7 @@ export class PlayerStream {
     }
 
     resumeRecordingSmartPause() {
-        if (this._isCanvasRecording) this._resetRecordingClock = true;
+        if (this._isCanvasRecording) this._recordingClock.markDiscontinuity();
     }
 
     async stopCanvasRecording() {
