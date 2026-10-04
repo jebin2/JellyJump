@@ -330,7 +330,14 @@ export class InfoMenu {
                     // Get video track extended info
                     const videoTrack = await input.getPrimaryVideoTrack();
                     if (videoTrack) {
-                        // Frame count and color space from packet stats scan
+                        // Frame count and color space from packet stats scan.
+                        //
+                        // This is the one place that genuinely needs the full
+                        // scan: an exact packet count cannot come from a
+                        // sample, and nor can it come from metadata. Everywhere
+                        // else that used to scan wanted only the frame rate and
+                        // now asks computeFrameRateMetrics instead -- do not
+                        // "optimise" this one to match them.
                         try {
                             const stats = await videoTrack.computePacketStats();
                             if (stats && stats.packetCount) {
@@ -397,12 +404,19 @@ export class InfoMenu {
                     const audioTrack = await input.getPrimaryAudioTrack();
                     if (audioTrack) {
                         try {
-                            const audioStats = await audioTrack.computePacketStats();
-                            if (audioStats && audioStats.averageBitrate) {
-                                audioBitrate = `${Math.round(audioStats.averageBitrate / 1000)} kbps`;
+                            // The container's own figure first -- free, and
+                            // written by whatever made the file. Only when it
+                            // is absent is a sample worth taking, and ~50
+                            // packets is plenty for a displayed estimate; the
+                            // whole file was never needed for one line of text.
+                            const stated = await audioTrack.getAverageBitrate();
+                            const bitrate = stated
+                                || (await audioTrack.computePacketStats(50)).averageBitrate;
+                            if (bitrate) {
+                                audioBitrate = `${Math.round(bitrate / 1000)} kbps`;
                             }
                         } catch (e) {
-                            Logger.warn('Failed to compute audio packet stats:', e);
+                            Logger.warn('Failed to determine audio bitrate:', e);
                         }
 
                         // Codec parameter string

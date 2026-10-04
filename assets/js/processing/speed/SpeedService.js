@@ -100,9 +100,12 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         let sourceFps = 30;
         let sourceBitrate = 0;
         try {
-            const stats = await videoTrack.computePacketStats();
-            sourceFps = stats.averagePacketRate || 30;
-            sourceBitrate = stats.averageBitrate || 0;
+            const metrics = await videoTrack.computeFrameRateMetrics();
+            sourceFps = metrics.bestGuessFrameRate || 30;
+            // Bitrate still from packet stats, but sampled from the first ~50
+            // rather than the whole file: it only feeds a bitrate budget,
+            // which does not need an exact figure.
+            sourceBitrate = (await videoTrack.computePacketStats(50)).averageBitrate || 0;
         } catch (e) {
             Logger.warn('[MediaProcessor] Could not compute frame rate, defaulting to 30fps', e);
         }
@@ -229,8 +232,8 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
 
         let sourceFps = 30;
         try {
-            const stats = await videoTrack.computePacketStats();
-            sourceFps = stats.averagePacketRate || 30;
+            const metrics = await videoTrack.computeFrameRateMetrics();
+            sourceFps = metrics.bestGuessFrameRate || 30;
         } catch (e) {
             Logger.warn('[MediaProcessor] Could not compute frame rate, defaulting to 30fps', e);
         }

@@ -129,8 +129,8 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
 
             let sourceFps = 30;
             try {
-                const stats = await videoTrack.computePacketStats();
-                sourceFps = stats.averagePacketRate || 30;
+                const metrics = await videoTrack.computeFrameRateMetrics();
+                sourceFps = metrics.bestGuessFrameRate || 30;
             } catch (e) {
                 Logger.warn('[MediaProcessor] Could not compute frame rate, defaulting to 30fps');
             }
