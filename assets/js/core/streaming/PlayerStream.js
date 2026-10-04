@@ -16,6 +16,12 @@ export class PlayerStream {
         this._liveAnchorWallOverride = null;
         this._liveAvSyncPaused = false;
         this._liveAvSyncMonitor = null;
+        // Declared rather than sprung into existence mid-method, which is how
+        // both of these used to appear: a timer handle whose field only
+        // existed once something had started it, and a guard that read as
+        // undefined until the loop first ran.
+        this._liveBadgeTimer = null;
+        this._isLiveLoopActive = false;
         this._wasMutedForAutoplay = false;
         this.streamRenderLoopId = null;
         this._isFetchingLiveFrame = false;

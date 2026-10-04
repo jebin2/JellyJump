@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  pages: read
 
 jobs:
   build-and-deploy:
@@ -33,6 +34,15 @@ jobs:
       
       - name: Build with Vite
         run: npm run build
+
+      - name: Note the current Pages build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          before=$(gh api "repos/${{ github.repository }}/pages/builds/latest" --jq '.created_at' 2>/dev/null || echo none)
+          echo "PAGES_BUILD_BEFORE=$before" >> "$GITHUB_ENV"
+          echo "Pages build current before this deploy: $before"
 
       - name: Deploy to release branch
         run: |
@@ -69,7 +79,49 @@ jobs:
           # Commit if there are changes
           if ! git diff --staged --quiet 2>/dev/null; then
             git commit -m "Build: Update release artifacts from main [skip ci]"
+            echo "PAGES_EXPECT_BUILD=yes" >> "$GITHUB_ENV"
+          else
+            echo "Nothing changed; Pages will not rebuild."
+            echo "PAGES_EXPECT_BUILD=no" >> "$GITHUB_ENV"
           fi
           
           # Push to release branch
           git push -f origin release
+
+      # Pushing to `release` is not the deploy. GitHub Pages then builds that
+      # branch itself, as a separate job with its own outcome -- and that
+      # build can fail while this workflow still reports success. It has: a
+      # green run published nothing, and the symptom was indistinguishable
+      # from slow CDN propagation. Without this step there is no signal at all.
+      - name: Verify GitHub Pages published
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.PAGES_EXPECT_BUILD == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          deadline=$(( SECONDS + 600 ))
+          while (( SECONDS < deadline )); do
+            if ! json=$(gh api "repos/${{ github.repository }}/pages/builds/latest" 2>/dev/null); then
+              echo "Pages API not answering yet; retrying."
+              sleep 15
+              continue
+            fi
+            status=$(jq -r '.status' <<< "$json")
+            created=$(jq -r '.created_at' <<< "$json")
+
+            # A build that predates this deploy says nothing about it.
+            if [ "$created" = "$PAGES_BUILD_BEFORE" ]; then
+              echo "Waiting for a new Pages build to start (newest is still $created)."
+            elif [ "$status" = "built" ]; then
+              echo "Pages published commit $(jq -r '.commit' <<< "$json")."
+              exit 0
+            elif [ "$status" = "errored" ]; then
+              echo "::error::GitHub Pages build failed: $(jq -r '.error.message // "no message given"' <<< "$json")"
+              exit 1
+            else
+              echo "Pages build is $status."
+            fi
+            sleep 15
+          done
+          echo "::error::Timed out after 10 minutes waiting for the GitHub Pages build."
+          exit 1
