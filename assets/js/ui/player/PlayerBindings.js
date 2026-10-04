@@ -134,7 +134,7 @@ export function attachPlayerBindings(player) {
             if (e.target.type === 'radio') {
                 const value = e.target.value;
                 if (value === 'off') {
-                    player.isSubtitlesEnabled = false;
+                    player.subtitles.disable();
                 } else {
                     player._switchSubtitleTrack(value);
                 }

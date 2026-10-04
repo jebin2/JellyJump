@@ -16,7 +16,6 @@ import {
     PLAYER_CONTROL_PRESETS,
     CONTROL_BAR_MODE_DEFAULT
 } from './config.js';
-import { SubtitleManager } from './subtitles/SubtitleManager.js';
 import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
 import { hasOverlays } from '../ui/player/OverlayCompositor.js';
 import {
@@ -120,7 +119,6 @@ import { PlayerControlBar } from '../ui/player/PlayerControlBar.js';
 
 import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { Logger } from '../shared/utils/Logger.js';
-import { ThumbnailGenerator } from '../ui/player/ThumbnailGenerator.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -169,11 +167,6 @@ export class CorePlayer {
         this.audioIteratorCleanupPromise = null;
 
         // Subtitles
-        this.subtitleManager = null;
-        this.isSubtitlesEnabled = false;
-        this.subtitleTracks = [];
-        this.activeSubtitleTrackId = null;
-        this.subtitleTrackCounter = 0;
         this.onSubtitleChange = null;
 
         // Screenshot Manager — lazily initialized
@@ -198,20 +191,6 @@ export class CorePlayer {
         this.asyncId = 0;
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
-
-        // Thumbnail Generator
-        this.thumbnailGenerator = null;
-        if (this.config.controls.thumbnails) {
-            this.thumbnailGenerator = new ThumbnailGenerator();
-            this.thumbnailGenerator.progressCallback = () => {
-                if (this.ui.thumbnailOverlay && this.ui.thumbnailOverlay.classList.contains('visible')) {
-                    this._updateThumbnailImage(this.lastThumbnailHoverTime);
-                }
-            };
-        }
-        this.thumbnailGenerationStarted = false;
-        this.thumbnailHoverTimer = null;
-        this.lastThumbnailHoverTime = 0;
 
         // Scrubbing state
         this.isScrubbing = false;
@@ -301,9 +280,6 @@ export class CorePlayer {
     _init() {
         mountPlayerShell(this);
 
-        if (this.config.controls.captions) {
-            this.subtitleManager = new SubtitleManager();
-        }
         if (this.config.controls.settings) {
             this.screenshotManager = new ScreenshotManager(this);
         }
@@ -806,10 +782,8 @@ export class CorePlayer {
             this.resizeObserver = null;
         }
 
-        if (this.thumbnailGenerator) {
-            this.thumbnailGenerator.destroy();
-            this.thumbnailGenerator = null;
-        }
+        // The component owns the generator, which holds decoded frames.
+        this.thumbnails?.destroy();
 
         if (this.videoFilters) {
             this.videoFilters.destroy?.();

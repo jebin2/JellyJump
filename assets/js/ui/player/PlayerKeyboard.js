@@ -86,7 +86,7 @@ export class PlayerKeyboard {
                 break;
             case 'c':
                 e.preventDefault();
-                p.isSubtitlesEnabled = !p.isSubtitlesEnabled;
+                p.subtitles.toggle();
                 p._updateSubtitleMenu();
                 break;
             case 'escape':

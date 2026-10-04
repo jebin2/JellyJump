@@ -138,11 +138,7 @@ export async function cleanupPlayerForLoad(player) {
     player._updateTimeDisplay();
     disposeMediaBunnyResources(player);
 
-    player.subtitleTracks = [];
-    player.subtitleTrackCounter = 0;
-    player.activeSubtitleTrackId = null;
-    player.isSubtitlesEnabled = false;
-    if (player.subtitleManager) player.subtitleManager.cues = [];
+    player.subtitles.reset();
 }
 
 export async function setupPlayerMediaTracks(player, url, isHls) {

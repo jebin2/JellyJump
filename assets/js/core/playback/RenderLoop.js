@@ -141,7 +141,7 @@ export function startPlayerRenderLoop(player) {
 
             player._updateProgress();
 
-            if (player.isSubtitlesEnabled) {
+            if (player.subtitles.enabled) {
                 player._renderSubtitles(playbackTime);
             }
         }

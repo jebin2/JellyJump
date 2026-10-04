@@ -1,15 +1,47 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
 import { Toast } from '../../shared/utils/Toast.js';
+import { SubtitleManager } from '../../core/subtitles/SubtitleManager.js';
 
 export class PlayerSubtitles {
     constructor(player) {
         this.player = player;
+
+        // Owned here rather than on Player, which held all five of these for
+        // this file to reach back and mutate. The parser is created only when
+        // captions are enabled, exactly as before.
+        this.manager = player.config.controls.captions ? new SubtitleManager() : null;
+        this.enabled = false;
+        this.tracks = [];
+        this.activeTrackId = null;
+        this.trackCounter = 0;
+    }
+
+    /**
+     * Forget everything about the previous file. One call in place of the five
+     * assignments the load path used to make into Player's fields.
+     */
+    reset() {
+        this.tracks = [];
+        this.trackCounter = 0;
+        this.activeTrackId = null;
+        this.enabled = false;
+        if (this.manager) this.manager.cues = [];
+    }
+
+    /** Turn captions off without forgetting the tracks that were loaded. */
+    disable() {
+        this.enabled = false;
+    }
+
+    /** What the C key does. */
+    toggle() {
+        this.enabled = !this.enabled;
     }
 
     async loadSubtitle(url, name) {
         const p = this.player;
-        if (!p.subtitleManager) {
+        if (!this.manager) {
             Logger.warn('Subtitle manager not initialized (captions disabled)');
             return;
         }
@@ -30,24 +62,24 @@ export class PlayerSubtitles {
                 }
             }
 
-            p.subtitleManager.parse(vttContent);
+            this.manager.parse(vttContent);
 
-            p.subtitleTrackCounter++;
-            const trackId = `custom-${p.subtitleTrackCounter}`;
-            const trackName = name || `Custom ${p.subtitleTrackCounter}`;
+            this.trackCounter++;
+            const trackId = `custom-${this.trackCounter}`;
+            const trackName = name || `Custom ${this.trackCounter}`;
 
-            p.subtitleTracks.push({
+            this.tracks.push({
                 id: trackId,
                 name: trackName,
-                cues: [...p.subtitleManager.cues]
+                cues: [...this.manager.cues]
             });
 
-            p.activeSubtitleTrackId = trackId;
-            p.isSubtitlesEnabled = true;
+            this.activeTrackId = trackId;
+            this.enabled = true;
             this.updateSubtitleMenu();
             Logger.log(`Subtitles loaded successfully as "${trackName}"`);
 
-            if (p.onSubtitleChange) p.onSubtitleChange(p.subtitleTracks);
+            if (p.onSubtitleChange) p.onSubtitleChange(this.tracks);
         } catch (error) {
             Logger.error('Error loading subtitles:', error);
         }
@@ -81,7 +113,7 @@ export class PlayerSubtitles {
             });
 
             // loadSubtitle bumps the counter and assigns this same number.
-            const name = `AI Generated ${p.subtitleTrackCounter + 1}`;
+            const name = `AI Generated ${this.trackCounter + 1}`;
             const blob = new Blob([vtt], { type: 'text/vtt' });
             const url = URL.createObjectURL(blob);
             try {
@@ -122,7 +154,7 @@ export class PlayerSubtitles {
         const oldCustomOptions = p.ui.subtitleOptions.querySelectorAll('[data-track-id]');
         oldCustomOptions.forEach(item => item.remove());
 
-        p.subtitleTracks.forEach(track => {
+        this.tracks.forEach(track => {
             const label = document.createElement('label');
             label.className = 'subtitle-radio-option';
             label.setAttribute('data-track-id', track.id);
@@ -134,11 +166,11 @@ export class PlayerSubtitles {
         });
 
         const offRadio = p.ui.subtitleOptions.querySelector('input[value="off"]');
-        if (!p.isSubtitlesEnabled) {
+        if (!this.enabled) {
             if (offRadio) offRadio.checked = true;
             p.ui.ccBtn.classList.remove('active');
         } else {
-            const activeRadio = p.ui.subtitleOptions.querySelector(`input[value="${p.activeSubtitleTrackId}"]`);
+            const activeRadio = p.ui.subtitleOptions.querySelector(`input[value="${this.activeTrackId}"]`);
             if (activeRadio) activeRadio.checked = true;
             p.ui.ccBtn.classList.add('active');
         }
@@ -146,12 +178,12 @@ export class PlayerSubtitles {
 
     switchSubtitleTrack(trackId) {
         const p = this.player;
-        const track = p.subtitleTracks.find(t => t.id === trackId);
+        const track = this.tracks.find(t => t.id === trackId);
         if (!track) return;
 
-        p.subtitleManager.cues = [...track.cues];
-        p.activeSubtitleTrackId = trackId;
-        p.isSubtitlesEnabled = true;
+        this.manager.cues = [...track.cues];
+        this.activeTrackId = trackId;
+        this.enabled = true;
         this.updateSubtitleMenu();
         Logger.log(`Switched to subtitle track: ${track.name}`);
     }
@@ -214,9 +246,9 @@ export class PlayerSubtitles {
 
     renderSubtitles(timestamp) {
         const p = this.player;
-        if (!p.subtitleManager) return;
+        if (!this.manager) return;
 
-        const activeCues = p.subtitleManager.getActiveCues(timestamp);
+        const activeCues = this.manager.getActiveCues(timestamp);
         if (activeCues.length === 0) return;
 
         const fontSize = Math.max(22, p.canvas.height * 0.055);
@@ -297,12 +329,12 @@ export class PlayerSubtitles {
 
     restoreSavedSubtitles(savedSubtitles) {
         const p = this.player;
-        p.subtitleTracks = savedSubtitles.map(track => ({
+        this.tracks = savedSubtitles.map(track => ({
             id: track.id,
             name: track.name,
             cues: [...track.cues]
         }));
-        p.subtitleTrackCounter = savedSubtitles.reduce((max, track) => {
+        this.trackCounter = savedSubtitles.reduce((max, track) => {
             const match = track.id.match(/custom-(\d+)/);
             return match ? Math.max(max, parseInt(match[1])) : max;
         }, 0);

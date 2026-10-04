@@ -1,9 +1,36 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { formatTime } from '../../shared/utils/mediaUtils.js';
+import { ThumbnailGenerator } from './ThumbnailGenerator.js';
 
+/**
+ * PlayerThumbnails - the hover preview strip over the progress bar.
+ *
+ * It owns its own state now. The generator, whether generation has started,
+ * the hover debounce timer and the last hovered time all used to live on
+ * Player and be reached back through `this.player`, which meant four of
+ * Player's seventy-four fields existed solely for this file to mutate.
+ *
+ * Nothing outside reads any of it, so this moved without a single call site
+ * changing: Player's six thumbnail methods still delegate here.
+ */
 export class PlayerThumbnails {
     constructor(player) {
         this.player = player;
+
+        this.generator = null;
+        this.generationStarted = false;
+        this.hoverTimer = null;
+        this.lastHoverTime = 0;
+
+        if (player.config.controls.thumbnails) {
+            this.generator = new ThumbnailGenerator();
+            // Frames arrive over time, so repaint whatever the pointer is
+            // currently sitting on as they do.
+            this.generator.progressCallback = () => {
+                const overlay = player.ui.thumbnailOverlay;
+                if (overlay?.classList.contains('visible')) this.updateImage(this.lastHoverTime);
+            };
+        }
     }
 
     createOverlay() {
@@ -41,16 +68,16 @@ export class PlayerThumbnails {
         p.ui.thumbnailOverlay.style.left = `${clampedRelLeft}px`;
         p.ui.thumbnailOverlay.style.bottom = `${containerRect.bottom - rect.top + 15}px`;
         p.ui.thumbnailTime.textContent = formatTime(time);
-        p.lastThumbnailHoverTime = time;
+        this.lastHoverTime = time;
 
         this.updateImage(time);
     }
 
     updateImage(time) {
         const p = this.player;
-        if (!p.ui.thumbnailOverlay || !p.thumbnailGenerator) return;
+        if (!p.ui.thumbnailOverlay || !this.generator) return;
 
-        const thumb = p.thumbnailGenerator.getThumbnail(time);
+        const thumb = this.generator.getThumbnail(time);
         if (thumb) {
             p.ui.thumbnailOverlay.style.backgroundImage = `url(${thumb})`;
             p.ui.thumbnailLoader.style.display = 'none';
@@ -58,8 +85,9 @@ export class PlayerThumbnails {
             p.ui.thumbnailOverlay.style.backgroundImage = 'none';
             p.ui.thumbnailLoader.style.display = 'block';
 
-            if (!p.thumbnailGenerationStarted && !p.thumbnailHoverTimer) {
-                p.thumbnailHoverTimer = setTimeout(() => this.startGeneration(), 300);
+            // Hovering briefly should not kick off a whole pass over the file.
+            if (!this.generationStarted && !this.hoverTimer) {
+                this.hoverTimer = setTimeout(() => this.startGeneration(), 300);
             }
         }
     }
@@ -67,17 +95,14 @@ export class PlayerThumbnails {
     handleLeave() {
         const p = this.player;
         if (p.ui.thumbnailOverlay) p.ui.thumbnailOverlay.classList.remove('visible');
-        if (p.thumbnailHoverTimer) {
-            clearTimeout(p.thumbnailHoverTimer);
-            p.thumbnailHoverTimer = null;
-        }
+        this._clearHoverTimer();
     }
 
     async startGeneration() {
-        const p = this.player;
-        if (p.thumbnailGenerationStarted) return;
-        p.thumbnailGenerationStarted = true;
+        if (this.generationStarted) return;
+        this.generationStarted = true;
 
+        const p = this.player;
         const url = p.sourceUrl;
         if (!url) return;
 
@@ -89,22 +114,36 @@ export class PlayerThumbnails {
 
         Logger.log('[Thumbnails] Starting generation with URL:', url);
         try {
-            await p.thumbnailGenerator.generate(url, p.duration, { width: 160, count: 100 });
+            await this.generator.generate(url, p.duration, { width: 160, count: 100 });
             Logger.log('[Thumbnails] Generation complete');
         } catch (e) {
             Logger.warn('[Thumbnails] Generation failed:', e);
-            p.thumbnailGenerationStarted = false;
+            this.generationStarted = false;
         }
     }
 
     cleanup() {
-        const p = this.player;
-        if (p.thumbnailGenerator) p.thumbnailGenerator.cancel();
-        p.thumbnailGenerationStarted = false;
-        if (p.thumbnailHoverTimer) {
-            clearTimeout(p.thumbnailHoverTimer);
-            p.thumbnailHoverTimer = null;
+        if (this.generator) this.generator.cancel();
+        this.generationStarted = false;
+        this._clearHoverTimer();
+        const overlay = this.player.ui.thumbnailOverlay;
+        if (overlay) overlay.style.backgroundImage = 'none';
+    }
+
+    /** Releases the generator, which holds decoded frames. */
+    destroy() {
+        this._clearHoverTimer();
+        if (this.generator) {
+            this.generator.destroy();
+            this.generator = null;
         }
-        if (p.ui.thumbnailOverlay) p.ui.thumbnailOverlay.style.backgroundImage = 'none';
+    }
+
+    /** @private */
+    _clearHoverTimer() {
+        if (this.hoverTimer) {
+            clearTimeout(this.hoverTimer);
+            this.hoverTimer = null;
+        }
     }
 }
