@@ -42,9 +42,16 @@ export function composeFrame(ctx, source, width, height, {
     decorations?.drawFront(frame, ctx, timeMs);
 }
 
-/** True when there is anything to draw over the frame at all. */
-export function hasOverlays({ filters, stickers, decorations } = {}) {
-    return !!(filters?.isActive?.() || stickers?.stickers?.length > 0 || decorations?.isActive?.());
+/**
+ * True when something is drawn *on top of* the frame.
+ *
+ * Deliberately blind to the colour effects. Colour is a treatment of the
+ * frame, not a thing above it, and it is this answer that decides whether the
+ * colour gets baked into the pixels -- so counting it here would make a plain
+ * filtered video bake itself for no reason, at full cost on every frame.
+ */
+export function hasOverlays({ stickers, decorations } = {}) {
+    return !!(stickers?.stickers?.length > 0 || decorations?.isActive?.());
 }
 
 /**

@@ -18,6 +18,7 @@ import {
 } from './config.js';
 import { SubtitleManager } from './subtitles/SubtitleManager.js';
 import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
+import { hasOverlays } from '../ui/player/OverlayCompositor.js';
 import {
     closePlayerAudioBufferIterator,
     closePlayerAudioBufferIteratorSoon,
@@ -708,6 +709,29 @@ export class CorePlayer {
     overlayTimeMs() {
         if (this.isStreamMode) return performance.now();
         return (this.currentTime || 0) * 1000;
+    }
+
+    /**
+     * Decide whether the colour effects go into the pixels or onto the element.
+     *
+     * A filter treats the footage; a sticker is a thing put on top of it. So a
+     * flower stays pink over a black-and-white clip rather than going grey
+     * with it -- which is what every camera app does, and what this app's own
+     * camera and export have always done. Playback was the odd one out: its
+     * colour is a CSS filter over the whole canvas, stickers included.
+     *
+     * Baking is the only way to get that order right, and it costs a filter
+     * per frame on the main thread. So it is switched on exactly when
+     * something has to sit above the colour -- which means a plain filtered
+     * video, however large, never pays for it. The camera always bakes
+     * regardless: its recorder reads canvas pixels and a CSS filter is
+     * invisible to it.
+     */
+    _syncOverlayBaking() {
+        if (!this.videoFilters) return;
+        const needed = !!this.isStreamMode
+            || hasOverlays({ stickers: this.stickers, decorations: this.decorations });
+        this.videoFilters.setCanvasMode(needed);
     }
 
     // ─── Frame presentation ──────────────────────────────────────────────────────

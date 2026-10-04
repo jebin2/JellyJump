@@ -90,6 +90,9 @@ export class DecorationLayer {
     /** @private */
     _repaint() {
         const player = this.player;
+        // A border or a shower of flowers sits above the colour too, so the
+        // same rule applies: bake it when there is something on top.
+        player._syncOverlayBaking?.();
         if (player.isPlaying) return;
         if (player.isStreamMode) { player._renderStreamFrame?.(); return; }
         if (player.videoTrack) player._extractAndDrawFrame?.(player.currentTime);

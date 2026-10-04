@@ -169,6 +169,7 @@ export class StickerLayer {
         this.stickers.splice(i, 1);
         if (this.selectedId === id) this.selectedId = null;
         this._syncBoxes();
+        this.player._syncOverlayBaking?.();
         this._repaintIfPaused();
     }
 
@@ -177,6 +178,7 @@ export class StickerLayer {
         this.stickers = [];
         this.selectedId = null;
         this._syncBoxes();
+        this.player._syncOverlayBaking?.();
         this._repaintIfPaused();
     }
 
@@ -222,6 +224,11 @@ export class StickerLayer {
         this.stickers.push(sticker);
         this.selectedId = sticker.id;
         this._syncBoxes();
+        // Something now sits above the colour, so it has to go into the pixels
+        // rather than onto the element -- or the filter would grey this out
+        // along with the picture. Before the repaint, so the frame that is
+        // redrawn is drawn the new way.
+        this.player._syncOverlayBaking?.();
         this._repaintIfPaused();
         return sticker;
     }

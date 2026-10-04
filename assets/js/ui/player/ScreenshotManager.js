@@ -68,9 +68,14 @@ export class ScreenshotManager {
         const stickers = this.player.stickers;
         const decorations = this.player.decorations;
 
-        // In canvas mode the colour is already in the pixels; in CSS mode it
-        // lives on the element and has to be put back on here.
-        const needsColour = !!filters && !filters.canvasMode && filters.isActive();
+        // Whether the colour has to be re-applied depends on the *source*, not
+        // on which mode the player is in. The camera's canvas already has it
+        // in its pixels; a file's frame is decoded fresh from the sink and
+        // never does, whatever the player was doing. Reading canvasMode here
+        // broke the moment playback started baking too: it reported "already
+        // applied" about a frame that had never seen it, and screenshots of a
+        // filtered video came out unfiltered.
+        const needsColour = !!filters?.isActive?.() && !stickersAlreadyDrawn;
         const needsOverlays = !stickersAlreadyDrawn
             && hasOverlays({ stickers, decorations });
         if (!needsColour && !needsOverlays) return source.toDataURL('image/png');

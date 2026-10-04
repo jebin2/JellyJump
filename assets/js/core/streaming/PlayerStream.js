@@ -51,7 +51,7 @@ export class PlayerStream {
         // stopWebcamStreamMode. Left on, canvas mode would keep suppressing
         // the CSS filters that playback draws with, and the filter panel
         // would look broken for the rest of the session.
-        this.player.videoFilters?.setCanvasMode(false);
+        this.player._syncOverlayBaking?.();
 
         if (this.streamVideo && this.streamVideo.srcObject) {
             Logger.log('[Player] Clearing webcam stream in load()');
@@ -540,7 +540,7 @@ export class PlayerStream {
         this.isWebcamMode = true;
         player.isPlaying = true;
         this.showStreamVideo();
-        player.videoFilters?.setCanvasMode(true);
+        player._syncOverlayBaking?.();
         this.setWebcamModeControls(true);
         player._setLoading(false);
 
@@ -561,12 +561,14 @@ export class PlayerStream {
     }
 
     stopWebcamStreamMode() {
-        this.player.videoFilters?.setCanvasMode(false);
         if (this.streamVideo) {
             this.streamVideo.srcObject = null;
             this.streamVideo.pause();
         }
         this.isStreamMode = false;
+        // After the flag, not before: the decision reads isStreamMode, and
+        // asking while it still said "camera" left baking switched on.
+        this.player._syncOverlayBaking?.();
         this.player.isPlaying = false;
         this.stopStreamRenderLoop();
         this.player._updatePlayPauseUI();

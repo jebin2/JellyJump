@@ -50,6 +50,9 @@ function makePlayer(canvasW = 1280, canvasH = 720) {
         removeRenderCallback: cb => callbacks.splice(callbacks.indexOf(cb), 1),
         // The real rule, copied from Player.overlayTimeMs.
         overlayTimeMs() { return this.isStreamMode ? 1e9 : this.currentTime * 1000; },
+        syncCalls: 0, videoTrack: true,
+        _syncOverlayBaking() { this.syncCalls++; this.syncOrder = (this.repaints || 0); },
+        _extractAndDrawFrame() { this.repaints = (this.repaints || 0) + 1; },
     };
 }
 
@@ -243,6 +246,46 @@ console.log('\nan animation follows the video, not the wall clock');
     layer.destroy();
 }
 
+// --- what gets baked ----------------------------------------------------------
+
+console.log('\nbaking is decided by what sits above the colour');
+{
+    const { hasOverlays } = await import('../assets/js/ui/player/OverlayCompositor.js');
+    check(hasOverlays({}) === false, 'a bare frame has nothing above it');
+    check(hasOverlays({ stickers: { stickers: [1] } }) === true, 'a sticker does');
+    check(hasOverlays({ decorations: { isActive: () => true } }) === true, 'so does a decoration');
+    // The whole point of the rule: colour is a treatment of the frame, not a
+    // thing on top of it, so a plain filtered video must not start baking.
+    check(hasOverlays({ filters: { isActive: () => true } }) === false,
+        'a colour effect alone does not, however active it is');
+}
+
+console.log('\nthe layer tells the player when that changes');
+{
+    const player = makePlayer();
+    const layer = new StickerLayer(player);
+    player.isPlaying = false;
+
+    const before = player.syncCalls;
+    const s = layer.addEmoji('🌸');
+    check(player.syncCalls === before + 1, 'adding a sticker asks the question again');
+    check(player.syncOrder === (player.repaints || 0) - 1,
+        'and asks it before the repaint, so the redrawn frame is drawn the new way');
+
+    const afterAdd = player.syncCalls;
+    layer.setMotion('bob');
+    check(player.syncCalls === afterAdd, 'a motion changes nothing about what is on top');
+
+    layer.remove(s.id);
+    check(player.syncCalls === afterAdd + 1, 'removing the last one asks again');
+
+    layer.addEmoji('🌻');
+    const afterSecond = player.syncCalls;
+    layer.clear();
+    check(player.syncCalls === afterSecond + 1, 'and so does clearing');
+    layer.destroy();
+}
+
 // --- screenshots -------------------------------------------------------------
 
 console.log('\na screenshot saves what was on screen');
@@ -311,6 +354,17 @@ console.log('\na screenshot saves what was on screen');
     check(live === 'data:live-canvas',
         'the camera canvas is saved as-is — the effects and stickers are already in it');
     check(madeCanvases.length === 0, 'with no second canvas allocated');
+
+    // Playback bakes too, once a sticker is on screen -- but a file's frame is
+    // still decoded fresh from the sink and has never seen the colour. Reading
+    // the player's mode here instead of the source is what made screenshots of
+    // a filtered video come out unfiltered.
+    madeCanvases.length = 0;
+    const baked = composite.call({ player: { videoFilters: filters, stickers: layer } },
+        sourceFrame, { stickersAlreadyDrawn: false });
+    const fresh = madeCanvases[0]?.ops.find(o => o.op === 'drawImage');
+    check(baked === 'data:composited' && fresh?.filter?.includes('sepia(1)'),
+        `a baking player still gets the colour onto a freshly decoded frame (${fresh?.filter})`);
 
     globalThis.document.createElement = realCreate;
     layer.destroy();
