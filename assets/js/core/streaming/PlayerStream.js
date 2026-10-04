@@ -1,6 +1,6 @@
 import { MediaBunny } from '../MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
-import { RecordingClock } from './RecordingClock.js';
+import { CanvasRecorder } from './CanvasRecorder.js';
 
 export class PlayerStream {
     constructor(player) {
@@ -28,23 +28,10 @@ export class PlayerStream {
         this._isFetchingLiveFrame = false;
         this._isMediaReady = false;
 
-        // Recording state
-        this._isCanvasRecording = false;
-        this._canvasChunks = null;
-        this._canvasOutput = null;
-        this._canvasAudioSource = null;
-        this._canvasReadyForMoreFrames = true;
-        this._canvasLastFrameNumber = -1;
-        // How far into the recording we are, in played time rather than wall
-        // time. Lives in its own module because it is the most timing-sensitive
-        // thing here and could not be tested while it was spread across these
-        // fields. _canvasRecordingPausedTime, _canvasPauseStartTime and
-        // _canvasStartTime went with it: all three were written and never read.
-        this._recordingClock = new RecordingClock();
-        this._recordingAudioContext = null;
-        this._audioStreamSource = null;
-        this._audioProcessor = null;
-        this._canvasCaptureInterval = null;
+        // Recording lives in its own component now: it reads the canvas and
+        // needs three events from here, so there is no reason for its eleven
+        // fields to sit among the stream's.
+        this.recorder = new CanvasRecorder(player, () => this._isMediaReady);
     }
 
     // ─── Load lifecycle ─────────────────────────────────────────────────────────
@@ -70,13 +57,7 @@ export class PlayerStream {
     // ─── Play / Pause hooks ──────────────────────────────────────────────────────
 
     onPlay() {
-        if (!this._isCanvasRecording) return;
-        if (this._recordingAudioContext && this._recordingAudioContext.state === 'suspended') {
-            this._recordingAudioContext.resume();
-        }
-        if (this._isMediaReady) {
-            this.resumeRecordingSmartPause();
-        }
+        this.recorder.onPlaybackResumed(this._isMediaReady);
     }
 
     async playStream() {
@@ -129,11 +110,7 @@ export class PlayerStream {
     }
 
     onPause() {
-        if (!this._isCanvasRecording) return;
-        if (this._recordingAudioContext && this._recordingAudioContext.state === 'running') {
-            this._recordingAudioContext.suspend();
-        }
-        this._recordingClock.markDiscontinuity();
+        this.recorder.onPlaybackPaused();
     }
 
     pauseStream(showOverlay) {
@@ -581,181 +558,26 @@ export class PlayerStream {
     }
 
     // ─── Canvas recording ────────────────────────────────────────────────────────
+    //
+    // Kept as delegates so Player and ScreenRecorderMenu are untouched. The
+    // only stream-specific part left is finding an audio track on the
+    // element, which is knowledge the recorder should not need.
 
     async startCanvasRecording(options = {}) {
-        if (this._isCanvasRecording) return;
-
-        const player = this.player;
-        Logger.log('[Stream] Video Bitrate: 50 Mbps (Raw Quality)');
-
-        this._isCanvasRecording = true;
-        this._canvasChunks = [];
-        this._canvasAudioSource = null;
-        this._canvasReadyForMoreFrames = true;
-        this._canvasLastFrameNumber = -1;
-        this._recordingClock.start(performance.now());
-        this._recordingAudioContext = null;
-        this._audioStreamSource = null;
-        this._audioProcessor = null;
-
-        let audioTrack = options.audioTrack;
+        let { audioTrack } = options;
         if (!audioTrack && this.streamVideo?.srcObject) {
-            const streamSrc = this.streamVideo.srcObject;
-            if (streamSrc.getAudioTracks?.().length > 0) {
-                audioTrack = streamSrc.getAudioTracks()[0];
-            }
+            const source = this.streamVideo.srcObject;
+            if (source.getAudioTracks?.().length > 0) audioTrack = source.getAudioTracks()[0];
         }
-
-        const audioIsEncodable = await MediaBunny.canEncodeAudio('opus', {
-            quality: new MediaBunny.Quality({ bitrate: 128000 }),
-        });
-
-        this._canvasOutput = new MediaBunny.Output({
-            format: new MediaBunny.Mp4OutputFormat({ fastStart: 'fragmented' }),
-            target: new MediaBunny.StreamTarget(new WritableStream({
-                write: (chunk) => { this._canvasChunks.push(chunk.data); },
-            })),
-        });
-
-        const frameRate = 30;
-        const videoSource = new MediaBunny.CanvasSource(player.canvas, {
-            codec: 'avc',
-            quality: new MediaBunny.Quality({ bitrate: 50_000_000 }),
-            keyFrameInterval: 2,
-            latencyMode: 'realtime',
-            width: player.canvas.width,
-            height: player.canvas.height,
-            sizeChangeBehavior: 'contain'
-        });
-        this._canvasOutput.addVideoTrack(videoSource, { frameRate });
-
-        if (audioTrack && audioIsEncodable) {
-            try {
-                this._canvasAudioSource = new MediaBunny.AudioSampleSource({
-                    codec: 'opus',
-                    quality: new MediaBunny.Quality({ bitrate: 128000 }),
-                    sampleRate: 48000
-                });
-                this._canvasOutput.addAudioTrack(this._canvasAudioSource);
-
-                this._recordingAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
-                this._audioStreamSource = this._recordingAudioContext.createMediaStreamSource(new MediaStream([audioTrack]));
-                this._audioProcessor = this._recordingAudioContext.createScriptProcessor(4096, 2, 2);
-
-                this._audioProcessor.onaudioprocess = (e) => {
-                    if (!this._isCanvasRecording || !this._isMediaReady) return;
-
-                    const inputBuffer = e.inputBuffer;
-                    const currentTimestamp = this._recordingClock.nextAudioTimestamp(inputBuffer.duration);
-
-                    try {
-                        // null covers both cases the inline version handled: a
-                        // buffer arriving while the clock is unanchored, and a
-                        // timestamp that had gone non-finite.
-                        if (currentTimestamp === null) {
-                            return;
-                        }
-
-                        const syncedSamples = MediaBunny.AudioSample.fromAudioBuffer(inputBuffer, currentTimestamp);
-                        const samplesToAdd = Array.isArray(syncedSamples) ? syncedSamples : [syncedSamples];
-                        samplesToAdd.forEach(s => {
-                            if (this._canvasAudioSource) {
-                                this._canvasAudioSource.add(s).then(() => s.close()).catch(err => {
-                                    Logger.warn('[Record] Failed to add audio sample:', err);
-                                    s.close();
-                                });
-                            } else {
-                                s.close();
-                            }
-                        });
-                    } catch (err) {
-                        Logger.warn('[Record] Audio encode error:', err);
-                    }
-                };
-
-                this._audioStreamSource.connect(this._audioProcessor);
-                this._audioProcessor.connect(this._recordingAudioContext.destination);
-                Logger.log('[Record] Manual Audio Pipeline Started');
-            } catch (e) {
-                Logger.error('[Record] Audio setup failed', e);
-                this._canvasAudioSource = null;
-            }
-        }
-
-        await this._canvasOutput.start();
-
-        if (!player.isPlaying && this._canvasAudioSource) {
-            try {
-                if (typeof this._canvasAudioSource.pause === 'function') {
-                    this._canvasAudioSource.pause();
-                    Logger.log('[Record] Initialized recording audio in PAUSED state (player is paused)');
-                }
-            } catch (e) {
-                Logger.error('[Record] Failed to set initial pause state for recording audio', e);
-            }
-        }
-
-        const addVideoFrame = async () => {
-            if (!this._isCanvasRecording || !player.isPlaying || !this._isMediaReady) return;
-            if (!this._canvasReadyForMoreFrames) return;
-
-            // null means this frame is the one re-anchoring the clock after a
-            // pause, so it is skipped rather than written at a timestamp that
-            // would carry the pause into the file.
-            const timestamp = this._recordingClock.nextVideoTimestamp(performance.now());
-            if (timestamp === null) return;
-
-            this._canvasReadyForMoreFrames = false;
-            try {
-                await videoSource.add(timestamp, 1 / frameRate);
-            } catch (e) {
-                Logger.warn('Frame add error', e);
-            }
-            this._canvasReadyForMoreFrames = true;
-        };
-
-        this._canvasCaptureInterval = setInterval(() => {
-            addVideoFrame().catch(e => Logger.error(e));
-        }, 1000 / frameRate);
-
-        Logger.log('[Stream] Canvas Recording Started (MediaBunny)');
-    }
-
-    resumeRecordingSmartPause() {
-        if (this._isCanvasRecording) this._recordingClock.markDiscontinuity();
+        return this.recorder.start({ ...options, audioTrack });
     }
 
     async stopCanvasRecording() {
-        if (!this._isCanvasRecording) return null;
+        return this.recorder.stop();
+    }
 
-        this._isCanvasRecording = false;
-        clearInterval(this._canvasCaptureInterval);
-        Logger.log('[Stream] Finalizing Canvas Recording...');
-
-        if (this._audioProcessor) {
-            this._audioProcessor.disconnect();
-            this._audioProcessor.onaudioprocess = null;
-            this._audioProcessor = null;
-        }
-        if (this._audioStreamSource) {
-            this._audioStreamSource.disconnect();
-            this._audioStreamSource = null;
-        }
-        if (this._recordingAudioContext) {
-            await this._recordingAudioContext.close();
-            this._recordingAudioContext = null;
-        }
-
-        if (this._canvasOutput) await this._canvasOutput.finalize();
-        this._canvasAudioSource = null;
-
-        if (this._canvasChunks?.length > 0) {
-            const blob = new Blob(this._canvasChunks, { type: 'video/mp4' });
-            this._canvasOutput = null;
-            this._canvasChunks = null;
-            return blob;
-        }
-        return null;
+    resumeRecordingSmartPause() {
+        this.recorder.onFramePresented();
     }
 
     // ─── Live video loop ─────────────────────────────────────────────────────────

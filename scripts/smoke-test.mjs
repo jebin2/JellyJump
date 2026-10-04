@@ -171,7 +171,7 @@ async function run(page, origin) {
         await sleep(800);                       // this gap must not reach the file
         await p.play().catch(() => {});
         await sleep(800);
-        out.played = p.stream._recordingClock.videoSeconds;
+        out.played = p.stream.recorder.clock.videoSeconds;
         out.wall = (performance.now() - wall0) / 1000;
 
         const blob = await p.stopCanvasRecording();
