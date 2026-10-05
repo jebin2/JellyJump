@@ -20,8 +20,12 @@ import { extname, join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist');
-const FIXTURE = join(ROOT, 'scripts/fixtures/smoke.webm');
-const FIXTURE_URL = '/__fixture__.webm';
+const FIXTURES = join(ROOT, 'scripts/fixtures');
+// Served under a prefix rather than one mapped file: HLS is a playlist plus
+// its segments, so it needs a directory.
+const FIXTURE_PREFIX = '/__fixtures__/';
+const FIXTURE_URL = `${FIXTURE_PREFIX}smoke.webm`;
+const HLS_URL = `${FIXTURE_PREFIX}hls/stream.m3u8`;
 
 let pass = 0, fail = 0;
 const check = (ok, label) => {
@@ -35,17 +39,18 @@ const TYPES = {
     '.png': 'image/png', '.gif': 'image/gif', '.jpg': 'image/jpeg',
     '.webm': 'video/webm', '.mp4': 'video/mp4', '.wasm': 'application/wasm',
     '.txt': 'text/plain', '.map': 'application/json', '.ico': 'image/x-icon',
+    '.m3u8': 'application/vnd.apple.mpegurl', '.ts': 'video/mp2t',
 };
 
 async function serveDist() {
     const server = createServer(async (req, res) => {
         try {
             const path = decodeURIComponent(req.url.split('?')[0]);
-            const file = path === FIXTURE_URL
-                ? FIXTURE
+            const file = path.startsWith(FIXTURE_PREFIX)
+                ? join(FIXTURES, path.slice(FIXTURE_PREFIX.length))
                 : join(DIST, path === '/' ? 'index.html' : path);
-            // Nothing outside dist, whatever the request says.
-            if (file !== FIXTURE && !file.startsWith(DIST)) { res.writeHead(403).end(); return; }
+            // Nothing outside dist or the fixtures, whatever the request says.
+            if (!file.startsWith(DIST) && !file.startsWith(FIXTURES)) { res.writeHead(403).end(); return; }
             const info = await stat(file);
             if (!info.isFile()) { res.writeHead(404).end(); return; }
             res.writeHead(200, {
@@ -77,6 +82,14 @@ function findBrowser() {
 async function run(page, origin) {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
+    page.on('console', m => {
+        if (m.type() !== 'error') return;
+        const text = m.text();
+        // Request failures are already covered by the response handler below,
+        // which knows which URL they came from.
+        if (text.includes('Failed to load resource')) return;
+        errors.push(`console: ${text.slice(0, 160)}`);
+    });
     page.on('response', r => {
         // The analytics embed is absent from the build and always 404s.
         if (r.status() >= 400 && !r.url().includes('analytics')) {
@@ -187,6 +200,37 @@ async function run(page, origin) {
     check(camera.wall > 2.2, `wall time across the run was ${camera.wall.toFixed(2)}s`);
     check(camera.played < camera.wall - 0.5,
         `recorded time follows played time, not wall time (${camera.played.toFixed(2)}s)`);
+
+    const hls = await page.evaluate(async (url) => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player, o = {};
+        await p.load(`${location.origin}${url}`);
+        for (let i = 0; i < 100 && !(p.duration > 0); i++) await sleep(100);
+        o.duration = p.duration;
+        o.videoTrack = !!p.videoTrack;
+        o.audioTrack = !!p.audioTrack;
+        await p.play().catch(() => {});
+        await sleep(1200);
+        const c = p.canvas;
+        const probe = document.createElement('canvas');
+        probe.width = c.width; probe.height = c.height;
+        probe.getContext('2d').drawImage(c, 0, 0);
+        const d = probe.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let ink = 0;
+        for (let i = 0; i < d.length; i += 997) if (d[i] > 8) ink++;
+        o.framesDrawn = ink > 0;
+        p.pause();
+        return o;
+    }, HLS_URL);
+
+    console.log('\nit plays an HLS playlist');
+    // Every one of these was wrong before the DTS codec read was fixed: setup
+    // aborted, so the duration stayed 0 and the audio track never existed,
+    // while frames still reached the canvas and made it look half-working.
+    check(Math.abs(hls.duration - 3) < 0.3, `duration is 3s (${hls.duration})`);
+    check(hls.videoTrack, 'the video track is there');
+    check(hls.audioTrack, 'and so is the audio track');
+    check(hls.framesDrawn, 'frames reach the canvas');
 
     console.log('\nnothing failed quietly');
     check(errors.length === 0, `no page errors or bad responses${errors.length ? `: ${errors.slice(0, 3).join('; ')}` : ''}`);
