@@ -83,8 +83,12 @@ export function cyclePlayerSpeed(player, direction) {
 export function stepPlayerFrame(player, direction) {
     const fps = player.frameRate || 30;
     const frameDuration = 1 / fps;
-    const newTime = player.currentTime + (direction * frameDuration);
-    player._seekTo(Math.max(0, Math.min(player.duration, newTime)));
+    // Held in editor mode this repeats at the key-repeat rate, far faster than
+    // a decoder rebuild, so it goes through the coalescing path for the same
+    // reason the relative-seek keys do. _requestSeek also moves currentTime
+    // synchronously, so each repeat steps from the position the last one asked
+    // for rather than from whatever has finished decoding.
+    player._requestSeek(player.currentTime + (direction * frameDuration));
 }
 
 /**
@@ -212,7 +216,12 @@ export function playerSeek(player, e) {
     const rect = player.ui.progressContainer.getBoundingClientRect();
     let pos = (e.clientX - rect.left) / rect.width;
     pos = Math.max(0, Math.min(1, pos));
-    player._seekTo(pos * player.duration);
+    // Clicks on the bar can land faster than a seek completes, and a bare
+    // _seekTo per click runs them concurrently: the clock ends up on the last
+    // click while the canvas can keep a frame decoded for an earlier one, so
+    // the picture disagrees with the position it reports. Coalescing makes the
+    // newest click the only one that paints.
+    player._requestSeek(pos * player.duration);
 }
 
 export function playerScrubStart(player, e) {

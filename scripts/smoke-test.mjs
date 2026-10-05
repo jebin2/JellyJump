@@ -142,6 +142,47 @@ async function run(page, origin) {
     check(seeks.a === seeks.again, 'seeking back to a timestamp reproduces the frame exactly');
     check(seeks.advanced, 'playback advances the clock');
 
+    // Clicks on the progress bar can arrive faster than a seek completes. The
+    // clock always ends up on the last one; the canvas used to be free to keep
+    // a frame decoded for an earlier one, so the picture disagreed with the
+    // reported position. Measured at 7 failures in 12 before the input paths
+    // were coalesced, so a handful of attempts is enough to catch a regression.
+    const bar = await page.evaluate(() => {
+        const r = window.player.ui.progressContainer.getBoundingClientRect();
+        window.__frameHash = () => {
+            const c = window.player.canvas;
+            const q = document.createElement('canvas');
+            q.width = c.width; q.height = c.height;
+            q.getContext('2d').drawImage(c, 0, 0);
+            const d = q.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) >>> 0;
+            return h;
+        };
+        return { x: r.left, y: r.top, w: r.width, h: r.height };
+    });
+    const clickBar = frac => page.mouse.click(bar.x + bar.w * frac, bar.y + bar.h / 2);
+    const settleBar = async frac => {
+        await clickBar(frac);
+        await page.waitForTimeout(500);
+        return page.evaluate(() => window.__frameHash());
+    };
+
+    await settleBar(0.95);
+    const quietClick = await settleBar(0.20);
+    let stormsAgreeing = 0;
+    const storms = 5;
+    for (let i = 0; i < storms; i++) {
+        await settleBar(0.95);
+        for (const f of [0.80, 0.45, 0.60]) await clickBar(f);
+        await clickBar(0.20);
+        await page.waitForTimeout(1800);
+        const h = await page.evaluate(() => window.__frameHash());
+        if (h === quietClick) stormsAgreeing++;
+    }
+
+    check(stormsAgreeing === storms,
+        `rapid bar clicks leave the frame for the last one (${stormsAgreeing}/${storms})`);
+
     const overlays = await page.evaluate(async () => {
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         const p = window.player;
