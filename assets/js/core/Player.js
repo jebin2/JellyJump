@@ -120,6 +120,7 @@ import { PlayerControlBar } from '../ui/player/PlayerControlBar.js';
 import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { Logger } from '../shared/utils/Logger.js';
 import { MediaTracks } from './playback/MediaTracks.js';
+import { PlaybackEpoch } from './playback/PlaybackEpoch.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -187,7 +188,7 @@ export class CorePlayer {
         this.audioBufferIterator = null;
         this.nextFrame = null;
         this.queuedAudioNodes = new Set();
-        this.asyncId = 0;
+        this.epoch = new PlaybackEpoch();
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
 

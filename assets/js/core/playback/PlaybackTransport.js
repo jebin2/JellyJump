@@ -97,7 +97,7 @@ export async function playPlayer(player) {
         const stale = player.videoFrameIterator;
         player.videoFrameIterator = null;
         player.nextFrame = null;
-        player._isFetchingFrame = false; // a stuck fetch exits on asyncId mismatch
+        player._isFetchingFrame = false; // a stuck fetch exits on a stale epoch
         Promise.resolve(stale.return?.()).catch(() => {});
     }
     player._pausedAtWall = null;

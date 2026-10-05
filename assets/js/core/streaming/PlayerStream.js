@@ -328,7 +328,7 @@ export class PlayerStream {
 
         this._liveAnchorWall = null;
         this._liveAnchorContent = null;
-        player.asyncId++;
+        player.epoch.bump();
 
         Logger.log('[Live] User requested jump to live edge');
         player._setLoading(true);
@@ -595,16 +595,15 @@ export class PlayerStream {
             return;
         }
 
-        let asyncId = -1;
+        let epoch = -1;
         let frameCount = 0;
         let drawnCount = 0;
 
         try {
             this._isLiveLoopActive = true;
-            player.asyncId++;
-            asyncId = player.asyncId;
+            epoch = player.epoch.bump();
 
-            Logger.log(`[Live:Video] Loop starting — asyncId=${asyncId}, liveStartTs=${this._liveStartTimestamp?.toFixed(3)}, audioSink=${!!player.audioSink}, audioContext=${!!player.audioContext}, audioContextState=${player.audioContext?.state}`);
+            Logger.log(`[Live:Video] Loop starting — epoch=${epoch}, liveStartTs=${this._liveStartTimestamp?.toFixed(3)}, audioSink=${!!player.audioSink}, audioContext=${!!player.audioContext}, audioContextState=${player.audioContext?.state}`);
 
             if (player.videoFrameIterator) {
                 Logger.log(`[Live:Video] Closing existing videoFrameIterator`);
@@ -688,7 +687,7 @@ export class PlayerStream {
                     startAudio();
                 }
 
-                if (player.asyncId !== asyncId || !this.isLive || !player.isPlaying) {
+                if (player.epoch.isStale(epoch) || !this.isLive || !player.isPlaying) {
                     Logger.log(`[Live:Video] Loop breaking — active=${player.isPlaying}, live=${this.isLive}`);
                     break;
                 }
@@ -742,7 +741,7 @@ export class PlayerStream {
                         if (currentTime < targetWall - 0.005) {
                             await new Promise(r => {
                                 const check = () => {
-                                    if (player.asyncId !== asyncId || !player.isPlaying) { r(); return; }
+                                    if (player.epoch.isStale(epoch) || !player.isPlaying) { r(); return; }
                                     if (player.audioContext.currentTime >= targetWall - 0.005) { r(); return; }
                                     requestAnimationFrame(check);
                                 };
@@ -770,10 +769,10 @@ export class PlayerStream {
         } catch (e) {
             Logger.warn(`[Live:Video] Loop error: ${e.message}`);
         } finally {
-            if (player.asyncId === asyncId) {
+            if (!player.epoch.isStale(epoch)) {
                 this._isLiveLoopActive = false;
             }
-            if (player.asyncId === asyncId) player._setLoading(false);
+            if (!player.epoch.isStale(epoch)) player._setLoading(false);
             Logger.log(`[Live:Video] Loop exited — total=${frameCount ?? 0}, drawn=${drawnCount ?? 0}`);
         }
     }

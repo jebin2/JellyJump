@@ -108,7 +108,7 @@ export async function cleanupPlayerForLoad(player) {
     await player._closeAudioBufferIterator();
     player.videoFrameIterator = null;
     player.nextFrame = null;
-    player.asyncId++;
+    player.epoch.bump();
     player.playbackTimeAtStart = 0;
     player.audioContextStartTime = null;
     player._stopQueuedAudio();
@@ -270,7 +270,7 @@ export async function startPlayerVideoIterator(player) {
     if (!player.videoSink) return;
 
     // Bump the generation first, which is what actually stops whatever else is
-    // in flight: every await in here and in updateNextFrame re-checks asyncId
+    // in flight: every await in here and in updateNextFrame re-checks the epoch
     // and bails when it has moved on.
     //
     // This used to return early while a frame fetch was in flight, which is the
@@ -279,8 +279,7 @@ export async function startPlayerVideoIterator(player) {
     // loop then ground all the way forward to the seek target one frame at a
     // time. That is the "picture keeps fast-forwarding after the key is
     // released" symptom: a seek must always win.
-    player.asyncId++;
-    const currentAsyncId = player.asyncId;
+    const epoch = player.epoch.bump();
     player._isFetchingFrame = true;
 
     let firstFrame = null;
@@ -289,7 +288,7 @@ export async function startPlayerVideoIterator(player) {
         if (player.videoFrameIterator) await player.videoFrameIterator.return();
 
         const startTime = player._getPlaybackTime();
-        Logger.log(`[VideoIterator] Initializing canvases at time: ${startTime.toFixed(3)}s (asyncId=${currentAsyncId})`);
+        Logger.log(`[VideoIterator] Initializing canvases at time: ${startTime.toFixed(3)}s (epoch=${epoch})`);
         player.videoFrameIterator = player.videoSink.canvases(startTime);
         if (!player.videoFrameIterator) {
             Logger.warn('[VideoIterator] videoSink returned null iterator for time:', player._getPlaybackTime());
@@ -305,7 +304,7 @@ export async function startPlayerVideoIterator(player) {
             return;
         }
 
-        if (currentAsyncId !== player.asyncId) return;
+        if (player.epoch.isStale(epoch)) return;
 
         player.nextFrame = secondFrame;
 
@@ -315,7 +314,7 @@ export async function startPlayerVideoIterator(player) {
     } finally {
         // Only if we are still the current generation: a newer start has taken
         // ownership of the flag and must not have it cleared out from under it.
-        if (player.asyncId === currentAsyncId) player._isFetchingFrame = false;
+        if (!player.epoch.isStale(epoch)) player._isFetchingFrame = false;
     }
 }
 

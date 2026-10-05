@@ -3,7 +3,7 @@ import { Logger } from '../../shared/utils/Logger.js';
 export async function updatePlayerNextFrame(player) {
     if (player._isFetchingFrame || !player.videoFrameIterator) return;
     
-    const currentAsyncId = player.asyncId;
+    const epoch = player.epoch.current;
     const currentIterator = player.videoFrameIterator;
     player._isFetchingFrame = true;
 
@@ -14,13 +14,13 @@ export async function updatePlayerNextFrame(player) {
     try {
         while (true) {
             // Re-check conditions after each potential await
-            if (!player.videoFrameIterator || player.videoFrameIterator !== currentIterator || player.asyncId !== currentAsyncId) break;
+            if (!player.videoFrameIterator || player.videoFrameIterator !== currentIterator || player.epoch.isStale(epoch)) break;
             
             const result = await currentIterator.next();
-            if (player.asyncId !== currentAsyncId || player.videoFrameIterator !== currentIterator) break;
+            if (player.epoch.isStale(epoch) || player.videoFrameIterator !== currentIterator) break;
             
             if (result.done) {
-                Logger.log(`[FrameSync] Iterator finished (asyncId=${currentAsyncId})`);
+                Logger.log(`[FrameSync] Iterator finished (epoch=${epoch})`);
                 if (player.videoFrameIterator === currentIterator) {
                     player.videoFrameIterator = null; 
                 }
@@ -63,12 +63,12 @@ export async function updatePlayerNextFrame(player) {
         // last one so the canvas lands on the caught-up picture rather than
         // holding whatever was there before. Skipped when a current frame was
         // found — the render loop is about to draw that instead.
-        if (lateFrame && !player.nextFrame && player.asyncId === currentAsyncId
+        if (lateFrame && !player.nextFrame && !player.epoch.isStale(epoch)
             && player.ctx && player.canvas) {
             player.presentFrame(lateFrame.canvas, { clear: true });
         }
     } catch (e) {
-        if (player.asyncId === currentAsyncId) {
+        if (!player.epoch.isStale(epoch)) {
             if (e?.name === 'QuotaExceededError' || e?.message?.includes('Codec reclaimed')) {
                 Logger.warn('[FrameSync] Codec reclaimed, restarting video iterator:', e);
                 player.videoFrameIterator = null;
@@ -79,7 +79,7 @@ export async function updatePlayerNextFrame(player) {
             }
         }
     } finally {
-        if (player.asyncId === currentAsyncId) {
+        if (!player.epoch.isStale(epoch)) {
             player._isFetchingFrame = false;
         }
     }
