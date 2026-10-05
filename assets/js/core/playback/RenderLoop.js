@@ -1,11 +1,11 @@
 import { Logger } from '../../shared/utils/Logger.js';
 
 export async function updatePlayerNextFrame(player) {
-    if (player._isFetchingFrame || !player.videoFrameIterator) return;
+    if (player.frames.isFetching || !player.frames.isOpen) return;
     
     const epoch = player.epoch.current;
-    const currentIterator = player.videoFrameIterator;
-    player._isFetchingFrame = true;
+    const currentIterator = player.frames.iterator;
+    player.frames.beginFetch();
 
     // The newest frame the loop skipped for being behind the clock, kept so the
     // canvas can be brought up to date once without showing the ones before it.
@@ -14,15 +14,15 @@ export async function updatePlayerNextFrame(player) {
     try {
         while (true) {
             // Re-check conditions after each potential await
-            if (!player.videoFrameIterator || player.videoFrameIterator !== currentIterator || player.epoch.isStale(epoch)) break;
+            if (!player.frames.holds(currentIterator) || player.epoch.isStale(epoch)) break;
             
             const result = await currentIterator.next();
-            if (player.epoch.isStale(epoch) || player.videoFrameIterator !== currentIterator) break;
+            if (player.epoch.isStale(epoch) || !player.frames.holds(currentIterator)) break;
             
             if (result.done) {
                 Logger.log(`[FrameSync] Iterator finished (epoch=${epoch})`);
-                if (player.videoFrameIterator === currentIterator) {
-                    player.videoFrameIterator = null; 
+                if (player.frames.holds(currentIterator)) {
+                    player.frames.dropIterator();
                 }
                 break;
             }
@@ -54,7 +54,7 @@ export async function updatePlayerNextFrame(player) {
                     if (player.isPlaying) player._resumeRecordingSmartPause();
                 }
             } else {
-                player.nextFrame = newNextFrame;
+                player.frames.setPending(newNextFrame);
                 break;
             }
         }
@@ -63,7 +63,7 @@ export async function updatePlayerNextFrame(player) {
         // last one so the canvas lands on the caught-up picture rather than
         // holding whatever was there before. Skipped when a current frame was
         // found — the render loop is about to draw that instead.
-        if (lateFrame && !player.nextFrame && !player.epoch.isStale(epoch)
+        if (lateFrame && !player.frames.pending && !player.epoch.isStale(epoch)
             && player.ctx && player.canvas) {
             player.presentFrame(lateFrame.canvas, { clear: true });
         }
@@ -71,17 +71,14 @@ export async function updatePlayerNextFrame(player) {
         if (!player.epoch.isStale(epoch)) {
             if (e?.name === 'QuotaExceededError' || e?.message?.includes('Codec reclaimed')) {
                 Logger.warn('[FrameSync] Codec reclaimed, restarting video iterator:', e);
-                player.videoFrameIterator = null;
-                player.nextFrame = null;
+                player.frames.discard();
                 player._startVideoIterator();
             } else {
                 Logger.error('[FrameSync] Iterator error:', e);
             }
         }
     } finally {
-        if (!player.epoch.isStale(epoch)) {
-            player._isFetchingFrame = false;
-        }
+        player.frames.endFetch(epoch);
     }
 }
 
@@ -96,7 +93,7 @@ export function startPlayerRenderLoop(player) {
             if (player._frameSyncLogCount === undefined) player._frameSyncLogCount = 0;
             player._frameSyncLogCount++;
             if (player._frameSyncLogCount % 60 === 0 && player._vodAnchorWall !== undefined && !player.isLive) {
-                const nextTs = player.nextFrame?.timestamp;
+                const nextTs = player.frames.pending?.timestamp;
                 const drift = nextTs !== undefined ? ((nextTs - playbackTime) * 1000).toFixed(0) : 'n/a';
                 Logger.log(`[FrameSync] frame=${player._frameSyncLogCount}, playback=${playbackTime.toFixed(3)}, nextFrameTs=${nextTs?.toFixed(3) ?? 'none'}, drift=${drift}ms, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}`);
             }
@@ -119,22 +116,22 @@ export function startPlayerRenderLoop(player) {
                 }
             }
 
-            if (!player.isLive && !player.nextFrame && player.videoFrameIterator) {
+            if (!player.isLive && !player.frames.pending && player.frames.isOpen) {
                 player._updateNextFrame();
             }
 
-            if (player.nextFrame) {
-                if (player.nextFrame.timestamp <= playbackTime) {
-                    player.presentFrame(player.nextFrame.canvas, { clear: true });
+            if (player.frames.pending) {
+                if (player.frames.pending.timestamp <= playbackTime) {
+                    player.presentFrame(player.frames.pending.canvas, { clear: true });
 
-                    player.nextFrame = null;
+                    player.frames.clearPending();
                     player._updateNextFrame();
-                } else if (!player.isLive && player.nextFrame.timestamp > playbackTime + 1.0) {
+                } else if (!player.isLive && player.frames.pending.timestamp > playbackTime + 1.0) {
                     // Insane drift: video is way ahead of audio (VOD only).
                     if (player._frameSyncLogCount % 60 === 0) {
-                        Logger.warn(`[FrameSync] Video way ahead of audio (nextFrame=${player.nextFrame.timestamp.toFixed(3)}, playback=${playbackTime.toFixed(3)}). Re-seeking video iterator.`);
+                        Logger.warn(`[FrameSync] Video way ahead of audio (pending=${player.frames.pending.timestamp.toFixed(3)}, playback=${playbackTime.toFixed(3)}). Re-seeking video iterator.`);
                     }
-                    player.nextFrame = null;
+                    player.frames.clearPending();
                     player._startVideoIterator();
                 }
             }

@@ -121,6 +121,7 @@ import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { Logger } from '../shared/utils/Logger.js';
 import { MediaTracks } from './playback/MediaTracks.js';
 import { PlaybackEpoch } from './playback/PlaybackEpoch.js';
+import { VideoFrameQueue } from './playback/VideoFrameQueue.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -184,11 +185,10 @@ export class CorePlayer {
         this.playbackId = 0;
 
         // MediaBunny playback state
-        this.videoFrameIterator = null;
         this.audioBufferIterator = null;
-        this.nextFrame = null;
         this.queuedAudioNodes = new Set();
         this.epoch = new PlaybackEpoch();
+        this.frames = new VideoFrameQueue(this.epoch);
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
 

@@ -68,9 +68,7 @@ export async function resetPlayer(player) {
     player._cleanupThumbnails();
 
     try {
-        if (player.videoFrameIterator) {
-            await player.videoFrameIterator.return();
-        }
+        await player.frames.close();
     } catch (e) { }
     try {
         await player._closeAudioBufferIterator();
@@ -80,8 +78,6 @@ export async function resetPlayer(player) {
 
     player.media.videoTrack = null;
     player.media.audioTrack = null;
-    player.videoFrameIterator = null;
-    player.nextFrame = null;
     player.currentVideoId = null;
 
     player._updateTimeDisplay();
@@ -103,11 +99,9 @@ export async function cleanupPlayerForLoad(player) {
     player._setWebcamModeControls(false);
     player.currentTime = 0;
 
-    if (player.videoFrameIterator) await player.videoFrameIterator.return();
+    await player.frames.close();
     if (player.audioIteratorCleanupPromise) await player.audioIteratorCleanupPromise;
     await player._closeAudioBufferIterator();
-    player.videoFrameIterator = null;
-    player.nextFrame = null;
     player.epoch.bump();
     player.playbackTimeAtStart = 0;
     player.audioContextStartTime = null;
@@ -280,33 +274,33 @@ export async function startPlayerVideoIterator(player) {
     // time. That is the "picture keeps fast-forwarding after the key is
     // released" symptom: a seek must always win.
     const epoch = player.epoch.bump();
-    player._isFetchingFrame = true;
+    player.frames.beginFetch();
 
     let firstFrame = null;
     let secondFrame = null;
     try {
-        if (player.videoFrameIterator) await player.videoFrameIterator.return();
+        await player.frames.close();
 
         const startTime = player._getPlaybackTime();
         Logger.log(`[VideoIterator] Initializing canvases at time: ${startTime.toFixed(3)}s (epoch=${epoch})`);
-        player.videoFrameIterator = player.videoSink.canvases(startTime);
-        if (!player.videoFrameIterator) {
+        const iterator = player.frames.open(player.videoSink, startTime);
+        if (!iterator) {
             Logger.warn('[VideoIterator] videoSink returned null iterator for time:', player._getPlaybackTime());
             return;
         }
 
         try {
-            firstFrame = (await player.videoFrameIterator.next()).value ?? null;
-            secondFrame = (await player.videoFrameIterator.next()).value ?? null;
+            firstFrame = (await iterator.next()).value ?? null;
+            secondFrame = (await iterator.next()).value ?? null;
         } catch (e) {
             Logger.warn('[VideoIterator] Failed to get initial frames, will retry on next play:', e);
-            player.videoFrameIterator = null;
+            player.frames.dropIterator();
             return;
         }
 
         if (player.epoch.isStale(epoch)) return;
 
-        player.nextFrame = secondFrame;
+        player.frames.setPending(secondFrame);
 
         if (firstFrame) {
             player.presentFrame(firstFrame.canvas);
@@ -314,7 +308,7 @@ export async function startPlayerVideoIterator(player) {
     } finally {
         // Only if we are still the current generation: a newer start has taken
         // ownership of the flag and must not have it cleared out from under it.
-        if (!player.epoch.isStale(epoch)) player._isFetchingFrame = false;
+        player.frames.endFetch(epoch);
     }
 }
 
@@ -413,11 +407,8 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
 
 export async function cleanupPlayerMediaBunny(player) {
     try {
-        if (player.videoFrameIterator) {
-            await player.videoFrameIterator.return();
-        }
+        await player.frames.close();
     } catch (e) { }
-    player.videoFrameIterator = null;
 
     try {
         await player._closeAudioBufferIterator();
@@ -427,5 +418,4 @@ export async function cleanupPlayerMediaBunny(player) {
 
     player.media.videoTrack = null;
     player.media.audioTrack = null;
-    player.nextFrame = null;
 }

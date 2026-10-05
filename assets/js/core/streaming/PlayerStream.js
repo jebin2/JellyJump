@@ -605,11 +605,9 @@ export class PlayerStream {
 
             Logger.log(`[Live:Video] Loop starting — epoch=${epoch}, liveStartTs=${this._liveStartTimestamp?.toFixed(3)}, audioSink=${!!player.audioSink}, audioContext=${!!player.audioContext}, audioContextState=${player.audioContext?.state}`);
 
-            if (player.videoFrameIterator) {
-                Logger.log(`[Live:Video] Closing existing videoFrameIterator`);
-                const it = player.videoFrameIterator;
-                player.videoFrameIterator = null;
-                await it.return().catch(() => { });
+            if (player.frames.isOpen) {
+                Logger.log(`[Live:Video] Closing existing frame queue`);
+                await player.frames.close().catch(() => { });
             }
             if (player.audioBufferIterator) {
                 Logger.log(`[Live:Video] Closing existing audioBufferIterator`);
@@ -631,7 +629,7 @@ export class PlayerStream {
             Logger.log(`[Live] Instant Anchor set — wall=${anchorWall.toFixed(3)}, content=${anchorContent.toFixed(3)}`);
 
             // Start iterators in parallel
-            player.videoFrameIterator = player.videoSink.canvases(anchorContent);
+            const videoIterator = player.frames.open(player.videoSink, anchorContent);
             player.audioBufferIterator = player.audioSink ? player.audioSink.buffers(anchorContent) : null;
 
             let audioStarted = false;
@@ -648,7 +646,7 @@ export class PlayerStream {
             if (player.isPlaying) this.resumeRecordingSmartPause();
 
             // ─── Main Video Rendering Loop (Official Pattern) ───
-            const myIterator = player.videoFrameIterator;
+            const myIterator = videoIterator;
 
             while (true) {
                 let result;

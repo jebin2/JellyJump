@@ -92,13 +92,9 @@ export async function playPlayer(player) {
     // behind the stuck next(), which would hang this whole play() call — and
     // let the restart below spin up a fresh decoder at the same position.
     const pausedForSec = player._pausedAtWall ? (performance.now() - player._pausedAtWall) / 1000 : 0;
-    if (pausedForSec > 10 && player.videoFrameIterator && !player.isLive) {
+    if (pausedForSec > 10 && player.frames.isOpen && !player.isLive) {
         Logger.log(`[Play] Resuming after ${pausedForSec.toFixed(0)}s pause — restarting video iterator (decoder may be reclaimed)`);
-        const stale = player.videoFrameIterator;
-        player.videoFrameIterator = null;
-        player.nextFrame = null;
-        player._isFetchingFrame = false; // a stuck fetch exits on a stale epoch
-        Promise.resolve(stale.return?.()).catch(() => {});
+        player.frames.abandon();
     }
     player._pausedAtWall = null;
 
@@ -107,7 +103,7 @@ export async function playPlayer(player) {
         Logger.log(`[Play] Resetting to start (position=${currentPosition.toFixed(2)}, duration=${player.duration.toFixed(2)})`);
         player.playbackTimeAtStart = 0;
         await player._startVideoIterator();
-    } else if (!player.videoFrameIterator) {
+    } else if (!player.frames.isOpen) {
         await player._startVideoIterator();
     }
 
