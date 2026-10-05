@@ -57,13 +57,37 @@ export function ensureDtsDecoder() {
 }
 
 /**
+ * The codec of a track, asked for the way the library wants to be asked.
+ *
+ * `track.codec` is a synchronous getter that *throws* when the codec is not
+ * known yet, which is the case for every HLS track until a segment has been
+ * read. Reading it here broke HLS outright: this function runs during setup
+ * for every source, so the throw aborted track setup, leaving a stream with
+ * no duration and no audio track while video frames still reached the canvas.
+ * @param {Object} track
+ * @returns {Promise<string|null>}
+ */
+async function codecOf(track) {
+    if (!track) return null;
+    try {
+        if (typeof track.getCodec === 'function') return await track.getCodec();
+        return track.codec ?? null;
+    } catch {
+        // A track that will not say what it is cannot be the one that needs
+        // an extra decoder registered for it.
+        return null;
+    }
+}
+
+/**
  * Register any on-demand decoder these tracks need, before asking whether they
  * can be decoded. Answering that question without this reports DTS as
  * undecodable and is self-fulfilling: nothing ever loads the decoder.
- * @param {Array<{codec: string}>} tracks
+ * @param {Array<Object>} tracks
  */
 export async function ensureDecodersFor(tracks) {
-    if (tracks.some((track) => track?.codec === 'dts')) {
+    const codecs = await Promise.all((tracks ?? []).map(codecOf));
+    if (codecs.includes('dts')) {
         await ensureDtsDecoder().catch((error) => {
             Logger.warn('[MediaBunny] DTS decoder failed to load:', error.message);
         });

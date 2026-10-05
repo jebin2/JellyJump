@@ -26,7 +26,7 @@ export async function pickDecodableAudioTrack(input) {
     for (const track of tracks) {
         if (track === primary) continue;
         if (await track.canDecode()) {
-            Logger.warn(`[MediaLifecycle] Primary audio track (${primary?.codec ?? 'unknown codec'}) can't be decoded here — using ${track.codec} (${track.languageCode || 'und'}) instead`);
+            Logger.warn(`[MediaLifecycle] Primary audio track (${primary ? await primary.getCodec() : 'unknown codec'}) can't be decoded here — using ${await track.getCodec()} (${track.languageCode || 'und'}) instead`);
             return track;
         }
     }
@@ -148,7 +148,12 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         player.media.videoTrack = await player.input.getPrimaryVideoTrack();
         
         if (player.videoTrack) {
-            Logger.log(`[MediaLifecycle] Video track found: ${player.videoTrack.codec}`);
+            // getCodec(), not `.codec`. The synchronous getter throws for a
+            // track whose codec is not known yet, which is every HLS track, and
+            // this line sits outside the !isHls guard below -- so a logging
+            // statement was aborting setup for every HLS stream, leaving the
+            // duration at 0 and no audio track at all.
+            Logger.log(`[MediaLifecycle] Video track found: ${await player.videoTrack.getCodec()}`);
             if (!isHls) {
                 try {
                     // The dedicated frame-rate API, not packet stats: it
@@ -188,7 +193,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         player.media.audioTrack = await pickDecodableAudioTrack(player.input);
 
         if (player.audioTrack) {
-            Logger.log(`[MediaLifecycle] Audio track found: ${player.audioTrack.codec}`);
+            Logger.log(`[MediaLifecycle] Audio track found: ${await player.audioTrack.getCodec()}`);
             player.media.audioSink = new MediaBunny.AudioBufferSink(player.audioTrack);
         }
     } catch (e) {
