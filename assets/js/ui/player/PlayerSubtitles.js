@@ -196,8 +196,8 @@ export class PlayerSubtitles {
         const track = audioTracks.find(t => t.id === trackId);
 
         if (track) {
-            p.audioTrack = track;
-            p.audioSink = new MediaBunny.AudioBufferSink(p.audioTrack);
+            p.media.audioTrack = track;
+            p.media.audioSink = new MediaBunny.AudioBufferSink(p.media.audioTrack);
 
             if (p.isPlaying) {
                 p.pause();

@@ -119,6 +119,7 @@ import { PlayerControlBar } from '../ui/player/PlayerControlBar.js';
 
 import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { Logger } from '../shared/utils/Logger.js';
+import { MediaTracks } from './playback/MediaTracks.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -158,12 +159,10 @@ export class CorePlayer {
 
         this.PRESETS = PLAYER_CONTROL_PRESETS;
 
-        // MediaBunny objects
-        this.input = null;
-        this.videoTrack = null;
-        this.videoSink = null;
-        this.audioTrack = null;
-        this.audioSink = null;
+        // The demuxed source and what is read from it. Owned by the
+        // component; exposed below as read-only views so the nine files that
+        // read these keep working untouched.
+        this.media = new MediaTracks();
         this.audioIteratorCleanupPromise = null;
 
         // Subtitles
@@ -709,6 +708,25 @@ export class CorePlayer {
             || hasOverlays({ stickers: this.stickers, decorations: this.decorations });
         this.videoFilters.setCanvasMode(needed);
     }
+
+    // ─── The current source ──────────────────────────────────────────────────────
+    //
+    // Read-only on purpose. Everything that writes these goes through
+    // player.media -- the load pipeline, and one place in the subtitle code
+    // that swaps the audio track.
+    //
+    // Assigning to one of these cannot shadow the component: the getter keeps
+    // returning the real value either way. Inside the app it also fails
+    // loudly, since every file is an ES module and therefore strict -- checked
+    // in a browser, a strict-mode assignment throws TypeError while the same
+    // line typed into a console is silently discarded. Worth knowing before
+    // concluding from the console that the write worked.
+
+    get input() { return this.media.input; }
+    get videoTrack() { return this.media.videoTrack; }
+    get videoSink() { return this.media.videoSink; }
+    get audioTrack() { return this.media.audioTrack; }
+    get audioSink() { return this.media.audioSink; }
 
     // ─── Frame presentation ──────────────────────────────────────────────────────
 

@@ -44,18 +44,7 @@ export function clearPlayerCanvas(player) {
 }
 
 export function disposeMediaBunnyResources(player) {
-    if (player.videoSink?.dispose) {
-        try { player.videoSink.dispose(); } catch (e) { }
-    }
-    if (player.audioSink?.dispose) {
-        try { player.audioSink.dispose(); } catch (e) { }
-    }
-    if (player.input?.dispose) {
-        try { player.input.dispose(); } catch (e) { }
-    }
-    player.videoSink = null;
-    player.audioSink = null;
-    player.input = null;
+    player.media.dispose();
 }
 
 export async function resetPlayer(player) {
@@ -89,8 +78,8 @@ export async function resetPlayer(player) {
 
     disposeMediaBunnyResources(player);
 
-    player.videoTrack = null;
-    player.audioTrack = null;
+    player.media.videoTrack = null;
+    player.media.audioTrack = null;
     player.videoFrameIterator = null;
     player.nextFrame = null;
     player.currentVideoId = null;
@@ -144,7 +133,7 @@ export async function cleanupPlayerForLoad(player) {
 export async function setupPlayerMediaTracks(player, url, isHls) {
     const urlSourceOptions = player.config.withCredentials ? { requestInit: { credentials: 'include' } } : {};
     Logger.log(`[MediaLifecycle] Setting up tracks for ${url} (isHls: ${isHls})`);
-    player.input = new MediaBunny.Input({
+    player.media.input = new MediaBunny.Input({
         source: new MediaBunny.UrlSource(url, urlSourceOptions),
         formats: [...(MediaBunny.HLS_FORMATS || []), ...MediaBunny.ALL_FORMATS]
     });
@@ -156,7 +145,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
 
     try {
         Logger.log('[MediaLifecycle] Fetching primary video track...');
-        player.videoTrack = await player.input.getPrimaryVideoTrack();
+        player.media.videoTrack = await player.input.getPrimaryVideoTrack();
         
         if (player.videoTrack) {
             Logger.log(`[MediaLifecycle] Video track found: ${player.videoTrack.codec}`);
@@ -179,7 +168,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
                 player.frameRate = 30;
             }
 
-            player.videoSink = new MediaBunny.CanvasSink(player.videoTrack, {
+            player.media.videoSink = new MediaBunny.CanvasSink(player.videoTrack, {
                 poolSize: isHls ? 6 : 2,
                 fit: 'contain'
             });
@@ -196,11 +185,11 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         }
 
         Logger.log('[MediaLifecycle] Fetching primary audio track...');
-        player.audioTrack = await pickDecodableAudioTrack(player.input);
+        player.media.audioTrack = await pickDecodableAudioTrack(player.input);
 
         if (player.audioTrack) {
             Logger.log(`[MediaLifecycle] Audio track found: ${player.audioTrack.codec}`);
-            player.audioSink = new MediaBunny.AudioBufferSink(player.audioTrack);
+            player.media.audioSink = new MediaBunny.AudioBufferSink(player.audioTrack);
         }
     } catch (e) {
         Logger.error('[MediaLifecycle] Error setting up media tracks:', e);
@@ -432,7 +421,7 @@ export async function cleanupPlayerMediaBunny(player) {
 
     disposeMediaBunnyResources(player);
 
-    player.videoTrack = null;
-    player.audioTrack = null;
+    player.media.videoTrack = null;
+    player.media.audioTrack = null;
     player.nextFrame = null;
 }
