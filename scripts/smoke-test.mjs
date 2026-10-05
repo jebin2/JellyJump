@@ -26,6 +26,12 @@ const FIXTURES = join(ROOT, 'scripts/fixtures');
 const FIXTURE_PREFIX = '/__fixtures__/';
 const FIXTURE_URL = `${FIXTURE_PREFIX}smoke.webm`;
 const HLS_URL = `${FIXTURE_PREFIX}hls/stream.m3u8`;
+// A live playlist cannot be a file: what makes a stream live is the absence of
+// #EXT-X-ENDLIST, and mediabunny then re-reads the playlist every
+// TARGETDURATION seconds expecting the window to have moved on. So it is
+// generated per request, with a media sequence that advances with the clock.
+const LIVE_PREFIX = '/__live__/';
+const LIVE_URL = `${LIVE_PREFIX}stream.m3u8`;
 
 let pass = 0, fail = 0;
 const check = (ok, label) => {
@@ -42,11 +48,53 @@ const TYPES = {
     '.m3u8': 'application/vnd.apple.mpegurl', '.ts': 'video/mp2t',
 };
 
+// Reuses the HLS fixture's three one-second segments as a sliding window. The
+// sequence advances for the first few seconds and then settles, so the stream
+// keeps answering refreshes without this test having to generate media.
+const live = {
+    startedAt: 0,
+    playlistRequests: 0,
+    segmentRequests: [],
+    reset() { this.startedAt = Date.now(); this.playlistRequests = 0; this.segmentRequests = []; },
+    playlist() {
+        this.playlistRequests++;
+        const elapsed = this.startedAt ? (Date.now() - this.startedAt) / 1000 : 0;
+        const sequence = Math.min(Math.floor(elapsed), 6);
+        const lines = [
+            '#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:1',
+            `#EXT-X-MEDIA-SEQUENCE:${sequence}`,
+        ];
+        // No #EXT-X-ENDLIST and no #EXT-X-PLAYLIST-TYPE: either one tells
+        // mediabunny the stream has ended, and isLive goes false.
+        for (let i = 0; i < 3; i++) {
+            lines.push('#EXTINF:1.000000,', `seg${(sequence + i) % 3}.ts`);
+        }
+        return lines.join('\n') + '\n';
+    },
+};
+
 async function serveDist() {
     const server = createServer(async (req, res) => {
         try {
             const path = decodeURIComponent(req.url.split('?')[0]);
-            const file = path.startsWith(FIXTURE_PREFIX)
+            if (path === LIVE_URL) {
+                const body = live.playlist();
+                res.writeHead(200, {
+                    'Content-Type': TYPES['.m3u8'],
+                    'Content-Length': Buffer.byteLength(body),
+                    // Without this the refreshes come from the cache and the
+                    // window never appears to move.
+                    'Cache-Control': 'no-store',
+                    'Cross-Origin-Opener-Policy': 'same-origin',
+                    'Cross-Origin-Embedder-Policy': 'require-corp',
+                });
+                res.end(body);
+                return;
+            }
+            if (path.startsWith(LIVE_PREFIX)) live.segmentRequests.push(path.slice(LIVE_PREFIX.length));
+            const file = path.startsWith(LIVE_PREFIX)
+                ? join(FIXTURES, 'hls', path.slice(LIVE_PREFIX.length))
+                : path.startsWith(FIXTURE_PREFIX)
                 ? join(FIXTURES, path.slice(FIXTURE_PREFIX.length))
                 : join(DIST, path === '/' ? 'index.html' : path);
             // Nothing outside dist or the fixtures, whatever the request says.
@@ -272,6 +320,63 @@ async function run(page, origin) {
     check(hls.videoTrack, 'the video track is there');
     check(hls.audioTrack, 'and so is the audio track');
     check(hls.framesDrawn, 'frames reach the canvas');
+
+    // A live stream is a different code path from the VOD one above, not a
+    // variation on it: a separate loop in PlayerStream with its own iterators,
+    // its own anchor and its own audio pump. The HLS fixture above does not
+    // reach it -- it carries #EXT-X-ENDLIST, so isLive is false and playback
+    // goes through the ordinary render loop.
+    //
+    // play() is deliberately not awaited. For a live stream the loop runs
+    // inside play()'s own promise chain and does not resolve while the stream
+    // is playing, so awaiting it hangs until the test times out.
+    live.reset();
+    const liveResult = await page.evaluate(async (url) => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        await p.load(url);
+        for (let i = 0; i < 80 && !p.isLive; i++) await sleep(100);
+
+        const c = p.canvas;
+        const hash = () => {
+            const q = document.createElement('canvas');
+            q.width = c.width; q.height = c.height;
+            const x = q.getContext('2d');
+            x.drawImage(c, 0, 0);
+            const d = x.getImageData(0, 0, c.width, c.height).data;
+            let h = 0, lit = 0;
+            for (let i = 0; i < d.length; i += 97) { h = (h * 31 + d[i]) >>> 0; if (d[i] !== 0) lit++; }
+            return { h, lit };
+        };
+
+        const isLive = p.isLive;
+        p.play().catch(() => {});
+
+        const frames = [];
+        let loopRan = false;
+        for (let i = 0; i < 16; i++) {
+            await sleep(400);
+            loopRan = loopRan || !!p.stream?._isLiveLoopActive;
+            frames.push(hash());
+        }
+        p.pause();
+        return {
+            isLive, loopRan,
+            distinctFrames: new Set(frames.map(f => f.h)).size,
+            litPixels: frames[frames.length - 1].lit,
+        };
+    }, `${origin}${LIVE_URL}`);
+
+    console.log('\nit plays a live stream');
+    check(liveResult.isLive, `a playlist with no #EXT-X-ENDLIST is live (isLive=${liveResult.isLive})`);
+    check(liveResult.loopRan, 'the live loop runs, rather than the VOD render loop');
+    check(liveResult.distinctFrames > 1,
+        `live frames keep reaching the canvas (${liveResult.distinctFrames} distinct)`);
+    check(liveResult.litPixels > 0, `the picture is not blank (${liveResult.litPixels} lit samples)`);
+    check(live.playlistRequests > 1,
+        `the playlist is re-read as the window moves (${live.playlistRequests} requests)`);
+    check(new Set(live.segmentRequests).size >= 3,
+        `segments are fetched as they appear (${new Set(live.segmentRequests).size} distinct)`);
 
     console.log('\nnothing failed quietly');
     check(errors.length === 0, `no page errors or bad responses${errors.length ? `: ${errors.slice(0, 3).join('; ')}` : ''}`);
