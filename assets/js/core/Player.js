@@ -119,6 +119,7 @@ import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { Logger } from '../shared/utils/Logger.js';
 import { MediaTracks } from './playback/MediaTracks.js';
 import { PlaybackEpoch } from './playback/PlaybackEpoch.js';
+import { PlaybackAnchor } from './playback/PlaybackAnchor.js';
 import { VideoFrameQueue } from './playback/VideoFrameQueue.js';
 import { AudioBufferQueue } from './audio/AudioBufferQueue.js';
 
@@ -178,8 +179,7 @@ export class CorePlayer {
         this.isAudioInitialized = false;
         this.currentAudioSource = null;
         this.activeSources = [];
-        this._vodAnchorWall = undefined;
-        this._vodAnchorContent = undefined;
+        this.vodAnchor = new PlaybackAnchor();
         this.playbackId = 0;
 
         // MediaBunny playback state

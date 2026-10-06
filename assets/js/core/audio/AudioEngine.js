@@ -103,8 +103,15 @@ export function restorePlayerAutoplayAudio(player, sourceLabel) {
 export async function runPlayerAudioIterator(player, iterator, anchorWall, anchorContent, prefetchedBuffer) {
     if (!player.audioSink || !iterator) return;
 
-    if (anchorWall !== undefined) player._vodAnchorWall = anchorWall;
-    if (anchorContent !== undefined) player._vodAnchorContent = anchorContent;
+    // Recorded on the VOD anchor even for a live pump, which is how it has
+    // always behaved: the live anchor is PlayerStream's, already set, and
+    // nothing reads the VOD one while live. Preserved rather than changed.
+    if (anchorWall !== undefined || anchorContent !== undefined) {
+        player.vodAnchor.set(
+            anchorWall !== undefined ? anchorWall : player.vodAnchor.wall,
+            anchorContent !== undefined ? anchorContent : player.vodAnchor.content,
+        );
+    }
 
     const myIterator = iterator;
     const isAnchored = anchorWall !== undefined && anchorContent !== undefined;
@@ -138,8 +145,8 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
         }
 
         // Use dynamic anchors for Live streams to keep in sync with video loop snaps
-        const currentAnchorWall = player.isLive ? (player.stream?._liveAnchorWall ?? anchorWall) : anchorWall;
-        const currentAnchorContent = player.isLive ? (player.stream?._liveAnchorContent ?? anchorContent) : anchorContent;
+        const currentAnchorWall = player.isLive ? (player.stream?.anchor.wall ?? anchorWall) : anchorWall;
+        const currentAnchorContent = player.isLive ? (player.stream?.anchor.content ?? anchorContent) : anchorContent;
 
         // Account for hardware output latency (usually 10-40ms)
         const outputLatency = player.audioContext.outputLatency || 0;
@@ -187,10 +194,9 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
             }
 
             if (player.isLive && player.audioContext) {
-                const liveAnchorWall = player.stream?._liveAnchorWall;
-                const liveAnchorContent = player.stream?._liveAnchorContent;
+                const liveAnchor = player.stream?.anchor;
 
-                if (liveAnchorWall === undefined || liveAnchorContent === undefined || liveAnchorWall === null || (!player._hasSnappedAnchor && timestamp > 1000000)) {
+                if (!liveAnchor?.isAnchored || (!liveAnchor.hasSnapped && timestamp > 1000000)) {
                     // Wait for anchor to be snapped by the video loop
                     if (sampleCount % 100 === 0) Logger.log(`[${_audioLogTag}:Audio] Waiting for snapped anchor...`);
                     await new Promise(r => setTimeout(r, 50));
@@ -198,7 +204,7 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
                 }
 
                 const outputLatency = player.audioContext.outputLatency || 0;
-                const sampleTargetTime = liveAnchorWall + (timestamp - liveAnchorContent) / player.playbackRate - outputLatency;
+                const sampleTargetTime = liveAnchor.wall + (timestamp - liveAnchor.content) / player.playbackRate - outputLatency;
                 const aheadMs = (sampleTargetTime - player.audioContext.currentTime) * 1000;
                 
                 if (aheadMs > 150) {

@@ -6,26 +6,10 @@ export function getPlayerPlaybackTime(player) {
         return player.streamVideo.currentTime;
     }
 
-    const isLive = player.isLive;
-    const anchorWall = isLive ? player.stream?._liveAnchorWall : player._vodAnchorWall;
-    const anchorContent = isLive ? player.stream?._liveAnchorContent : player._vodAnchorContent;
+    const anchor = player.isLive ? player.stream?.anchor : player.vodAnchor;
 
-    // `!= null`, not `!== undefined`: the two anchor pairs disagree about how
-    // they say "not anchored yet". The VOD fields are set to undefined, but the
-    // live ones are initialised to null, and null !== undefined is true -- so a
-    // live stream that had never set an anchor read as anchored at wall 0 and
-    // content 0. The elapsed time then came out as the AudioContext's whole age
-    // (it survives across loads), and playerPlay adopted that as the live start
-    // position: open a live stream after using the app for a minute and it
-    // starts a minute past the edge, into content that does not exist yet.
-    // 0 is still a real anchor; only null and undefined mean "none".
-    if (anchorWall != null && anchorContent != null && player.audioContext && player.audioContext.state === 'running') {
-        const elapsed = player.audioContext.currentTime - anchorWall;
-        const newPosition = anchorContent + (elapsed * player.playbackRate);
-        if (newPosition >= anchorContent - 0.1) {
-            return newPosition;
-        }
-        return anchorContent;
+    if (anchor?.isAnchored && player.audioContext && player.audioContext.state === 'running') {
+        return anchor.positionAt(player.audioContext.currentTime, player.playbackRate);
     }
 
     if (player.isPlaying && player.fallbackStartTime !== undefined) {
@@ -126,7 +110,7 @@ export function completePlayerMedia(player) {
 }
 
 export async function seekPlayerTo(player, time) {
-    Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${player._vodAnchorWall?.toFixed(3)}, vodAnchorContent=${player._vodAnchorContent?.toFixed(3)}, playbackTime=${player._getPlaybackTime().toFixed(3)}`);
+    Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${player.vodAnchor.wall?.toFixed(3)}, vodAnchorContent=${player.vodAnchor.content?.toFixed(3)}, playbackTime=${player._getPlaybackTime().toFixed(3)}`);
 
     player._setLoading(true);
 
@@ -151,8 +135,7 @@ export async function seekPlayerTo(player, time) {
     player.currentTime = player.playbackTimeAtStart;
     player._updateProgress();
 
-    player._vodAnchorWall = undefined;
-    player._vodAnchorContent = undefined;
+    player.vodAnchor.clear();
 
     try {
         await player._startVideoIterator();

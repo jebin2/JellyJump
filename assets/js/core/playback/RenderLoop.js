@@ -34,12 +34,6 @@ export async function updatePlayerNextFrame(player) {
                 continue; 
             }
 
-            if (!player._hasSnappedAnchor && player.isLive) {
-                player._liveAnchorContent = newNextFrame.timestamp;
-                player._hasSnappedAnchor = true;
-                Logger.log(`[Live] Anchor snapped to first frame ts=${newNextFrame.timestamp.toFixed(3)}`);
-            }
-
             const playbackTime = player._getPlaybackTime();
             if (newNextFrame.timestamp <= playbackTime) {
                 // Late frame: skip it. Held rather than drawn — painting every
@@ -92,7 +86,7 @@ export function startPlayerRenderLoop(player) {
 
             if (player._frameSyncLogCount === undefined) player._frameSyncLogCount = 0;
             player._frameSyncLogCount++;
-            if (player._frameSyncLogCount % 60 === 0 && player._vodAnchorWall !== undefined && !player.isLive) {
+            if (player._frameSyncLogCount % 60 === 0 && player.vodAnchor.isAnchored && !player.isLive) {
                 const nextTs = player.frames.pending?.timestamp;
                 const drift = nextTs !== undefined ? ((nextTs - playbackTime) * 1000).toFixed(0) : 'n/a';
                 Logger.log(`[FrameSync] frame=${player._frameSyncLogCount}, playback=${playbackTime.toFixed(3)}, nextFrameTs=${nextTs?.toFixed(3) ?? 'none'}, drift=${drift}ms, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}`);

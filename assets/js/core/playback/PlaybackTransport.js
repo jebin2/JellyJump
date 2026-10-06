@@ -121,8 +121,7 @@ export async function playPlayer(player) {
 
             const vodAnchorWall = player.audioContext.currentTime + 0.02;
             const vodAnchorContent = vodPrefetchedBuffer?.timestamp ?? startTime;
-            player._vodAnchorWall = vodAnchorWall;
-            player._vodAnchorContent = vodAnchorContent;
+            player.vodAnchor.set(vodAnchorWall, vodAnchorContent);
             Logger.log(`[Play] VOD anchor prefetched — wall=${vodAnchorWall.toFixed(3)}, content=${vodAnchorContent.toFixed(3)}, buffer=${vodPrefetchedBuffer ? 'ok' : 'null'}`);
 
             player._runAudioIterator(audioIterator, vodAnchorWall, vodAnchorContent, vodPrefetchedBuffer);

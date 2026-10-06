@@ -1,4 +1,5 @@
 import { MediaBunny } from '../MediaBunny.js';
+import { PlaybackAnchor } from '../playback/PlaybackAnchor.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { CanvasRecorder } from './CanvasRecorder.js';
 
@@ -12,10 +13,7 @@ export class PlayerStream {
         this.isWebcamMode = false;
         this.isLive = false;
         this._liveStartTimestamp = null;
-        this._liveAnchorWall = null;
-        this._liveAnchorContent = null;
-        this._liveAnchorWallOverride = null;
-        this._liveAvSyncPaused = false;
+        this.anchor = new PlaybackAnchor();
         this._liveAvSyncMonitor = null;
         // Declared rather than sprung into existence mid-method, which is how
         // both of these used to appear: a timer handle whose field only
@@ -326,8 +324,7 @@ export class PlayerStream {
         const player = this.player;
         if (!this.isLive || !player.videoTrack) return;
 
-        this._liveAnchorWall = null;
-        this._liveAnchorContent = null;
+        this.anchor.clear();
         player.epoch.bump();
 
         Logger.log('[Live] User requested jump to live edge');
@@ -358,9 +355,12 @@ export class PlayerStream {
         const currentTime = player._getPlaybackTime();
 
         // We estimate the current live edge based on our anchor and elapsed wall time
-        if (this._liveAnchorWall && player.audioContext) {
-            const elapsedSinceAnchor = player.audioContext.currentTime - this._liveAnchorWall;
-            const liveWallPos = this._liveAnchorContent + elapsedSinceAnchor;
+        // isAnchored, not truthiness: a real anchor at wall 0 -- which is what
+        // a fresh AudioContext gives -- used to read as no anchor, and this
+        // stopped measuring drift without saying so.
+        if (this.anchor.isAnchored && player.audioContext) {
+            const elapsedSinceAnchor = player.audioContext.currentTime - this.anchor.wall;
+            const liveWallPos = this.anchor.content + elapsedSinceAnchor;
             const drift = liveWallPos - currentTime;
 
             // If we are more than 10s behind the "moving" live anchor, mark as not-live
@@ -420,14 +420,12 @@ export class PlayerStream {
         this.isLive = false;
         this._isLiveLoopActive = false;
         this._liveStartTimestamp = null;
-        this._liveAnchorWall = null;
-        this._liveAnchorContent = null;
+        this.anchor.reset();
 
         if (this._liveAvSyncMonitor) {
             clearInterval(this._liveAvSyncMonitor);
             this._liveAvSyncMonitor = null;
         }
-        this._liveAvSyncPaused = false;
 
         const { ui } = this.player;
         if (ui.liveBadge) {
@@ -621,8 +619,7 @@ export class PlayerStream {
             const anchorWall = player.audioContext ? player.audioContext.currentTime : 0;
             const anchorContent = resumePosition ?? 0;
 
-            this._liveAnchorWall = anchorWall;
-            this._liveAnchorContent = anchorContent;
+            this.anchor.set(anchorWall, anchorContent);
 
             Logger.log(`[Live] Instant Anchor set — wall=${anchorWall.toFixed(3)}, content=${anchorContent.toFixed(3)}`);
 
@@ -642,7 +639,7 @@ export class PlayerStream {
                     || !player.audioContext) return;
                 audioStarted = true;
                 Logger.log(`[Live:Audio] Starting audio sync loop`);
-                player._runAudioIterator(audioIterator, this._liveAnchorWall, this._liveAnchorContent);
+                player._runAudioIterator(audioIterator, this.anchor.wall, this.anchor.content);
             };
 
             player._setLoading(false);
@@ -672,7 +669,7 @@ export class PlayerStream {
                 frameCount++;
 
                 // Validate frame timestamp for Live streams
-                if (!player._hasSnappedAnchor && this.isLive && Math.abs(frame.timestamp - anchorContent) > 120) {
+                if (!this.anchor.hasSnapped && this.isLive && Math.abs(frame.timestamp - anchorContent) > 120) {
                     // This frame is from a stale segment (likely pre-pause cache). Discard it.
                     if (frameCount % 60 === 0) {
                         Logger.warn(`[Live:Video] Discarding stale frame (ts=${frame.timestamp.toFixed(3)}, expected=${anchorContent.toFixed(3)})`);
@@ -680,11 +677,12 @@ export class PlayerStream {
                     continue; 
                 }
 
-                if (!player._hasSnappedAnchor) {
-                    this._liveAnchorContent = frame.timestamp;
-                    this._liveAnchorWall = player.audioContext ? player.audioContext.currentTime : 0;
-                    player._hasSnappedAnchor = true;
-                    Logger.log(`[Live] Anchor snapped to first frame — content=${frame.timestamp.toFixed(3)}, wall=${this._liveAnchorWall.toFixed(3)}`);
+                if (!this.anchor.hasSnapped) {
+                    this.anchor.snapTo(
+                        player.audioContext ? player.audioContext.currentTime : 0,
+                        frame.timestamp,
+                    );
+                    Logger.log(`[Live] Anchor snapped to first frame — content=${frame.timestamp.toFixed(3)}, wall=${this.anchor.wall.toFixed(3)}`);
                     
                     player.presentFrame(frame.canvas, { clear: true });
                     startAudio();
@@ -701,8 +699,8 @@ export class PlayerStream {
                 }
 
                 const isBackground = document.hidden;
-                const dynamicAnchorWall = this._liveAnchorWall;
-                const dynamicAnchorContent = this._liveAnchorContent;
+                const dynamicAnchorWall = this.anchor.wall;
+                const dynamicAnchorContent = this.anchor.content;
 
                 if (dynamicAnchorWall !== null && dynamicAnchorContent !== null && player.audioContext) {
                     const currentTime = player.audioContext.currentTime;

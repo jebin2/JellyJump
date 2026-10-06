@@ -109,10 +109,9 @@ export async function cleanupPlayerForLoad(player) {
     player.playbackTimeAtStart = 0;
     player.audioContextStartTime = null;
     player._stopQueuedAudio();
-    player._vodAnchorWall = undefined;
-    player._vodAnchorContent = undefined;
+    player.vodAnchor.clear();
     player._frameSyncLogCount = 0;
-    player._hasSnappedAnchor = false;
+    player.stream?.anchor.reset();
     player.fallbackStartTime = undefined;
     player.isLive = false;
     if (player.stream) {
