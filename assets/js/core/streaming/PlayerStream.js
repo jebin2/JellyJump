@@ -195,10 +195,7 @@ export class PlayerStream {
         const player = this.player;
 
         this.streamVideo.onplaying = () => {
-            if (this.isStreamMode) {
-                player._setLoading(false);
-                this.hideStreamError();
-            }
+            if (this.isStreamMode) player._setLoading(false);
         };
 
         this.streamVideo.onended = () => {
@@ -435,70 +432,6 @@ export class PlayerStream {
         }
         ui.progressContainer?.classList.remove('live-mode-hidden');
         ui.timeDisplay?.classList.remove('live-mode-hidden');
-
-        this.hideStreamError();
-    }
-
-    // ─── Error overlay ───────────────────────────────────────────────────────────
-
-    createErrorOverlay() {
-        const player = this.player;
-        const overlay = document.createElement('div');
-        overlay.className = 'jellyjump-error-overlay';
-        overlay.style.display = 'none';
-        overlay.innerHTML = `
-            <div class="jellyjump-error-content">
-                <span class="jellyjump-error-icon">⚠️</span>
-                <h3 class="jellyjump-error-title">Stream Error</h3>
-                <p class="jellyjump-error-message">Failed to load stream.</p>
-                <p class="jellyjump-error-suggestion"></p>
-                <div class="jellyjump-error-actions">
-                    <button class="jellyjump-btn-secondary jellyjump-error-retry">Retry</button>
-                    <button class="hidden jellyjump-btn-secondary jellyjump-error-dismiss">Dismiss</button>
-                </div>
-            </div>
-        `;
-
-        const wrapper = player.container.querySelector('.jellyjump-video-wrapper') || player.container;
-        wrapper.appendChild(overlay);
-        player.ui.errorOverlay = overlay;
-
-        overlay.querySelector('.jellyjump-error-retry').addEventListener('click', () => {
-            this.hideStreamError();
-            if (player.sourceUrl) player.load(player.sourceUrl, false, player.currentVideoId);
-        });
-        overlay.querySelector('.jellyjump-error-dismiss').addEventListener('click', () => this.hideStreamError());
-    }
-
-    showStreamError(errorDetails) {
-        const { ui } = this.player;
-        if (!ui.errorOverlay) return;
-
-        const overlay = ui.errorOverlay;
-        overlay.querySelector('.jellyjump-error-icon').textContent = errorDetails.icon || '⚠️';
-        overlay.querySelector('.jellyjump-error-title').textContent = errorDetails.title || 'Stream Error';
-        overlay.querySelector('.jellyjump-error-message').textContent = errorDetails.message || 'Failed to load stream.';
-        overlay.querySelector('.jellyjump-error-suggestion').textContent = errorDetails.suggestion || '';
-        overlay.querySelector('.jellyjump-error-retry').style.display = errorDetails.recoverable ? 'inline-block' : 'none';
-
-        this.player._setLoading(false);
-        overlay.style.display = 'flex';
-
-        if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-                type: 'streamError',
-                error: {
-                    type: errorDetails.type,
-                    title: errorDetails.title,
-                    message: errorDetails.message,
-                    recoverable: errorDetails.recoverable
-                }
-            }, '*');
-        }
-    }
-
-    hideStreamError() {
-        if (this.player.ui.errorOverlay) this.player.ui.errorOverlay.style.display = 'none';
     }
 
     // ─── Webcam stream ───────────────────────────────────────────────────────────

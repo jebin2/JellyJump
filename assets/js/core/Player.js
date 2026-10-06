@@ -398,9 +398,6 @@ export class CorePlayer {
     _setWebcamModeControls(isWebcamMode) { this.stream.setWebcamModeControls(isWebcamMode); }
     async _cleanupMediaBunny() { return cleanupPlayerMediaBunny(this); }
     _cleanupHLS() { this.stream.cleanupHLS(); }
-    _createErrorOverlay() { this.stream.createErrorOverlay(); }
-    _showStreamError(errorDetails) { this.stream.showStreamError(errorDetails); }
-    _hideStreamError() { this.stream.hideStreamError(); }
     async _startLiveVideoLoop(force = false) { return this.stream.startLiveVideoLoop(force); }
 
     // ─── Audio ───────────────────────────────────────────────────────────────────

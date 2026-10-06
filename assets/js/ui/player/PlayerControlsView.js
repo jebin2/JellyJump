@@ -45,7 +45,6 @@ export function createPlayerControls(player) {
     if (player.config.controls.filters) initFiltersPanel(player);
     if (player.config.controls.equalizer) initEqualizerPanel(player);
 
-    player._createErrorOverlay();
     player._createThumbnailOverlay();
     player._applyControlVisibility();
     if (player.config.controls.speed) player._updateSpeedMenu();
