@@ -45,6 +45,12 @@ jobs:
           echo "Pages build current before this deploy: $before"
 
       - name: Deploy to release branch
+        # A pull request against main triggers this workflow too, and without
+        # this guard the step force-pushed the PR's build to `release` -- which
+        # is the branch Pages serves, so proposing a change published it to the
+        # live site. The two steps around this one were already guarded; this
+        # one, the only one that actually deploys, was not.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
