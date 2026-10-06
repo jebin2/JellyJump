@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny, codecOf } from '../../core/MediaBunny.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { SubtitleManager } from '../../core/subtitles/SubtitleManager.js';
 
@@ -230,13 +230,20 @@ export class PlayerSubtitles {
         // hiding them makes tracks silently vanish — but marked, so picking one
         // isn't unexplained silence.
         const decodable = await Promise.all(tracks.map(t => t.canDecode().catch(() => false)));
+        // getCodec(), not `.codec`, for the same reason canDecode() is awaited
+        // above: these are the library's supported accessors, and the plain
+        // getter throws when the codec is not resolved yet. That window could
+        // not be reproduced here -- an HLS track reports its codec fine by the
+        // time this menu is built, VOD or live -- so this is the right way to
+        // ask rather than a fix for an observed failure.
+        const codecs = await Promise.all(tracks.map(codecOf));
 
         tracks.forEach((track, index) => {
             const item = template.content.cloneNode(true).querySelector('.jellyjump-menu-item');
             const label = track.languageCode || `Track ${index + 1}`;
             item.textContent = decodable[index]
                 ? label
-                : `${label} — ${track.codec || 'unsupported'} (not supported)`;
+                : `${label} — ${codecs[index] || 'unsupported'} (not supported)`;
             item.dataset.value = track.id;
             if (!decodable[index]) item.classList.add('disabled');
             if (p.audioTrack && p.audioTrack.id === track.id) item.classList.add('active');

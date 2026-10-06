@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 
 
@@ -65,11 +65,12 @@ async function analyzeInputVideos(inputs, onProgress) {
         const width = videoTrack.displayWidth || videoTrack.codedWidth;
         const height = videoTrack.displayHeight || videoTrack.codedHeight;
 
-        Logger.log(`[MergeService] Video ${i + 1}: ${width}x${height}, ${duration}s, codec: ${videoTrack.codec}`);
+        const codec = await codecOf(videoTrack);
+        Logger.log(`[MergeService] Video ${i + 1}: ${width}x${height}, ${duration}s, codec: ${codec}`);
 
         maxWidth = Math.max(maxWidth, width);
         maxHeight = Math.max(maxHeight, height);
-        videoInfos.push({ index: i, input, width, height, duration, codec: videoTrack.codec });
+        videoInfos.push({ index: i, input, width, height, duration, codec });
 
         if (onProgress) onProgress((i + 1) / (inputs.length * 2));
     }
@@ -208,7 +209,7 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
 
             const canDecodeVideo = await videoTrack.canDecode();
             if (!canDecodeVideo) {
-                throw new Error(`Cannot decode video ${i + 1}. Codec ${videoTrack.codec} not supported.`);
+                throw new Error(`Cannot decode video ${i + 1}. Codec ${await codecOf(videoTrack)} not supported.`);
             }
 
             const videoSink = new MediaBunny.VideoSampleSink(videoTrack);

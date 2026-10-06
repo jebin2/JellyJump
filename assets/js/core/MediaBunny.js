@@ -67,7 +67,7 @@ export function ensureDtsDecoder() {
  * @param {Object} track
  * @returns {Promise<string|null>}
  */
-async function codecOf(track) {
+export async function codecOf(track) {
     if (!track) return null;
     try {
         if (typeof track.getCodec === 'function') return await track.getCodec();

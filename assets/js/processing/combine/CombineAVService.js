@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
 
 /**
  * Combine the video track of one file with the audio track of another, muxing
@@ -64,10 +64,10 @@ export async function combineAudioVideo({ videoSource, audioSource, format = 'mp
         });
 
         if (videoConversion.discardedTracks.some(d => d.track === videoTrack)) {
-            throw new Error(`Video track could not be added to the ${format} output (unsupported codec: ${videoTrack.codec}).`);
+            throw new Error(`Video track could not be added to the ${format} output (unsupported codec: ${await codecOf(videoTrack)}).`);
         }
         if (audioConversion.discardedTracks.some(d => d.track === audioTrack)) {
-            throw new Error(`Audio track could not be added to the ${format} output (unsupported codec: ${audioTrack.codec}).`);
+            throw new Error(`Audio track could not be added to the ${format} output (unsupported codec: ${await codecOf(audioTrack)}).`);
         }
 
         let videoProgress = 0;

@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny, ensureDecodersFor } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureDecodersFor, codecOf } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
 
 async function getTrackDetails(input) {
@@ -19,7 +19,7 @@ async function getTrackDetails(input) {
                 id: track.id,
                 type: track.type,
                 language: track.languageCode,
-                codec: track.codec,
+                codec: await codecOf(track),
                 codecString,
                 duration,
                 width: track.width || track.displayWidth,
