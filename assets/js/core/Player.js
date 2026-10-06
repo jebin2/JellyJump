@@ -42,7 +42,8 @@ import {
     cleanupPlayerMediaBunny,
     startPlayerVideoIterator,
     extractAndDrawPlayerFrame,
-    handlePlayerInitialFrame
+    handlePlayerInitialFrame,
+    loadPlayerMedia,
 } from './playback/MediaLifecycle.js';
 import {
     getPlayerPlaybackTime,
@@ -77,10 +78,7 @@ import {
     teardownPlayerYouTube,
     syncYouTubeAudio
 } from './youtube/YouTubePlayback.js';
-import {
-    createStreamController,
-    installStreamStateProxies
-} from './streaming/StreamController.js';
+import { PlayerStream } from './streaming/PlayerStream.js';
 import {
     mountPlayerShell,
     initPlayerResizeObserver,
@@ -267,8 +265,7 @@ export class CorePlayer {
             this._handlers.keydown = (e) => this._handleKeyboard(e);
         }
 
-        this.stream = createStreamController(this);
-        installStreamStateProxies(this);
+        this.stream = new PlayerStream(this);
         this.keyboard = new PlayerKeyboard(this);
         this.subtitles = new PlayerSubtitles(this);
         this.loop = new PlayerLoopControl(this);
@@ -480,86 +477,8 @@ export class CorePlayer {
     _loadPlaybackState() { return loadPlayerPlaybackState(this); }
 
     // ─── Load ────────────────────────────────────────────────────────────────────
-    async load(url, autoplay = false, videoId = null, savedSubtitles = null, options = {}) {
-        this.sourceUrl = url;
-        try {
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            // Pre-emptively mute ONLY the autoplay iOS will actually block:
-            // no transient user activation AND an audio pipeline never yet
-            // unlocked by a gesture. Gesture-driven loads (tapping a playlist
-            // item or Add Video) are allowed to play sound, and once the
-            // context has been unlocked, video switches keep it. If a resume
-            // still fails later, play()'s timeout fallback mutes and arms
-            // restore-on-interaction, so nothing is left silently broken.
-            const gestureActive = typeof navigator !== 'undefined' && navigator.userActivation
-                ? navigator.userActivation.isActive
-                : false;
-            if (autoplay && isMobile && !this.config.muted && !gestureActive && !this.isAudioInitialized) {
-                Logger.log('[Player] Mobile autoplay without user activation - enforcing muted playback');
-                this.config.muted = true;
-                // The AudioContext/gainNode survive across loads, so the flag
-                // alone doesn't silence anything - sync the gain or the icon
-                // shows muted while audio keeps playing.
-                this._syncAudioGain();
-                // Mark as auto-muted so the first user interaction restores
-                // audio instead of leaving the video silent until a manual
-                // unmute. Skipped when the user muted deliberately (guard
-                // above): auto-restore must not override their choice.
-                this._wasMutedForAutoplay = true;
-                this._updateVolumeUI();
-            }
-
-            const youtube = parseYouTubeUrl(url);
-            const isHls = !youtube && StreamDetector.detect(url) === StreamDetector.TYPE_HLS;
-            if (isHls) this.isLive = true;
-
-            await this._cleanupForLoad();
-
-            // The embed is kept alive across YouTube videos and only dropped
-            // here, where what comes next is finally known — leaving it would
-            // park a hidden cross-origin iframe behind a local file.
-            if (!youtube) teardownPlayerYouTube(this);
-
-            // A YouTube link has no media stream to demux, so the whole track
-            // setup below does not apply — YouTube's own player takes over the
-            // picture and the sound.
-            if (youtube) {
-                this.currentVideoId = videoId || url;
-                this._setLoading(true);
-                await loadPlayerYouTube(this, youtube, autoplay);
-                Logger.log('Media loaded successfully (youtube)');
-                return;
-            }
-
-            // cleanup's pause() suspended the AudioContext; wake it now while
-            // the tap's transient activation is still valid (same race as the
-            // seek path), so play() below finds it already running.
-            if (autoplay && this.audioContext) {
-                this.audioContext.resume().catch(() => { });
-            }
-
-            this._setLoading(true);
-            Logger.log(`Loading media: ${url}`);
-            this.currentVideoId = videoId || url;
-
-            await this._setupMediaTracks(url, isHls);
-
-            if (isHls) await this._handleHLSState();
-            if (savedSubtitles?.length > 0) this._restoreSavedSubtitles(savedSubtitles);
-
-            await this._handleInitialFrame(autoplay);
-            this._updateSubtitleMenu();
-
-            if (!this.isLive) this._setLoading(false);
-            Logger.log('Media loaded successfully');
-
-        } catch (error) {
-            Logger.error('Error loading media:', error);
-            this._setLoading(false);
-            if (this.onStreamError && this.currentVideoId) {
-                this.onStreamError(this.currentVideoId, error.message || 'Failed to load media');
-            }
-        }
+    async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
+        return loadPlayerMedia(this, url, autoplay, videoId, savedSubtitles);
     }
 
     // ─── Play ────────────────────────────────────────────────────────────────────
@@ -757,6 +676,39 @@ export class CorePlayer {
         // can run while it is being rebuilt.
         if (this.ui) this._updatePlayPauseUI();
     }
+
+    // ─── Stream state ────────────────────────────────────────────────────────────
+    // These live on PlayerStream, and the player exposes them because the UI,
+    // the render loop and the transport all ask the player. They used to be
+    // installed onto each instance by a loop over a key list in
+    // StreamController, which meant that grepping Player.js for `isLive` --
+    // read 27 times across the app, four of them every frame -- found nothing
+    // at all, and the only way to learn the property existed was to find the
+    // list. Written out, the player's surface is its source.
+    //
+    // The getters tolerate a missing stream: there is a window in the
+    // constructor, between `this.stream = null` and the real one being built,
+    // where nothing reads them today but a read would otherwise throw.
+    get isStreamMode() { return this.stream?.isStreamMode; }
+    set isStreamMode(value) { this.stream.isStreamMode = value; }
+
+    get isLive() { return this.stream?.isLive; }
+    set isLive(value) { this.stream.isLive = value; }
+
+    get streamVideo() { return this.stream?.streamVideo; }
+    set streamVideo(value) { this.stream.streamVideo = value; }
+
+    get isWebcamMode() { return this.stream?.isWebcamMode; }
+    set isWebcamMode(value) { this.stream.isWebcamMode = value; }
+
+    get _liveStartTimestamp() { return this.stream?._liveStartTimestamp; }
+    set _liveStartTimestamp(value) { this.stream._liveStartTimestamp = value; }
+
+    get _wasMutedForAutoplay() { return this.stream?._wasMutedForAutoplay; }
+    set _wasMutedForAutoplay(value) { this.stream._wasMutedForAutoplay = value; }
+
+    get _isMediaReady() { return this.stream?._isMediaReady; }
+    set _isMediaReady(value) { this.stream._isMediaReady = value; }
 
     get input() { return this.media.input; }
     get videoTrack() { return this.media.videoTrack; }

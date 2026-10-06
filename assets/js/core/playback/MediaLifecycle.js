@@ -1,5 +1,8 @@
 import { MediaBunny, ensureDecodersFor } from '../MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
+import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
+import { StreamDetector } from '../../shared/utils/StreamDetector.js';
+import { loadPlayerYouTube, teardownPlayerYouTube } from '../youtube/YouTubePlayback.js';
 
 /**
  * Choose an audio track the browser can actually decode.
@@ -418,4 +421,98 @@ export async function cleanupPlayerMediaBunny(player) {
 
     player.media.videoTrack = null;
     player.media.audioTrack = null;
+}
+
+
+/**
+ * Load a URL into the player.
+ *
+ * The orchestration lived on Player while every step it calls -- the cleanup,
+ * the track setup, the HLS state, the initial frame -- already lived here, so
+ * reading the load path meant moving between two files for no reason.
+ *
+ * The `options` argument is gone. Nothing ever read it: Playlist passed
+ * `{ isAudio }` and no one looked, because isAudioMode is decided from the
+ * tracks the file actually has rather than from what the playlist believed.
+ */
+export async function loadPlayerMedia(player, url, autoplay = false, videoId = null, savedSubtitles = null) {
+    player.sourceUrl = url;
+    try {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        // Pre-emptively mute ONLY the autoplay iOS will actually block:
+        // no transient user activation AND an audio pipeline never yet
+        // unlocked by a gesture. Gesture-driven loads (tapping a playlist
+        // item or Add Video) are allowed to play sound, and once the
+        // context has been unlocked, video switches keep it. If a resume
+        // still fails later, play()'s timeout fallback mutes and arms
+        // restore-on-interaction, so nothing is left silently broken.
+        const gestureActive = typeof navigator !== 'undefined' && navigator.userActivation
+            ? navigator.userActivation.isActive
+            : false;
+        if (autoplay && isMobile && !player.config.muted && !gestureActive && !player.isAudioInitialized) {
+            Logger.log('[Player] Mobile autoplay without user activation - enforcing muted playback');
+            player.config.muted = true;
+            // The AudioContext/gainNode survive across loads, so the flag
+            // alone doesn't silence anything - sync the gain or the icon
+            // shows muted while audio keeps playing.
+            player._syncAudioGain();
+            // Mark as auto-muted so the first user interaction restores
+            // audio instead of leaving the video silent until a manual
+            // unmute. Skipped when the user muted deliberately (guard
+            // above): auto-restore must not override their choice.
+            player._wasMutedForAutoplay = true;
+            player._updateVolumeUI();
+        }
+
+        const youtube = parseYouTubeUrl(url);
+        const isHls = !youtube && StreamDetector.detect(url) === StreamDetector.TYPE_HLS;
+        if (isHls) player.isLive = true;
+
+        await player._cleanupForLoad();
+
+        // The embed is kept alive across YouTube videos and only dropped
+        // here, where what comes next is finally known — leaving it would
+        // park a hidden cross-origin iframe behind a local file.
+        if (!youtube) teardownPlayerYouTube(player);
+
+        // A YouTube link has no media stream to demux, so the whole track
+        // setup below does not apply — YouTube's own player takes over the
+        // picture and the sound.
+        if (youtube) {
+            player.currentVideoId = videoId || url;
+            player._setLoading(true);
+            await loadPlayerYouTube(player, youtube, autoplay);
+            Logger.log('Media loaded successfully (youtube)');
+            return;
+        }
+
+        // cleanup's pause() suspended the AudioContext; wake it now while
+        // the tap's transient activation is still valid (same race as the
+        // seek path), so play() below finds it already running.
+        if (autoplay && player.audioContext) {
+            player.audioContext.resume().catch(() => { });
+        }
+
+        player._setLoading(true);
+        Logger.log(`Loading media: ${url}`);
+        player.currentVideoId = videoId || url;
+
+        await player._setupMediaTracks(url, isHls);
+
+        if (isHls) await player._handleHLSState();
+        if (savedSubtitles?.length > 0) player._restoreSavedSubtitles(savedSubtitles);
+
+        await player._handleInitialFrame(autoplay);
+        player._updateSubtitleMenu();
+
+        if (!player.isLive) player._setLoading(false);
+        Logger.log('Media loaded successfully');
+
+    } catch (error) {
+        Logger.error('Error loading media:', error);
+        player._setLoading(false);
+        if (player.onStreamError && player.currentVideoId) {
+            player.onStreamError(player.currentVideoId, error.message || 'Failed to load media');
+        }
+    }
 }

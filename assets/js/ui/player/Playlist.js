@@ -1423,7 +1423,7 @@ export class Playlist {
             };
 
             // Load video with saved subtitles (if any) - pass isAudio for audio files
-            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null, { isAudio: video.isAudio });
+            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null);
 
             this._clearLoadGuard();
 
