@@ -1,5 +1,6 @@
 import { MediaBunny } from '../MediaBunny.js';
 import { PlaybackAnchor } from '../playback/PlaybackAnchor.js';
+import { scheduleLiveFrame } from './LiveFrameSchedule.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { CanvasRecorder } from './CanvasRecorder.js';
 
@@ -699,51 +700,57 @@ export class PlayerStream {
                 }
 
                 const isBackground = document.hidden;
-                const dynamicAnchorWall = this.anchor.wall;
-                const dynamicAnchorContent = this.anchor.content;
+                const schedule = player.audioContext
+                    ? scheduleLiveFrame({
+                        anchor: this.anchor,
+                        frameTimestamp: frame.timestamp,
+                        now: player.audioContext.currentTime,
+                        outputLatency: player.audioContext.outputLatency || 0,
+                    })
+                    : { kind: 'unanchored' };
 
-                if (dynamicAnchorWall !== null && dynamicAnchorContent !== null && player.audioContext) {
-                    const currentTime = player.audioContext.currentTime;
-                    const outputLatency = player.audioContext.outputLatency || 0;
-                    const targetWall = dynamicAnchorWall + (frame.timestamp - dynamicAnchorContent) + outputLatency;
-                    const drift = currentTime - targetWall;
+                let action = schedule.kind;
+                if (action === 'jumpToEdge') {
+                    Logger.warn(`[Live:Video] Massive drift detected (${schedule.drift.toFixed(1)}s) — jumping to live edge`);
+                    if (player.videoTrack) {
+                        const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
+                        this._liveStartTimestamp = currentLiveEdge ?? 0;
+                        setTimeout(() => this.startLiveVideoLoop(true), 0);
+                        break;
+                    }
+                    // Nothing to ask where the edge is, so catch up instead.
+                    action = 'catchUp';
+                }
 
-                    if (drift > 0.25) {
-                        if (frameCount % 120 === 0 || drift > 2.0) {
-                            if (frameCount % 120 === 0) Logger.log(`[Live:Video] Catching up — behind=${drift.toFixed(3)}s, frame=${frameCount}`);
-                            if (drift > 1.0) {
-                                player._setLoading(true);
-                                this._updateLiveBadgeState();
-                            }
+                if (action === 'catchUp') {
+                    // The periodic report and the spinner both depend on how
+                    // many frames have gone by, so they stay here.
+                    if (frameCount % 120 === 0 || schedule.loud) {
+                        if (frameCount % 120 === 0) Logger.log(`[Live:Video] Catching up — behind=${schedule.drift.toFixed(3)}s, frame=${frameCount}`);
+                        if (schedule.showLoading) {
+                            player._setLoading(true);
+                            this._updateLiveBadgeState();
                         }
-
-                        if (drift > 30.0) {
-                            Logger.warn(`[Live:Video] Massive drift detected (${drift.toFixed(1)}s) — jumping to live edge`);
-                            if (player.videoTrack) {
-                                const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                                this._liveStartTimestamp = currentLiveEdge ?? 0;
-                                setTimeout(() => this.startLiveVideoLoop(true), 0);
-                                break; 
-                            }
-                        }
-
-                        if (!isBackground) {
-                            player.presentFrame(frame.canvas);
-                        }
-                        continue;
                     }
 
+                    if (!isBackground) {
+                        player.presentFrame(frame.canvas);
+                    }
+                    continue;
+                }
+
+                if (action === 'present') {
                     if (!audioStarted) startAudio();
                     player._setLoading(false);
 
                     if (isBackground) {
                         await new Promise(r => setTimeout(r, 100));
                     } else {
-                        if (currentTime < targetWall - 0.005) {
+                        if (player.audioContext.currentTime < schedule.waitUntil) {
                             await new Promise(r => {
                                 const check = () => {
                                     if (player.epoch.isStale(epoch) || !player.isPlaying) { r(); return; }
-                                    if (player.audioContext.currentTime >= targetWall - 0.005) { r(); return; }
+                                    if (player.audioContext.currentTime >= schedule.waitUntil) { r(); return; }
                                     requestAnimationFrame(check);
                                 };
                                 requestAnimationFrame(check);
@@ -754,11 +761,10 @@ export class PlayerStream {
                         drawnCount++;
 
                         if (drawnCount % 120 === 0) {
-                            Logger.log(`[Live:Video] Sync status — late=${((player.audioContext.currentTime - targetWall) * 1000).toFixed(1)}ms, drawn=${drawnCount}, total=${frameCount}`);
+                            Logger.log(`[Live:Video] Sync status — late=${((player.audioContext.currentTime - schedule.targetWall) * 1000).toFixed(1)}ms, drawn=${drawnCount}, total=${frameCount}`);
                         }
-
                     }
-                } else {
+                } else if (action === 'unanchored') {
                     if (!isBackground) {
                         player.presentFrame(frame.canvas);
                         await new Promise(r => requestAnimationFrame(r));
