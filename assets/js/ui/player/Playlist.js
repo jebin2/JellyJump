@@ -1,4 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
+import { classifyPlaylistItem } from './PlaylistItemKind.js';
 import { Toast } from "../../shared/utils/Toast.js";
 import { StorageService } from "../../shared/services/StorageService.js";
 import { CorePlayer } from '../../core/Player.js';
@@ -1247,7 +1248,13 @@ export class Playlist {
 
             const video = this.items[index];
 
-            if (video.needsReload) {
+            // One decision, taken once and in a tested order; the side effects
+            // below stay exactly where they were.
+            const itemKind = classifyPlaylistItem(video, {
+                hasWebcamStream: !!ScreenRecorderMenu.stream,
+            });
+
+            if (itemKind === 'needsReload') {
                 Toast.show('This local file needs to be re-uploaded.', 4000, true);
                 return;
             }
@@ -1264,7 +1271,7 @@ export class Playlist {
             // Handle Live Webcam Restore
             if (video.isWebcam) {
                 Logger.log('[Playlist] Selecting Live Webcam Item');
-                if (ScreenRecorderMenu.stream) {
+                if (itemKind === 'webcam') {
                     Logger.log('[Playlist] Restoring live webcam stream');
                     await this.player.loadWebcamStream(ScreenRecorderMenu.stream);
                     this.activeIndex = index;
@@ -1288,14 +1295,14 @@ export class Playlist {
             // thumbnail generation — assumes a fetchable media file, and a
             // watch page is not one: the cache path would download HTML and the
             // demuxer would reject it.
-            if (video.isYouTube) {
+            if (itemKind === 'youtube') {
                 await this.player.load(video.url, autoplay, video.id, null);
                 this._clearLoadGuard();
                 this._saveState();
                 return;
             }
 
-            if (video.isLive || video.isStream || (video.url && video.url.includes('.m3u8'))) {
+            if (itemKind === 'stream') {
                 video.isStream = true; // Mark for metadata prefetch skip
 
                 // INSTANT FEEDBACK: Show LIVE badge immediately before load succeeds
