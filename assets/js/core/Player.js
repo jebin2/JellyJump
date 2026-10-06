@@ -381,11 +381,7 @@ export class CorePlayer {
     _clearAutoHideTimer() { this.controlBar.clearAutoHideTimer(); }
 
     // ─── Stream helpers ──────────────────────────────────────────────────────────
-    _createStreamVideo() { this.stream.createStreamVideo(); }
-    _showStreamVideo() { this.stream.showStreamVideo(); }
-    _hideStreamVideo() { this.stream.hideStreamVideo(); }
     _setupStreamVideoEvents() { this.stream.setupStreamVideoEvents(); }
-    _startStreamRenderLoop() { this.stream.startStreamRenderLoop(); }
     async loadWebcamStream(stream) { return this.stream.loadWebcamStream(stream); }
     async startCanvasRecording(options = {}) { return this.stream.startCanvasRecording(options); }
     _resumeRecordingSmartPause() { this.stream.resumeRecordingSmartPause(); }
