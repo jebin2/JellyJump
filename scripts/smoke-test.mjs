@@ -139,10 +139,36 @@ async function run(page, origin) {
         errors.push(`console: ${text.slice(0, 160)}`);
     });
     page.on('response', r => {
-        // The analytics embed is absent from the build and always 404s.
-        if (r.status() >= 400 && !r.url().includes('analytics')) {
-            errors.push(`${r.status()} ${r.url().replace(origin, '')}`);
+        if (r.status() >= 400) errors.push(`${r.status()} ${r.url().replace(origin, '')}`);
+    });
+    // Nothing may leave this machine. The analytics embed is real now, and it
+    // posts an event per page load, so without this every run would write test
+    // traffic into the project's live analytics. Blocking all non-local
+    // requests also means an accidental new third-party dependency shows up
+    // here as a blocked URL instead of quietly working on the author's
+    // machine and failing on someone else's.
+    const blocked = new Set();
+    await page.route('**/*', route => {
+        const url = route.request().url();
+        if (url.startsWith(origin) || url.startsWith('blob:') || url.startsWith('data:')) {
+            return route.continue();
         }
+        blocked.add(url);
+        return route.abort();
+    });
+
+    // A request that never gets a response is invisible to the handler above.
+    // The analytics embed used to 404 here and was excluded by name; when it
+    // was briefly pointed at another origin it failed on CSP, which is not a
+    // status code at all and so would have gone unnoticed too.
+    page.on('requestfailed', r => {
+        const url = r.url();
+        if (url.startsWith('blob:') || url.startsWith('data:')) return;
+        if (blocked.has(url)) return;                 // deliberately cut off
+        // The live playlist is polled for as long as the stream is open, so
+        // whichever poll is in flight when the run moves on is cancelled.
+        if (url.includes(LIVE_URL) && r.failure()?.errorText === 'net::ERR_ABORTED') return;
+        errors.push(`${r.failure()?.errorText ?? 'failed'} ${url.replace(origin, '')}`);
     });
 
     await page.goto(`${origin}/player.html`);
