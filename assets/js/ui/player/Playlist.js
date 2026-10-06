@@ -1200,6 +1200,147 @@ export class Playlist {
      * @param {number} index 
      * @param {boolean} autoplay - Whether to start playing immediately
      */
+
+    /**
+     * A YouTube watch page: handed straight to the player, which gives it to
+     * YouTube's iframe. Nothing below the dispatch applies -- caching, metadata
+     * and thumbnails all assume a fetchable media file, and a watch page is not
+     * one.
+     */
+    async _playYouTubeItem(video, autoplay) {
+        await this.player.load(video.url, autoplay, video.id, null);
+        this._clearLoadGuard();
+        this._saveState();
+    }
+
+    /**
+     * An HLS or live URL, loaded without the metadata pass.
+     *
+     * The LIVE badge goes up before the load is known to succeed, because
+     * waiting makes selecting a live item feel broken; the catch puts it back
+     * down, which is the only reason the load is wrapped at all.
+     */
+    async _playStreamItem(video, index, autoplay) {
+        video.isStream = true; // Mark for metadata prefetch skip
+
+        const showLiveImmediately = video.isLive || video.url?.includes('.m3u8');
+        if (showLiveImmediately) {
+            this.player.isLive = true;
+            this.player._updateStreamUI?.();
+        }
+
+        try {
+            // For streams, use autoplay directly - user clicked to play
+            await this.player.load(video.url, autoplay, video.id, null);
+        } catch (e) {
+            if (showLiveImmediately) {
+                this.player.isLive = false;
+                this.player._updateStreamUI?.();
+            }
+            throw e;
+        }
+
+        this._updateStreamItemMetadata(video, index);
+        this._clearLoadGuard();
+        this._saveState();
+    }
+
+    /**
+     * Make sure the item has something the player can open.
+     *
+     * A remote URL is served from the cache when it is there and streamed
+     * straight from the network when it is not, caching behind the playback so
+     * the next time is instant. A local file is pulled out of storage. A file
+     * that has gone missing takes the whole item with it: it is removed from
+     * the playlist and the next one starts, which is why this reports back
+     * rather than throwing -- the caller has nothing left to load.
+     *
+     * @returns {Promise<boolean>} false when the item is gone and selectItem
+     *          should stop; true when there is a source to play.
+     */
+    async _ensureItemSource(video, index, autoplay) {
+        if (video.blob_url) return true;
+
+        try {
+            // OPTIMIZATION: For remote URLs, check cache first.
+            // If not in cache, play directly from URL and cache in background.
+            if (!video.isLocal && video.url && !video.isStream) {
+                const cachedBlob = await MediaMetadata.checkCache(video);
+
+                if (cachedBlob) {
+                    Logger.log(`[Playlist] Playing from cache: ${video.title}`);
+                    video.blob_url = URL.createObjectURL(cachedBlob);
+                    // Mark as having file so we don't try to download again
+                    video.file = cachedBlob;
+                } else {
+                    Logger.log(`[Playlist] Playing directly from URL (background caching): ${video.title}`);
+                    // Direct playback
+                    video.blob_url = video.url;
+
+                    // Not for shared libraries: caching downloads the
+                    // whole file, which defeats streaming a multi-GB
+                    // movie over the network and fills storage with a
+                    // copy of someone else's library.
+                    if (!video.isRemoteLibrary) MediaMetadata.cacheInBackground(video, () => {
+                        Logger.log(`[Playlist] Background cache complete for: ${video.title}`);
+                        this._saveState();
+                    });
+                }
+            } else {
+                // Local files or legacy behavior
+                if (this.player && typeof this.player._setLoading === 'function') {
+                    this.player._setLoading(true);
+                } else if (this.player.ui && this.player.ui.loader) {
+                    this.player.ui.loader.classList.add('visible');
+                }
+                Logger.log(`Loading file from storage: ${video.title}`);
+                this.player.already_fetching = true;
+                await MediaMetadata.getProcessedSourceURL(video);
+            }
+
+            if (this.player.already_fetching) {
+                // This reads empty and is not. If the resolve above did not
+                // produce a blob_url, `.startsWith` throws here, the catch
+                // below removes the item and the playlist moves on -- which is
+                // the handling for a file that has gone missing. Collapsing
+                // the test would leave such an item in the list and merely
+                // fail to play it.
+                if (video.blob_url.startsWith('blob:')) {
+                    // Keep it for a bit or let the player handle revocation
+                }
+                this.player.already_fetching = false;
+            }
+        } catch (e) {
+            Logger.error('Error loading file from storage:', e);
+            if (this.player && typeof this.player._setLoading === 'function') {
+                this.player._setLoading(false);
+            } else if (this.player.ui && this.player.ui.loader) {
+                this.player.ui.loader.classList.remove('visible');
+            }
+
+            // Auto-remove and skip to next
+            this._clearLoadGuard();
+            Logger.warn(`File not found: ${video.title}. Removing and skipping.`);
+
+            // 1. Data Removal (handles activeIndex adjustment)
+            this.state.removeItem(index);
+            this._saveState();
+            this.render();
+
+            // 2. Play next or loop back
+            if (index < this.state.items.length) {
+                this.selectItem(index, autoplay);
+            } else if (this.state.items.length > 0 && this.player.loopMode === 'playlist') {
+                this.selectItem(0, autoplay);
+            } else {
+                this._stopPlayback();
+            }
+            return false;
+        }
+
+        return true;
+    }
+
     async selectItem(index, autoplay = true) {
         if (index < 0 || index >= this.items.length) return;
 
@@ -1296,118 +1437,16 @@ export class Playlist {
             // watch page is not one: the cache path would download HTML and the
             // demuxer would reject it.
             if (itemKind === 'youtube') {
-                await this.player.load(video.url, autoplay, video.id, null);
-                this._clearLoadGuard();
-                this._saveState();
+                await this._playYouTubeItem(video, autoplay);
                 return;
             }
 
             if (itemKind === 'stream') {
-                video.isStream = true; // Mark for metadata prefetch skip
-
-                // INSTANT FEEDBACK: Show LIVE badge immediately before load succeeds
-                let showLiveImmediately = video.isLive || video.url?.includes('.m3u8');
-                if (showLiveImmediately) {
-                    this.player.isLive = true;
-                    this.player._updateStreamUI?.();
-                }
-
-                try {
-                    // For streams, use autoplay directly - user clicked to play
-                    await this.player.load(video.url, autoplay, video.id, null);
-                } catch (e) {
-                    // Hide LIVE badge on failure
-                    if (showLiveImmediately) {
-                        this.player.isLive = false;
-                        this.player._updateStreamUI?.();
-                    }
-                    throw e;
-                }
-
-                // Update item metadata after stream loads
-                this._updateStreamItemMetadata(video, index);
-
-                this._clearLoadGuard();
-                this._saveState();
+                await this._playStreamItem(video, index, autoplay);
                 return;
             }
 
-            // On-Demand Loading: Fetch file from DB if missing OR if URL was revoked
-            // Also handles remote URL items that need to load from cache
-            if (!video.blob_url) {
-                try {
-                    // OPTIMIZATION: For remote URLs, check cache first.
-                    // If not in cache, play directly from URL and cache in background.
-                    if (!video.isLocal && video.url && !video.isStream) {
-                        const cachedBlob = await MediaMetadata.checkCache(video);
-
-                        if (cachedBlob) {
-                            Logger.log(`[Playlist] Playing from cache: ${video.title}`);
-                            video.blob_url = URL.createObjectURL(cachedBlob);
-                            // Mark as having file so we don't try to download again
-                            video.file = cachedBlob;
-                        } else {
-                            Logger.log(`[Playlist] Playing directly from URL (background caching): ${video.title}`);
-                            // Direct playback
-                            video.blob_url = video.url;
-
-                            // Not for shared libraries: caching downloads the
-                            // whole file, which defeats streaming a multi-GB
-                            // movie over the network and fills storage with a
-                            // copy of someone else's library.
-                            if (!video.isRemoteLibrary) MediaMetadata.cacheInBackground(video, () => {
-                                Logger.log(`[Playlist] Background cache complete for: ${video.title}`);
-                                this._saveState();
-                            });
-                        }
-                    } else {
-                        // Local files or legacy behavior
-                        if (this.player && typeof this.player._setLoading === 'function') {
-                            this.player._setLoading(true);
-                        } else if (this.player.ui && this.player.ui.loader) {
-                            this.player.ui.loader.classList.add('visible');
-                        }
-                        Logger.log(`Loading file from storage: ${video.title}`);
-                        this.player.already_fetching = true;
-                        await MediaMetadata.getProcessedSourceURL(video);
-                    }
-
-                    if (this.player.already_fetching) {
-                        // If we were fetching (local file), clean up after a bit
-                        // But for remote URLs we might want to keep the blob_url if it's a blob
-                        if (video.blob_url.startsWith('blob:')) {
-                            // Keep it for a bit or let the player handle revocation
-                        }
-                        this.player.already_fetching = false;
-                    }
-                } catch (e) {
-                    Logger.error('Error loading file from storage:', e);
-                    if (this.player && typeof this.player._setLoading === 'function') {
-                        this.player._setLoading(false);
-                    } else if (this.player.ui && this.player.ui.loader) {
-                        this.player.ui.loader.classList.remove('visible');
-                    }
-
-                    // Auto-remove and skip to next
-                    this._clearLoadGuard();
-                    Logger.warn(`File not found: ${video.title}. Removing and skipping.`);
-
-                    // 1. Data Removal (handles activeIndex adjustment)
-                    this.state.removeItem(index);
-                    this._saveState();
-                    this.render();
-
-                    // 2. Play next or loop back
-                    if (index < this.state.items.length) {
-                        this.selectItem(index, autoplay);
-                    } else if (this.state.items.length > 0 && this.player.loopMode === 'playlist') {
-                        this.selectItem(0, autoplay);
-                    } else {
-                        this._stopPlayback();
-                    }
-                    return;
-                }
-            }
+            if (!await this._ensureItemSource(video, index, autoplay)) return;
 
             // Final safety check: Ensure we have a valid URL before loading
             if (!video.blob_url) {
