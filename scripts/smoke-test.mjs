@@ -231,6 +231,37 @@ async function run(page, origin) {
     check(stormsAgreeing === storms,
         `rapid bar clicks leave the frame for the last one (${stormsAgreeing}/${storms})`);
 
+    // isPlaying is written by four engines in five files, and the play/pause
+    // button has to follow every one. The pairing is structural now rather
+    // than remembered, so this checks the two cannot drift apart.
+    //
+    // It runs here, on the ordinary fixture, rather than after the live
+    // section: play() does not resolve while a live stream is playing, so
+    // awaiting it there hangs the whole run.
+    const button = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        const agrees = () => {
+            const b = p.ui.playBtn;
+            if (!b) return null;
+            const saysPlaying = b.getAttribute('aria-label') === 'Pause';
+            return saysPlaying === !!p.isPlaying;
+        };
+        const results = [];
+        await p.play().catch(() => {}); await sleep(500); results.push(agrees());
+        p.pause(); await sleep(300); results.push(agrees());
+        await p._seekTo(0.4).catch(() => {}); await sleep(450); results.push(agrees());
+        await p.play().catch(() => {}); await sleep(450); results.push(agrees());
+        await p._seekTo(1.9).catch(() => {}); await sleep(300);
+        await p.play().catch(() => {}); await sleep(1500); results.push(agrees());
+        p.pause();
+        return results;
+    });
+
+    console.log('\nthe button never disagrees with the player');
+    check(button.every(ok => ok === true),
+        `play, pause, seek, resume and reaching the end all agree (${button.filter(Boolean).length}/${button.length})`);
+
     const overlays = await page.evaluate(async () => {
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         const p = window.player;

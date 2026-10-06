@@ -723,6 +723,41 @@ export class CorePlayer {
     // line typed into a console is silently discarded. Worth knowing before
     // concluding from the console that the write worked.
 
+    /**
+     * Whether playback is running.
+     *
+     * An accessor rather than a field because four engines write it -- the
+     * transport, the live stream, the webcam path and the YouTube embed, in
+     * five files and eighteen places -- and the play/pause button has to
+     * follow every one of them. Twelve of those writes remembered to call
+     * _updatePlayPauseUI() on the next line. The other five did not, and
+     * relied on something nearby doing it: the webcam path plays immediately
+     * afterwards, and one is a redundant second assignment of a value already
+     * set. That leaves the three YouTube sites -- load, suspend and teardown
+     * -- where nothing visibly pairs with the write. Measuring those needs the
+     * real embed, so whether the button was ever actually stale there is
+     * unverified.
+     *
+     * Making it a setter turns the convention into something the code cannot
+     * forget, whichever of those five was a latent bug and which was merely
+     * fragile. On every path that can be driven in a test -- load, play,
+     * pause, seek both ways, reaching the end, reload while playing, and the
+     * webcam -- the button behaves exactly as it did before.
+     *
+     * Every existing write keeps its exact syntax, and the explicit
+     * calls that were already there are left alone -- they also refresh the
+     * overlay, which depends on isLoading and so can need updating when the
+     * flag itself has not moved.
+     */
+    get isPlaying() { return this._isPlaying; }
+    set isPlaying(value) {
+        if (this._isPlaying === value) return;
+        this._isPlaying = value;
+        // The constructor sets this before `ui` is built, and the reset paths
+        // can run while it is being rebuilt.
+        if (this.ui) this._updatePlayPauseUI();
+    }
+
     get input() { return this.media.input; }
     get videoTrack() { return this.media.videoTrack; }
     get videoSink() { return this.media.videoSink; }
