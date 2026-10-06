@@ -122,6 +122,7 @@ import { Logger } from '../shared/utils/Logger.js';
 import { MediaTracks } from './playback/MediaTracks.js';
 import { PlaybackEpoch } from './playback/PlaybackEpoch.js';
 import { VideoFrameQueue } from './playback/VideoFrameQueue.js';
+import { AudioBufferQueue } from './audio/AudioBufferQueue.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -165,7 +166,6 @@ export class CorePlayer {
         // component; exposed below as read-only views so the nine files that
         // read these keep working untouched.
         this.media = new MediaTracks();
-        this.audioIteratorCleanupPromise = null;
 
         // Subtitles
         this.onSubtitleChange = null;
@@ -185,10 +185,10 @@ export class CorePlayer {
         this.playbackId = 0;
 
         // MediaBunny playback state
-        this.audioBufferIterator = null;
         this.queuedAudioNodes = new Set();
         this.epoch = new PlaybackEpoch();
         this.frames = new VideoFrameQueue(this.epoch);
+        this.audioBuffers = new AudioBufferQueue();
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
 

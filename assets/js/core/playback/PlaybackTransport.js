@@ -114,9 +114,9 @@ export async function playPlayer(player) {
             const startTime = player.playbackTimeAtStart;
             await player._closeAudioBufferIterator();
             Logger.log(`[Play] Starting audio iterator at time: ${startTime.toFixed(2)}s`);
-            player.audioBufferIterator = player.audioSink.buffers(startTime);
+            const audioIterator = player.audioBuffers.open(player.audioSink, startTime);
 
-            const firstResult = await player.audioBufferIterator.next();
+            const firstResult = await audioIterator.next();
             const vodPrefetchedBuffer = firstResult?.value ?? null;
 
             const vodAnchorWall = player.audioContext.currentTime + 0.02;
@@ -125,7 +125,7 @@ export async function playPlayer(player) {
             player._vodAnchorContent = vodAnchorContent;
             Logger.log(`[Play] VOD anchor prefetched — wall=${vodAnchorWall.toFixed(3)}, content=${vodAnchorContent.toFixed(3)}, buffer=${vodPrefetchedBuffer ? 'ok' : 'null'}`);
 
-            player._runAudioIterator(player.audioBufferIterator, vodAnchorWall, vodAnchorContent, vodPrefetchedBuffer);
+            player._runAudioIterator(audioIterator, vodAnchorWall, vodAnchorContent, vodPrefetchedBuffer);
         }
 
         await startPlayerAudioVisualizer(player);
@@ -206,9 +206,7 @@ export async function setPlayerPlaybackRate(player, rate) {
 
     if (wasPlaying) {
         player.pause();
-        if (player.audioIteratorCleanupPromise) {
-            await player.audioIteratorCleanupPromise;
-        }
+        await player.audioBuffers.settle();
     }
 
     player.playbackRate = rate;

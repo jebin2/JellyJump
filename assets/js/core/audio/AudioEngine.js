@@ -76,23 +76,11 @@ export function stopPlayerQueuedAudio(player) {
 }
 
 export async function closePlayerAudioBufferIterator(player) {
-    if (!player.audioBufferIterator) return;
-
-    const iterator = player.audioBufferIterator;
-    player.audioBufferIterator = null;
-    await iterator.return();
+    await player.audioBuffers.close();
 }
 
 export function closePlayerAudioBufferIteratorSoon(player) {
-    if (!player.audioBufferIterator) return;
-
-    const iterator = player.audioBufferIterator;
-    player.audioBufferIterator = null;
-    player.audioIteratorCleanupPromise = iterator.return().catch(e => {
-        Logger.debug('Error closing audio iterator:', e);
-    }).finally(() => {
-        player.audioIteratorCleanupPromise = null;
-    });
+    player.audioBuffers.closeSoon();
 }
 
 export function restorePlayerAutoplayAudio(player, sourceLabel) {
@@ -249,9 +237,7 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
             Logger.log(`[${_audioLogTag}:Audio] Iterator stopped (input disposed) after ${sampleCount} buffers`);
         }
     } finally {
-        Logger.log(`[${_audioLogTag}:Audio] Cleanup — sampleCount=${sampleCount}, isOurIterator=${player.audioBufferIterator === myIterator}`);
-        if (player.audioBufferIterator === myIterator) {
-            try { await myIterator.return(); } catch (e) { }
-        }
+        Logger.log(`[${_audioLogTag}:Audio] Cleanup — sampleCount=${sampleCount}, isOurIterator=${player.audioBuffers.holds(myIterator)}`);
+        await player.audioBuffers.closeIfHeld(myIterator);
     }
 }

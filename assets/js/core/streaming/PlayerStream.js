@@ -609,11 +609,9 @@ export class PlayerStream {
                 Logger.log(`[Live:Video] Closing existing frame queue`);
                 await player.frames.close().catch(() => { });
             }
-            if (player.audioBufferIterator) {
-                Logger.log(`[Live:Video] Closing existing audioBufferIterator`);
-                const it = player.audioBufferIterator;
-                player.audioBufferIterator = null;
-                await it.return().catch(() => { });
+            if (player.audioBuffers.isOpen) {
+                Logger.log(`[Live:Video] Closing existing audio queue`);
+                await player.audioBuffers.close().catch(() => { });
             }
 
             player._setLoading(true);
@@ -630,14 +628,21 @@ export class PlayerStream {
 
             // Start iterators in parallel
             const videoIterator = player.frames.open(player.videoSink, anchorContent);
-            player.audioBufferIterator = player.audioSink ? player.audioSink.buffers(anchorContent) : null;
+            const audioIterator = player.audioBuffers.open(player.audioSink, anchorContent);
 
             let audioStarted = false;
             const startAudio = () => {
-                if (audioStarted || !player.audioBufferIterator || !player.audioContext) return;
+                // holds(), not just a non-null local: this runs from inside the
+                // frame loop, after awaits, so a resync may have closed the
+                // queue since it was opened. Reading the field live used to be
+                // what stopped audio starting in that case. The null check
+                // stays because an item with no audio sink opens to null, and
+                // an empty queue holds null too.
+                if (audioStarted || !audioIterator || !player.audioBuffers.holds(audioIterator)
+                    || !player.audioContext) return;
                 audioStarted = true;
                 Logger.log(`[Live:Audio] Starting audio sync loop`);
-                player._runAudioIterator(player.audioBufferIterator, this._liveAnchorWall, this._liveAnchorContent);
+                player._runAudioIterator(audioIterator, this._liveAnchorWall, this._liveAnchorContent);
             };
 
             player._setLoading(false);

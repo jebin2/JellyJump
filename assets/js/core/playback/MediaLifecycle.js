@@ -100,7 +100,7 @@ export async function cleanupPlayerForLoad(player) {
     player.currentTime = 0;
 
     await player.frames.close();
-    if (player.audioIteratorCleanupPromise) await player.audioIteratorCleanupPromise;
+    await player.audioBuffers.settle();
     await player._closeAudioBufferIterator();
     player.epoch.bump();
     player.playbackTimeAtStart = 0;
