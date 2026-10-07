@@ -121,6 +121,7 @@ import { MediaTracks } from './playback/MediaTracks.js';
 import { PlaybackEpoch } from './playback/PlaybackEpoch.js';
 import { PlaybackAnchor } from './playback/PlaybackAnchor.js';
 import { BroadcastStream } from './streaming/BroadcastStream.js';
+import { WatchParty } from './streaming/WatchParty.js';
 import { VideoFrameQueue } from './playback/VideoFrameQueue.js';
 import { AudioBufferQueue } from './audio/AudioBufferQueue.js';
 
@@ -189,6 +190,7 @@ export class CorePlayer {
         this.frames = new VideoFrameQueue(this.epoch);
         this.audioBuffers = new AudioBufferQueue();
         this.broadcast = new BroadcastStream(this);
+        this.watchParty = new WatchParty(this);
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
 

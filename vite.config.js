@@ -40,6 +40,7 @@ export default defineConfig({
                 main: resolve(__dirname, 'index.html'),
                 player: resolve(__dirname, 'player.html'),
                 embed: resolve(__dirname, 'embed.html'),
+                watch: resolve(__dirname, 'watch.html'),
             },
         },
     },

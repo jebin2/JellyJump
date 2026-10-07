@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob: mediastream:; connect-src *; object-src 'none'; base-uri 'self'; form-action 'none'">
+    <title>Watch together — JellyJump</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+               background: #0b0b0d; color: #e8e8ea; padding: 16px;
+               font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        main { width: 100%; max-width: 900px; }
+        h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .25rem; }
+        p { margin: .25rem 0 0; color: #a0a0a8; }
+        .panel { border: 1px solid #26262b; border-radius: 10px; padding: 1.25rem; background: #131317; }
+        #stage { margin-top: .75rem; }
+        video { width: 100%; background: #000; border-radius: 10px; display: block; }
+        /* Collapsed rather than hidden until a frame has arrived. */
+        #stage:not(.live) video { height: 1px; opacity: 0; }
+        #stage.live video { aspect-ratio: 16 / 9; }
+        .row { display: flex; gap: .5rem; margin-top: .75rem; }
+        input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: .8rem;
+                padding: .6rem .7rem; border-radius: 8px; border: 1px solid #2e2e35;
+                background: #0e0e11; color: #e8e8ea; }
+        button { padding: .6rem 1rem; border-radius: 8px; border: 1px solid #2e2e35;
+                 background: #1d1d22; color: #e8e8ea; cursor: pointer; font-size: .9rem; }
+        button:hover { background: #26262d; }
+        .spin { width: 1rem; height: 1rem; border: 2px solid #33333a; border-top-color: #9a9aa4;
+                border-radius: 50%; display: inline-block; vertical-align: -2px;
+                animation: spin .8s linear infinite; margin-right: .5rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+    </style>
+</head>
+<body>
+<main>
+    <section id="joining" class="panel">
+        <h1><span class="spin"></span>Joining…</h1>
+        <p>Reading the invitation.</p>
+    </section>
+
+    <section id="reply" class="panel" hidden>
+        <h1>Send this code back</h1>
+        <p>The host needs this to finish connecting. Paste it wherever they sent you the link.</p>
+        <div class="row">
+            <input id="code" readonly spellcheck="false">
+            <button id="copy" type="button">Copy</button>
+        </div>
+    </section>
+
+    <section id="problem" class="panel" hidden>
+        <h1>Can't watch this</h1>
+        <p id="detail"></p>
+    </section>
+
+    <!-- Always in the document and never display:none. A hidden video element
+         can stop decoding, so a stream attached to one may never report
+         metadata -- which would leave this page waiting for an event that
+         cannot arrive. It is sized to nothing until there is something to
+         show instead. -->
+    <section id="stage">
+        <video id="video" playsinline></video>
+    </section>
+</main>
+<script type="module" src="./assets/js/watch-main.js"></script>
+</body>
+</html>

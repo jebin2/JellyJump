@@ -1,0 +1,109 @@
+/**
+ * A watch party end to end, across two pages and no server.
+ *
+ * The host opens a film, makes an invitation, and the viewer page answers it;
+ * this script plays the part the humans play, carrying the two codes between
+ * them. That is the whole of the signalling design -- there is nothing in the
+ * middle to test, which is the point.
+ *
+ * A two-second fixture cannot outlast a negotiation, so playback is looped.
+ *
+ *   npm run build && node scripts/watch-party-test.mjs
+ */
+import { chromium } from 'playwright-core';
+import { createServer } from 'node:http';
+import { readFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join, extname, resolve } from 'node:path';
+const ROOT=resolve(import.meta.dirname,'..');
+const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.ttf':'font/ttf','.ico':'image/x-icon','.webm':'video/webm'};
+const srv=createServer(async(req,res)=>{const u=decodeURIComponent(req.url.split('?')[0]);
+  const f=u.startsWith('/fx/')?join(process.env.FX || join(ROOT,'scripts/fixtures'),u.slice(4)):u.startsWith('/__fixtures__/')?join(ROOT,'scripts/fixtures',u.slice(14)):join(ROOT,'dist',u==='/'?'/index.html':u);
+  try{const i=await stat(f);res.writeHead(200,{'Content-Type':MIME[extname(f)]||'application/octet-stream','Content-Length':i.size,'Accept-Ranges':'bytes'});res.end(await readFile(f));}catch{res.writeHead(404);res.end();}});
+let pass=0, fail=0;
+const check=(ok,label)=>{ if(ok){pass++;console.log(`  PASS  ${label}`);} else {fail++;console.log(`  FAIL  ${label}`);} };
+await new Promise(r=>srv.listen(0,'127.0.0.1',r));
+const origin=`http://127.0.0.1:${srv.address().port}`;
+const CANDIDATES=[process.env.CHROMIUM_PATH, process.env.CHROME_PATH,
+    '/usr/bin/chromium','/usr/bin/chromium-browser','/usr/bin/google-chrome',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].filter(Boolean);
+const browserPath=CANDIDATES.find(p=>existsSync(p));
+if(!browserPath){ console.error('No Chromium or Chrome found. Set CHROMIUM_PATH.'); process.exit(1); }
+const b=await chromium.launch({executablePath:browserPath,args:['--no-sandbox','--no-proxy-server','--autoplay-policy=no-user-gesture-required']});
+
+const hostPage=await b.newPage();
+const hostErr=[]; hostPage.on('pageerror',e=>hostErr.push(String(e).slice(0,140)));
+await hostPage.goto(`${origin}/player.html`);
+await hostPage.waitForFunction(()=>!!window.player,null,{timeout:60000});
+await hostPage.evaluate(async url=>{
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const p=window.player;
+  await p.load(url);
+  for(let i=0;i<120&&!(p.duration>0);i++) await sleep(100);
+  p.loopMode='one';
+  await p.play().catch(()=>{});
+  await sleep(600);
+}, process.env.SRC || '/__fixtures__/smoke.webm');
+
+// ── the host makes an invitation ──
+const invite=await hostPage.evaluate(async base=>{
+  const r=await window.player.watchParty.invite({ baseUrl: base });
+  return { id:r.id, link:r.link, codeLen:r.code.length };
+}, `${origin}/watch.html`);
+check(invite.codeLen > 100, `the host produces an invitation (${invite.codeLen} chars)`);
+check(invite.link.includes('#'), 'carried in the fragment, which never reaches a server');
+check(!invite.link.split('#')[0].includes(invite.code ?? '\u0000'), 'and not in the path or query');
+
+// ── a friend opens it in a different page ──
+const viewPage=await b.newPage();
+const viewErr=[]; viewPage.on('pageerror',e=>viewErr.push(String(e).slice(0,140)));
+await viewPage.goto(invite.link);
+await viewPage.waitForFunction(()=>{
+  const c=document.getElementById('code'); return c && c.value.length>0;
+},null,{timeout:30000});
+const reply=await viewPage.evaluate(()=>({
+  code: document.getElementById('code').value,
+  replyShown: !document.getElementById('reply').hidden,
+}));
+check(reply.code.length > 100, `the viewer answers it (${reply.code.length} chars)`);
+check(reply.replyShown, 'and is told to send that answer back');
+
+// ── the human carries it back ──
+const accepted=await hostPage.evaluate(async code=>{
+  try { return { id: await window.player.watchParty.accept(code) }; }
+  catch (e) { return { error: String(e.message) }; }
+}, reply.code);
+check(!accepted.error, `the host accepts the answer${accepted.error ? ': ' + accepted.error : ''}`);
+
+// ── does the friend actually see it? ──
+await viewPage.waitForFunction(()=>{
+  const v=document.getElementById('video'); return v && v.videoWidth>0;
+},null,{timeout:30000}).catch(()=>{});
+await viewPage.waitForTimeout(4000);
+const watching=await viewPage.evaluate(async()=>{
+  const v=document.getElementById('video');
+  const stage=document.getElementById('stage');
+  const grab=()=>{ if(!v.videoWidth) return {h:0,lit:0};
+    const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+    const x=c.getContext('2d'); x.drawImage(v,0,0);
+    const d=x.getImageData(0,0,c.width,c.height).data;
+    let h=0,lit=0; for(let i=0;i<d.length;i+=97){h=(h*31+d[i])>>>0; if(d[i]!==0)lit++;} return {h,lit}; };
+  const a=grab(); await new Promise(r=>setTimeout(r,1200)); const c2=grab();
+  return { w:v.videoWidth, h:v.videoHeight, stageLive:stage.classList.contains('live'),
+           replyHidden: document.getElementById('reply').hidden,
+           lit:c2.lit, moved:a.h!==c2.h, audioTracks: v.srcObject?.getAudioTracks().length ?? 0 };
+});
+const hostSide=await hostPage.evaluate(()=>({ viewers: window.player.watchParty.viewerCount,
+                                              invites: window.player.watchParty.invites }));
+check(watching.w > 0, `the viewer receives a picture (${watching.w}x${watching.h})`);
+check(watching.lit > 0, `which is not blank (${watching.lit} lit samples)`);
+check(watching.moved, 'and is moving');
+check(watching.audioTracks === 1, 'with audio');
+check(watching.stageLive && watching.replyHidden, 'the page switches from asking to watching');
+check(hostSide.viewers === 1, `the host counts the viewer (${hostSide.viewers})`);
+check(hostSide.invites[0]?.state === 'connected', `the connection reports connected (${hostSide.invites[0]?.state})`);
+check(hostErr.length === 0 && viewErr.length === 0,
+    `no page errors${hostErr.length || viewErr.length ? ': ' + [...hostErr, ...viewErr].join('; ') : ''}`);
+console.log(`\n${pass} passed, ${fail} failed\n`);
+await b.close(); srv.close();
+process.exit(fail ? 1 : 0);
