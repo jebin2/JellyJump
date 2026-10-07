@@ -308,6 +308,64 @@ async function run(page, origin) {
         return { colourOnly, withSticker, cleared, shot };
     });
 
+    // Reaching the end of a file leaves the playback clock at the end, and the
+    // fallback clock's origin has to move with it. When it did not, the next
+    // play() read a position of roughly the duration, decided to reset to the
+    // start, and then opened the video iterator at that stale position --
+    // past the end of the file. It yielded a frame or two, the pump saw `done`
+    // and dropped the queue, and nothing reopened it, because the render loop
+    // only pumps while the queue is open. isPlaying stayed true and the clock
+    // kept running, so nothing looked wrong except that the picture had stopped.
+    const afterEnd = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        let draws = 0;
+        const paint = p.presentFrame.bind(p);
+        p.presentFrame = (...args) => { draws++; return paint(...args); };
+
+        // Play to the end and wait until it has actually stopped, then press
+        // play again WITHOUT seeking. Seeking first is what used to hide this:
+        // it sets the position itself, so the stale clock was never read.
+        // Pressing play on a finished video is the path a person takes.
+        await p._seekTo(1.0).catch(() => {});
+        await sleep(300);
+        p.play().catch(() => {});
+        // Wait for it to start before waiting for it to stop: play() is async,
+        // so isPlaying is still false on the first check and the wait below
+        // would fall straight through.
+        for (let i = 0; i < 40 && !p.isPlaying; i++) await sleep(50);
+        for (let i = 0; i < 80 && p.isPlaying; i++) await sleep(100);
+        const endedAt = +p.currentTime.toFixed(2);
+        draws = 0;
+        p.play().catch(() => {});
+        await sleep(1600);
+        const resumed = { draws, playing: p.isPlaying, t: +p.currentTime.toFixed(2) };
+        p.pause();
+
+        // And loop-one, measured after several loops rather than one. The
+        // breakage is cumulative: each loop opened an iterator past the end and
+        // dropped it, so only the seek's own frames were ever drawn.
+        const previousLoop = p.loopMode;
+        p.loopMode = 'one';
+        await p._seekTo(0).catch(() => {});
+        p.play().catch(() => {});
+        await sleep(5000);          // three loop boundaries on a 2s file
+        draws = 0;
+        await sleep(1500);
+        const looped = { draws, playing: p.isPlaying, t: +p.currentTime.toFixed(2) };
+        p.loopMode = previousLoop;
+        p.pause();
+        p.presentFrame = paint;
+        return { endedAt, resumed, looped };
+    });
+
+    console.log('\nit keeps drawing after the end');
+    check(afterEnd.resumed.draws > 8,
+        `pressing play on a finished video draws again `
+        + `(${afterEnd.resumed.draws} frames in 1.6s, ended at ${afterEnd.endedAt})`);
+    check(afterEnd.looped.draws > 8,
+        `and loop-one keeps drawing past the loop (${afterEnd.looped.draws} frames in 1.5s)`);
+
     // Broadcasting the player to someone else. The canvas is the only place
     // every source ends up -- file, HLS, camera, with effects already
     // composited -- so capturing it needs no knowledge of what is playing.

@@ -98,16 +98,35 @@ export async function playPlayer(player) {
     }
     player._pausedAtWall = null;
 
+    // Anchored before anything asks the clock, not after.
+    //
+    // When no audio anchor exists, position is measured as the time elapsed
+    // since fallbackStartTime plus playbackTimeAtStart. Left over from an
+    // earlier play, that origin reports a position with no relation to where
+    // playback actually is -- and this used to be set below, after both the
+    // check and the rebuild had already read it.
+    //
+    // What that cost: on loop-one, completeMedia seeks to 0 and calls play(),
+    // the stale clock reported about 2s on a 2s file, so the reset branch fired
+    // although playback was already at the start, and _startVideoIterator
+    // opened an iterator past the end of the file. It yielded a frame or two,
+    // the pump saw `done` and dropped it, and nothing reopened it -- the render
+    // loop only pumps while the queue is open. The clock went on looping and
+    // isPlaying stayed true, so the player looked healthy while drawing fell
+    // from about 15fps to about 1fps. Pressing play after a video had ended
+    // froze the picture the same way, for the same reason.
+    player.fallbackStartTime = performance.now();
+
     const currentPosition = player._getPlaybackTime();
     if (player.duration > 1.0 && currentPosition >= player.duration - 0.5) {
         Logger.log(`[Play] Resetting to start (position=${currentPosition.toFixed(2)}, duration=${player.duration.toFixed(2)})`);
         player.playbackTimeAtStart = 0;
+        // The origin moves with the position, or the next reader disagrees again.
+        player.fallbackStartTime = performance.now();
         await player._startVideoIterator();
     } else if (!player.frames.isOpen) {
         await player._startVideoIterator();
     }
-
-    player.fallbackStartTime = performance.now();
 
     if (player.audioSink) {
         if (!player.isLive) {
