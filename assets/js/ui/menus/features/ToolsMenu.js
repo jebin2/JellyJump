@@ -58,6 +58,14 @@ export class ToolsMenu {
                 </div>
                 <span class="tools-tile-label">Combine A/V</span>
             </button>
+            <button class="tools-tile" data-action="watch-party" title="Watch Together">
+                <div class="tools-tile-icon">
+                    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                        <use href="assets/icons/sprite.svg#icon-link"></use>
+                    </svg>
+                </div>
+                <span class="tools-tile-label">Watch Together</span>
+            </button>
             <button class="tools-tile" data-action="share" title="Share Library">
                 <div class="tools-tile-icon">
                     <svg width="24" height="24" fill="currentColor">
@@ -119,6 +127,9 @@ export class ToolsMenu {
                 } else if (action === 'combine-av') {
                     const { CombineAVMenu } = await import('./CombineAVMenu.js');
                     CombineAVMenu.init(playlist);
+                } else if (action === 'watch-party') {
+                    const { WatchPartyMenu } = await import('./WatchPartyMenu.js');
+                    WatchPartyMenu.show(playlist.player);
                 } else if (action === 'share') {
                     ShareMenu.show();
                 } else if (action === 'reset') {
