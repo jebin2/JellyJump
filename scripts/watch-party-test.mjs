@@ -123,6 +123,52 @@ check(fsOn.label === 'Exit fullscreen', `the button says what it will do now (${
 check(!fsOff.on && fsOff.label === 'Fullscreen', 'double-clicking the picture comes back out');
 check(fsOn.playing && fsOff.playing, 'and the stream never stops for either');
 
+// ── a friend joining while the host is paused ──
+// captureStream only emits when the canvas is modified, so a paused player
+// produces nothing and a viewer who joins sees black until playback resumes.
+// There is no "current frame" to send -- only a history of modifications.
+const paused = await (async () => {
+  await hostPage.evaluate(async () => {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const p = window.player;
+    await p._seekTo(0.8).catch(() => {});
+    await sleep(500);
+    p.pause();
+    await sleep(400);
+  });
+  const inv = await hostPage.evaluate(async base => {
+    const r = await window.player.watchParty.invite({ baseUrl: base });
+    return { id: r.id, link: r.link };
+  }, `${origin}/watch.html`);
+  const g = await b.newPage();
+  await g.goto(inv.link);
+  await g.waitForFunction(() => {
+    const c = document.getElementById('code'); return c && c.value.length > 0;
+  }, null, { timeout: 40000 });
+  const c = await g.evaluate(() => document.getElementById('code').value);
+  await hostPage.evaluate(async code => window.player.watchParty.accept(code), c);
+  await g.waitForTimeout(6000);           // the host never presses play
+  const seen = await g.evaluate(() => {
+    const el = document.getElementById('video');
+    if (!el.videoWidth) return { w: 0, lit: 0 };
+    const cv = document.createElement('canvas');
+    cv.width = el.videoWidth; cv.height = el.videoHeight;
+    const x = cv.getContext('2d');
+    x.drawImage(el, 0, 0);
+    const d = x.getImageData(0, 0, cv.width, cv.height).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 97) if (d[i] !== 0) lit++;
+    return { w: el.videoWidth, lit };
+  });
+  const stillPaused = !(await hostPage.evaluate(() => window.player.isPlaying));
+  await g.close();
+  return { seen, stillPaused };
+})();
+
+check(paused.stillPaused, 'the host stayed paused throughout');
+check(paused.seen.w > 0,
+  `a friend joining a paused host still gets the picture (${paused.seen.w}px, ${paused.seen.lit} lit)`);
+
 // ── one link, two people: the mistake this panel invites ──
 // Sending a single link to a group is the obvious thing to do and the one
 // thing that does not work: a second answer to the same offer is refused, and
@@ -201,15 +247,21 @@ for (const g of guests) {
     return { w: v.videoWidth, playing: !v.paused };
   }));
 }
-const manyState = await hostPage.evaluate(() => window.player.watchParty.viewerCount);
+// The states of these three invitations, not a global count: guests from
+// earlier phases are still attached, and a closed page's connection lingers a
+// while, so a total is brittle in a way that says nothing about this case.
+const manyState = await hostPage.evaluate(ids => {
+  const all = window.player.watchParty.invites;
+  return ids.map(id => all.find(i => i.id === id)?.state ?? 'gone');
+}, many.map(m => m.id));
 
 check(routed.every(r => r.got === r.expected),
   `each reply reaches its own invitation whatever order they arrive in `
   + `(${routed.map(r => 'guest' + r.guest + '->invite' + r.got).join(', ')})`);
 check(watchingAll.every(w => w.w > 0 && w.playing),
   `all three friends get a picture (${watchingAll.map(w => w.w).join(', ')})`);
-// Four, not three: the guest from the single-friend phase above is still here.
-check(manyState === 4, `and the host counts everyone watching (${manyState})`);
+check(manyState.every(state => state === 'connected'),
+  `and the host has all three connected (${manyState.join(', ')})`);
 for (const g of guests) await g.close();
 
 // ── and it can be stopped, which is the part a host has to be able to trust ──

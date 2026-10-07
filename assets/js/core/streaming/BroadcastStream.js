@@ -20,11 +20,19 @@ import { Logger } from '../../shared/utils/Logger.js';
  * Nothing here knows about peers or networks. It produces a stream; who it is
  * sent to is someone else's problem.
  */
+/**
+ * How often the canvas is nudged so the capture keeps producing while nothing
+ * is being drawn. Low, because this exists to stop the picture vanishing, not
+ * to carry playback.
+ */
+const HEARTBEAT_MS = 500;
+
 export class BroadcastStream {
     constructor(player) {
         this.player = player;
         this._stream = null;
         this._audioTap = null;
+        this._heartbeat = null;
     }
 
     /** True while there is a stream to send. */
@@ -53,6 +61,7 @@ export class BroadcastStream {
 
         this._stream = canvas.captureStream(fps);
         Logger.log(`[Broadcast] Capturing ${canvas.width}x${canvas.height} at ${fps}fps`);
+        this._startHeartbeat();
         this.attachAudio();
         return this._stream;
     }
@@ -86,8 +95,41 @@ export class BroadcastStream {
         return true;
     }
 
+    /**
+     * Keep the capture producing while nothing is drawing to the canvas.
+     *
+     * captureStream only emits a frame when the canvas is modified, so a paused
+     * player produces nothing at all and a viewer who joins sees black until
+     * playback resumes -- there is no "current frame" to send, only a history
+     * of modifications. requestFrame() looks like the answer and is not: it has
+     * effect only on a manual-mode track, one made by captureStream() with no
+     * frame rate, and does nothing for this one. Measured: eight calls, zero
+     * frames delivered.
+     *
+     * So the canvas is drawn onto itself, which is a real pixel operation and
+     * visually nothing, twice a second. A zero-alpha pixel also works and is
+     * cheaper, but it is the sort of write a browser is entitled to optimise
+     * away, and this has to be reliable rather than clever. It runs whether or
+     * not playback is running: a player can report isPlaying while drawing
+     * nothing, and at twice a second the redundant draws cost nothing.
+     */
+    _startHeartbeat() {
+        clearInterval(this._heartbeat);
+        this._heartbeat = setInterval(() => {
+            const { canvas, ctx } = this.player;
+            if (!this._stream || !canvas || !ctx || !canvas.width || !canvas.height) return;
+            try {
+                ctx.drawImage(canvas, 0, 0);
+            } catch (e) {
+                // A canvas can be briefly unusable mid-resize; the next tick is fine.
+            }
+        }, HEARTBEAT_MS);
+    }
+
     /** Stop capturing and release the tap. */
     close() {
+        clearInterval(this._heartbeat);
+        this._heartbeat = null;
         if (this._audioTap) {
             // Only this tap: the gain node's own connection to the speakers is
             // a separate edge and must survive.
