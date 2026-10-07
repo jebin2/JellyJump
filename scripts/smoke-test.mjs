@@ -25,6 +25,11 @@ const FIXTURES = join(ROOT, 'scripts/fixtures');
 // its segments, so it needs a directory.
 const FIXTURE_PREFIX = '/__fixtures__/';
 const FIXTURE_URL = `${FIXTURE_PREFIX}smoke.webm`;
+// The only fixture with an audio track. Without one the VOD anchor is never
+// set -- it is written only by the audio pump -- so the anchor branch of
+// _getPlaybackTime, which is the primary playback clock, is unreachable. Half
+// the clock logic went untested until this existed.
+const AV_FIXTURE_URL = `${FIXTURE_PREFIX}smoke-av.webm`;
 const HLS_URL = `${FIXTURE_PREFIX}hls/stream.m3u8`;
 // A live playlist cannot be a file: what makes a stream live is the absence of
 // #EXT-X-ENDLIST, and mediabunny then re-reads the playlist every
@@ -371,6 +376,58 @@ async function run(page, origin) {
         + `(${afterEnd.resumed.draws} frames in 1.6s, ended at ${afterEnd.endedAt})`);
     check(afterEnd.looped.draws > 8,
         `and loop-one keeps drawing past the loop (${afterEnd.looped.draws} frames in 1.5s)`);
+
+    // Replaying a finished video, on a file that has audio.
+    //
+    // What this does cover: the anchor branch of _getPlaybackTime, which is the
+    // primary playback clock and which no test reached before, because the
+    // anchor is written only by the audio pump and every other fixture is
+    // silent.
+    //
+    // And the freeze itself, fixed in 11d84bb: play() resumes the AudioContext
+    // before reading the position, so an anchor left over from the finished
+    // playthrough reported a position past the end and the iterator was opened
+    // there, exhausted on arrival, and never reopened. Against a tree built
+    // without that fix this reports one frame in two seconds with the queue
+    // shut -- the same symptom the deployed site showed.
+    const replay = await page.evaluate(async (url) => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        const blob = await (await fetch(url)).blob();
+        await p.load(URL.createObjectURL(new File([blob], 'av.webm', { type: 'video/webm' })));
+        for (let i = 0; i < 120 && !(p.duration > 0); i++) await sleep(100);
+
+        let draws = 0;
+        const paint = p.presentFrame.bind(p);
+        p.presentFrame = (...args) => { draws++; return paint(...args); };
+
+        await p._seekTo(p.duration - 1.5).catch(() => {});
+        await sleep(300);
+        p.play().catch(() => {});
+        for (let i = 0; i < 40 && !p.isPlaying; i++) await sleep(50);
+        for (let i = 0; i < 120 && p.isPlaying; i++) await sleep(100);
+        const ended = {
+            t: +p.currentTime.toFixed(2),
+            anchored: !!p.vodAnchor?.isAnchored,
+            anchorContent: +(p.vodAnchor?.content ?? -1).toFixed(2),
+        };
+
+        draws = 0;
+        p.play().catch(() => {});
+        await sleep(2000);
+        const after = { draws, playing: p.isPlaying, queueOpen: p.frames.isOpen };
+        p.pause();
+        p.presentFrame = paint;
+        return { duration: +p.duration.toFixed(2), ended, after };
+    }, AV_FIXTURE_URL);
+
+    console.log('\nit replays a finished video that has audio');
+    check(replay.ended.anchored,
+        `the anchor is set while playing, as only an audio track causes `
+        + `(content ${replay.ended.anchorContent})`);
+    check(replay.after.draws > 10,
+        `pressing play on the finished video draws again (${replay.after.draws} frames in 2s)`);
+    check(replay.after.queueOpen, 'and the frame queue stays open');
 
     // Broadcasting the player to someone else. The canvas is the only place
     // every source ends up -- file, HLS, camera, with effects already
