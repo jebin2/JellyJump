@@ -42,14 +42,21 @@ export class WatchPartyMenu {
             <p class="wp-lead">
                 Send a friend the link. They send a code back. Then they are watching
                 what you are watching — they cannot pause or seek it.
+                <strong>Each link works for one person.</strong>
             </p>
             <div class="wp-step">
-                <div class="wp-step-head"><span class="wp-num">1</span> Send this link</div>
+                <div class="wp-step-head">
+                    <span class="wp-num">1</span>
+                    <span>Send this link to <span class="wp-whose">one friend</span></span>
+                </div>
                 <div class="wp-row">
                     <input class="wp-link" readonly spellcheck="false" placeholder="Creating…">
                     <button class="wp-copy jellyjump-btn-secondary" type="button" disabled>Copy</button>
                 </div>
-                <p class="wp-hint">Paste it wherever you talk to them. It is long; that is normal.</p>
+                <p class="wp-hint">
+                    Paste it in a message to that one person — not a group. It is long;
+                    that is normal.
+                </p>
             </div>
             <div class="wp-step">
                 <div class="wp-step-head"><span class="wp-num">2</span> Paste their reply</div>
@@ -79,6 +86,7 @@ export class WatchPartyMenu {
         const status = body.querySelector('.wp-status');
         const viewers = body.querySelector('.wp-viewers');
         const stopButton = body.querySelector('.wp-stop');
+        const whose = body.querySelector('.wp-whose');
 
         const party = player.watchParty;
         let currentInvite = null;
@@ -121,6 +129,11 @@ export class WatchPartyMenu {
                 linkField.value = currentInvite.link;
                 copyButton.disabled = false;
                 copyButton.textContent = 'Copy';
+                // Named, so it is visible that this link belongs to one person
+                // and that the previous one is spent. Sending the same link to
+                // several people is the one mistake this panel invites, and it
+                // breaks the first of them as well as the rest.
+                whose.textContent = `Friend ${currentInvite.id}`;
             } catch (error) {
                 Logger.warn('[WatchParty] Invite failed:', error);
                 linkField.placeholder = error.message || 'Could not create an invitation.';

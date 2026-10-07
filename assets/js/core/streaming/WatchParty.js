@@ -3,6 +3,15 @@ import { packSignal, unpackSignal } from './SignalCodec.js';
 
 /** How long to wait for ICE gathering before sending what we have. */
 const GATHER_TIMEOUT_MS = 5000;
+/**
+ * How long an answered invitation may stay unconnected before it is given up
+ * on. Generous, because a bad network can take a while -- but not unbounded,
+ * or an invitation that can never complete sits in the list for ever claiming
+ * to be connecting. The clearest way to produce one is to open the same link
+ * twice: both answerers fail, and the state stays `connecting` rather than
+ * `failed`, so nothing else would ever clear it.
+ */
+const CONNECT_TIMEOUT_MS = 30000;
 
 /**
  * Hosting a watch party: one broadcast, several viewers, no server.
@@ -71,7 +80,9 @@ export class WatchParty {
         connection.addEventListener('connectionstatechange', () => {
             const state = connection.connectionState;
             if (state !== 'failed' && state !== 'closed') return;
-            if (this._peers.get(id)?.connection !== connection) return;
+            const peer = this._peers.get(id);
+            if (peer?.connection !== connection) return;
+            clearTimeout(peer.timer);
             this._peers.delete(id);
             connection.close();
             Logger.log(`[WatchParty] Invite ${id} ${state}; forgotten`);
@@ -112,10 +123,22 @@ export class WatchParty {
         if (!peer) {
             throw new Error('That reply is for an invitation this tab no longer has.');
         }
-        if (peer.accepted) throw new Error('That invitation has already been answered.');
+        if (peer.accepted) {
+            // The common way to get here is sending one link to several people.
+            throw new Error(
+                'That invitation was already used. Each friend needs their own link — '
+                + 'send them the new one below.');
+        }
 
         await peer.connection.setRemoteDescription(answer);
         peer.accepted = true;
+        peer.timer = setTimeout(() => {
+            if (peer.connection.connectionState === 'connected') return;
+            if (this._peers.get(target) !== peer) return;
+            Logger.warn(`[WatchParty] Invite ${target} never connected; giving up`);
+            this._peers.delete(target);
+            peer.connection.close();
+        }, CONNECT_TIMEOUT_MS);
         Logger.log(`[WatchParty] Invite ${target} answered`);
         return target;
     }
@@ -127,7 +150,10 @@ export class WatchParty {
 
     /** Hang up on everyone and stop capturing. */
     stop() {
-        for (const peer of this._peers.values()) peer.connection.close();
+        for (const peer of this._peers.values()) {
+            clearTimeout(peer.timer);
+            peer.connection.close();
+        }
         this._peers.clear();
         this.player.broadcast.close();
         Logger.log('[WatchParty] Stopped');

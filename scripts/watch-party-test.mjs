@@ -123,6 +123,42 @@ check(fsOn.label === 'Exit fullscreen', `the button says what it will do now (${
 check(!fsOff.on && fsOff.label === 'Fullscreen', 'double-clicking the picture comes back out');
 check(fsOn.playing && fsOff.playing, 'and the stream never stops for either');
 
+// ── one link, two people: the mistake this panel invites ──
+// Sending a single link to a group is the obvious thing to do and the one
+// thing that does not work: a second answer to the same offer is refused, and
+// the first answerer's connection is spoiled too, staying at `connecting`
+// rather than failing. So the refusal has to say what to do instead.
+const reuse = await hostPage.evaluate(async base => {
+  const r = await window.player.watchParty.invite({ baseUrl: base });
+  return { id: r.id, link: r.link };
+}, `${origin}/watch.html`);
+const twoTabs = [];
+for (let i = 0; i < 2; i++) {
+  const t = await b.newPage();
+  await t.goto(reuse.link);
+  await t.waitForFunction(() => {
+    const c = document.getElementById('code'); return c && c.value.length > 0;
+  }, null, { timeout: 40000 });
+  twoTabs.push(await t.evaluate(() => document.getElementById('code').value));
+  await t.close();
+}
+const firstUse = await hostPage.evaluate(async code => {
+  try { return { id: await window.player.watchParty.accept(code) }; }
+  catch (e) { return { error: String(e.message) }; }
+}, twoTabs[0]);
+const secondUse = await hostPage.evaluate(async code => {
+  try { return { id: await window.player.watchParty.accept(code) }; }
+  catch (e) { return { error: String(e.message) }; }
+}, twoTabs[1]);
+
+check(firstUse.id === reuse.id, `the first answer to a link is taken (${firstUse.id ?? firstUse.error})`);
+check(!!secondUse.error, 'a second answer to the same link is refused');
+check(/own link/.test(secondUse.error ?? ''),
+  `and the refusal says what to do instead ("${(secondUse.error ?? '').slice(0, 60)}…")`);
+// The invitation that was used twice can never connect, and is dropped after
+// CONNECT_TIMEOUT_MS. Verified by measurement rather than here: waiting thirty
+// seconds on every run to watch a zombie disappear is not worth the minute.
+
 // ── several friends, with the replies coming back in the wrong order ──
 // This is the case that matters once there is more than one guest. Each reply
 // carries the id of the invitation it answers; without that the host has to

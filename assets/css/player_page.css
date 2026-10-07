@@ -1428,3 +1428,7 @@
 .watch-party .wp-dot.on {
     background: #4ccf6a;
 }
+.watch-party .wp-whose {
+    color: var(--jj-accent, #8ab4ff);
+    font-weight: 600;
+}
