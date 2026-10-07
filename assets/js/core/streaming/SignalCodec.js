@@ -61,8 +61,16 @@ async function through(stream, bytes) {
  * @returns {Promise<string>} a paste-safe string, prefixed so a mistyped or
  *          truncated paste is rejected rather than half-parsed
  */
-export async function packSignal(description) {
-    const payload = JSON.stringify({ t: description.type, s: description.sdp });
+export async function packSignal(description, { invite } = {}) {
+    const payload = JSON.stringify({
+        t: description.type,
+        s: description.sdp,
+        // Which invitation this belongs to. The host issues one per friend and
+        // the answers come back by hand, in whatever order people get round to
+        // it -- so a reply has to say what it is replying to rather than the
+        // host guessing from arrival order.
+        ...(invite === undefined ? {} : { i: invite }),
+    });
     const bytes = new TextEncoder().encode(payload);
     const squeezed = await through(new CompressionStream('gzip'), bytes);
     return `${PREFIX}.${toBase64Url(squeezed)}`;
@@ -90,5 +98,5 @@ export async function unpackSignal(text) {
         throw new Error('That code is incomplete or damaged.');
     }
     if (!payload?.t || !payload?.s) throw new Error('That code is missing its description.');
-    return { type: payload.t, sdp: payload.s };
+    return { type: payload.t, sdp: payload.s, invite: payload.i };
 }

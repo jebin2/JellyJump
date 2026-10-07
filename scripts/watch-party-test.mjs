@@ -123,6 +123,59 @@ check(fsOn.label === 'Exit fullscreen', `the button says what it will do now (${
 check(!fsOff.on && fsOff.label === 'Fullscreen', 'double-clicking the picture comes back out');
 check(fsOn.playing && fsOff.playing, 'and the stream never stops for either');
 
+// ── several friends, with the replies coming back in the wrong order ──
+// This is the case that matters once there is more than one guest. Each reply
+// carries the id of the invitation it answers; without that the host has to
+// guess from arrival order, and guessing wrong does not raise anything --
+// setRemoteDescription accepts the mismatched answer and the connection simply
+// never completes. Measured: two of three friends on a black screen, no error.
+const many = [];
+for (let i = 0; i < 3; i++) {
+  many.push(await hostPage.evaluate(async base => {
+    const r = await window.player.watchParty.invite({ baseUrl: base });
+    return { id: r.id, link: r.link };
+  }, `${origin}/watch.html`));
+}
+const guests = [], guestCodes = [];
+for (const inv of many) {
+  const g = await b.newPage();
+  await g.goto(inv.link);
+  await g.waitForFunction(() => {
+    const c = document.getElementById('code'); return c && c.value.length > 0;
+  }, null, { timeout: 40000 });
+  guestCodes.push(await g.evaluate(() => document.getElementById('code').value));
+  guests.push(g);
+}
+const routed = [];
+for (const idx of [2, 0, 1]) {            // deliberately not 0, 1, 2
+  const r = await hostPage.evaluate(async code => {
+    try { return { id: await window.player.watchParty.accept(code) }; }
+    catch (e) { return { error: String(e.message) }; }
+  }, guestCodes[idx]);
+  // Compared against the id the invitation was actually issued with, not the
+  // guest's position: one invitation was already handed out above, so this
+  // batch is numbered from two.
+  routed.push({ guest: idx + 1, expected: many[idx].id, got: r.id ?? r.error });
+}
+await hostPage.waitForTimeout(5000);
+const watchingAll = [];
+for (const g of guests) {
+  watchingAll.push(await g.evaluate(() => {
+    const v = document.getElementById('video');
+    return { w: v.videoWidth, playing: !v.paused };
+  }));
+}
+const manyState = await hostPage.evaluate(() => window.player.watchParty.viewerCount);
+
+check(routed.every(r => r.got === r.expected),
+  `each reply reaches its own invitation whatever order they arrive in `
+  + `(${routed.map(r => 'guest' + r.guest + '->invite' + r.got).join(', ')})`);
+check(watchingAll.every(w => w.w > 0 && w.playing),
+  `all three friends get a picture (${watchingAll.map(w => w.w).join(', ')})`);
+// Four, not three: the guest from the single-friend phase above is still here.
+check(manyState === 4, `and the host counts everyone watching (${manyState})`);
+for (const g of guests) await g.close();
+
 // ── and it can be stopped, which is the part a host has to be able to trust ──
 const beforeStop=await hostPage.evaluate(()=>({ active:window.player.watchParty.isActive,
   broadcasting:window.player.broadcast.isOpen }));

@@ -1411,3 +1411,20 @@
     opacity: .45;
     cursor: default;
 }
+.watch-party .wp-viewer-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .85rem;
+    padding: .15rem 0;
+}
+.watch-party .wp-dot {
+    width: .5rem;
+    height: .5rem;
+    border-radius: 50%;
+    background: var(--jj-border, #3a3a42);
+    flex: none;
+}
+.watch-party .wp-dot.on {
+    background: #4ccf6a;
+}

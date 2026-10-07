@@ -62,7 +62,8 @@ export class WatchPartyMenu {
             <div class="wp-viewers"></div>
             <div class="wp-footer">
                 <p class="wp-hint wp-running">
-                    One link and one code per friend — repeat for each.
+                    One link and one code per friend — send them all, then paste the
+                    replies back in any order.
                     <strong>Closing this panel does not stop sharing.</strong>
                 </p>
                 <button class="wp-stop jellyjump-btn-secondary" type="button">Stop sharing</button>
@@ -83,12 +84,31 @@ export class WatchPartyMenu {
         let currentInvite = null;
         let pollId = null;
 
+        // A count is not enough once there is more than one friend: with three
+        // links out and two replies back, the host needs to know which one is
+        // still missing. Replies carry their invitation's id, so they can be
+        // pasted in any order -- this is what shows that happened.
+        const describe = (state, accepted) => {
+            if (state === 'connected') return 'watching';
+            if (!accepted) return 'waiting for their reply';
+            if (state === 'connecting' || state === 'new') return 'connecting…';
+            return state;
+        };
         const renderViewers = () => {
             const list = party.invites;
-            const connected = list.filter(i => i.state === 'connected').length;
-            viewers.textContent = !list.length ? ''
-                : connected === 1 ? '1 friend is watching.'
-                : `${connected} friends are watching.`;
+            viewers.textContent = '';
+            if (!list.length) { stopButton.disabled = !party.isActive; return; }
+            for (const invite of list) {
+                const row = document.createElement('div');
+                row.className = 'wp-viewer-row';
+                const dot = document.createElement('span');
+                dot.className = 'wp-dot';
+                if (invite.state === 'connected') dot.classList.add('on');
+                const label = document.createElement('span');
+                label.textContent = `Friend ${invite.id} — ${describe(invite.state, invite.accepted)}`;
+                row.append(dot, label);
+                viewers.append(row);
+            }
             stopButton.disabled = !party.isActive;
         };
 
@@ -126,9 +146,9 @@ export class WatchPartyMenu {
             acceptButton.disabled = true;
             status.textContent = 'Connecting…';
             try {
-                await party.accept(code);
+                const which = await party.accept(code);
                 answerField.value = '';
-                status.textContent = 'Connected. Make a new link for the next friend.';
+                status.textContent = `Friend ${which} is connected. The next link is ready below.`;
                 renderViewers();
                 // Each friend needs their own pair, so the next one is queued up
                 // immediately rather than making them ask for it.

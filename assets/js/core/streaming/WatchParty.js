@@ -82,7 +82,7 @@ export class WatchParty {
         await connection.setLocalDescription(await connection.createOffer());
         await this._gathered(connection);
 
-        const code = await packSignal(connection.localDescription);
+        const code = await packSignal(connection.localDescription, { invite: id });
         const base = baseUrl ?? new URL('watch.html', window.location.href).href;
         // The fragment, not the query: fragments are not sent to servers and do
         // not appear in access logs, so the handshake stays between the two of
@@ -103,9 +103,15 @@ export class WatchParty {
         if (answer.type !== 'answer') {
             throw new Error('That is an invitation, not a reply to one.');
         }
-        const target = id ?? this._newestUnaccepted();
+        // The reply names its own invitation, so replies can come back in any
+        // order and from any number of friends. The fallback is for a code made
+        // before this carried an id; it is only ever right with one invitation
+        // outstanding, which is why it is not the main path.
+        const target = id ?? answer.invite ?? this._newestUnaccepted();
         const peer = this._peers.get(target);
-        if (!peer) throw new Error('There is no invitation waiting for that code.');
+        if (!peer) {
+            throw new Error('That reply is for an invitation this tab no longer has.');
+        }
         if (peer.accepted) throw new Error('That invitation has already been answered.');
 
         await peer.connection.setRemoteDescription(answer);
@@ -186,7 +192,9 @@ export class WatchViewer {
         await this.connection.setLocalDescription(await this.connection.createAnswer());
         await this._gathered();
 
-        const code = await packSignal(this.connection.localDescription);
+        // Echo the invitation back so the host knows which connection this
+        // answers without having to rely on the order replies arrive in.
+        const code = await packSignal(this.connection.localDescription, { invite: offer.invite });
         return { code, stream: arrival };
     }
 
