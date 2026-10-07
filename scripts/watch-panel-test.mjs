@@ -151,7 +151,25 @@ const watching = await second.evaluate(() => {
 check(watching.w > 0 && watching.playing,
     `a friend invited after stopping still gets a picture (${watching.w}px, playing ${watching.playing})`);
 
+// ── a host who closes the tab has stopped sharing too ──
+// Timed, like the Stop button: without a goodbye on the way out the friend
+// keeps a frozen frame until ICE gives up, about eight seconds later.
 check(errs.length === 0, `no page errors${errs.length ? ': ' + errs.join('; ') : ''}`);
+const closedAt = await (async () => {
+    const started = Date.now();
+    await host.close();
+    for (let i = 0; i < 120; i++) {
+        const shown = await second.evaluate(() => !document.getElementById('problem').hidden)
+            .catch(() => false);
+        if (shown) return Date.now() - started;
+        await second.waitForTimeout(100);
+    }
+    return null;
+})();
+check(closedAt !== null && closedAt < 2000,
+    `closing the host tab tells the friend at once (${closedAt}ms; about 8000ms with no goodbye)`);
+await second.close();
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 await b.close(); srv.close();
 process.exit(fail ? 1 : 0);

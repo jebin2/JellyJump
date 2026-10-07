@@ -11,6 +11,8 @@
  *   npm run build && node scripts/watch-party-test.mjs
  */
 import { chromium } from 'playwright-core';
+import { unpackSignal } from '../assets/js/core/streaming/SignalCodec.js';
+import { rtcConfiguration } from '../assets/js/core/streaming/WatchParty.js';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -67,6 +69,20 @@ const reply=await viewPage.evaluate(()=>({
 }));
 check(reply.code.length > 100, `the viewer answers it (${reply.code.length} chars)`);
 check(reply.replyShown, 'and is told to send that answer back');
+// Both ends are configured the same way. The viewer's own answer is not
+// checked for an srflx candidate because it will not have one: measured in
+// Chromium, an offerer gathers host and srflx while an answerer to the very
+// same offer gathers only host, whatever the direction or candidate pool.
+// That is the browser's doing, not this code's, and it is survivable -- the
+// viewer's connectivity checks reach the host's srflx address, and the host
+// learns the viewer's from the checks arriving (a peer-reflexive candidate).
+// What matters is that the invitation carries somewhere to aim at.
+const replyCandidates = ((await unpackSignal(reply.code)).sdp.match(/^a=candidate:.*$/gm) || [])
+  .map(l => (l.match(/typ (\w+)/) || [])[1]);
+check(replyCandidates.length > 0,
+  `the answer carries candidates of its own (${replyCandidates.join(', ') || 'none'})`);
+check(rtcConfiguration().iceServers?.length > 0,
+  `and both ends are built with somewhere to ask (${rtcConfiguration().iceServers.length} STUN servers)`);
 
 // ── the human carries it back ──
 const accepted=await hostPage.evaluate(async code=>{
@@ -336,6 +352,38 @@ const restartId = await hostPage.evaluate(async () => {
 check(restartId === 1, `a party started after stopping begins at Friend 1 (got Friend ${restartId})`);
 await hostPage.evaluate(()=>window.player.watchParty.stop());
 await hostPage.waitForTimeout(400);
+
+// ── an invitation has to be answerable from outside this house ──
+// Only `host` candidates means this machine's own addresses, which work
+// between two computers on one network and nowhere else. The srflx one is
+// what a friend on their own internet connects to.
+const candidateTypes = await hostPage.evaluate(async () => {
+  const party = window.player.watchParty;
+  const r = await party.invite({ baseUrl: location.origin + '/watch.html' });
+  // The description that was packed into the link, not the config it was asked
+  // for: what matters is which candidates actually ended up in the invitation.
+  const sdp = party._peers.get(r.id)?.connection.localDescription?.sdp || '';
+  return (sdp.match(/^a=candidate:.*$/gm) || []).map(l => (l.match(/typ (\w+)/) || [])[1]);
+});
+check(candidateTypes.includes('srflx'),
+  `an invitation carries a candidate reachable from outside (${candidateTypes.join(', ') || 'none'})`);
+await hostPage.evaluate(()=>window.player.watchParty.stop());
+await hostPage.waitForTimeout(400);
+
+// ── and the link in it has to be one a friend can open ──
+// The desktop app loads its UI from file://, where a viewer page "beside this
+// one" is a path on the host's own disk.
+const links = await hostPage.evaluate(() => {
+  const party = window.player.watchParty;
+  return {
+    web: party._viewerPageUrl('https://example.test/player.html'),
+    desktop: party._viewerPageUrl('file:///opt/JellyJump/resources/build/player.html'),
+  };
+});
+check(links.web === 'https://example.test/watch.html',
+  `on the web a friend is sent the page beside this one (${links.web})`);
+check(links.desktop.startsWith('https://'),
+  `from the desktop app they are sent a page they can open, not a path on the host's disk (${links.desktop})`);
 
 check(hostErr.length === 0 && viewErr.length === 0,
     `no page errors${hostErr.length || viewErr.length ? ': ' + [...hostErr, ...viewErr].join('; ') : ''}`);

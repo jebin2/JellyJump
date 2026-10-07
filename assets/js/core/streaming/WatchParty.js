@@ -1,5 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { packSignal, unpackSignal } from './SignalCodec.js';
+import { BASE_URL } from '../../shared/config.js';
 
 /** How long to wait for ICE gathering before sending what we have. */
 const GATHER_TIMEOUT_MS = 5000;
@@ -25,6 +26,34 @@ const CONNECT_TIMEOUT_MS = 30000;
 const CONTROL_CHANNEL = 'jj-control';
 /** Long enough for a tiny message to leave before the connection is torn down. */
 const GOODBYE_FLUSH_MS = 120;
+/**
+ * Where to ask what this machine looks like from outside.
+ *
+ * With no ICE servers at all, an invitation carries only `host` candidates --
+ * this machine's own addresses -- which two computers in one house can use and
+ * nobody else can. Measured on a real connection: no servers gave 2 host
+ * candidates, a STUN server gave 2 host and 2 srflx, and it is the srflx one
+ * that lets a friend on their own internet connect.
+ *
+ * This is not a backend. A STUN server is asked one question -- what address
+ * did this packet come from -- and keeps nothing; the media never touches it
+ * and neither does the handshake, which still travels by hand. Two are listed
+ * so one being down is not the end of the party.
+ *
+ * What it still does not cover is a network that gives every connection a
+ * different outside port, which happens behind symmetric NAT and on some
+ * mobile carriers. Nothing but a relay fixes that, and a relay is a server
+ * carrying the video, which is the one thing this feature does not have.
+ */
+const ICE_SERVERS = [
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.l.google.com:19302' },
+];
+
+/** The connection settings both ends share. */
+export function rtcConfiguration() {
+    return { iceServers: ICE_SERVERS };
+}
 
 /**
  * Hosting a watch party: one broadcast, several viewers, no server.
@@ -49,6 +78,7 @@ export class WatchParty {
         this.player = player;
         this._peers = new Map();
         this._nextId = 1;
+        this._departure = null;
     }
 
     /** Viewers whose connection has completed. */
@@ -88,15 +118,50 @@ export class WatchParty {
      * one viewer.
      *
      * @param {{baseUrl?: string}} [options] - where the viewer page lives;
-     *        defaults to watch.html beside the current page
+     *        defaults to a viewer page a friend can actually reach
      * @returns {Promise<{id: number, code: string, link: string}>}
      */
+    /**
+     * A host who closes the tab or quits the app has stopped sharing just as
+     * surely as one who pressed the button, and their friends deserve the same
+     * notice. Without this they keep a frozen frame until ICE gives up on the
+     * other end, about eight seconds later.
+     *
+     * pagehide rather than beforeunload: it fires on the ways out that
+     * beforeunload misses, and this has nothing to ask the host first.
+     */
+    _watchForDeparture() {
+        if (this._departure) return;
+        this._departure = () => this._sayGoodbye();
+        window.addEventListener('pagehide', this._departure);
+    }
+
+    /**
+     * Where the viewer page lives, as a friend can reach it.
+     *
+     * In the browser that is watch.html beside this one. The desktop app
+     * loads its UI from file://, where the same reckoning gives a path on
+     * this machine that nobody else can open -- a link that cannot work, sent
+     * in good faith. The hosted copy is used there instead: it is the same
+     * static page, and the handshake still rides in the fragment, which is
+     * never sent to any server, so nothing about the party becomes less
+     * private for being pasted into a hosted URL.
+     *
+     * @param {string} [here] - the page doing the inviting; defaults to this one
+     */
+    _viewerPageUrl(here = window.location.href) {
+        const beside = new URL('watch.html', here);
+        if (beside.protocol === 'http:' || beside.protocol === 'https:') return beside.href;
+        return `${BASE_URL}/watch.html`;
+    }
+
     async invite({ baseUrl } = {}) {
+        this._watchForDeparture();
         const stream = this.player.broadcast.open();
         if (!stream) throw new Error('There is nothing playing to share.');
         this.player.broadcast.attachAudio();
 
-        const connection = new RTCPeerConnection();
+        const connection = new RTCPeerConnection(rtcConfiguration());
         const id = this._nextId++;
         this._peers.set(id, { connection, accepted: false });
 
@@ -124,7 +189,7 @@ export class WatchParty {
         await this._gathered(connection);
 
         const code = await packSignal(connection.localDescription, { invite: id });
-        const base = baseUrl ?? new URL('watch.html', window.location.href).href;
+        const base = baseUrl ?? this._viewerPageUrl();
         // The fragment, not the query: fragments are not sent to servers and do
         // not appear in access logs, so the handshake stays between the two of
         // you even though the link passes through a chat.
@@ -190,10 +255,14 @@ export class WatchParty {
      * Everyone is told before the connection goes, so their page can say what
      * happened at once rather than waiting for ICE to notice.
      */
-    stop() {
-        const peers = [...this._peers.values()];
-        for (const peer of peers) {
-            clearTimeout(peer.timer);
+    /**
+     * Tell everyone watching that this is over.
+     *
+     * Synchronous on purpose: it is also called while the page is being torn
+     * down, where there is no later to continue in.
+     */
+    _sayGoodbye() {
+        for (const peer of this._peers.values()) {
             try {
                 if (peer.control?.readyState === 'open') {
                     peer.control.send(JSON.stringify({ type: 'bye' }));
@@ -204,6 +273,12 @@ export class WatchParty {
                 Logger.debug('[WatchParty] Goodbye not sent:', e);
             }
         }
+    }
+
+    stop() {
+        const peers = [...this._peers.values()];
+        for (const peer of peers) clearTimeout(peer.timer);
+        this._sayGoodbye();
         this._peers.clear();
         // The numbers only exist to tell this party's links apart. Once it is
         // over the names are free again, so the next party starts at Friend 1
@@ -266,7 +341,7 @@ export class WatchViewer {
             throw new Error('That is a reply, not an invitation.');
         }
 
-        this.connection = new RTCPeerConnection();
+        this.connection = new RTCPeerConnection(rtcConfiguration());
         // The host opens this channel; the viewer only receives on it. It
         // carries one message today and is the obvious place for anything else
         // the host ever needs to tell a viewer directly.
