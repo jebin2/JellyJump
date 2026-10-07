@@ -185,6 +185,10 @@ export class WatchParty {
             }
         }
         this._peers.clear();
+        // The numbers only exist to tell this party's links apart. Once it is
+        // over the names are free again, so the next party starts at Friend 1
+        // rather than carrying on from whatever the last one reached.
+        this._nextId = 1;
         this.player.broadcast.close();
         // Closing immediately would drop the message still on its way out.
         setTimeout(() => {

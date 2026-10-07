@@ -327,6 +327,16 @@ check(told, 'and the viewer is told the host stopped');
 check(told && toldAt < 1500,
   `told at once rather than when ICE notices (${toldAt}ms; about 8000ms without the goodbye)`);
 
+// The numbers name this party's links. A host who stops and starts again is
+// on their first friend, so the panel must not greet them as Friend 4.
+const restartId = await hostPage.evaluate(async () => {
+  const r = await window.player.watchParty.invite({ baseUrl: location.origin + '/watch.html' });
+  return r.id;
+});
+check(restartId === 1, `a party started after stopping begins at Friend 1 (got Friend ${restartId})`);
+await hostPage.evaluate(()=>window.player.watchParty.stop());
+await hostPage.waitForTimeout(400);
+
 check(hostErr.length === 0 && viewErr.length === 0,
     `no page errors${hostErr.length || viewErr.length ? ': ' + [...hostErr, ...viewErr].join('; ') : ''}`);
 console.log(`\n${pass} passed, ${fail} failed\n`);
