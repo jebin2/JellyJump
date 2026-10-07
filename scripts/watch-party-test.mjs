@@ -305,17 +305,27 @@ await hostPage.evaluate(()=>window.player.watchParty.stop());
 await hostPage.waitForTimeout(800);
 const afterStop=await hostPage.evaluate(()=>({ active:window.player.watchParty.isActive,
   broadcasting:window.player.broadcast.isOpen, invites:window.player.watchParty.invites.length }));
-// The viewer learns of it only when ICE gives up, which takes several seconds.
-let told=false;
-for (let i=0;i<14 && !told;i++){
-  told=await viewPage.evaluate(()=>!document.getElementById('problem').hidden);
-  if(!told) await viewPage.waitForTimeout(1000);
-}
+// Timed, not merely awaited. The host sends a goodbye over a control channel
+// before tearing the connection down, so this should be immediate; without it
+// the viewer waits for ICE to give up, measured at about eight seconds of
+// frozen picture. The threshold is what distinguishes the two.
+const toldAt = await (async () => {
+  const started = Date.now();
+  for (let i = 0; i < 120; i++) {
+    const shown = await viewPage.evaluate(() => !document.getElementById('problem').hidden);
+    if (shown) return Date.now() - started;
+    await viewPage.waitForTimeout(100);
+  }
+  return null;
+})();
+const told = toldAt !== null;
 check(beforeStop.active && beforeStop.broadcasting, 'a party reports itself active while running');
 check(!afterStop.active && !afterStop.broadcasting,
   `stopping releases the capture (active=${afterStop.active} broadcasting=${afterStop.broadcasting})`);
 check(afterStop.invites === 0, `and forgets its invitations (${afterStop.invites} left)`);
-check(told, 'and the viewer is eventually told the host stopped');
+check(told, 'and the viewer is told the host stopped');
+check(told && toldAt < 1500,
+  `told at once rather than when ICE notices (${toldAt}ms; about 8000ms without the goodbye)`);
 
 check(hostErr.length === 0 && viewErr.length === 0,
     `no page errors${hostErr.length || viewErr.length ? ': ' + [...hostErr, ...viewErr].join('; ') : ''}`);

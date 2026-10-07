@@ -117,6 +117,14 @@ async function main() {
         document.addEventListener('webkitfullscreenchange', syncLabel);
     }
 
+    // The host telling us directly, which arrives at once. The ICE-based
+    // detection below still stands for a host that vanishes without saying so
+    // -- a closed laptop, a lost network -- but that takes seconds.
+    viewer.onHostStopped = () => {
+        Logger.log('[Watch] The host said goodbye');
+        show('problem', 'The host has stopped sharing.');
+    };
+
     viewer.connection.addEventListener('connectionstatechange', () => {
         const state = viewer.connection.connectionState;
         Logger.log(`[Watch] Connection ${state}`);

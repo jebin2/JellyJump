@@ -12,6 +12,19 @@ const GATHER_TIMEOUT_MS = 5000;
  * `failed`, so nothing else would ever clear it.
  */
 const CONNECT_TIMEOUT_MS = 30000;
+/**
+ * A channel carrying nothing but the host saying goodbye.
+ *
+ * Closing a peer connection does not tell the other end anything: the viewer
+ * finds out only when ICE gives up, which was measured at about eight seconds
+ * of frozen picture with no explanation. One message makes it immediate. It
+ * has to be created before the offer so it is described in the SDP, which
+ * lengthens the code that gets pasted -- worth it for not leaving people
+ * staring at a still frame wondering whose fault it is.
+ */
+const CONTROL_CHANNEL = 'jj-control';
+/** Long enough for a tiny message to leave before the connection is torn down. */
+const GOODBYE_FLUSH_MS = 120;
 
 /**
  * Hosting a watch party: one broadcast, several viewers, no server.
@@ -89,6 +102,9 @@ export class WatchParty {
         });
 
         for (const track of stream.getTracks()) connection.addTrack(track, stream);
+        // Created before the offer, or it is not in the SDP and the viewer
+        // never sees the channel at all.
+        this._peers.get(id).control = connection.createDataChannel(CONTROL_CHANNEL);
 
         await connection.setLocalDescription(await connection.createOffer());
         await this._gathered(connection);
@@ -148,14 +164,32 @@ export class WatchParty {
         return this._peers.size > 0 || this.player.broadcast.isOpen;
     }
 
-    /** Hang up on everyone and stop capturing. */
+    /**
+     * Hang up on everyone and stop capturing.
+     *
+     * Everyone is told before the connection goes, so their page can say what
+     * happened at once rather than waiting for ICE to notice.
+     */
     stop() {
-        for (const peer of this._peers.values()) {
+        const peers = [...this._peers.values()];
+        for (const peer of peers) {
             clearTimeout(peer.timer);
-            peer.connection.close();
+            try {
+                if (peer.control?.readyState === 'open') {
+                    peer.control.send(JSON.stringify({ type: 'bye' }));
+                }
+            } catch (e) {
+                // A channel that will not carry a goodbye is not worth a fuss;
+                // ICE will get there eventually.
+                Logger.debug('[WatchParty] Goodbye not sent:', e);
+            }
         }
         this._peers.clear();
         this.player.broadcast.close();
+        // Closing immediately would drop the message still on its way out.
+        setTimeout(() => {
+            for (const peer of peers) peer.connection.close();
+        }, GOODBYE_FLUSH_MS);
         Logger.log('[WatchParty] Stopped');
     }
 
@@ -192,6 +226,8 @@ export class WatchViewer {
     constructor() {
         this.connection = null;
         this.stream = null;
+        /** Called when the host says it has stopped, rather than simply vanishing. */
+        this.onHostStopped = null;
     }
 
     /**
@@ -207,6 +243,17 @@ export class WatchViewer {
         }
 
         this.connection = new RTCPeerConnection();
+        // The host opens this channel; the viewer only receives on it. It
+        // carries one message today and is the obvious place for anything else
+        // the host ever needs to tell a viewer directly.
+        this.connection.addEventListener('datachannel', event => {
+            if (event.channel.label !== CONTROL_CHANNEL) return;
+            event.channel.addEventListener('message', message => {
+                let payload;
+                try { payload = JSON.parse(message.data); } catch { return; }
+                if (payload?.type === 'bye') this.onHostStopped?.();
+            });
+        });
         const arrival = new Promise(resolve => {
             this.connection.addEventListener('track', event => {
                 this.stream = event.streams[0];
