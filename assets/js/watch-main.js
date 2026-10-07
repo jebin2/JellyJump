@@ -1,4 +1,5 @@
 import { WatchViewer } from './core/streaming/WatchParty.js';
+import { describeConnection } from './core/streaming/ConnectionReport.js';
 import { Logger } from './shared/utils/Logger.js';
 
 /**
@@ -125,15 +126,42 @@ async function main() {
         show('problem', 'The host has stopped sharing.');
     };
 
-    viewer.connection.addEventListener('connectionstatechange', () => {
+    // ── Why it is or is not working ─────────────────────────────────────────
+    // A party that will not connect looks identical to a bug from here, and
+    // the viewer is the only person who can see this page. So it says which
+    // kinds of address each end had and which pair they settled on, in a line
+    // that can be read back to the host.
+    const routeLine = el('route');
+    const reportRoute = async () => {
+        const report = await describeConnection(viewer.connection);
+        routeLine.textContent = report.text;
+        routeLine.hidden = false;
+        return report;
+    };
+    // While connecting it changes, so it is refreshed; once there is a route
+    // or there is provably none, it stops.
+    const routeTimer = setInterval(async () => {
+        const report = await reportRoute();
+        if (report.route || report.state === 'failed' || report.state === 'closed') {
+            clearInterval(routeTimer);
+        }
+    }, 2000);
+    reportRoute();
+
+    viewer.connection.addEventListener('connectionstatechange', async () => {
         const state = viewer.connection.connectionState;
         Logger.log(`[Watch] Connection ${state}`);
+        const report = await reportRoute();
         if (state === 'failed') {
-            show('problem', 'The connection could not be established. '
-                + 'Some networks block direct connections; try another network.');
+            clearInterval(routeTimer);
+            show('problem', 'The connection could not be established. Some home '
+                + 'networks will not allow a direct one. Trying another network '
+                + 'on either side -- a phone on mobile data, say -- usually works.');
         } else if (state === 'disconnected' || state === 'closed') {
+            clearInterval(routeTimer);
             show('problem', 'The host has stopped sharing.');
         }
+        Logger.log(`[Watch] ${report.text}`);
     });
 }
 

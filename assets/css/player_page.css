@@ -1418,6 +1418,15 @@
     font-size: .85rem;
     padding: .15rem 0;
 }
+/* Why a friend is not connected, under their row. The panel is where a host
+   looks when somebody stays on "connecting", and a network that will not allow
+   a direct connection is otherwise indistinguishable from a broken feature. */
+.watch-party .wp-viewer-why {
+    margin: 0 0 .35rem 1rem;
+    font-size: .78rem;
+    line-height: 1.45;
+    color: var(--jj-text-dim, #8a8a92);
+}
 .watch-party .wp-dot {
     width: .5rem;
     height: .5rem;

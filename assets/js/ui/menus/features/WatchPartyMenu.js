@@ -102,22 +102,39 @@ export class WatchPartyMenu {
             if (state === 'connecting' || state === 'new') return 'connecting…';
             return state;
         };
-        const renderViewers = () => {
-            const list = party.invites;
-            viewers.textContent = '';
-            if (!list.length) { stopButton.disabled = !party.isActive; return; }
-            for (const invite of list) {
-                const row = document.createElement('div');
-                row.className = 'wp-viewer-row';
-                const dot = document.createElement('span');
-                dot.className = 'wp-dot';
-                if (invite.state === 'connected') dot.classList.add('on');
-                const label = document.createElement('span');
-                label.textContent = `Friend ${invite.id} — ${describe(invite.state, invite.accepted)}`;
-                row.append(dot, label);
-                viewers.append(row);
+        // One render at a time: reading each connection's stats is async, and
+        // two passes interleaving would build the list twice over.
+        let rendering = false;
+        const renderViewers = async () => {
+            if (rendering) return;
+            rendering = true;
+            try {
+                const list = await party.invitesWithRoutes();
+                viewers.textContent = '';
+                stopButton.disabled = !party.isActive;
+                for (const invite of list) {
+                    const row = document.createElement('div');
+                    row.className = 'wp-viewer-row';
+                    const dot = document.createElement('span');
+                    dot.className = 'wp-dot';
+                    if (invite.state === 'connected') dot.classList.add('on');
+                    const label = document.createElement('span');
+                    const how = invite.route ? ` (${invite.route})` : '';
+                    label.textContent = `Friend ${invite.id} — ${describe(invite.state, invite.accepted)}${how}`;
+                    row.append(dot, label);
+                    viewers.append(row);
+                    // The detail is only worth the space when something is
+                    // wrong: a friend who answered and still is not watching.
+                    if (invite.accepted && !invite.route) {
+                        const why = document.createElement('p');
+                        why.className = 'wp-viewer-why';
+                        why.textContent = invite.detail;
+                        viewers.append(why);
+                    }
+                }
+            } finally {
+                rendering = false;
             }
-            stopButton.disabled = !party.isActive;
         };
 
         const showInvite = (invite) => {
@@ -143,7 +160,7 @@ export class WatchPartyMenu {
                 linkField.placeholder = error.message || 'Could not create an invitation.';
                 status.textContent = error.message || '';
             }
-            renderViewers();
+            await renderViewers();
         };
 
         copyButton.addEventListener('click', async () => {
@@ -167,7 +184,7 @@ export class WatchPartyMenu {
                 const which = await party.accept(code);
                 answerField.value = '';
                 status.textContent = `Friend ${which} is connected. The next link is ready below.`;
-                renderViewers();
+                await renderViewers();
                 // Each friend needs their own pair, so the next one is queued up
                 // immediately rather than making them ask for it.
                 await newInvite();

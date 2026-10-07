@@ -16,6 +16,8 @@
         h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .25rem; }
         p { margin: .25rem 0 0; color: #a0a0a8; }
         .panel { border: 1px solid #26262b; border-radius: 10px; padding: 1.25rem; background: #131317; }
+        .route { margin: .75rem 0 0; font-size: .8rem; color: #8b8b94; line-height: 1.5; }
+        #route[hidden] { display: none; }
         #stage { margin-top: .75rem; position: relative; }
         #full { position: absolute; right: .6rem; bottom: .6rem;
                 display: grid; place-items: center; width: 2.4rem; height: 2.4rem;
@@ -75,6 +77,13 @@
         <h1>Can't watch this</h1>
         <p id="detail"></p>
     </section>
+
+    <!-- Why it is or is not working, in words, for the person who can do
+         something about it. A party that will not connect is almost always the
+         shape of somebody's home network, and without this neither end can
+         tell that from a bug. Candidate types only -- this line is meant to be
+         pasted back to the host, and an address would be someone's IP. -->
+    <p id="route" class="route" hidden></p>
 
     <!-- Always in the document and never display:none. A hidden video element
          can stop decoding, so a stream attached to one may never report

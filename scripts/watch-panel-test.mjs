@@ -113,6 +113,60 @@ const live = await read();
 check(live.viewers.includes('watching'), `a connected friend reads as watching (${live.viewers})`);
 check(live.whose === 'Friend 2', `and the next link is waiting as Friend 2 (${live.whose})`);
 
+// ── and both ends can say how the connection is carrying itself ──
+// A party that will not connect is indistinguishable from a broken feature
+// without this, and the two people who can act on it are the two looking at
+// these two screens.
+const hostRoute = await host.evaluate(() => {
+    const rows = [...document.querySelectorAll('.wp-viewer-row')].map(r => r.textContent);
+    return rows.find(r => r.includes('Friend 1')) || '';
+});
+check(/\((direct|relayed)\)/.test(hostRoute),
+    `the host's panel says how a friend is connected (${hostRoute.trim()})`);
+const guestRoute = await guest.evaluate(() => {
+    const line = document.getElementById('route');
+    return { hidden: line.hidden, text: line.textContent };
+});
+check(!guestRoute.hidden && /Connected (direct|relayed)/.test(guestRoute.text),
+    `and the friend's page says the same from their side ("${guestRoute.text}")`);
+// Pasteable, so neither end has to describe it: types, never addresses.
+check(!/\b\d{1,3}(\.\d{1,3}){3}\b/.test(guestRoute.text) && !/[0-9a-f]{1,4}:[0-9a-f]{1,4}:/i.test(guestRoute.text),
+    'without putting anybody\'s address in a line meant for a chat');
+
+// ── and when a friend cannot get through, it says why ──
+// A reply routed to the wrong invitation is the one way to make a connection
+// that is accepted and then silently never completes -- which is exactly the
+// shape of the real failure this line exists for.
+const stuck = await host.evaluate(async () => {
+    const party = window.player.watchParty;
+    const spare = await party.invite();
+    return spare.id;
+});
+{
+    const wrongLink = await host.evaluate(() => document.querySelector('.wp-link').value);
+    const bystander = await ctx.newPage();
+    await bystander.goto(wrongLink, { waitUntil: 'domcontentloaded' });
+    await bystander.waitForFunction(() => {
+        const t = document.getElementById('code');
+        return t && t.value.length > 0;
+    }, null, { timeout: 40000 });
+    const code = await bystander.evaluate(() => document.getElementById('code').value);
+    // Deliberately handed to a different invitation than the one it answers.
+    await host.evaluate(async ({ code, id }) => {
+        await window.player.watchParty.accept(code, id).catch(() => {});
+    }, { code, id: stuck });
+    await host.waitForTimeout(2500);
+    const why = await host.evaluate(() => {
+        const lines = [...document.querySelectorAll('.wp-viewer-why')].map(p => p.textContent);
+        return lines.join(' || ');
+    });
+    check(/Still trying|No route|route is open/.test(why),
+        `a friend who cannot get through is explained, not just left spinning ("${why}")`);
+    check(!/\b\d{1,3}(\.\d{1,3}){3}\b/.test(why),
+        'and that explanation is free of addresses too');
+    await bystander.close();
+}
+
 // ── stopping ends the party without closing the door ──
 await host.click('.wp-stop');
 // Bounded rather than awaited: a panel that never comes back is the bug, and

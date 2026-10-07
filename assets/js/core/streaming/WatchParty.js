@@ -1,6 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { packSignal, unpackSignal } from './SignalCodec.js';
 import { BASE_URL } from '../../shared/config.js';
+import { describeConnection } from './ConnectionReport.js';
 
 /** How long to wait for ICE gathering before sending what we have. */
 const GATHER_TIMEOUT_MS = 5000;
@@ -96,6 +97,30 @@ export class WatchParty {
             id,
             state: peer.connection.connectionState,
             accepted: peer.accepted,
+        }));
+    }
+
+    /**
+     * The same list, with how each connection is actually carrying itself.
+     *
+     * Separate from invites() because it has to read the connection's stats,
+     * which is asynchronous, and most callers only want the states. A host
+     * watching a friend stay on "connecting" is the one caller that needs to
+     * know whether anything is getting through at all.
+     *
+     * @returns {Promise<Array<{id: number, state: string, accepted: boolean,
+     *          route: string|null, detail: string}>>}
+     */
+    async invitesWithRoutes() {
+        return Promise.all([...this._peers.entries()].map(async ([id, peer]) => {
+            const report = await describeConnection(peer.connection);
+            return {
+                id,
+                state: peer.connection.connectionState,
+                accepted: peer.accepted,
+                route: report.route,
+                detail: report.text,
+            };
         }));
     }
 
