@@ -1395,3 +1395,19 @@
     font-size: .85rem;
     color: var(--jj-text, #e8e8ea);
 }
+.watch-party .wp-footer {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    justify-content: space-between;
+}
+.watch-party .wp-footer .wp-hint {
+    margin: 0;
+}
+.watch-party .wp-stop {
+    white-space: nowrap;
+}
+.watch-party .wp-stop:disabled {
+    opacity: .45;
+    cursor: default;
+}

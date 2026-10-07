@@ -60,10 +60,13 @@ export class WatchPartyMenu {
                 <p class="wp-hint wp-status"></p>
             </div>
             <div class="wp-viewers"></div>
-            <p class="wp-hint">
-                One link and one code per friend — repeat for each. Links expire when
-                you close this tab.
-            </p>
+            <div class="wp-footer">
+                <p class="wp-hint wp-running">
+                    One link and one code per friend — repeat for each.
+                    <strong>Closing this panel does not stop sharing.</strong>
+                </p>
+                <button class="wp-stop jellyjump-btn-secondary" type="button">Stop sharing</button>
+            </div>
         `;
         modal.setBody(body);
         modal.open();
@@ -74,6 +77,7 @@ export class WatchPartyMenu {
         const acceptButton = body.querySelector('.wp-accept');
         const status = body.querySelector('.wp-status');
         const viewers = body.querySelector('.wp-viewers');
+        const stopButton = body.querySelector('.wp-stop');
 
         const party = player.watchParty;
         let currentInvite = null;
@@ -81,11 +85,11 @@ export class WatchPartyMenu {
 
         const renderViewers = () => {
             const list = party.invites;
-            if (!list.length) { viewers.textContent = ''; return; }
             const connected = list.filter(i => i.state === 'connected').length;
-            viewers.textContent = connected === 1
-                ? '1 friend is watching.'
+            viewers.textContent = !list.length ? ''
+                : connected === 1 ? '1 friend is watching.'
                 : `${connected} friends are watching.`;
+            stopButton.disabled = !party.isActive;
         };
 
         const newInvite = async () => {
@@ -137,14 +141,35 @@ export class WatchPartyMenu {
             }
         });
 
+        stopButton.addEventListener('click', () => {
+            // The one thing in this panel that is destructive, so it says what
+            // it did rather than just going quiet.
+            // Stopping here closes the peer connections at once, but a viewer
+            // only learns of it when ICE gives up on the other end -- measured
+            // at about eight seconds, during which their picture is frozen with
+            // no explanation. An explicit goodbye over a data channel would be
+            // quicker and is not worth a data channel yet.
+            party.stop();
+            linkField.value = '';
+            linkField.placeholder = 'Sharing stopped.';
+            copyButton.disabled = true;
+            answerField.value = '';
+            status.textContent = 'Sharing stopped. Nobody is watching.';
+            renderViewers();
+            Toast.show('Watch party ended.', 2500);
+        });
+
         // Connection state changes with no event of its own to listen to here,
         // so the count is refreshed on a slow timer while the panel is open.
         pollId = setInterval(renderViewers, 1500);
         modal.onCleanup(() => {
             clearInterval(pollId);
             // Deliberately not stopping the party: closing this panel should not
-            // disconnect friends who are already watching. ShareMenu behaves the
-            // same way, and the player keeps broadcasting until it is stopped.
+            // disconnect friends who are already watching, the same way
+            // ShareMenu leaves sharing running. That is only defensible because
+            // the panel says so and offers a way to stop, which it did not
+            // before -- a host could close this believing they had stopped
+            // sharing while friends went on watching.
         });
 
         newInvite();

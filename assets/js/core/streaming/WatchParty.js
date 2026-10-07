@@ -64,6 +64,19 @@ export class WatchParty {
         const id = this._nextId++;
         this._peers.set(id, { connection, accepted: false });
 
+        // A connection that has failed or been closed is never coming back,
+        // and holding it keeps an RTCPeerConnection alive for nothing. Invites
+        // that are never answered accumulate the same way -- one per friend who
+        // was sent a link and did not open it.
+        connection.addEventListener('connectionstatechange', () => {
+            const state = connection.connectionState;
+            if (state !== 'failed' && state !== 'closed') return;
+            if (this._peers.get(id)?.connection !== connection) return;
+            this._peers.delete(id);
+            connection.close();
+            Logger.log(`[WatchParty] Invite ${id} ${state}; forgotten`);
+        });
+
         for (const track of stream.getTracks()) connection.addTrack(track, stream);
 
         await connection.setLocalDescription(await connection.createOffer());
@@ -99,6 +112,11 @@ export class WatchParty {
         peer.accepted = true;
         Logger.log(`[WatchParty] Invite ${target} answered`);
         return target;
+    }
+
+    /** True while anything is being shared -- an invite out, or someone watching. */
+    get isActive() {
+        return this._peers.size > 0 || this.player.broadcast.isOpen;
     }
 
     /** Hang up on everyone and stop capturing. */

@@ -123,6 +123,25 @@ check(fsOn.label === 'Exit fullscreen', `the button says what it will do now (${
 check(!fsOff.on && fsOff.label === 'Fullscreen', 'double-clicking the picture comes back out');
 check(fsOn.playing && fsOff.playing, 'and the stream never stops for either');
 
+// ── and it can be stopped, which is the part a host has to be able to trust ──
+const beforeStop=await hostPage.evaluate(()=>({ active:window.player.watchParty.isActive,
+  broadcasting:window.player.broadcast.isOpen }));
+await hostPage.evaluate(()=>window.player.watchParty.stop());
+await hostPage.waitForTimeout(800);
+const afterStop=await hostPage.evaluate(()=>({ active:window.player.watchParty.isActive,
+  broadcasting:window.player.broadcast.isOpen, invites:window.player.watchParty.invites.length }));
+// The viewer learns of it only when ICE gives up, which takes several seconds.
+let told=false;
+for (let i=0;i<14 && !told;i++){
+  told=await viewPage.evaluate(()=>!document.getElementById('problem').hidden);
+  if(!told) await viewPage.waitForTimeout(1000);
+}
+check(beforeStop.active && beforeStop.broadcasting, 'a party reports itself active while running');
+check(!afterStop.active && !afterStop.broadcasting,
+  `stopping releases the capture (active=${afterStop.active} broadcasting=${afterStop.broadcasting})`);
+check(afterStop.invites === 0, `and forgets its invitations (${afterStop.invites} left)`);
+check(told, 'and the viewer is eventually told the host stopped');
+
 check(hostErr.length === 0 && viewErr.length === 0,
     `no page errors${hostErr.length || viewErr.length ? ': ' + [...hostErr, ...viewErr].join('; ') : ''}`);
 console.log(`\n${pass} passed, ${fail} failed\n`);
