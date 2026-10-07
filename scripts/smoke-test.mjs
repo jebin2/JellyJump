@@ -336,6 +336,12 @@ async function run(page, origin) {
         for (let i = 0; i < 40 && !p.isPlaying; i++) await sleep(50);
         for (let i = 0; i < 80 && p.isPlaying; i++) await sleep(100);
         const endedAt = +p.currentTime.toFixed(2);
+        // A pause before pressing play, deliberately. The stale anchor's
+        // reported position is its content time plus however long the
+        // AudioContext has been running, so waiting is what pushes it past the
+        // duration -- without this the stale position lands inside a
+        // two-second file and the bug cannot show itself here at all.
+        await sleep(1500);
         draws = 0;
         p.play().catch(() => {});
         await sleep(1600);

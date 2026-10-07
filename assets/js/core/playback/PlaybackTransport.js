@@ -121,8 +121,17 @@ export async function playPlayer(player) {
     if (player.duration > 1.0 && currentPosition >= player.duration - 0.5) {
         Logger.log(`[Play] Resetting to start (position=${currentPosition.toFixed(2)}, duration=${player.duration.toFixed(2)})`);
         player.playbackTimeAtStart = 0;
-        // The origin moves with the position, or the next reader disagrees again.
+        // Both clocks move with the position, or the next reader disagrees.
+        //
+        // The anchor is the one that matters here and was the harder half to
+        // see. _getPlaybackTime prefers it whenever the AudioContext is
+        // running, and play() resumes the context a few lines above -- so an
+        // anchor left over from the finished playthrough (content near the
+        // duration) reported a position past the end, the iterator was opened
+        // there, and it was exhausted on arrival. seekPlayerTo already clears
+        // it when repositioning; this branch is a reposition that did not.
         player.fallbackStartTime = performance.now();
+        player.vodAnchor.clear();
         await player._startVideoIterator();
     } else if (!player.frames.isOpen) {
         await player._startVideoIterator();
