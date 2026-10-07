@@ -120,25 +120,30 @@ export class WatchPartyMenu {
             stopButton.disabled = !party.isActive;
         };
 
+        const showInvite = (invite) => {
+            currentInvite = invite;
+            linkField.value = invite.link;
+            copyButton.disabled = false;
+            copyButton.textContent = 'Copy';
+            // Named, so it is visible that this link belongs to one person
+            // and that the previous one is spent. Sending the same link to
+            // several people is the one mistake this panel invites, and it
+            // breaks the first of them as well as the rest.
+            whose.textContent = `Friend ${invite.id}`;
+        };
+
         const newInvite = async () => {
             linkField.value = '';
             linkField.placeholder = 'Creating…';
             copyButton.disabled = true;
             try {
-                currentInvite = await party.invite();
-                linkField.value = currentInvite.link;
-                copyButton.disabled = false;
-                copyButton.textContent = 'Copy';
-                // Named, so it is visible that this link belongs to one person
-                // and that the previous one is spent. Sending the same link to
-                // several people is the one mistake this panel invites, and it
-                // breaks the first of them as well as the rest.
-                whose.textContent = `Friend ${currentInvite.id}`;
+                showInvite(await party.invite());
             } catch (error) {
                 Logger.warn('[WatchParty] Invite failed:', error);
                 linkField.placeholder = error.message || 'Could not create an invitation.';
                 status.textContent = error.message || '';
             }
+            renderViewers();
         };
 
         copyButton.addEventListener('click', async () => {
@@ -174,22 +179,22 @@ export class WatchPartyMenu {
             }
         });
 
-        stopButton.addEventListener('click', () => {
+        stopButton.addEventListener('click', async () => {
             // The one thing in this panel that is destructive, so it says what
-            // it did rather than just going quiet.
-            // Stopping here closes the peer connections at once, but a viewer
-            // only learns of it when ICE gives up on the other end -- measured
-            // at about eight seconds, during which their picture is frozen with
-            // no explanation. An explicit goodbye over a data channel would be
-            // quicker and is not worth a data channel yet.
+            // it did rather than just going quiet. Everyone watching is told
+            // over the control channel before their connection goes, so their
+            // page explains itself at once instead of freezing for the eight
+            // seconds ICE takes to notice.
             party.stop();
-            linkField.value = '';
-            linkField.placeholder = 'Sharing stopped.';
-            copyButton.disabled = true;
             answerField.value = '';
             status.textContent = 'Sharing stopped. Nobody is watching.';
-            renderViewers();
             Toast.show('Watch party ended.', 2500);
+            // Then straight back to a usable panel: stopping ends the party,
+            // it does not close the door. Leaving the link box empty read as
+            // broken, and the only way back to a link was closing this and
+            // opening it again.
+            stopButton.disabled = true;
+            await newInvite();
         });
 
         // Connection state changes with no event of its own to listen to here,
@@ -205,6 +210,16 @@ export class WatchPartyMenu {
             // sharing while friends went on watching.
         });
 
-        newInvite();
+        // A link that is already out there is shown again rather than replaced.
+        // Reopening this panel has not sent anybody anything, so minting a new
+        // invitation here would both rename the friend who holds the old link
+        // and leave a row waiting for a reply that is never coming.
+        const outstanding = party.pendingInvite;
+        if (outstanding) {
+            showInvite(outstanding);
+            renderViewers();
+        } else {
+            newInvite();
+        }
     }
 }

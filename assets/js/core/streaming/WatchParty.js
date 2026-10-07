@@ -70,6 +70,20 @@ export class WatchParty {
     }
 
     /**
+     * The invitation still waiting for a reply, if there is one -- the link a
+     * host has in hand but nobody has answered yet.
+     *
+     * @returns {{id: number, code: string, link: string}|null}
+     */
+    get pendingInvite() {
+        const outstanding = [...this._peers.entries()]
+            .filter(([, peer]) => !peer.accepted && peer.link);
+        if (!outstanding.length) return null;
+        const [id, peer] = outstanding[outstanding.length - 1];
+        return { id, code: peer.code, link: peer.link };
+    }
+
+    /**
      * Start broadcasting if it has not started, and produce an invitation for
      * one viewer.
      *
@@ -115,8 +129,14 @@ export class WatchParty {
         // not appear in access logs, so the handshake stays between the two of
         // you even though the link passes through a chat.
         const link = `${base}#${code}`;
+        const issued = { id, code, link };
+        // Kept so the same invitation can be shown again. A host who closes
+        // and reopens the panel has not sent a new link to anyone, and minting
+        // one there would rename the friend the old link went to.
+        const peer = this._peers.get(id);
+        if (peer) Object.assign(peer, issued);
         Logger.log(`[WatchParty] Invite ${id} ready (${code.length} chars)`);
-        return { id, code, link };
+        return issued;
     }
 
     /**

@@ -1,0 +1,157 @@
+/**
+ * The Watch Together panel, driven the way a host drives it.
+ *
+ * watch-party-test.mjs covers the protocol: two pages, two codes, a picture at
+ * the other end. This covers the panel around it, which is where every bug a
+ * host has actually hit has been -- a blank link box, a friend numbered 4 at
+ * the start of a party, a row for a reply that is never coming. None of those
+ * break a connection, so none of them fail a protocol test; they just make the
+ * panel unusable until it is closed and opened again.
+ *
+ *   npm run build && node scripts/watch-panel-test.mjs
+ */
+import { chromium } from 'playwright-core';
+import { createServer } from 'node:http';
+import { readFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join, extname, resolve } from 'node:path';
+
+const ROOT = resolve(import.meta.dirname, '..');
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon', '.webm': 'video/webm' };
+const srv = createServer(async (req, res) => {
+    const u = decodeURIComponent(req.url.split('?')[0]);
+    const f = u.startsWith('/__fixtures__/')
+        ? join(ROOT, 'scripts/fixtures', u.slice(14))
+        : join(ROOT, 'dist', u === '/' ? '/index.html' : u);
+    try {
+        const i = await stat(f);
+        res.writeHead(200, { 'Content-Type': MIME[extname(f)] || 'application/octet-stream', 'Content-Length': i.size, 'Accept-Ranges': 'bytes' });
+        res.end(await readFile(f));
+    } catch { res.writeHead(404); res.end(); }
+});
+let pass = 0, fail = 0;
+const check = (ok, label) => { if (ok) { pass++; console.log(`  PASS  ${label}`); } else { fail++; console.log(`  FAIL  ${label}`); } };
+await new Promise(r => srv.listen(0, '127.0.0.1', r));
+const origin = `http://127.0.0.1:${srv.address().port}`;
+
+const CANDIDATES = [process.env.CHROMIUM_PATH, process.env.CHROME_PATH,
+    '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].filter(Boolean);
+const browserPath = CANDIDATES.find(p => existsSync(p));
+if (!browserPath) { console.error('No Chromium or Chrome found. Set CHROMIUM_PATH.'); process.exit(1); }
+const b = await chromium.launch({ executablePath: browserPath, args: ['--no-sandbox', '--no-proxy-server', '--autoplay-policy=no-user-gesture-required'] });
+const ctx = await b.newContext();
+const host = await ctx.newPage();
+const errs = [];
+host.on('pageerror', e => errs.push(String(e).slice(0, 140)));
+
+await host.goto(`${origin}/player.html`);
+await host.waitForFunction(() => !!window.player, null, { timeout: 60000 });
+// Looped: a short fixture must not run out mid-negotiation.
+await host.evaluate(async url => {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const p = window.player;
+    await p.load(url);
+    for (let i = 0; i < 120 && !(p.duration > 0); i++) await sleep(100);
+    p.loopMode = 'one';
+    await p.play().catch(() => {});
+    await sleep(800);
+}, process.env.SRC || '/__fixtures__/smoke-av.webm');
+
+const openPanel = async () => {
+    await host.click('#mb-tools');
+    await host.waitForSelector('[data-action="watch-party"]', { timeout: 15000 });
+    await host.click('[data-action="watch-party"]');
+    await host.waitForFunction(() => {
+        const i = document.querySelector('.wp-link');
+        return i && i.value.length > 0;
+    }, null, { timeout: 30000 });
+};
+const closePanel = async () => {
+    await host.click('.mb-modal-overlay .mb-modal-close');
+    await host.waitForFunction(() => !document.querySelector('.mb-modal-overlay'), null, { timeout: 10000 });
+};
+const read = () => host.evaluate(() => ({
+    whose: document.querySelector('.wp-whose')?.textContent,
+    link: document.querySelector('.wp-link')?.value || '',
+    copy: !document.querySelector('.wp-copy')?.disabled,
+    viewers: document.querySelector('.wp-viewers')?.textContent?.replace(/\s+/g, ' ').trim(),
+    ids: window.player.watchParty.invites.map(i => i.id),
+}));
+/** The humans' job: carry the code from the viewer page back to the panel. */
+const connectGuest = async () => {
+    const link = await host.evaluate(() => document.querySelector('.wp-link').value);
+    const guest = await ctx.newPage();
+    await guest.goto(link, { waitUntil: 'domcontentloaded' });
+    await guest.waitForFunction(() => {
+        const t = document.getElementById('code');
+        return t && t.value.length > 0;
+    }, null, { timeout: 40000 });
+    await host.fill('.wp-answer', await guest.evaluate(() => document.getElementById('code').value));
+    await host.click('.wp-accept');
+    await host.waitForFunction(() => window.player.watchParty.viewerCount > 0, null, { timeout: 40000 });
+    return guest;
+};
+
+// ── a panel is ready the moment it opens ──
+await openPanel();
+const first = await read();
+check(first.whose === 'Friend 1' && first.link.length > 100,
+    `the panel opens with Friend 1's link ready (${first.whose}, ${first.link.length} chars)`);
+
+// ── and reopening it has not sent anybody a new link, so it must not mint one ──
+await closePanel();
+await openPanel();
+const again = await read();
+check(JSON.stringify(again.ids) === '[1]' && again.whose === 'Friend 1',
+    `reopening shows the outstanding invitation rather than a new one (ids ${JSON.stringify(again.ids)}, ${again.whose})`);
+check(again.link === first.link, 'and it is the same link, so the friend holding it still matches');
+
+const guest = await connectGuest();
+await host.waitForTimeout(1200);
+const live = await read();
+check(live.viewers.includes('watching'), `a connected friend reads as watching (${live.viewers})`);
+check(live.whose === 'Friend 2', `and the next link is waiting as Friend 2 (${live.whose})`);
+
+// ── stopping ends the party without closing the door ──
+await host.click('.wp-stop');
+// Bounded rather than awaited: a panel that never comes back is the bug, and
+// it should read as a failure here, not as the script giving up.
+await host.waitForFunction(() => {
+    const i = document.querySelector('.wp-link');
+    return i && i.value.length > 0;
+}, null, { timeout: 15000 }).catch(() => {});
+const stopped = await read();
+check(stopped.link.length > 100 && stopped.copy,
+    `stopping leaves a fresh link, not a blank box (${stopped.link.length} chars, copy ${stopped.copy ? 'enabled' : 'disabled'})`);
+check(stopped.link !== live.link, 'and it is a new one, since the old invitations are gone');
+check(stopped.whose === 'Friend 1',
+    `the names reset there and then, without reopening the panel (${stopped.whose})`);
+check(!stopped.viewers.includes('watching') && JSON.stringify(stopped.ids) === '[1]',
+    `nobody is left watching and one fresh invitation stands (${JSON.stringify(stopped.ids)})`);
+check(await guest.evaluate(() => !document.getElementById('problem').hidden),
+    'the friend who was watching is told the host stopped');
+await guest.close();
+
+// ── and the capture survived being closed and reopened, which is the risk ──
+// Guarded, so a panel with no link to give fails the checks above rather than
+// breaking this one too.
+if (!stopped.link) {
+    check(false, 'no link to invite a second friend with, so the capture is untested');
+    console.log(`\n${pass} passed, ${fail} failed\n`);
+    await b.close(); srv.close();
+    process.exit(1);
+}
+const second = await connectGuest();
+await second.waitForTimeout(3000);
+const watching = await second.evaluate(() => {
+    const v = document.getElementById('video');
+    return { w: v.videoWidth, playing: !v.paused && v.currentTime > 0 };
+});
+check(watching.w > 0 && watching.playing,
+    `a friend invited after stopping still gets a picture (${watching.w}px, playing ${watching.playing})`);
+
+check(errs.length === 0, `no page errors${errs.length ? ': ' + errs.join('; ') : ''}`);
+console.log(`\n${pass} passed, ${fail} failed\n`);
+await b.close(); srv.close();
+process.exit(fail ? 1 : 0);
