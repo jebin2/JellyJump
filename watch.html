@@ -16,6 +16,8 @@
         h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .25rem; }
         p { margin: .25rem 0 0; color: #a0a0a8; }
         .panel { border: 1px solid #26262b; border-radius: 10px; padding: 1.25rem; background: #131317; }
+        .waiting { margin: .9rem 0 0; font-size: .85rem; color: #c8b88a; line-height: 1.5; }
+        #waiting[hidden] { display: none; }
         .route { margin: .75rem 0 0; font-size: .8rem; color: #8b8b94; line-height: 1.5; }
         #route[hidden] { display: none; }
         #stage { margin-top: .75rem; position: relative; }
@@ -71,6 +73,10 @@
             <input id="code" readonly spellcheck="false">
             <button id="copy" type="button">Copy</button>
         </div>
+        <!-- Shown only if the connection gives up while this code is still
+             waiting to be pasted, which is not a failure of anything: nothing
+             can connect until the host has it. -->
+        <p id="waiting" class="waiting" hidden></p>
     </section>
 
     <section id="problem" class="panel" hidden>

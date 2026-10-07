@@ -11,6 +11,7 @@
  *   npm run build && node scripts/watch-panel-test.mjs
  */
 import { chromium } from 'playwright-core';
+import { packSignal, unpackSignal } from '../assets/js/core/streaming/SignalCodec.js';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -165,6 +166,46 @@ const stuck = await host.evaluate(async () => {
     check(!/\b\d{1,3}(\.\d{1,3}){3}\b/.test(why),
         'and that explanation is free of addresses too');
     await bystander.close();
+}
+
+// ── a connection that gives up before the host has pasted the code ──
+// Nothing can connect until the host pastes it, and they take as long as a
+// person takes, so ICE giving up first says nothing about whether this will
+// work. The page used to replace the code with "Can't watch this", taking
+// away the one thing the viewer still had to do. Every candidate here points
+// at an address nothing answers on, which is the real failure, not a stub.
+{
+    const invite = await host.evaluate(async () =>
+        await window.player.watchParty.invite({ baseUrl: location.origin + '/watch.html' }));
+    const offer = await unpackSignal(invite.code);
+    const dead = offer.sdp
+        .replace(/^(a=candidate:\S+ \d+ \S+ \d+ )(\S+)/gm, '$1198.51.100.1')
+        .replace(/^c=IN IP4 .*$/gm, 'c=IN IP4 198.51.100.1');
+    const deadCode = await packSignal({ type: 'offer', sdp: dead }, { invite: offer.invite });
+    const stranded = await ctx.newPage();
+    await stranded.goto(`${origin}/watch.html#${deadCode}`, { waitUntil: 'domcontentloaded' });
+    await stranded.waitForFunction(() => {
+        const t = document.getElementById('code');
+        return t && t.value.length > 0;
+    }, null, { timeout: 40000 });
+    // Wait for it to actually give up rather than assuming how long that takes.
+    await stranded.waitForFunction(() => !document.getElementById('waiting').hidden
+        || !document.getElementById('problem').hidden, null, { timeout: 60000 }).catch(() => {});
+    const stateNow = await stranded.evaluate(() => ({
+        onReply: !document.getElementById('reply').hidden,
+        codeThere: document.getElementById('code').value.length > 100,
+        problem: !document.getElementById('problem').hidden,
+        waiting: document.getElementById('waiting').hidden ? '' : document.getElementById('waiting').textContent,
+        route: document.getElementById('route').textContent,
+    }));
+    check(stateNow.onReply && stateNow.codeThere,
+        'a connection that gives up early leaves the code where the viewer can still send it');
+    check(!stateNow.problem, 'and does not announce a failure that has not happened');
+    check(/waiting for the host/i.test(stateNow.waiting),
+        `saying what is actually going on instead (${stateNow.waiting.slice(0, 60)}…)`);
+    check(/No route could be found/.test(stateNow.route) && !/none yet/.test(stateNow.route),
+        `with both ends still named after it gave up (${stateNow.route})`);
+    await stranded.close();
 }
 
 // ── stopping ends the party without closing the door ──

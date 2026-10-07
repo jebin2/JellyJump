@@ -134,5 +134,32 @@ const ADDRESSES = /\b\d{1,3}(\.\d{1,3}){3}\b/;
         'the short form names a failure');
 }
 
+// ── and it does not forget what an end offered once it has given up ──
+// A connection that fails drops its candidates from the stats. Reporting
+// "none yet" then would understate what happened at the exact moment somebody
+// is reading the line to find out what happened.
+{
+    const connection = {
+        connectionState: 'connecting',
+        getStats: async () => ({ forEach: fn => [
+            localCandidate('L', 'srflx', '203.0.113.7'),
+            remoteCandidate('R', 'srflx', '198.51.100.4'),
+            pair('P', 'L', 'R', 'in-progress'),
+        ].forEach(fn) }),
+    };
+    const during = await describeConnection(connection);
+    check(during.text.includes('You offered: public address')
+        && during.text.includes('They offered: public address'),
+        `while trying, both ends are reported (${during.text})`);
+    // The same connection, now failed and with nothing left in its stats.
+    connection.connectionState = 'failed';
+    connection.getStats = async () => ({ forEach: () => {} });
+    const after = await describeConnection(connection);
+    check(after.text.includes('You offered: public address')
+        && after.text.includes('They offered: public address'),
+        `and still reported after it gives up (${after.text})`);
+    check(!after.text.includes('none yet'), 'rather than claiming neither end offered anything');
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

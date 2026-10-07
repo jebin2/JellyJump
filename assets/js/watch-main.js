@@ -66,10 +66,17 @@ async function main() {
     // Either event is enough to know there is a picture; whichever lands first
     // reveals it. loadedmetadata alone has been observed not to fire for a
     // stream attached while the element was not being rendered.
+    // Whether a picture has ever arrived. Before it has, the host has probably
+    // just not pasted the code yet, and nothing that happens to the connection
+    // means what it would mean afterwards.
+    let hasWatched = false;
     const reveal = () => {
+        hasWatched = true;
         show('watching');
         if (canFullscreen) fullButton.hidden = false;
     };
+    const clearWaiting = () => { el('waiting').hidden = true; };
+    video.addEventListener('loadedmetadata', clearWaiting);
     video.addEventListener('loadedmetadata', reveal, { once: true });
     video.addEventListener('resize', reveal, { once: true });
 
@@ -142,9 +149,10 @@ async function main() {
     // or there is provably none, it stops.
     const routeTimer = setInterval(async () => {
         const report = await reportRoute();
-        if (report.route || report.state === 'failed' || report.state === 'closed') {
-            clearInterval(routeTimer);
-        }
+        // Kept running while the code is still waiting to be pasted: the
+        // connection can still come good once the host has it, and this line
+        // is the only thing saying so.
+        if (report.route && hasWatched) clearInterval(routeTimer);
     }, 2000);
     reportRoute();
 
@@ -152,16 +160,30 @@ async function main() {
         const state = viewer.connection.connectionState;
         Logger.log(`[Watch] Connection ${state}`);
         const report = await reportRoute();
+        Logger.log(`[Watch] ${report.text}`);
+        if (state !== 'failed' && state !== 'disconnected' && state !== 'closed') return;
+
+        // Nothing can connect until the host has pasted this code, and they
+        // take as long as a person takes. The connection giving up before then
+        // says nothing about whether this will work -- so the code stays put.
+        // Replacing it with an error took away the one thing the viewer still
+        // had to do, which is how a party that was about to work looked broken.
+        if (!hasWatched) {
+            el('waiting').textContent = 'Still waiting for the host to paste your code. '
+                + 'This is normal until they do. If they already have and nothing '
+                + 'happened, ask them for a fresh link.';
+            el('waiting').hidden = false;
+            return;
+        }
+
+        clearInterval(routeTimer);
         if (state === 'failed') {
-            clearInterval(routeTimer);
             show('problem', 'The connection could not be established. Some home '
                 + 'networks will not allow a direct one. Trying another network '
                 + 'on either side -- a phone on mobile data, say -- usually works.');
-        } else if (state === 'disconnected' || state === 'closed') {
-            clearInterval(routeTimer);
+        } else {
             show('problem', 'The host has stopped sharing.');
         }
-        Logger.log(`[Watch] ${report.text}`);
     });
 }
 

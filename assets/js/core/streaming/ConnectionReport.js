@@ -22,6 +22,25 @@ const PLAIN = {
 const plain = type => PLAIN[type] || type || 'unknown';
 
 /**
+ * What each connection has been seen to offer, ever.
+ *
+ * A connection that has given up drops its candidates from the stats, so a
+ * report taken afterwards says "none yet" about an end that plainly did offer
+ * something -- the worst moment to start understating what happened, since it
+ * is the moment somebody is reading the line to work out what went wrong.
+ * Weak, so remembering costs nothing once the connection is gone.
+ */
+const seen = new WeakMap();
+
+function remember(connection, local, remote) {
+    const kept = seen.get(connection) || { local: new Set(), remote: new Set() };
+    for (const type of local) kept.local.add(type);
+    for (const type of remote) kept.remote.add(type);
+    seen.set(connection, kept);
+    return { local: [...kept.local], remote: [...kept.remote] };
+}
+
+/**
  * @param {RTCPeerConnection|null} connection
  * @returns {Promise<{state: string, route: string|null, local: string[],
  *          remote: string[], tried: number, text: string}>}
@@ -60,8 +79,8 @@ export async function describeConnection(connection) {
     const typesOf = kind => [...new Set([...candidates.values()]
         .filter(c => c.type === kind)
         .map(c => c.candidateType))].filter(Boolean);
-    const local = typesOf('local-candidate');
-    const remote = typesOf('remote-candidate');
+    const { local, remote } = remember(
+        connection, typesOf('local-candidate'), typesOf('remote-candidate'));
     const live = pairs.find(p => p.id === selectedId)
         || pairs.find(p => p.state === 'succeeded' && p.nominated)
         || pairs.find(p => p.state === 'succeeded');
