@@ -95,6 +95,21 @@ const watching=await viewPage.evaluate(async()=>{
 });
 const hostSide=await hostPage.evaluate(()=>({ viewers: window.player.watchParty.viewerCount,
                                               invites: window.player.watchParty.invites }));
+// ── fullscreen, which a viewer gets because it is not playback control ──
+await viewPage.click('#full');
+await viewPage.waitForTimeout(700);
+const fsOn=await viewPage.evaluate(()=>{
+  const v=document.getElementById('video');
+  return { on: !!document.fullscreenElement, element: document.fullscreenElement?.id ?? null,
+           label: document.getElementById('full').getAttribute('aria-label'),
+           fills: v.getBoundingClientRect().height > innerHeight*0.8, playing: !v.paused };
+});
+await viewPage.dblclick('#video');
+await viewPage.waitForTimeout(700);
+const fsOff=await viewPage.evaluate(()=>({ on: !!document.fullscreenElement,
+  label: document.getElementById('full').getAttribute('aria-label'),
+  playing: !document.getElementById('video').paused }));
+
 check(watching.w > 0, `the viewer receives a picture (${watching.w}x${watching.h})`);
 check(watching.lit > 0, `which is not blank (${watching.lit} lit samples)`);
 check(watching.moved, 'and is moving');
@@ -102,6 +117,12 @@ check(watching.audioTracks === 1, 'with audio');
 check(watching.stageLive && watching.replyHidden, 'the page switches from asking to watching');
 check(hostSide.viewers === 1, `the host counts the viewer (${hostSide.viewers})`);
 check(hostSide.invites[0]?.state === 'connected', `the connection reports connected (${hostSide.invites[0]?.state})`);
+check(fsOn.on && fsOn.element === 'stage', `fullscreen fills the screen (${fsOn.element})`);
+check(fsOn.fills, 'and the picture fills it rather than sitting in a 16:9 box');
+check(fsOn.label === 'Exit fullscreen', `the button says what it will do now (${fsOn.label})`);
+check(!fsOff.on && fsOff.label === 'Fullscreen', 'double-clicking the picture comes back out');
+check(fsOn.playing && fsOff.playing, 'and the stream never stops for either');
+
 check(hostErr.length === 0 && viewErr.length === 0,
     `no page errors${hostErr.length || viewErr.length ? ': ' + [...hostErr, ...viewErr].join('; ') : ''}`);
 console.log(`\n${pass} passed, ${fail} failed\n`);

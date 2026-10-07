@@ -16,7 +16,21 @@
         h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .25rem; }
         p { margin: .25rem 0 0; color: #a0a0a8; }
         .panel { border: 1px solid #26262b; border-radius: 10px; padding: 1.25rem; background: #131317; }
-        #stage { margin-top: .75rem; }
+        #stage { margin-top: .75rem; position: relative; }
+        #full { position: absolute; right: .6rem; bottom: .6rem;
+                display: grid; place-items: center; width: 2.4rem; height: 2.4rem;
+                padding: 0; border-radius: 8px; border: 1px solid #ffffff26;
+                background: #00000073; color: #fff; cursor: pointer;
+                opacity: 0; transition: opacity .15s; }
+        /* Shown on hover, and always on touch, where there is no hover to rely on. */
+        #stage:hover #full, #full:focus-visible { opacity: 1; }
+        @media (hover: none) { #stage.live #full { opacity: 1; } }
+        #full:hover { background: #000000a6; }
+        /* In fullscreen the stage is the whole screen, so the video should fill
+           it rather than keep a 16:9 box in the middle of black. */
+        #stage:fullscreen { margin: 0; display: grid; place-items: center; background: #000; }
+        #stage:fullscreen video { height: 100%; width: 100%; aspect-ratio: auto;
+                                  object-fit: contain; border-radius: 0; }
         video { width: 100%; background: #000; border-radius: 10px; display: block; }
         /* Collapsed rather than hidden until a frame has arrived. */
         #stage:not(.live) video { height: 1px; opacity: 0; }
@@ -63,6 +77,17 @@
          show instead. -->
     <section id="stage">
         <video id="video" playsinline></video>
+        <!-- Fullscreen is not playback control: it changes nothing about what
+             the host is sending or where it is, so a viewer gets it. Pause and
+             seek are what they do not get, and this adds neither. -->
+        <button id="full" type="button" hidden
+                aria-label="Fullscreen" title="Fullscreen (or double-click)">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <path id="full-icon" fill="none" stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round"
+                      d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3m13 5h3a2 2 0 0 0 2-2v-3"/>
+            </svg>
+        </button>
     </section>
 </main>
 <script type="module" src="./assets/js/watch-main.js"></script>

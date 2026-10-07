@@ -69,6 +69,48 @@ async function main() {
     video.addEventListener('loadedmetadata', reveal, { once: true });
     video.addEventListener('resize', reveal, { once: true });
 
+    // ── Fullscreen ──────────────────────────────────────────────────────────
+    // The stage is what goes fullscreen rather than the video, so the button
+    // stays reachable inside it. iOS Safari does not support requestFullscreen
+    // on an arbitrary element and only offers it on the video itself, so that
+    // is the fallback; if neither exists the button is never shown rather than
+    // offered and broken.
+    const stage = el('stage');
+    const fullButton = el('full');
+    const canFullscreen = !!(stage.requestFullscreen || stage.webkitRequestFullscreen
+        || video.webkitEnterFullscreen);
+
+    const toggleFullscreen = async () => {
+        const current = document.fullscreenElement || document.webkitFullscreenElement;
+        try {
+            if (current) {
+                await (document.exitFullscreen?.() ?? document.webkitExitFullscreen?.());
+            } else if (stage.requestFullscreen) {
+                await stage.requestFullscreen();
+            } else if (stage.webkitRequestFullscreen) {
+                await stage.webkitRequestFullscreen();
+            } else if (video.webkitEnterFullscreen) {
+                video.webkitEnterFullscreen();
+            }
+        } catch (error) {
+            // A refusal is not worth interrupting the film for.
+            Logger.warn('[Watch] Fullscreen refused:', error);
+        }
+    };
+
+    if (canFullscreen) {
+        fullButton.hidden = false;
+        fullButton.addEventListener('click', toggleFullscreen);
+        video.addEventListener('dblclick', toggleFullscreen);
+        const syncLabel = () => {
+            const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+            fullButton.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');
+            fullButton.title = on ? 'Exit fullscreen (or double-click)' : 'Fullscreen (or double-click)';
+        };
+        document.addEventListener('fullscreenchange', syncLabel);
+        document.addEventListener('webkitfullscreenchange', syncLabel);
+    }
+
     viewer.connection.addEventListener('connectionstatechange', () => {
         const state = viewer.connection.connectionState;
         Logger.log(`[Watch] Connection ${state}`);
