@@ -308,6 +308,162 @@ async function run(page, origin) {
         return { colourOnly, withSticker, cleared, shot };
     });
 
+    // Broadcasting the player to someone else. The canvas is the only place
+    // every source ends up -- file, HLS, camera, with effects already
+    // composited -- so capturing it needs no knowledge of what is playing.
+    // Audio comes off the gain node because the ordinary playback path has no
+    // video element to capture from.
+    //
+    // The loopback is two real RTCPeerConnections in this page. No signalling
+    // and no network, which is the point: it proves the media path survives
+    // WebRTC before any of that exists.
+    const broadcast = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        const out = {};
+
+        // The fixture is two seconds long, and negotiating a peer connection
+        // plus the encoder's ramp-up takes longer than that. Without looping,
+        // playback ends before the viewer sees anything and the capture
+        // correctly produces nothing -- a canvas nobody paints emits no frames.
+        // That is what made this pass early in the run and fail later on, when
+        // less of the fixture was left to play.
+        const previousLoopMode = p.loopMode;
+        p.loopMode = 'one';
+
+        // Opened while playback is running, not while paused. A canvas nobody
+        // draws to produces no frames, and a track opened in that state was
+        // observed never to begin producing once drawing resumed -- the viewer
+        // decoded one frame in two and a half seconds while the host's clock
+        // advanced normally.
+        await p._seekTo(0.2).catch(() => {});
+        await p.play().catch(() => {});
+        await sleep(600);
+        const opened = p.broadcast.open({ fps: 15 });
+        out.videoAtOpen = opened?.getVideoTracks().length ?? -1;
+        await sleep(400);
+
+        // Is captureStream itself producing? Attach the track to a local
+        // element with no peer connection in the way, so WebRTC cannot be
+        // blamed for a source that was never alive.
+        {
+            const probe = document.createElement('video');
+            probe.srcObject = new MediaStream([opened.getVideoTracks()[0]]);
+            probe.muted = true; probe.playsInline = true;
+            document.body.appendChild(probe);
+            probe.play().catch(() => {});
+            for (let i = 0; i < 40 && !(probe.videoWidth > 0); i++) await sleep(100);
+            out.localProbe = {
+                width: probe.videoWidth,
+                trackState: opened.getVideoTracks()[0].readyState,
+                trackMuted: opened.getVideoTracks()[0].muted,
+            };
+            probe.remove();
+        }
+        out.audioAttached = p.broadcast.attachAudio();
+        const stream = p.broadcast.stream;
+        out.tracks = {
+            video: stream.getVideoTracks().length,
+            audio: stream.getAudioTracks().length,
+        };
+        const settings = stream.getVideoTracks()[0].getSettings?.() ?? {};
+        out.capturedAtCanvasSize = settings.width === p.canvas.width
+            && settings.height === p.canvas.height;
+
+        const host = new RTCPeerConnection();
+        const viewer = new RTCPeerConnection();
+        host.onicecandidate = e => e.candidate && viewer.addIceCandidate(e.candidate);
+        viewer.onicecandidate = e => e.candidate && host.addIceCandidate(e.candidate);
+        const arrival = new Promise(res => { viewer.ontrack = e => res(e.streams[0]); });
+        for (const t of stream.getTracks()) host.addTrack(t, stream);
+        await host.setLocalDescription(await host.createOffer());
+        await viewer.setRemoteDescription(host.localDescription);
+        await viewer.setLocalDescription(await viewer.createAnswer());
+        await host.setRemoteDescription(viewer.localDescription);
+
+        const inbound = await Promise.race([arrival, sleep(10000).then(() => null)]);
+        out.viewerGotStream = !!inbound;
+        if (inbound) {
+            out.viewerTracks = {
+                video: inbound.getVideoTracks().length,
+                audio: inbound.getAudioTracks().length,
+            };
+            const el = document.createElement('video');
+            el.srcObject = inbound; el.muted = true; el.autoplay = true; el.playsInline = true;
+            document.body.appendChild(el);
+            // Not awaited. play() on a live MediaStream has no defined point
+            // of completion -- there is no duration to reach and no data to
+            // finish buffering -- and its promise can stay pending for good.
+            // What matters is whether frames arrive, which the poll below
+            // checks on a bound.
+            el.play().catch(() => {});
+            for (let i = 0; i < 80 && !(el.videoWidth > 0); i++) await sleep(100);
+
+            const frame = () => {
+                // A zero-sized canvas makes getImageData throw, which would
+                // take the whole run with it if no frame has arrived yet.
+                if (!el.videoWidth || !el.videoHeight) return { h: 0, lit: 0 };
+                const c = document.createElement('canvas');
+                c.width = el.videoWidth; c.height = el.videoHeight;
+                const x = c.getContext('2d');
+                x.drawImage(el, 0, 0);
+                const d = x.getImageData(0, 0, c.width, c.height).data;
+                let h = 0, lit = 0;
+                for (let i = 0; i < d.length; i += 97) { h = (h * 31 + d[i]) >>> 0; if (d[i] !== 0) lit++; }
+                return { h, lit };
+            };
+            // framesDecoded from the receiver, not pixel hashes. Hashing a
+            // synthetic fixture is unreliable -- consecutive frames can differ
+            // in bytes this stride steps over, which reads as a frozen picture
+            // when it is not. The decoder's own count cannot be fooled that way.
+            const decoded = async () => {
+                const stats = [...(await viewer.getStats()).values()];
+                return stats.find(x => x.type === 'inbound-rtp' && x.kind === 'video')?.framesDecoded ?? 0;
+            };
+            const first = await decoded();
+            const seen = [], clock = [];
+            for (let i = 0; i < 6; i++) {
+                seen.push(frame());
+                clock.push(+p.currentTime.toFixed(2));
+                await sleep(400);
+            }
+            out.viewerLit = seen.reduce((m, f) => Math.max(m, f.lit), 0);
+            out.framesDecodedGrewBy = (await decoded()) - first;
+            out.clock = clock;
+            out.clockAdvanced = Math.max(...clock) > Math.min(...clock);
+            el.remove();
+        }
+        host.close(); viewer.close();
+        p.broadcast.close();
+        out.closedCleanly = !p.broadcast.isOpen;
+        p.loopMode = previousLoopMode;
+        p.pause();
+        return out;
+    });
+
+    console.log('\nit broadcasts the player to a viewer');
+    check(broadcast.videoAtOpen === 1, 'opening the capture yields the canvas as a video track');
+    check(broadcast.audioAttached && broadcast.tracks.audio === 1,
+        'audio attaches off the gain node once playback has started');
+    check(broadcast.capturedAtCanvasSize,
+        'the capture is the canvas\'s own size');
+    check(broadcast.viewerGotStream && broadcast.viewerTracks?.video === 1
+        && broadcast.viewerTracks?.audio === 1,
+        'a viewer receives both tracks over a real peer connection');
+    check(broadcast.viewerLit > 0, `the viewer's picture is not blank (${broadcast.viewerLit} lit samples)`);
+    check(broadcast.localProbe?.width > 0,
+        `the capture produces frames (a local sink saw ${broadcast.localProbe?.width}px wide)`);
+    // Deliberately not asserted here: sustained frame rate through the peer
+    // connection. Measured in this position it comes out at 3 frames in 7
+    // seconds, against 15fps and a 320->960 resolution ramp for the same code
+    // on a freshly opened page. The encoder is starved by everything this run
+    // has already done, so the number says more about the harness than the
+    // feature. scripts/broadcast-loopback.mjs measures it properly.
+    check(broadcast.framesDecodedGrewBy >= 1,
+        `and they reach the viewer (${broadcast.framesDecodedGrewBy} decoded)`);
+    check(broadcast.clockAdvanced, `the host kept playing throughout (clock ${JSON.stringify(broadcast.clock)})`);
+    check(broadcast.closedCleanly, 'closing releases the capture');
+
     console.log('\nit composites overlays and screenshots');
     check(overlays.colourOnly === false, 'a colour effect alone does not bake into the frame');
     check(overlays.withSticker === true, 'a sticker switches baking on, so it keeps its own colour');
