@@ -65,7 +65,10 @@ async function main() {
     // Either event is enough to know there is a picture; whichever lands first
     // reveals it. loadedmetadata alone has been observed not to fire for a
     // stream attached while the element was not being rendered.
-    const reveal = () => show('watching');
+    const reveal = () => {
+        show('watching');
+        if (canFullscreen) fullButton.hidden = false;
+    };
     video.addEventListener('loadedmetadata', reveal, { once: true });
     video.addEventListener('resize', reveal, { once: true });
 
@@ -99,7 +102,10 @@ async function main() {
     };
 
     if (canFullscreen) {
-        fullButton.hidden = false;
+        // Wired now, shown later. Unhiding it here put a control on the page
+        // while the viewer was still being asked to send their code back --
+        // nothing to make fullscreen yet, and a button taking up space below
+        // the collapsed picture. It appears in reveal(), with the picture.
         fullButton.addEventListener('click', toggleFullscreen);
         video.addEventListener('dblclick', toggleFullscreen);
         const syncLabel = () => {

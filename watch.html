@@ -23,9 +23,15 @@
                 background: #00000073; color: #fff; cursor: pointer;
                 opacity: 0; transition: opacity .15s; }
         /* Shown on hover, and always on touch, where there is no hover to rely on. */
-        #stage:hover #full, #full:focus-visible { opacity: 1; }
+        /* Only once there is a picture: `.live` guards both, so even if the
+           button were left in the document it could not surface early. */
+        #stage.live:hover #full, #stage.live #full:focus-visible { opacity: 1; }
         @media (hover: none) { #stage.live #full { opacity: 1; } }
         #full:hover { background: #000000a6; }
+        /* `display: grid` above is an id selector and beats the browser's own
+           [hidden] { display: none }, so the attribute alone left the button in
+           the layout and in the tab order with nothing to do. */
+        #full[hidden] { display: none; }
         /* In fullscreen the stage is the whole screen, so the video should fill
            it rather than keep a 16:9 box in the middle of black. */
         #stage:fullscreen { margin: 0; display: grid; place-items: center; background: #000; }

@@ -95,6 +95,40 @@ const watching=await viewPage.evaluate(async()=>{
 });
 const hostSide=await hostPage.evaluate(()=>({ viewers: window.player.watchParty.viewerCount,
                                               invites: window.player.watchParty.invites }));
+// The control must not exist before there is a picture. It appeared on the
+// "send your code back" step, where there is nothing to make fullscreen, and
+// the id selector styling it beat the browser's own [hidden] rule -- so the
+// attribute left it in the layout and in the tab order regardless.
+const beforePicture = await (async () => {
+  const inv = await hostPage.evaluate(async base => {
+    const r = await window.player.watchParty.invite({ baseUrl: base });
+    return { id: r.id, link: r.link };
+  }, `${origin}/watch.html`);
+  const g = await b.newPage();
+  await g.goto(inv.link);
+  await g.waitForFunction(() => {
+    const c = document.getElementById('code'); return c && c.value.length > 0;
+  }, null, { timeout: 40000 });
+  const state = await g.evaluate(() => {
+    const f = document.getElementById('full');
+    const box = f.getBoundingClientRect();
+    f.focus();
+    return {
+      onCodeStep: !document.getElementById('reply').hidden,
+      display: getComputedStyle(f).display,
+      takesSpace: box.width > 0 || box.height > 0,
+      focusable: document.activeElement === f,
+    };
+  });
+  await g.close();
+  return state;
+})();
+
+check(beforePicture.onCodeStep && beforePicture.display === 'none',
+  `no fullscreen control while the code is being sent (display ${beforePicture.display})`);
+check(!beforePicture.takesSpace, 'and it takes up no space');
+check(!beforePicture.focusable, 'and a keyboard cannot reach it');
+
 // ── fullscreen, which a viewer gets because it is not playback control ──
 await viewPage.click('#full');
 await viewPage.waitForTimeout(700);
