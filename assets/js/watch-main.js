@@ -1,5 +1,6 @@
 import { WatchViewer } from './core/streaming/WatchParty.js';
 import { describeConnection } from './core/streaming/ConnectionReport.js';
+import { viewerView, WAITING_NOTE } from './core/streaming/ViewerView.js';
 import { Logger } from './shared/utils/Logger.js';
 
 /**
@@ -70,6 +71,9 @@ async function main() {
     // just not pasted the code yet, and nothing that happens to the connection
     // means what it would mean afterwards.
     let hasWatched = false;
+    // Set once the party is genuinely over, so a connection that flickers back
+    // to life after the host has gone does not resume a film nobody is sending.
+    let over = false;
     const reveal = () => {
         hasWatched = true;
         show('watching');
@@ -125,14 +129,6 @@ async function main() {
         document.addEventListener('webkitfullscreenchange', syncLabel);
     }
 
-    // The host telling us directly, which arrives at once. The ICE-based
-    // detection below still stands for a host that vanishes without saying so
-    // -- a closed laptop, a lost network -- but that takes seconds.
-    viewer.onHostStopped = () => {
-        Logger.log('[Watch] The host said goodbye');
-        show('problem', 'The host has stopped sharing.');
-    };
-
     // ── Why it is or is not working ─────────────────────────────────────────
     // A party that will not connect looks identical to a bug from here, and
     // the viewer is the only person who can see this page. So it says which
@@ -156,34 +152,41 @@ async function main() {
     }, 2000);
     reportRoute();
 
+    // The host telling us directly, which arrives at once. The state-based
+    // detection below still stands for a host that vanishes without saying so
+    // -- a closed laptop, a lost network -- but that takes seconds.
+    viewer.onHostStopped = () => {
+        Logger.log('[Watch] The host said goodbye');
+        over = true;
+        clearInterval(routeTimer);
+        el('interrupted').hidden = true;
+        show('problem', 'The host has stopped sharing.');
+    };
+
+    // What each state means for this page is decided in ViewerView, where the
+    // cases can be read and tested; this only carries the decision out.
+    const applyView = (view) => {
+        over = view.over;
+        el('interrupted').hidden = !view.interrupted;
+        if (view.waiting) {
+            el('waiting').textContent = WAITING_NOTE;
+            el('waiting').hidden = false;
+        }
+        if (view.panel === 'watching') {
+            el('waiting').hidden = true;
+            show('watching');
+        } else if (view.panel) {
+            clearInterval(routeTimer);
+            show(view.panel, view.detail);
+        }
+    };
+
     viewer.connection.addEventListener('connectionstatechange', async () => {
         const state = viewer.connection.connectionState;
         Logger.log(`[Watch] Connection ${state}`);
         const report = await reportRoute();
         Logger.log(`[Watch] ${report.text}`);
-        if (state !== 'failed' && state !== 'disconnected' && state !== 'closed') return;
-
-        // Nothing can connect until the host has pasted this code, and they
-        // take as long as a person takes. The connection giving up before then
-        // says nothing about whether this will work -- so the code stays put.
-        // Replacing it with an error took away the one thing the viewer still
-        // had to do, which is how a party that was about to work looked broken.
-        if (!hasWatched) {
-            el('waiting').textContent = 'Still waiting for the host to paste your code. '
-                + 'This is normal until they do. If they already have and nothing '
-                + 'happened, ask them for a fresh link.';
-            el('waiting').hidden = false;
-            return;
-        }
-
-        clearInterval(routeTimer);
-        if (state === 'failed') {
-            show('problem', 'The connection could not be established. Some home '
-                + 'networks will not allow a direct one. Trying another network '
-                + 'on either side -- a phone on mobile data, say -- usually works.');
-        } else {
-            show('problem', 'The host has stopped sharing.');
-        }
+        applyView(viewerView({ state, hasWatched, over }));
     });
 }
 

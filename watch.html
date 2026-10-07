@@ -16,6 +16,13 @@
         h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .25rem; }
         p { margin: .25rem 0 0; color: #a0a0a8; }
         .panel { border: 1px solid #26262b; border-radius: 10px; padding: 1.25rem; background: #131317; }
+        .interrupted {
+            position: absolute; top: .6rem; left: .6rem; margin: 0;
+            padding: .3rem .6rem; border-radius: 6px;
+            background: rgba(0, 0, 0, .72); color: #e8e8ea;
+            font-size: .8rem; pointer-events: none;
+        }
+        #interrupted[hidden], #stage:not(.live) .interrupted { display: none; }
         .waiting { margin: .9rem 0 0; font-size: .85rem; color: #c8b88a; line-height: 1.5; }
         #waiting[hidden] { display: none; }
         .route { margin: .75rem 0 0; font-size: .8rem; color: #8b8b94; line-height: 1.5; }
@@ -98,6 +105,10 @@
          show instead. -->
     <section id="stage">
         <video id="video" playsinline></video>
+        <!-- A connection can drop briefly and come back on its own. The last
+             frame stays put and this says what is happening, rather than the
+             page declaring the party over and collapsing the picture. -->
+        <p id="interrupted" class="interrupted" hidden>Reconnecting…</p>
         <!-- Fullscreen is not playback control: it changes nothing about what
              the host is sending or where it is, so a viewer gets it. Pause and
              seek are what they do not get, and this adds neither. -->
