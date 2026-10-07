@@ -69,14 +69,16 @@ const reply=await viewPage.evaluate(()=>({
 }));
 check(reply.code.length > 100, `the viewer answers it (${reply.code.length} chars)`);
 check(reply.replyShown, 'and is told to send that answer back');
-// Both ends are configured the same way. The viewer's own answer is not
-// checked for an srflx candidate because it will not have one: measured in
-// Chromium, an offerer gathers host and srflx while an answerer to the very
-// same offer gathers only host, whatever the direction or candidate pool.
-// That is the browser's doing, not this code's, and it is survivable -- the
-// viewer's connectivity checks reach the host's srflx address, and the host
-// learns the viewer's from the checks arriving (a peer-reflexive candidate).
-// What matters is that the invitation carries somewhere to aim at.
+// Both ends are configured the same way, and the answer is not checked for an
+// srflx candidate because it has none *here*: in this environment an offerer
+// gathers host and srflx while an answerer to the same offer gathers only
+// host, whatever the direction or candidate pool.
+//
+// That is this network, not the browser and not this code. On real machines
+// it does gather one -- a host on home wifi and a viewer on a mobile hotspot
+// connected directly, and both ends reported a public address to a public
+// address. So this asserts what is true everywhere (both ends configured, the
+// answer carries candidates) rather than what only holds on a test machine.
 const replyCandidates = ((await unpackSignal(reply.code)).sdp.match(/^a=candidate:.*$/gm) || [])
   .map(l => (l.match(/typ (\w+)/) || [])[1]);
 check(replyCandidates.length > 0,
