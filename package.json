@@ -27,6 +27,7 @@
     "test:party": "node scripts/connection-report-test.mjs && node scripts/viewer-view-test.mjs && node scripts/watch-party-test.mjs && node scripts/watch-panel-test.mjs",
     "test:playlist": "node scripts/playlist-kind-test.mjs",
     "test:camera": "node scripts/camera-effects-test.mjs && node scripts/sticker-test.mjs && node scripts/decoration-test.mjs && node scripts/recording-clock-test.mjs",
+    "test:css": "node scripts/css-token-test.mjs",
     "test:smoke": "node scripts/smoke-test.mjs"
   },
   "devDependencies": {

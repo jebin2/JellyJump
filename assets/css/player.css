@@ -70,7 +70,7 @@
 .playlist-item:focus-visible,
 .playlist-folder-header:focus-visible,
 button:focus-visible {
-    outline: 2px solid var(--primary-color);
+    outline: 2px solid var(--accent-primary);
     outline-offset: -2px;
 }
 
@@ -1003,7 +1003,7 @@ button:focus-visible {
 }
 
 .jellyjump-btn-text:hover {
-    color: var(--error-color, #ff4444);
+    color: var(--error-color);
 }
 
 /* -----------------------------------------
@@ -1725,7 +1725,7 @@ body.fullscreen-active {
     align-items: center;
     padding: 12px;
     background: var(--bg-primary);
-    border: 2px solid var(--border-color, #444);
+    border: 2px solid var(--border-color);
     border-radius: 6px;
     transition: all 0.2s;
 }
@@ -1833,7 +1833,7 @@ body.fullscreen-active {
     background: var(--bg-primary);
     border-radius: 4px;
     overflow: hidden;
-    border: 1px solid var(--border-color, #444);
+    border: 1px solid var(--border-color);
 }
 
 .progress-bar-fill {
@@ -1847,7 +1847,7 @@ body.fullscreen-active {
 /* Modal Footer */
 .modal-footer {
     padding: 20px;
-    border-top: 2px solid var(--border-color, #444);
+    border-top: 2px solid var(--border-color);
     background: var(--bg-tertiary);
     display: flex;
     justify-content: flex-end;
@@ -1939,7 +1939,7 @@ body.fullscreen-active {
 .track-section-title {
     font-size: 1.1em;
     color: var(--text-primary);
-    border-bottom: 1px solid var(--border-color, #444);
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 8px;
 }
 
@@ -2012,12 +2012,12 @@ body.fullscreen-active {
 }
 
 .time-input-group input:focus {
-    border-color: var(--color-primary);
+    border-color: var(--accent-primary);
     outline: none;
 }
 
 .time-input-group input.invalid {
-    border-color: var(--color-danger);
+    border-color: var(--error-color);
     animation: shake 0.3s;
 }
 
@@ -2050,7 +2050,7 @@ body.fullscreen-active {
 .tool-card-remove {
     background: none;
     border: none;
-    color: var(--color-danger);
+    color: var(--error-color);
     font-size: 1.2em;
     cursor: pointer;
     padding: 0 4px;
@@ -2138,7 +2138,7 @@ body.fullscreen-active {
 }
 
 .timeline-range {
-    background: var(--color-primary);
+    background: var(--accent-primary);
     opacity: 0.3;
     pointer-events: none;
 }
@@ -2148,7 +2148,7 @@ body.fullscreen-active {
     height: 100%;
     /* Full height of slider */
     top: 0;
-    background: var(--color-accent);
+    background: var(--accent-primary);
     border: 2px solid var(--text-primary);
     border-radius: 4px;
     /* Rectangular with rounded corners */
@@ -2163,12 +2163,12 @@ body.fullscreen-active {
 .timeline-handle:hover,
 .timeline-handle:focus {
     transform: translateX(-50%) scale(1.1);
-    background: var(--color-primary);
+    background: var(--accent-primary);
     outline: none;
 }
 
 .timeline-handle:focus {
-    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.5);
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.5);
 }
 
 /* Preview Controls */
@@ -2691,7 +2691,7 @@ body.fullscreen-active {
 
 .folder-sync-btn:hover {
     color: var(--accent-primary, #00aff0);
-    background: rgba(var(--accent-primary-rgb, 0, 175, 240), 0.1);
+    background: rgba(var(--accent-primary-rgb), 0.1);
 }
 
 /* -----------------------------------------
@@ -2719,7 +2719,7 @@ body.fullscreen-active {
 
 .playlist-item--broken .playlist-title {
     text-decoration: line-through;
-    color: var(--error-color, #ff4444);
+    color: var(--error-color);
 }
 
 .playlist-item--broken .playlist-thumbnail {
@@ -2746,7 +2746,7 @@ body.fullscreen-active {
 }
 
 .folder-validate-btn:hover {
-    color: var(--warning-color, #ffaa00);
+    color: var(--warning-color);
     background: rgba(255, 170, 0, 0.1);
 }
 
@@ -2793,7 +2793,7 @@ body.fullscreen-active {
 }
 
 .validation-counts .count-broken {
-    color: var(--error-color, #ff4444);
+    color: var(--error-color);
 }
 
 .validation-counts .count-working {
@@ -3286,7 +3286,7 @@ body.fullscreen-active {
    For now, we will rely on :has() or just the input feedback. */
 
 .radio-option:has(input[type='radio']:checked) {
-    background: rgba(var(--accent-primary-rgb, 100, 255, 218), 0.1);
+    background: rgba(var(--accent-primary-rgb), 0.1);
     border-color: var(--accent-primary);
 }
 

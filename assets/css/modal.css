@@ -163,9 +163,9 @@
 }
 
 .modal-btn--danger {
-    background-color: var(--error-color, #ff4444);
+    background-color: var(--error-color);
     color: #fff;
-    border-color: var(--error-color, #ff4444);
+    border-color: var(--error-color);
 }
 
 .modal-btn--secondary {
@@ -366,18 +366,18 @@
 
 /* Success/Error Messages */
 .success-message {
-    color: var(--success-color, #00cc66);
+    color: var(--success-color);
     font-weight: bold;
 }
 
 .error-message {
-    color: var(--error-color, #ff4444);
+    color: var(--error-color);
 }
 
 /* Helpers */
 .mb-modal-error {
     margin-top: 10px;
-    color: var(--error-color, #ff4444);
+    color: var(--error-color);
     font-size: 0.9em;
     background: rgba(255, 0, 0, 0.1);
     padding: 8px;
@@ -454,7 +454,7 @@
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     margin: 0 0 var(--space-md, 16px) var(--space-md, 16px);
 }
 
@@ -476,7 +476,7 @@
 }
 
 .mb-modal-split .modal-controls-panel::-webkit-scrollbar-thumb {
-    background: var(--border-light, #333);
+    background: var(--border-light);
     border-radius: 2px;
 }
 
@@ -520,7 +520,7 @@
     width: 100%;
     min-height: 0;
     background: #000;
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     overflow: hidden;
 }
 
@@ -573,7 +573,7 @@
 
 .info-section {
     background: var(--bg-tertiary);
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     padding: var(--space-sm, 8px) var(--space-md, 16px);
 }
 
@@ -612,7 +612,7 @@
     align-items: center;
     padding: var(--space-xs, 4px) var(--space-sm, 8px);
     margin: 0 calc(-1 * var(--space-sm, 8px));
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     transition: background-color 0.15s ease;
 }
 

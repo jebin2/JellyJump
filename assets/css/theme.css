@@ -68,6 +68,8 @@
   /* Slightly lighter */
   --bg-tertiary: #2a2a2a;
   /* Highest elevation */
+  --bg-hover: #2a2a2a;
+  /* The lift a surface gets under the pointer */
 
   /* Accents */
   --accent-primary: #00ff88;
@@ -80,6 +82,13 @@
   /* Orange */
   --accent-danger: #ff3366;
   /* Red/Pink */
+  --accent-primary-rgb: 0, 255, 136;
+  /* The same green, as components, for rgba() tints */
+
+  /* Status */
+  --error-color: #ff4444;
+  --success-color: #00cc66;
+  --warning-color: #ffaa00;
 
   /* Text */
   --text-primary: #ffffff;
@@ -91,6 +100,10 @@
   --border-primary: #00ff88;
   --border-secondary: #ffffff;
   --border-dark: #333333;
+  --border-light: #333333;
+  /* Divider on a dark surface: panel edges, menu rules, modal seams */
+  --border-color: #444444;
+  /* A step brighter, for a control that has to be found */
 
   /* --- Typography System --- */
   /* Families */
@@ -143,6 +156,8 @@
 
   --radius-none: 0;
   /* Neobrutalism = No rounded corners */
+  --radius-sm: 4px;
+  /* Except on controls, where the app softened its corners in practice */
 
   /* --- Shadow System --- */
   /* Solid shadows, no blur */
