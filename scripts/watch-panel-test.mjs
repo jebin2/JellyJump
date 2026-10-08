@@ -134,6 +134,22 @@ check(!guestRoute.hidden && /Connected (direct|relayed)/.test(guestRoute.text),
 check(!/\b\d{1,3}(\.\d{1,3}){3}\b/.test(guestRoute.text) && !/[0-9a-f]{1,4}:[0-9a-f]{1,4}:/i.test(guestRoute.text),
     'without putting anybody\'s address in a line meant for a chat');
 
+// ── and the encoder was told where to start ──
+// Without it the first eight seconds of every party are 320x180 and it takes
+// eighteen to reach 640x360, on links that could carry it from the start
+// (measured on a shaped link; scripts/broadcast-tuning.mjs). It only works
+// applied to the reply, so this reads the description the host actually
+// accepted rather than the one the viewer sent.
+const told = await host.evaluate(() => {
+    const peer = [...window.player.watchParty._peers.values()].find(p => p.accepted);
+    return peer?.connection?.remoteDescription?.sdp || '';
+});
+check(/x-google-start-bitrate=\d+/.test(told),
+    `the accepted reply tells the encoder where to start (${/x-google-start-bitrate=(\d+)/.exec(told)?.[1] || 'nothing'} kbps)`);
+check((told.match(/x-google-start-bitrate/g) || []).length
+    === (told.match(/^a=fmtp:/gm) || []).length,
+    'on every codec the reply offers, since which one is chosen is not ours to pick');
+
 // ── and how much is actually reaching them ──
 // "It looks blurry" has two causes that look identical: an encoder that has
 // not finished climbing, and a network that is the ceiling. Only the numbers

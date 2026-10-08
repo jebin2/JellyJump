@@ -57,6 +57,44 @@ export function rtcConfiguration() {
 }
 
 /**
+ * How fast the encoder may assume the link is, in kbps, before it has measured
+ * it.
+ *
+ * Left alone, WebRTC starts near 300kbps and feels its way up, which costs
+ * about twenty seconds at the start of every party. Measured on a real 2Mbit
+ * link: 320x180 for the first eight seconds, 480x270 until eighteen, and only
+ * then the 960x540 it then stayed at. The link could carry that the whole time.
+ *
+ * 600 rather than something bolder because this number has to be safe on the
+ * links it cannot see. At 1200, a 700kbit link froze for a second or two while
+ * the estimator took the overshoot back; at 600 the same link merely started at
+ * 640x360 and eased down to its 480x270 without dropping a frame, while the
+ * 2Mbit link still reached 640x360 in three seconds instead of eighteen.
+ *
+ * Deliberately not degradationPreference: 'maintain-resolution', which measured
+ * better still -- a full 1280x720 at 30fps on the 2Mbit link -- and turned the
+ * 700kbit one into 1280x720 at five frames a second. A mobile link is exactly
+ * the one that changes while somebody is watching.
+ */
+const START_BITRATE_KBPS = 600;
+
+/**
+ * Tell the encoder where to start, through the answer.
+ *
+ * It has to be the answer: an encoder is constrained by the description it
+ * receives, so the same line in the offer does nothing whatsoever. This edits
+ * the host's own copy of what the viewer sent, on its way in -- nothing goes
+ * back over the wire, and a viewer running older code is unaffected.
+ */
+export function withStartBitrate(sdp, kbps = START_BITRATE_KBPS) {
+    if (!sdp) return sdp;
+    return sdp.replace(/^a=fmtp:(\d+) (.*)$/gm, (line, pt, params) =>
+        /x-google-start-bitrate/.test(params)
+            ? line
+            : `a=fmtp:${pt} ${params};x-google-start-bitrate=${kbps}`);
+}
+
+/**
  * Hosting a watch party: one broadcast, several viewers, no server.
  *
  * Each viewer needs its own peer connection, and each connection needs two
@@ -261,7 +299,9 @@ export class WatchParty {
                 + 'send them the new one below.');
         }
 
-        await peer.connection.setRemoteDescription(answer);
+        await peer.connection.setRemoteDescription({
+            type: 'answer', sdp: withStartBitrate(answer.sdp),
+        });
         peer.accepted = true;
         peer.timer = setTimeout(() => {
             if (peer.connection.connectionState === 'connected') return;

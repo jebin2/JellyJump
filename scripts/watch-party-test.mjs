@@ -12,7 +12,7 @@
  */
 import { chromium } from 'playwright-core';
 import { unpackSignal } from '../assets/js/core/streaming/SignalCodec.js';
-import { rtcConfiguration } from '../assets/js/core/streaming/WatchParty.js';
+import { rtcConfiguration, withStartBitrate } from '../assets/js/core/streaming/WatchParty.js';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -24,6 +24,31 @@ const srv=createServer(async(req,res)=>{const u=decodeURIComponent(req.url.split
   try{const i=await stat(f);res.writeHead(200,{'Content-Type':MIME[extname(f)]||'application/octet-stream','Content-Length':i.size,'Accept-Ranges':'bytes'});res.end(await readFile(f));}catch{res.writeHead(404);res.end();}});
 let pass=0, fail=0;
 const check=(ok,label)=>{ if(ok){pass++;console.log(`  PASS  ${label}`);} else {fail++;console.log(`  FAIL  ${label}`);} };
+
+// ── where the encoder is told to start ──
+// Measured on a shaped link (scripts/broadcast-tuning.mjs): without this the
+// picture is 320x180 for the first eight seconds of every party and takes
+// eighteen to reach 640x360, on a link that could carry it from the start.
+{
+    const sdp = ['v=0', 'm=video 9 UDP/TLS/RTP/SAVPF 96 97',
+        'a=fmtp:96 max-fs=12288;max-fr=60', 'a=fmtp:97 apt=96', 'a=rtpmap:96 VP8/90000'].join('\r\n');
+    const out = withStartBitrate(sdp, 600);
+    check(/a=fmtp:96 max-fs=12288;max-fr=60;x-google-start-bitrate=600/.test(out),
+        'the codec line carries a start bitrate, keeping what was already on it');
+    check(out.split('\n').length === sdp.split('\n').length,
+        'and nothing else about the description changes');
+    check(!/a=rtpmap:96 VP8\/90000;/.test(out), 'lines that are not codec parameters are left alone');
+    check(withStartBitrate(out, 600) === out, 'applying it twice does not write it twice');
+    check(withStartBitrate('') === '' && withStartBitrate(undefined) === undefined,
+        'an empty description is handed back rather than thrown at');
+    // It is the answer that constrains the encoder, so this has to be applied
+    // to what comes back, not to what goes out.
+    const source = await readFile(join(ROOT, 'assets/js/core/streaming/WatchParty.js'), 'utf8');
+    const accept = source.slice(source.indexOf('async accept('), source.indexOf('get isActive'));
+    check(/setRemoteDescription\(\{[^}]*withStartBitrate/s.test(accept),
+        'and the host applies it to the reply it receives, which is the only end that works');
+}
+
 await new Promise(r=>srv.listen(0,'127.0.0.1',r));
 const origin=`http://127.0.0.1:${srv.address().port}`;
 const CANDIDATES=[process.env.CHROMIUM_PATH, process.env.CHROME_PATH,
