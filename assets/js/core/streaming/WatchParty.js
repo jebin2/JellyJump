@@ -357,6 +357,12 @@ export class WatchViewer {
         this.stream = null;
         /** Called when the host says it has stopped, rather than simply vanishing. */
         this.onHostStopped = null;
+        /**
+         * Called with the name of the step join() has reached: 'reading',
+         * then 'finding'. The step, not the sentence -- what to say about it
+         * is the page's business, and lives with the page's other wording.
+         */
+        this.onProgress = null;
     }
 
     /**
@@ -366,6 +372,7 @@ export class WatchViewer {
      *          to send back, and the stream once the host's media arrives
      */
     async join(offerText) {
+        this.onProgress?.('reading');
         const offer = await unpackSignal(offerText);
         if (offer.type !== 'offer') {
             throw new Error('That is a reply, not an invitation.');
@@ -392,6 +399,9 @@ export class WatchViewer {
 
         await this.connection.setRemoteDescription(offer);
         await this.connection.setLocalDescription(await this.connection.createAnswer());
+        // The one step that takes long enough for a viewer to wonder: up to
+        // GATHER_TIMEOUT_MS of asking the network what addresses it has.
+        this.onProgress?.('finding');
         await this._gathered();
 
         // Echo the invitation back so the host knows which connection this

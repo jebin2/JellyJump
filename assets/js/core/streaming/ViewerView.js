@@ -31,7 +31,23 @@ const WAITING_NOTE = 'Still waiting for the host to paste your code. This is '
     + 'normal until they do. If they already have and nothing happened, ask '
     + 'them for a fresh link.';
 
-export { FAILED_DETAIL, ENDED_DETAIL, WAITING_NOTE };
+/**
+ * What the loading screen says while join() works, one line per step the
+ * viewer reports. Nothing here is a state the connection can be in -- it is
+ * only the page saying what it is busy with, because a logo on its own for
+ * five seconds is indistinguishable from a page that has hung.
+ */
+const JOINING_STEPS = {
+    reading: 'Reading the invitation…',
+    finding: 'Finding a way to connect…',
+};
+
+/** @param {string} step @returns {string} the line, or '' for an unknown step. */
+export function joiningNote(step) {
+    return JOINING_STEPS[step] || '';
+}
+
+export { FAILED_DETAIL, ENDED_DETAIL, WAITING_NOTE, JOINING_STEPS };
 
 /**
  * @param {{state: string, hasWatched: boolean, over: boolean}} situation

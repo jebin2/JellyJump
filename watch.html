@@ -155,22 +155,25 @@
             border-color: var(--accent-primary);
         }
 
-        /* The player's loading mark at heading size. The image comes from
-           .page-loader-logo in common.css rather than being named again here:
-           the build fingerprints that file's url, and one named in this inline
-           block would not be rewritten with it. */
-        .spin {
-            width: 1.4rem; height: 1.4rem; display: inline-block; vertical-align: -.3rem;
-            margin-right: var(--space-sm);
+        /* The loading screen is the joining step, so it is a column with a
+           line under the mark rather than a mark alone. */
+        #page-loader { flex-direction: column; gap: var(--space-md); padding: var(--space-md); }
+        .page-loader-note {
+            margin: 0; text-align: center;
+            font-size: var(--text-sm); color: var(--text-secondary);
         }
     </style>
 </head>
 <body>
 <!-- The same loading screen the player opens with, so the first paint of a
-     pasted link is already recognisable. Hidden by watch-main.js as soon as it
-     runs, including on the paths that end in an error. -->
+     pasted link is already recognisable -- and it stays up for the whole of
+     joining rather than flashing past, because until the code is ready there
+     is nothing for anyone to do. The line underneath is what separates it from
+     a page that has hung. watch-main.js takes it down the moment there is
+     something to show, including on the paths that end in an error. -->
 <div class="page-loader" id="page-loader">
     <div class="page-loader-logo"></div>
+    <p class="page-loader-note" id="loader-note">Reading the invitation…</p>
 </div>
 <main>
     <p class="brand">
@@ -179,11 +182,6 @@
             JellyJump
         </span>
     </p>
-
-    <section id="joining" class="panel">
-        <h1><span class="page-loader-logo spin"></span>Joining…</h1>
-        <p>Reading the invitation.</p>
-    </section>
 
     <section id="reply" class="panel" hidden>
         <h1>Send this code back</h1>

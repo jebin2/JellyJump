@@ -198,6 +198,71 @@ check(look.icon, 'and its fullscreen control comes from the shared icon sprite')
 check(look.readout.clear && look.readout.over,
     'the route and the numbers stack over the film instead of on each other');
 
+// ── and before any of that, the link opens on the loading screen ──
+// Opening a link from a chat lands on a page that has several seconds of work
+// to do before there is anything to read. It shows the mark and one line
+// saying what it is doing, and nothing else -- a bare panel skeleton would be
+// the page looking broken, and a mark with no line would be a page that has
+// hung. The script is blocked here so the first paint can be read as it is.
+{
+    // Its own context with no service worker: the player page registers one,
+    // and it would serve the script from its cache straight past the block.
+    const bare = await b.newContext({ serviceWorkers: 'block' });
+    const cold = await bare.newPage();
+    await cold.route('**/*.js', r => r.abort());
+    await cold.goto(`${origin}/watch.html#notanoffer`, { waitUntil: 'domcontentloaded' });
+    const first = await cold.evaluate(() => {
+        const vis = id => {
+            const n = document.getElementById(id);
+            const cs = getComputedStyle(n);
+            return !n.hidden && cs.display !== 'none' && cs.visibility !== 'hidden';
+        };
+        return {
+            loader: vis('page-loader'),
+            note: document.getElementById('loader-note').textContent.trim(),
+            reply: vis('reply'), problem: vis('problem'),
+        };
+    });
+    check(first.loader && first.note.length > 0,
+        `a link opens on the mark with a line under it ("${first.note}")`);
+    check(!first.reply && !first.problem,
+        'and nothing else, so a half-built form is never what greets a guest');
+    await cold.close();
+    await bare.close();
+}
+
+// ── the line changes as it works, and the screen goes when there is a code ──
+{
+    const notes = [];
+    const watcher = await ctx.newPage();
+    // Hooked before the module runs, so the sequence is recorded rather than
+    // sampled -- loopback gathers too fast to catch a step by polling.
+    await watcher.addInitScript(() => {
+        window.__notes = [];
+        document.addEventListener('DOMContentLoaded', () => {
+            const n = document.getElementById('loader-note');
+            const take = () => window.__notes.push(n.textContent.trim());
+            take();
+            new MutationObserver(take).observe(n, { childList: true, characterData: true, subtree: true });
+        });
+    });
+    const spare = await host.evaluate(async () =>
+        (await window.player.watchParty.invite()).link);
+    await watcher.goto(spare, { waitUntil: 'domcontentloaded' });
+    await watcher.waitForFunction(() => document.getElementById('code')?.value.length > 0,
+        null, { timeout: 40000 });
+    notes.push(...await watcher.evaluate(() => window.__notes));
+    const done = await watcher.evaluate(() => ({
+        loader: getComputedStyle(document.getElementById('page-loader')).visibility,
+        reply: !document.getElementById('reply').hidden,
+    }));
+    check(new Set(notes.filter(Boolean)).size > 1,
+        `the line says what it is waiting for as it goes (${[...new Set(notes.filter(Boolean))].join(' → ')})`);
+    check(done.loader === 'hidden' && done.reply,
+        'and the screen gives way the moment there is a code to send back');
+    await watcher.close();
+}
+
 // ── and when a friend cannot get through, it says why ──
 // A reply routed to the wrong invitation is the one way to make a connection
 // that is accepted and then silently never completes -- which is exactly the

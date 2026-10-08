@@ -8,7 +8,8 @@
  *
  *   node scripts/viewer-view-test.mjs
  */
-import { viewerView, FAILED_DETAIL, ENDED_DETAIL } from '../assets/js/core/streaming/ViewerView.js';
+import { viewerView, joiningNote, JOINING_STEPS, FAILED_DETAIL, ENDED_DETAIL }
+    from '../assets/js/core/streaming/ViewerView.js';
 
 let pass = 0, fail = 0;
 const check = (ok, label) => { if (ok) { pass++; console.log(`  PASS  ${label}`); } else { fail++; console.log(`  FAIL  ${label}`); } };
@@ -65,6 +66,17 @@ check(!viewerView({ state: 'connected', hasWatched: true, over: true }).interrup
 // ── a viewer who never saw a picture cannot "return" to one ──
 check(viewerView({ state: 'connected', hasWatched: false }).panel === null,
     'connected before any picture waits for the picture rather than switching views');
+
+// ── and the loading screen says what it is waiting for ──
+// A logo on its own for five seconds reads as a page that has hung, which is
+// the whole reason there is a line under it.
+for (const step of Object.keys(JOINING_STEPS)) {
+    check(joiningNote(step).length > 0, `the loading screen has a line for "${step}" (${joiningNote(step)})`);
+}
+check(joiningNote('reading') !== joiningNote('finding'),
+    'and the two steps do not say the same thing, or the screen would look stuck');
+check(joiningNote('nonsense') === '' && joiningNote(undefined) === '',
+    'an unknown step says nothing rather than blanking the line with undefined');
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

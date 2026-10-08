@@ -1,6 +1,6 @@
 import { WatchViewer } from './core/streaming/WatchParty.js';
 import { describeConnection, describeMedia } from './core/streaming/ConnectionReport.js';
-import { viewerView, WAITING_NOTE } from './core/streaming/ViewerView.js';
+import { viewerView, joiningNote, WAITING_NOTE } from './core/streaming/ViewerView.js';
 import { Logger } from './shared/utils/Logger.js';
 
 /**
@@ -24,8 +24,17 @@ function hideLoader() {
     el('page-loader')?.classList.add('hidden');
 }
 
+/** What the loading screen is waiting for, under the mark. */
+function loaderStep(step) {
+    const note = joiningNote(step);
+    if (note) el('loader-note').textContent = note;
+}
+
 function show(state, detail) {
-    for (const name of ['joining', 'reply', 'problem']) {
+    // The loading screen is the joining state, so reaching any of these means
+    // joining is over -- whether it ended in a code, a picture or a refusal.
+    hideLoader();
+    for (const name of ['reply', 'problem']) {
         el(name).hidden = name !== state;
     }
     // The video is never hidden, only collapsed: see watch.html.
@@ -38,7 +47,6 @@ function show(state, detail) {
 }
 
 async function main() {
-    hideLoader();
     const offer = window.location.hash.slice(1);
     if (!offer) {
         show('problem', 'This link is missing its invitation. Ask for a new one.');
@@ -46,9 +54,9 @@ async function main() {
     }
 
     const viewer = new WatchViewer();
+    viewer.onProgress = loaderStep;
     let answer;
     try {
-        show('joining');
         answer = await viewer.join(offer);
     } catch (error) {
         Logger.warn('[Watch] Could not read the invitation:', error);
@@ -210,6 +218,5 @@ async function main() {
 
 main().catch(error => {
     Logger.error('[Watch] Fatal:', error);
-    hideLoader();
     show('problem', 'Something went wrong joining this watch party.');
 });
