@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- font-src is for the theme's local Space Grotesk/Space Mono files; the
+         page still talks to nobody but itself and the peer. -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self' blob: mediastream:; connect-src *; object-src 'none'; base-uri 'self'; form-action 'none'">
+    <title>Watch together — JellyJump</title>
+    <meta name="description" content="Watch what a friend is playing in JellyJump, peer to peer.">
+
+    <!-- Same marks as the rest of the app: this link arrives in a chat from
+         someone the viewer trusts, so the page has to be recognisably ours
+         before it has connected to anything. -->
+    <link rel="icon" href="./assets/jelly_jump_logo-qiMeMAa9.png">
+    <link rel="apple-touch-icon" href="./assets/jelly_jump_logo-qiMeMAa9.png">
+    <meta name="theme-color" content="#00d9a5">
+    <link rel="preload" href="./assets/jelly_jump_logo-jF-iEcbg.gif" as="image">
+
+    <!-- The real theme, not a copy of it: one set of tokens, fonts and the
+         loading logo, so this page cannot drift away from the player's look. -->
+    <style>
+        /* Page-specific only. Anything with an equivalent in the player is
+           taken from the tokens above rather than restated in hex. */
+        body {
+            min-height: 100dvh;
+            display: grid;
+            place-items: center;
+            padding: var(--space-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-primary);
+            font-size: var(--text-base);
+            line-height: 1.5;
+        }
+        main { width: 100%; max-width: 900px; }
+
+        .brand { display: flex; justify-content: center; margin-bottom: var(--space-md); }
+        .brand .nav-logo-img { height: 32px; }
+
+        h1 { font-size: var(--text-lg); font-weight: var(--font-bold); margin: 0 0 var(--space-xs); }
+        p { margin: var(--space-xs) 0 0; color: var(--text-secondary); }
+
+        /* Matches .mb-modal: the panels are the same kind of surface the
+           player's dialogs are, so they read as part of the same app. */
+        .panel {
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+            padding: var(--space-lg);
+            background: var(--bg-secondary);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, .5);
+        }
+
+        .interrupted {
+            position: absolute; top: .6rem; left: .6rem; margin: 0;
+            padding: .3rem .6rem; border-radius: 6px;
+            background: rgba(0, 0, 0, .72); color: var(--text-primary);
+            font-size: var(--text-xs); pointer-events: none;
+        }
+        #interrupted[hidden], #stage:not(.live) .interrupted { display: none; }
+
+        .waiting { margin: var(--space-md) 0 0; font-size: var(--text-sm); color: var(--accent-warning); line-height: 1.5; }
+        #waiting[hidden] { display: none; }
+
+        .route { margin: .75rem 0 0; font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+        #route[hidden], #flow[hidden] { display: none; }
+
+        #stage { margin-top: .75rem; position: relative; }
+
+        /* Taken from .jellyjump-btn: transparent, currentColor icon, accent on
+           hover -- the player's control treatment, in a corner overlay. */
+        #full {
+            position: absolute; right: .6rem; bottom: .6rem;
+            display: grid; place-items: center; width: 2.4rem; height: 2.4rem;
+            padding: 0; border-radius: 8px; border: 1px solid #ffffff26;
+            background: #00000073; color: var(--text-primary); cursor: pointer;
+            opacity: 0; transition: opacity var(--transition-normal), color var(--transition-normal);
+        }
+        #full:hover { color: var(--accent-primary); background: #000000a6; }
+        #full svg { fill: currentColor; }
+        /* Shown on hover, and always on touch, where there is no hover to rely on. */
+        /* Only once there is a picture: `.live` guards both, so even if the
+           button were left in the document it could not surface early. */
+        #stage.live:hover #full, #stage.live #full:focus-visible { opacity: 1; }
+        @media (hover: none) { #stage.live #full { opacity: 1; } }
+        /* `display: grid` above is an id selector and beats the browser's own
+           [hidden] { display: none }, so the attribute alone left the button in
+           the layout and in the tab order with nothing to do. */
+        #full[hidden] { display: none; }
+
+        video { width: 100%; background: #000; border-radius: 8px; display: block; }
+        /* Collapsed rather than hidden until a frame has arrived. */
+        #stage:not(.live) video { height: 1px; opacity: 0; }
+        #stage.live video { aspect-ratio: 16 / 9; }
+
+        /* ── Watching ───────────────────────────────────────────────────────
+           Once there is a picture this page is a player, so it behaves like
+           one: the picture takes the whole window and letterboxes itself,
+           exactly as .jellyjump-container/.jellyjump-video do. Before that it
+           is a form, and a form should not be full-screen. */
+        body.watching { padding: 0; }
+        body.watching main { max-width: none; height: 100dvh; }
+        body.watching .brand { display: none; }
+        body.watching #stage { margin: 0; height: 100%; background: #000; }
+        body.watching #stage.live video {
+            height: 100%; width: 100%; aspect-ratio: auto;
+            object-fit: contain; border-radius: var(--radius-none);
+        }
+        /* The numbers still matter while watching -- they are how a soft
+           picture gets explained -- but they are not worth a permanent band
+           across the film, so they follow the fullscreen button's rule.
+           Both lines move as one strip rather than being pinned separately:
+           either of them can wrap on a narrow screen, and two independently
+           anchored lines would then sit on top of each other. */
+        body.watching .readout {
+            position: fixed; left: 0; right: 0; bottom: 0;
+            padding: .4rem .8rem; background: rgba(0, 0, 0, .66);
+            opacity: 0; transition: opacity var(--transition-normal);
+            pointer-events: none;
+        }
+        body.watching .route { margin: 0; }
+        body.watching:hover .readout { opacity: 1; }
+        @media (hover: none) { body.watching .readout { opacity: 1; } }
+
+        /* In fullscreen the stage is the whole screen, so the video should fill
+           it rather than keep a 16:9 box in the middle of black. */
+        #stage:fullscreen { margin: 0; display: grid; place-items: center; background: #000; }
+        #stage:fullscreen video { height: 100%; width: 100%; aspect-ratio: auto;
+                                  object-fit: contain; border-radius: var(--radius-none); }
+
+        .row { display: flex; gap: var(--space-sm); margin-top: .75rem; }
+        input {
+            flex: 1; min-width: 0;
+            font-family: var(--font-mono); font-size: var(--text-xs);
+            padding: .6rem .7rem; border-radius: 4px;
+            border: 1px solid var(--border-dark);
+            background: var(--bg-primary); color: var(--text-primary);
+        }
+        input:focus-visible { outline: none; border-color: var(--accent-primary); }
+        /* .jellyjump-btn-secondary, which lives in player.css -- a stylesheet
+           this page has no other reason to carry. Same tokens, same result. */
+        button {
+            padding: 8px 16px; border-radius: 4px;
+            background-color: var(--bg-tertiary); color: var(--text-primary);
+            border: 1px solid var(--border-dark);
+            font-family: var(--font-primary); font-size: var(--text-sm);
+            cursor: pointer; transition: all var(--transition-normal);
+        }
+        button:hover {
+            background-color: var(--bg-secondary);
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        /* The loading screen is the joining step, so it is a column with a
+           line under the mark rather than a mark alone. */
+        #page-loader { flex-direction: column; gap: var(--space-md); padding: var(--space-md); }
+        .page-loader-note {
+            margin: 0; text-align: center;
+            font-size: var(--text-sm); color: var(--text-secondary);
+        }
+    </style>
+  <script type="module" crossorigin src="./assets/watch-dZAaPYHq.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/common-BafvDNbj.js">
+  <link rel="modulepreload" crossorigin href="./assets/config-BgOwAUD5.js">
+  <link rel="modulepreload" crossorigin href="./assets/Logger-BZONLj9l.js">
+  <link rel="modulepreload" crossorigin href="./assets/WatchParty-DkUYmZJQ.js">
+  <link rel="stylesheet" crossorigin href="./assets/common-D47Dymdg.css">
+</head>
+<body>
+<!-- The same loading screen the player opens with, so the first paint of a
+     pasted link is already recognisable -- and it stays up for the whole of
+     joining rather than flashing past, because until the code is ready there
+     is nothing for anyone to do. The line underneath is what separates it from
+     a page that has hung. watch-main.js takes it down the moment there is
+     something to show, including on the paths that end in an error. -->
+<div class="page-loader" id="page-loader">
+    <div class="page-loader-logo"></div>
+    <p class="page-loader-note" id="loader-note">Reading the invitation…</p>
+</div>
+<main>
+    <p class="brand">
+        <span class="nav-logo">
+            <img src="./assets/jelly_jump_logo-qiMeMAa9.png" alt="" class="nav-logo-img">
+            JellyJump
+        </span>
+    </p>
+
+    <section id="reply" class="panel" hidden>
+        <h1>Send this code back</h1>
+        <p>The host needs this to finish connecting. Paste it wherever they sent you the link.</p>
+        <div class="row">
+            <input id="code" readonly spellcheck="false">
+            <button id="copy" type="button">Copy</button>
+        </div>
+        <!-- Shown only if the connection gives up while this code is still
+             waiting to be pasted, which is not a failure of anything: nothing
+             can connect until the host has it. -->
+        <p id="waiting" class="waiting" hidden></p>
+    </section>
+
+    <section id="problem" class="panel" hidden>
+        <h1>Can't watch this</h1>
+        <p id="detail"></p>
+    </section>
+
+    <div class="readout">
+        <!-- Why it is or is not working, in words, for the person who can do
+             something about it. A party that will not connect is almost always the
+             shape of somebody's home network, and without this neither end can
+             tell that from a bug. Candidate types only -- this line is meant to be
+             pasted back to the host, and an address would be someone's IP. -->
+        <p id="route" class="route" hidden></p>
+        <!-- How much is actually arriving. A picture can be soft because the
+             encoder has not finished climbing or because the network is the
+             ceiling, and those look identical without the numbers. -->
+        <p id="flow" class="route" hidden></p>
+    </div>
+
+    <!-- Always in the document and never display:none. A hidden video element
+         can stop decoding, so a stream attached to one may never report
+         metadata -- which would leave this page waiting for an event that
+         cannot arrive. It is sized to nothing until there is something to
+         show instead. -->
+    <section id="stage">
+        <video id="video" playsinline></video>
+        <!-- A connection can drop briefly and come back on its own. The last
+             frame stays put and this says what is happening, rather than the
+             page declaring the party over and collapsing the picture. -->
+        <p id="interrupted" class="interrupted" hidden>Reconnecting…</p>
+        <!-- Fullscreen is not playback control: it changes nothing about what
+             the host is sending or where it is, so a viewer gets it. Pause and
+             seek are what they do not get, and this adds neither. -->
+        <button id="full" type="button" hidden
+                aria-label="Fullscreen" title="Fullscreen (or double-click)">
+            <!-- The player's own fullscreen icon, from the shared sprite. -->
+            <svg width="22" height="22" aria-hidden="true" focusable="false">
+                <use id="full-icon" href="./assets/sprite-DJq0wWlQ.svg#icon-fullscreen"></use>
+            </svg>
+        </button>
+    </section>
+</main>
+</body>
+</html>

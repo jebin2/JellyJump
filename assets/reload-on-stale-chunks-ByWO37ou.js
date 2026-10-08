@@ -1,0 +1,2 @@
+var e=`jj-stale-chunk-reload-at`,t=3e4;window.addEventListener(`vite:preloadError`,n=>{let r=Number(sessionStorage.getItem(e)||0);Date.now()-r<t||(n.preventDefault(),sessionStorage.setItem(e,String(Date.now())),console.warn(`[App] Build changed underneath us — reloading to fetch new chunks`),window.location.reload())});
+//# sourceMappingURL=reload-on-stale-chunks-ByWO37ou.js.map

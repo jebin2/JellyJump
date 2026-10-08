@@ -1,0 +1,43 @@
+{
+  "name": "jellyjump",
+  "version": "0.4.1",
+  "description": "JellyJump Media Player",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "quality": "node scripts/quality-check.mjs",
+    "verify:libs": "bash download_libs.sh verify",
+    "check": "npm run quality && npm run verify:libs && npm run build",
+    "clean": "rm -rf dist",
+    "build:desktop": "./build-desktop.sh",
+    "sim:jjc3": "bash scripts/jjc3-sim.sh",
+    "test:rs": "node scripts/rs-selftest.mjs && node scripts/shard-pipeline-test.mjs",
+    "test:server": "node scripts/library-server-test.mjs",
+    "test:remote": "node scripts/remote-library-test.mjs && node scripts/remote-library-load-test.mjs",
+    "test:cli": "node scripts/cli-test.mjs",
+    "test:share": "npm run test:server && npm run test:remote && npm run test:cli && npm run test:youtube && npm run test:linklist",
+    "test:youtube": "node scripts/youtube-url-test.mjs && node scripts/youtube-embed-test.mjs",
+    "test:linklist": "node scripts/linklist-test.mjs && node scripts/linklist-scan-test.mjs",
+    "test:live": "node scripts/live-schedule-test.mjs",
+    "measure:broadcast": "node scripts/broadcast-loopback.mjs",
+    "measure:tuning": "unshare -r -n node scripts/broadcast-tuning.mjs",
+    "test:signal": "node scripts/signal-codec-test.mjs",
+    "test:party": "node scripts/connection-report-test.mjs && node scripts/viewer-view-test.mjs && node scripts/watch-party-test.mjs && node scripts/watch-panel-test.mjs",
+    "test:playlist": "node scripts/playlist-kind-test.mjs",
+    "test:camera": "node scripts/camera-effects-test.mjs && node scripts/sticker-test.mjs && node scripts/decoration-test.mjs && node scripts/recording-clock-test.mjs",
+    "test:css": "node scripts/css-token-test.mjs",
+    "test:desktop": "npm run build && rm -rf desktop/build && cp -r dist desktop/build && node scripts/desktop-smoke-test.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0",
+    "vite": "^8.0.0"
+  },
+  "dependencies": {
+    "@huggingface/hub": "^2.13.0",
+    "@huggingface/transformers": "^4.2.0"
+  }
+}
