@@ -156,6 +156,48 @@ check(!guestFlow.hidden && /\d+×\d+/.test(guestFlow.text),
     `and the friend sees the same from their side ("${guestFlow.text}")`);
 check(/fps/.test(guestFlow.text), 'with the frame rate, which is what softness shows up in');
 
+// ── and the picture gets the window, the way the player's does ──
+// This page is a player once there is something to play, so a 16:9 card in
+// the middle of a dark page is wrong: the film should fill what is there and
+// letterbox itself, exactly as .jellyjump-container does. It also has to look
+// like ours before it has connected to anything -- the link arrives in a chat,
+// and a stranger's unbranded page asking you to paste a code back is the
+// shape of a scam.
+const look = await guest.evaluate(async () => {
+    await document.fonts.ready;
+    const box = document.getElementById('video').getBoundingClientRect();
+    const sprite = await fetch('assets/icons/sprite.svg').then(r => r.text()).catch(() => '');
+    return {
+        vw: window.innerWidth, vh: window.innerHeight,
+        w: Math.round(box.width), h: Math.round(box.height),
+        watching: document.body.classList.contains('watching'),
+        brand: getComputedStyle(document.querySelector('.brand')).display,
+        loader: getComputedStyle(document.getElementById('page-loader')).visibility,
+        font: getComputedStyle(document.body).fontFamily,
+        themed: getComputedStyle(document.documentElement)
+            .getPropertyValue('--accent-primary').trim(),
+        grotesk: document.fonts.check('16px "Space Grotesk"'),
+        icon: /icon-fullscreen/.test(sprite),
+        // The two diagnostic lines ride over the film as one strip; pinned
+        // separately they land on top of each other as soon as one wraps.
+        readout: (() => {
+            const r = document.getElementById('route').getBoundingClientRect();
+            const f = document.getElementById('flow').getBoundingClientRect();
+            return { clear: r.bottom <= f.top + 1, over: f.bottom <= window.innerHeight + 1 };
+        })(),
+    };
+});
+check(look.watching && look.w >= look.vw - 2 && look.h >= look.vh - 2,
+    `the film fills the window (${look.w}×${look.h} of ${look.vw}×${look.vh})`);
+check(look.brand === 'none', 'and nothing else is competing with it for the space');
+check(look.loader === 'hidden', 'the loading screen is gone once the page has run');
+// #0f8 is the same green: the build minifies the token's value.
+check(/^(#00ff88|#0f8)$/.test(look.themed) && /Space Grotesk/.test(look.font) && look.grotesk,
+    `the page wears the app's own theme and font (${look.themed}, ${look.font.split(',')[0]})`);
+check(look.icon, 'and its fullscreen control comes from the shared icon sprite');
+check(look.readout.clear && look.readout.over,
+    'the route and the numbers stack over the film instead of on each other');
+
 // ── and when a friend cannot get through, it says why ──
 // A reply routed to the wrong invitation is the one way to make a connection
 // that is accepted and then silently never completes -- which is exactly the

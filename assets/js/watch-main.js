@@ -16,16 +16,29 @@ import { Logger } from './shared/utils/Logger.js';
 
 const el = id => document.getElementById(id);
 
+// Same loading screen and same dismissal as player-main.js, for the same
+// reason: it cannot be an inline script under this page's CSP. Called on every
+// path out of main(), including the failures, or a page that cannot connect
+// would sit behind the logo saying nothing.
+function hideLoader() {
+    el('page-loader')?.classList.add('hidden');
+}
+
 function show(state, detail) {
     for (const name of ['joining', 'reply', 'problem']) {
         el(name).hidden = name !== state;
     }
     // The video is never hidden, only collapsed: see watch.html.
     el('stage').classList.toggle('live', state === 'watching');
+    // Once there is a picture the page stops being a form and becomes a
+    // player, which is a whole-window layout rather than a card. The CSS owns
+    // what that means; this only says which of the two it is.
+    document.body.classList.toggle('watching', state === 'watching');
     if (detail) el('detail').textContent = detail;
 }
 
 async function main() {
+    hideLoader();
     const offer = window.location.hash.slice(1);
     if (!offer) {
         show('problem', 'This link is missing its invitation. Ask for a new one.');
@@ -122,6 +135,10 @@ async function main() {
         video.addEventListener('dblclick', toggleFullscreen);
         const syncLabel = () => {
             const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+            // The same two sprite symbols the player's own fullscreen button
+            // swaps between, so the control is literally the same icon.
+            el('full-icon')?.setAttribute('href',
+                `assets/icons/sprite.svg#icon-fullscreen${on ? '-exit' : ''}`);
             fullButton.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen');
             fullButton.title = on ? 'Exit fullscreen (or double-click)' : 'Fullscreen (or double-click)';
         };
@@ -193,5 +210,6 @@ async function main() {
 
 main().catch(error => {
     Logger.error('[Watch] Fatal:', error);
+    hideLoader();
     show('problem', 'Something went wrong joining this watch party.');
 });
