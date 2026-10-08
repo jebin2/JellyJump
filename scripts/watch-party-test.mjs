@@ -9,6 +9,13 @@
  * A two-second fixture cannot outlast a negotiation, so playback is looped.
  *
  *   npm run build && node scripts/watch-party-test.mjs
+ *
+ * SRC points it at a different source, which is how the other pipelines get
+ * the same end-to-end treatment -- they reach the canvas by different routes
+ * and only this says whether a friend actually sees them:
+ *
+ *   SRC=/__fixtures__/hls/stream.m3u8   an HLS playlist
+ *   SRC=/__live__/stream.m3u8           a live one, with no #EXT-X-ENDLIST
  */
 import { chromium } from 'playwright-core';
 import { unpackSignal } from '../assets/js/core/streaming/SignalCodec.js';
@@ -19,8 +26,29 @@ import { existsSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 const ROOT=resolve(import.meta.dirname,'..');
 const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.ttf':'font/ttf','.ico':'image/x-icon','.webm':'video/webm'};
+// A live playlist cannot be a file: what makes a stream live is the absence of
+// #EXT-X-ENDLIST, so mediabunny keeps re-reading it expecting the window to
+// have moved on. Generated per request, with the sequence advancing for the
+// first few seconds and then settling, so it keeps answering refreshes.
+// Reached with SRC=/__live__/stream.m3u8, which is a different pipeline from
+// the VOD one -- its own loop, anchor and audio pump inside PlayerStream.
+const LIVE='/__live__/';
+const livePlaylist=(started)=>{
+  const sequence=Math.min(Math.floor((Date.now()-started)/1000),6);
+  const lines=['#EXTM3U','#EXT-X-VERSION:3','#EXT-X-TARGETDURATION:1',`#EXT-X-MEDIA-SEQUENCE:${sequence}`];
+  for(let i=0;i<3;i++) lines.push('#EXTINF:1.000000,',`seg${(sequence+i)%3}.ts`);
+  return lines.join('\n')+'\n';
+};
+const liveStartedAt=Date.now();
 const srv=createServer(async(req,res)=>{const u=decodeURIComponent(req.url.split('?')[0]);
-  const f=u.startsWith('/fx/')?join(process.env.FX || join(ROOT,'scripts/fixtures'),u.slice(4)):u.startsWith('/__fixtures__/')?join(ROOT,'scripts/fixtures',u.slice(14)):join(ROOT,'dist',u==='/'?'/index.html':u);
+  if(u===`${LIVE}stream.m3u8`){
+    const body=livePlaylist(liveStartedAt);
+    // Without no-store the refreshes come from the cache and the window never
+    // appears to move, so the stream stops reading as live.
+    res.writeHead(200,{'Content-Type':'application/vnd.apple.mpegurl','Content-Length':Buffer.byteLength(body),'Cache-Control':'no-store'});
+    res.end(body); return;
+  }
+  const f=u.startsWith(LIVE)?join(ROOT,'scripts/fixtures/hls',u.slice(LIVE.length)):u.startsWith('/fx/')?join(process.env.FX || join(ROOT,'scripts/fixtures'),u.slice(4)):u.startsWith('/__fixtures__/')?join(ROOT,'scripts/fixtures',u.slice(14)):join(ROOT,'dist',u==='/'?'/index.html':u);
   try{const i=await stat(f);res.writeHead(200,{'Content-Type':MIME[extname(f)]||'application/octet-stream','Content-Length':i.size,'Accept-Ranges':'bytes'});res.end(await readFile(f));}catch{res.writeHead(404);res.end();}});
 let pass=0, fail=0;
 const check=(ok,label)=>{ if(ok){pass++;console.log(`  PASS  ${label}`);} else {fail++;console.log(`  FAIL  ${label}`);} };
@@ -66,10 +94,17 @@ await hostPage.evaluate(async url=>{
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const p=window.player;
   await p.load(url);
-  for(let i=0;i<120&&!(p.duration>0);i++) await sleep(100);
-  p.loopMode='one';
-  await p.play().catch(()=>{});
-  await sleep(600);
+  // A live stream never reports a duration -- there is no end to measure to --
+  // so waiting for one hangs until the run is killed. Either is ready.
+  for(let i=0;i<120&&!(p.duration>0)&&!p.isLive;i++) await sleep(100);
+  // Nothing to loop on a live stream, and setting it is not harmless: the
+  // loop-one path seeks, which a stream with no seekable range cannot do.
+  if(!p.isLive) p.loopMode='one';
+  // Not awaited for a live stream: its loop runs inside play()'s own promise
+  // chain and does not resolve while the stream is playing, so awaiting it
+  // hangs until the run is killed.
+  if(p.isLive) p.play().catch(()=>{}); else await p.play().catch(()=>{});
+  await sleep(p.isLive?2500:600);
 }, process.env.SRC || '/__fixtures__/smoke.webm');
 
 // ── the host makes an invitation ──
@@ -204,7 +239,12 @@ check(fsOn.playing && fsOff.playing, 'and the stream never stops for either');
 // captureStream only emits when the canvas is modified, so a paused player
 // produces nothing and a viewer who joins sees black until playback resumes.
 // There is no "current frame" to send -- only a history of modifications.
-const paused = await (async () => {
+//
+// Nothing to test on a live stream, which has no seekable range to seek into
+// and no pause worth the name. Skipped out loud rather than quietly, so a
+// shorter run is never mistaken for a passing one.
+const isLiveSource = await hostPage.evaluate(() => !!window.player.isLive);
+const paused = isLiveSource ? null : await (async () => {
   await hostPage.evaluate(async () => {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const p = window.player;
@@ -242,9 +282,13 @@ const paused = await (async () => {
   return { seen, stillPaused };
 })();
 
-check(paused.stillPaused, 'the host stayed paused throughout');
-check(paused.seen.w > 0,
-  `a friend joining a paused host still gets the picture (${paused.seen.w}px, ${paused.seen.lit} lit)`);
+if (isLiveSource) {
+  console.log('  SKIP  a friend joining a paused host (a live stream cannot seek or pause)');
+} else {
+  check(paused.stillPaused, 'the host stayed paused throughout');
+  check(paused.seen.w > 0,
+    `a friend joining a paused host still gets the picture (${paused.seen.w}px, ${paused.seen.lit} lit)`);
+}
 
 // ── one link, two people: the mistake this panel invites ──
 // Sending a single link to a group is the obvious thing to do and the one
