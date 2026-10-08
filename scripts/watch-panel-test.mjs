@@ -94,6 +94,34 @@ const connectGuest = async () => {
     return guest;
 };
 
+// ── a video whose pixels are not ours is refused, and says so ──
+// A YouTube video plays in YouTube's own cross-origin iframe: the canvas is
+// never drawn to and there is no audio graph to tap, so a party started on one
+// sends a blank rectangle and silence. The player already reports that as a
+// capability -- the screenshot tool has refused on it for ages -- and this used
+// to open the panel regardless, which is a worse failure than not offering it:
+// the friend pastes a code back and gets nothing. Faked here rather than loaded
+// from YouTube, so the check costs no network and cannot flake.
+{
+    await host.evaluate(() => {
+        window.__caps = window.player.capabilities;
+        window.player.capabilities = { canvasFrames: false, audioGraph: false };
+    });
+    await host.click('#mb-tools');
+    await host.waitForSelector('[data-action="watch-party"]', { timeout: 15000 });
+    await host.click('[data-action="watch-party"]');
+    await host.waitForTimeout(900);
+    const refused = await host.evaluate(() => ({
+        panel: !!document.querySelector('.watch-party'),
+        said: [...document.querySelectorAll('[class*=toast], .mb-toast, #toast')]
+            .map(t => t.textContent.trim()).filter(Boolean).join(' '),
+    }));
+    check(!refused.panel, 'a watch party is not offered for a video whose frames are not ours');
+    check(/YouTube/i.test(refused.said) && /link/i.test(refused.said),
+        `and it says why, and what to do instead ("${refused.said.slice(0, 90)}…")`);
+    await host.evaluate(() => { window.player.capabilities = window.__caps; });
+}
+
 // ── a panel is ready the moment it opens ──
 await openPanel();
 const first = await read();

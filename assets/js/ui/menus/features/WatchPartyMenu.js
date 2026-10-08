@@ -32,6 +32,18 @@ export class WatchPartyMenu {
             Toast.show('Open something to watch first.', 3500, true);
             return;
         }
+        // A YouTube video plays in YouTube's own iframe, which is cross-origin:
+        // the canvas beneath it is never drawn to and there is no audio graph to
+        // tap. Without this the panel opened as usual and the friend who went to
+        // all the trouble of pasting a code back got a blank rectangle and
+        // silence -- a failure that looks exactly like a broken feature. The
+        // same guard as the screenshot tool, for the same reason.
+        if (player.capabilities && !player.capabilities.canvasFrames) {
+            Toast.show('A YouTube video cannot be shared this way — its picture and '
+                + 'sound belong to YouTube. Send your friend the YouTube link instead.',
+                5000, true);
+            return;
+        }
 
         const modal = new Modal({ maxWidth: '560px' });
         modal.setTitle('Watch Together');
