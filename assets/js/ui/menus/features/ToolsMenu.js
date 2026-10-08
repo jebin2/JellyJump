@@ -11,78 +11,42 @@ export class ToolsMenu {
      * @param {Playlist} playlist - Playlist instance for context
      */
     static async show(playlist) {
-        const modal = new Modal({ maxWidth: '320px' });
+        // The same shape as the per-item tools modal: three columns of small
+        // tiles at 480px, rather than two columns of large ones at 320px. Eight
+        // tools in two columns was four rows and a scroll; in three it is three
+        // rows and none.
+        const modal = new Modal({ maxWidth: '480px' });
         modal.setTitle('Tools');
+
+        // Listed rather than written out eight times, which is also how
+        // ItemToolsMenu builds its grid -- two copies of the same markup drift,
+        // and this one had already picked up a tile with a different icon size
+        // and no fill.
+        const tools = [
+            { action: 'screen-record', icon: 'icon-record', label: 'Record Screen', title: 'Record Screen' },
+            { action: 'camera-record', icon: 'icon-camera', label: 'Camera', title: 'Camera Recording' },
+            { action: 'merge', icon: 'icon-copy', label: 'Merge Videos', title: 'Merge Videos' },
+            { action: 'slideshow', icon: 'icon-image', label: 'Slideshow', title: 'Images to Video' },
+            { action: 'combine-av', icon: 'icon-audio', label: 'Combine A/V', title: 'Combine Audio/Video' },
+            { action: 'watch-party', icon: 'icon-link', label: 'Watch Together', title: 'Watch Together' },
+            { action: 'share', icon: 'icon-link', label: 'Share Library', title: 'Share Library' },
+            { action: 'reset', icon: 'icon-trash', label: 'Reset App', title: 'Reset App', danger: true },
+        ];
 
         // Create tools grid content
         const content = document.createElement('div');
-        content.className = 'tools-grid';
-        content.innerHTML = `
-            <button class="tools-tile" data-action="screen-record" title="Record Screen">
+        content.className = 'tools-grid tools-grid-3';
+        content.innerHTML = tools.map(tool => `
+            <button class="tools-tile tools-tile-sm${tool.danger ? ' tools-tile-danger' : ''}"
+                    data-action="${tool.action}" title="${tool.title}">
                 <div class="tools-tile-icon">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-record"></use>
+                    <svg width="20" height="20" fill="currentColor" aria-hidden="true">
+                        <use href="assets/icons/sprite.svg#${tool.icon}"></use>
                     </svg>
                 </div>
-                <span class="tools-tile-label">Record Screen</span>
+                <span class="tools-tile-label">${tool.label}</span>
             </button>
-            <button class="tools-tile" data-action="camera-record" title="Camera Recording">
-                <div class="tools-tile-icon">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-camera"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">Camera</span>
-            </button>
-            <button class="tools-tile" data-action="merge" title="Merge Videos">
-                <div class="tools-tile-icon">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-copy"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">Merge Videos</span>
-            </button>
-            <button class="tools-tile" data-action="slideshow" title="Images to Video">
-                <div class="tools-tile-icon">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-image"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">Slideshow</span>
-            </button>
-            <button class="tools-tile" data-action="combine-av" title="Combine Audio/Video">
-                <div class="tools-tile-icon">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-audio"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">Combine A/V</span>
-            </button>
-            <button class="tools-tile" data-action="watch-party" title="Watch Together">
-                <div class="tools-tile-icon">
-                    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-                        <use href="assets/icons/sprite.svg#icon-link"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">Watch Together</span>
-            </button>
-            <button class="tools-tile" data-action="share" title="Share Library">
-                <div class="tools-tile-icon">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-link"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">Share Library</span>
-            </button>
-            <button class="tools-tile tools-tile-danger" data-action="reset" title="Reset App">
-                <div class="tools-tile-icon">
-                    <svg width="24" height="24" fill="currentColor">
-                        <use href="assets/icons/sprite.svg#icon-trash"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">Reset App</span>
-            </button>
-        `;
+        `).join('');
 
         modal.setBody(content);
 
