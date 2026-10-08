@@ -118,6 +118,86 @@ export async function describeConnection(connection) {
     return { ...facts, text: `Still trying ${facts.tried} route${facts.tried === 1 ? '' : 's'}. ${tail}` };
 }
 
+/**
+ * What is actually flowing, and what is holding it back.
+ *
+ * Separate from the route: a party can be connected by the best possible path
+ * and still look soft, because an encoder starts cautiously and climbs by
+ * watching what gets through. Measured on an unlimited connection, that climb
+ * takes tens of seconds -- so "it looks blurry" has two completely different
+ * causes, and the only way to tell them apart is to read the numbers.
+ *
+ * `held back by` is the one that settles it. It comes from the sending end, so
+ * a host sees it and a viewer does not; `bandwidth` after the first minute
+ * means the network is the ceiling, and nothing means the encoder had simply
+ * not finished climbing.
+ */
+const flow = new WeakMap();
+
+/**
+ * @param {RTCPeerConnection|null} connection
+ * @returns {Promise<{width: number|null, height: number|null, fps: number|null,
+ *          kbps: number|null, rtt: number|null, limitedBy: string|null,
+ *          text: string}>}
+ */
+export async function describeMedia(connection) {
+    const nothing = {
+        width: null, height: null, fps: null, kbps: null,
+        rtt: null, limitedBy: null, text: '',
+    };
+    if (!connection || typeof connection.getStats !== 'function') return nothing;
+
+    let stats;
+    try {
+        stats = await connection.getStats();
+    } catch {
+        return nothing;
+    }
+
+    const facts = { ...nothing };
+    let bytes = null;
+    let at = null;
+    stats.forEach(report => {
+        const video = report.kind === 'video' || report.mediaType === 'video';
+        if (video && (report.type === 'outbound-rtp' || report.type === 'inbound-rtp')) {
+            facts.width = report.frameWidth ?? facts.width;
+            facts.height = report.frameHeight ?? facts.height;
+            facts.fps = report.framesPerSecond ?? facts.fps;
+            // 'none' is a reason not to say anything.
+            const limited = report.qualityLimitationReason;
+            if (limited && limited !== 'none') facts.limitedBy = limited;
+            bytes = report.bytesSent ?? report.bytesReceived ?? bytes;
+            at = report.timestamp ?? at;
+        } else if (report.type === 'candidate-pair'
+                && (report.selected || report.state === 'succeeded')
+                && report.currentRoundTripTime != null) {
+            facts.rtt = Math.round(report.currentRoundTripTime * 1000);
+        }
+    });
+
+    // A rate needs two readings; the first one through has nothing to compare.
+    if (bytes != null && at != null) {
+        const last = flow.get(connection);
+        if (last && at > last.at) {
+            facts.kbps = Math.round((bytes - last.bytes) * 8 / (at - last.at));
+        }
+        flow.set(connection, { bytes, at });
+    }
+
+    const parts = [];
+    if (facts.width && facts.height) parts.push(`${facts.width}×${facts.height}`);
+    if (facts.fps != null) parts.push(`${facts.fps} fps`);
+    if (facts.kbps != null) {
+        parts.push(facts.kbps >= 1000
+            ? `${(facts.kbps / 1000).toFixed(1)} Mbps`
+            : `${facts.kbps} kbps`);
+    }
+    if (facts.rtt != null) parts.push(`${facts.rtt} ms round trip`);
+    if (facts.limitedBy) parts.push(`held back by ${facts.limitedBy}`);
+    facts.text = parts.join(' · ');
+    return facts;
+}
+
 /** The short form, for a list of viewers rather than a page of its own. */
 export async function describeRoute(connection) {
     const report = await describeConnection(connection);

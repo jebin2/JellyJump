@@ -134,6 +134,28 @@ check(!guestRoute.hidden && /Connected (direct|relayed)/.test(guestRoute.text),
 check(!/\b\d{1,3}(\.\d{1,3}){3}\b/.test(guestRoute.text) && !/[0-9a-f]{1,4}:[0-9a-f]{1,4}:/i.test(guestRoute.text),
     'without putting anybody\'s address in a line meant for a chat');
 
+// ── and how much is actually reaching them ──
+// "It looks blurry" has two causes that look identical: an encoder that has
+// not finished climbing, and a network that is the ceiling. Only the numbers
+// tell them apart, so both screens carry them.
+await host.waitForTimeout(2600);   // a rate needs two readings
+const flow = await host.evaluate(async () => {
+    const rows = [...document.querySelectorAll('.wp-viewer-why')].map(p => p.textContent);
+    const invites = await window.player.watchParty.invitesWithRoutes();
+    return { rows, detail: invites.find(i => i.route)?.detail || '' };
+});
+check(/\d+×\d+/.test(flow.detail),
+    `the host is told the size a connected friend is getting (${flow.detail})`);
+check(flow.rows.some(r => /\d+×\d+/.test(r)),
+    'and it is on the panel, not just in the object behind it');
+const guestFlow = await guest.evaluate(() => {
+    const line = document.getElementById('flow');
+    return { hidden: line.hidden, text: line.textContent };
+});
+check(!guestFlow.hidden && /\d+×\d+/.test(guestFlow.text),
+    `and the friend sees the same from their side ("${guestFlow.text}")`);
+check(/fps/.test(guestFlow.text), 'with the frame rate, which is what softness shows up in');
+
 // ── and when a friend cannot get through, it says why ──
 // A reply routed to the wrong invitation is the one way to make a connection
 // that is accepted and then silently never completes -- which is exactly the

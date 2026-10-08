@@ -123,9 +123,12 @@ export class WatchPartyMenu {
                     label.textContent = `Friend ${invite.id} — ${describe(invite.state, invite.accepted)}${how}`;
                     row.append(dot, label);
                     viewers.append(row);
-                    // The detail is only worth the space when something is
-                    // wrong: a friend who answered and still is not watching.
-                    if (invite.accepted && !invite.route) {
+                    // Worth the space whenever there is something to say: why
+                    // a friend is not through, or -- once they are -- how much
+                    // is reaching them, which is the only way to tell a soft
+                    // picture caused by their network from one caused by the
+                    // encoder still climbing.
+                    if (invite.accepted && invite.detail) {
                         const why = document.createElement('p');
                         why.className = 'wp-viewer-why';
                         why.textContent = invite.detail;

@@ -1,7 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { packSignal, unpackSignal } from './SignalCodec.js';
 import { BASE_URL } from '../../shared/config.js';
-import { describeConnection } from './ConnectionReport.js';
+import { describeConnection, describeMedia } from './ConnectionReport.js';
 
 /** How long to wait for ICE gathering before sending what we have. */
 const GATHER_TIMEOUT_MS = 5000;
@@ -109,17 +109,22 @@ export class WatchParty {
      * know whether anything is getting through at all.
      *
      * @returns {Promise<Array<{id: number, state: string, accepted: boolean,
-     *          route: string|null, detail: string}>>}
+     *          route: string|null, detail: string, limitedBy: string|null}>>}
      */
     async invitesWithRoutes() {
         return Promise.all([...this._peers.entries()].map(async ([id, peer]) => {
             const report = await describeConnection(peer.connection);
+            const flow = await describeMedia(peer.connection);
             return {
                 id,
                 state: peer.connection.connectionState,
                 accepted: peer.accepted,
                 route: report.route,
-                detail: report.text,
+                // What is going wrong, or -- once it is going right -- how
+                // well. The second is what tells a host whether a friend's
+                // soft picture is their network or just the encoder warming up.
+                detail: report.route ? flow.text : report.text,
+                limitedBy: flow.limitedBy,
             };
         }));
     }

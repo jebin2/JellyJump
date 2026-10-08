@@ -1,5 +1,5 @@
 import { WatchViewer } from './core/streaming/WatchParty.js';
-import { describeConnection } from './core/streaming/ConnectionReport.js';
+import { describeConnection, describeMedia } from './core/streaming/ConnectionReport.js';
 import { viewerView, WAITING_NOTE } from './core/streaming/ViewerView.js';
 import { Logger } from './shared/utils/Logger.js';
 
@@ -135,21 +135,22 @@ async function main() {
     // kinds of address each end had and which pair they settled on, in a line
     // that can be read back to the host.
     const routeLine = el('route');
+    const flowLine = el('flow');
     const reportRoute = async () => {
         const report = await describeConnection(viewer.connection);
         routeLine.textContent = report.text;
         routeLine.hidden = false;
+        const flow = await describeMedia(viewer.connection);
+        flowLine.textContent = flow.text;
+        flowLine.hidden = !flow.text;
         return report;
     };
     // While connecting it changes, so it is refreshed; once there is a route
     // or there is provably none, it stops.
-    const routeTimer = setInterval(async () => {
-        const report = await reportRoute();
-        // Kept running while the code is still waiting to be pasted: the
-        // connection can still come good once the host has it, and this line
-        // is the only thing saying so.
-        if (report.route && hasWatched) clearInterval(routeTimer);
-    }, 2000);
+    // Kept running for the whole party rather than stopping once connected:
+    // the numbers are the point of it, and the one thing worth watching is how
+    // they change over the first minute while the encoder finds its level.
+    const routeTimer = setInterval(() => { reportRoute(); }, 2000);
     reportRoute();
 
     // The host telling us directly, which arrives at once. The state-based

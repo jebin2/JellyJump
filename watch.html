@@ -97,6 +97,10 @@
          tell that from a bug. Candidate types only -- this line is meant to be
          pasted back to the host, and an address would be someone's IP. -->
     <p id="route" class="route" hidden></p>
+    <!-- How much is actually arriving. A picture can be soft because the
+         encoder has not finished climbing or because the network is the
+         ceiling, and those look identical without the numbers. -->
+    <p id="flow" class="route" hidden></p>
 
     <!-- Always in the document and never display:none. A hidden video element
          can stop decoding, so a stream attached to one may never report

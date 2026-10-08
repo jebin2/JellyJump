@@ -12,7 +12,7 @@
  *
  *   node scripts/connection-report-test.mjs
  */
-import { describeConnection, describeRoute } from '../assets/js/core/streaming/ConnectionReport.js';
+import { describeConnection, describeRoute, describeMedia } from '../assets/js/core/streaming/ConnectionReport.js';
 
 let pass = 0, fail = 0;
 const check = (ok, label) => { if (ok) { pass++; console.log(`  PASS  ${label}`); } else { fail++; console.log(`  FAIL  ${label}`); } };
@@ -159,6 +159,63 @@ const ADDRESSES = /\b\d{1,3}(\.\d{1,3}){3}\b/;
         && after.text.includes('They offered: public address'),
         `and still reported after it gives up (${after.text})`);
     check(!after.text.includes('none yet'), 'rather than claiming neither end offered anything');
+}
+
+// ── how much is flowing, which is a different question from the route ──
+// A party can be connected by the best possible path and still look soft,
+// because an encoder starts low and climbs. These numbers are what separates
+// "the network is the ceiling" from "it has not finished climbing yet".
+const videoStat = (type, over) => ({
+    id: 'V', type, kind: 'video', frameWidth: 960, frameHeight: 540,
+    framesPerSecond: 24, timestamp: 1000, ...over,
+});
+{
+    const connection = {
+        connectionState: 'connected',
+        getStats: async () => ({ forEach: fn => [
+            videoStat('outbound-rtp', { bytesSent: 100000, qualityLimitationReason: 'bandwidth' }),
+            pair('P', 'L', 'R', 'succeeded', { selected: true, currentRoundTripTime: 0.048 }),
+        ].forEach(fn) }),
+    };
+    const first = await describeMedia(connection);
+    check(first.text.includes('960×540') && first.text.includes('24 fps'),
+        `the picture's size and rate are reported (${first.text})`);
+    check(first.kbps === null && !/bps/.test(first.text),
+        'a rate needs two readings, so the first says nothing about it');
+    check(first.text.includes('48 ms round trip'), 'the round trip is reported in milliseconds');
+    check(first.limitedBy === 'bandwidth' && first.text.includes('held back by bandwidth'),
+        'and what is holding it back is named');
+
+    // A second later, 150 kB further on: 1200 kbps.
+    connection.getStats = async () => ({ forEach: fn => [
+        videoStat('outbound-rtp', { bytesSent: 250000, timestamp: 2000 }),
+    ].forEach(fn) });
+    const second = await describeMedia(connection);
+    check(second.kbps === 1200, `the rate comes from the change between readings (${second.kbps} kbps)`);
+    check(second.text.includes('1.2 Mbps'), `and reads as Mbps once it is over a thousand (${second.text})`);
+    check(!/held back/.test(second.text), 'a limitation that has gone is no longer claimed');
+}
+{
+    // A viewer reads the receiving end, which has no limitation reason at all.
+    const r = await describeMedia({
+        connectionState: 'connected',
+        getStats: async () => ({ forEach: fn => [
+            videoStat('inbound-rtp', { bytesReceived: 5000, frameWidth: 320, frameHeight: 180 }),
+        ].forEach(fn) }),
+    });
+    check(r.text.includes('320×180') && r.limitedBy === null,
+        `the receiving end reports what arrived (${r.text})`);
+}
+{
+    const quiet = await describeMedia({
+        connectionState: 'new',
+        getStats: async () => ({ forEach: () => {} }),
+    });
+    check(quiet.text === '', 'nothing flowing yet says nothing at all');
+    check((await describeMedia(null)).text === '', 'and no connection is handled');
+    check((await describeMedia({ connectionState: 'connected',
+        getStats: async () => { throw new Error('no'); } })).text === '',
+        'as are stats that throw');
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
