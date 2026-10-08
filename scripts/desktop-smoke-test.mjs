@@ -12,7 +12,7 @@
  *   npm run build && cp -r dist desktop/build && node scripts/desktop-smoke-test.mjs
  */
 import { _electron as electron } from 'playwright-core';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -26,6 +26,21 @@ if (!existsSync(resolve(ROOT, 'desktop/build/player.html'))) {
 
 // --ozone-platform=headless segfaults the moment a debugger attaches, so the
 // window is real; it is closed again as soon as the checks are done.
+// ── what the package says about itself ──
+// electron-builder copies these straight into the .deb's Maintainer, Vendor
+// and Homepage fields and into the installer metadata on every platform, so a
+// placeholder here is not a note to self -- it is published. The repository
+// this one named for three releases was a 404.
+{
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, 'desktop/package.json'), 'utf8'));
+    const blob = JSON.stringify(pkg);
+    check(!/example\.com|example\.org|your-?name|TODO|FIXME/i.test(blob),
+        `the package names a real author, not a placeholder (${pkg.author})`);
+    const urls = [pkg.homepage, pkg.repository?.url].filter(Boolean);
+    check(urls.length === 2 && urls.every(u => u.includes('github.com/jebin2/JellyJump')),
+        `and points at the repository that exists (${urls.join(', ')})`);
+}
+
 const app = await electron.launch({
     args: ['.', '--no-sandbox'],
     cwd: resolve(ROOT, 'desktop'),
