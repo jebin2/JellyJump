@@ -1,6 +1,6 @@
 {
   "name": "jellyjump",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "JellyJump Media Player",
   "type": "module",
   "scripts": {
@@ -29,6 +29,7 @@
     "test:playlist": "node scripts/playlist-kind-test.mjs",
     "test:camera": "node scripts/camera-effects-test.mjs && node scripts/sticker-test.mjs && node scripts/decoration-test.mjs && node scripts/recording-clock-test.mjs",
     "test:css": "node scripts/css-token-test.mjs",
+    "test:desktop": "npm run build && rm -rf desktop/build && cp -r dist desktop/build && node scripts/desktop-smoke-test.mjs",
     "test:smoke": "node scripts/smoke-test.mjs"
   },
   "devDependencies": {
