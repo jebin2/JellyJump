@@ -132,8 +132,6 @@
     z-index: 10005;
     /* Above play-overlay and other UI elements */
     pointer-events: auto !important;
-    background-color: var(--bg-primary);
-    border: 2px solid var(--accent-primary);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     padding: var(--space-sm) var(--space-sm);
     margin: 0;
@@ -166,7 +164,6 @@
 /* Sidebar Collapse Button - Default (expanded) state */
 .sidebar-collapse-btn {
     background: none;
-    border: 2px solid var(--border-color);
     color: var(--text-primary);
     cursor: pointer;
     padding: 4px 8px;
@@ -995,7 +992,6 @@
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    background: rgba(var(--accent-primary-rgb), 0.2);
     color: var(--accent-primary);
 }
 
