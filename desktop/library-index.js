@@ -56,6 +56,10 @@ function setRoots(roots) {
         .filter(Boolean);
 }
 
+function getRoots() {
+    return scanRoots.slice();
+}
+
 function addBatch(files) {
     for (const file of files || []) {
         if (!file?.path) continue;
@@ -163,6 +167,6 @@ function resolveServable(id) {
 }
 
 module.exports = {
-    addBatch, addLinkList, setRoots, clear, list, listLinkLists, size,
+    addBatch, addLinkList, setRoots, getRoots, clear, list, listLinkLists, size,
     resolveServable, idFor,
 };

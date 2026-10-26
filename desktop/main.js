@@ -1,9 +1,9 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { registerScannerIpc } = require('./scanner-host');
-const { registerShareIpc } = require('./share-host');
+const { registerShareIpc, enable: enableShare, disable: disableShare, describe: describeShare } = require('./share-host');
 const { handleCliArgs, isTerminalInvocation, isQueryInvocation } = require('./cli');
 
 /**
@@ -410,7 +410,111 @@ registerShareIpc({
 // Window Creation
 // ============================================
 
+function createApplicationMenu() {
+    const template = [
+        {
+            label: 'File',
+            submenu: [
+                { role: 'quit' }
+            ]
+        },
+        {
+            label: 'Share',
+            submenu: [
+                {
+                    label: 'Start Sharing',
+                    click: async () => {
+                        try {
+                            await enableShare();
+                        } catch (error) {
+                            console.error('Failed to start sharing:', error);
+                        }
+                    }
+                },
+                {
+                    label: 'Stop Sharing',
+                    click: async () => {
+                        try {
+                            await disableShare();
+                        } catch (error) {
+                            console.error('Failed to stop sharing:', error);
+                        }
+                    }
+                },
+                {
+                    label: 'Share Status',
+                    click: async () => {
+                        try {
+                            const state = await describeShare();
+                            const { dialog } = require('electron');
+                            if (state.enabled && state.url) {
+                                dialog.showMessageBox({
+                                    type: 'info',
+                                    title: 'Share Status',
+                                    message: 'Sharing is active',
+                                    detail: `URL: ${state.url}\nItems: ${state.itemCount || 0}`
+                                });
+                            } else {
+                                dialog.showMessageBox({
+                                    type: 'info',
+                                    title: 'Share Status',
+                                    message: 'Sharing is not active',
+                                    detail: state.reason || ''
+                                });
+                            }
+                        } catch (error) {
+                            const { dialog } = require('electron');
+                            dialog.showErrorBox('Share Status Error', error.message);
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            label: 'View',
+            submenu: [
+                { role: 'reload' },
+                { role: 'forceReload' },
+                { role: 'toggleDevTools' },
+                { type: 'separator' },
+                { role: 'resetZoom' },
+                { role: 'zoomIn' },
+                { role: 'zoomOut' },
+                { type: 'separator' },
+                { role: 'togglefullscreen' }
+            ]
+        },
+        {
+            label: 'Window',
+            submenu: [
+                { role: 'minimize' },
+                { role: 'close' }
+            ]
+        }
+    ];
+
+    if (process.platform === 'darwin') {
+        template.unshift({
+            label: app.name,
+            submenu: [
+                { role: 'about' },
+                { type: 'separator' },
+                { role: 'services' },
+                { type: 'separator' },
+                { role: 'hide' },
+                { role: 'hideOthers' },
+                { type: 'separator' },
+                { role: 'quit' }
+            ]
+        });
+    }
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+}
+
 function createWindow() {
+    createApplicationMenu();
     const win = new BrowserWindow({
         width: 1280,
         height: 720,
@@ -420,7 +524,7 @@ function createWindow() {
             webSecurity: true,
             preload: preloadPath
         },
-        autoHideMenuBar: true,
+        autoHideMenuBar: false,
         title: "JellyJump Player",
         icon: path.join(__dirname, 'build/assets/icons/jelly_jump_logo.png'),
         backgroundColor: '#0a0a0a'
@@ -458,55 +562,14 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-    // A flag means the user wants an answer, not an app — most likely over SSH,
-    // where the share link is otherwise unreadable. Handled before any window
-    // exists so nothing flashes up on the remote machine's display.
+    // A flag means the user wants an answer, not an app
     const mode = await handleCliArgs(process.argv, configPath);
     if (mode === 'exit') {
-        // app.exit, not app.quit: quit exits 0 regardless of process.exitCode,
-        // so a failed --share-status or a rejected option would report success
-        // to anything checking $?.
         app.exit(process.exitCode || 0);
         return;
     }
-    // Only one instance may run, because sharing is machine-wide state, not
-    // per-process: the second instance binds its own local port and points the
-    // tailnet address at itself, taking the library over silently — and when it
-    // exits it tears the mapping down, leaving the first instance running and
-    // convinced it is still sharing while every link is dead. Two full disk
-    // scans at once is the smaller half of the problem.
-    //
-    // Requested here rather than at the top of the file so --share-status and
-    // --help still answer while an instance is running; those only read.
+
     if (!app.requestSingleInstanceLock()) {
-        if (mode === 'headless') {
-            console.error('JellyJump is already running on this machine.\n\n'
-                + 'Only one instance can share the library — a second would take over the\n'
-                + 'tailnet address, and stop sharing for the first when it exits.\n\n'
-                + '    jellyjump --share-status    whether it is sharing, and the link\n'
-                + '    jellyjump --stop            stop the instance that is running\n');
-            app.exit(1);
-            return;
-        }
-
-        // A GUI launch normally raises the window the other instance owns. When
-        // that instance is headless there is no window to raise, so this would
-        // exit silently and look like the app was broken — say what is holding
-        // it, and name the process to stop.
-        const headlessPid = runningHeadlessPid();
-        if (headlessPid) {
-            const message = 'JellyJump is sharing this library without a window '
-                + `(started with --no-gui, process ${headlessPid}).\n\n`
-                + 'Stop it first — Ctrl+C in that terminal, or:\n\n'
-                + '    jellyjump --stop';
-            // Both, because this launch may have come from a terminal or from a
-            // desktop icon, and neither one sees the other's output.
-            console.error(`JellyJump is already running.\n${message}\n`);
-            require('electron').dialog.showErrorBox('JellyJump is already running', message);
-            app.exit(1);
-            return;
-        }
-
         app.quit();
         return;
     }
@@ -520,14 +583,6 @@ app.whenReady().then(async () => {
             existing.focus();
         }
     });
-
-    if (mode === 'headless') {
-        // No window at all, so this works on a box with no desktop session.
-        const { runHeadless } = require('./headless');
-        process.exitCode = await runHeadless(configPath);
-        app.quit();
-        return;
-    }
 
     createWindow();
 

@@ -10,6 +10,8 @@
  */
 const crypto = require('crypto');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 const { app, ipcMain } = require('electron');
 const libraryServer = require('./library-server');
 const libraryIndex = require('./library-index');
@@ -20,6 +22,33 @@ const HTTPS_PORT = 8443;
 let shareState = { enabled: false, url: null, dnsName: null, reason: null };
 let readToken;
 let writeToken;
+
+function getShareEnvPath() {
+    return path.join(app.getPath('userData'), 'jellyjump-share.env');
+}
+
+function writeShareEnv(url) {
+    try {
+        const envPath = getShareEnvPath();
+        const content = `JELLYJUMP_SHARE_URL=${url}\n`;
+        fs.writeFileSync(envPath, content, 'utf8');
+        process.env.JELLYJUMP_SHARE_URL = url;
+    } catch (error) {
+        console.error('[Share] Failed to write share env:', error);
+    }
+}
+
+function clearShareEnv() {
+    try {
+        const envPath = getShareEnvPath();
+        if (fs.existsSync(envPath)) {
+            fs.unlinkSync(envPath);
+        }
+        delete process.env.JELLYJUMP_SHARE_URL;
+    } catch (error) {
+        console.error('[Share] Failed to clear share env:', error);
+    }
+}
 
 async function currentToken() {
     let token = await readToken();
@@ -41,8 +70,13 @@ async function describe() {
     };
 }
 
+const watcher = require('./watcher');
+
 async function enable() {
     if (shareState.enabled) return describe();
+
+    // Ensure watcher is running when sharing is enabled
+    try { watcher.start(); } catch {}
 
     const ts = await tailscale.status();
     if (!ts.available) {
@@ -74,12 +108,14 @@ async function enable() {
         return describe();
     }
 
+    const shareUrl = tailscale.shareUrl({ dnsName: ts.dnsName, httpsPort: HTTPS_PORT, token });
     shareState = {
         enabled: true,
-        url: tailscale.shareUrl({ dnsName: ts.dnsName, httpsPort: HTTPS_PORT, token }),
+        url: shareUrl,
         dnsName: ts.dnsName,
         reason: null,
     };
+    writeShareEnv(shareUrl);
     return describe();
 }
 
@@ -87,6 +123,9 @@ async function disable() {
     await tailscale.stopServe({ httpsPort: HTTPS_PORT });
     await libraryServer.stop();
     shareState = { enabled: false, url: null, dnsName: shareState.dnsName, reason: null };
+    clearShareEnv();
+    // Optionally stop watcher to save resources when not sharing
+    // try { watcher.stop(); } catch {}
     return describe();
 }
 
@@ -140,6 +179,7 @@ function registerShareIpc({ assertTrustedIpcEvent, readShareToken, writeShareTok
 /** Tear down on quit, so nothing is left served after the app closes. */
 async function stopSharing() {
     if (shareState.enabled) await disable();
+    else clearShareEnv();
 }
 
 module.exports = { registerShareIpc, configureTokens, enable, disable, describe, stopSharing };
