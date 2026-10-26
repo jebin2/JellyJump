@@ -69,15 +69,32 @@ async function runHeadless(configPath) {
 
     let found = 0;
     let lastReport = Date.now();
+    const inline = process.stdout.isTTY;
+    let statusOnLine = false;
+    const clearStatus = () => {
+        if (!statusOnLine) return;
+        process.stdout.write('\n');
+        statusOnLine = false;
+    };
     runScan({
-        onPhase: (m) => console.log(`  ${PHASE_NAMES[m.phase] || `pass ${m.phase}`}…`),
+        onPhase: (m) => {
+            clearStatus();
+            console.log(`  ${PHASE_NAMES[m.phase] || `pass ${m.phase}`}…`);
+        },
         onBatch: (count) => {
             // Silence on a terminal reads as a hang, which is what makes
             // someone interrupt a scan that was working.
             found += count;
             if (Date.now() - lastReport >= 3000) {
                 lastReport = Date.now();
-                console.log(`    ${found} found…`);
+                // Overwrite the previous count in place instead of scrolling.
+                // Non-terminals (logs, pipes) keep one line per update.
+                if (inline) {
+                    process.stdout.write(`\r    ${found} found…`);
+                    statusOnLine = true;
+                } else {
+                    console.log(`    ${found} found…`);
+                }
             }
         },
     }).then((result) => {
