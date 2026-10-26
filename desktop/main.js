@@ -1,14 +1,16 @@
 const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { registerScannerIpc } = require('./scanner-host');
 const { registerShareIpc, enable: enableShare, disable: disableShare, describe: describeShare } = require('./share-host');
-const { handleCliArgs, isTerminalInvocation } = require('./cli');
+const { handleCliArgs, isTerminalInvocation, isQueryInvocation } = require('./cli');
 
 /**
  * Answer a read-only flag as plain Node, with no Chromium at all.
  *
- * --version and --help print a line of text; none of that needs a browser process. Starting one is what produced "Invalid
+ * --version, --share-status and --help read a file and shell out to tailscale;
+ * none of that needs a browser process. Starting one is what produced "Invalid
  * file descriptor to ICU data received" in the AppImage: its runtime unmounts
  * the squashfs as soon as we exit, and a Chromium child still initializing at
  * that moment loses icudtl.dat underneath it. Measured — the .deb and the
@@ -16,8 +18,8 @@ const { handleCliArgs, isTerminalInvocation } = require('./cli');
  * combination of --no-zygote / --disable-gpu / --disable-crash-reporter
  * suppressed it.
  *
- * The one thing only Electron knows -- the version -- is handed down, so a
- * Node-mode answer cannot drift from what the app itself would report.
+ * The two things only Electron knows are handed down, so a Node-mode answer
+ * cannot drift from what the app itself would report.
  */
 function runQueryAsNode() {
     const { spawnSync } = require('child_process');
@@ -29,6 +31,7 @@ function runQueryAsNode() {
             env: {
                 ...process.env,
                 ELECTRON_RUN_AS_NODE: '1',
+                JELLYJUMP_CONFIG: path.join(app.getPath('userData'), 'jellyjump.json'),
                 JELLYJUMP_VERSION: app.getVersion(),
             },
         }
@@ -36,21 +39,75 @@ function runQueryAsNode() {
     process.exit(child.status ?? 1);
 }
 
-// Decided here, at the top of the file, because by the time `ready` fires the
-// windowing backend has already been picked -- and on a machine reached over SSH
-// there is none. Electron defaults to the X11 backend, finds no $DISPLAY, and
-// aura aborts the process with SIGSEGV before any of our code runs. A flag that
-// only prints must therefore never get that far.
-const wantsTerminal = isTerminalInvocation(process.argv);
-if (process.platform === 'linux' && wantsTerminal) {
-    runQueryAsNode(); // does not return
+function hasOzoneSwitch(argv) {
+    return argv.some((arg) => arg.startsWith('--ozone-platform'));
 }
 
-// A window asked for where no display exists is the same crash; say so rather
-// than segfaulting without a hint.
+/**
+ * Re-run ourselves with a windowing backend that needs no display.
+ *
+ * app.commandLine.appendSwitch cannot do this: by the time the main script
+ * runs, Chromium has already selected and initialized the ozone platform, so
+ * the switch is read too late and ignored. Measured from a bare environment
+ * (the SSH case) against the packaged build — appendSwitch and
+ * ELECTRON_OZONE_PLATFORM_HINT both still died in aura; only a switch present
+ * on the command line at exec time worked. A machine with a desktop session
+ * hides this, because ozone then picks Wayland and succeeds anyway.
+ *
+ * spawnSync rather than spawn: this process must not reach `ready`, and
+ * blocking the event loop is what guarantees it cannot.
+ *
+ * Signals therefore cannot be forwarded — a handler here cannot run while
+ * spawnSync blocks (measured: it fires only after the call returns). So the two
+ * signals are handled differently on purpose:
+ *
+ *   SIGINT  — ignored here. Ctrl+C already reaches the child directly through
+ *             the terminal's process group, and ignoring it keeps this process
+ *             alive to relay the child's shutdown output in the right order.
+ *   SIGTERM — left at its default, so `kill` and `systemctl stop` do kill this
+ *             process. The child notices its wrapper is gone (JELLYJUMP_WRAPPER_PID)
+ *             and shuts down cleanly rather than being orphaned.
+ */
+function relaunchWithoutDisplay() {
+    const { spawnSync } = require('child_process');
+    process.on('SIGINT', () => {});
+    const child = spawnSync(
+        process.execPath,
+        // --disable-gpu because nothing is ever drawn, and without it ANGLE
+        // still tries to open the X display it does not have, printing an
+        // error per attempt around our output.
+        [...process.argv.slice(1), '--ozone-platform=headless', '--disable-gpu'],
+        {
+            stdio: 'inherit',
+            // Named rather than inferred from ppid: `nohup jellyjump --no-gui &`
+            // is a legitimate way to run this, and there the parent shell is
+            // *meant* to go away. Only this wrapper's death means anything.
+            env: { ...process.env, JELLYJUMP_WRAPPER_PID: String(process.pid) },
+        }
+    );
+    // 128 + signal is the shell's own convention for a signalled exit.
+    process.exit(child.status ?? (child.signal ? 128 + os.constants.signals[child.signal] : 1));
+}
+
+// Chosen here, at the top of the file, because by the time `ready` fires the
+// windowing backend has already been picked — and on a machine reached over SSH
+// there is none. Electron defaults to the X11 backend, finds no $DISPLAY, and
+// aura aborts the process with SIGSEGV before any of our code runs. That killed
+// every flag on exactly the machine the flags exist for.
+const wantsTerminal = isTerminalInvocation(process.argv);
+if (process.platform === 'linux' && wantsTerminal) {
+    // Neither of these returns.
+    if (isQueryInvocation(process.argv)) runQueryAsNode();
+    else if (!hasOzoneSwitch(process.argv)) relaunchWithoutDisplay();
+}
+
+// A GUI asked for where no display exists is the same crash, and it is worth
+// saying so: the segfault above gives no hint that --no-gui is what was wanted.
 if (process.platform === 'linux' && !wantsTerminal
     && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
-    console.error('No display found -- JellyJump needs a desktop session to open a window.');
+    console.error('No display found — JellyJump cannot open a window here.\n\n'
+        + 'If you are connected over SSH, run it without a window instead:\n\n'
+        + '    jellyjump --no-gui\n');
     process.exit(1);
 }
 
@@ -85,6 +142,23 @@ if (process.platform === 'linux') {
 }
 
 const configPath = path.join(app.getPath('userData'), 'jellyjump.json');
+
+/**
+ * The pid of a headless instance that is actually still alive, if there is one.
+ * The recorded pid can be stale — a `kill -9` leaves no chance to clear it — so
+ * it is checked rather than trusted.
+ * @returns {number|null}
+ */
+function runningHeadlessPid() {
+    try {
+        const { headlessPid } = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        if (!headlessPid) return null;
+        process.kill(headlessPid, 0);
+        return headlessPid;
+    } catch {
+        return null;
+    }
+}
 
 function isTrustedIpcEvent(event) {
     const frameUrl = event.senderFrame?.url;
@@ -491,14 +565,55 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-    // A flag means the user wants an answer, not an app
-    const mode = await handleCliArgs(process.argv);
+    // A flag means the user wants an answer, not an app — most likely over SSH,
+    // where the share link is otherwise unreadable. Handled before any window
+    // exists so nothing flashes up on the remote machine's display.
+    const mode = await handleCliArgs(process.argv, configPath);
     if (mode === 'exit') {
+        // app.exit, not app.quit: quit exits 0 regardless of process.exitCode,
+        // so a failed --share-status or a rejected option would report success
+        // to anything checking $?.
         app.exit(process.exitCode || 0);
         return;
     }
-
+    // Only one instance may run, because sharing is machine-wide state, not
+    // per-process: the second instance binds its own local port and points the
+    // tailnet address at itself, taking the library over silently — and when it
+    // exits it tears the mapping down, leaving the first instance running and
+    // convinced it is still sharing while every link is dead. Two full disk
+    // scans at once is the smaller half of the problem.
+    //
+    // Requested here rather than at the top of the file so --share-status and
+    // --help still answer while an instance is running; those only read.
     if (!app.requestSingleInstanceLock()) {
+        if (mode === 'headless') {
+            console.error('JellyJump is already running on this machine.\n\n'
+                + 'Only one instance can share the library — a second would take over the\n'
+                + 'tailnet address, and stop sharing for the first when it exits.\n\n'
+                + '    jellyjump --share-status    whether it is sharing, and the link\n'
+                + '    jellyjump --stop            stop the instance that is running\n');
+            app.exit(1);
+            return;
+        }
+
+        // A GUI launch normally raises the window the other instance owns. When
+        // that instance is headless there is no window to raise, so this would
+        // exit silently and look like the app was broken — say what is holding
+        // it, and name the process to stop.
+        const headlessPid = runningHeadlessPid();
+        if (headlessPid) {
+            const message = 'JellyJump is sharing this library without a window '
+                + `(started with --no-gui, process ${headlessPid}).\n\n`
+                + 'Stop it first — Ctrl+C in that terminal, or:\n\n'
+                + '    jellyjump --stop';
+            // Both, because this launch may have come from a terminal or from a
+            // desktop icon, and neither one sees the other's output.
+            console.error(`JellyJump is already running.\n${message}\n`);
+            require('electron').dialog.showErrorBox('JellyJump is already running', message);
+            app.exit(1);
+            return;
+        }
+
         app.quit();
         return;
     }
@@ -512,6 +627,14 @@ app.whenReady().then(async () => {
             existing.focus();
         }
     });
+
+    if (mode === 'headless') {
+        // No window at all, so this works on a box with no desktop session.
+        const { runHeadless } = require('./headless');
+        process.exitCode = await runHeadless(configPath);
+        app.quit();
+        return;
+    }
 
     createWindow();
 
