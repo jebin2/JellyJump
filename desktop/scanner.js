@@ -27,74 +27,10 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-
-// Video containers only. The renderer's MEDIA_EXTENSIONS also covers audio,
-// subtitles and images, which is the right set for "may this be read" but the
-// wrong one for "is this a video worth listing".
-const VIDEO_EXTENSIONS = new Set([
-    '.mp4', '.mkv', '.avi', '.webm', '.mov', '.m4v', '.wmv',
-    '.flv', '.ts', '.m2ts', '.mts', '.3gp', '.ogv',
-]);
-
-const SUBTITLE_EXTENSIONS = new Set(['.srt', '.vtt']);
-
-// Extensions that are not only video. ".ts" is MPEG transport stream and also
-// TypeScript, and a home directory holds thousands of the latter — including
-// generated ones like CMake's compiler_depend.ts. Extension alone would list
-// source files as videos, so these are confirmed by content.
-const AMBIGUOUS_EXTENSIONS = new Set(['.ts']);
-
-// Our own link-list files. Deliberately our own extension rather than .txt: a
-// media drive holds recovery codes and password exports, and any rule that
-// opens text files to see whether they are interesting opens those too. Nothing
-// but .jjlist is ever read.
-const LINK_LIST_EXTENSION = '.jjlist';
-
-// A hand-written playlist is small. The cap is not about disk — it is what
-// stops a file that happens to carry this extension from being read into memory
-// and posted across the process boundary.
-const LINK_LIST_MAX_BYTES = 256 * 1024;
-
-// MPEG-TS is 188-byte packets, each starting with this sync byte. Three in a row
-// at the right stride is conclusive enough and needs only the first 377 bytes.
-const TS_SYNC_BYTE = 0x47;
-const TS_PACKET_SIZE = 188;
-const TS_SYNC_CHECKS = 3;
-const TS_PROBE_BYTES = TS_PACKET_SIZE * (TS_SYNC_CHECKS - 1) + 1;
-
-/**
- * Whether a file with an ambiguous extension really is video.
- * Cheap by design: a size check rules out source files for free, and only what
- * survives that is opened.
- */
-async function looksLikeTransportStream(filePath, size) {
-    if (size < TS_PROBE_BYTES) return false;
-
-    let handle;
-    try {
-        handle = await fs.promises.open(filePath, 'r');
-        const { buffer, bytesRead } = await handle.read(Buffer.alloc(TS_PROBE_BYTES), 0, TS_PROBE_BYTES, 0);
-        if (bytesRead < TS_PROBE_BYTES) return false;
-        for (let i = 0; i < TS_SYNC_CHECKS; i++) {
-            if (buffer[i * TS_PACKET_SIZE] !== TS_SYNC_BYTE) return false;
-        }
-        return true;
-    } catch {
-        return false;
-    } finally {
-        await handle?.close().catch(() => {});
-    }
-}
-
-// Directory names never worth descending into. This matters most on the home
-// pass, which would otherwise spend the bulk of its time inside dependency
-// trees and caches. Dotfolders are skipped wholesale by the walker, so these
-// are the ones that are not hidden.
-const SKIP_DIRECTORIES = new Set([
-    'node_modules', '.git', '.svn', '.hg', '.cache', '.npm', '.venv',
-    '__pycache__', 'Library', 'AppData', 'System Volume Information',
-    '$RECYCLE.BIN', '.Trash', '.local', 'snap', '.thumbnails',
-]);
+const {
+    VIDEO_EXTENSIONS, LINK_LIST_EXTENSION,
+    isSkippedName, inspectVideo, inspectSubtitle, sidecarsFor, readLinkList,
+} = require('./scan-rules');
 
 // Streaming keeps memory flat and lets the UI fill in as results arrive, rather
 // than sitting empty until the whole tree is walked.
@@ -153,22 +89,8 @@ async function* walk(root, visited, counters) {
         const subtitles = [];
         for (const entry of entries) {
             if (!entry.isFile() && !entry.isSymbolicLink()) continue;
-            const ext = path.extname(entry.name).toLowerCase();
-            if (!SUBTITLE_EXTENSIONS.has(ext)) continue;
-            const full = path.join(dir, entry.name);
-            try {
-                const stat = await fs.promises.stat(full);
-                if (!stat.isFile() || stat.size === 0) continue;
-                subtitles.push({
-                    path: full,
-                    name: entry.name,
-                    size: stat.size,
-                    mtime: stat.mtimeMs,
-                    ext,
-                });
-            } catch {
-                // Unreadable or vanished; no sidecar is better than a failed scan.
-            }
+            const subtitle = await inspectSubtitle(path.join(dir, entry.name), entry.name);
+            if (subtitle) subtitles.push(subtitle);
         }
 
         for (const entry of entries) {
@@ -193,13 +115,13 @@ async function* walk(root, visited, counters) {
                     continue;
                 }
                 if (stat.isDirectory()) {
-                    if (!SKIP_DIRECTORIES.has(entry.name) && !entry.name.startsWith('.')) {
+                    if (!isSkippedName(entry.name)) {
                         queue.push(resolved);
                     }
                     continue;
                 }
             } else if (entry.isDirectory()) {
-                if (SKIP_DIRECTORIES.has(entry.name) || entry.name.startsWith('.')) continue;
+                if (isSkippedName(entry.name)) continue;
                 if (visited.has(full)) continue;
                 visited.add(full);
                 queue.push(full);
@@ -214,52 +136,19 @@ async function* walk(root, visited, counters) {
             const ext = path.extname(entry.name).toLowerCase();
 
             if (ext === LINK_LIST_EXTENSION) {
-                // Sent as text, not parsed here: the parser lives in the
-                // renderer's shared module and having a second copy in this
-                // process is how the two drift apart.
-                try {
-                    const stat = await fs.promises.stat(full);
-                    if (stat.isFile() && stat.size > 0 && stat.size <= LINK_LIST_MAX_BYTES) {
-                        yield {
-                            kind: 'linklist',
-                            path: full,
-                            name: entry.name,
-                            mtime: stat.mtimeMs,
-                            text: await fs.promises.readFile(full, 'utf8'),
-                        };
-                    }
-                } catch {
-                    // Unreadable or vanished; a playlist file is not worth
-                    // failing a scan over.
-                }
+                // Unreadable or vanished is null; a playlist file is not worth
+                // failing a scan over.
+                const list = await readLinkList(full, entry.name);
+                if (list) yield list;
                 continue;
             }
 
             if (!VIDEO_EXTENSIONS.has(ext)) continue;
 
-            try {
-                const stat = await fs.promises.stat(full);
-                if (!stat.isFile() || stat.size === 0) continue;
-                if (AMBIGUOUS_EXTENSIONS.has(ext)
-                    && !(await looksLikeTransportStream(full, stat.size))) {
-                    continue;
-                }
-                const mediaBase = entry.name.slice(0, -ext.length).toLowerCase();
-                const sidecars = subtitles.filter((subtitle) => {
-                    const subtitleBase = subtitle.name.slice(0, -subtitle.ext.length).toLowerCase();
-                    return subtitleBase === mediaBase || subtitleBase.startsWith(`${mediaBase}.`);
-                });
-                yield {
-                    path: full,
-                    name: entry.name,
-                    size: stat.size,
-                    mtime: stat.mtimeMs,
-                    ext,
-                    ...(sidecars.length > 0 ? { subtitles: sidecars } : {}),
-                };
-            } catch {
-                // Vanished or unreadable between readdir and stat.
-            }
+            const video = await inspectVideo(full, entry.name);
+            if (!video) continue;
+            const sidecars = sidecarsFor(entry.name, subtitles);
+            yield { ...video, ...(sidecars.length > 0 ? { subtitles: sidecars } : {}) };
         }
     }
 }

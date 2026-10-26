@@ -176,6 +176,26 @@ console.log('a link list is not fetchable');
 check((await fetch(`${base}/api/stream/${index.idFor(listPath)}`, { headers: auth })).status === 404,
     'its id resolves to nothing, so it cannot be downloaded');
 
+// A zero-byte video (what a failed download leaves behind) used to throw out of
+// the request handler -- an uncaught exception in the app's main process,
+// triggered by whoever asked for it.
+console.log('an empty file');
+const emptyPath = path.join(root, 'empty.mp4');
+writeFileSync(emptyPath, '');
+index.addBatch([{ path: emptyPath, name: 'empty.mp4', size: 0, mtime: Date.now(), ext: '.mp4' }]);
+let crashed = null;
+const onCrash = (e) => { crashed = e; };
+process.on('uncaughtException', onCrash);
+const emptyRes = await fetch(`${base}/api/stream/${index.idFor(emptyPath)}`, { headers: auth });
+const emptyBody = await emptyRes.arrayBuffer();
+await new Promise((r) => setTimeout(r, 100));
+process.off('uncaughtException', onCrash);
+check(!crashed, `is served without throwing (${crashed?.code || 'no exception'})`);
+check(emptyRes.status === 200 && emptyBody.byteLength === 0, 'as an empty 200');
+check(emptyRes.headers.get('content-length') === '0', 'saying so');
+check((await fetch(`${base}/api/stream/${index.idFor(emptyPath)}`,
+    { headers: { ...auth, Range: 'bytes=0-9' } })).status === 416, 'and a range into it is refused');
+
 await server.stop();
 rmSync(tmp, { recursive: true, force: true });
 

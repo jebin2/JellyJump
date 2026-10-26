@@ -42,8 +42,9 @@ function getScanner() {
         // walk the whole tree twice.
         if (message?.type === 'started') {
             libraryIndex.setRoots(message.roots);
-            // Start watching for new files if sharing might be used
-            try { watcher.start(); } catch {}
+            // Only moves a watcher sharing already asked for; a scan alone
+            // never starts one.
+            try { watcher.rootsChanged(); } catch {}
         }
         if (message?.type === 'batch') libraryIndex.addBatch(message.files);
         // Kept apart from the file index on purpose: that index is the sharing

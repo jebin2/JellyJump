@@ -80,8 +80,8 @@ check(linkListFolderName('holiday.2024.jjlist') === 'holiday.2024', 'only the la
 // it spells the extension itself. Two copies of a constant drift; this fails
 // when they do.
 console.log('\nthe scanner agrees with us about the extension');
-const scannerSource = fs.readFileSync(new URL('../desktop/scanner.js', import.meta.url), 'utf8');
-const scannerExt = /LINK_LIST_EXTENSION = '([^']+)'/.exec(scannerSource)?.[1];
+const scannerRulesSource = fs.readFileSync(new URL('../desktop/scan-rules.js', import.meta.url), 'utf8');
+const scannerExt = /LINK_LIST_EXTENSION = '([^']+)'/.exec(scannerRulesSource)?.[1];
 check(scannerExt === LINK_LIST_EXTENSION,
     `the scanner's extension matches this module's (${scannerExt} vs ${LINK_LIST_EXTENSION})`);
 

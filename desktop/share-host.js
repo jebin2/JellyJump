@@ -16,8 +16,11 @@ const { app, ipcMain } = require('electron');
 const libraryServer = require('./library-server');
 const libraryIndex = require('./library-index');
 const tailscale = require('./tailscale');
+const watcher = require('./watcher');
 
 const HTTPS_PORT = 8443;
+// How long quitting waits for the tailnet mapping to come down.
+const QUIT_TEARDOWN_MS = 5000;
 
 let shareState = { enabled: false, url: null, dnsName: null, reason: null };
 let readToken;
@@ -31,7 +34,12 @@ function writeShareEnv(url) {
     try {
         const envPath = getShareEnvPath();
         const content = `JELLYJUMP_SHARE_URL=${url}\n`;
-        fs.writeFileSync(envPath, content, 'utf8');
+        // The URL carries the share token, which the link itself says to treat
+        // like a password -- so not readable by other accounts on the machine.
+        // `mode` only applies when the file is created, so a file left by an
+        // older build is tightened too.
+        fs.writeFileSync(envPath, content, { encoding: 'utf8', mode: 0o600 });
+        fs.chmodSync(envPath, 0o600);
         process.env.JELLYJUMP_SHARE_URL = url;
     } catch (error) {
         console.error('[Share] Failed to write share env:', error);
@@ -70,12 +78,19 @@ async function describe() {
     };
 }
 
-const watcher = require('./watcher');
+// Two clicks on Share before the first finishes would otherwise each start a
+// server and a tailscale mapping, and `enabled` is only set at the very end.
+let enabling = null;
 
-async function enable() {
+function enable() {
     if (shareState.enabled) return describe();
+    if (!enabling) enabling = startSharing().finally(() => { enabling = null; });
+    return enabling;
+}
 
-    // Ensure watcher is running when sharing is enabled
+async function startSharing() {
+
+    // The index is the allowlist, so it has to stay current while it is shared.
     try { watcher.start(); } catch {}
 
     const ts = await tailscale.status();
@@ -124,8 +139,8 @@ async function disable() {
     await libraryServer.stop();
     shareState = { enabled: false, url: null, dnsName: shareState.dnsName, reason: null };
     clearShareEnv();
-    // Optionally stop watcher to save resources when not sharing
-    // try { watcher.stop(); } catch {}
+    // Nothing is shared, so nothing needs keeping current.
+    try { watcher.stop(); } catch {}
     return describe();
 }
 
@@ -172,8 +187,23 @@ function registerShareIpc({ assertTrustedIpcEvent, readShareToken, writeShareTok
     ipcMain.handle('share-regenerate-token', guarded(regenerateToken));
 
     // Leaving a tailscale serve mapping behind after the app quits would keep
-    // pointing at a port nothing is listening on.
-    app.on('before-quit', stopSharing);
+    // pointing at a port nothing is listening on. An async listener is not
+    // waited for: the app exits as soon as it returns, usually before
+    // `tailscale serve off` has run. So quitting is held until the teardown is
+    // done (or has taken too long to be worth waiting for) and then resumed.
+    let tearingDown = false;
+    app.on('before-quit', (event) => {
+        if (tearingDown || !shareState.enabled) {
+            clearShareEnv();
+            return;
+        }
+        tearingDown = true;
+        event.preventDefault();
+        Promise.race([
+            stopSharing(),
+            new Promise((resolve) => setTimeout(resolve, QUIT_TEARDOWN_MS)),
+        ]).catch(() => {}).finally(() => app.quit());
+    });
 }
 
 /** Tear down on quit, so nothing is left served after the app closes. */

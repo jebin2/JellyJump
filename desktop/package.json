@@ -30,7 +30,8 @@
     ],
     "asarUnpack": [
       "preload.js",
-      "scanner.js"
+      "scanner.js",
+      "scan-rules.js"
     ],
     "publish": {
       "provider": "github",

@@ -193,6 +193,15 @@ function streamFile(req, res, entry) {
         'Cache-Control': 'private, max-age=0',
     };
 
+    // An empty file has no byte to start at, and createReadStream({end: -1})
+    // throws from inside this handler -- an uncaught exception in the main
+    // process, caused by anyone who asks for a zero-byte video (a download that
+    // failed leaves exactly that). Answer it as what it is: nothing, successfully.
+    if (entry.size === 0) {
+        res.writeHead(200, { ...headers, 'Content-Length': 0 });
+        return res.end();
+    }
+
     const start = range ? range.start : 0;
     const end = range ? range.end : entry.size - 1;
     headers['Content-Length'] = end - start + 1;

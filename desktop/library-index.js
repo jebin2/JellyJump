@@ -88,6 +88,30 @@ function listLinkLists() {
     return [...linkListsByPath.values()].map((l) => ({ name: l.name, text: l.text }));
 }
 
+/**
+ * Forget a file that has gone, so the listing and its count stop offering
+ * something that would only answer 404. A subtitle also leaves the video that
+ * listed it.
+ */
+function removePath(filePath) {
+    const id = idFor(filePath);
+    const entry = byId.get(id);
+    if (entry) {
+        byId.delete(id);
+        for (const subtitle of entry.subtitles || []) {
+            if (subtitle?.path) byId.delete(idFor(subtitle.path));
+        }
+        if (entry.kind === 'subtitle') {
+            for (const video of byId.values()) {
+                if (video.subtitles?.some((s) => s.path === filePath)) {
+                    video.subtitles = video.subtitles.filter((s) => s.path !== filePath);
+                }
+            }
+        }
+    }
+    linkListsByPath.delete(filePath);
+}
+
 function clear() {
     byId.clear();
     linkListsByPath.clear();
@@ -167,6 +191,6 @@ function resolveServable(id) {
 }
 
 module.exports = {
-    addBatch, addLinkList, setRoots, getRoots, clear, list, listLinkLists, size,
+    addBatch, addLinkList, removePath, setRoots, getRoots, clear, list, listLinkLists, size,
     resolveServable, idFor,
 };
