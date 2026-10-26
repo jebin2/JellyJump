@@ -15,7 +15,7 @@
     "build:desktop": "./build-desktop.sh",
     "sim:jjc3": "bash scripts/jjc3-sim.sh",
     "test:rs": "node scripts/rs-selftest.mjs && node scripts/shard-pipeline-test.mjs",
-    "test:server": "node scripts/library-server-test.mjs",
+    "test:server": "node scripts/library-server-test.mjs && node scripts/share-host-test.mjs",
     "test:subtitles": "node scripts/subtitle-scan-test.mjs",
     "test:remote": "node scripts/remote-library-test.mjs && node scripts/remote-library-load-test.mjs",
     "test:cli": "node scripts/cli-test.mjs",

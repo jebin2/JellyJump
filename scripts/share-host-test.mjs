@@ -160,6 +160,61 @@ watcher.stop();
 await sleep(200);
 check(!watcher.isRunning(), 'and stops when asked');
 
+// ── The cost of watching ─────────────────────────────────────────────────────
+// A recordings drive with tens of thousands of clips ran a server out of inotify
+// watches (8192 by default) and printed an error per file, because every file
+// had a watch of its own. A folder reports the files in it, so folders are all
+// that need watching.
+console.log('\nwhat watching costs');
+const fsReal = require('node:fs');
+const realWatch = fsReal.watch;
+let watchCalls = 0;
+fsReal.watch = (...args) => { watchCalls++; return realWatch(...args); };
+
+const big = path.join(tmp, 'recordings');
+for (const day of ['mon', 'tue', 'wed']) {
+    mkdirSync(path.join(big, day), { recursive: true });
+    for (let i = 0; i < 150; i++) writeFileSync(path.join(big, day, `clip${i}.ts`), ts);
+}
+index.setRoots([big]);
+watcher.rootsChanged();
+watcher.start();
+await sleep(800);
+check(watchCalls === 4, `450 files in 3 folders cost 4 watches, not 450 (${watchCalls})`);
+check(watcher.stats().folders === 4, 'one per folder, root included');
+
+writeFileSync(path.join(big, 'tue', 'late.mp4'), 'x'.repeat(4000));
+check(await until(() => names().includes('late.mp4')), 'and a file added in one is still noticed');
+
+mkdirSync(path.join(big, 'thu'));
+writeFileSync(path.join(big, 'thu', 'new-day.mp4'), 'x'.repeat(4000));
+check(await until(() => names().includes('new-day.mp4')), 'as is one in a folder created after the watcher started');
+check(watcher.stats().folders === 5, 'which is then watched too');
+
+// ── Running out anyway ───────────────────────────────────────────────────────
+console.log('\nrunning out of watches');
+watcher.stop();
+let allowed = 2;
+fsReal.watch = (...args) => {
+    if (allowed-- <= 0) throw Object.assign(new Error('ENOSPC: System limit for number of file watchers reached'), { code: 'ENOSPC' });
+    return realWatch(...args);
+};
+const errors = [];
+const realError = console.error;
+console.error = (...a) => errors.push(a.join(' '));
+let threw = null;
+try {
+    watcher.start();
+    await sleep(800);
+} catch (error) { threw = error; }
+console.error = realError;
+check(!threw, 'does not throw');
+check(errors.length === 1, `says so once, not once per folder (${errors.length} messages)`);
+check(/max_user_watches/.test(errors[0] || ''), 'and says how to fix it');
+check(watcher.stats().exhausted && watcher.stats().folders === 2, 'keeps the folders it did get');
+watcher.stop();
+fsReal.watch = realWatch;
+
 await server.stop();
 rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${pass} passed, ${fail} failed`);

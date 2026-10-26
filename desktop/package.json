@@ -74,8 +74,5 @@
     "@electron/rebuild": "^3.7.1",
     "electron": "^39.2.4",
     "electron-builder": "^26.0.12"
-  },
-  "dependencies": {
-    "chokidar": "^3.6.0"
   }
 }
