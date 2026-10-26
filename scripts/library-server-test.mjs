@@ -33,6 +33,10 @@ const clipPath = path.join(root, 'clip.mp4');
 const body = Buffer.from('0123456789abcdefghijklmnopqrstuvwxyz');
 writeFileSync(clipPath, body);
 
+const subtitlePath = path.join(root, 'clip.srt');
+const subtitleBody = Buffer.from('1\n00:00:00,000 --> 00:00:01,000\nhello\n');
+writeFileSync(subtitlePath, subtitleBody);
+
 const secretPath = path.join(outside, 'secret.mp4');
 writeFileSync(secretPath, 'TOP SECRET');
 const escapePath = path.join(root, 'escape.mp4');
@@ -40,7 +44,20 @@ symlinkSync(secretPath, escapePath);
 
 index.setRoots([root]);
 index.addBatch([
-    { path: clipPath, name: 'clip.mp4', size: body.length, mtime: Date.now(), ext: '.mp4' },
+    {
+        path: clipPath,
+        name: 'clip.mp4',
+        size: body.length,
+        mtime: Date.now(),
+        ext: '.mp4',
+        subtitles: [{
+            path: subtitlePath,
+            name: 'clip.srt',
+            size: subtitleBody.length,
+            mtime: Date.now(),
+            ext: '.srt',
+        }],
+    },
     { path: escapePath, name: 'escape.mp4', size: 10, mtime: Date.now(), ext: '.mp4' },
 ]);
 
@@ -83,12 +100,24 @@ check(Array.isArray(listing.items) && listing.items.length === 2, `lists the ind
 check(listing.items.every(i => !JSON.stringify(i).includes(tmp)),
     'no absolute paths are leaked to the client');
 check(listing.items.every(i => /^[a-f0-9]{16}$/.test(i.id)), 'every item has an opaque id');
+check(!listing.items.some(i => i.name.endsWith('.srt')),
+    'a sidecar subtitle is not listed as a video');
+check(listing.items.find(i => i.name === 'clip.mp4')?.subtitles?.length === 1,
+    'its sidecar travels with the video');
+check(!JSON.stringify(listing.items.find(i => i.name === 'clip.mp4')?.subtitles).includes(tmp),
+    'without leaking the subtitle path');
 
 console.log('\nwhat is addressable');
 const clip = listing.items.find(i => i.name === 'clip.mp4');
 const escape = listing.items.find(i => i.name === 'escape.mp4');
 check((await fetch(`${base}/api/stream/${clip.id}`, { headers: auth })).status === 200,
     'an indexed file streams');
+const subtitleId = clip?.subtitles?.[0]?.id;
+const subtitleResponse = await fetch(`${base}/api/stream/${subtitleId}`, { headers: auth });
+check(subtitleResponse.status === 200, 'its sidecar streams');
+check(await subtitleResponse.text() === subtitleBody.toString(), 'with the subtitle bytes');
+check((subtitleResponse.headers.get('content-type') || '').includes('application/x-subrip'),
+    'and a subtitle content type');
 check((await fetch(`${base}/api/stream/${escape.id}`, { headers: auth })).status === 404,
     'a symlink escaping the scan root is refused');
 check((await fetch(`${base}/api/stream/${'0'.repeat(16)}`, { headers: auth })).status === 404,

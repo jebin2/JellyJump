@@ -144,6 +144,7 @@ const MIME = {
     '.ogv': 'video/ogg', '.ts': 'video/mp2t', '.m2ts': 'video/mp2t',
     '.mts': 'video/mp2t', '.3gp': 'video/3gpp', '.flv': 'video/x-flv',
     '.wmv': 'video/x-ms-wmv',
+    '.srt': 'application/x-subrip; charset=utf-8', '.vtt': 'text/vtt; charset=utf-8',
 };
 
 /**

@@ -448,7 +448,10 @@ export class Playlist {
             mimeType,
             path: this._discoveredPath(file.path),
             localPath: file.path,
-            id: generateId()
+            id: generateId(),
+            ...(Array.isArray(file.subtitles) && file.subtitles.length > 0
+                ? { subtitlePaths: file.subtitles.map((subtitle) => subtitle.path) }
+                : {}),
         };
     }
 
@@ -1473,25 +1476,21 @@ export class Playlist {
 
             this._clearLoadGuard();
 
-            // [NEW] Auto-load matched subtitle file/path
-            if (video.subtitleFile || video.subtitlePath) {
-                try {
-                    let subUrl = '';
-                    if (video.subtitleFile) {
-                        // Create Blob URL for File object
-                        // Revoke previous if exists to avoid leaks
-                        if (video.subtitleUrl) URL.revokeObjectURL(video.subtitleUrl);
-                        video.subtitleUrl = URL.createObjectURL(video.subtitleFile);
-                        subUrl = video.subtitleUrl;
-                    } else if (video.subtitlePath) {
-                        // Use path directly (Electron)
-                        subUrl = video.subtitlePath;
-                    }
+            const subtitleSources = [];
+            if (video.subtitleFile) {
+                if (video.subtitleUrl) URL.revokeObjectURL(video.subtitleUrl);
+                video.subtitleUrl = URL.createObjectURL(video.subtitleFile);
+                subtitleSources.push(video.subtitleUrl);
+            } else if (video.subtitlePath) {
+                subtitleSources.push(video.subtitlePath);
+            }
+            if (Array.isArray(video.subtitlePaths)) subtitleSources.push(...video.subtitlePaths);
+            if (Array.isArray(video.subtitleUrls)) subtitleSources.push(...video.subtitleUrls);
 
-                    if (subUrl) {
-                        Logger.log(`[Playlist] Loading auto-detected subtitle: ${subUrl}`);
-                        await this.player.loadSubtitle(subUrl);
-                    }
+            for (const subUrl of new Set(subtitleSources.filter(Boolean))) {
+                try {
+                    Logger.log(`[Playlist] Loading auto-detected subtitle: ${subUrl}`);
+                    await this.player.loadSubtitle(subUrl);
                 } catch (e) {
                     Logger.error('[Playlist] Failed to load auto-detected subtitle:', e);
                 }
@@ -1818,7 +1817,11 @@ export class Playlist {
             let added = 0;
             const merged = fresh.map((item) => {
                 const previous = byRemoteId.get(item.remoteId);
-                if (previous) return previous;
+                if (previous) {
+                    if (item.subtitleUrls) previous.subtitleUrls = item.subtitleUrls;
+                    else delete previous.subtitleUrls;
+                    return previous;
+                }
                 added++;
                 item.id = generateId();
                 return item;

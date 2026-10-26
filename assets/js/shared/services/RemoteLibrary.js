@@ -140,6 +140,12 @@ function shapeItem(item, url, token, serverName, rawUrl) {
         // other machine keeps scanning after it was taken.
         remoteSource: rawUrl,
         remoteServer: serverName,
+        ...(Array.isArray(item.subtitles) && item.subtitles.length > 0
+            ? {
+                subtitleUrls: item.subtitles.map((subtitle) =>
+                    `${url.origin}/api/stream/${subtitle.id}?token=${encodeURIComponent(token)}`),
+            }
+            : {}),
     };
 }
 

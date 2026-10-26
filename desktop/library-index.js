@@ -61,6 +61,11 @@ function addBatch(files) {
         if (!file?.path) continue;
         const id = idFor(file.path);
         byId.set(id, { id, ...file });
+        for (const subtitle of file.subtitles || []) {
+            if (!subtitle?.path) continue;
+            const subtitleId = idFor(subtitle.path);
+            byId.set(subtitleId, { id: subtitleId, kind: 'subtitle', ...subtitle });
+        }
     }
 }
 
@@ -85,21 +90,36 @@ function clear() {
 }
 
 function size() {
-    return byId.size;
+    let total = 0;
+    for (const file of byId.values()) {
+        if (file.kind !== 'subtitle') total++;
+    }
+    return total;
 }
 
 /** Listing for a client: no absolute paths, which are not the client's business. */
 function list() {
-    return [...byId.values()].map((f) => ({
-        id: f.id,
-        name: f.name,
-        size: f.size,
-        mtime: f.mtime,
-        ext: f.ext,
-        // Folder path relative to the scan root, so a remote client can group
-        // the same way the desktop playlist does.
-        folder: relativeFolder(f.path),
-    }));
+    return [...byId.values()]
+        .filter((f) => f.kind !== 'subtitle')
+        .map((f) => ({
+            id: f.id,
+            name: f.name,
+            size: f.size,
+            mtime: f.mtime,
+            ext: f.ext,
+            // Folder path relative to the scan root, so a remote client can group
+            // the same way the desktop playlist does.
+            folder: relativeFolder(f.path),
+            ...(f.subtitles?.length > 0
+                ? {
+                    subtitles: f.subtitles.map((subtitle) => ({
+                        id: idFor(subtitle.path),
+                        name: subtitle.name,
+                        ext: subtitle.ext,
+                    })),
+                }
+                : {}),
+        }));
 }
 
 function relativeFolder(filePath) {

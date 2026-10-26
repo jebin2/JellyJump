@@ -36,6 +36,8 @@ const VIDEO_EXTENSIONS = new Set([
     '.flv', '.ts', '.m2ts', '.mts', '.3gp', '.ogv',
 ]);
 
+const SUBTITLE_EXTENSIONS = new Set(['.srt', '.vtt']);
+
 // Extensions that are not only video. ".ts" is MPEG transport stream and also
 // TypeScript, and a home directory holds thousands of the latter — including
 // generated ones like CMake's compiler_depend.ts. Extension alone would list
@@ -148,6 +150,27 @@ async function* walk(root, visited, counters) {
             continue; // unreadable directory is normal, not fatal
         }
 
+        const subtitles = [];
+        for (const entry of entries) {
+            if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+            const ext = path.extname(entry.name).toLowerCase();
+            if (!SUBTITLE_EXTENSIONS.has(ext)) continue;
+            const full = path.join(dir, entry.name);
+            try {
+                const stat = await fs.promises.stat(full);
+                if (!stat.isFile() || stat.size === 0) continue;
+                subtitles.push({
+                    path: full,
+                    name: entry.name,
+                    size: stat.size,
+                    mtime: stat.mtimeMs,
+                    ext,
+                });
+            } catch {
+                // Unreadable or vanished; no sidecar is better than a failed scan.
+            }
+        }
+
         for (const entry of entries) {
             if (cancelled) return;
             const full = path.join(dir, entry.name);
@@ -221,12 +244,18 @@ async function* walk(root, visited, counters) {
                     && !(await looksLikeTransportStream(full, stat.size))) {
                     continue;
                 }
+                const mediaBase = entry.name.slice(0, -ext.length).toLowerCase();
+                const sidecars = subtitles.filter((subtitle) => {
+                    const subtitleBase = subtitle.name.slice(0, -subtitle.ext.length).toLowerCase();
+                    return subtitleBase === mediaBase || subtitleBase.startsWith(`${mediaBase}.`);
+                });
                 yield {
                     path: full,
                     name: entry.name,
                     size: stat.size,
                     mtime: stat.mtimeMs,
                     ext,
+                    ...(sidecars.length > 0 ? { subtitles: sidecars } : {}),
                 };
             } catch {
                 // Vanished or unreadable between readdir and stat.

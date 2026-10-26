@@ -30,9 +30,25 @@ mkdirSync(path.join(root, 'Series'), { recursive: true });
 const body = Buffer.from('0123456789abcdefghijklmnopqrstuvwxyz');
 const clip = path.join(root, 'Series', 'ep1.mp4');
 writeFileSync(clip, body);
+const subtitle = path.join(root, 'Series', 'ep1.srt');
+const subtitleBody = Buffer.from('1\n00:00:00,000 --> 00:00:01,000\nhello\n');
+writeFileSync(subtitle, subtitleBody);
 
 index.setRoots([root]);
-index.addBatch([{ path: clip, name: 'ep1.mp4', size: body.length, mtime: Date.now(), ext: '.mp4' }]);
+index.addBatch([{
+    path: clip,
+    name: 'ep1.mp4',
+    size: body.length,
+    mtime: Date.now(),
+    ext: '.mp4',
+    subtitles: [{
+        path: subtitle,
+        name: 'ep1.srt',
+        size: subtitleBody.length,
+        mtime: Date.now(),
+        ext: '.srt',
+    }],
+}]);
 
 const TOKEN = 'c'.repeat(64);
 const { port } = await server.start({ token: TOKEN, name: 'testbox' });
@@ -71,6 +87,10 @@ check(item.isLocal === false && item.isStream === false,
 check(item.path === 'testbox/Series/ep1.mp4', `grouped under the server (${item.path})`);
 check(item.url.includes('/api/stream/'), 'points at the stream endpoint');
 check(item.url.includes(`token=${TOKEN}`), 'carries the token, which UrlSource cannot send as a header');
+check(item.subtitleUrls?.length === 1, 'carries its sidecar subtitle');
+check(item.subtitleUrls?.[0]?.includes('/api/stream/')
+    && item.subtitleUrls?.[0]?.includes(`token=${TOKEN}`),
+    'as a stream URL with the same token');
 
 console.log('\nthe item actually streams');
 const full = await fetch(item.url);
@@ -80,6 +100,10 @@ check(await full.text() === body.toString(), 'and returns the file');
 const ranged = await fetch(item.url, { headers: { Range: 'bytes=4-9' } });
 check(ranged.status === 206 && await ranged.text() === '456789',
     'and serves ranges, so seeking works');
+
+const subtitleResponse = await fetch(item.subtitleUrls[0]);
+check(subtitleResponse.status === 200, 'the sidecar URL resolves');
+check(await subtitleResponse.text() === subtitleBody.toString(), 'and returns the subtitle');
 
 console.log('\nreloading a library');
 // The listing is a snapshot; the other machine keeps scanning. Reload must pick
