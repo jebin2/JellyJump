@@ -112,6 +112,20 @@ function removePath(filePath) {
     linkListsByPath.delete(filePath);
 }
 
+/** Whether a file is already in the index. */
+function hasPath(filePath) {
+    return byId.has(idFor(filePath)) && byId.get(idFor(filePath)).kind !== 'subtitle';
+}
+
+/** The indexed videos directly inside a directory, for noticing which have gone. */
+function pathsIn(dir) {
+    const found = [];
+    for (const file of byId.values()) {
+        if (file.kind !== 'subtitle' && path.dirname(file.path) === dir) found.push(file.path);
+    }
+    return found;
+}
+
 function clear() {
     byId.clear();
     linkListsByPath.clear();
@@ -191,6 +205,6 @@ function resolveServable(id) {
 }
 
 module.exports = {
-    addBatch, addLinkList, removePath, setRoots, getRoots, clear, list, listLinkLists, size,
+    addBatch, addLinkList, removePath, hasPath, pathsIn, setRoots, getRoots, clear, list, listLinkLists, size,
     resolveServable, idFor,
 };

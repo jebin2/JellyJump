@@ -9,6 +9,13 @@
  * per file. The cost here is the number of folders, which is orders of
  * magnitude smaller.
  *
+ * When the system's watches run out anyway -- the limit is a root-only setting
+ * and not something this app can or should ask a person to change -- the
+ * folders that did not get one are checked on a timer instead. A folder's
+ * modification time changes whenever something is added to or removed from it,
+ * so a pass costs one stat per folder and a listing only for the ones that
+ * moved. Slower to notice, never missing, and nobody has to do anything.
+ *
  * Off by default and only wanted while a library is being shared: share-host
  * turns it on and off, and a rescan only moves it to the new roots.
  *
@@ -26,6 +33,8 @@ const rules = require('./scan-rules');
 // the index would be served truncated.
 const SETTLE_MS = 800;
 const FLUSH_MS = 300;
+// How often folders without a watch of their own are looked at again.
+let sweepMs = 30000;
 
 /** dir -> FSWatcher */
 let watchers = new Map();
@@ -35,6 +44,10 @@ let watchedRoots = [];
 let wanted = false;
 let generation = 0;
 let exhausted = false;
+/** dir -> its modification time when last looked at, for folders with no watch */
+let unwatched = new Map();
+let sweepTimer = null;
+let sweeping = false;
 const settling = new Map();   // path -> timer
 const pendingAdds = new Map();
 let addTimer = null;
@@ -83,13 +96,12 @@ function unwatch(dir) {
     }
 }
 
-/** Where the limit was hit is not an error to repeat, but it is worth saying once. */
+/** Said once, not once per folder; the fallback needs no action from anyone. */
 function reportExhausted() {
     if (exhausted) return;
     exhausted = true;
-    console.error(`[Watcher] Out of file watches after ${watchers.size} folders. `
-        + 'Files added in the rest will appear after the next scan. To watch them all: '
-        + 'sudo sysctl fs.inotify.max_user_watches=524288');
+    console.error(`[Watcher] Out of file watches after ${watchers.size} folders; `
+        + `checking the rest every ${Math.round(sweepMs / 1000)}s instead.`);
 }
 
 function watchDirectory(dir, mine) {
@@ -112,9 +124,19 @@ function watchDirectory(dir, mine) {
 async function watchTree(root, mine) {
     const queue = [root];
     while (queue.length > 0) {
-        if (mine !== generation || exhausted) return;
+        if (mine !== generation) return;
         const dir = queue.shift();
-        if (!watchDirectory(dir, mine) && !watchers.has(dir)) continue;
+        if (!watchDirectory(dir, mine) && !watchers.has(dir)) {
+            // Out of watches is not out of folders: this one is still part of
+            // the library, so it is looked at on a timer instead.
+            if (!exhausted) continue;
+            try {
+                unwatched.set(dir, (await fs.promises.stat(dir)).mtimeMs);
+            } catch {
+                continue;
+            }
+            startSweeping(mine);
+        }
         let entries;
         try {
             entries = await fs.promises.readdir(dir, { withFileTypes: true });
@@ -192,6 +214,63 @@ async function admitExisting(dir, mine) {
     }
 }
 
+function startSweeping(mine) {
+    if (sweepTimer) return;
+    sweepTimer = setInterval(() => { sweep(mine).catch(() => {}); }, sweepMs);
+    sweepTimer.unref?.();
+}
+
+/** One pass over the folders that have no watch of their own. */
+async function sweep(mine) {
+    if (sweeping || mine !== generation) return;
+    sweeping = true;
+    try {
+        for (const dir of Array.from(unwatched.keys())) {
+            if (mine !== generation) return;
+            let stat;
+            try {
+                stat = await fs.promises.stat(dir);
+            } catch {
+                // The folder is gone, and so is everything it held.
+                unwatched.delete(dir);
+                for (const gone of libraryIndex.pathsIn(dir)) libraryIndex.removePath(gone);
+                continue;
+            }
+            if (stat.mtimeMs === unwatched.get(dir)) continue;
+            unwatched.set(dir, stat.mtimeMs);
+
+            let entries;
+            try {
+                entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            } catch {
+                continue;
+            }
+            const present = new Set();
+            for (const entry of entries) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    if (!rules.isSkippedName(entry.name) && !watchers.has(full) && !unwatched.has(full)) {
+                        // New folder: walked now, so what is already in it is not
+                        // waiting a further pass.
+                        await watchTree(full, mine);
+                        await admitExisting(full, mine);
+                    }
+                } else if (entry.isFile()) {
+                    present.add(full);
+                    const ext = path.extname(entry.name).toLowerCase();
+                    const wanted = rules.VIDEO_EXTENSIONS.has(ext) || ext === rules.LINK_LIST_EXTENSION;
+                    if (wanted && !libraryIndex.hasPath(full)) onChange(full, mine);
+                }
+            }
+            for (const known of libraryIndex.pathsIn(dir)) {
+                if (!present.has(known)) libraryIndex.removePath(known);
+            }
+        }
+    } finally {
+        sweeping = false;
+    }
+}
+
 function begin() {
     const roots = libraryIndex.getRoots();
     if (roots.length === 0) return;
@@ -220,6 +299,11 @@ function close() {
     for (const handle of watchers.values()) handle.close();
     watchers = new Map();
     watchedRoots = [];
+    unwatched = new Map();
+    if (sweepTimer) {
+        clearInterval(sweepTimer);
+        sweepTimer = null;
+    }
 }
 
 const sameRoots = (a, b) => a.length === b.length && a.every((r, i) => r === b[i]);
@@ -244,12 +328,17 @@ function rootsChanged() {
 }
 
 function isRunning() {
-    return watchers.size > 0;
+    return watchers.size > 0 || unwatched.size > 0;
 }
 
 /** For tests and diagnostics: how many folders are watched, and whether it ran out. */
 function stats() {
-    return { folders: watchers.size, exhausted };
+    return { folders: watchers.size, polled: unwatched.size, exhausted };
 }
 
-module.exports = { start, stop, rootsChanged, isRunning, stats };
+/** For tests: how often unwatched folders are looked at. */
+function setSweepInterval(ms) {
+    sweepMs = ms;
+}
+
+module.exports = { start, stop, rootsChanged, isRunning, stats, setSweepInterval };

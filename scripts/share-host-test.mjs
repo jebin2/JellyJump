@@ -195,6 +195,7 @@ check(watcher.stats().folders === 5, 'which is then watched too');
 console.log('\nrunning out of watches');
 watcher.stop();
 let allowed = 2;
+watcher.setSweepInterval(400);
 fsReal.watch = (...args) => {
     if (allowed-- <= 0) throw Object.assign(new Error('ENOSPC: System limit for number of file watchers reached'), { code: 'ENOSPC' });
     return realWatch(...args);
@@ -210,8 +211,23 @@ try {
 console.error = realError;
 check(!threw, 'does not throw');
 check(errors.length === 1, `says so once, not once per folder (${errors.length} messages)`);
-check(/max_user_watches/.test(errors[0] || ''), 'and says how to fix it');
+check(!/sudo|sysctl|max_user_watches/.test(errors[0] || ''), 'and asks nothing of the person: no command to run');
 check(watcher.stats().exhausted && watcher.stats().folders === 2, 'keeps the folders it did get');
+check(watcher.stats().polled === 3, `and covers the rest by checking them (${watcher.stats().polled} folders)`);
+
+// Whichever of the day folders missed out on a watch, a new file in each must
+// still arrive -- by event where there is a watch, by the timer where not.
+for (const day of ['mon', 'tue', 'wed']) {
+    writeFileSync(path.join(big, day, `after-${day}.mp4`), 'x'.repeat(4000));
+}
+check(await until(() => ['mon', 'tue', 'wed'].every((d) => names().includes(`after-${d}.mp4`)), 8000),
+    'a new file arrives in every folder, watched or not');
+rmSync(path.join(big, 'mon', 'after-mon.mp4')); rmSync(path.join(big, 'wed', 'after-wed.mp4'));
+check(await until(() => !names().includes('after-mon.mp4') && !names().includes('after-wed.mp4'), 8000),
+    'and a deleted one leaves the listing in each');
+mkdirSync(path.join(big, 'fri'));
+writeFileSync(path.join(big, 'fri', 'friday.mp4'), 'x'.repeat(4000));
+check(await until(() => names().includes('friday.mp4'), 8000), 'and so does a file in a folder created after the limit was hit');
 watcher.stop();
 fsReal.watch = realWatch;
 
