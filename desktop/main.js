@@ -111,16 +111,19 @@ if (process.platform === 'linux' && !wantsTerminal
     process.exit(1);
 }
 
-// Required on Linux AppImage: kernel user-namespace sandboxing is often
-// unavailable (restricted sysctl), which causes the network service to crash
-// before any file:// navigation can complete.
+// No sandbox switches in code, on purpose. appendSwitch('no-sandbox') is read
+// after Chromium's zygote has already started, so it un-sandboxes some
+// processes and not others -- and combined with disable-dev-shm-usage (shared
+// memory moved from /dev/shm to /tmp) the sandboxed renderer was refused both
+// and retried forever: hundreds of thousands of "Creating shared memory ...
+// failed" lines a second, and a window that never painted. A sandbox setting
+// only means anything on the command line at exec time; electron-builder puts
+// --no-sandbox there for the AppImage's menu entry, which is where it is needed.
 // NetworkServiceSandbox: the network service process inherits the same
 //   sandbox restrictions and fails on systems without user namespaces.
 // in-process-gpu: keeps GPU code in the main process to avoid GPU zygote
 //   spawn failures on headless / restricted desktops.
 if (process.platform === 'linux') {
-    app.commandLine.appendSwitch('no-sandbox');
-    app.commandLine.appendSwitch('disable-dev-shm-usage');
     app.commandLine.appendSwitch('disable-features', 'NetworkServiceSandbox');
 
     // disable-gpu-sandbox addresses the same failure in-process-gpu was added

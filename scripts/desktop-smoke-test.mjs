@@ -41,6 +41,27 @@ if (!existsSync(resolve(ROOT, 'desktop/build/player.html'))) {
         `and points at the repository that exists (${urls.join(', ')})`);
 }
 
+// Started the way a person starts it -- no flags. Every other check here passes
+// --no-sandbox itself, which is how the sandbox switches the app sets in code
+// went unnoticed: appended after the zygote had started, they left some
+// renderers sandboxed and unable to make shared memory, and a plain launch
+// printed hundreds of thousands of "Creating shared memory ... failed" lines a
+// second and never painted a window. Counted, not just looked at: a handful
+// of lines is noise, a flood is a hung app.
+if (process.platform === 'linux') {
+    const { spawn } = await import('node:child_process');
+    const child = spawn(resolve(ROOT, 'desktop/node_modules/electron/dist/electron'), ['.'], {
+        cwd: resolve(ROOT, 'desktop'), stdio: ['ignore', 'ignore', 'pipe'],
+        env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' },
+    });
+    let flood = 0;
+    child.stderr.on('data', d => { flood += (String(d).match(/platform_shared_memory_region/g) || []).length; });
+    await new Promise(r => setTimeout(r, 8000));
+    child.kill();
+    await new Promise(r => setTimeout(r, 1500));
+    check(flood < 10, `a plain launch is not stuck failing to make shared memory (${flood} errors in 8s)`);
+}
+
 const app = await electron.launch({
     args: ['.', '--no-sandbox'],
     cwd: resolve(ROOT, 'desktop'),
