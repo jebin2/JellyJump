@@ -8,7 +8,7 @@ async function getTrackDetails(input) {
 
     // This panel reports whether each track is decodable, so the on-demand
     // decoders have to be loaded before it asks — otherwise it says no about a
-    // DTS track the player would go on to play perfectly well.
+    // DTS or TrueHD track the player would go on to play perfectly well.
     await ensureDecodersFor(audioTracks);
 
     const formatTrackInfo = async (tracks) => {

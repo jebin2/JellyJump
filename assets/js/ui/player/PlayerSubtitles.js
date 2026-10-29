@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny, codecOf } from '../../core/MediaBunny.js';
+import { MediaBunny, codecOf, ensureDecodersFor } from '../../core/MediaBunny.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { SubtitleManager } from '../../core/subtitles/SubtitleManager.js';
 
@@ -226,9 +226,13 @@ export class PlayerSubtitles {
         p.ui.audioContainer.style.display = 'block';
         const template = document.getElementById('player-menu-item-template');
 
-        // Codecs the browser can't decode (DTS, TrueHD, …) are still listed —
-        // hiding them makes tracks silently vanish — but marked, so picking one
-        // isn't unexplained silence.
+        // Codecs the browser can't decode are still listed — hiding them makes
+        // tracks silently vanish — but marked, so picking one isn't unexplained
+        // silence. The on-demand decoders load first so DTS and TrueHD aren't
+        // labelled unsupported here while the player happily plays them; today
+        // playback has already registered them by the time this menu is built,
+        // but that is an ordering accident and the promise is cached anyway.
+        await ensureDecodersFor(tracks);
         const decodable = await Promise.all(tracks.map(t => t.canDecode().catch(() => false)));
         // getCodec(), not `.codec`, for the same reason canDecode() is awaited
         // above: these are the library's supported accessors, and the plain

@@ -34,6 +34,7 @@ LIBS=(
     "mediabunny-aac-encoder.js|https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@${MEDIABUNNY_VERSION}/+esm|faadc1903b5cc00674087da47cd3cc28d7172569cd8ab9f06e7e758c8ed7edec"
     "mediabunny-prores.js|https://cdn.jsdelivr.net/npm/@mediabunny/prores@${MEDIABUNNY_VERSION}/+esm|1f7792e2d79414c70031643835fe75c38063afac1632a76ad4f7bd9e8c50ef0f"
     "mediabunny-dts.js|https://cdn.jsdelivr.net/npm/@mediabunny/dts@${MEDIABUNNY_VERSION}/+esm|b027774acab64ab2ce925a4f87c5a1f85b7593dfc4e6e120751ceca658b5e8f6"
+    "mediabunny-truehd.js|https://cdn.jsdelivr.net/npm/@mediabunny/truehd@${MEDIABUNNY_VERSION}/+esm|837730e1eb3403eb375392ee1751d14ff15d0ef4e5a999719d14a84e54dc60d4"
     "gif.js|https://cdn.jsdelivr.net/npm/gif.js@${GIFJS_VERSION}/+esm|f9396fea5aed6ddfc7dfba99fb3cb0cc1940a5d3dc0626d8d5bc2d13c7605dc7"
     "gif.worker.js|https://cdn.jsdelivr.net/npm/gif.js@${GIFJS_VERSION}/dist/gif.worker.js|ca9e3048557ec05d619e18b83403cd3669c88939e5fa2d6034ce7625d445970d"
 )

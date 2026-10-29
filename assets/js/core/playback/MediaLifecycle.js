@@ -13,9 +13,10 @@ import { loadPlayerYouTube, teardownPlayerYouTube } from '../youtube/YouTubePlay
  * with permanent silence, even though a playable track was sitting right
  * there. Prefer the primary track, then fall back to the first decodable one.
  *
- * DTS is now decodable too, but only once its plugin is loaded, so the tracks
- * are inspected before anything is asked whether it can decode — otherwise the
- * answer would be no for the very files the plugin exists for.
+ * DTS and TrueHD are now decodable too, but only once their plugins are
+ * loaded, so the tracks are inspected before anything is asked whether it can
+ * decode — otherwise the answer would be no for the very files the plugins
+ * exist for.
  *
  * @returns {Promise<Object|null>} null when nothing is decodable (video still plays)
  */

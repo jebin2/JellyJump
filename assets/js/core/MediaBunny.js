@@ -14,9 +14,10 @@
  *   eagerly     AC-3 and ProRes decoders — playback needs them the moment a
  *               track is opened.
  *   on demand   the MP3/FLAC/AAC encoders (~1.6 MB) via ensureEncoders(), and
- *               the DTS decoder (~1.6 MB) via ensureDtsDecoder(). Both are
- *               awaited by the code that needs them, so a library with no DTS
- *               in it never pays for the decoder.
+ *               the DTS (~1.6 MB) and TrueHD (~730 KB) decoders via
+ *               ensureDecodersFor(). All are awaited by the code that needs
+ *               them, so a library with no DTS or TrueHD in it never pays for
+ *               those decoders.
  */
 
 import * as MediaBunny from '../lib/mediabunny.js';
@@ -33,7 +34,28 @@ registerAc3Decoder();
 registerProresDecoder();
 
 let encodersPromise = null;
-let dtsPromise = null;
+const decoderPromises = new Map();
+
+/**
+ * Load and register one on-demand decoder plugin, at most once.
+ *
+ * A rejected load drops out of the cache so a transient network failure can be
+ * retried; a settled one is kept, since registering the same decoder twice
+ * achieves nothing.
+ * @param {string} name
+ * @param {() => Promise<unknown>} load
+ */
+function ensureDecoder(name, load) {
+    let promise = decoderPromises.get(name);
+    if (!promise) {
+        promise = load().catch((error) => {
+            decoderPromises.delete(name);
+            throw error;
+        });
+        decoderPromises.set(name, promise);
+    }
+    return promise;
+}
 
 /**
  * Load and register the DTS decoder.
@@ -45,16 +67,29 @@ let dtsPromise = null;
  * and most libraries never hit a DTS track at all.
  */
 export function ensureDtsDecoder() {
-    if (!dtsPromise) {
-        dtsPromise = import('../lib/mediabunny-dts.js')
-            .then(({ registerDtsDecoder }) => registerDtsDecoder())
-            .catch((error) => {
-                dtsPromise = null; // allow retry on transient load failure
-                throw error;
-            });
-    }
-    return dtsPromise;
+    return ensureDecoder('dts', () => import('../lib/mediabunny-dts.js')
+        .then(({ registerDtsDecoder }) => registerDtsDecoder()));
 }
+
+/**
+ * Load and register the Dolby TrueHD decoder.
+ *
+ * TrueHD is the other half of Blu-ray audio — where DTS discs carry DTS-HD,
+ * Dolby discs carry TrueHD — so it fails in exactly the same way: WebCodecs
+ * has no decoder, and the rip plays as video with permanent silence. Same
+ * on-demand treatment, and cheaper to load than DTS at ~730 KB.
+ */
+export function ensureTrueHdDecoder() {
+    return ensureDecoder('truehd', () => import('../lib/mediabunny-truehd.js')
+        .then(({ registerTrueHdDecoder }) => registerTrueHdDecoder()));
+}
+
+// Codec reported by the library -> name for logs, loader. Checked against every
+// track a source opens with, so order and size do not matter.
+const ON_DEMAND_DECODERS = [
+    { codec: 'dts', label: 'DTS', ensure: ensureDtsDecoder },
+    { codec: 'truehd', label: 'TrueHD', ensure: ensureTrueHdDecoder },
+];
 
 /**
  * The codec of a track, asked for the way the library wants to be asked.
@@ -81,17 +116,19 @@ export async function codecOf(track) {
 
 /**
  * Register any on-demand decoder these tracks need, before asking whether they
- * can be decoded. Answering that question without this reports DTS as
- * undecodable and is self-fulfilling: nothing ever loads the decoder.
+ * can be decoded. Answering that question without this reports DTS and TrueHD
+ * as undecodable and is self-fulfilling: nothing ever loads the decoder.
  * @param {Array<Object>} tracks
  */
 export async function ensureDecodersFor(tracks) {
     const codecs = await Promise.all((tracks ?? []).map(codecOf));
-    if (codecs.includes('dts')) {
-        await ensureDtsDecoder().catch((error) => {
-            Logger.warn('[MediaBunny] DTS decoder failed to load:', error.message);
-        });
-    }
+    await Promise.all(
+        ON_DEMAND_DECODERS
+            .filter(({ codec }) => codecs.includes(codec))
+            .map(({ label, ensure }) => ensure().catch((error) => {
+                Logger.warn(`[MediaBunny] ${label} decoder failed to load:`, error.message);
+            })),
+    );
 }
 
 /**
