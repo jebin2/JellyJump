@@ -127,16 +127,76 @@ export async function cleanupPlayerForLoad(player) {
     player.subtitles.reset();
 }
 
+/** blob: and file: — a local source, where a failed read is never a blip. */
+const LOCAL_SOURCE = /^(blob|file):/i;
+
+/** Give up on a remote source after this many failed attempts. */
+const FETCH_ATTEMPTS = 4;
+
+/**
+ * How long to wait before retrying a failed fetch, and when to stop.
+ *
+ * UrlSource's default is infinite exponential backoff capped at 16s, which
+ * turns a request that can never succeed into a load() that never settles:
+ * an empty file answers the very first range request with 416, the library
+ * retried it for ever, and the player sat on a spinner with no error. The
+ * catch in loadPlayerMedia had been there the whole time — nothing ever
+ * reached it.
+ *
+ * A local source gets no retries at all: there is no network between us and a
+ * blob, so a failure is the answer, not a blip. A remote one keeps a few
+ * backoff attempts, which playing from a shared library over Wi-Fi genuinely
+ * needs, and then gives up as well.
+ * @param {string} url
+ */
+function retryPolicyFor(url) {
+    if (LOCAL_SOURCE.test(url)) return () => null;
+    return (previousAttempts) => (previousAttempts >= FETCH_ATTEMPTS
+        ? null
+        : Math.min(2 ** previousAttempts, 8));
+}
+
+/**
+ * Why a source could not be read, in words worth putting on a playlist item.
+ *
+ * Reached only once a load has already failed, so it costs nothing in the
+ * normal case. An empty file is the common cause and the one worth naming —
+ * it is indistinguishable from a broken one in the error the library raises,
+ * but it answers a plain request with a Content-Length of 0, which a revoked
+ * blob URL or a host that has gone away cannot do. The body is cancelled
+ * rather than read, so asking this of a multi-GB file buffers nothing.
+ * @param {string} url
+ * @param {Error} error the original failure, returned when nothing better is known
+ * @returns {Promise<Error>}
+ */
+async function explainSourceFailure(url, error) {
+    try {
+        const response = await fetch(url);
+        const size = Number(response.headers.get('content-length'));
+        response.body?.cancel();
+        if (response.ok && size === 0) {
+            return new Error('This file is empty (0 bytes) — there is nothing to play');
+        }
+    } catch {
+        // The probe failing tells us nothing the original error does not.
+    }
+    return error;
+}
+
 export async function setupPlayerMediaTracks(player, url, isHls) {
     const urlSourceOptions = player.config.withCredentials ? { requestInit: { credentials: 'include' } } : {};
     Logger.log(`[MediaLifecycle] Setting up tracks for ${url} (isHls: ${isHls})`);
     player.media.input = new MediaBunny.Input({
-        source: new MediaBunny.UrlSource(url, urlSourceOptions),
+        source: new MediaBunny.UrlSource(url, { ...urlSourceOptions, getRetryDelay: retryPolicyFor(url) }),
         formats: [...(MediaBunny.HLS_FORMATS || []), ...MediaBunny.ALL_FORMATS]
     });
 
     if (!isHls) {
-        player.duration = await player.input.computeDuration();
+        try {
+            player.duration = await player.input.computeDuration();
+        } catch (e) {
+            throw await explainSourceFailure(url, e);
+        }
         player._updateTimeDisplay();
     }
 
@@ -195,7 +255,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         }
     } catch (e) {
         Logger.error('[MediaLifecycle] Error setting up media tracks:', e);
-        throw e;
+        throw await explainSourceFailure(url, e);
     }
 
     player._updateAudioTracks();
