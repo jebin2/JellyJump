@@ -54,7 +54,16 @@ const VERSION = 4;                 // format version carried in the audio header
 // The frame header's shard index is uint32, so the format itself imposes no
 // practical ceiling — up to 2^32-1 shards. Size is bounded by memory instead.
 const MAX_TOTAL_SHARDS = 0xFFFFFFFF;
-const AUDIO_REPEAT = 3;   // transmit the audio header this many times
+// Copies of the audio header to transmit. Each is 13s for a 106-byte header,
+// and the video has to cover whatever the audio needs, so every copy costs
+// ~390 frames of carrier that carry no payload. Two rather than three because
+// a single copy already survived every profile in scripts/jjc3-sim.sh on its
+// own, down to AAC 64 kbps and through a 854x480 downscale -- so the second is
+// the spare, and the third was buying very little for a third of the encode
+// time. Decoding is unaffected either way: decodeAudio scans for the first
+// copy whose CRC passes and does not care how many there are, so carriers made
+// before and after this read the same.
+const AUDIO_REPEAT = 2;
 const AUDIO_GAP_SEC = 1;  // silence between audio repetitions
 
 export class PlatformCrypto {
