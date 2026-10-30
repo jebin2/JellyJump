@@ -36,12 +36,12 @@ function scheduleIdleShutdown() {
 
 function handleMessage(event) {
     workerBooted = true;
-    const { id, type, value, error } = event.data;
+    const { id, type, value, info, error } = event.data;
     const entry = pending.get(id);
     if (!entry) return;
 
     if (type === 'progress') {
-        entry.onProgress?.(value);
+        entry.onProgress?.(value, info);
     } else if (type === 'done') {
         pending.delete(id);
         entry.resolve(value);

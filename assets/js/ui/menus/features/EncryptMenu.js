@@ -17,6 +17,7 @@ export class EncryptMenu {
         const downloadBtn       = modalContent.querySelector('.download-btn');
         const progressSection   = modalContent.querySelector('.progress-section');
         const progressPct       = modalContent.querySelector('.progress-percentage');
+        const progressStatus    = modalContent.querySelector('.progress-status');
         const successMessage    = modalContent.querySelector('.success-message');
         const errorMessage      = modalContent.querySelector('.error-message');
 
@@ -183,8 +184,22 @@ export class EncryptMenu {
                 const source = sourceBlob ||
                     await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
-                const onProgress = (p) => {
+                // A percentage alone says nothing about a job that can run for
+                // minutes, so show how long is left as soon as there is enough
+                // of a rate to extrapolate from.
+                const fmtDur = (sec) => {
+                    if (!Number.isFinite(sec) || sec < 0) return '';
+                    if (sec >= 3600) return `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`;
+                    if (sec >= 60) return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+                    return `${Math.max(1, Math.round(sec))}s`;
+                };
+                const onProgress = (p, info) => {
                     progressPct.textContent = Math.round(p * 100) + '%';
+                    if (!progressStatus) return;
+                    const eta = info?.etaSec !== undefined ? fmtDur(info.etaSec) : '';
+                    progressStatus.textContent = eta
+                        ? `${eta} left · ${Math.round(info.fps)} fps`
+                        : (currentMode === 'encrypt' ? 'Encrypting...' : 'Decrypting...');
                 };
 
                 let resultBlob, newFilename, streamed = false;

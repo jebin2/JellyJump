@@ -99,7 +99,9 @@ export class PlatformCrypto {
      */
     static async encrypt(blob, password, options = {}) {
         const { filename, mimeType, hint, onProgress, signal } = options;
-        const progress = (v) => onProgress && onProgress(v);
+        // `info` carries the rate and the estimate; callers that only want the
+        // fraction can keep ignoring it.
+        const progress = (v, info) => onProgress && onProgress(v, info);
 
         const t0 = performance.now();
         const ms = (a, b) => `${(b - a).toFixed(1)}ms`;
@@ -219,7 +221,7 @@ export class PlatformCrypto {
             signal,
             t0,
             fileHandle: options.fileHandle,   // present → stream carrier to disk
-            onProgress: (v) => progress(0.40 + v * 0.55),
+            onProgress: (v, info) => progress(0.40 + v * 0.55, info),
         });
 
         progress(1);
@@ -241,7 +243,8 @@ export class PlatformCrypto {
      * @returns {Promise<{blob: Blob, metadata: Object}>}
      */
     static async decrypt(blob, password, onProgress, signal) {
-        const progress = (v) => onProgress && onProgress(v);
+        const progress = (v, info) => onProgress && onProgress(v, info);
+        const scanStart = performance.now();
         Logger.log(`[PlatformCrypto] DECRYPT start — ${blob.size} bytes`);
         progress(0);
 
@@ -344,7 +347,15 @@ export class PlatformCrypto {
                 for (let gi = 0; gi < genHave.length; gi++) {
                     have += Math.min(genHave[gi], plan.generations[gi].k);
                 }
-                progress(0.20 + (have / plan.totalDataShards) * 0.55);
+                const pct = have / plan.totalDataShards;
+                const elapsedSec = (performance.now() - scanStart) / 1000;
+                progress(0.20 + pct * 0.55, pct > 0.02 ? {
+                    etaSec: elapsedSec / pct - elapsedSec,
+                    elapsedSec,
+                    fps: frameCount / Math.max(elapsedSec, 0.001),
+                    framesDone: frameCount,
+                    framesTotal: numFrames,
+                } : undefined);
                 await new Promise(r => setTimeout(r, 0));
             }
         }
@@ -748,7 +759,13 @@ export class PlatformCrypto {
                 windowStart = now;
 
                 signal?.throwIfAborted();
-                onProgress && onProgress(pct);
+                onProgress && onProgress(pct, {
+                    etaSec,
+                    elapsedSec,
+                    fps: REPORT_EVERY / (windowMs / 1000),
+                    framesDone: done,
+                    framesTotal: totalFrames,
+                });
                 await new Promise(r => setTimeout(r, 0));
             }
         }

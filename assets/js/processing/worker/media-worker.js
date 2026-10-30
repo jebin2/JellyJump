@@ -61,7 +61,7 @@ self.onmessage = async (event) => {
         const result = await fn({
             ...options,
             signal: controller.signal,
-            onProgress: (value) => self.postMessage({ id, type: 'progress', value }),
+            onProgress: (value, info) => self.postMessage({ id, type: 'progress', value, info }),
         });
 
         // HLS results are a Map<string, ArrayBuffer>; transfer the buffers
