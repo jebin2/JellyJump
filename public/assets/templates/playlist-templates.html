@@ -2170,6 +2170,29 @@
     </div>
 </template>
 
+<!-- Unlock (decrypt-on-play) Content Template -->
+<template id="unlock-content-template">
+    <p class="unlock-intro text-sm text-secondary mb-md">
+        This video is an encrypted carrier. Enter the password to play the file hidden inside it.
+    </p>
+
+    <!-- Hint, shown only when the carrier carries one -->
+    <div class="unlock-hint-display hidden mb-md">
+        <span class="text-secondary text-sm font-mono">HINT:</span>
+        <span class="unlock-hint-value text-sm" style="color: var(--accent-primary); margin-left: 6px;"></span>
+    </div>
+
+    <div class="unlock-password-section mb-md">
+        <label class="text-secondary text-sm font-mono mb-sm block">PASSWORD:</label>
+        <input type="password" class="unlock-password jellyjump-input w-full" placeholder="Enter password"
+            autocomplete="off">
+    </div>
+
+    <p class="unlock-note text-xs text-secondary" style="opacity:0.7;">
+        The original file is rebuilt in memory — the carrier on disk is left untouched.
+    </p>
+</template>
+
 <!-- Slideshow Content Template -->
 <template id="slideshow-content-template">
     <div class="slideshow-container">

@@ -110,6 +110,11 @@ export const FOOTER_CONFIGS = {
         icon: 'icon-lock',
         title: 'Encrypt/Decrypt'
     },
+    unlock: {
+        actionClass: 'unlock-btn',
+        icon: 'icon-lock',
+        title: 'Unlock and play'
+    },
     multicut: {
         actionClass: 'multicut-btn',
         icon: 'icon-scissors',

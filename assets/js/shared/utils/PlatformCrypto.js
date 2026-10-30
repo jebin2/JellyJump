@@ -371,6 +371,50 @@ export class PlatformCrypto {
     }
 
     /**
+     * Is this blob a JJC4 carrier? Cheap enough to ask before playing anything.
+     *
+     * Asks the video, not the audio: readMetadata has to decode the whole
+     * audio track to read the header tones, which is far too slow to do to
+     * every file someone opens. A carrier's very first frames are data frames,
+     * and each one carries a sync byte and a CRC over its own contents, so one
+     * decoded frame answers the question — and a CRC-32 agreeing by chance is
+     * a 1-in-4-billion event, which no ordinary video will produce.
+     *
+     * Returns false rather than throwing for anything unreadable: this runs on
+     * the way to playing a file, where "not a carrier" and "not openable" lead
+     * to the same place.
+     * @param {Blob} blob
+     * @param {number} [maxFrames] frames to try before giving up
+     * @returns {Promise<boolean>}
+     */
+    static async looksLikeCarrier(blob, maxFrames = 4) {
+        let input = null;
+        try {
+            const { MediaBunny } = await import('../../core/MediaBunny.js');
+            input = new MediaBunny.Input({
+                source: new MediaBunny.BlobSource(blob),
+                formats: MediaBunny.ALL_FORMATS,
+            });
+            const videoTracks = await input.getVideoTracks();
+            if (!videoTracks.length) return false;
+
+            const decodeSample = PlatformCrypto._makeFrameDecoder();
+            let seen = 0;
+            for await (const sample of new MediaBunny.VideoSampleSink(videoTracks[0]).samples()) {
+                const decoded = await decodeSample(sample);
+                sample.close();
+                if (decoded && decoded.valid) return true;
+                if (++seen >= maxFrames) return false;
+            }
+            return false;
+        } catch {
+            return false;
+        } finally {
+            input?.dispose?.();
+        }
+    }
+
+    /**
      * Read metadata from a JJC4 file without decrypting the payload.
      * Returns null if not a JJC4 file.
      * @param {Blob} blob

@@ -31,6 +31,7 @@
     "test:camera": "node scripts/camera-effects-test.mjs && node scripts/sticker-test.mjs && node scripts/decoration-test.mjs && node scripts/recording-clock-test.mjs",
     "test:css": "node scripts/css-token-test.mjs",
     "test:desktop": "npm run build && rm -rf desktop/build && cp -r dist desktop/build && node scripts/desktop-smoke-test.mjs",
+    "test:encrypt": "node scripts/encrypt-test.mjs",
     "test:source": "node scripts/source-failure-test.mjs",
     "test:smoke": "node scripts/smoke-test.mjs"
   },

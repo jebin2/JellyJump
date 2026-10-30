@@ -1,4 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
+import { unlockIfEncrypted } from './EncryptedPlayback.js';
 import { classifyPlaylistItem } from './PlaylistItemKind.js';
 import { Toast } from "../../shared/utils/Toast.js";
 import { StorageService } from "../../shared/services/StorageService.js";
@@ -1454,6 +1455,15 @@ export class Playlist {
             // Final safety check: Ensure we have a valid URL before loading
             if (!video.blob_url) {
                 Logger.error('Video URL is null, cannot load:', video.title);
+                return;
+            }
+
+            // An encrypted carrier plays as its placeholder unless it is
+            // unlocked first; this swaps blob_url over to the decrypted file.
+            // Closing the password dialog means "don't play this", so stop
+            // here rather than loading the placeholder they just declined.
+            if (!await unlockIfEncrypted(video)) {
+                this._clearLoadGuard();
                 return;
             }
 
