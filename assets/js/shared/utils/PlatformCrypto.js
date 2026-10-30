@@ -41,7 +41,7 @@ import {
     encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
 import {
-    encodeFrameToI420, decodeFrame,
+    encodeFrameToI420, decodeFrame, decodeFrameFromLuma,
     planShards, buildShards, interleavedShardOrder, assembleShardsRS,
     RS_DATA_SHARDS, RS_PARITY_SHARDS,
     DATA_BYTES_PER_FRAME, FPS, VIDEO_W, VIDEO_H,
@@ -270,8 +270,7 @@ export class PlatformCrypto {
         const duration   = await videoTrack.computeDuration();
         const numFrames  = Math.round(duration * FPS);
 
-        const canvas = PlatformCrypto._createCanvas(VIDEO_W, VIDEO_H);
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const decodeSample = PlatformCrypto._makeFrameDecoder();
 
         let frameCount = 0;
 
@@ -283,9 +282,7 @@ export class PlatformCrypto {
         // needs no timing assumptions at all.
         const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
         for await (const sample of videoSink.samples()) {
-            sample.draw(ctx, 0, 0, VIDEO_W, VIDEO_H);
-            const imageData = ctx.getImageData(0, 0, VIDEO_W, VIDEO_H);
-            const decoded = decodeFrame(imageData);
+            const decoded = await decodeSample(sample);
             if (decoded && decoded.valid) {
                 // CRC-valid frames fill shard slots; failed/absent frames are
                 // erasures — Reed–Solomon heals them at assembly.
@@ -341,6 +338,36 @@ export class PlatformCrypto {
         Logger.log(`[PlatformCrypto] DECRYPT done — ${plaintext.length} B (type=${outputType})`);
         progress(1);
         return { blob: new Blob([plaintext], { type: outputType }), metadata };
+    }
+
+    /**
+     * A frame decoder that reads each sample by the cheapest route it allows.
+     *
+     * A decoded sample is already I420, and its first plane is the very luma
+     * the encoder wrote, so copying it out skips the canvas entirely. A
+     * carrier a platform re-encoded at a smaller size cannot take that route,
+     * because the block grid is in VIDEO_W × VIDEO_H coordinates, so it goes
+     * through a canvas, which scales it back on the way. Returned as a factory
+     * so the canvas and the buffer are made once per scan rather than per
+     * frame.
+     * @returns {(sample: Object) => Promise<{shardIndex: number, data: Uint8Array, valid: boolean}|null>}
+     */
+    static _makeFrameDecoder() {
+        let canvas = null, ctx = null, buf = null;
+        return async (sample) => {
+            if (sample.displayWidth === VIDEO_W && sample.displayHeight === VIDEO_H) {
+                const size = sample.allocationSize();
+                if (!buf || buf.length < size) buf = new Uint8Array(size);
+                const layout = await sample.copyTo(buf);
+                return decodeFrameFromLuma(buf, layout?.[0]?.stride ?? VIDEO_W);
+            }
+            if (!ctx) {
+                canvas = PlatformCrypto._createCanvas(VIDEO_W, VIDEO_H);
+                ctx = canvas.getContext('2d', { willReadFrequently: true });
+            }
+            sample.draw(ctx, 0, 0, VIDEO_W, VIDEO_H);
+            return decodeFrame(ctx.getImageData(0, 0, VIDEO_W, VIDEO_H));
+        };
     }
 
     /**
