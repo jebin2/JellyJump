@@ -41,7 +41,7 @@ import {
     encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
 import {
-    encodeFrameToI420, decodeFrame, decodeFrameFromLuma,
+    makeFrameWriter, decodeFrame, decodeFrameFromLuma,
     planShards, buildShards, interleavedShardOrder, assembleShardsRS,
     RS_DATA_SHARDS, RS_PARITY_SHARDS,
     DATA_BYTES_PER_FRAME, FPS, VIDEO_W, VIDEO_H,
@@ -611,6 +611,9 @@ export class PlatformCrypto {
         const placeholderRgba = tmpCtx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
         const placeholderI420 = PlatformCrypto._rgbaToI420(placeholderRgba, VIDEO_W, VIDEO_H);
         const i420Frame       = new Uint8Array(I420_SIZE);
+        // Built once per carrier: it inspects the placeholder to find which
+        // block rows it can write a whole row at a time.
+        const writeFrame      = makeFrameWriter(placeholderI420);
         Logger.log(`[PlatformCrypto] [${rel()}] placeholder pre-render + RGBA→I420: ${ms(t, performance.now())}`);
         Logger.log(`[PlatformCrypto] [${rel()}] STEP 6/6 — encoding carrier video (${totalFrames} frames, ${plan.totalShards} shards)${fileHandle ? ' → streaming to disk' : ''}`);
 
@@ -649,7 +652,7 @@ export class PlatformCrypto {
 
                 ts = performance.now();
                 const globalIdx = shardOrder[frameIdx];
-                encodeFrameToI420(i420Frame, globalIdx, shards[globalIdx]);
+                writeFrame(i420Frame, globalIdx, shards[globalIdx]);
                 tPixelWrite += performance.now() - ts;
 
                 frameData = i420Frame;

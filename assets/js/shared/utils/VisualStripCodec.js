@@ -253,33 +253,102 @@ function _writeBlockI420Y(i420, col, row, bit) {
     }
 }
 
+// Where each block row's blocks start in _ALL_BLOCKS, and how many it has.
+// _ALL_BLOCKS is built row-major, so one row is a contiguous span of it.
+const _ROW_SPANS = (() => {
+    const spans = [];
+    let start = 0;
+    while (start < _ALL_BLOCKS.length) {
+        const row = _ALL_BLOCKS[start].row;
+        let end = start;
+        while (end < _ALL_BLOCKS.length && _ALL_BLOCKS[end].row === row) end++;
+        spans.push({ row, start, count: end - start });
+        start = end;
+    }
+    return spans;
+})();
+
 /**
- * Encode one frame directly into a pre-allocated I420 buffer.
- * The buffer must already contain the placeholder I420 (copied before calling).
- * Only white (bit=1) blocks are written to the Y plane — black blocks are left
- * as-is from the placeholder (background Y < 128, decoded as 0). U/V planes
- * are never touched; they stay at 128 (neutral chroma) from the placeholder.
+ * Build a frame writer for one carrier's placeholder.
  *
- * @param {Uint8Array} i420        pre-filled with placeholder I420 pixels
- * @param {number} shardIndex      global shard index (0 … 2^32-1)
- * @param {Uint8Array} data        exactly DATA_BYTES_PER_FRAME bytes
+ * Writing a frame block by block means 16 fills of 16 bytes per white block,
+ * around 26 000 fill calls per frame, which measured as the largest single
+ * cost in encrypting -- ahead of the H.264 encoder itself. Wherever the
+ * placeholder is identical on all 16 pixel rows of a block row, that row can
+ * instead be built once as one VIDEO_W-byte row and copied down, trading a
+ * fill per block per row for 16 row-sized copies.
+ *
+ * Which rows qualify is measured from the placeholder rather than assumed from
+ * the banner geometry. The contract here is only that the placeholder is dark
+ * behind the data blocks, so a placeholder that grows a gradient or a second
+ * card must not quietly have the detail flattened out of it. Rows that are not
+ * uniform keep the per-block path, and because a uniform row is by definition
+ * the same on every one of its pixel rows, copying one down cannot disturb
+ * anything the codec skips.
+ *
+ * The buffer passed to the returned writer must already hold the placeholder:
+ * black blocks are left as they are, and the U/V planes are never touched.
+ *
+ * @param {Uint8Array} placeholderI420 the frame every carrier frame starts from
+ * @returns {(i420: Uint8Array, shardIndex: number, data: Uint8Array) => void}
  */
-export function encodeFrameToI420(i420, shardIndex, data) {
-    const checksum = _headerCrc(shardIndex, data);
-    const hBits = _headerBits(shardIndex, checksum);
-
-    for (let i = 0; i < _HDR_BLOCKS.length; i++) {
-        const { row, col } = _HDR_BLOCKS[i];
-        _writeBlockI420Y(i420, col, row, hBits[i]);
+export function makeFrameWriter(placeholderI420) {
+    const scratch = new Uint8Array(VIDEO_W);
+    const templates = new Array(BLOCKS_Y).fill(null);
+    for (const { row } of _ROW_SPANS) {
+        const top = row * BLOCK_PX * VIDEO_W;
+        let uniform = true;
+        for (let dy = 1; dy < BLOCK_PX && uniform; dy++) {
+            const base = top + dy * VIDEO_W;
+            for (let x = 0; x < VIDEO_W; x++) {
+                if (placeholderI420[base + x] !== placeholderI420[top + x]) { uniform = false; break; }
+            }
+        }
+        if (uniform) templates[row] = placeholderI420.slice(top, top + VIDEO_W);
     }
+    Logger.log(`[VisualStripCodec] Frame writer — ${templates.filter(Boolean).length}/${BLOCKS_Y} block rows can be written a row at a time`);
 
-    for (let i = 0; i < _DATA_BLOCKS.length; i++) {
-        const byteIdx = i >> 3;
-        const bitIdx  = 7 - (i & 7);
-        const bit     = byteIdx < data.length ? (data[byteIdx] >> bitIdx) & 1 : 0;
-        const { row, col } = _DATA_BLOCKS[i];
-        _writeBlockI420Y(i420, col, row, bit);
-    }
+    return (i420, shardIndex, data) => {
+        const checksum = _headerCrc(shardIndex, data);
+        const hBits = _headerBits(shardIndex, checksum);
+
+        // Row 0 is the header, 80 blocks of it; not worth a second path.
+        for (let i = 0; i < _HDR_BLOCKS.length; i++) {
+            const { row, col } = _HDR_BLOCKS[i];
+            _writeBlockI420Y(i420, col, row, hBits[i]);
+        }
+
+        for (const span of _ROW_SPANS) {
+            // Data bits are numbered from the first block after the header
+            // row, which is exactly where _DATA_BLOCKS starts.
+            const first = span.start - HEADER_BITS;
+            if (first < 0) continue;
+            const template = templates[span.row];
+
+            if (!template) {
+                for (let j = 0; j < span.count; j++) {
+                    const i = first + j;
+                    const byteIdx = i >> 3;
+                    const bit = byteIdx < data.length ? (data[byteIdx] >> (7 - (i & 7))) & 1 : 0;
+                    const { row, col } = _DATA_BLOCKS[i];
+                    _writeBlockI420Y(i420, col, row, bit);
+                }
+                continue;
+            }
+
+            scratch.set(template);
+            for (let j = 0; j < span.count; j++) {
+                const i = first + j;
+                const byteIdx = i >> 3;
+                const bit = byteIdx < data.length ? (data[byteIdx] >> (7 - (i & 7))) & 1 : 0;
+                if (!bit) continue;
+                const x0 = _DATA_BLOCKS[i].col * BLOCK_PX;
+                scratch.fill(255, x0, x0 + BLOCK_PX);
+            }
+            const top = span.row * BLOCK_PX * VIDEO_W;
+            for (let dy = 0; dy < BLOCK_PX; dy++) i420.set(scratch, top + dy * VIDEO_W);
+        }
+    };
 }
 
 // ─── Decoding ────────────────────────────────────────────────────────────────
