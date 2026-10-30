@@ -1,0 +1,215 @@
+/**
+ * Share host — main-process side of library sharing.
+ *
+ * Starts the local library server and fronts it with `tailscale serve`, then
+ * hands the renderer a link to copy. Off until switched on: nothing is served
+ * and no token exists until the user asks for it.
+ *
+ * The token persists across restarts so a link already pasted on a phone keeps
+ * working; regenerating it is what revokes every link that was handed out.
+ */
+const crypto = require('crypto');
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
+const { app, ipcMain } = require('electron');
+const libraryServer = require('./library-server');
+const libraryIndex = require('./library-index');
+const tailscale = require('./tailscale');
+const watcher = require('./watcher');
+
+const HTTPS_PORT = 8443;
+// How long quitting waits for the tailnet mapping to come down.
+const QUIT_TEARDOWN_MS = 5000;
+
+let shareState = { enabled: false, url: null, dnsName: null, reason: null };
+let readToken;
+let writeToken;
+
+function getShareEnvPath() {
+    return path.join(app.getPath('userData'), 'jellyjump-share.env');
+}
+
+function writeShareEnv(url) {
+    try {
+        const envPath = getShareEnvPath();
+        const content = `JELLYJUMP_SHARE_URL=${url}\n`;
+        // The URL carries the share token, which the link itself says to treat
+        // like a password -- so not readable by other accounts on the machine.
+        // `mode` only applies when the file is created, so a file left by an
+        // older build is tightened too.
+        fs.writeFileSync(envPath, content, { encoding: 'utf8', mode: 0o600 });
+        fs.chmodSync(envPath, 0o600);
+        process.env.JELLYJUMP_SHARE_URL = url;
+    } catch (error) {
+        console.error('[Share] Failed to write share env:', error);
+    }
+}
+
+function clearShareEnv() {
+    try {
+        const envPath = getShareEnvPath();
+        if (fs.existsSync(envPath)) {
+            fs.unlinkSync(envPath);
+        }
+        delete process.env.JELLYJUMP_SHARE_URL;
+    } catch (error) {
+        console.error('[Share] Failed to clear share env:', error);
+    }
+}
+
+async function currentToken() {
+    let token = await readToken();
+    if (!token) {
+        token = crypto.randomBytes(32).toString('hex');
+        await writeToken(token);
+    }
+    return token;
+}
+
+async function describe() {
+    const ts = await tailscale.status();
+    return {
+        ...shareState,
+        tailscaleAvailable: ts.available,
+        tailscaleReason: ts.reason || null,
+        dnsName: ts.dnsName || shareState.dnsName,
+        itemCount: libraryIndex.size(),
+    };
+}
+
+// Two clicks on Share before the first finishes would otherwise each start a
+// server and a tailscale mapping, and `enabled` is only set at the very end.
+let enabling = null;
+
+function enable() {
+    if (shareState.enabled) return describe();
+    if (!enabling) enabling = startSharing().finally(() => { enabling = null; });
+    return enabling;
+}
+
+async function startSharing() {
+
+    // The index is the allowlist, so it has to stay current while it is shared.
+    try { watcher.start(); } catch {}
+
+    const ts = await tailscale.status();
+    if (!ts.available) {
+        // Not an error: no tailnet is an ordinary state, and the reason is what
+        // the user needs to see.
+        shareState = { enabled: false, url: null, dnsName: ts.dnsName || null, reason: ts.reason };
+        return describe();
+    }
+
+    const token = await currentToken();
+    const { port } = await libraryServer.start({
+        token,
+        name: ts.dnsName.split('.')[0],
+    });
+
+    const served = await tailscale.startServe({ localPort: port, httpsPort: HTTPS_PORT });
+    if (!served.ok) {
+        await libraryServer.stop();
+        // By far the most common cause, and the one a user cannot guess: until
+        // an operator is set, Tailscale only lets root publish a service, so
+        // the app is refused. Name the exact command — with sudo, which it does
+        // need, and the real username rather than a $USER that will not expand
+        // when it is read out of a dialog.
+        const reason = await tailscale.canServeWithoutSudo()
+            ? `Could not start sharing: ${served.error}`
+            : 'JellyJump does not have permission to publish on your tailnet yet. '
+              + `Run this once in a terminal, then try again:\n\n    sudo tailscale set --operator=${os.userInfo().username}`;
+        shareState = { enabled: false, url: null, dnsName: ts.dnsName, reason };
+        return describe();
+    }
+
+    const shareUrl = tailscale.shareUrl({ dnsName: ts.dnsName, httpsPort: HTTPS_PORT, token });
+    shareState = {
+        enabled: true,
+        url: shareUrl,
+        dnsName: ts.dnsName,
+        reason: null,
+    };
+    writeShareEnv(shareUrl);
+    return describe();
+}
+
+async function disable() {
+    await tailscale.stopServe({ httpsPort: HTTPS_PORT });
+    await libraryServer.stop();
+    shareState = { enabled: false, url: null, dnsName: shareState.dnsName, reason: null };
+    clearShareEnv();
+    // Nothing is shared, so nothing needs keeping current.
+    try { watcher.stop(); } catch {}
+    return describe();
+}
+
+/** Invalidate every link already handed out. */
+async function regenerateToken() {
+    await writeToken(crypto.randomBytes(32).toString('hex'));
+    if (shareState.enabled) {
+        await disable();
+        return enable();
+    }
+    return describe();
+}
+
+/**
+ * @param {Object} deps
+ * @param {Function} deps.assertTrustedIpcEvent
+ * @param {Function} deps.readShareToken  - () => Promise<string|null>
+ * @param {Function} deps.writeShareToken - (token) => Promise<void>
+ */
+/**
+ * Point sharing at where the token is stored. Separate from IPC registration so
+ * headless mode, which registers no IPC at all, can still share.
+ */
+function configureTokens({ readShareToken, writeShareToken }) {
+    readToken = readShareToken;
+    writeToken = writeShareToken;
+}
+
+function registerShareIpc({ assertTrustedIpcEvent, readShareToken, writeShareToken }) {
+    configureTokens({ readShareToken, writeShareToken });
+
+    const guarded = (fn) => async (event, ...args) => {
+        try {
+            assertTrustedIpcEvent(event);
+            return { success: true, state: await fn(...args) };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    };
+
+    ipcMain.handle('share-status', guarded(describe));
+    ipcMain.handle('share-enable', guarded(enable));
+    ipcMain.handle('share-disable', guarded(disable));
+    ipcMain.handle('share-regenerate-token', guarded(regenerateToken));
+
+    // Leaving a tailscale serve mapping behind after the app quits would keep
+    // pointing at a port nothing is listening on. An async listener is not
+    // waited for: the app exits as soon as it returns, usually before
+    // `tailscale serve off` has run. So quitting is held until the teardown is
+    // done (or has taken too long to be worth waiting for) and then resumed.
+    let tearingDown = false;
+    app.on('before-quit', (event) => {
+        if (tearingDown || !shareState.enabled) {
+            clearShareEnv();
+            return;
+        }
+        tearingDown = true;
+        event.preventDefault();
+        Promise.race([
+            stopSharing(),
+            new Promise((resolve) => setTimeout(resolve, QUIT_TEARDOWN_MS)),
+        ]).catch(() => {}).finally(() => app.quit());
+    });
+}
+
+/** Tear down on quit, so nothing is left served after the app closes. */
+async function stopSharing() {
+    if (shareState.enabled) await disable();
+    else clearShareEnv();
+}
+
+module.exports = { registerShareIpc, configureTokens, enable, disable, describe, stopSharing };
