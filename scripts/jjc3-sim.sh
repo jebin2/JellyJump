@@ -60,6 +60,14 @@ echo ""
 if grep -q "JJC3SIM-RESULT: ALL-PASS" "$LOG"; then
     echo "RESULT: PASS (all profiles, including stress)"
     exit 0
+elif grep -q "JJC3SIM-RESULT: INCONCLUSIVE" "$LOG"; then
+    # A profile whose bitrate cap never bound proved nothing, so this is not a
+    # pass. It usually means the carrier was too short for rate control to
+    # converge -- re-run with a larger payload.
+    echo "RESULT: INCONCLUSIVE (a bitrate cap did not bind, so that profile tested nothing)"
+    grep -o 'JJC3SIM-RESULT: [^"]*' "$LOG"
+    echo "Try a longer carrier: scripts/jjc3-sim.sh 512"
+    exit 2
 elif grep -q "JJC3SIM-RESULT: REQUIRED-PASS" "$LOG"; then
     echo "RESULT: PASS (required profiles; see stress failures above — these map the format's margins)"
     exit 0

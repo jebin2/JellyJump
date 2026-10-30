@@ -17,7 +17,7 @@
      *
      * Console output contract (parsed by the runner script):
      *   "JJC3SIM: <line>"        progress + per-profile results
-     *   "JJC3SIM-RESULT: ..."    ALL-PASS | REQUIRED-PASS | FAIL
+     *   "JJC3SIM-RESULT: ..."    ALL-PASS | REQUIRED-PASS | INCONCLUSIVE | FAIL
      */
     import { PlatformCrypto } from '/assets/js/shared/utils/PlatformCrypto.js';
     import { MediaBunny, ensureEncoders } from '/assets/js/core/MediaBunny.js';
@@ -88,6 +88,28 @@
         const carrier = await PlatformCrypto.encrypt(new Blob([payload]), 'sim-password', { filename: 'payload.bin' });
         log(`carrier: ${(carrier.size / 1048576).toFixed(2)} MB — encrypt took ${((performance.now() - t) / 1000).toFixed(1)}s`);
 
+        // Every profile below is a bitrate cap, so the achieved bitrate has to
+        // be checked against it. An encoder given content it cannot compress --
+        // and a carrier full of hard-edged blocks is exactly that -- will blow
+        // straight through a low target on a short clip, and then the profile
+        // has tested nothing while still reporting PASS.
+        const carrierDurationSec = await (async () => {
+            const input = new MediaBunny.Input({
+                source: new MediaBunny.BlobSource(carrier),
+                formats: MediaBunny.ALL_FORMATS,
+            });
+            const track = await input.getPrimaryVideoTrack();
+            const d = await track.computeDuration();
+            input.dispose?.();
+            return d;
+        })();
+        const kbps = (blob) => (blob.size * 8) / carrierDurationSec / 1000;
+        log(`carrier duration ${carrierDurationSec.toFixed(1)}s at ${kbps(carrier).toFixed(0)} kbps`);
+        if (carrierDurationSec < 10) {
+            log(`WARNING: a ${carrierDurationSec.toFixed(1)}s carrier gives rate control very little runway, ` +
+                'so low-bitrate profiles may not bind. Re-run with a larger ?kb= for a meaningful stress test.');
+        }
+
         const results = [];
         for (const profile of PROFILES) {
             try {
@@ -106,9 +128,20 @@
                 const got = new Uint8Array(await blob.arrayBuffer());
                 const ok = got.length === payload.length && got.every((b, i) => b === payload[i]);
 
-                results.push({ profile, ok });
-                log(`${ok ? 'PASS' : 'FAIL (decrypted bytes differ)'} — ${profile.name} ` +
-                    `[reencode ${encodeSec.toFixed(1)}s → ${(attacked.size / 1048576).toFixed(2)}MB, decrypt ${decSec.toFixed(1)}s]`);
+                // Did the cap actually bite? Anything far above target means the
+                // encoder ignored it and this profile proved nothing.
+                const target = profile.video && profile.video.bitrate;
+                const achieved = kbps(attacked);
+                const enforced = !target || achieved <= (target / 1000) * 1.5;
+
+                results.push({ profile, ok, enforced, achieved });
+                const verdict = !ok ? 'FAIL (decrypted bytes differ)'
+                    : enforced ? 'PASS' : 'PASS (CAP NOT ENFORCED)';
+                log(`${verdict} — ${profile.name} ` +
+                    `[reencode ${encodeSec.toFixed(1)}s → ${(attacked.size / 1048576).toFixed(2)}MB ` +
+                    `@ ${achieved.toFixed(0)} kbps` +
+                    (target ? ` vs ${(target / 1000).toFixed(0)} target` : '') +
+                    `, decrypt ${decSec.toFixed(1)}s]`);
             } catch (e) {
                 results.push({ profile, ok: false });
                 log(`FAIL (${e && e.message}) — ${profile.name}`);
@@ -117,15 +150,21 @@
 
         const failedRequired = results.filter(r => !r.ok && r.profile.required);
         const failedStress   = results.filter(r => !r.ok && !r.profile.required);
+        const unenforced     = results.filter(r => r.ok && !r.enforced);
         log(`SUMMARY: ${results.filter(r => r.ok).length}/${results.length} passed` +
-            (failedStress.length ? ` — stress failures: ${failedStress.map(r => r.profile.name).join('; ')}` : ''));
+            (failedStress.length ? ` — stress failures: ${failedStress.map(r => r.profile.name).join('; ')}` : '') +
+            (unenforced.length ? ` — caps not enforced: ${unenforced.map(r => r.profile.name).join('; ')}` : ''));
 
-        if (failedRequired.length === 0 && failedStress.length === 0) {
-            console.log('JJC3SIM-RESULT: ALL-PASS');
-        } else if (failedRequired.length === 0) {
-            console.log('JJC3SIM-RESULT: REQUIRED-PASS');
-        } else {
+        // A pass whose bitrate cap never bound is not evidence of anything, so
+        // it is reported as inconclusive rather than folded into ALL-PASS.
+        if (failedRequired.length) {
             console.log('JJC3SIM-RESULT: FAIL required=' + failedRequired.map(r => r.profile.name).join('|'));
+        } else if (unenforced.length) {
+            console.log('JJC3SIM-RESULT: INCONCLUSIVE unenforced=' + unenforced.map(r => r.profile.name).join('|'));
+        } else if (failedStress.length === 0) {
+            console.log('JJC3SIM-RESULT: ALL-PASS');
+        } else {
+            console.log('JJC3SIM-RESULT: REQUIRED-PASS');
         }
     } catch (e) {
         log('FATAL: ' + (e && e.message));
