@@ -71,17 +71,26 @@ async function run(page, origin) {
         try { await PlatformCrypto.decrypt(carrier, 'not-the-password'); }
         catch (e) { refused = String(e?.message || e); }
 
+        // The carrier's length used to be set by the audio header, which held a
+        // small payload's carrier at ~30s however little it carried. It is set
+        // by the payload now, so a small file makes a short carrier.
+        const carrierSeconds = PlatformCrypto.estimatedDuration(payload.length);
+
         const detected = await PlatformCrypto.looksLikeCarrier(carrier);
         const plainVideo = await (await fetch(`${origin}/scripts/fixtures/smoke.webm`)).blob();
         const falsePositive = await PlatformCrypto.looksLikeCarrier(plainVideo);
 
-        return { identical, refused, detected, falsePositive, carrierBytes: carrier.size };
+        return { identical, refused, detected, falsePositive, carrierSeconds, carrierBytes: carrier.size };
     }, { origin, password: PASSWORD });
 
     console.log('\nit gives back exactly what it was given');
     check(trip.identical, 'a 32 KB payload survives encrypt -> decrypt byte for byte');
     check(/integrity|password/i.test(trip.refused || ''),
         `a wrong password is refused by the HMAC, not by guesswork: ${JSON.stringify(trip.refused)}`);
+
+    console.log('\nthe payload sets the carrier length, not the header');
+    check(trip.carrierSeconds < 5,
+        `32 KB makes a carrier of ${trip.carrierSeconds.toFixed(1)}s, not the ~30s the audio header used to force`);
 
     console.log('\nit can tell a carrier from an ordinary video');
     check(trip.detected, 'a carrier is recognised');

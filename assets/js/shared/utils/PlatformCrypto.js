@@ -5,24 +5,23 @@
  * embedded INSIDE a carrier MP4's actual pixel and audio content so that
  * any platform's re-encoding cannot strip it.
  *
- * Two independent channels carry data:
+ * The video strip carries everything:
  *
- *   Audio track — carries the crypto parameters (salt, IV, HMAC, metadata).
- *     Uses 16-tone OOK at 800–6800 Hz, 200 ms symbols.
- *     Repeated 3× for robustness. Survives AAC 128 kbps transcoding.
+ *   Header frames — the crypto parameters (salt, IV, HMAC, metadata), in
+ *     frames marked by a reserved shard index, repeated once per second so
+ *     losing a stretch of the carrier costs at most one copy.
  *
- *   Video strip — carries the encrypted payload as 16×16-pixel black/white
+ *   Payload frames — the encrypted payload as 16×16-pixel black/white
  *     blocks across the frame. The payload is split into 395-byte shards
  *     protected by Reed–Solomon erasure coding (200 data + 50 parity per
  *     generation → 25% overhead, up to 20% of frames per generation may be
  *     lost). Survives H.264/H.265 transcoding at typical platform bitrates.
  *
  * Carrier MP4 structure:
- *   Video: 1280×720, 30 fps
- *     Top 80%  — animated placeholder ("This video is encrypted")
- *     Bottom 20% — visual data strip
- *   Audio: 48 kHz mono, AAC
- *     Header tones (3 repetitions) + silence to match video duration
+ *   Video: 1280×720, 30 fps — placeholder card with the data blocks around it
+ *   Audio: 48 kHz mono AAC silence, so the carrier looks like an ordinary
+ *     video to whatever re-encodes it. It carries no data, and no longer sets
+ *     the carrier's length.
  *
  * File size guideline:
  *   ~9.5 KB/sec of usable visual-strip capacity at 30 fps after 25% parity.
@@ -38,7 +37,7 @@ import { Logger } from './Logger.js';
 import { CryptoHelper } from './CryptoHelper.js';
 import { DOMAIN } from '../config.js';
 import {
-    encodeAudio, decodeAudio, audioDurationSec, AUDIO_SAMPLE_RATE,
+    AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
 import {
     makeFrameWriter, decodeFrame, decodeFrameFromLuma,
@@ -50,21 +49,27 @@ import {
 } from './VisualStripCodec.js';
 
 const MAGIC = 'JJC4';
-const VERSION = 4;                 // format version carried in the audio header
+const VERSION = 5;                 // the header lives in the video strip
+
+// Shard indices at or above this carry header bytes rather than payload. The
+// index travels inside the frame's own CRC, so a header frame verifies itself
+// exactly like a data frame, and the reserved range sits far above any real
+// shard count (a 20 MB payload is ~53 000 shards).
+const HEADER_INDEX_BASE = 0xFFFF0000;
+// A full set of header frames is written this often. Each copy costs one frame
+// -- 1/30 s -- against 13 s for a copy in the audio channel, so the header can
+// be repeated dozens of times and still be far cheaper than it used to be.
+const HEADER_EVERY = 30;
+// Placeholder frames at the end, so a platform trimming the tail cannot eat a
+// payload frame.
+const TAIL_FRAMES = 15;
+// How far into the carrier to look for a header before giving up. A copy sits
+// at frame 0 and every HEADER_EVERY frames after it, so this covers several
+// copies even if the opening ones were destroyed.
+const HEADER_SCAN_FRAMES = 150;
 // The frame header's shard index is uint32, so the format itself imposes no
 // practical ceiling — up to 2^32-1 shards. Size is bounded by memory instead.
 const MAX_TOTAL_SHARDS = 0xFFFFFFFF;
-// Copies of the audio header to transmit. Each is 13s for a 106-byte header,
-// and the video has to cover whatever the audio needs, so every copy costs
-// ~390 frames of carrier that carry no payload. Two rather than three because
-// a single copy already survived every profile in scripts/jjc3-sim.sh on its
-// own, down to AAC 64 kbps and through a 854x480 downscale -- so the second is
-// the spare, and the third was buying very little for a third of the encode
-// time. Decoding is unaffected either way: decodeAudio scans for the first
-// copy whose CRC passes and does not care how many there are, so carriers made
-// before and after this read the same.
-const AUDIO_REPEAT = 2;
-const AUDIO_GAP_SEC = 1;  // silence between audio repetitions
 
 export class PlatformCrypto {
     static MAGIC = MAGIC;
@@ -158,21 +163,43 @@ export class PlatformCrypto {
         headerFixed.set(iv,   28);                                   // iv
         headerFixed.set(hmac, 44);                                   // hmac
 
-        const audioHeaderBytes = new Uint8Array(headerFixed.length + metaBytes.length);
-        audioHeaderBytes.set(headerFixed, 0);
-        audioHeaderBytes.set(metaBytes, headerFixed.length);
-        Logger.log(`[PlatformCrypto] Audio header — ${audioHeaderBytes.length} B (fixed=76 meta=${metaBytes.length})`);
+        const headerBytes = new Uint8Array(headerFixed.length + metaBytes.length);
+        headerBytes.set(headerFixed, 0);
+        headerBytes.set(metaBytes, headerFixed.length);
 
-        // ── Step 3: Compute durations ──────────────────────────────────────
-        const singleAudioSec = audioDurationSec(audioHeaderBytes.length);
-        const totalAudioSec  = singleAudioSec * AUDIO_REPEAT +
-                               AUDIO_GAP_SEC  * (AUDIO_REPEAT - 1);
+        // The header rides in the video strip, split across as many frames as
+        // it needs -- one, unless the filename and hint are long.
+        // Padded to a full frame's worth: the frame CRC covers all
+        // DATA_BYTES_PER_FRAME bytes, and the decoder reads back a full-length
+        // zero-padded array, so a short chunk here would fail its own CRC.
+        const headerChunks = [];
+        for (let off = 0; off < headerBytes.length; off += DATA_BYTES_PER_FRAME) {
+            const chunk = new Uint8Array(DATA_BYTES_PER_FRAME);
+            chunk.set(headerBytes.subarray(off, Math.min(off + DATA_BYTES_PER_FRAME, headerBytes.length)));
+            headerChunks.push(chunk);
+        }
+        Logger.log(`[PlatformCrypto] Header — ${headerBytes.length} B (fixed=76 meta=${metaBytes.length}) in ${headerChunks.length} frame(s)`);
 
-        const videoDataSec = plan.totalShards / FPS;
-        const videoSec     = Math.max(totalAudioSec + 2, videoDataSec) + 1; // 1 s tail
-        const totalFrames  = Math.ceil(videoSec * FPS);
+        // ── Step 3: Lay out the carrier's frames ───────────────────────────
+        // Header copies are interleaved through the payload rather than massed
+        // at the front, so a burst of damage cannot take every copy with it.
+        const shardOrder = interleavedShardOrder(plan);
+        const schedule = [];
+        let nextShard = 0;
+        while (nextShard < shardOrder.length) {
+            for (let c = 0; c < headerChunks.length; c++) schedule.push({ header: c });
+            for (let i = 0; i < HEADER_EVERY && nextShard < shardOrder.length; i++) {
+                schedule.push({ shard: shardOrder[nextShard++] });
+            }
+        }
+        for (let c = 0; c < headerChunks.length; c++) schedule.push({ header: c });
+        for (let i = 0; i < TAIL_FRAMES; i++) schedule.push({});
 
-        step(5, `planned carrier: payload=${(payloadSize/1048576).toFixed(2)}MB → ${plan.totalShards} shards (${plan.generations.length} gen), ${videoSec.toFixed(1)}s video, ${totalFrames} frames`);
+        const totalFrames = schedule.length;
+        const videoSec    = totalFrames / FPS;
+        const headerCopies = Math.ceil(shardOrder.length / HEADER_EVERY) + 1;
+
+        step(5, `planned carrier: payload=${(payloadSize/1048576).toFixed(2)}MB → ${plan.totalShards} shards (${plan.generations.length} gen), ${videoSec.toFixed(1)}s video, ${totalFrames} frames (${headerCopies} header copies)`);
         // Loud heads-up when the carrier will be very long — the encode time
         // and file size scale linearly with frame count, so this is where a
         // multi-GB payload turns into an hours-long job.
@@ -186,10 +213,8 @@ export class PlatformCrypto {
         const mp4Blob = await PlatformCrypto._generateCarrierMp4({
             ciphertext,
             plan,
-            audioHeaderBytes,
-            totalAudioSec,
-            totalFrames,
-            singleAudioSec,
+            headerChunks,
+            schedule,
             hint,
             signal,
             t0,
@@ -228,13 +253,17 @@ export class PlatformCrypto {
             formats: MediaBunny.ALL_FORMATS,
         });
 
-        // ── Step 1: Decode audio header ───────────────────────────────────
-        const audioTracks = await input.getAudioTracks();
-        if (!audioTracks.length) throw new Error('JJC4: no audio track found');
+        // ── Step 1: Read the header ───────────────────────────────────────
+        const videoTracks = await input.getVideoTracks();
+        if (!videoTracks.length) throw new Error('JJC4: no video track found');
+        const videoTrack = videoTracks[0];
 
-        const headerBytes = await PlatformCrypto._readAndDecodeAudio(audioTracks[0]);
-        if (!headerBytes) throw new Error('JJC4: could not decode audio header');
-        Logger.log(`[PlatformCrypto] Audio header decoded — ${headerBytes.length} B`);
+        const headerBytes = await PlatformCrypto._readVideoHeader(MediaBunny, videoTrack);
+        if (!headerBytes) {
+            throw new Error('No JellyJump header found in this video. Either it is not an '
+                + 'encrypted carrier, or it was made before the header moved into the '
+                + 'video strip and can no longer be read.');
+        }
         progress(0.15);
 
         const hdv          = new DataView(headerBytes.buffer, headerBytes.byteOffset);
@@ -258,8 +287,9 @@ export class PlatformCrypto {
 
         // Reed–Solomon shards — derive the identical plan the encoder used
         // from (payloadSize, rs) alone.
-        if (version < VERSION) {
-            throw new Error(`Unsupported JJC version ${version} (expected ${VERSION}). This file was made by an incompatible build.`);
+        if (version !== VERSION) {
+            throw new Error(`Unsupported JJC version ${version} (this build reads ${VERSION}). `
+                + 'Carriers made before the header moved into the video strip cannot be read.');
         }
         const rs = Array.isArray(metadata.rs) && metadata.rs.length === 2
             ? metadata.rs : [RS_DATA_SHARDS, RS_PARITY_SHARDS];
@@ -272,10 +302,6 @@ export class PlatformCrypto {
         Logger.log(`[PlatformCrypto] RS plan — ${plan.totalShards} shards, ${plan.generations.length} generation(s), rs=[${rs}]`);
 
         // ── Step 2: Decode visual strip ───────────────────────────────────
-        const videoTracks = await input.getVideoTracks();
-        if (!videoTracks.length) throw new Error('JJC4: no video track found');
-
-        const videoTrack = videoTracks[0];
         const duration   = await videoTrack.computeDuration();
         const numFrames  = Math.round(duration * FPS);
 
@@ -292,9 +318,10 @@ export class PlatformCrypto {
         const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
         for await (const sample of videoSink.samples()) {
             const decoded = await decodeSample(sample);
-            if (decoded && decoded.valid) {
+            if (decoded && decoded.valid && decoded.shardIndex < HEADER_INDEX_BASE) {
                 // CRC-valid frames fill shard slots; failed/absent frames are
-                // erasures — Reed–Solomon heals them at assembly.
+                // erasures — Reed–Solomon heals them at assembly. Header
+                // frames carry a reserved index and are not shards.
                 const idx = decoded.shardIndex;
                 if (idx < plan.totalShards && !shardSlots[idx]) {
                     shardSlots[idx] = decoded.data;
@@ -347,6 +374,57 @@ export class PlatformCrypto {
         Logger.log(`[PlatformCrypto] DECRYPT done — ${plaintext.length} B (type=${outputType})`);
         progress(1);
         return { blob: new Blob([plaintext], { type: outputType }), metadata };
+    }
+
+    /**
+     * Read the JJC header out of the video strip.
+     *
+     * Header frames are ordinary frames carrying a reserved shard index, so
+     * they verify themselves with the same CRC as every other frame and need
+     * no separate trust. Only the opening stretch of the carrier is searched:
+     * a copy is written every HEADER_EVERY frames, so if none has turned up by
+     * then this is a v4 file whose header lives in the audio tones instead.
+     * @returns {Promise<Uint8Array|null>}
+     */
+    static async _readVideoHeader(MediaBunny, videoTrack) {
+        const decodeSample = PlatformCrypto._makeFrameDecoder();
+        const chunks = new Map();
+        let expected = null;
+        let scanned = 0;
+
+        for await (const sample of new MediaBunny.VideoSampleSink(videoTrack).samples()) {
+            const decoded = await decodeSample(sample);
+            sample.close();
+            if (decoded && decoded.valid && decoded.shardIndex >= HEADER_INDEX_BASE) {
+                const chunkIndex = decoded.shardIndex - HEADER_INDEX_BASE;
+                if (!chunks.has(chunkIndex)) chunks.set(chunkIndex, decoded.data);
+                // Chunk 0 carries the length fields, so it says how many
+                // chunks the whole header occupies.
+                if (expected === null && chunks.has(0)) {
+                    const first = chunks.get(0);
+                    const dv = new DataView(first.buffer, first.byteOffset);
+                    const total = 76 + dv.getUint16(10, false);
+                    expected = Math.ceil(total / DATA_BYTES_PER_FRAME);
+                }
+                if (expected !== null && chunks.size >= expected) break;
+            }
+            if (++scanned >= HEADER_SCAN_FRAMES) break;
+        }
+
+        if (expected === null || chunks.size < expected) return null;
+
+        const first = chunks.get(0);
+        const total = 76 + new DataView(first.buffer, first.byteOffset).getUint16(10, false);
+        const headerBytes = new Uint8Array(total);
+        for (let i = 0; i < expected; i++) {
+            const chunk = chunks.get(i);
+            if (!chunk) return null;
+            headerBytes.set(chunk.subarray(0, Math.min(chunk.length, total - i * DATA_BYTES_PER_FRAME)),
+                i * DATA_BYTES_PER_FRAME);
+        }
+        if (new TextDecoder().decode(headerBytes.subarray(0, 4)) !== MAGIC) return null;
+        Logger.log(`[PlatformCrypto] Header read from the video strip — ${total} B in ${expected} chunk(s), ${scanned} frames scanned`);
+        return headerBytes;
     }
 
     /**
@@ -438,10 +516,9 @@ export class PlatformCrypto {
                 formats: MediaBunny.ALL_FORMATS,
             });
 
-            const audioTracks = await input.getAudioTracks();
-            if (!audioTracks.length) return null;
-
-            const headerBytes = await PlatformCrypto._readAndDecodeAudio(audioTracks[0]);
+            const videoTracks = await input.getVideoTracks();
+            if (!videoTracks.length) return null;
+            const headerBytes = await PlatformCrypto._readVideoHeader(MediaBunny, videoTracks[0]);
             if (!headerBytes) return null;
 
             const metadataSize = new DataView(
@@ -466,51 +543,21 @@ export class PlatformCrypto {
      * Estimated video duration (seconds) for a given plaintext file size.
      */
     static estimatedDuration(fileSize) {
-        const singleAudioSec = audioDurationSec(76 + 100); // 76 fixed + ~100 metadata
-        const totalAudioSec  = singleAudioSec * AUDIO_REPEAT + AUDIO_GAP_SEC * (AUDIO_REPEAT - 1);
-        const videoDataSec   = stripDurationSec(fileSize);
-        return Math.max(totalAudioSec + 2, videoDataSec) + 1;
+        // Payload frames, plus one header copy per HEADER_EVERY of them, plus
+        // the tail. Nothing depends on the audio any more.
+        const dataFrames   = stripDurationSec(fileSize) * FPS;
+        const headerFrames = Math.ceil(dataFrames / HEADER_EVERY) + 1;
+        return (dataFrames + headerFrames + TAIL_FRAMES) / FPS;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    static async _readAndDecodeAudio(audioTrack) {
-        const MB = await _getMediaBunny();
-        const audioSink = new MB.AudioSampleSink(audioTrack);
-        const chunks = [];
-        let totalSamples = 0;
-        const maxSamples = AUDIO_SAMPLE_RATE * 60; // one full header repetition fits within 60 s
-
-        for await (const sample of audioSink.samples()) {
-            // Copy channel 0 as raw f32 — avoids AudioBuffer, which does not
-            // exist inside workers.
-            const bytesNeeded = sample.allocationSize({ format: 'f32-planar', planeIndex: 0 });
-            const ch = new Float32Array(bytesNeeded / 4);
-            sample.copyTo(ch, { format: 'f32-planar', planeIndex: 0 });
-            chunks.push(ch);
-            totalSamples += ch.length;
-            sample.close();
-            if (totalSamples >= maxSamples) break;
-        }
-
-        const allSamples = new Float32Array(totalSamples);
-        let pos = 0;
-        for (const c of chunks) { allSamples.set(c, pos); pos += c.length; }
-        Logger.log(`[PlatformCrypto] Audio read — ${chunks.length} chunks, ${totalSamples} samples (${(totalSamples / AUDIO_SAMPLE_RATE).toFixed(2)} s)`);
-
-        const headerBytes = decodeAudio(allSamples);
-        if (!headerBytes) return null;
-
-        const magic = new TextDecoder().decode(headerBytes.slice(0, 4));
-        if (magic !== MAGIC) return null;
-
-        return headerBytes;
-    }
-
     static async _generateCarrierMp4({
-        ciphertext, plan, audioHeaderBytes, totalAudioSec, totalFrames,
-        singleAudioSec, hint, signal, t0, fileHandle, onProgress,
+        ciphertext, plan, headerChunks, schedule, hint, signal, t0,
+        fileHandle, onProgress,
     }) {
+        const totalFrames   = schedule.length;
+        const totalAudioSec = totalFrames / FPS;
         const ms  = (a, b) => `${(b - a).toFixed(1)}ms`;
         const rel = () => `t=${ms(t0, performance.now())}`;
         let t;
@@ -582,20 +629,14 @@ export class PlatformCrypto {
 
         // ── Feed audio (concurrently with the video loop below — the Output
         // interleaves both tracks and applies backpressure per source) ──────
+        // Silence, now that the header travels in the video strip. The track
+        // is kept because a carrier is meant to look like an ordinary video to
+        // whatever re-encodes it, and silence costs nothing to synthesise.
         const audioPromise = (async () => {
-            let ta = performance.now();
-            const headerFloat32 = encodeAudio(audioHeaderBytes);
-            Logger.log(`[PlatformCrypto] [${rel()}] encodeAudio (${audioHeaderBytes.length}B → ${headerFloat32.length} samples): ${ms(ta, performance.now())}`);
-
-            const gapSamples    = Math.round(AUDIO_SAMPLE_RATE * AUDIO_GAP_SEC);
-            const silenceFloat  = new Float32Array(gapSamples);
-            const totalAudioArray = PlatformCrypto._buildAudioArray(
-                headerFloat32, silenceFloat, AUDIO_REPEAT, totalAudioSec
-            );
-
-            ta = performance.now();
-            await PlatformCrypto._feedAudio(audioSource, totalAudioArray);
-            Logger.log(`[PlatformCrypto] [${rel()}] _feedAudio (${(totalAudioArray.length/AUDIO_SAMPLE_RATE).toFixed(1)}s audio): ${ms(ta, performance.now())}`);
+            const ta = performance.now();
+            const silence = new Float32Array(Math.ceil(totalAudioSec * AUDIO_SAMPLE_RATE));
+            await PlatformCrypto._feedAudio(audioSource, silence);
+            Logger.log(`[PlatformCrypto] [${rel()}] _feedAudio (${totalAudioSec.toFixed(1)}s silence): ${ms(ta, performance.now())}`);
         })();
 
         // ── Feed video frames ──────────────────────────────────────────────
@@ -606,7 +647,7 @@ export class PlatformCrypto {
         // the 25% parity is newly allocated. One shard per frame, no repeats.
         let t2 = performance.now();
         const shards = buildShards(ciphertext, plan);
-        const shardOrder = interleavedShardOrder(plan);
+        const shardOrder = schedule.filter((slot) => slot.shard !== undefined);
         Logger.log(`[PlatformCrypto] [${rel()}] RS encode (${plan.totalShards} shards, ${plan.generations.length} generations): ${ms(t2, performance.now())}`);
 
         // Pre-render placeholder once: canvas → RGBA → I420.
@@ -641,18 +682,18 @@ export class PlatformCrypto {
             ? `${(sec / 3600).toFixed(1)}h`
             : sec >= 60 ? `${(sec / 60).toFixed(1)}m` : `${sec.toFixed(0)}s`;
 
-        // One frame per shard — no repetition (RS parity replaces the old 3×
-        // copies). Shards are emitted in interleaved round-robin order across
-        // generations, so a burst of heavily-quantized frames (platforms
-        // encode bit-starved opening GOPs) spreads its damage across
-        // generations rather than exhausting one generation's parity budget.
-        // Any leftover timeline (the carrier length is usually set by the audio
-        // header) is filled with cheap static placeholder frames as a tail.
+        // The schedule says what every output frame carries: a header chunk, a
+        // payload shard, or nothing. Shards are emitted in interleaved
+        // round-robin order across generations, so a burst of heavily-quantized
+        // frames (platforms encode bit-starved opening GOPs) spreads its damage
+        // across generations rather than exhausting one generation's parity.
         const nData = shardOrder.length;
+        let shardsWritten = 0;
 
         for (frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
+            const slot = schedule[frameIdx];
             let frameData = placeholderI420;
-            if (frameIdx < nData) {
+            if (slot.header !== undefined || slot.shard !== undefined) {
                 let ts;
 
                 ts = performance.now();
@@ -660,8 +701,12 @@ export class PlatformCrypto {
                 tMemcpy += performance.now() - ts;
 
                 ts = performance.now();
-                const globalIdx = shardOrder[frameIdx];
-                writeFrame(i420Frame, globalIdx, shards[globalIdx]);
+                if (slot.header !== undefined) {
+                    writeFrame(i420Frame, HEADER_INDEX_BASE + slot.header, headerChunks[slot.header]);
+                } else {
+                    writeFrame(i420Frame, slot.shard, shards[slot.shard]);
+                    shardsWritten++;
+                }
                 tPixelWrite += performance.now() - ts;
 
                 frameData = i420Frame;
@@ -693,7 +738,7 @@ export class PlatformCrypto {
                 // ── Step progress: overall %, elapsed, ETA, throughput ──
                 Logger.log(
                     `[PlatformCrypto] [${rel()}] video ${(pct * 100).toFixed(1)}% ` +
-                    `— frame ${done}/${totalFrames} (shards ${Math.min(done, nData)}/${nData}) ` +
+                    `— frame ${done}/${totalFrames} (shards ${shardsWritten}/${nData}) ` +
                     `| elapsed ${fmtDur(elapsedSec)} ETA ${fmtDur(etaSec)} ` +
                     `| ${(REPORT_EVERY / (windowMs / 1000)).toFixed(0)} fps` +
                     (bytesWritten ? ` | ${(bytesWritten / 1048576).toFixed(0)}MB on disk` : '') +
@@ -738,27 +783,6 @@ export class PlatformCrypto {
         canvas.width = width;
         canvas.height = height;
         return canvas;
-    }
-
-    static _buildAudioArray(headerFloat32, silenceFloat, repeats, totalDurationSec) {
-        const partsLength = headerFloat32.length * repeats +
-                            silenceFloat.length * (repeats - 1);
-        const totalSamples = Math.max(
-            partsLength,
-            Math.ceil(totalDurationSec * AUDIO_SAMPLE_RATE)
-        );
-        const result = new Float32Array(totalSamples); // zero-initialized
-
-        let pos = 0;
-        for (let i = 0; i < repeats; i++) {
-            result.set(headerFloat32, pos);
-            pos += headerFloat32.length;
-            if (i < repeats - 1) {
-                // silence gap (already zero, just advance)
-                pos += silenceFloat.length;
-            }
-        }
-        return result;
     }
 
     static async _feedAudio(audioSource, float32Array) {
