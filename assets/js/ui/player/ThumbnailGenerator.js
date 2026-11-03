@@ -73,12 +73,19 @@ export class ThumbnailGenerator {
             // 3. Setup CanvasSink
             // We just specify width, let height be auto-calculated if supported, 
             // or we could calculate if needed. CanvasSink usually handles aspect ratio.
-            const sink = new CanvasSink(videoTrack, {
+            // Keep the hardware decoder free for playback; thumbnails are small
+            // background work that software decoding handles fine.
+            //
+            // It is only a preference, though. canDecode() above answers for the
+            // decoder's *default* configuration and takes no options, so it
+            // cannot be asked about this one: a browser with no software
+            // decoder for this codec passes that check and then throws
+            // "Unsupported configuration" when the decoder is configured,
+            // losing every thumbnail. So the sink is built on demand and the
+            // pass is retried on the browser's own terms if that happens.
+            const makeSink = (preferSoftware) => new CanvasSink(videoTrack, {
                 width: width,
-                // fit: 'contain' // Optional
-                // Keep the hardware decoder free for playback; thumbnails are
-                // small background work that software decoding handles fine.
-                decoderOptions: { hardwareAcceleration: 'prefer-software' },
+                ...(preferSoftware ? { decoderOptions: { hardwareAcceleration: 'prefer-software' } } : {}),
             });
 
             // 4. Calculate timestamps
@@ -105,39 +112,52 @@ export class ThumbnailGenerator {
             }
 
             // 5. Generate via iterator
-            const iterator = sink.canvasesAtTimestamps(timestamps);
-            let processedCount = 0;
+            const runPass = async (sink) => {
+                let processedCount = 0;
 
-            for await (const result of iterator) {
-                if (!this.isGenerating) break;
+                for await (const result of sink.canvasesAtTimestamps(timestamps)) {
+                    if (!this.isGenerating) break;
 
-                // Skip null results
-                if (!result) continue;
+                    // Skip null results
+                    if (!result) continue;
 
-                const { canvas, timestamp } = result;
+                    const { canvas, timestamp } = result;
 
-                if (!canvas) continue;
+                    if (!canvas) continue;
 
-                // Convert canvas to blob URL
-                let blobUrl;
-                if (canvas.convertToBlob) {
-                    const b = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
-                    blobUrl = URL.createObjectURL(b);
-                } else if (canvas.toBlob) {
-                    blobUrl = await new Promise(resolve =>
-                        canvas.toBlob(b => resolve(URL.createObjectURL(b)), 'image/jpeg', 0.7)
-                    );
-                } else {
-                    Logger.warn('[Thumbnails] Canvas conversion not supported');
-                    continue;
+                    // Convert canvas to blob URL
+                    let blobUrl;
+                    if (canvas.convertToBlob) {
+                        const b = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+                        blobUrl = URL.createObjectURL(b);
+                    } else if (canvas.toBlob) {
+                        blobUrl = await new Promise(resolve =>
+                            canvas.toBlob(b => resolve(URL.createObjectURL(b)), 'image/jpeg', 0.7)
+                        );
+                    } else {
+                        Logger.warn('[Thumbnails] Canvas conversion not supported');
+                        continue;
+                    }
+
+                    this.thumbnails.push({ time: timestamp, url: blobUrl });
+
+                    processedCount++;
+                    if (this.progressCallback) {
+                        this.progressCallback(processedCount / timestamps.length);
+                    }
                 }
+            };
 
-                this.thumbnails.push({ time: timestamp, url: blobUrl });
-
-                processedCount++;
-                if (this.progressCallback) {
-                    this.progressCallback(processedCount / timestamps.length);
-                }
+            try {
+                await runPass(makeSink(true));
+            } catch (e) {
+                // The decoder is configured on first use, so an unsupported
+                // configuration surfaces mid-pass rather than at construction.
+                if (!this.isGenerating || !/configuration|configure/i.test(String(e && e.message))) throw e;
+                Logger.warn('[Thumbnails] Software decoding refused for this codec — '
+                    + "retrying with the browser's own choice of decoder");
+                this.thumbnails = [];
+                await runPass(makeSink(false));
             }
 
         } catch (e) {
