@@ -341,7 +341,11 @@ function _withTimeout(promise, ms, what) {
     return Promise.race([
         promise.finally(() => clearTimeout(timer)),
         new Promise((_, reject) => {
-            timer = setTimeout(() => reject(new Error(`timed out waiting for the ${what} after ${ms}ms`)), ms);
+            timer = setTimeout(() => {
+                const error = new Error(`timed out waiting for the ${what} after ${ms}ms`);
+                error.name = 'FrameWaitTimeout';
+                reject(error);
+            }, ms);
         }),
     ]);
 }
@@ -389,6 +393,20 @@ export async function startPlayerVideoIterator(player) {
             firstFrame = (await _withTimeout(iterator.next(), limit, 'first frame')).value ?? null;
             secondFrame = (await _withTimeout(iterator.next(), limit, 'second frame')).value ?? null;
         } catch (e) {
+            if (e && e.name === 'FrameWaitTimeout') {
+                // Still sitting on that next(), and it will never finish. This
+                // needs abandon(), not dropIterator(): the generator has to be
+                // returned so the frames it holds are closed rather than left
+                // for the collector to complain about, the pending frame has to
+                // go so a stale one is not kept on screen, and the fetch latch
+                // has to be forced open because the wedged pump will never
+                // reach its own endFetch to clear it.
+                Logger.warn(`[VideoIterator] ${e.message} — abandoning this iterator`);
+                player.frames.abandon();
+                return;
+            }
+            // A generator that threw is already finished: there is nothing to
+            // return and the latch clears normally.
             Logger.warn('[VideoIterator] Failed to get initial frames, will retry on next play:', e);
             player.frames.dropIterator();
             return;

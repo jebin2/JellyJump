@@ -174,8 +174,19 @@ async function run(page, origin) {
         p.firstFrameTimeoutMs = 400;
 
         // An iterator that never answers, which is what a stalled decoder is.
-        const realOpen = p.frames.open.bind(p.frames);
-        p.frames.open = () => ({ next: () => new Promise(() => {}), return: async () => ({ done: true }) });
+        // Stubbed at the sink, not at frames.open: open() is what records the
+        // iterator on the queue, and abandon() acts on what open() recorded, so
+        // replacing open() itself would leave abandon() looking at nothing.
+        //
+        // return() is the whole point of the check: an abandoned generator that
+        // is never returned never closes the frames it holds, which is what the
+        // collector complains about and what starves the decoder afterwards.
+        const realCanvases = p.videoSink.canvases.bind(p.videoSink);
+        let returned = false;
+        p.videoSink.canvases = () => ({
+            next: () => new Promise(() => {}),
+            return: async () => { returned = true; return { done: true }; },
+        });
 
         p._requestSeek(1.0);
         await sleep(50);
@@ -188,9 +199,15 @@ async function run(page, origin) {
             if (!p._seekLoopActive) releasedMs = Math.round(performance.now() - t0);
         }
         const spinnerAfter = !!document.querySelector('.jellyjump-loading:not([hidden])');
+        // The wedged pump never reaches its own endFetch, so giving up has to
+        // force the latch open and drop the stale frame, or the next play is
+        // refused and the old picture stays on screen.
+        const latchCleared = !p.frames.isFetching;
+        const pendingCleared = p.frames.pending === null;
+        await sleep(50);   // return() is fired without being awaited
 
         // Put the real decoder back; the player must take seeks again.
-        p.frames.open = realOpen;
+        p.videoSink.canvases = realCanvases;
         delete p.firstFrameTimeoutMs;
         p._requestSeek(0.5);
         for (let i = 0; i < 80 && p._seekLoopActive; i++) await sleep(100);
@@ -198,6 +215,7 @@ async function run(page, origin) {
             tookIt, releasedMs, spinnerAfter,
             seeksAgain: !p._seekLoopActive,
             landed: Number(p.currentTime.toFixed(2)),
+            latchCleared, pendingCleared, returned,
         };
     });
 
@@ -205,6 +223,9 @@ async function run(page, origin) {
     check(wedged.tookIt, 'the seek is actually in flight, so this exercises the coalescing loop');
     check(wedged.releasedMs !== null, `it gives up instead of hanging for ever (released after ${wedged.releasedMs}ms)`);
     check(!wedged.spinnerAfter, 'the spinner is not left running');
+    check(wedged.returned, 'the wedged iterator is returned, so the frames it holds are released');
+    check(wedged.latchCleared, 'the fetch latch is released, so the next play is not refused');
+    check(wedged.pendingCleared, 'and the stale frame is dropped rather than left on screen');
     check(wedged.seeksAgain, `and seeking works again afterwards (landed at ${wedged.landed}s)`);
 }
 
