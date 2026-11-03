@@ -193,28 +193,35 @@ export class MediaMetadata {
      * @param {Function} onSave - Callback to save state after fetching
      * @returns {Promise<void>}
      */
+    /**
+     * A source to *read* from, as opposed to one to hand to something that
+     * needs the bytes.
+     *
+     * A remote file is read where it lies: createMediaBunnyInput and
+     * MediaBunny's UrlSource both take a URL and range-request only what they
+     * touch, so inspecting a header costs a few KB. getProcessedSourceURL,
+     * which the callers that really do need the bytes still use, downloads the
+     * whole file to make a blob of it -- 992 MB for one episode, just to read
+     * its codecs, while the player was streaming the same file.
+     *
+     * @param {Object} item
+     * @param {Function} [onSave]
+     * @returns {Promise<string>} a URL the reader can open
+     */
+    static async sourceForReading(item, onSave) {
+        if (!item.blob_url?.startsWith('blob:') && /^https?:/i.test(item.url || '')) {
+            return item.url;
+        }
+        return MediaMetadata.getProcessedSourceURL(item, onSave);
+    }
+
     static async ensureMetadata(item, onSave) {
         // Already cached
         if (item.videoInfo || item.audioInfo) {
             return;
         }
 
-        // Read a remote file where it lies rather than dragging it over first.
-        //
-        // This used to go through getProcessedSourceURL, which downloads the
-        // whole thing to make a blob — so selecting a 992 MB episode from a
-        // shared library fetched all 992 MB just to read its codecs, while the
-        // player was streaming the same file for playback. The two fought over
-        // the link, which is what made the sound stutter.
-        //
-        // Metadata lives in the header, and createMediaBunnyInput already backs
-        // a URL with UrlSource, so passing the URL straight through reads the
-        // few ranges it actually needs. Only this path changes: everything that
-        // genuinely needs the bytes — export, trim, encrypt — still asks for
-        // the blob.
-        const blobUrl = (!item.blob_url?.startsWith('blob:') && /^https?:/i.test(item.url || ''))
-            ? item.url
-            : await MediaMetadata.getProcessedSourceURL(item, onSave);
+        const blobUrl = await MediaMetadata.sourceForReading(item, onSave);
 
         try {
             const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(blobUrl);
