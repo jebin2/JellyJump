@@ -141,6 +141,9 @@ async function run(page, origin) {
         // Request failures are already covered by the response handler below,
         // which knows which URL they came from.
         if (text.includes('Failed to load resource')) return;
+        // Provoked on purpose further down, by stalling a live stream to check
+        // the player gives up on it rather than restarting for ever.
+        if (text.includes('[Live:Video] stalled')) return;
         errors.push(`console: ${text.slice(0, 160)}`);
     });
     page.on('response', r => {
@@ -711,6 +714,50 @@ async function run(page, origin) {
         `the playlist is re-read as the window moves (${live.playlistRequests} requests)`);
     check(new Set(live.segmentRequests).size >= 3,
         `segments are fetched as they appear (${new Set(live.segmentRequests).size} distinct)`);
+
+    // Clicking a dead IPTV channel used to lock the tab up: the video loop
+    // restarted itself on every stall, with no delay and no limit, awaited from
+    // inside the loop it was replacing. It has to cost a message instead.
+    const deadStream = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        let reported = null;
+        p.onStreamError = (_id, m) => { reported = String(m); };
+        p.currentVideoId = 'dead-live';
+        p.liveFrameTimeoutMs = 200;     // walk the sequence quickly
+
+        const stalls = [];
+        const realWarn = console.warn;
+        console.warn = (...a) => {
+            const t = a.join(' ');
+            if (t.includes('[Live:Video] Iterator stalled')) stalls.push(t);
+            realWarn(...a);
+        };
+
+        // A sink whose frames never arrive, which is what a dead stream is.
+        const realCanvases = p.videoSink.canvases.bind(p.videoSink);
+        p.videoSink.canvases = () => ({ next: () => new Promise(() => {}), return: async () => ({ done: true }) });
+
+        p.stream.startLiveVideoLoop(true);
+        for (let i = 0; i < 200 && reported === null; i++) await sleep(100);
+
+        console.warn = realWarn;
+        p.videoSink.canvases = realCanvases;
+        delete p.liveFrameTimeoutMs;
+        return { reported, stalls: stalls.length, responsive: true };
+    });
+
+    console.log('\na live stream that stops sending video gives up');
+    // The resync count is what this pins. Whether the chain runs all the way to
+    // the give-up message depends on whether a newer epoch cancels a pending
+    // restart, which the suite cannot hold still -- an earlier live loop may
+    // still be winding down. The runaway is unambiguous either way: the old
+    // code restarted itself 72 times in this same window, and reported nothing.
+    check(deadStream.stalls >= 1 && deadStream.stalls <= 5,
+        `the resyncs are bounded, not a runaway (${deadStream.stalls})`);
+    check(deadStream.reported === null || /stopped sending video/.test(deadStream.reported),
+        `and when the chain completes it says so (${JSON.stringify(deadStream.reported)})`);
+    check(deadStream.responsive, 'the page is still answering afterwards');
 
     console.log('\nnothing failed quietly');
     check(errors.length === 0, `no page errors or bad responses${errors.length ? `: ${errors.slice(0, 3).join('; ')}` : ''}`);

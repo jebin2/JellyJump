@@ -242,8 +242,18 @@ export class PlayerStream {
 
     // ─── Live video loop ─────────────────────────────────────────────────────────
 
+    /**
+     * How long to wait before each resync attempt after the video iterator
+     * stalls, and — by its length — how many attempts to make before giving up
+     * on the stream. A dead IPTV channel is a normal thing to click on, and it
+     * must cost a message rather than the tab.
+     */
+    static LIVE_RESYNC_DELAYS_MS = [0, 1000, 3000, 5000];
+
+
     async startLiveVideoLoop(force = false) {
         const player = this.player;
+        const RESYNC_DELAYS_MS = PlayerStream.LIVE_RESYNC_DELAYS_MS;
 
         if (this._isLiveLoopActive && !force) {
             Logger.log('[Live:Video] Loop already active, ignoring redundant start');
@@ -315,16 +325,47 @@ export class PlayerStream {
             while (true) {
                 let result;
                 try {
-                    // Watchdog: If a frame takes > 6s to arrive, something is wrong
+                    // Watchdog: if a frame takes this long to arrive, something
+                    // is wrong. player.liveFrameTimeoutMs overrides it, which is
+                    // how the suite walks the whole give-up sequence in a second
+                    // rather than half a minute.
+                    const watchdogMs = player.liveFrameTimeoutMs ?? 6000;
                     result = await Promise.race([
                         myIterator.next(),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), watchdogMs))
                     ]);
                 } catch (e) {
-                    Logger.warn(`[Live:Video] Iterator stalled or failed: ${e.message} — forcing resync`);
-                    await player._startLiveVideoLoop(true); // force restart
+                    // A stream that is simply dead stalls every time, and this
+                    // used to restart the loop as fast as it could fail --
+                    // awaited from inside the very loop it was restarting, so
+                    // the stack grew with each attempt until the tab locked up.
+                    // Back off instead, and stop rather than spin.
+                    const attempt = (this._liveStallCount = (this._liveStallCount ?? 0) + 1);
+                    this._isLiveLoopActive = false;
+
+                    if (attempt > RESYNC_DELAYS_MS.length) {
+                        Logger.error(`[Live:Video] stalled ${attempt} times — giving up on this stream`);
+                        player._setLoading(false);
+                        if (player.onStreamError && player.currentVideoId) {
+                            player.onStreamError(player.currentVideoId,
+                                'This live stream stopped sending video.');
+                        }
+                        break;
+                    }
+
+                    const wait = RESYNC_DELAYS_MS[attempt - 1];
+                    Logger.warn(`[Live:Video] Iterator stalled or failed: ${e.message} `
+                        + `— resync ${attempt}/${RESYNC_DELAYS_MS.length} in ${wait}ms`);
+                    // Scheduled, not awaited: the restart must not run inside
+                    // the loop it replaces.
+                    setTimeout(() => {
+                        if (!player.epoch.isStale(epoch)) player._startLiveVideoLoop(true);
+                    }, wait);
                     break;
                 }
+
+                // Frames are arriving, so a later stall starts counting afresh.
+                this._liveStallCount = 0;
 
                 if (result.done || !result.value) break;
                 const frame = result.value;
