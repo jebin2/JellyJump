@@ -162,6 +162,50 @@ async function run(page, origin) {
     console.log('\nand the player still works afterwards');
     check(Math.abs(good.duration - 2) < 0.2, `a good file plays again (duration ${good.duration})`);
     check(!good.spinner, 'with no spinner left over from the failures');
+
+    // A decoder that wedges on the seek target used to take the whole player
+    // with it: the iterator rebuild never returned, so seekPlayerTo never
+    // cleared the loading flag and the coalescing loop never released, leaving
+    // the spinner up and every later seek silently dropped until the app was
+    // restarted. Dragging the scrub bar is what reaches this path.
+    const wedged = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        p.firstFrameTimeoutMs = 400;
+
+        // An iterator that never answers, which is what a stalled decoder is.
+        const realOpen = p.frames.open.bind(p.frames);
+        p.frames.open = () => ({ next: () => new Promise(() => {}), return: async () => ({ done: true }) });
+
+        p._requestSeek(1.0);
+        await sleep(50);
+        const tookIt = !!p._seekLoopActive;
+
+        let releasedMs = null;
+        const t0 = performance.now();
+        for (let i = 0; i < 100 && releasedMs === null; i++) {
+            await sleep(100);
+            if (!p._seekLoopActive) releasedMs = Math.round(performance.now() - t0);
+        }
+        const spinnerAfter = !!document.querySelector('.jellyjump-loading:not([hidden])');
+
+        // Put the real decoder back; the player must take seeks again.
+        p.frames.open = realOpen;
+        delete p.firstFrameTimeoutMs;
+        p._requestSeek(0.5);
+        for (let i = 0; i < 80 && p._seekLoopActive; i++) await sleep(100);
+        return {
+            tookIt, releasedMs, spinnerAfter,
+            seeksAgain: !p._seekLoopActive,
+            landed: Number(p.currentTime.toFixed(2)),
+        };
+    });
+
+    console.log('\na decoder that stalls on a seek does not wedge the player');
+    check(wedged.tookIt, 'the seek is actually in flight, so this exercises the coalescing loop');
+    check(wedged.releasedMs !== null, `it gives up instead of hanging for ever (released after ${wedged.releasedMs}ms)`);
+    check(!wedged.spinnerAfter, 'the spinner is not left running');
+    check(wedged.seeksAgain, `and seeking works again afterwards (landed at ${wedged.landed}s)`);
 }
 
 // --- harness ----------------------------------------------------------------

@@ -323,6 +323,29 @@ export function resetPlayerUI(player) {
     player._updateProgress();
 }
 
+// Long enough that a slow decoder spin-up, a large GOP or a sluggish network
+// source still lands, short enough that a wedged one does not cost the session.
+// player.firstFrameTimeoutMs overrides it, which is how the suite exercises the
+// recovery path without waiting half a minute for it.
+const FIRST_FRAME_TIMEOUT_MS = 30000;
+
+/**
+ * Reject if a promise has not settled in time.
+ *
+ * The timer is cleared either way, so a settled promise leaves nothing behind.
+ * The abandoned promise may still settle later; its iterator is dropped by the
+ * caller, which is what stops it being mistaken for the current one.
+ */
+function _withTimeout(promise, ms, what) {
+    let timer;
+    return Promise.race([
+        promise.finally(() => clearTimeout(timer)),
+        new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`timed out waiting for the ${what} after ${ms}ms`)), ms);
+        }),
+    ]);
+}
+
 export async function startPlayerVideoIterator(player) {
     if (!player.videoSink) return;
 
@@ -353,8 +376,18 @@ export async function startPlayerVideoIterator(player) {
         }
 
         try {
-            firstFrame = (await iterator.next()).value ?? null;
-            secondFrame = (await iterator.next()).value ?? null;
+            // Bounded, because a decoder that wedges on the seek target never
+            // settles these at all. Unbounded, that took the whole player with
+            // it: the rebuild never returned, so seekPlayerTo never cleared the
+            // loading flag and never released the seek loop, leaving the
+            // spinner up and every later seek silently dropped -- recoverable
+            // only by restarting. A seek that cannot produce a frame in this
+            // long has failed by any measure, and failing is already handled
+            // right here: drop the iterator and let the next play or seek try
+            // again.
+            const limit = player.firstFrameTimeoutMs ?? FIRST_FRAME_TIMEOUT_MS;
+            firstFrame = (await _withTimeout(iterator.next(), limit, 'first frame')).value ?? null;
+            secondFrame = (await _withTimeout(iterator.next(), limit, 'second frame')).value ?? null;
         } catch (e) {
             Logger.warn('[VideoIterator] Failed to get initial frames, will retry on next play:', e);
             player.frames.dropIterator();
