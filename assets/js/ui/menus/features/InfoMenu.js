@@ -287,7 +287,12 @@ export class InfoMenu {
 
             // Fetch extended metadata using MediaBunny directly
             try {
-                const blobUrl = await MediaMetadata.getProcessedSourceURL(item);
+                // Reading, not processing: this panel only inspects the
+                // header, so a remote file must not be dragged over whole for
+                // it. Opening Video Information on an episode from a shared
+                // library used to download the entire file before showing a
+                // codec string.
+                const blobUrl = await MediaMetadata.sourceForReading(item);
                 let inputSource;
                 if (typeof blobUrl === 'string') {
                     inputSource = new MediaBunny.UrlSource(blobUrl);

@@ -515,15 +515,20 @@ export class PlatformCrypto {
     /**
      * Read metadata from a JJC4 file without decrypting the payload.
      * Returns null if not a JJC4 file.
-     * @param {Blob} blob
+     *
+     * Takes a URL as readily as a Blob, because this only reads a header: made
+     * to download first, asking whether a remote episode happens to be an
+     * encrypted carrier cost the whole file before the dialog could open.
+     * @param {Blob|string} source a Blob, or a URL to read in place
      * @returns {Promise<Object|null>}
      */
-    static async readMetadata(blob) {
+    static async readMetadata(source) {
         try {
             const { MediaBunny } = await import('../../core/MediaBunny.js');
-            const blobSource = new MediaBunny.BlobSource(blob);
             const input = new MediaBunny.Input({
-                source: blobSource,
+                source: typeof source === 'string'
+                    ? new MediaBunny.UrlSource(source)
+                    : new MediaBunny.BlobSource(source),
                 formats: MediaBunny.ALL_FORMATS,
             });
 
