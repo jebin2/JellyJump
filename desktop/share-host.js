@@ -131,10 +131,88 @@ async function startSharing() {
         reason: null,
     };
     writeShareEnv(shareUrl);
+    startHealthChecks();
     return describe();
 }
 
+// How often the tailnet mapping is re-checked while sharing. The mapping lives
+// in the tailscaled daemon, not in this process, so it can disappear while the
+// app stays perfectly healthy -- which is exactly the failure this exists for:
+// a link that works for hours and then quietly stops, with a restart as the
+// only known cure, because a restart is the only thing that re-ran serve.
+// Overridable so the suite can exercise the recovery without waiting a
+// minute for it, and so a host that wants a tighter watch can have one.
+const HEALTH_INTERVAL_MS = Number(process.env.JELLYJUMP_SHARE_HEALTH_MS) || 60_000;
+let healthTimer = null;
+let lastHealthProblem = null;
+
+/**
+ * Keep the published link working without a restart.
+ *
+ * `tailscale serve` is installed once when sharing starts and nothing has
+ * re-checked it since, so anything that drops the mapping -- the daemon
+ * restarting, re-authenticating, an operator change -- takes the link down for
+ * good. This notices and puts it back.
+ *
+ * Problems are logged once each rather than every minute: a headless host is
+ * read through its log, and a line a minute would bury it. If the cause turns
+ * out not to be the mapping, this says so too, which is the evidence the next
+ * report will need.
+ */
+function startHealthChecks() {
+    if (healthTimer) return;
+    healthTimer = setInterval(async () => {
+        if (!shareState.enabled) return;
+        try {
+            if (!libraryServer.isRunning()) {
+                if (lastHealthProblem !== 'server') {
+                    console.error('[share] the local library server is no longer listening — '
+                        + 'the link cannot work until sharing is restarted');
+                    lastHealthProblem = 'server';
+                }
+                return;
+            }
+
+            const served = await tailscale.serveStatus(HTTPS_PORT);
+            if (served.active) {
+                if (lastHealthProblem) {
+                    console.log('[share] the tailnet mapping is healthy again');
+                    lastHealthProblem = null;
+                }
+                return;
+            }
+
+            console.error('[share] the tailnet mapping has gone — restoring it');
+            const port = libraryServer.address();
+            const again = await tailscale.startServe({ localPort: port, httpsPort: HTTPS_PORT });
+            if (again.ok) {
+                console.log('[share] the link is working again');
+                lastHealthProblem = null;
+            } else {
+                if (lastHealthProblem !== 'serve') {
+                    console.error(`[share] could not restore it: ${again.error || 'unknown reason'}`);
+                    lastHealthProblem = 'serve';
+                }
+            }
+        } catch (error) {
+            if (lastHealthProblem !== 'check') {
+                console.error(`[share] health check failed: ${error && error.message}`);
+                lastHealthProblem = 'check';
+            }
+        }
+    }, HEALTH_INTERVAL_MS);
+    healthTimer.unref?.();
+}
+
+function stopHealthChecks() {
+    if (!healthTimer) return;
+    clearInterval(healthTimer);
+    healthTimer = null;
+    lastHealthProblem = null;
+}
+
 async function disable() {
+    stopHealthChecks();
     await tailscale.stopServe({ httpsPort: HTTPS_PORT });
     await libraryServer.stop();
     shareState = { enabled: false, url: null, dnsName: shareState.dnsName, reason: null };

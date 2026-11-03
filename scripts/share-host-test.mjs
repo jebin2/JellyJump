@@ -45,15 +45,21 @@ require.cache[electronPath] = { id: electronPath, filename: electronPath, loaded
     exports: { app: fakeApp, ipcMain: { handle() {} } } };
 
 const calls = { startServe: 0, stopServe: 0 };
+let serveIsLive = true;   // what `tailscale serve status` reports
 let releaseStop = null;
 const tailscalePath = require.resolve('../desktop/tailscale.js');
 require.cache[tailscalePath] = { id: tailscalePath, filename: tailscalePath, loaded: true, exports: {
     status: async () => { await sleep(30); return { available: true, dnsName: 'host.tail.ts.net' }; },
     startServe: async () => { calls.startServe++; await sleep(30); return { ok: true }; },
+    serveStatus: async () => ({ active: serveIsLive }),
     stopServe: () => { calls.stopServe++; return new Promise((r) => { releaseStop = r; }); },
     canServeWithoutSudo: async () => true,
     shareUrl: ({ dnsName, token }) => `https://${dnsName}:8443/?token=${token}`,
 } };
+
+// Set before share-host is loaded, which reads it once: the health check runs
+// every minute in production, and this test is not going to wait for that.
+process.env.JELLYJUMP_SHARE_HEALTH_MS = '300';
 
 const index = require('../desktop/library-index.js');
 const watcher = require('../desktop/watcher.js');
@@ -94,6 +100,23 @@ await sleep(50); releaseStop(); await disabling;
 calls.stopServe = 0;
 await share.enable();
 check((statSync(envPath).mode & 0o777) === 0o600, 'a file an older build left readable is tightened');
+
+// ── a tailnet mapping that disappears is put back ────────────────────────────
+// The mapping lives in the tailscaled daemon, not in this process, so it can go
+// while the app stays healthy -- a link that works for hours and then quietly
+// stops, with a restart as the only cure, because a restart was the only thing
+// that re-ran serve. Nothing re-checked it until now.
+{
+    const before = calls.startServe;
+    serveIsLive = false;
+    const restored = await until(() => calls.startServe > before, 6000);
+    check(restored, `a mapping that vanishes is published again without a restart (${calls.startServe - before} retry)`);
+    serveIsLive = true;
+    const settled = calls.startServe;
+    await sleep(900);
+    check(calls.startServe === settled,
+        `and once it is back the checks leave it alone (${calls.startServe - settled} further publishes)`);
+}
 
 // ── Quitting waits for the mapping to come down ──────────────────────────────
 console.log('\nquitting');
