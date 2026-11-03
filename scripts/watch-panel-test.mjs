@@ -137,7 +137,20 @@ check(JSON.stringify(again.ids) === '[1]' && again.whose === 'Friend 1',
 check(again.link === first.link, 'and it is the same link, so the friend holding it still matches');
 
 const guest = await connectGuest();
-await host.waitForTimeout(1200);
+// The panel advances on real events -- the connection settling and its route
+// being determined -- not on a timer, so wait for the state rather than
+// sleeping and hoping. Measured here, the route lands around 2s and the next
+// invitation's name around 5s, so the fixed 1.2s wait this replaces was simply
+// reading the panel mid-handshake, while it still said "a route is open but
+// the connection has not finished". A timeout falls through to the checks
+// below rather than throwing, so a panel that never advances is reported as
+// the assertion it failed instead of a stack trace.
+await host.waitForFunction(() => {
+    const whose = document.querySelector('.wp-whose')?.textContent;
+    const row = [...document.querySelectorAll('.wp-viewer-row')]
+        .map(r => r.textContent).find(t => t.includes('Friend 1')) || '';
+    return whose === 'Friend 2' && /\((direct|relayed)\)/.test(row);
+}, null, { timeout: 30000 }).catch(() => {});
 const live = await read();
 check(live.viewers.includes('watching'), `a connected friend reads as watching (${live.viewers})`);
 check(live.whose === 'Friend 2', `and the next link is waiting as Friend 2 (${live.whose})`);
