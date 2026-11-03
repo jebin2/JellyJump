@@ -43,14 +43,18 @@ export class EncryptMenu {
         // Payloads above the in-RAM ceiling can't be held as one ArrayBuffer;
         // the carrier is streamed to a disk file the user picks (needs the
         // File System Access API — Electron and Chromium have it).
+        // From the item when the bytes are not in hand: a remote file is no
+        // longer downloaded just to open this dialog, so its size comes from
+        // the listing rather than from a blob.
+        const sourceSize = () => sourceBlob?.size ?? item.fileSize ?? 0;
         const needsStreaming = () =>
-            sourceBlob && sourceBlob.size > PlatformCrypto.IN_RAM_PAYLOAD_LIMIT;
+            sourceSize() > PlatformCrypto.IN_RAM_PAYLOAD_LIMIT;
         const canStream = typeof window !== 'undefined' && 'showSaveFilePicker' in window;
 
         const updatePlatformUI = () => {
             if (!platformSection) return;
             platformSection.style.display = currentMode === 'encrypt' ? '' : 'none';
-            if (currentMode !== 'encrypt' || !sourceBlob) return;
+            if (currentMode !== 'encrypt' || !sourceSize()) return;
 
             if (needsStreaming() && !canStream) {
                 const maxMb = Math.floor(PlatformCrypto.IN_RAM_PAYLOAD_LIMIT / 1048576);
@@ -81,7 +85,7 @@ export class EncryptMenu {
                 }
                 const dur = platformSection.querySelector('.encrypt-platform-duration');
                 if (dur) {
-                    const sec = PlatformCrypto.estimatedDuration(sourceBlob.size);
+                    const sec = PlatformCrypto.estimatedDuration(sourceSize());
                     const min = Math.floor(sec / 60);
                     const s   = Math.round(sec % 60);
                     dur.textContent = min > 0 ? `~${min}m ${s}s` : `~${s}s`;
@@ -129,8 +133,15 @@ export class EncryptMenu {
 
         // ── Detect existing JJC4 file + read metadata ───────────────────────
         try {
-            sourceBlob   = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-            fileMetadata = await PlatformCrypto.readMetadata(sourceBlob);
+            // A header read, so a remote file is inspected where it lies. This
+            // used to fetch the whole thing before the dialog could even open,
+            // which on a shared library meant waiting out a multi-gigabyte
+            // download to be told the file is not encrypted.
+            const probeSource = await MediaMetadata.sourceForReading(item, () => playlist._saveState());
+            if (typeof probeSource === 'string' && probeSource.startsWith('blob:')) {
+                sourceBlob = await (await fetch(probeSource)).blob();
+            }
+            fileMetadata = await PlatformCrypto.readMetadata(probeSource);
             if (fileMetadata) {
                 Logger.log(`[EncryptMenu] Detected JJC4 file — ${JSON.stringify(fileMetadata)}`);
                 // Pre-select decrypt mode
