@@ -205,6 +205,23 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         player.media.videoTrack = await player.input.getPrimaryVideoTrack();
         
         if (player.videoTrack) {
+            // Ask whether this can be played at all, which nothing did before:
+            // the sink below was built for any track that existed, so a codec
+            // the browser has no decoder for produced a sink that could never
+            // yield a frame. With sound usually decoding anyway -- EAC3 and
+            // AC-3 go through our own plugin -- that came out as audio playing
+            // under a frozen picture and an endless spinner, with nothing
+            // anywhere saying why. HEVC is the common case: browsers decode it
+            // only on hardware that supports it, and 10-bit narrower still.
+            //
+            // Not for HLS: those tracks cannot answer until a segment has been
+            // read, and asking early reports every stream as undecodable.
+            if (!isHls && !(await player.videoTrack.canDecode())) {
+                const codec = await player.videoTrack.getCodec();
+                throw new Error(`This video is ${String(codec).toUpperCase()}, which this browser cannot decode. `
+                    + 'The sound may still play. Converting it to H.264 will make it playable here.');
+            }
+
             // getCodec(), not `.codec`. The synchronous getter throws for a
             // track whose codec is not known yet, which is every HLS track, and
             // this line sits outside the !isHls guard below -- so a logging

@@ -1,7 +1,39 @@
 import { Logger } from '../../shared/utils/Logger.js';
 
+// How long to leave a closed queue alone before trying to open it again, and
+// how many times to bother. Spaced out because the usual reason a rebuild gave
+// up is that the source is slow, and hammering it would not help.
+const REOPEN_DELAY_MS = 2000;
+const REOPEN_ATTEMPTS = 3;
+
+/**
+ * Put the video back when a rebuild gave up under a running player.
+ *
+ * Abandoning a wedged iterator leaves the queue closed, and the pump above
+ * refuses to run on a closed queue -- so without this the audio carries on
+ * alone and the picture stays frozen until the person happens to seek, which
+ * is exactly what a slow remote source produced: the spinner cleared, the
+ * sound came back, and the video sat still. A few spaced-out attempts, then it
+ * stops rather than retrying for ever behind a source that is simply gone.
+ */
+function _reopenClosedQueue(player) {
+    if (player._reopenTimer || !player.isPlaying || player.isLive) return;
+    if ((player._reopenAttempts ?? 0) >= REOPEN_ATTEMPTS) return;
+    player._reopenAttempts = (player._reopenAttempts ?? 0) + 1;
+    Logger.warn(`[FrameSync] The frame queue is closed while playing — reopening `
+        + `(attempt ${player._reopenAttempts}/${REOPEN_ATTEMPTS})`);
+    // player.reopenDelayMs overrides the wait, which is how the suite exercises
+    // this inside a two-second fixture.
+    player._reopenTimer = setTimeout(() => {
+        player._reopenTimer = null;
+        if (!player.frames.isOpen && player.isPlaying) player._startVideoIterator();
+    }, player.reopenDelayMs ?? REOPEN_DELAY_MS);
+}
+
 export async function updatePlayerNextFrame(player) {
     if (player.frames.isFetching || !player.frames.isOpen) return;
+    // Pumping again, so a later closure starts counting from scratch.
+    player._reopenAttempts = 0;
     
     const epoch = player.epoch.current;
     const currentIterator = player.frames.iterator;
@@ -110,8 +142,12 @@ export function startPlayerRenderLoop(player) {
                 }
             }
 
-            if (!player.isLive && !player.frames.pending && player.frames.isOpen) {
-                player._updateNextFrame();
+            if (!player.isLive && !player.frames.pending) {
+                if (player.frames.isOpen) player._updateNextFrame();
+                // A rebuild that gave up leaves the queue closed, and the pump
+                // will not run on one — so the picture would stay frozen under
+                // a player that is otherwise still going.
+                else _reopenClosedQueue(player);
             }
 
             if (player.frames.pending) {

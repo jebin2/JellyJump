@@ -227,6 +227,47 @@ async function run(page, origin) {
     check(wedged.latchCleared, 'the fetch latch is released, so the next play is not refused');
     check(wedged.pendingCleared, 'and the stale frame is dropped rather than left on screen');
     check(wedged.seeksAgain, `and seeking works again afterwards (landed at ${wedged.landed}s)`);
+
+    // What a slow remote source actually produced: the seek gave up, the
+    // spinner cleared and the sound came back, but the picture stayed frozen
+    // because the queue was left closed and the pump will not run on a closed
+    // queue. The video has to come back on its own rather than waiting for the
+    // person to nudge it with another seek.
+    const recovered = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        p.firstFrameTimeoutMs = 300;
+        p.reopenDelayMs = 150;          // the fixture is only two seconds long
+
+        const realCanvases = p.videoSink.canvases.bind(p.videoSink);
+        let stalling = true;
+        p.videoSink.canvases = (...args) => (stalling
+            ? { next: () => new Promise(() => {}), return: async () => ({ done: true }) }
+            : realCanvases(...args));
+
+        await p.play();
+        p._requestSeek(0.3);            // stay well inside the clip
+        for (let i = 0; i < 60 && p._seekLoopActive; i++) await sleep(100);
+        const deadAfterGiveUp = !p.frames.isOpen;
+
+        // The source comes good, as a slow one eventually does.
+        stalling = false;
+        let reopened = false;
+        for (let i = 0; i < 100; i++) {
+            await sleep(100);
+            if (p.frames.isOpen) { reopened = true; break; }
+        }
+        p.videoSink.canvases = realCanvases;
+        delete p.firstFrameTimeoutMs;
+        delete p.reopenDelayMs;
+        return { deadAfterGiveUp, reopened, playing: p.isPlaying,
+                 attempts: p._reopenAttempts ?? 0, timer: !!p._reopenTimer, live: p.isLive };
+    });
+
+    console.log('\nand the picture comes back without being nudged');
+    check(recovered.deadAfterGiveUp, 'giving up does leave the queue closed, so this is the real case');
+    check(recovered.reopened, 'the queue is reopened on its own once the source comes good'
+        + ` [playing=${recovered.playing} attempts=${recovered.attempts} live=${recovered.live}]`);
 }
 
 // --- harness ----------------------------------------------------------------
