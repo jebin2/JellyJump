@@ -199,8 +199,22 @@ export class MediaMetadata {
             return;
         }
 
-        // Use helper to get source (with caching for remote URLs)
-        const blobUrl = await MediaMetadata.getProcessedSourceURL(item, onSave);
+        // Read a remote file where it lies rather than dragging it over first.
+        //
+        // This used to go through getProcessedSourceURL, which downloads the
+        // whole thing to make a blob — so selecting a 992 MB episode from a
+        // shared library fetched all 992 MB just to read its codecs, while the
+        // player was streaming the same file for playback. The two fought over
+        // the link, which is what made the sound stutter.
+        //
+        // Metadata lives in the header, and createMediaBunnyInput already backs
+        // a URL with UrlSource, so passing the URL straight through reads the
+        // few ranges it actually needs. Only this path changes: everything that
+        // genuinely needs the bytes — export, trim, encrypt — still asks for
+        // the blob.
+        const blobUrl = (!item.blob_url?.startsWith('blob:') && /^https?:/i.test(item.url || ''))
+            ? item.url
+            : await MediaMetadata.getProcessedSourceURL(item, onSave);
 
         try {
             const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(blobUrl);
