@@ -264,6 +264,27 @@ async function run(page, origin) {
                  attempts: p._reopenAttempts ?? 0, timer: !!p._reopenTimer, live: p.isLive };
     });
 
+    // Reading a remote file's metadata used to drag the whole file over to make
+    // a blob out of it -- 992 MB for one episode, just to learn its codecs,
+    // while the player was streaming the same file. Metadata lives in the
+    // header, so nothing should be materialised for it.
+    const meta = await page.evaluate(async (url) => {
+        // Through the playlist's own entry point, so this exercises the bundle
+        // the app ships rather than a source module the build does not emit.
+        const item = { id: 'remote', title: 'remote.webm', url, isRemoteLibrary: true };
+        await window.playlist._prefetchMetadata(item);
+        return {
+            gotDuration: !!item.duration && item.duration !== '--:--',
+            video: item.videoInfo?.codec ?? null,
+            materialised: !!item.blob_url,
+            error: item._metadataError ?? null,
+        };
+    }, `${origin}${FIXTURE_URL}`);
+
+    console.log('\nreading a remote file\'s metadata does not download it');
+    check(meta.gotDuration && meta.video, `the metadata is read (${meta.video}, ${meta.gotDuration})`);
+    check(!meta.materialised, 'and no blob is made of the file to do it');
+
     console.log('\nand the picture comes back without being nudged');
     check(recovered.deadAfterGiveUp, 'giving up does leave the queue closed, so this is the real case');
     check(recovered.reopened, 'the queue is reopened on its own once the source comes good'
