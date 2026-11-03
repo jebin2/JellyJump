@@ -18,6 +18,14 @@ export class StreamDetector {
 
         const lowerUrl = url.toLowerCase();
 
+        // JellyJump's own share links serve whole files from /api/stream/<id>,
+        // which the '/stream/' pattern below would otherwise claim as HLS. That
+        // misread every file played from a shared library: the frame rate was
+        // forced to 30 where the file was 23.976, the frame-rate probe and the
+        // decodability check were both skipped, and the item started out marked
+        // live before being corrected.
+        if (/\/api\/stream\/[a-f0-9]{16}/.test(lowerUrl)) return this.TYPE_FILE;
+
         // HLS manifest (.m3u8 or common HLS path patterns)
         if (lowerUrl.includes('.m3u8') ||
             lowerUrl.includes('/hls/') ||
