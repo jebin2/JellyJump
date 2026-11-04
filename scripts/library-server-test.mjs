@@ -196,6 +196,34 @@ check(emptyRes.headers.get('content-length') === '0', 'saying so');
 check((await fetch(`${base}/api/stream/${index.idFor(emptyPath)}`,
     { headers: { ...auth, Range: 'bytes=0-9' } })).status === 416, 'and a range into it is refused');
 
+// ── reaching a private address from a public page ────────────────────────────
+// A library on a tailnet is a private address, and browsers refuse to let a
+// page served from the public internet reach one unless the device opts in on
+// the preflight. Reported from a real console as "Permission was denied for
+// this request to access the `local` address space", with the app able to say
+// only that it could not reach the server.
+const preflight = (origin, askPna) => fetch(`${base}/api/info`, {
+    method: 'OPTIONS',
+    headers: {
+        Origin: origin,
+        'Access-Control-Request-Method': 'GET',
+        ...(askPna ? { 'Access-Control-Request-Private-Network': 'true' } : {}),
+    },
+});
+
+console.log('\nprivate network access');
+const pnaAllowed = await preflight('https://jellyjump.voidall.com', true);
+check(pnaAllowed.headers.get('access-control-allow-private-network') === 'true',
+    'a trusted origin asking to reach this private address is allowed to');
+
+const pnaUnasked = await preflight('https://jellyjump.voidall.com', false);
+check(pnaUnasked.headers.get('access-control-allow-private-network') === null,
+    'and the header is not volunteered when nothing asked for it');
+
+const pnaForeign = await preflight('https://evil.example', true);
+check(pnaForeign.headers.get('access-control-allow-private-network') === null,
+    'an origin that is not trusted is refused, so this opens nothing else up');
+
 await server.stop();
 rmSync(tmp, { recursive: true, force: true });
 

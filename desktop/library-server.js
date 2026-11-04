@@ -57,6 +57,19 @@ function applyCors(req, res) {
     if (origin && allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Vary', 'Origin');
+        // Private Network Access. A library on a tailnet is a private address,
+        // and browsers refuse to let a page served from the public internet
+        // reach one unless the device itself opts in on the preflight. Without
+        // this the request fails before any status comes back -- the console
+        // says "Permission was denied for this request to access the `local`
+        // address space" and the app can only report that it could not reach
+        // the server, which is indistinguishable from the host being off.
+        //
+        // Only for origins already on the allowlist: this says "that page may
+        // reach me", not "the internet may".
+        if (req.headers['access-control-request-private-network'] === 'true') {
+            res.setHeader('Access-Control-Allow-Private-Network', 'true');
+        }
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Range');
