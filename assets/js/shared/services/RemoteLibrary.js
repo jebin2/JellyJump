@@ -31,6 +31,44 @@ export function looksLikeShareLink(rawUrl) {
  * Confirm a URL is a JellyJump library and return what it says about itself.
  * @returns {Promise<{ok: boolean, name?: string, count?: number, error?: string}>}
  */
+/**
+ * Is this host somewhere on the viewer's own network rather than the open
+ * internet? Tailnet names, .local names and the RFC1918 ranges.
+ */
+function isPrivateHost(hostname = '') {
+    const h = hostname.toLowerCase();
+    return h === 'localhost'
+        || h.endsWith('.ts.net')          // Tailscale
+        || h.endsWith('.local')
+        || /^127\./.test(h)
+        || /^10\./.test(h)
+        || /^192\.168\./.test(h)
+        || /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+}
+
+/**
+ * Why a library could not be reached, when the browser can tell us more than
+ * "failed". Both cases here are policies rather than faults, and both have a
+ * different way out, so saying which one it is saves the user guessing.
+ * @param {URL} url the library's address
+ * @returns {string} a parenthetical to append, or ''
+ */
+export function reachHint(url) {
+    if (url.protocol === 'http:' && globalThis.location?.protocol === 'https:') {
+        return ' (this page is https, so it cannot load an http library)';
+    }
+    // Private Network Access: a page served from the public internet is not
+    // allowed to reach a device on the viewer's own network, and the request
+    // fails before any status comes back — so this is indistinguishable from
+    // the host being down unless it is named.
+    if (isPrivateHost(url.hostname) && !isPrivateHost(globalThis.location?.hostname ?? '')) {
+        return ' — your browser blocks a page on the public internet from reaching a device '
+            + 'on your own network. Open the share link itself instead of this page, or use '
+            + 'the desktop app';
+    }
+    return '';
+}
+
 export async function probe(rawUrl) {
     let url;
     try {
@@ -51,12 +89,10 @@ export async function probe(rawUrl) {
         if (typeof info?.count !== 'number') return { ok: false, error: 'Not a JellyJump library' };
         return { ok: true, name: info.name || url.hostname, count: info.count };
     } catch (error) {
-        // A blocked mixed-content request or an unreachable host both land here,
-        // and the difference matters to the user.
-        const hint = url.protocol === 'http:' && location.protocol === 'https:'
-            ? ' (this page is https, so it cannot load an http library)'
-            : '';
-        return { ok: false, error: `Could not reach the library${hint}` };
+        // A blocked mixed-content request, a request the browser refused for
+        // reaching a private address, and a host that is simply down all land
+        // here, and the difference matters to the user.
+        return { ok: false, error: `Could not reach the library${reachHint(url)}` };
     }
 }
 

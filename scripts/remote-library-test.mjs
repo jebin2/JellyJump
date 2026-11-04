@@ -156,6 +156,34 @@ const asMedia = await fetch(shareLink);
 check((asMedia.headers.get('content-type') || '').includes('text/html'),
     'the link itself returns HTML, which is why it must never reach the demuxer');
 
+// ── why a library could not be reached ───────────────────────────────────────
+// "Failed to fetch" is what the browser gives for a request it refused, for one
+// it could not route, and for a host that is simply off — and the user can only
+// act on the first if it is named. Reported from a real console: a library on a
+// tailnet, opened from the deployed site, failed with "Permission was denied for
+// this request to access the `local` address space".
+{
+    const saved = globalThis.location;
+    globalThis.location = { protocol: 'https:', hostname: 'jellyjump.voidall.com' };
+    const fromPublic = (u) => remote.reachHint(new URL(u));
+
+    check(/own network/.test(fromPublic('https://box.tailfb0d73.ts.net:8443/')),
+        'a tailnet library opened from a public page says the browser blocked it');
+    check(/own network/.test(fromPublic('https://192.168.1.50:8443/')),
+        'and so does one on a LAN address');
+    check(fromPublic('https://library.example.com/') === '',
+        'an ordinary remote host gets no such claim');
+    check(/https/.test(fromPublic('http://box.example.com/')),
+        'and a plain-http library from an https page still names mixed content');
+
+    // From a page that is itself local, reaching a local address is allowed, so
+    // claiming otherwise would send the user chasing the wrong thing.
+    globalThis.location = { protocol: 'http:', hostname: 'localhost' };
+    check(remote.reachHint(new URL('https://box.tailfb0d73.ts.net:8443/')) === '',
+        'a local page reaching a local address is not blamed on the browser');
+    globalThis.location = saved;
+}
+
 await server.stop();
 rmSync(tmp, { recursive: true, force: true });
 

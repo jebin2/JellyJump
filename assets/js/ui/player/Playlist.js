@@ -28,7 +28,7 @@ import {
     looksLikeShareLink, probe as probeRemoteLibrary, fetchItems as fetchRemoteItems,
     fetchItemsStreaming as fetchRemoteItemsStreaming,
     savedLinks as savedRemoteLinks, rememberLink as rememberRemoteLink, forgetLink as forgetRemoteLink,
-    hostOf,
+    hostOf, reachHint,
 } from '../../shared/services/RemoteLibrary.js';
 
 // Folder that scan results are grouped under in the playlist tree.
@@ -1783,8 +1783,13 @@ export class Playlist {
                     unreachable.push({ link, reason: 'the host answered with nothing' });
                 }
             } catch (error) {
-                Logger.warn('[Playlist] Shared library unavailable, keeping the link:', error.message);
-                unreachable.push({ link, reason: error.message || 'unreachable' });
+                // "Failed to fetch" on its own tells nobody anything, and the
+                // likeliest cause for a library on a tailnet is the browser
+                // refusing the request rather than the host being down.
+                let reason = error.message || 'unreachable';
+                try { reason += reachHint(new URL(link)); } catch { /* unparseable link */ }
+                Logger.warn('[Playlist] Shared library unavailable, keeping the link:', reason);
+                unreachable.push({ link, reason });
             }
         }
 
