@@ -57,14 +57,18 @@ export function reachHint(url) {
     if (url.protocol === 'http:' && globalThis.location?.protocol === 'https:') {
         return ' (this page is https, so it cannot load an http library)';
     }
-    // Private Network Access: a page served from the public internet is not
-    // allowed to reach a device on the viewer's own network, and the request
-    // fails before any status comes back — so this is indistinguishable from
-    // the host being down unless it is named.
+    // Local Network Access: a page served from the public internet may not reach
+    // a device on the viewer's own network until they allow it, and the request
+    // fails before any status comes back — so this is indistinguishable from the
+    // host being down unless it is named. Confirmed in practice: granting the
+    // permission is what fixes it, so that is what this says first. A tailnet
+    // address is classed as local whatever the hostname looks like, because the
+    // browser goes by the address it resolves to.
     if (isPrivateHost(url.hostname) && !isPrivateHost(globalThis.location?.hostname ?? '')) {
-        return ' — your browser blocks a page on the public internet from reaching a device '
-            + 'on your own network. Open the share link itself instead of this page, or use '
-            + 'the desktop app';
+        return ' — your browser is blocking this page from reaching a device on your own '
+            + 'network. Allow local network access for this site (your browser may ask, or '
+            + 'you can set it under this site\'s permissions), or open the share link '
+            + 'directly instead of this page';
     }
     return '';
 }

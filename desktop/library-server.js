@@ -57,13 +57,16 @@ function applyCors(req, res) {
     if (origin && allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Vary', 'Origin');
-        // Private Network Access. A library on a tailnet is a private address,
-        // and browsers refuse to let a page served from the public internet
-        // reach one unless the device itself opts in on the preflight. Without
-        // this the request fails before any status comes back -- the console
-        // says "Permission was denied for this request to access the `local`
-        // address space" and the app can only report that it could not reach
-        // the server, which is indistinguishable from the host being off.
+        // Private Network Access: the preflight opt-in that let a page on the
+        // public internet reach a device on the viewer's own network.
+        //
+        // This does NOT fix current Chrome. PNA was put on hold and replaced by
+        // Local Network Access, which gates the same requests behind a user
+        // permission instead of a response header -- confirmed in practice,
+        // where granting that permission is what let the library load while
+        // this header was already being sent. It is kept because browsers that
+        // implement the older design still honour it, and it costs one header
+        // on a preflight; it is not the answer to "the library will not load".
         //
         // Only for origins already on the allowlist: this says "that page may
         // reach me", not "the internet may".
