@@ -639,6 +639,12 @@ export class PlatformCrypto {
         output.addVideoTrack(videoSampleSource);
         output.addAudioTrack(audioSource);
 
+        // No creation time in the carrier. Mediabunny stamps every file it
+        // writes with the wall clock (mvhd/tkhd/mdhd), and for an encrypted
+        // file that is metadata anyone holding it can read without the
+        // password: exactly when it was made. Null writes 0 instead.
+        output.setMetadataTags({ creationTime: null });
+
         t = performance.now();
         await output.start();
         Logger.log(`[PlatformCrypto] [${rel()}] output.start(): ${ms(t, performance.now())}`);
