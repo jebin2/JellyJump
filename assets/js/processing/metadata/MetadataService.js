@@ -66,7 +66,13 @@ export async function getMetadata(source) {
                 codedHeight: videoTrack.codedHeight,
                 codec: videoTrackInfo.codec,
                 rotation: videoTrack.rotation || 0,
-                hasHDR: false,
+                // Asked here rather than left for the Info panel to find out:
+                // the panel falls back to this value whenever its own read of
+                // the file fails, and a hardcoded false then said "No" for
+                // every HDR file. It reads only the track's colour metadata, so
+                // it costs nothing like the packet scan below. (Before
+                // mediabunny 1.66 it also called wide-gamut SDR HDR.)
+                hasHDR: await videoTrack.hasHighDynamicRange().catch(() => false),
                 // Whether this browser can actually decode it. Determined here
                 // because the track is already open — asking later would mean
                 // reopening the file just to answer it. HEVC is the common case:
