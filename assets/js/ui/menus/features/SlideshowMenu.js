@@ -2,6 +2,7 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { decodeAudioRange, getAudioDuration } from '../../../processing/shared/AudioHelpers.js';
 
 /**
  * Slideshow Menu Handler
@@ -239,14 +240,15 @@ export class SlideshowMenu {
             try {
                 previewCtx = previewCtx || new AudioContext();
                 if (previewCtx.state === 'suspended') await previewCtx.resume();
-                const arrayBuffer = await musicFile.arrayBuffer();
-                const audioBuffer = await previewCtx.decodeAudioData(arrayBuffer);
                 const start = parseFloat(audioStartSlider.value);
                 const end = parseFloat(audioEndSlider.value);
+                // Only the trimmed range is decoded, not the whole song.
+                const audioBuffer = await decodeAudioRange(musicFile, start, end);
+                if (!audioBuffer) return;
                 previewNode = previewCtx.createBufferSource();
                 previewNode.buffer = audioBuffer;
                 previewNode.connect(previewCtx.destination);
-                previewNode.start(0, start, end - start);
+                previewNode.start(0);
                 playIcon.setAttribute('href', 'assets/icons/sprite.svg#icon-pause');
                 previewNode.onended = () => {
                     previewNode = null;
@@ -265,12 +267,9 @@ export class SlideshowMenu {
             musicClear.classList.remove('hidden');
             stopPreview();
 
-            // Decode to get duration, then show trim UI
+            // Read the duration from the file, then show trim UI
             try {
-                const ctx = new AudioContext();
-                const buf = await ctx.decodeAudioData(await musicFile.arrayBuffer());
-                audioDuration = buf.duration;
-                await ctx.close();
+                audioDuration = await getAudioDuration(musicFile);
                 const max = audioDuration.toFixed(2);
                 audioStartSlider.max = max;
                 audioEndSlider.max = max;

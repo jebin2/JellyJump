@@ -11,7 +11,6 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { wordChunksToVTT } from '../../core/subtitles/SubtitleConverter.js';
 
 const TARGET_RATE = 16000;      // Whisper input rate
-const RESAMPLE_SEGMENT_S = 30;  // resample in ~30s batches to bound OfflineAudioContext churn
 
 // The extraction pass is roughly the first slice of the whole job; the rest is
 // model download + inference. Keep the two phases visually distinct.
@@ -20,32 +19,6 @@ const PHASE = {
     MODEL: 'model',
     TRANSCRIBE: 'transcribe',
 };
-
-/**
- * Downmix an AudioBuffer to a single mono Float32Array (channel average) in a
- * single pass over the output (cache-friendly for the common stereo case).
- */
-function downmixToMono(audioBuffer) {
-    const channels = audioBuffer.numberOfChannels;
-    const frames = audioBuffer.length;
-    const mono = new Float32Array(frames);
-
-    if (channels === 1) {
-        // Copy out: mediabunny may recycle the source buffer once we advance.
-        mono.set(audioBuffer.getChannelData(0));
-        return mono;
-    }
-
-    const data = [];
-    for (let c = 0; c < channels; c++) data.push(audioBuffer.getChannelData(c));
-    const inv = 1 / channels;
-    for (let i = 0; i < frames; i++) {
-        let sum = 0;
-        for (let c = 0; c < channels; c++) sum += data[c][i];
-        mono[i] = sum * inv;
-    }
-    return mono;
-}
 
 /**
  * A Float32Array that grows by doubling. Sized up front from the known media
@@ -86,74 +59,56 @@ async function extractPcm(player, onProgress) {
     const track = player.audioTrack || tracks[0];
     if (!track) throw new Error('This media has no audio track to transcribe.');
 
-    // A dedicated sink so we never disturb the playback iterator.
-    const sink = new MediaBunny.AudioBufferSink(track);
     const duration = player.duration || 0;
     Logger.log(`[Subtitles] Decoding audio track (${duration ? duration.toFixed(1) + 's' : 'unknown length'})…`);
-    let loggedFormat = false;
 
     // Pre-size from duration (+ small margin) so we usually never reallocate,
     // and never build one giant array via a final concat.
     const out = createPcmSink(Math.ceil(((duration || 60) + 0.5) * TARGET_RATE));
 
-    let nativeRate = 0;
-    let segParts = [];       // native-rate mono pieces awaiting resample
-    let segFrames = 0;       // frames accumulated in segParts
-
-    const flushSegment = async () => {
-        if (segFrames === 0) return;
-
-        if (nativeRate === TARGET_RATE) {
-            // Already at target rate — copy straight through, no resample.
-            for (const p of segParts) out.push(p);
-        } else {
-            // OfflineAudioContext applies a proper anti-aliasing filter (linear
-            // decimation would alias and hurt recognition accuracy). We fill the
-            // source buffer directly from the pending parts — no interim concat.
-            const targetFrames = Math.max(1, Math.round(segFrames * (TARGET_RATE / nativeRate)));
-            const offline = new OfflineAudioContext(1, targetFrames, TARGET_RATE);
-            const src = offline.createBuffer(1, segFrames, nativeRate);
-            const ch = src.getChannelData(0);
-            let off = 0;
-            for (const p of segParts) { ch.set(p, off); off += p.length; }
-
-            const node = offline.createBufferSource();
-            node.buffer = src;
-            node.connect(offline.destination);
-            node.start(0);
-
-            const rendered = await offline.startRendering();
-            out.push(rendered.getChannelData(0));  // push() copies before GC
-        }
-        segParts = [];
-        segFrames = 0;
-    };
-
+    // Mediabunny resamples and downmixes, as one continuous stream rather
+    // than in separate batches. It runs as a Conversion whose `process` sees
+    // each sample after resampling and keeps its PCM; the conversion's own
+    // output writes nowhere, and PCM there needs no encoder from the browser.
+    //
+    // Measured against the OfflineAudioContext this replaced: neither applies
+    // an anti-aliasing filter (a 12 kHz tone folds to 4 kHz at full strength
+    // in both, as Chrome resamples buffer playback by linear interpolation),
+    // so recognition input is unchanged in that respect.
     let lastPct = -1;
-    for await (const { buffer, timestamp } of sink.buffers(0)) {
-        if (!buffer) continue;
-        nativeRate = buffer.sampleRate;
+    const conversion = await MediaBunny.Conversion.init({
+        input: player.input,
+        output: new MediaBunny.Output({
+            format: new MediaBunny.MkvOutputFormat(),
+            target: new MediaBunny.NullTarget(),
+        }),
+        video: { discard: true },
+        // The track being played, which need not be the file's primary one.
+        audio: (candidate) => candidate.id !== track.id ? { discard: true } : {
+            sampleRate: TARGET_RATE,
+            numberOfChannels: 1,
+            codec: 'pcm-f32',
+            forceTranscode: true,
+            process: (sample) => {
+                const pcm = new Float32Array(sample.numberOfFrames);
+                sample.copyTo(pcm, { planeIndex: 0, format: 'f32-planar' });
+                out.push(pcm);
 
-        if (!loggedFormat) {
-            loggedFormat = true;
-            Logger.log(`[Subtitles] Source audio: ${nativeRate}Hz, ${buffer.numberOfChannels}ch → resampling to ${TARGET_RATE}Hz mono`);
-        }
-
-        segParts.push(downmixToMono(buffer));
-        segFrames += buffer.length;
-
-        if (segFrames >= RESAMPLE_SEGMENT_S * nativeRate) {
-            await flushSegment();
-        }
-
-        // Throttle progress to whole-percent changes: the raw loop fires per
-        // decoded buffer (thousands of times), and each report writes the DOM.
-        if (duration > 0 && onProgress) {
-            const pct = Math.floor(Math.min(0.999, (timestamp || 0) / duration) * 100);
-            if (pct !== lastPct) { lastPct = pct; onProgress(pct / 100); }
-        }
+                // Throttled to whole-percent changes: this runs per decoded
+                // sample (thousands of times), and each report writes the DOM.
+                if (duration > 0 && onProgress) {
+                    const pct = Math.floor(Math.min(0.999, (sample.timestamp || 0) / duration) * 100);
+                    if (pct !== lastPct) { lastPct = pct; onProgress(pct / 100); }
+                }
+                return null;
+            },
+        },
+    });
+    if (!conversion.isValid) {
+        const reasons = conversion.discardedTracks.map(t => t.reason).join(', ');
+        throw new Error(`Could not decode the audio of this media (${reasons}).`);
     }
-    await flushSegment();
+    await conversion.execute();
 
     if (out.length === 0) throw new Error('Could not decode any audio from this media.');
     if (onProgress) onProgress(1);

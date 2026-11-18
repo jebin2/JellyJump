@@ -1,6 +1,7 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
+import { decodeAudioRange } from '../shared/AudioHelpers.js';
 
 
 /**
@@ -126,58 +127,50 @@ function renderTransitionFrame(ctx, bmA, bmB, rectA, rectB, progress, transType,
  * @private
  */
 async function addSlideshowAudio(audioSource, audioBlob, totalDuration, audioStartTime, audioEndTime, audioLoop) {
-    const audioContext = new AudioContext();
-    try {
-        Logger.log('[SlideshowService] Adding background music...');
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    Logger.log('[SlideshowService] Adding background music...');
+    const trimStart = Math.max(0, audioStartTime);
+    // Only the chosen range is decoded; it is then looped from memory.
+    const audioBuffer = await decodeAudioRange(audioBlob, trimStart, audioEndTime ?? Infinity);
+    if (!audioBuffer) return;
 
-        const sampleRate = audioBuffer.sampleRate;
-        const numChannels = audioBuffer.numberOfChannels;
-        const trackDur = audioBuffer.duration;
+    const sampleRate = audioBuffer.sampleRate;
+    const numChannels = audioBuffer.numberOfChannels;
+    const rangeDur = audioBuffer.duration;
 
-        const trimStart = Math.max(0, audioStartTime);
-        const trimEnd = Math.min(audioEndTime !== null ? audioEndTime : trackDur, trackDur);
+    let outputTs = 0;
+    let passStart = 0;
 
-        if (trimEnd <= trimStart) return;
+    while (outputTs < totalDuration) {
+        const remaining = totalDuration - outputTs;
+        const chunkDur = Math.min(rangeDur - passStart, remaining);
+        if (chunkDur <= 0) break;
 
-        let outputTs = 0;
-        let passStart = trimStart;
+        const startSample = Math.floor(passStart * sampleRate);
+        const chunkSamples = Math.ceil(chunkDur * sampleRate);
+        const endSample = Math.min(startSample + chunkSamples, audioBuffer.length);
+        const actualSamples = endSample - startSample;
+        if (actualSamples <= 0) break;
 
-        while (outputTs < totalDuration) {
-            const remaining = totalDuration - outputTs;
-            const chunkDur = Math.min(trimEnd - passStart, remaining);
-            if (chunkDur <= 0) break;
-
-            const startSample = Math.floor(passStart * sampleRate);
-            const chunkSamples = Math.ceil(chunkDur * sampleRate);
-            const endSample = Math.min(startSample + chunkSamples, audioBuffer.length);
-            const actualSamples = endSample - startSample;
-            if (actualSamples <= 0) break;
-
-            const chunkBuffer = audioContext.createBuffer(numChannels, actualSamples, sampleRate);
-            for (let ch = 0; ch < numChannels; ch++) {
-                const src = audioBuffer.getChannelData(ch);
-                chunkBuffer.getChannelData(ch).set(src.subarray(startSample, endSample));
-            }
-
-            const samples = MediaBunny.AudioSample.fromAudioBuffer(chunkBuffer, outputTs);
-            const samplesArr = Array.isArray(samples) ? samples : [samples];
-            for (const sample of samplesArr) {
-                await audioSource.add(sample);
-                sample.close();
-            }
-
-            outputTs += chunkDur;
-            passStart += chunkDur;
-
-            if (passStart >= trimEnd) {
-                if (!audioLoop) break;
-                passStart = trimStart;
-            }
+        const chunkBuffer = new AudioBuffer({ numberOfChannels: numChannels, length: actualSamples, sampleRate });
+        for (let ch = 0; ch < numChannels; ch++) {
+            const src = audioBuffer.getChannelData(ch);
+            chunkBuffer.getChannelData(ch).set(src.subarray(startSample, endSample));
         }
-    } finally {
-        await audioContext.close();
+
+        const samples = MediaBunny.AudioSample.fromAudioBuffer(chunkBuffer, outputTs);
+        const samplesArr = Array.isArray(samples) ? samples : [samples];
+        for (const sample of samplesArr) {
+            await audioSource.add(sample);
+            sample.close();
+        }
+
+        outputTs += chunkDur;
+        passStart += chunkDur;
+
+        if (passStart >= rangeDur) {
+            if (!audioLoop) break;
+            passStart = 0;
+        }
     }
 }
 
