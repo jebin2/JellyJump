@@ -4,6 +4,7 @@ import { Toast } from '../../../shared/utils/Toast.js';
 import { MediaBunny } from '../../../core/MediaBunny.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { formatTime } from '../../../shared/utils/mediaUtils.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Optimize Menu
@@ -131,18 +132,24 @@ export const OptimizeMenu = {
                 const progressBar = body.querySelector('.optimize-progress-bar');
                 progressWrap.style.display = 'block';
 
+                const job = startCancellableJob(progressWrap);
                 try {
                     await this._convert(item, w, h, (pct) => {
                         progressLabel.textContent = `Optimizing… ${pct}%`;
                         progressBar.style.width = `${pct}%`;
-                    });
+                    }, job.signal);
                     Toast.show(`Optimized "${item.title}" to 1080p`);
                 } catch (e) {
-                    Logger.error('[Optimize] Conversion failed:', e);
-                    // Fall back to adding the original untouched.
+                    // Either way the original is added untouched.
                     item.optimizeDeclined = true;
-                    Toast.show(`Could not optimize (${e.message}) - adding the original.`, 4000, true);
+                    if (job.isCancelled(e)) {
+                        Toast.show('Optimizing cancelled - adding the original.');
+                    } else {
+                        Logger.error('[Optimize] Conversion failed:', e);
+                        Toast.show(`Could not optimize (${e.message}) - adding the original.`, 4000, true);
+                    }
                 } finally {
+                    job.end();
                     converting = false;
                     modal.closeBtn.disabled = false;
                     settle();
@@ -159,7 +166,7 @@ export const OptimizeMenu = {
      * item's source in place (the item is not in the playlist yet).
      * @private
      */
-    async _convert(item, srcW, srcH, onPct) {
+    async _convert(item, srcW, srcH, onPct, signal) {
         // Constrain only the long side; mediabunny derives the other
         // dimension from the source aspect ratio, so the original ratio is
         // preserved exactly (no independent rounding, no fill-stretching).
@@ -184,7 +191,8 @@ export const OptimizeMenu = {
                     lastPct = pct;
                     onPct(pct);
                 }
-            }
+            },
+            signal,
         });
 
         if (item.url && item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);

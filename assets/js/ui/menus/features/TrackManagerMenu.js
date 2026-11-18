@@ -3,6 +3,7 @@ import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Track Manager Menu Handler
@@ -231,6 +232,7 @@ export class TrackManagerMenu {
         progressPercentage.textContent = '0%';
         progressStatus.textContent = 'Extracting...';
 
+        const job = startCancellableJob(progressSection);
         try {
             // Get source with caching
             const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
@@ -244,7 +246,8 @@ export class TrackManagerMenu {
                 onProgress: (p) => {
                     const percent = Math.round(p * 100) + '%';
                     progressPercentage.textContent = percent;
-                }
+                },
+                signal: job.signal,
             });
 
             this.handleExtractionSuccess({
@@ -260,10 +263,11 @@ export class TrackManagerMenu {
             });
         } catch (e) {
             Logger.error('Extraction failed:', e);
-            errorMessage.textContent = `Extraction failed: ${e.message}`;
+            errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Extraction failed: ${e.message}`;
             errorMessage.classList.remove('hidden');
             progressSection.classList.add('hidden');
         } finally {
+            job.end();
             modal.querySelectorAll('button').forEach(btn => btn.disabled = false);
             if (speedDropdown) speedDropdown.setDisabled(false);
         }

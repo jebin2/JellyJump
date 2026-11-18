@@ -2,8 +2,9 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
+import { executeConversion, cancellableProgress, cancelUnfinished, throwIfCancelled } from '../shared/Cancellation.js';
 
-export async function extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress }) {
+export async function extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress, signal }) {
     // Conversion auto-transcodes when the source codec doesn't fit the target container
     await ensureEncoders();
     const blobSource = source instanceof Blob ? new MediaBunny.BlobSource(source) : new MediaBunny.BufferSource(source);
@@ -69,7 +70,7 @@ export async function extractTrackStreamCopy({ source, trackIndex, trackType, fo
             conversion.onProgress = onProgress;
         }
 
-        await conversion.execute();
+        await executeConversion(conversion, signal);
 
         const mimeType = trackType === 'video' ? `video/${format}` : `audio/${format}`;
         return new Blob([output.target.buffer], { type: mimeType });
@@ -100,7 +101,9 @@ export async function extractTrackStreamCopy({ source, trackIndex, trackType, fo
     }
 }
 
-export async function extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress }) {
+export async function extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress: reportProgress, signal }) {
+    // Checked at every progress report, which this pipeline makes per frame.
+    const onProgress = cancellableProgress(reportProgress, signal);
     await ensureEncoders();
     Logger.log(`[MediaProcessor] Extracting ${trackType} track ${trackIndex} with speed ${speed}x`);
 
@@ -202,8 +205,14 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
 
         const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
         const samples = [];
-        for await (const sample of audioSink.samples()) {
-            samples.push(sample);
+        try {
+            for await (const sample of audioSink.samples()) {
+                samples.push(sample);
+                throwIfCancelled(signal);
+            }
+        } catch (error) {
+            for (const sample of samples) sample.close();
+            throw error;
         }
 
         Logger.log(`[MediaProcessor] Collected ${samples.length} audio samples for speed adjustment`);
@@ -281,6 +290,7 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
 
         return new Blob([output.target.buffer], { type: `audio/${format}` });
     } finally {
+        await cancelUnfinished(output);
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
         }

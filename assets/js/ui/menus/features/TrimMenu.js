@@ -4,6 +4,7 @@ import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Trim Menu Handler
@@ -172,6 +173,7 @@ export class TrimMenu {
             successMessage.classList.add('hidden');
             progressSection.classList.remove('hidden');
 
+            const job = startCancellableJob(progressSection);
             try {
                 // Get source with caching
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
@@ -182,8 +184,8 @@ export class TrimMenu {
                     progressPercentage.textContent = `${Math.round(progress * 100)}%`;
                 };
                 const blob = losslessToggle?.checked
-                    ? await MediaProcessor.losslessTrim({ source, trim: trimOpts, onProgress })
-                    : await MediaProcessor.process({ source, format: 'mp4', quality: 100, trim: trimOpts, onProgress });
+                    ? await MediaProcessor.losslessTrim({ source, trim: trimOpts, onProgress, signal: job.signal })
+                    : await MediaProcessor.process({ source, format: 'mp4', quality: 100, trim: trimOpts, onProgress, signal: job.signal });
 
                 // Success
                 progressSection.classList.add('hidden');
@@ -207,12 +209,14 @@ export class TrimMenu {
 
             } catch (e) {
                 Logger.error('Trimming failed:', e);
-                errorMessage.textContent = `Trimming failed: ${e.message}`;
+                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Trimming failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 trimBtn.disabled = false;
                 modal.closeBtn.disabled = false;
                 if (losslessToggle) losslessToggle.disabled = false;
                 progressSection.classList.add('hidden');
+            } finally {
+                job.end();
             }
         });
     }

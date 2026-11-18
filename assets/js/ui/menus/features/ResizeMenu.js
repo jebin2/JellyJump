@@ -2,6 +2,7 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Resize Menu Handler  
@@ -162,6 +163,7 @@ export class ResizeMenu {
             modal.closeBtn.disabled = true;
             progressStatus.textContent = `Resizing to ${targetW}x${targetH}...`;
 
+            const job = startCancellableJob(progressSection);
             try {
                 // Get source with caching
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
@@ -174,7 +176,8 @@ export class ResizeMenu {
                     onProgress: (progress) => {
                         const percent = Math.round(progress * 100);
                         progressText.textContent = `${percent}%`;
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 // Success
@@ -204,11 +207,13 @@ export class ResizeMenu {
 
             } catch (e) {
                 Logger.error('Resize failed:', e);
-                errorDisplay.textContent = `Resize failed: ${e.message}`;
+                errorDisplay.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Resize failed: ${e.message}`;
                 errorDisplay.classList.remove('hidden');
                 progressSection.classList.add('hidden');
                 resizeBtn.disabled = false;
                 modal.closeBtn.disabled = false;
+            } finally {
+                job.end();
             }
         });
     }

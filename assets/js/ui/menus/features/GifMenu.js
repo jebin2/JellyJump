@@ -5,6 +5,7 @@ import { formatTime, parseTime, formatFileSize } from '../../../shared/utils/med
 import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * GIF Menu Handler
@@ -235,6 +236,7 @@ export class GifMenu {
             downloadBtn.classList.add('hidden');
             progressSection.classList.remove('hidden');
 
+            const job = startCancellableJob(progressSection);
             try {
                 // Calculate dimensions
                 let targetWidth, targetHeight;
@@ -269,7 +271,8 @@ export class GifMenu {
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
                         progressText.textContent = `${pct}%`;
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 // Success
@@ -319,7 +322,7 @@ export class GifMenu {
 
             } catch (e) {
                 Logger.error('GIF creation failed:', e);
-                errorMessage.textContent = `GIF creation failed: ${e.message}`;
+                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `GIF creation failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
 
@@ -329,6 +332,8 @@ export class GifMenu {
                 qualitySlider.disabled = false;
                 createBtn.disabled = false;
                 modal.closeBtn.disabled = false;
+            } finally {
+                job.end();
             }
         });
 

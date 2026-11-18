@@ -5,6 +5,7 @@ import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { STICKER_MOTIONS } from '../../player/StickerLayer.js';
 import { BORDER_PRESETS, RAIN_PRESETS } from '../../player/DecorationLayer.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Export Menu - writes a file with whatever is on screen baked into it.
@@ -69,6 +70,7 @@ export class ExportMenu {
             successMessage.classList.add('hidden');
             progressSection.classList.remove('hidden');
 
+            const job = startCancellableJob(progressSection);
             try {
                 const start = parseTime(startInput.value) || 0;
                 const end = parseTime(endInput.value) || duration;
@@ -92,6 +94,7 @@ export class ExportMenu {
                     onProgress: (progress) => {
                         progressPercentage.textContent = `${Math.round(progress * 100)}%`;
                     },
+                    signal: job.signal,
                 });
 
                 progressSection.classList.add('hidden');
@@ -110,10 +113,11 @@ export class ExportMenu {
             } catch (err) {
                 Logger.error('[ExportMenu] Export failed:', err);
                 progressSection.classList.add('hidden');
-                errorMessage.textContent = err.message || 'Export failed.';
+                errorMessage.textContent = job.isCancelled(err) ? CANCELLED_MESSAGE : (err.message || 'Export failed.');
                 errorMessage.classList.remove('hidden');
                 exportBtn.disabled = false;
             } finally {
+                job.end();
                 modal.closeBtn.disabled = false;
             }
         });

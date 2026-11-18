@@ -4,6 +4,7 @@ import { createMediaBunnyInput, chooseQuality } from '../shared/InputFactory.js'
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
 import { buildOverlayStage } from '../../ui/player/OverlayCompositor.js';
+import { executeConversion } from '../shared/Cancellation.js';
 
 /**
  * Process video (transcode, trim, resize, crop, etc.)
@@ -23,7 +24,8 @@ export async function process({
     rotate = 0, 
     flip = null, 
     overlays = null,
-    onProgress 
+    onProgress,
+    signal,
 }) {
     Logger.log('[TranscodeService] Starting processing...', { format, quality, resolution, trim, crop, removeBackgroundOptions, watermark, blur });
 
@@ -265,7 +267,7 @@ export async function process({
             conversion.onProgress = onProgress;
         }
 
-        await conversion.execute();
+        await executeConversion(conversion, signal);
 
         return new Blob([output.target.buffer], { type: format === 'prores' ? 'video/quicktime' : `video/${format}` });
     } finally {

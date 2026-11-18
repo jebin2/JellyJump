@@ -12,6 +12,7 @@ import {
     updateOverlay
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Watermark Menu Handler - Multi-watermark with time ranges
@@ -583,6 +584,7 @@ export class WatermarkMenu {
 
             updateSelection(-1);
 
+            const job = startCancellableJob(elements.progress.section);
             try {
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
@@ -649,7 +651,8 @@ export class WatermarkMenu {
                         if (elements.progress.status) {
                             elements.progress.status.textContent = p < 0.9 ? "Watermarking..." : "Finalizing...";
                         }
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 // Success
@@ -668,10 +671,11 @@ export class WatermarkMenu {
 
             } catch (e) {
                 Logger.error('Watermark processing failed:', e);
-                elements.messages.error.textContent = e.message;
+                elements.messages.error.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : e.message;
                 elements.messages.error.classList.remove('hidden');
                 elements.progress.section.classList.add('hidden');
             } finally {
+                job.end();
                 elements.processBtn.disabled = false;
             }
         };

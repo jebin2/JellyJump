@@ -8,6 +8,7 @@ import {
 } from './BoxEditorUtils.js';
 
 import { MediaMetadata } from "../../../shared/utils/MediaMetadata.js";
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 export class RotateMenu {
     /**
@@ -129,6 +130,7 @@ export class RotateMenu {
             successMsg.classList.add('hidden');
             statusText.textContent = 'Processing...';
 
+            const job = startCancellableJob(progressSection);
             try {
                 // Get source safely (fixes TypeError: blob must be a Blob)
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
@@ -148,7 +150,8 @@ export class RotateMenu {
                     flip: (flipH || flipV) ? { horizontal: flipH, vertical: flipV } : null,
                     onProgress: (progress) => {
                         percentageText.textContent = `${Math.round(progress * 100)}%`;
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 // Success
@@ -164,9 +167,11 @@ export class RotateMenu {
                 Logger.error('[RotateMenu] Processing failed', error);
                 progressSection.classList.add('hidden');
                 actionButtons.classList.remove('hidden');
-                errorMsg.textContent = 'Processing failed. See console.';
+                errorMsg.textContent = job.isCancelled(error) ? CANCELLED_MESSAGE : 'Processing failed. See console.';
                 errorMsg.classList.remove('hidden');
                 isProcessing = false;
+            } finally {
+                job.end();
             }
         });
 

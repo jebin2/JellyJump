@@ -1,6 +1,7 @@
 import GIF from '../../lib/gif.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
+import { throwIfCancelled, cancelledError } from '../shared/Cancellation.js';
 
 export async function createGif(options) {
     const {
@@ -11,7 +12,8 @@ export async function createGif(options) {
         width,
         height,
         quality,
-        onProgress
+        onProgress,
+        signal,
     } = options;
 
     // Frames are decoded by Mediabunny rather than by seeking a <video>
@@ -52,6 +54,7 @@ export async function createGif(options) {
         let hasFrame = false;
 
         for await (const wrapped of sink.canvasesAtTimestamps(timestamps)) {
+            throwIfCancelled(signal);
             // null is a timestamp before the first frame; the previous frame,
             // if there is one, is held for it, as a seek would have shown.
             if (wrapped) {
@@ -81,6 +84,11 @@ export async function createGif(options) {
             });
 
             gif.on('error', reject);
+            // Encoding runs in gif.js's own workers; abort() stops them.
+            signal?.addEventListener('abort', () => {
+                gif.abort();
+                reject(cancelledError());
+            }, { once: true });
             gif.render();
         });
     } finally {
