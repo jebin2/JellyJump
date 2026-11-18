@@ -1,4 +1,6 @@
 import GIF from '../../lib/gif.js';
+import { MediaBunny } from '../../core/MediaBunny.js';
+import { createMediaBunnyInput } from '../shared/InputFactory.js';
 
 export async function createGif(options) {
     const {
@@ -12,18 +14,17 @@ export async function createGif(options) {
         onProgress
     } = options;
 
-    const video = document.createElement('video');
-    video.muted = true;
-    video.playsInline = true;
-
-    const videoUrl = URL.createObjectURL(input);
-    video.src = videoUrl;
+    // Frames are decoded by Mediabunny rather than by seeking a <video>
+    // element: each one is the frame at that exact timestamp instead of
+    // wherever the element's seek landed, and any file the player can open
+    // works here too, including codecs and containers the browser itself
+    // cannot play.
+    const mediaInput = createMediaBunnyInput(input);
 
     try {
-        await new Promise((resolve, reject) => {
-            video.onloadedmetadata = resolve;
-            video.onerror = reject;
-        });
+        const videoTrack = await mediaInput.getPrimaryVideoTrack();
+        if (!videoTrack) throw new Error('That file has no video track in it.');
+        if (!(await videoTrack.canDecode())) throw new Error('This video cannot be decoded in this browser.');
 
         const canvas = document.createElement('canvas');
         canvas.width = width;
@@ -42,24 +43,30 @@ export async function createGif(options) {
         const totalFrames = Math.ceil(duration * fps);
         const frameInterval = duration / totalFrames;
 
+        // startTime is on the player's timeline, which is the file's own
+        // timestamps, so it is used as given.
+        const sink = new MediaBunny.CanvasSink(videoTrack, { width, height, fit: 'fill' });
+        const timestamps = Array.from({ length: totalFrames }, (_, i) => startTime + i * frameInterval);
+
         let framesProcessed = 0;
+        let hasFrame = false;
 
-        for (let i = 0; i < totalFrames; i++) {
-            const currentTime = startTime + (i * frameInterval);
-
-            video.currentTime = currentTime;
-            await new Promise(resolve => {
-                video.onseeked = resolve;
-            });
-
-            ctx.drawImage(video, 0, 0, width, height);
-            gif.addFrame(canvas, { delay: frameDelay, copy: true });
+        for await (const wrapped of sink.canvasesAtTimestamps(timestamps)) {
+            // null is a timestamp before the first frame; the previous frame,
+            // if there is one, is held for it, as a seek would have shown.
+            if (wrapped) {
+                ctx.drawImage(wrapped.canvas, 0, 0, width, height);
+                hasFrame = true;
+            }
+            if (hasFrame) gif.addFrame(canvas, { delay: frameDelay, copy: true });
             framesProcessed++;
 
             if (onProgress) {
                 onProgress(framesProcessed / totalFrames * 0.5);
             }
         }
+
+        if (!hasFrame) throw new Error('No frames could be read from that part of the video.');
 
         return new Promise((resolve, reject) => {
             gif.on('finished', (blob) => {
@@ -77,8 +84,6 @@ export async function createGif(options) {
             gif.render();
         });
     } finally {
-        URL.revokeObjectURL(videoUrl);
-        video.src = '';
-        video.load();
+        mediaInput.dispose();
     }
 }

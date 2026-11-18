@@ -76,7 +76,8 @@ export class MediaProcessor {
 
 
     static async process(options) {
-        // GIF creation drives a DOM <video> element and must stay on the main thread
+        // GIF creation stays on the main thread: its encoder (gif.js) takes DOM
+        // canvases and starts its own workers from here
         if (options.format === 'gif') {
             return transcodeMedia(options);
         }
