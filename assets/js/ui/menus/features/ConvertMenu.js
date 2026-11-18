@@ -6,6 +6,7 @@ import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { ZipHelper } from '../../../shared/utils/ZipHelper.js';
 import { uploadToHuggingFace } from '../../../processing/hls/HuggingFaceUploader.js';
 import { MediaBunny } from '../../../core/MediaBunny.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Convert Menu Handler
@@ -133,6 +134,7 @@ export class ConvertMenu {
             hfSuccessSection.classList.add('hidden');
             hfErrorMessage.classList.add('hidden');
 
+            const job = startCancellableJob(progressSection);
             try {
                 await ConvertMenu._startConversion(item, format, quality, playlist, (progress) => {
                     progressPercentage.textContent = Math.round(progress * 100) + '%';
@@ -140,7 +142,7 @@ export class ConvertMenu {
                     // Store HLS files and enable upload once conversion is done
                     hfUploadBtn._hlsFiles = hlsFiles;
                     onCredentialsChange();
-                });
+                }, job.signal);
 
                 successMessage.textContent = format === 'hls' ? '✓ Ready for download (ZIP)' : '✓ Added to playlist';
                 successMessage.classList.remove('hidden');
@@ -162,7 +164,7 @@ export class ConvertMenu {
 
             } catch (error) {
                 Logger.error('Conversion failed:', error);
-                errorMessage.textContent = `Operation failed: ${error.message}`;
+                errorMessage.textContent = job.isCancelled(error) ? CANCELLED_MESSAGE : `Operation failed: ${error.message}`;
                 errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
 
@@ -174,6 +176,8 @@ export class ConvertMenu {
                 formatDropdown.setDisabled(false);
                 convertBtn.disabled = false;
                 modal.closeBtn.disabled = false;
+            } finally {
+                job.end();
             }
         });
 
@@ -245,7 +249,7 @@ export class ConvertMenu {
      * @param {HTMLElement} downloadBtn - Download button element
      * @private
      */
-    static async _startConversion(item, format, quality, playlist, onProgress, downloadBtn, onHlsFiles) {
+    static async _startConversion(item, format, quality, playlist, onProgress, downloadBtn, onHlsFiles, signal) {
         // Get source with caching
         const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
@@ -268,6 +272,7 @@ export class ConvertMenu {
                     source,
                     quality,
                     onProgress,
+                    signal,
                 });
                 ConvertMenu._handleHlsSuccess(hlsFiles, item, downloadBtn);
                 onHlsFiles?.(hlsFiles);
@@ -277,7 +282,8 @@ export class ConvertMenu {
                     trackIndex: 0,
                     trackType: 'audio',
                     format: 'flac',
-                    onProgress: onProgress
+                    onProgress: onProgress,
+                    signal,
                 });
                 ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
             } else {
@@ -285,7 +291,8 @@ export class ConvertMenu {
                     source: source,
                     format: targetFormat,
                     quality: quality,
-                    onProgress: onProgress
+                    onProgress: onProgress,
+                    signal,
                 });
                 ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
             }

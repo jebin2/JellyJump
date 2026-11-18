@@ -3,6 +3,7 @@ import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId } from '../../../shared/utils/mediaUtils.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Merge Menu Handler
@@ -290,6 +291,7 @@ export class MergeMenu {
             errorMsg.classList.add('hidden');
             successMsg.classList.add('hidden');
 
+            const job = startCancellableJob(progressSection);
             try {
                 // Prepare Inputs (with caching)
                 const inputs = [];
@@ -308,7 +310,8 @@ export class MergeMenu {
                     onProgress: (progress) => {
                         const pct = Math.round(progress * 100);
                         progressText.textContent = `${pct}%`;
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 // Success
@@ -366,7 +369,7 @@ export class MergeMenu {
             } catch (e) {
                 Logger.error('Merge failed:', e);
                 progressSection.classList.add('hidden'); // Hide progress bar on error
-                errorMsg.textContent = `Merge failed: ${e.message}`;
+                errorMsg.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Merge failed: ${e.message}`;
                 errorMsg.classList.remove('hidden');
 
                 // Re-enable inputs on error
@@ -377,6 +380,8 @@ export class MergeMenu {
 
                 mergeBtn.disabled = false;
                 mergeBtn.innerHTML = '<span class="mr-xs">Merge</span><svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-layers"></use></svg>';
+            } finally {
+                job.end();
             }
         });
     }

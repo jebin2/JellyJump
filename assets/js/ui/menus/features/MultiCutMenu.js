@@ -4,6 +4,7 @@ import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime, generateId } from '../../../shared/utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * MultiCut Menu Handler
@@ -228,6 +229,8 @@ export class MultiCutMenu {
             successMessage.classList.add('hidden');
             progressSection.classList.remove('hidden');
 
+            const job = startCancellableJob(progressSection);
+            const { signal } = job;
             try {
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
@@ -264,7 +267,8 @@ export class MultiCutMenu {
                         trim: { start: segments[0].start, end: segments[0].end },
                         onProgress: (progress) => {
                             progressPercentage.textContent = `${Math.round(progress * 100)}%`;
-                        }
+                        },
+                        signal,
                     });
                 } else {
                     // Multiple segments — trim each then merge
@@ -280,7 +284,8 @@ export class MultiCutMenu {
                             onProgress: (progress) => {
                                 const overall = (i * trimWeight + progress * trimWeight) * 100;
                                 progressPercentage.textContent = `${Math.round(overall)}%`;
-                            }
+                            },
+                            signal,
                         });
                         segmentBlobs.push(segBlob);
                     }
@@ -290,7 +295,8 @@ export class MultiCutMenu {
                         onProgress: (progress) => {
                             const overall = (0.8 + progress * 0.2) * 100;
                             progressPercentage.textContent = `${Math.round(overall)}%`;
-                        }
+                        },
+                        signal,
                     });
                 }
 
@@ -315,11 +321,13 @@ export class MultiCutMenu {
 
             } catch (e) {
                 Logger.error('Multi-cut failed:', e);
-                errorMessage.textContent = `Failed: ${e.message}`;
+                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 multicutBtn.disabled = false;
                 modal.closeBtn.disabled = false;
                 progressSection.classList.add('hidden');
+            } finally {
+                job.end();
             }
         });
     }

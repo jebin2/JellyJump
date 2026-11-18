@@ -3,6 +3,7 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Speed & Reverse Menu Handler
@@ -141,6 +142,7 @@ export class SpeedReverseMenu {
                 const closeBtn = modal.modal.querySelector('.mb-modal-close');
                 if (closeBtn) closeBtn.style.display = 'none';
 
+                const job = startCancellableJob(progressSection);
                 try {
                     // Get source
                     let sourceFile;
@@ -171,14 +173,16 @@ export class SpeedReverseMenu {
                             source: sourceFile,
                             includeAudio: includeAudio,
                             speed: speed,
-                            onProgress: onProgress
+                            onProgress: onProgress,
+                            signal: job.signal,
                         });
                     } else {
                         outputBlob = await MediaProcessor.changeVideoSpeed({
                             source: sourceFile,
                             speed: speed,
                             includeAudio: includeAudio,
-                            onProgress: onProgress
+                            onProgress: onProgress,
+                            signal: job.signal,
                         });
                     }
 
@@ -217,11 +221,12 @@ export class SpeedReverseMenu {
                 } catch (e) {
                     Logger.error('Processing failed:', e);
                     if (errorMessage) {
-                        errorMessage.textContent = `Processing failed: ${e.message}`;
+                        errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Processing failed: ${e.message}`;
                         errorMessage.classList.remove('hidden');
                     }
                     if (progressSection) progressSection.classList.add('hidden');
                 } finally {
+                    job.end();
                     modal.close = originalClose;
                     if (closeBtn) closeBtn.style.display = '';
 

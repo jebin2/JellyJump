@@ -3,6 +3,7 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { decodeAudioRange, getAudioDuration } from '../../../processing/shared/AudioHelpers.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Slideshow Menu Handler
@@ -332,6 +333,7 @@ export class SlideshowMenu {
                 modal.close = () => { };
                 if (closeBtn) closeBtn.style.display = 'none';
 
+                const job = startCancellableJob(progressSection);
                 try {
                     const onProgress = (progress) => {
                         const pct = Math.round(progress * 100);
@@ -351,7 +353,8 @@ export class SlideshowMenu {
                         audioStartTime,
                         audioEndTime,
                         fps,
-                        onProgress
+                        onProgress,
+                        signal: job.signal,
                     });
 
                     if (successMessage) successMessage.classList.remove('hidden');
@@ -379,11 +382,12 @@ export class SlideshowMenu {
                 } catch (e) {
                     Logger.error('[SlideshowMenu] Processing failed:', e);
                     if (errorMessage) {
-                        errorMessage.textContent = `Failed: ${e.message}`;
+                        errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Failed: ${e.message}`;
                         errorMessage.classList.remove('hidden');
                     }
                     if (progressSection) progressSection.classList.add('hidden');
                 } finally {
+                    job.end();
                     modal.close = originalClose;
                     if (closeBtn) closeBtn.style.display = '';
                     if (processBtn) processBtn.disabled = false;

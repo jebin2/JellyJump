@@ -3,6 +3,7 @@ import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId } from '../../../shared/utils/mediaUtils.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Combine Audio/Video Menu Handler
@@ -104,6 +105,7 @@ export class CombineAVMenu {
             errorMsg.classList.add('hidden');
             successMsg.classList.add('hidden');
 
+            const job = startCancellableJob(progressSection);
             try {
                 const videoBlob = await MediaMetadata.getSourceBlob(videoItem, () => playlist._saveState());
                 const audioBlob = await MediaMetadata.getSourceBlob(audioItem, () => playlist._saveState());
@@ -114,7 +116,8 @@ export class CombineAVMenu {
                     format,
                     onProgress: (progress) => {
                         progressText.textContent = `${Math.round(progress * 100)}%`;
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 progressSection.classList.add('hidden');
@@ -159,7 +162,7 @@ export class CombineAVMenu {
             } catch (e) {
                 Logger.error('Combine Audio/Video failed:', e);
                 progressSection.classList.add('hidden');
-                errorMsg.textContent = `Combine failed: ${e.message}`;
+                errorMsg.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Combine failed: ${e.message}`;
                 errorMsg.classList.remove('hidden');
 
                 videoSelect.disabled = false;
@@ -167,6 +170,8 @@ export class CombineAVMenu {
                 formatSelect.disabled = false;
                 combineBtn.disabled = false;
                 combineBtn.innerHTML = '<span class="mr-xs">Combine</span><svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-audio"></use></svg>';
+            } finally {
+                job.end();
             }
         });
     }

@@ -15,6 +15,7 @@ import {
     setupAutoUpdate
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 /**
  * Crop Menu Handler - Fresh Implementation
@@ -170,6 +171,7 @@ function setupCropButton(elements, state, item, playlist, modal) {
         elements.buttons.crop.disabled = true;
         modal.closeBtn.disabled = true;
 
+        const job = startCancellableJob(elements.progress.section);
         try {
             const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
@@ -185,7 +187,8 @@ function setupCropButton(elements, state, item, playlist, modal) {
                 },
                 onProgress: (progress) => {
                     elements.progress.text.textContent = `${Math.round(progress * 100)}%`;
-                }
+                },
+                signal: job.signal,
             });
 
             // Success
@@ -205,10 +208,12 @@ function setupCropButton(elements, state, item, playlist, modal) {
 
         } catch (e) {
             Logger.error('Crop failed:', e);
-            showError(elements.messages.error, `Crop failed: ${e.message}`);
+            showError(elements.messages.error, job.isCancelled(e) ? CANCELLED_MESSAGE : `Crop failed: ${e.message}`);
             hideProgress(elements.progress);
             elements.buttons.crop.disabled = false;
             modal.closeBtn.disabled = false;
+        } finally {
+            job.end();
         }
     });
 }

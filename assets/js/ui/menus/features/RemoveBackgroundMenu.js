@@ -4,6 +4,7 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { formatTime } from '../../../shared/utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 export class RemoveBackgroundMenu {
     /**
@@ -323,6 +324,7 @@ export class RemoveBackgroundMenu {
 
             // Pause player
             if (player) player.pause();
+            const job = startCancellableJob(progressSection);
             try {
                 const bgType = Array.from(bgTypeRadios).find(r => r.checked).value;
                 const bgColor = customBgColorInput.value;
@@ -342,7 +344,8 @@ export class RemoveBackgroundMenu {
                         if (progress < 0.1) progressStatus.textContent = "Initializing...";
                         else if (progress < 0.9) progressStatus.textContent = "Removing background...";
                         else progressStatus.textContent = "Finalizing...";
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 // Success
@@ -374,10 +377,11 @@ export class RemoveBackgroundMenu {
 
             } catch (e) {
                 Logger.error('Processing failed:', e);
-                errorMessage.textContent = `Processing failed: ${e.message}`;
+                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Processing failed: ${e.message}`;
                 errorMessage.classList.remove('hidden');
                 progressSection.classList.add('hidden');
             } finally {
+                job.end();
                 // Re-enable controls
                 processBtn.disabled = false;
                 livePreviewToggle.disabled = false;

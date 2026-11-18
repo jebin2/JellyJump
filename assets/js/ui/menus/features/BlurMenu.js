@@ -12,6 +12,7 @@ import {
     updateOverlay
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
 
 export class BlurMenu {
     /**
@@ -509,6 +510,7 @@ export class BlurMenu {
             // De-select to hide box overlay
             updateSelection(-1);
 
+            const job = startCancellableJob(elements.progress.section);
             try {
                 const intensity = getBlurIntensity();
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
@@ -523,7 +525,8 @@ export class BlurMenu {
                         if (elements.progress.status) {
                             elements.progress.status.textContent = p < 0.9 ? "Blurring..." : "Finalizing...";
                         }
-                    }
+                    },
+                    signal: job.signal,
                 });
 
                 // Success
@@ -540,10 +543,11 @@ export class BlurMenu {
 
             } catch (e) {
                 Logger.error('Blur processing failed:', e);
-                elements.messages.error.textContent = e.message;
+                elements.messages.error.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : e.message;
                 elements.messages.error.classList.remove('hidden');
                 elements.progress.section.classList.add('hidden');
             } finally {
+                job.end();
                 elements.processBtn.disabled = false;
             }
         };
