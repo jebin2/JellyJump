@@ -80,13 +80,7 @@ export class MediaProcessor {
         if (options.format === 'gif') {
             return transcodeMedia(options);
         }
-        // So does a transparent export: it is encoded through MediaRecorder,
-        // the only encoder in the browser that keeps an alpha channel, and
-        // neither MediaRecorder nor canvas.captureStream exists in a worker.
-        if (options.removeBackgroundOptions?.bgType === 'transparent') {
-            return transcodeMedia(options);
-        }
-        // And so does an export carrying the on-screen effects. Two reasons,
+        // So does an export carrying the on-screen effects. Two reasons,
         // either alone sufficient: the layers are live objects that cannot be
         // cloned to a worker, and the SVG-backed FX resolve against filter
         // definitions in the document. Measured, url(#jj-fx-matrix) turns a

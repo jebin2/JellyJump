@@ -16,32 +16,17 @@ import { AnimatedImage, decodePlan } from './AnimatedImage.js';
  * carries alpha), so this closes the loop: cut a clip out, put it back on
  * another video as a sticker.
  *
- * Which is why the frames come from playing the clip and drawing it, rather
- * than from the demuxer the player uses. Measured on a transparent VP8 WebM:
- * MediaBunny's CanvasSink returned every frame correctly and 100% opaque --
- * the alpha channel does not survive it -- while drawing the same clip from a
- * <video> gave 71.7% clear and 28.3% partial alpha, soft edges intact. The
- * slower route is the one that keeps the thing we want.
+ * Frames come from Mediabunny's CanvasSink with `alpha: true`. Without that
+ * option the sink draws onto a black bed, which is what an earlier
+ * measurement saw and took to mean the alpha could not survive it. With it,
+ * transparent VP8 and VP9 WebMs come back with the same clear and partial
+ * coverage a <video> element shows. Decoding this way is not tied to
+ * playback, so every frame is read and it takes as long as decoding does,
+ * not as long as the clip runs.
  */
 
 /** Longer clips are refused rather than quietly truncated. */
 const MAX_STICKER_SECONDS = 30;
-
-/**
- * Played at normal speed, because faster loses frames.
- *
- * Capture is per *presented* frame, and the compositor presents fewer of them
- * when the clip runs fast: measured on a two-second 15fps clip, 1x captured 23
- * frames and 4x captured 11 of the same ~29. An earlier reading that said 4x
- * cost nothing came from a one-second clip where both runs hit the harness
- * timeout rather than finishing, so neither number meant anything.
- *
- * The wait is bounded by the 30s clip limit instead.
- */
-const CAPTURE_RATE = 1;
-
-/** A stuck decode must not hang the caller for ever. */
-const CAPTURE_TIMEOUT_MS = 20000;
 
 /**
  * @param {Blob} blob - a video file; WebM if it is to keep transparency
@@ -50,26 +35,28 @@ const CAPTURE_TIMEOUT_MS = 20000;
  * @throws {Error} with a message meant for the user
  */
 export async function decodeVideoSticker(blob, frameWidth) {
-    if (!('requestVideoFrameCallback' in HTMLVideoElement.prototype)) {
-        throw new Error('This browser cannot take a clip as a sticker. An image or GIF will work.');
-    }
-
-    const video = document.createElement('video');
-    const objectUrl = URL.createObjectURL(blob);
+    // Loaded here rather than at the top: StickerLayer imports this module for
+    // every sticker, and most are images that never need a decoder.
+    const { MediaBunny } = await import('../../core/MediaBunny.js');
+    const input = new MediaBunny.Input({
+        source: new MediaBunny.BlobSource(blob),
+        formats: MediaBunny.ALL_FORMATS,
+    });
 
     try {
-        video.src = objectUrl;
-        video.muted = true;
-        video.playsInline = true;
-        video.preload = 'auto';
+        let track;
+        let duration;
+        try {
+            track = await input.getPrimaryVideoTrack();
+            duration = track ? await input.computeDuration() : 0;
+        } catch {
+            throw new Error('That clip could not be opened.');
+        }
 
-        await new Promise((resolve, reject) => {
-            video.onloadeddata = resolve;
-            video.onerror = () => reject(new Error('That clip could not be opened.'));
-        });
-
-        const { videoWidth: width, videoHeight: height, duration } = video;
-        if (!width || !height) throw new Error('That file has no video track in it.');
+        if (!track) throw new Error('That file has no video track in it.');
+        if (!(await track.canDecode())) {
+            throw new Error('This browser cannot take that clip as a sticker. An image or GIF will work.');
+        }
         if (!(duration > 0) || !Number.isFinite(duration)) throw new Error('That clip has no length.');
         if (duration > MAX_STICKER_SECONDS) {
             throw new Error(
@@ -77,66 +64,61 @@ export async function decodeVideoSticker(blob, frameWidth) {
             );
         }
 
+        const width = track.displayWidth;
+        const height = track.displayHeight;
+
+        // Every frame's timestamp, read from the packets without decoding
+        // anything. Sorted, because packets come in decode order.
+        const stamps = [];
+        for await (const packet of new MediaBunny.EncodedPacketSink(track).packets(undefined, undefined, { metadataOnly: true })) {
+            stamps.push(packet.timestamp);
+        }
+        stamps.sort((a, b) => a - b);
+        if (stamps.length === 0) throw new Error('No frames could be read from that clip.');
+
         // The same budget a GIF gets, for the same reason: the cost is frames
         // times width times height, and a video is long in the first of those.
-        // The frame count is not known before playing, so it is estimated high
-        // enough that the plan errs towards holding less.
-        const plan = decodePlan({
-            frameCount: Math.max(1, Math.round(duration * 30)), width, height, frameWidth,
-        });
+        const frameCount = stamps.length;
+        const plan = decodePlan({ frameCount, width, height, frameWidth });
         const targetWidth = Math.max(1, Math.round(width * plan.scale));
         const targetHeight = Math.max(1, Math.round(height * plan.scale));
 
-        const scratch = document.createElement('canvas');
-        scratch.width = width;
-        scratch.height = height;
-        // Alpha is why this exists, so the frame must not land on a white bed.
-        const ctx = scratch.getContext('2d', { alpha: true });
+        const sink = new MediaBunny.CanvasSink(track, {
+            width: targetWidth,
+            height: targetHeight,
+            fit: 'fill',
+            alpha: true,
+        });
 
         const frames = [];
         const times = [];
-        let index = 0;
+        const firstTimestamp = stamps[0];
+        // Only the frames being kept are asked for, so the ones dropped are
+        // decoded (the decoder needs them) but never drawn.
+        const kept = stamps.filter((_, i) => i % plan.keepEvery === 0);
 
-        video.playbackRate = CAPTURE_RATE;
-        await video.play().catch(() => { /* capture below fails honestly if it did not start */ });
+        try {
+            for await (const wrapped of sink.canvasesAtTimestamps(kept)) {
+                if (!wrapped) continue;
+                frames.push(await createImageBitmap(wrapped.canvas));
+                times.push(wrapped.timestamp - firstTimestamp);
+            }
+        } catch (error) {
+            for (const frame of frames) frame.close?.();
+            throw new Error('No frames could be read from that clip.', { cause: error });
+        }
 
-        await new Promise((resolve) => {
-            const stop = () => resolve();
-            const guard = setTimeout(stop, CAPTURE_TIMEOUT_MS);
-            video.addEventListener('ended', () => { clearTimeout(guard); stop(); }, { once: true });
-
-            const onFrame = async (_now, meta) => {
-                if (index++ % plan.keepEvery === 0) {
-                    ctx.clearRect(0, 0, width, height);
-                    ctx.drawImage(video, 0, 0);
-                    frames.push(await createImageBitmap(scratch, {
-                        resizeWidth: targetWidth,
-                        resizeHeight: targetHeight,
-                        resizeQuality: 'medium',
-                    }));
-                    times.push(meta.mediaTime);
-                }
-                if (video.ended) { clearTimeout(guard); stop(); return; }
-                video.requestVideoFrameCallback(onFrame);
-            };
-            video.requestVideoFrameCallback(onFrame);
-        });
-
-        video.pause();
         if (frames.length === 0) throw new Error('No frames could be read from that clip.');
 
         // Timings come from the frames themselves, not a nominal rate: a
         // browser recording is variable-rate, and this keeps its real timing.
         const durations = times.map((t, i) => {
-            const next = i + 1 < times.length ? times[i + 1] : duration;
+            const next = i + 1 < times.length ? times[i + 1] : duration - firstTimestamp;
             return Math.max(1, (next - t) * 1000);
         });
 
         return new AnimatedImage(frames, durations);
     } finally {
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-        URL.revokeObjectURL(objectUrl);
+        input.dispose();
     }
 }
