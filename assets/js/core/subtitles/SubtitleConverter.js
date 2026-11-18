@@ -198,3 +198,42 @@ export async function loadJSONTranscript(url, options = {}) {
     const words = parseTranscriptJSON(jsonContent);
     return jsonToVTT(words, options);
 }
+
+/** HH:MM:SS.mmm from whole milliseconds, so 59.9996s cannot become "60.000". */
+function vttTimestamp(ms) {
+    const total = Math.max(0, Math.round(ms));
+    const h = Math.floor(total / 3_600_000);
+    const m = Math.floor(total / 60_000) % 60;
+    const s = Math.floor(total / 1000) % 60;
+    const pad = (n, w) => String(n).padStart(w, '0');
+    return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)}.${pad(total % 1000, 3)}`;
+}
+
+/**
+ * Cues as a WebVTT file, for writing into an exported video.
+ *
+ * `start`/`end` cut the cues to a range of the source and move them so the
+ * range begins at zero, which is where an exported range begins: a cue that
+ * straddles an edge is clipped to it, one wholly outside is left out.
+ * `align:center` is there because QuickTime does not show WebVTT cues
+ * without alignment.
+ *
+ * @param {Array<{start: number, end: number, text: string}>} cues - seconds
+ * @param {{ start?: number, end?: number }} [range] - seconds on the source
+ * @returns {string|null} null when no cue falls in the range
+ */
+export function cuesToVTT(cues, { start = 0, end = Infinity } = {}) {
+    const lines = ['WEBVTT', ''];
+    let count = 0;
+    for (const cue of [...cues].sort((a, b) => a.start - b.start)) {
+        const from = Math.max(cue.start, start);
+        const to = Math.min(cue.end, end);
+        const text = (cue.text || '').trim();
+        // A blank line would end the cue early in WebVTT.
+        const body = text.split(/\r?\n/).filter(l => l.trim()).join('\n');
+        if (!(to > from) || !body) continue;
+        lines.push(`${vttTimestamp((from - start) * 1000)} --> ${vttTimestamp((to - start) * 1000)} align:center`, body, '');
+        count++;
+    }
+    return count ? lines.join('\n') : null;
+}
