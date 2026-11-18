@@ -95,8 +95,8 @@ export class MediaProcessor {
 
 
 
-    static async losslessTrim({ source, trim, onProgress }) {
-        return losslessTrimMedia({ source, trim, onProgress });
+    static async losslessTrim({ source, trim, onProgress, signal }) {
+        return losslessTrimMedia({ source, trim, onProgress, signal });
     }
 
     /**
@@ -132,14 +132,14 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async extractTrack({ source, trackIndex, trackType, format, speed = 1, onProgress }) {
+    static async extractTrack({ source, trackIndex, trackType, format, speed = 1, onProgress, signal }) {
         // Clamp speed to valid range
         const clampedSpeed = Math.max(0.25, Math.min(2, speed));
 
         if (clampedSpeed === 1) {
-            return this._extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress });
+            return this._extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress, signal });
         } else {
-            return this._extractTrackWithSpeed({ source, trackIndex, trackType, format, speed: clampedSpeed, onProgress });
+            return this._extractTrackWithSpeed({ source, trackIndex, trackType, format, speed: clampedSpeed, onProgress, signal });
         }
     }
 
@@ -147,8 +147,8 @@ export class MediaProcessor {
      * Extract track using stream copy (fast, no re-encoding)
      * @private
      */
-    static async _extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress }) {
-        return extractProcessedTrackStreamCopy({ source, trackIndex, trackType, format, onProgress });
+    static async _extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress, signal }) {
+        return extractProcessedTrackStreamCopy({ source, trackIndex, trackType, format, onProgress, signal });
     }
 
     /**
@@ -160,16 +160,16 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Map<string, ArrayBuffer>>}
      */
-    static async processHls({ source, quality = 100, onProgress }) {
-        return dispatch('processHls', { source, quality, onProgress }, processHlsMedia);
+    static async processHls({ source, quality = 100, onProgress, signal }) {
+        return dispatch('processHls', { source, quality, onProgress, signal }, processHlsMedia);
     }
 
     /**
      * Extract track with speed adjustment (requires re-encoding)
      * @private
      */
-    static async _extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress }) {
-        return extractProcessedTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress });
+    static async _extractTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress, signal }) {
+        return extractProcessedTrackWithSpeed({ source, trackIndex, trackType, format, speed, onProgress, signal });
     }
 
 
@@ -203,8 +203,8 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async reverseVideo({ source, includeAudio = false, speed = 1, onProgress }) {
-        const options = { source, includeAudio, speed, onProgress };
+    static async reverseVideo({ source, includeAudio = false, speed = 1, onProgress, signal }) {
+        const options = { source, includeAudio, speed, onProgress, signal };
         // Audio processing uses Web Audio (AudioBuffer/OfflineAudioContext),
         // which is not available in workers on all browsers — keep it inline.
         if (includeAudio) {
@@ -221,8 +221,8 @@ export class MediaProcessor {
      * @param {Function} [options.onProgress]
      * @returns {Promise<Blob>}
      */
-    static async changeVideoSpeed({ source, speed = 1, onProgress, includeAudio = true }) {
-        const options = { source, speed, onProgress, includeAudio };
+    static async changeVideoSpeed({ source, speed = 1, onProgress, includeAudio = true, signal }) {
+        const options = { source, speed, onProgress, includeAudio, signal };
         // See reverseVideo: Web Audio-dependent paths stay on the main thread.
         if (includeAudio) {
             return changeProcessedVideoSpeed(options);

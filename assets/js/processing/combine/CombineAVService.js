@@ -1,5 +1,6 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
+import { executeConversion, cancelUnfinished } from '../shared/Cancellation.js';
 
 /**
  * Combine the video track of one file with the audio track of another, muxing
@@ -14,7 +15,7 @@ import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
  * @param {Function} [options.onProgress]
  * @returns {Promise<Blob>}
  */
-export async function combineAudioVideo({ videoSource, audioSource, format = 'mp4', onProgress }) {
+export async function combineAudioVideo({ videoSource, audioSource, format = 'mp4', onProgress, signal }) {
     await ensureEncoders();
 
     let videoInput = null;
@@ -79,7 +80,10 @@ export async function combineAudioVideo({ videoSource, audioSource, format = 'mp
         audioConversion.onProgress = (p) => { audioProgress = p; reportProgress(); };
 
         await output.start();
-        await Promise.all([videoConversion.execute(), audioConversion.execute()]);
+        await Promise.all([
+            executeConversion(videoConversion, signal),
+            executeConversion(audioConversion, signal),
+        ]);
         await output.finalize();
 
         if (onProgress) onProgress(1);
@@ -88,6 +92,8 @@ export async function combineAudioVideo({ videoSource, audioSource, format = 'mp
         return new Blob([output.target.buffer], { type: `video/${format}` });
 
     } finally {
+        // Composable conversions leave their Output alone when cancelled.
+        await cancelUnfinished(output);
         for (const conversion of [videoConversion, audioConversion]) {
             if (conversion && typeof conversion.dispose === 'function') {
                 try { conversion.dispose(); } catch (e) { Logger.warn('Error disposing conversion:', e); }

@@ -1,10 +1,11 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
+import { executeConversion } from '../shared/Cancellation.js';
 
 let currentConversion = null;
 
-export async function processHls({ source, quality = 100, onProgress }) {
+export async function processHls({ source, quality = 100, onProgress, signal }) {
     Logger.log('[MediaProcessor] Starting HLS conversion...');
     const startTime = performance.now();
 
@@ -88,7 +89,7 @@ export async function processHls({ source, quality = 100, onProgress }) {
         }
 
         if (onProgress) currentConversion.onProgress = onProgress;
-        await currentConversion.execute();
+        await executeConversion(currentConversion, signal);
 
         Logger.log(`[MediaProcessor] HLS done — ${writtenFiles.size} files`);
         return writtenFiles;

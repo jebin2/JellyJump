@@ -1,6 +1,7 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
+import { executeConversion, cancelUnfinished, throwIfCancelled } from '../shared/Cancellation.js';
 
 
 /**
@@ -97,7 +98,7 @@ async function analyzeInputVideos(inputs, onProgress) {
  *
  * @returns {Promise<number>} how many samples were added
  */
-async function addResampledAudio(input, audioSource, offset, sampleRate, numberOfChannels) {
+async function addResampledAudio(input, audioSource, offset, sampleRate, numberOfChannels, signal) {
     const discard = new MediaBunny.Output({
         format: new MediaBunny.MkvOutputFormat(),
         target: new MediaBunny.NullTarget(),
@@ -136,7 +137,7 @@ async function addResampledAudio(input, audioSource, offset, sampleRate, numberO
         const reasons = conversion.discardedTracks.map(t => t.reason).join(', ');
         throw new Error(`Cannot read the audio for merging (${reasons}).`);
     }
-    await conversion.execute();
+    await executeConversion(conversion, signal);
     return count;
 }
 
@@ -150,7 +151,7 @@ async function addResampledAudio(input, audioSource, offset, sampleRate, numberO
  * @param {Function} [options.onProgress]
  * @returns {Promise<Blob>}
  */
-export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'proportional', backgroundColor = '#000000', onProgress }) {
+export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'proportional', backgroundColor = '#000000', onProgress, signal }) {
     await ensureEncoders();
     if (!inputs || inputs.length < 2) {
         throw new Error('At least 2 videos are required for merging.');
@@ -260,6 +261,7 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
 
             for await (const sample of videoSink.samples()) {
                 try {
+                    throwIfCancelled(signal);
                     const relativeTimestamp = sample.timestamp - videoStartTime;
                     const absoluteTimestamp = currentTimestamp + relativeTimestamp;
                     const duration = sample.duration || (1 / targetFps);
@@ -292,7 +294,7 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
                     Logger.log(`[MergeService] Processing audio from video ${i + 1}...`);
 
                     const audioSampleCount = await addResampledAudio(
-                        input, audioSource, currentTimestamp, targetSampleRate, targetChannels,
+                        input, audioSource, currentTimestamp, targetSampleRate, targetChannels, signal,
                     );
 
                     Logger.log(`[MergeService] Processed ${audioSampleCount} audio samples from video ${i + 1}`);
@@ -320,6 +322,7 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
         return new Blob([output.target.buffer], { type: `video/${format}` });
 
     } finally {
+        await cancelUnfinished(output);
         if (output && typeof output.dispose === 'function') {
             try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
         }

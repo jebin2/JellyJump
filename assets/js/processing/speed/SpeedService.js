@@ -2,12 +2,17 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS, createMediaBunnyInput } from '../shared/InputFactory.js';
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
+import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../shared/Cancellation.js';
 
-async function processAudioWithSpeed(audioTrack, audioSource, speed = 1) {
+async function processAudioWithSpeed(audioTrack, audioSource, speed = 1, signal) {
     const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
     let outputTimestamp = 0;
 
     for await (const sample of audioSink.samples()) {
+        if (signal?.aborted) {
+            sample.close();
+            throwIfCancelled(signal);
+        }
         let finalBuffer = sample.toAudioBuffer();
 
         if (speed !== 1) {
@@ -78,7 +83,9 @@ async function reverseAudioWithSink(audioTrack, audioSource, speed = 1, onProgre
     }
 }
 
-export async function reverseVideo({ source, includeAudio = false, speed = 1, onProgress }) {
+export async function reverseVideo({ source, includeAudio = false, speed = 1, onProgress: reportProgress, signal }) {
+    // Checked at every progress report, which this pipeline makes per frame.
+    const onProgress = cancellableProgress(reportProgress, signal);
     await ensureEncoders();
     Logger.log('[MediaProcessor] Starting video reversal with samplesAtTimestamps...');
 
@@ -186,6 +193,8 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
                     Logger.log('[MediaProcessor] Audio reversal complete');
                 }
             } catch (e) {
+                // A cancel must stop the job, not be logged past.
+                if (isCancellation(e)) throw e;
                 Logger.warn('[MediaProcessor] Audio reversal failed:', e);
             }
         }
@@ -199,6 +208,7 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         Logger.log('[MediaProcessor] Reverse complete!');
         return new Blob([output.target.buffer], { type: 'video/mp4' });
     } finally {
+        await cancelUnfinished(output);
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
         }
@@ -214,7 +224,8 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
     }
 }
 
-export async function changeVideoSpeed({ source, speed = 1, onProgress, includeAudio = true }) {
+export async function changeVideoSpeed({ source, speed = 1, onProgress: reportProgress, includeAudio = true, signal }) {
+    const onProgress = cancellableProgress(reportProgress, signal);
     await ensureEncoders();
     Logger.log(`[MediaProcessor] Changing speed to ${speed}x...`);
 
@@ -315,10 +326,12 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
             try {
                 const audioTrack = await input.getPrimaryAudioTrack();
                 if (audioTrack) {
-                    await processAudioWithSpeed(audioTrack, audioSource, speed);
+                    await processAudioWithSpeed(audioTrack, audioSource, speed, signal);
                     Logger.log('[MediaProcessor] Audio processing complete');
                 }
             } catch (e) {
+                // A cancel must stop the job, not be logged past.
+                if (isCancellation(e)) throw e;
                 Logger.warn('[MediaProcessor] Audio processing failed:', e);
             }
         }
@@ -328,6 +341,7 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress, includeA
         await output.finalize();
         return new Blob([output.target.buffer], { type: 'video/mp4' });
     } finally {
+        await cancelUnfinished(output);
         try { if (input) input.dispose(); } catch (e) { Logger.warn('[MediaProcessor] input dispose failed:', e); }
         try { if (output) output.dispose(); } catch (e) { Logger.warn('[MediaProcessor] output dispose failed:', e); }
         try { if (canvasSource) canvasSource.dispose(); } catch (e) { Logger.warn('[MediaProcessor] canvasSource dispose failed:', e); }

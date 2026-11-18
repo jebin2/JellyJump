@@ -2,6 +2,7 @@ import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 import { decodeAudioRange } from '../shared/AudioHelpers.js';
+import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../shared/Cancellation.js';
 
 
 /**
@@ -126,12 +127,13 @@ function renderTransitionFrame(ctx, bmA, bmB, rectA, rectB, progress, transType,
  * Write looped/trimmed audio from audioBlob into audioSource for totalDuration seconds.
  * @private
  */
-async function addSlideshowAudio(audioSource, audioBlob, totalDuration, audioStartTime, audioEndTime, audioLoop) {
+async function addSlideshowAudio(audioSource, audioBlob, totalDuration, audioStartTime, audioEndTime, audioLoop, signal) {
     Logger.log('[SlideshowService] Adding background music...');
     const trimStart = Math.max(0, audioStartTime);
     // Only the chosen range is decoded; it is then looped from memory.
     const audioBuffer = await decodeAudioRange(audioBlob, trimStart, audioEndTime ?? Infinity);
     if (!audioBuffer) return;
+    throwIfCancelled(signal);
 
     const sampleRate = audioBuffer.sampleRate;
     const numChannels = audioBuffer.numberOfChannels;
@@ -141,6 +143,7 @@ async function addSlideshowAudio(audioSource, audioBlob, totalDuration, audioSta
     let passStart = 0;
 
     while (outputTs < totalDuration) {
+        throwIfCancelled(signal);
         const remaining = totalDuration - outputTs;
         const chunkDur = Math.min(rangeDur - passStart, remaining);
         if (chunkDur <= 0) break;
@@ -199,8 +202,11 @@ export async function createSlideshowVideo({
     audioStartTime = 0,
     audioEndTime = null,
     fps = 30,
-    onProgress
+    onProgress: reportProgress,
+    signal,
 }) {
+    // Checked at every progress report, which the render loop makes per frame.
+    const onProgress = cancellableProgress(reportProgress, signal);
     Logger.log('[SlideshowService] createSlideshowVideo start', { count: imageBlobs.length, transition, fps });
 
     await ensureEncoders();
@@ -344,8 +350,10 @@ export async function createSlideshowVideo({
         // Step 5: Audio
         if (audioSource && audioBlob) {
             try {
-                await addSlideshowAudio(audioSource, audioBlob, totalDuration, audioStartTime, audioEndTime, audioLoop);
+                await addSlideshowAudio(audioSource, audioBlob, totalDuration, audioStartTime, audioEndTime, audioLoop, signal);
             } catch (e) {
+                // A cancel must stop the job, not be logged past.
+                if (isCancellation(e)) throw e;
                 Logger.warn('[SlideshowService] Audio processing failed for slideshow:', e);
             }
         }
@@ -361,6 +369,7 @@ export async function createSlideshowVideo({
         return new Blob([output.target.buffer], { type: 'video/mp4' });
 
     } finally {
+        await cancelUnfinished(output);
         if (output && typeof output.dispose === 'function') {
             try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
         }

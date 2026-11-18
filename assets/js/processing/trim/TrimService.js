@@ -1,6 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny } from '../../core/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
+import { executeConversion } from '../shared/Cancellation.js';
 
 /**
  * Trim without re-encoding, through Mediabunny's copy conversion.
@@ -22,7 +23,7 @@ import { createMediaBunnyInput } from '../shared/InputFactory.js';
  * @param {(progress: number) => void} [onProgress]
  * @returns {Promise<Blob>}
  */
-export async function losslessTrim({ source, trim, onProgress }) {
+export async function losslessTrim({ source, trim, onProgress, signal }) {
     Logger.log('[MediaProcessor] Starting lossless trim...', trim);
 
     let input = null;
@@ -54,7 +55,7 @@ export async function losslessTrim({ source, trim, onProgress }) {
 
         if (onProgress) conversion.onProgress = onProgress;
 
-        await conversion.execute();
+        await executeConversion(conversion, signal);
         onProgress?.(1);
 
         return new Blob([output.target.buffer], { type: 'video/mp4' });
