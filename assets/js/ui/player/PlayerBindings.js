@@ -343,7 +343,11 @@ export function attachPlayerBindings(player) {
                 e.target.value = '';
                 if (!file) return;
                 try {
-                    await player.stickers?.addFile(file);
+                    const sticker = await player.stickers?.addFile(file);
+                    if (sticker?.media?.opaque) {
+                        Toast.show('That clip has no transparency, so it shows as a rectangle. '
+                            + 'Remove Background can cut it out first.', 5000);
+                    }
                 } catch (error) {
                     Toast.show(error.message, 5000, true);
                 }
