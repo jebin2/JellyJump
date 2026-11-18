@@ -1,7 +1,7 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
-import { MediaBunny } from '../../../core/MediaBunny.js';
+import { MediaBunny, ensureDecodersFor } from '../../../core/MediaBunny.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 
 /**
@@ -431,8 +431,12 @@ export class InfoMenu {
                             Logger.warn('Failed to get audio codec param:', e);
                         }
 
-                        // Decode support check
+                        // Decode support check. The DTS and TrueHD decoders load
+                        // on demand, so they are loaded first: asked before that,
+                        // a DTS track read "Not Supported" when opened ahead of
+                        // playback, though the player decodes it.
                         try {
+                            await ensureDecodersFor([audioTrack]);
                             const canDecode = await audioTrack.canDecode();
                             audioCanDecode = canDecode ? '✅ Supported' : '❌ Not Supported';
                         } catch (e) {
