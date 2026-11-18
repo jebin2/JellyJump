@@ -1,5 +1,6 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { Toast } from "../../../shared/utils/Toast.js";
+import { startTrackRecording } from "../../../core/streaming/TrackRecorder.js";
 
 /**
  * Recorder Menu Handler
@@ -7,8 +8,8 @@ import { Toast } from "../../../shared/utils/Toast.js";
  */
 export class ScreenRecorderMenu {
     static isRecording = false;
-    static mediaRecorder = null;
-    static chunks = [];
+    /** The running screen recording, from startTrackRecording. */
+    static recording = null;
     static stream = null;
 
     // Facecam State
@@ -344,7 +345,6 @@ export class ScreenRecorderMenu {
 
     static async _startRecording(playlist, mode, displaySurface = 'monitor', captureAudio = false, micDeviceId = null, disableEchoCancel = false) {
         try {
-            this.chunks = [];
             this.currentMode = mode;
 
             // 1. Start Facecam
@@ -369,7 +369,8 @@ export class ScreenRecorderMenu {
             }
 
             this.stream = await navigator.mediaDevices.getDisplayMedia(constraints);
-            let combinedStream = this.stream;
+            const videoTrack = this.stream.getVideoTracks()[0];
+            let audioTrack = null;
 
             // 3. If audio requested, get microphone and create combined stream
             if (captureAudio) {
@@ -395,55 +396,53 @@ export class ScreenRecorderMenu {
                         Logger.log(`[ScreenRecorder] Using mic: ${micTracks[0].label}`);
                     }
 
-                    const videoTrack = this.stream.getVideoTracks()[0];
-                    const audioTrack = micStream.getAudioTracks()[0];
-                    combinedStream = new MediaStream([videoTrack, audioTrack]);
-
-                    Logger.log(`[ScreenRecorder] Combined stream: video=${combinedStream.getVideoTracks().length}, audio=${combinedStream.getAudioTracks().length}`);
+                    audioTrack = micTracks[0] || null;
                 } catch (micErr) {
                     Logger.warn('[ScreenRecorder] Microphone access denied:', micErr);
                     Toast.show('Microphone access denied', 3000, true);
                 }
             }
 
-            combinedStream.getVideoTracks()[0].onended = () => {
+            this.recording = await startTrackRecording({
+                videoTrack,
+                audioTrack,
+                onError: () => {
+                    Toast.show('Recording failed and was stopped.', 3000, true);
+                    this.recording = null;
+                    this._releaseScreenCapture();
+                    this.isRecording = false;
+                    this._updateButtonState(false);
+                },
+            });
+
+            // The browser's own "Stop sharing" button ends the track.
+            videoTrack.onended = () => {
                 this.stopRecording(playlist);
             };
 
-            const options = { mimeType: 'video/webm;codecs=vp9,opus' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options.mimeType = 'video/webm;codecs=vp9';
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    delete options.mimeType;
-                }
-            }
-
-            this.mediaRecorder = new MediaRecorder(combinedStream, options);
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    this.chunks.push(event.data);
-                }
-            };
-
-            this.mediaRecorder.onstop = () => {
-                this._saveRecording(playlist);
-            };
-
-            this.mediaRecorder.start(1000);
             this.isRecording = true;
 
-            const audioTracks = combinedStream.getAudioTracks();
+            // Sharing can end while the recorder is still starting, before the
+            // handler above existed; that 'ended' has already fired and gone.
+            if (videoTrack.readyState === 'ended') {
+                this.stopRecording(playlist);
+                return;
+            }
+
             this._updateButtonState(true);
-            const audioStatus = captureAudio ? (audioTracks.length > 0 ? '🎤 Mic ON' : '⚠️ No mic') : '🔇 No Audio';
+            const audioStatus = captureAudio ? (this.recording.hasAudio ? '🎤 Mic ON' : '⚠️ No mic') : '🔇 No Audio';
             Toast.show(`Recording started (${audioStatus})`);
 
         } catch (err) {
             Logger.error('ScreenRecorder: Start Error', err);
-            if (err.name !== 'NotAllowedError') {
+            // Sharing stopped before the recorder could start is the user's
+            // own choice, not a failure to report.
+            const sharingEnded = this.stream?.getVideoTracks()[0]?.readyState === 'ended';
+            if (err.name !== 'NotAllowedError' && !sharingEnded) {
                 Toast.show('Failed to start recording: ' + err.message, 3000, true);
             }
-            this._stopFacecam();
+            this._releaseScreenCapture();
+            this.recording = null;
             this.isRecording = false;
         }
     }
@@ -694,46 +693,38 @@ export class ScreenRecorderMenu {
             return;
         }
 
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.mediaRecorder.stop();
-
-            if (this.stream) {
-                this.stream.getTracks().forEach(track => track.stop());
-                this.stream = null;
-            }
-
-            // Cleanup mic stream if it exists
-            if (this.micStream) {
-                this.micStream.getTracks().forEach(track => track.stop());
-                this.micStream = null;
-            }
-
-            this._stopFacecam();
-
+        if (this.recording) {
+            const recording = this.recording;
+            this.recording = null;
             this.isRecording = false;
             this._updateButtonState(false);
             Toast.show('Processing recording...');
+
+            try {
+                // Finalized before the tracks are stopped, so the last
+                // frames already captured still reach the file.
+                const blob = await recording.stop();
+                this._saveRecordingBlob(playlist, blob);
+            } catch (err) {
+                Logger.error('ScreenRecorder: Save Error', err);
+                Toast.show('Failed to save recording', 3000, true);
+            } finally {
+                this._releaseScreenCapture();
+            }
         }
     }
 
-    static _saveRecording(playlist) {
-        if (this.chunks.length === 0) return;
-
-        try {
-            const blob = new Blob(this.chunks, { type: 'video/webm' });
-            this._saveRecordingBlob(playlist, blob);
-
-        } catch (err) {
-            Logger.error('ScreenRecorder: Save Error', err);
-            Toast.show('Failed to save recording', 3000, true);
-        } finally {
-            this.chunks = [];
-            this.isRecording = false;
-            this.mediaRecorder = null;
+    /** Stop the shared screen, the microphone and the facecam. */
+    static _releaseScreenCapture() {
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
-            this._stopFacecam();
-            this._updateButtonState(false);
         }
+        if (this.micStream) {
+            this.micStream.getTracks().forEach(track => track.stop());
+            this.micStream = null;
+        }
+        this._stopFacecam();
     }
 
     static _saveRecordingBlob(playlist, blob) {

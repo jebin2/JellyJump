@@ -1,5 +1,6 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { Modal } from '../../Modal.js';
+import { initPlayerAudio, tapPlayerAudio } from '../../../core/audio/AudioEngine.js';
 
 /**
  * Record Menu Handler
@@ -7,8 +8,10 @@ import { Modal } from '../../Modal.js';
  */
 export class RecordMenu {
     static isRecording = false;
-    static mediaRecorder = null;
-    static chunks = [];
+    /** The player's sound for the recording, from tapPlayerAudio. */
+    static audioTap = null;
+    /** Settles once a start in progress has finished, either way. */
+    static _starting = null;
 
     /**
      * Initialize and handle recording
@@ -34,129 +37,131 @@ export class RecordMenu {
             return;
         }
 
-        // Check playback state
-        if (playlist.player.paused) {
-            playlist._showToast('Recording started. Play video to capture.', 'info');
-        }
-
-        // Start Recording (Standard Download Mode)
-        this._startRecording(playlist);
+        await this._startRecording(playlist);
     }
 
     /**
-     * Start Recording
-     * @param {Playlist} playlist 
+     * Start Recording.
+     *
+     * Recorded by the player's own CanvasRecorder, through Mediabunny: frames
+     * are taken only while the video plays, so pausing does not pad the file,
+     * and the picture includes everything drawn on the canvas.
+     * @param {Playlist} playlist
      */
     static _startRecording(playlist) {
+        // Marked as recording at once, so the button flips and a second click
+        // means stop; stopRecording waits for this to finish before stopping.
+        this.isRecording = true;
+        this._starting = this._start(playlist).finally(() => { this._starting = null; });
+        return this._starting;
+    }
+
+    static async _start(playlist) {
+        const player = playlist.player;
         try {
-            this.chunks = []; // Reset chunks
+            await player.startCanvasRecording({ audioTrack: await this._tapAudio(player) });
 
-            // Capture Video from Canvas
-            const videoStream = playlist.player.canvas.captureStream(30); // 30 FPS
-
-            // Capture Audio from Video Element
-            let audioStream;
-            const videoEl = playlist.player.video || playlist.player.streamVideo;
-
-            if (videoEl) {
-                // Try standard captureStream, fallback to mozCaptureStream
-                if (videoEl.captureStream) {
-                    audioStream = videoEl.captureStream();
-                } else if (videoEl.mozCaptureStream) {
-                    audioStream = videoEl.mozCaptureStream();
-                }
-            }
-
-            // Combine Tracks
-            const tracks = [...videoStream.getVideoTracks()];
-            if (audioStream) {
-                const audioTracks = audioStream.getAudioTracks();
-                if (audioTracks.length > 0) {
-                    tracks.push(...audioTracks);
-                    Logger.log('RecordMenu: Audio tracks added');
-                } else {
-                    Logger.warn('RecordMenu: No audio tracks found on video element stream');
-                }
-            } else {
-                Logger.warn('RecordMenu: Could not capture audio stream from video element');
-            }
-
-            const combinedStream = new MediaStream(tracks);
-
-            this.mediaRecorder = new MediaRecorder(combinedStream, {
-                mimeType: 'video/webm;codecs=vp9,opus' // Try VP9 + Opus
-            });
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    this.chunks.push(event.data);
-                }
-            };
-
-            this.mediaRecorder.onstop = () => {
-                // Create Blob and File
-                const filename = `recording_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
-                const blob = new Blob(this.chunks, { type: 'video/webm' });
-
-                // Add to Playlist
-                const itemPath = playlist.items[playlist.activeIndex].path || playlist.items[playlist.activeIndex].title;
-                const file = new File([blob], filename, { type: 'video/webm' });
-                const newItem = {
-                    title: filename,
-                    url: URL.createObjectURL(blob),
-                    file: file,
-                    duration: 'Loading...',
-                    type: 'video',
-                    isLocal: true,
-                    path: `${itemPath}/${filename}`,
-                    id: Date.now().toString() // Simple ID generation
-                };
-
-                playlist.addItems([newItem]);
-
-                // Trigger Download
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-
-                // Cleanup
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-
-                playlist._showToast('Recording saved', 'success');
-                this.chunks = [];
-                this.isRecording = false;
-                this.mediaRecorder = null;
-            };
-
-            this.mediaRecorder.start(1000); // Write chunks every second
-            this.isRecording = true;
-            if (!playlist.player.paused) {
-                playlist._showToast('Recording started. Play video to capture.', 'info');
-            }
-
+            playlist._showToast(
+                !player.isPlaying ? 'Recording started. Play video to capture.' : 'Recording started.',
+                'info',
+            );
         } catch (err) {
             Logger.error('RecordMenu: Start Error', err);
             playlist._showToast('Failed to start recording: ' + err.message, 'error');
+            this._releaseAudioTap();
             this.isRecording = false;
         }
     }
 
     /**
-     * Stop Recording
-     * @param {Playlist} playlist 
+     * The sound to record, or null to let the recorder find its own.
+     *
+     * A file or HLS stream plays through the player's Web Audio graph, which
+     * is tapped ahead of the volume control: muting or turning down the
+     * player while recording does not silence the file. A camera or a
+     * received watch-party stream plays through its own media element
+     * instead, so the graph has nothing in it; for those the recorder takes
+     * the element's audio track itself.
+     * @returns {Promise<MediaStreamTrack|null>}
      */
-    static stopRecording(playlist) {
-        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-            this.mediaRecorder.stop();
-            playlist._showToast('Stopping recording...', 'info');
+    static async _tapAudio(player) {
+        if (player.isStreamMode || player.isWebcamMode) return null;
+
+        // The player builds its audio graph on first play; a recording
+        // started before that would have no output to tap. This runs from
+        // the menu click, so the context is allowed to start.
+        if (!player.audioContext) await initPlayerAudio(player);
+        this.audioTap = tapPlayerAudio(player, { beforeVolume: true });
+        if (!this.audioTap) Logger.warn('RecordMenu: No audio to record; recording picture only');
+        return this.audioTap?.track ?? null;
+    }
+
+    static _releaseAudioTap() {
+        this.audioTap?.release();
+        this.audioTap = null;
+    }
+
+    /**
+     * Stop Recording
+     * @param {Playlist} playlist
+     */
+    static async stopRecording(playlist) {
+        if (!this.isRecording) return;
+        if (this._starting) {
+            await this._starting;
+            // The start failed and has already said so.
+            if (!this.isRecording) return;
         }
+        this.isRecording = false;
+        const player = playlist.player;
+        playlist._showToast('Stopping recording...', 'info');
+
+        let blob = null;
+        try {
+            blob = await player.stopCanvasRecording();
+        } catch (err) {
+            Logger.error('RecordMenu: Stop Error', err);
+        } finally {
+            this._releaseAudioTap();
+        }
+
+        if (!blob) {
+            playlist._showToast('Nothing was recorded. Play the video while recording.', 'warning');
+            return;
+        }
+        this._saveRecording(playlist, blob);
+    }
+
+    /** Add the recording to the playlist and download it. */
+    static _saveRecording(playlist, blob) {
+        const filename = `recording_${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
+
+        const itemPath = playlist.items[playlist.activeIndex]?.path || playlist.items[playlist.activeIndex]?.title || '';
+        const file = new File([blob], filename, { type: 'video/mp4' });
+        playlist.addItems([{
+            title: filename,
+            url: URL.createObjectURL(blob),
+            file: file,
+            duration: 'Loading...',
+            type: 'video',
+            isLocal: true,
+            path: `${itemPath}/${filename}`,
+            id: Date.now().toString(),
+        }]);
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+
+        playlist._showToast('Recording saved', 'success');
     }
 
     /**

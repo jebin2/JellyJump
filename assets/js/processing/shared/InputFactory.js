@@ -9,27 +9,47 @@ export function createMediaBunnyInput(source) {
     return new MediaBunny.Input({ source: new MediaBunny.BlobSource(source), formats: MediaBunny.ALL_FORMATS });
 }
 
-export function getBitrate(quality, pixelCount, sourceBitrate = 0) {
+/**
+ * The encoding quality for a transcode, as a Mediabunny Quality.
+ *
+ * When the source bitrate is known, the output gets that share of it -- the
+ * "respective to the video" behaviour, which a quality level alone cannot
+ * express. When it is not known, the share becomes a Mediabunny quality level
+ * instead, which sizes the bitrate for the codec and resolution actually being
+ * encoded rather than a fixed 4 Mbps at 720p for every codec.
+ *
+ * @param {'high'|'medium'|'low'|number} quality - a preset, or 0..100
+ * @param {number} sourceBitrate - bits per second, already scaled to the
+ *   output's pixel count; 0 when unknown
+ * @returns {{ quality: Object, bitrate: number|null }} bitrate is set only
+ *   when one was chosen here, so it can be logged
+ */
+export function chooseQuality(quality, sourceBitrate = 0) {
     let q = 100;
     if (typeof quality === 'number') {
         q = quality;
-    } else if (quality === 'high') {
-        q = 100;
     } else if (quality === 'medium') {
         q = 60;
     } else if (quality === 'low') {
         q = 30;
     }
+    const fraction = Math.min(1, Math.max(0, q / 100));
 
-    let targetBitrate;
     if (sourceBitrate > 0) {
-        targetBitrate = sourceBitrate * (q / 100);
-    } else {
-        const basePixels = 1280 * 720;
-        const standardBitrate = 4000000;
-        const pixelFactor = pixelCount > 0 ? pixelCount / basePixels : 1;
-        targetBitrate = standardBitrate * pixelFactor * (q / 100);
+        // Floored, because Mediabunny rejects a bitrate of zero, which a
+        // quality of 0 or a tiny source would otherwise produce.
+        const bitrate = Math.max(MIN_VIDEO_BITRATE, Math.floor(sourceBitrate * fraction));
+        return { quality: new MediaBunny.Quality({ bitrate }), bitrate };
     }
-
-    return Math.floor(targetBitrate);
+    // Scaled so 100% lands on 'high', the level a transcode at 100% gets
+    // (it skips bitrate control and takes the Conversion's default). Mapped
+    // straight across instead, 90% would sit above 'high' and give a bigger
+    // file than 100%.
+    return { quality: new MediaBunny.Quality(fraction * QUALITY_LEVEL_HIGH), bitrate: null };
 }
+
+/** Where 'high' sits on Mediabunny's 0..1 quality scale. */
+const QUALITY_LEVEL_HIGH = 0.75;
+
+/** The least a video is given: watchable at small sizes, never zero. */
+const MIN_VIDEO_BITRATE = 100_000;

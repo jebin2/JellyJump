@@ -1,9 +1,8 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
-import { createMediaBunnyInput, getBitrate } from '../shared/InputFactory.js';
+import { createMediaBunnyInput, chooseQuality } from '../shared/InputFactory.js';
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
-import { recordTransparentWebM } from './AlphaRecorder.js';
 import { buildOverlayStage } from '../../ui/player/OverlayCompositor.js';
 
 /**
@@ -44,9 +43,10 @@ export async function process({
 
     const watermarkImages = new Map();
 
-    // If removing background, we need to handle it via the process callback
-    // and potentially force transcoding to a format that supports alpha (WebM) if transparent
-    if (removeBackgroundOptions && removeBackgroundOptions.bgType === 'transparent') {
+    // A transparent background needs a container that carries alpha, which
+    // MP4 does not; WebM does.
+    const transparent = removeBackgroundOptions?.bgType === 'transparent';
+    if (transparent) {
         format = 'webm';
     }
 
@@ -95,28 +95,6 @@ export async function process({
             }
         }
 
-        // Transparency cannot survive the WebCodecs encoder everything else
-        // goes through -- Chrome reports alpha:'keep' unsupported for every
-        // WebM codec -- so it takes a different road entirely. Awaited rather
-        // than returned, because the finally below disposes the input this
-        // still needs to read.
-        if (removeBackgroundOptions && removeBackgroundOptions.bgType === 'transparent') {
-            if (!firstTimestamp) {
-                try {
-                    firstTimestamp = await videoTrack.getFirstTimestamp();
-                } catch (e) {
-                    Logger.warn('[TranscodeService] Could not get first timestamp:', e);
-                }
-            }
-            return await recordTransparentWebM({
-                input, videoTrack,
-                width: originalWidth, height: originalHeight, nativeRotation,
-                removeBackgroundOptions, watermarkItems, watermarkImages, blur,
-                firstTimestamp,
-                onProgress,
-            });
-        }
-
         // Configure Output Format
         let outputFormat;
         if (format === 'gif') {
@@ -153,7 +131,6 @@ export async function process({
             outputHeight = resolution.height || Math.round(resolution.width / aspect);
         }
         const pixelRatio = Math.min(1, (outputWidth * outputHeight) / (originalWidth * originalHeight));
-        const outputPixels = outputWidth * outputHeight;
         const scaledSourceBitrate = originalBitrate * pixelRatio;
 
         // Held separately from videoConfig.quality purely so the log below can
@@ -164,15 +141,23 @@ export async function process({
             // ProRes always re-encodes; only the desktop app has an encoder for it.
             videoConfig.codec = 'prores';
             if (needsBitrateControl) {
-                targetBitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
-                videoConfig.quality = new MediaBunny.Quality({ bitrate: targetBitrate });
+                ({ quality: videoConfig.quality, bitrate: targetBitrate } = chooseQuality(quality, scaledSourceBitrate));
             } else {
                 videoConfig.quality = MediaBunny.QUALITY_VERY_HIGH;
             }
         } else if (needsBitrateControl) {
             videoConfig.codec = (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc';
-            targetBitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
-            videoConfig.quality = new MediaBunny.Quality({ bitrate: targetBitrate });
+            ({ quality: videoConfig.quality, bitrate: targetBitrate } = chooseQuality(quality, scaledSourceBitrate));
+        }
+
+        // Mediabunny encodes the alpha plane with a second encoder and stores
+        // it alongside the colour, so it never needs Chrome's VideoEncoder to
+        // accept alpha itself. VP9 is set explicitly because it is the codec
+        // measured to come back transparent, read by a plain <video> as well as
+        // by Mediabunny; leaving the choice open could land on one that is not.
+        if (transparent) {
+            videoConfig.codec = 'vp9';
+            videoConfig.alpha = 'keep';
         }
 
         if (targetBitrate) {

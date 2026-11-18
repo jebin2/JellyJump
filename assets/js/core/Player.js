@@ -179,6 +179,7 @@ export class CorePlayer {
         // Web Audio API
         this.audioContext = null;
         this.gainNode = null;
+        this.mixNode = null;
         this.nextAudioTime = 0;
         this.isAudioInitialized = false;
         this.currentAudioSource = null;

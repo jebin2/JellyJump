@@ -30,7 +30,7 @@ export class PlayerStream {
         // Recording lives in its own component now: it reads the canvas and
         // needs three events from here, so there is no reason for its eleven
         // fields to sit among the stream's.
-        this.recorder = new CanvasRecorder(player, () => this._isMediaReady);
+        this.recorder = new CanvasRecorder(player, () => this._recordingMediaReady());
     }
 
     // ─── Load lifecycle ─────────────────────────────────────────────────────────
@@ -56,7 +56,19 @@ export class PlayerStream {
     // ─── Play / Pause hooks ──────────────────────────────────────────────────────
 
     onPlay() {
-        this.recorder.onPlaybackResumed(this._isMediaReady);
+        this.recorder.onPlaybackResumed(this._recordingMediaReady());
+    }
+
+    /**
+     * Whether what is on the canvas is worth recording. A stream or camera
+     * says so once its frames are flowing. A file needs no such wait: its
+     * frames are drawn whenever it plays, and the flag a file sets is only
+     * raised after a frame arrives late, so smooth playback never set it and
+     * a recording of a file came out empty.
+     */
+    _recordingMediaReady() {
+        if (!this.isStreamMode && !this.isWebcamMode) return true;
+        return this._isMediaReady;
     }
 
 
