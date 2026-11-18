@@ -10,6 +10,11 @@ export async function initPlayerAudio(player) {
     player.audioContext = sampleRate ? new AudioContext({ sampleRate }) : new AudioContext();
 
     player.gainNode = player.audioContext.createGain();
+    // Everything the player plays meets here, after the equalizer and before
+    // volume and mute. It exists so a recording can take the sound as played
+    // without taking the viewer's volume with it.
+    player.mixNode = player.audioContext.createGain();
+    player.mixNode.connect(player.gainNode);
 
     if (player.config.controls.equalizer) {
         player.audioEqualizer = new AudioEqualizer(player.audioContext);
@@ -17,7 +22,7 @@ export async function initPlayerAudio(player) {
         const eqOutput = player.audioEqualizer.getOutputNode();
 
         // Source connection still happens later during audio scheduling.
-        eqOutput.connect(player.gainNode);
+        eqOutput.connect(player.mixNode);
     }
 
     player.gainNode.connect(player.audioContext.destination);
@@ -60,6 +65,7 @@ export async function closePlayerAudioContext(player) {
     await player.audioContext.close();
     player.audioContext = null;
     player.gainNode = null;
+    player.mixNode = null;
     player.isAudioInitialized = false;
 }
 
@@ -141,7 +147,7 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
         if (player.audioEqualizer && player.audioEqualizer.isInitialized) {
             audioSource.connect(player.audioEqualizer.getInputNode());
         } else {
-            audioSource.connect(player.gainNode);
+            audioSource.connect(player.mixNode);
         }
 
         // Use dynamic anchors for Live streams to keep in sync with video loop snaps
@@ -246,4 +252,41 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
         Logger.log(`[${_audioLogTag}:Audio] Cleanup — sampleCount=${sampleCount}, isOurIterator=${player.audioBuffers.holds(myIterator)}`);
         await player.audioBuffers.closeIfHeld(myIterator);
     }
+}
+
+/**
+ * The player's sound as a MediaStreamTrack, for recording or broadcasting it.
+ *
+ * `beforeVolume` takes it ahead of the volume control, so the viewer muting
+ * or turning down the player does not silence a recording. Without it the tap
+ * follows what comes out of the speakers. Either way the player's own
+ * connection to the speakers is untouched.
+ *
+ * @param {Object} player
+ * @param {{ beforeVolume?: boolean }} [options]
+ * @returns {{ track: MediaStreamTrack, release: () => void } | null} null
+ *   while the player has no audio graph
+ */
+export function tapPlayerAudio(player, { beforeVolume = false } = {}) {
+    const { audioContext } = player;
+    const node = beforeVolume ? player.mixNode : player.gainNode;
+    if (!audioContext || !node) return null;
+
+    const destination = audioContext.createMediaStreamDestination();
+    node.connect(destination);
+    const [track] = destination.stream.getAudioTracks();
+
+    let released = false;
+    const release = () => {
+        if (released) return;
+        released = true;
+        try { node.disconnect(destination); } catch { /* the graph is already gone */ }
+        destination.stream.getTracks().forEach(t => t.stop());
+    };
+
+    if (!track) {
+        release();
+        return null;
+    }
+    return { track, release };
 }

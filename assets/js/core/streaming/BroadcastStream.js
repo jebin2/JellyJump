@@ -1,4 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
+import { tapPlayerAudio } from '../audio/AudioEngine.js';
 
 /**
  * The player's output as a MediaStream, for sending to someone else.
@@ -77,20 +78,11 @@ export class BroadcastStream {
     attachAudio() {
         if (!this._stream || this._audioTap) return this.hasAudio;
 
-        const { audioContext, gainNode } = this.player;
-        if (!audioContext || !gainNode) return false;
+        const tap = tapPlayerAudio(this.player);
+        if (!tap) return false;
 
-        this._audioTap = audioContext.createMediaStreamDestination();
-        gainNode.connect(this._audioTap);
-
-        const [track] = this._audioTap.stream.getAudioTracks();
-        if (!track) {
-            gainNode.disconnect(this._audioTap);
-            this._audioTap = null;
-            return false;
-        }
-
-        this._stream.addTrack(track);
+        this._audioTap = tap;
+        this._stream.addTrack(tap.track);
         Logger.log('[Broadcast] Audio attached from the gain node');
         return true;
     }
@@ -133,7 +125,7 @@ export class BroadcastStream {
         if (this._audioTap) {
             // Only this tap: the gain node's own connection to the speakers is
             // a separate edge and must survive.
-            try { this.player.gainNode?.disconnect(this._audioTap); } catch (e) { /* already gone */ }
+            this._audioTap.release();
             this._audioTap = null;
         }
         if (this._stream) {
