@@ -3,6 +3,7 @@ import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
 import { executeConversion, cancellableProgress, cancelUnfinished, throwIfCancelled } from '../shared/Cancellation.js';
+import { copyMetadataTags } from '../shared/MetadataTags.js';
 
 export async function extractTrackStreamCopy({ source, trackIndex, trackType, format, onProgress, signal }) {
     // Conversion auto-transcodes when the source codec doesn't fit the target container
@@ -162,6 +163,8 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
             });
 
             output.addVideoTrack(canvasSource);
+            // The source's title and cover art, as a Conversion would keep them.
+            await copyMetadataTags(input, output);
             await output.start();
 
             const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
@@ -258,6 +261,8 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
             ? { codec }
             : { codec, quality: new MediaBunny.Quality({ bitrate: AUDIO_BITRATE_BPS }) });
         output.addAudioTrack(audioSource);
+        // The source's title and cover art, as a Conversion would keep them.
+        await copyMetadataTags(input, output);
         await output.start();
 
         let outputTimestamp = 0;

@@ -2,6 +2,7 @@ import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 import { executeConversion, cancelUnfinished, throwIfCancelled } from '../shared/Cancellation.js';
+import { copyMetadataTags } from '../shared/MetadataTags.js';
 
 
 /**
@@ -237,6 +238,8 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
             Logger.log(`[MergeService] Audio output: ${targetChannels} channels @ ${targetSampleRate}Hz`);
         }
 
+        // The first file's title and cover art, as a Conversion would keep them.
+        await copyMetadataTags(inputObjects[0], output);
         await output.start();
 
         let currentTimestamp = 0;
