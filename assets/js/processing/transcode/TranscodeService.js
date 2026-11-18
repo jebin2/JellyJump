@@ -1,6 +1,6 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
-import { createMediaBunnyInput, getBitrate } from '../shared/InputFactory.js';
+import { createMediaBunnyInput, chooseQuality } from '../shared/InputFactory.js';
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
 import { buildOverlayStage } from '../../ui/player/OverlayCompositor.js';
@@ -131,7 +131,6 @@ export async function process({
             outputHeight = resolution.height || Math.round(resolution.width / aspect);
         }
         const pixelRatio = Math.min(1, (outputWidth * outputHeight) / (originalWidth * originalHeight));
-        const outputPixels = outputWidth * outputHeight;
         const scaledSourceBitrate = originalBitrate * pixelRatio;
 
         // Held separately from videoConfig.quality purely so the log below can
@@ -142,15 +141,13 @@ export async function process({
             // ProRes always re-encodes; only the desktop app has an encoder for it.
             videoConfig.codec = 'prores';
             if (needsBitrateControl) {
-                targetBitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
-                videoConfig.quality = new MediaBunny.Quality({ bitrate: targetBitrate });
+                ({ quality: videoConfig.quality, bitrate: targetBitrate } = chooseQuality(quality, scaledSourceBitrate));
             } else {
                 videoConfig.quality = MediaBunny.QUALITY_VERY_HIGH;
             }
         } else if (needsBitrateControl) {
             videoConfig.codec = (format === 'webm' || format === 'mkv') ? 'vp9' : 'avc';
-            targetBitrate = getBitrate(quality, outputPixels, scaledSourceBitrate);
-            videoConfig.quality = new MediaBunny.Quality({ bitrate: targetBitrate });
+            ({ quality: videoConfig.quality, bitrate: targetBitrate } = chooseQuality(quality, scaledSourceBitrate));
         }
 
         // Mediabunny encodes the alpha plane with a second encoder and stores
