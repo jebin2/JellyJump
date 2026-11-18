@@ -5,6 +5,7 @@
  */
 
 import { MediaBunny } from './MediaBunny.js';
+import { ScreenWakeLock } from './playback/ScreenWakeLock.js';
 import {
     onPlayerEvent,
     offPlayerEvent,
@@ -136,6 +137,7 @@ export class CorePlayer {
         this.config = { ...PLAYER_CONFIG, ...options };
         this.canvas = null;
         this.ctx = null;
+        this._wakeLock = new ScreenWakeLock();
         this.isPlaying = false;
         this.currentTime = 0;
         this.duration = 0;
@@ -669,6 +671,8 @@ export class CorePlayer {
     set isPlaying(value) {
         if (this._isPlaying === value) return;
         this._isPlaying = value;
+        // Nothing else keeps the screen awake for a canvas-drawn video.
+        this._wakeLock?.set(value);
         // The constructor sets this before `ui` is built, and the reset paths
         // can run while it is being rebuilt.
         if (this.ui) this._updatePlayPauseUI();
@@ -763,6 +767,9 @@ export class CorePlayer {
     // ─── Destroy ─────────────────────────────────────────────────────────────────
     async destroy() {
         await this.reset();
+
+        this._wakeLock?.destroy();
+        this._wakeLock = null;
 
         this._events = {};
 
