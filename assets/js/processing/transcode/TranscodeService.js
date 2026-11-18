@@ -4,7 +4,9 @@ import { createMediaBunnyInput, chooseQuality } from '../shared/InputFactory.js'
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
 import { buildOverlayStage } from '../../ui/player/OverlayCompositor.js';
-import { executeConversion } from '../shared/Cancellation.js';
+import { executeConversion, cancelUnfinished } from '../shared/Cancellation.js';
+import { copyMetadataTags } from '../shared/MetadataTags.js';
+import { cuesToVTT } from '../../core/subtitles/SubtitleConverter.js';
 
 /**
  * Process video (transcode, trim, resize, crop, etc.)
@@ -24,6 +26,7 @@ export async function process({
     rotate = 0, 
     flip = null, 
     overlays = null,
+    subtitles = null,
     onProgress,
     signal,
 }) {
@@ -261,13 +264,28 @@ export async function process({
             conversionOptions.trim = trim;
         }
 
+        // Subtitle tracks travel as WebVTT, which MP4, MKV and WebM can hold
+        // and MOV cannot. A Conversion wants its Output to itself, so adding
+        // a track of our own means running it as a composable one.
+        const subtitleTracks = outputFormat.getSupportedSubtitleCodecs().includes('webvtt')
+            ? prepareSubtitles(subtitles, trim)
+            : [];
+        if (subtitles?.length && !subtitleTracks.length) {
+            Logger.warn(`[TranscodeService] Subtitles not written: ${format} cannot hold them, or no cue falls in range`);
+        }
+        if (subtitleTracks.length) conversionOptions.composable = true;
+
         conversion = await MediaBunny.Conversion.init(conversionOptions);
 
         if (onProgress) {
             conversion.onProgress = onProgress;
         }
 
-        await executeConversion(conversion, signal);
+        if (subtitleTracks.length) {
+            await runWithSubtitles({ input, output, conversion, videoTrack, subtitleTracks, signal });
+        } else {
+            await executeConversion(conversion, signal);
+        }
 
         return new Blob([output.target.buffer], { type: format === 'prores' ? 'video/quicktime' : `video/${format}` });
     } finally {
@@ -288,4 +306,60 @@ export async function process({
         }
         watermarkImages.clear();
     }
+}
+
+/**
+ * The subtitle tracks worth writing, as WebVTT, timed for the output.
+ *
+ * An exported range starts at zero, so a trimmed export takes the cues in
+ * that range, moved to match. A track with nothing left in range is dropped.
+ *
+ * @param {Array<{name?: string, cues: Array}>|null} subtitles
+ * @param {{start: number, end: number}|null} trim
+ * @returns {Array<{name: string|null, vtt: string}>}
+ */
+function prepareSubtitles(subtitles, trim) {
+    if (!subtitles?.length) return [];
+    const range = trim ? { start: trim.start, end: trim.end } : {};
+    return subtitles
+        .map(track => ({ name: track.name || null, vtt: cuesToVTT(track.cues || [], range) }))
+        .filter(track => track.vtt);
+}
+
+/**
+ * Run a composable Conversion alongside subtitle tracks of our own.
+ *
+ * Everything a self-contained Conversion would have done for its Output is
+ * done here: the source's tags, start, finalize, and on failure or cancel,
+ * releasing the Output (a composable Conversion leaves it alone).
+ */
+async function runWithSubtitles({ input, output, conversion, videoTrack, subtitleTracks, signal }) {
+    // A composable Conversion reports itself valid whatever it dropped, so
+    // the check a normal one makes on the video is made here.
+    const droppedVideo = conversion.discardedTracks.find(d => d.track === videoTrack);
+    if (droppedVideo) throw new Error(`The video cannot be converted (${droppedVideo.reason}).`);
+
+    const sources = subtitleTracks.map(({ name, vtt }) => {
+        const source = new MediaBunny.TextSubtitleSource('webvtt');
+        output.addSubtitleTrack(source, name ? { name } : {});
+        return { source, vtt };
+    });
+    await copyMetadataTags(input, output);
+
+    try {
+        await output.start();
+        await Promise.all([
+            executeConversion(conversion, signal),
+            // Each file is small and added whole, then closed so the output
+            // knows the track is complete.
+            ...sources.map(async ({ source, vtt }) => {
+                await source.add(vtt);
+                source.close();
+            }),
+        ]);
+        await output.finalize();
+    } finally {
+        await cancelUnfinished(output);
+    }
+    Logger.log(`[TranscodeService] Wrote ${sources.length} subtitle track(s)`);
 }

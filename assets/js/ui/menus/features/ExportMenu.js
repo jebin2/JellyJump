@@ -43,17 +43,30 @@ export class ExportMenu {
 
         const applied = isPlayingThis ? ExportMenu._describe(player) : [];
 
+        // Subtitles loaded into or generated on the player go into the file
+        // as tracks of their own, switchable in the viewer's player.
+        const subtitleTracks = isPlayingThis ? (player.subtitles?.tracks ?? []).filter(t => t.cues?.length) : [];
+        const subtitleToggle = content.querySelector('#export-fx-subtitles-toggle');
+        if (subtitleTracks.length) {
+            const names = subtitleTracks.map(t => t.name).join(', ');
+            content.querySelector('.export-fx-subtitles-label').textContent =
+                `Include ${subtitleTracks.length === 1 ? 'the subtitle track' : `${subtitleTracks.length} subtitle tracks`} (${names})`;
+            content.querySelector('.export-fx-subtitles').classList.remove('hidden');
+        }
+
         if (!isPlayingThis) {
             empty.textContent = 'Play this video first. The effects live on the player, '
                 + 'so they can only be baked into the video that is on screen.';
             empty.classList.remove('hidden');
-        } else if (applied.length === 0) {
+        } else if (applied.length === 0 && !subtitleTracks.length) {
             empty.classList.remove('hidden');
-        } else {
+        } else if (applied.length) {
             summary.innerHTML = applied.map(line => `<li>${line}</li>`).join('');
         }
 
-        exportBtn.disabled = !isPlayingThis || applied.length === 0;
+        // Subtitles alone are worth exporting: they turn a video and a
+        // separate caption file into one file that carries both.
+        exportBtn.disabled = !isPlayingThis || (applied.length === 0 && !subtitleTracks.length);
 
         await playlist._ensureMetadata(item);
         let duration = 0;
@@ -94,6 +107,9 @@ export class ExportMenu {
                     onProgress: (progress) => {
                         progressPercentage.textContent = `${Math.round(progress * 100)}%`;
                     },
+                    subtitles: subtitleTracks.length && subtitleToggle?.checked
+                        ? subtitleTracks.map(t => ({ name: t.name, cues: t.cues }))
+                        : null,
                     signal: job.signal,
                 });
 
