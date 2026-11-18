@@ -1,6 +1,7 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
 import { executeConversion, cancelUnfinished } from '../shared/Cancellation.js';
+import { copyMetadataTags } from '../shared/MetadataTags.js';
 
 /**
  * Combine the video track of one file with the audio track of another, muxing
@@ -79,6 +80,8 @@ export async function combineAudioVideo({ videoSource, audioSource, format = 'mp
         videoConversion.onProgress = (p) => { videoProgress = p; reportProgress(); };
         audioConversion.onProgress = (p) => { audioProgress = p; reportProgress(); };
 
+        // The video's title and cover art; composable conversions leave tags to us.
+        await copyMetadataTags(videoInput, output);
         await output.start();
         await Promise.all([
             executeConversion(videoConversion, signal),

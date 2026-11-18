@@ -3,6 +3,7 @@ import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
 import { AUDIO_BITRATE_BPS, createMediaBunnyInput } from '../shared/InputFactory.js';
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
 import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../shared/Cancellation.js';
+import { copyMetadataTags } from '../shared/MetadataTags.js';
 
 async function processAudioWithSpeed(audioTrack, audioSource, speed = 1, signal) {
     const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
@@ -152,6 +153,8 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
             }
         }
 
+        // The source's title and cover art, as a Conversion would keep them.
+        await copyMetadataTags(input, output);
         await output.start();
 
         Logger.log('[MediaProcessor] Extracting frames in reverse order using samplesAtTimestamps...');
@@ -289,6 +292,8 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress: reportPr
             }
         }
 
+        // The source's title and cover art, as a Conversion would keep them.
+        await copyMetadataTags(input, output);
         await output.start();
 
         Logger.log('[MediaProcessor] Processing video frames...');
