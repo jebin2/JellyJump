@@ -2,6 +2,7 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, codecOf, ensureDecodersFor } from '../../core/MediaBunny.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { SubtitleManager } from '../../core/subtitles/SubtitleManager.js';
+import { labelAudioTracks } from './AudioTrackLabels.js';
 
 export class PlayerSubtitles {
     constructor(player) {
@@ -241,10 +242,13 @@ export class PlayerSubtitles {
         // time this menu is built, VOD or live -- so this is the right way to
         // ask rather than a fix for an observed failure.
         const codecs = await Promise.all(tracks.map(codecOf));
+        // Name, language, purpose and channel layout, so two English tracks
+        // no longer both read "eng".
+        const labels = await labelAudioTracks(tracks);
 
         tracks.forEach((track, index) => {
             const item = template.content.cloneNode(true).querySelector('.jellyjump-menu-item');
-            const label = track.languageCode || `Track ${index + 1}`;
+            const label = labels[index];
             item.textContent = decodable[index]
                 ? label
                 : `${label} — ${codecs[index] || 'unsupported'} (not supported)`;
