@@ -117,7 +117,12 @@ export async function decodeVideoSticker(blob, frameWidth) {
             return Math.max(1, (next - t) * 1000);
         });
 
-        return new AnimatedImage(frames, durations);
+        const sticker = new AnimatedImage(frames, durations);
+        // Read from the file's own flags, nothing decoded: a clip that cannot
+        // carry alpha will sit on the video as a solid rectangle, which is
+        // worth saying before someone wonders where the cut-out went.
+        sticker.opaque = !(await track.canBeTransparent().catch(() => false));
+        return sticker;
     } finally {
         input.dispose();
     }

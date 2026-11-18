@@ -217,7 +217,13 @@ export class PlayerSubtitles {
         if (!p.ui.audioMenu || !p.ui.audioContainer) return;
 
         p.ui.audioMenu.textContent = '';
-        const tracks = p.input ? await p.input.getAudioTracks() : [];
+        const allTracks = p.input ? await p.input.getAudioTracks() : [];
+        // Only audio that can play with the picture on screen. In a file every
+        // track pairs with every other, so this changes nothing; in an HLS
+        // stream whose variants each carry their own audio, the other
+        // variants' tracks belong to pictures that are not showing.
+        const paired = p.videoTrack ? allTracks.filter(t => t.canBePairedWith(p.videoTrack)) : allTracks;
+        const tracks = paired.length ? paired : allTracks;
 
         if (tracks.length <= 1) {
             p.ui.audioContainer.style.display = 'none';

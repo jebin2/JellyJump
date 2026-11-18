@@ -24,10 +24,20 @@ export async function pickDecodableAudioTrack(input) {
     const tracks = await input.getAudioTracks();
     await ensureDecodersFor(tracks);
 
+    // Mediabunny's primary already prefers audio that goes with the primary
+    // video, then the file's default track.
     const primary = await input.getPrimaryAudioTrack();
     if (primary && await primary.canDecode()) return primary;
 
-    for (const track of tracks) {
+    // The fallback keeps that preference: in an HLS stream whose variants
+    // each carry their own audio, the first decodable track can belong to a
+    // different variant from the picture being shown.
+    const video = await input.getPrimaryVideoTrack().catch(() => null);
+    const ordered = video
+        ? [...tracks.filter(t => t.canBePairedWith(video)), ...tracks.filter(t => !t.canBePairedWith(video))]
+        : tracks;
+
+    for (const track of ordered) {
         if (track === primary) continue;
         if (await track.canDecode()) {
             Logger.warn(`[MediaLifecycle] Primary audio track (${primary ? await primary.getCodec() : 'unknown codec'}) can't be decoded here — using ${await track.getCodec()} (${track.languageCode || 'und'}) instead`);
