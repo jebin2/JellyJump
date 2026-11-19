@@ -631,6 +631,8 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
             player.currentVideoId = videoId || url;
             player._setLoading(true);
             await loadPlayerYouTube(player, youtube, autoplay);
+            // The direction button hides for YouTube.
+            player._updatePlayPauseUI();
             Logger.log('Media loaded successfully (youtube)');
             return;
         }
@@ -655,6 +657,9 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         player._updateSubtitleMenu();
 
         if (!player.isLive) player._setLoading(false);
+        // Now that it is known whether this is live and has a picture, the
+        // direction button shows or hides to match.
+        player._updatePlayPauseUI();
         Logger.log('Media loaded successfully');
 
     } catch (error) {

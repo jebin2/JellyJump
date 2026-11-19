@@ -26,7 +26,10 @@ export function createPlayerControls(player) {
         player.ui.playOverlay.style.display = 'none';
     }
 
-    if (player.config.controls.playPause) player.ui.playBtn = q('#mb-play-btn');
+    if (player.config.controls.playPause) {
+        player.ui.playBtn = q('#mb-play-btn');
+        player.ui.directionBtn = q('#mb-direction-btn');
+    }
     if (player.config.controls.navigation) {
         player.ui.prevBtn = q('#mb-prev-btn');
         player.ui.nextBtn = q('#mb-next-btn');
@@ -77,7 +80,7 @@ function initSpeedPanel(player) {
     player.ui.speedSlider = q('#mb-speed-slider');
     player.ui.speedValue = q('#mb-speed-value');
     player.ui.resetSpeedBtn = q('#mb-reset-speed-btn');
-    player.ui.reverseBtn = q('#mb-reverse-btn');
+
     player.ui.closeSpeedPanelBtn = q('.jellyjump-speed-panel .jellyjump-close-btn');
 }
 

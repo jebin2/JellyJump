@@ -51,6 +51,13 @@
                         <use href="assets/icons/sprite.svg#icon-play"></use>
                     </svg>
                 </button>
+                <button class="jellyjump-btn jellyjump-direction-btn control--hidden" id="mb-direction-btn"
+                    aria-label="Play backwards" aria-pressed="false" title="Play backwards (Shift+J)"
+                    data-control="playPause">
+                    <svg width="20" height="20" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-flip-h"></use>
+                    </svg>
+                </button>
                 <button class="jellyjump-btn control--hidden" id="mb-prev-btn" aria-label="Previous Video" disabled
                     data-control="navigation">
                     <svg width="24" height="24" fill="currentColor">
@@ -315,7 +322,6 @@
                 </div>
             </div>
             <div class="speed-actions">
-                <button class="jellyjump-btn-text" id="mb-reverse-btn" title="Play backwards from here, at this speed (Shift+J)">◀ Play backwards</button>
                 <button class="jellyjump-btn-text" id="mb-reset-speed-btn">Reset to 1x</button>
             </div>
         </div>
@@ -439,7 +445,7 @@
                     <ul>
                         <li><span class="key">Space</span> / <span class="key">K</span> Play/Pause</li>
                         <li><span class="key">J</span> / <span class="key">L</span> -/+ 10s</li>
-                        <li><span class="key">Shift</span>+<span class="key">J</span> Play backwards</li>
+                        <li><span class="key">Shift</span>+<span class="key">J</span> Play forwards / backwards</li>
                         <li><span class="key">←</span> / <span class="key">→</span> -/+ 5s</li>
                         <li><span class="key">0</span>-<span class="key">9</span> Seek 0-90%</li>
                         <li><span class="key">Home</span> / <span class="key">End</span> Start/End</li>

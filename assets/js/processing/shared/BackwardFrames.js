@@ -45,8 +45,16 @@ export class BackwardFrameReader {
      * @param {Object} [options.decoderOptions] - passed to VideoSampleSink
      * @param {number} [options.maxFrames] - hold fewer than the default, for
      *   a caller that keeps two readers going at once
+     * @param {(sample: Object) => Promise<{timestamp: number, close: () => void}>} [options.toHeld]
+     *   turn each decoded frame into what is held, so the decoder's own frame
+     *   can be released at once. Hardware decoders keep only a small pool of
+     *   frames and can stall while too many are held; a caller that only needs
+     *   to draw a frame can hold a copy instead. sampleAt() and
+     *   backwardSamples() clone what is held, so for them the copy must itself
+     *   be a VideoSample.
      */
-    constructor(videoTrack, { decoderOptions, maxFrames = MAX_HELD_FRAMES } = {}) {
+    constructor(videoTrack, { decoderOptions, maxFrames = MAX_HELD_FRAMES, toHeld = null } = {}) {
+        this.toHeld = toHeld;
         this.track = videoTrack;
         this.sink = new MediaBunny.VideoSampleSink(videoTrack, decoderOptions);
         this.packets = new MediaBunny.EncodedPacketSink(videoTrack);
@@ -156,7 +164,7 @@ export class BackwardFrameReader {
      * keeping the last `capacity` frames.
      * @private
      */
-    async _fill(timestamp) {
+    async _fill(timestamp, { trustPackets = true } = {}) {
         const key = await this.packets.getKeyPacket(timestamp, { metadataOnly: true })
             ?? await this.packets.getFirstPacket({ metadataOnly: true });
         if (!key) {
@@ -167,16 +175,38 @@ export class BackwardFrameReader {
         // Up to and including the frame at `timestamp`; a little past it,
         // since the range's end is exclusive.
         const end = timestamp + 2 * SAME_INSTANT;
+        // With a conversion, only the frames that will be kept are converted:
+        // which ones that is comes from the packets' timestamps, read without
+        // decoding. Converting every decoded frame and dropping most of them
+        // cost far more than the decoding did.
+        const keep = this.toHeld && trustPackets ? await this._lastTimestamps(key, timestamp) : null;
+        let decodedInRange = 0;
         const kept = [];
         for await (const sample of this.sink.samples(key.timestamp, end)) {
             this.decodedFrames++;
             if (sample.timestamp > timestamp + SAME_INSTANT) { sample.close(); continue; }
-            kept.push(sample);
+            decodedInRange++;
+            if (keep && !keep.has(Math.round(sample.timestamp * 1e6))) { sample.close(); continue; }
+            if (this.toHeld) {
+                try {
+                    kept.push(await this.toHeld(sample));
+                } finally {
+                    sample.close();
+                }
+            } else {
+                kept.push(sample);
+            }
             if (kept.length > this.capacity) kept.shift().close();
         }
         if (this.closed) {
             for (const frame of kept) frame.close();
             return;
+        }
+        // Frames were decoded but none matched the packets' timestamps (a
+        // container whose timing the two disagree on): decode again,
+        // converting as it goes, rather than hold nothing and ask for ever.
+        if (keep && kept.length === 0 && decodedInRange > 0) {
+            return this._fill(timestamp, { trustPackets: false });
         }
         // Swapped in whole, so the old stretch stays drawable until the new
         // one is ready.
@@ -184,5 +214,70 @@ export class BackwardFrameReader {
         this.held = kept;
         this.heldUntil = timestamp;
         for (const frame of previous) frame.close();
+    }
+
+    /**
+     * The timestamps of the last `capacity` frames from `key` up to
+     * `timestamp`, in microseconds, read from the packets alone.
+     * @private
+     */
+    async _lastTimestamps(key, timestamp) {
+        const stamps = [];
+        for await (const packet of this.packets.packets(key, undefined, { metadataOnly: true })) {
+            // Decode order runs a little ahead of presentation order (B-frames),
+            // so read a couple of seconds past before stopping.
+            if (packet.timestamp > timestamp + 2) break;
+            if (packet.timestamp <= timestamp + SAME_INSTANT) stamps.push(packet.timestamp);
+        }
+        stamps.sort((a, b) => a - b);
+        return new Set(stamps.slice(-this.capacity).map(t => Math.round(t * 1e6)));
+    }
+}
+
+/**
+ * Frames for a falling sequence of timestamps, with the stretch before the
+ * current one decoded while the current one is being used -- for an export,
+ * where the caller is busy encoding each frame and the decoder would
+ * otherwise sit idle until it finished. Two readers take turns, as in reverse
+ * playback; only one ever decodes at a time.
+ *
+ * Yields a VideoSample (or null before the first frame) per timestamp,
+ * owned by the caller, exactly as samplesAtTimestamps does.
+ *
+ * @param {Object} videoTrack - a Mediabunny InputVideoTrack
+ * @param {Iterable<number>|AsyncIterable<number>} timestamps - falling
+ * @param {Object} [options] - passed to each BackwardFrameReader; `toHeld`
+ *   must give VideoSamples (it is what gets cloned and handed out)
+ */
+export async function* backwardSamples(videoTrack, timestamps, options = {}) {
+    const readers = [new BackwardFrameReader(videoTrack, options), new BackwardFrameReader(videoTrack, options)];
+    let current = readers[0];
+    const failed = [];
+    // Nothing comes before the first frame, so nothing to decode ahead there.
+    const first = await videoTrack.getFirstTimestamp().catch(() => 0);
+    try {
+        for await (const t of timestamps) {
+            let other = current === readers[0] ? readers[1] : readers[0];
+            if (current.peek(t) === undefined) {
+                // The stretch decoded ahead is waited for, never decoded over.
+                if (other.busy) await other.fill(t).catch(() => {});
+                if (failed.length) throw failed[0];
+                if (other.peek(t) !== undefined) {
+                    [current, other] = [other, current];
+                } else {
+                    await current.fill(t);
+                }
+            }
+            // The stretch before this one, decoded while this one is used.
+            const oldest = current.oldest;
+            if (oldest !== null && oldest > first + SAME_INSTANT
+                && !other.busy && other.peek(oldest - SAME_INSTANT) === undefined) {
+                other.fill(oldest - SAME_INSTANT).catch(error => failed.push(error));
+            }
+            const frame = current.peek(t);
+            yield frame ? frame.clone() : await current.sink.getSample(t);
+        }
+    } finally {
+        for (const reader of readers) reader.close();
     }
 }
