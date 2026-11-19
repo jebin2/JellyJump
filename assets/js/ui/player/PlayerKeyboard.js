@@ -1,3 +1,4 @@
+import { Toast } from '../../shared/utils/Toast.js';
 export class PlayerKeyboard {
     constructor(player) {
         this.player = player;
@@ -29,7 +30,11 @@ export class PlayerKeyboard {
             case 'j':
                 e.preventDefault();
                 // Shift+J plays backwards (and stops doing so); J alone steps back.
-                if (e.shiftKey) p.toggleReverse();
+                if (e.shiftKey) {
+                    p.toggleReverse().then(result => {
+                        if (result?.reason) Toast.show(result.reason, 3500);
+                    });
+                }
                 else p._requestSeek(p.currentTime - 10);
                 break;
             case 'l':

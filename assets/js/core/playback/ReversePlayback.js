@@ -16,6 +16,13 @@ import { BackwardFrameReader } from '../../processing/shared/BackwardFrames.js';
  * stall at every key frame. Each holds fewer frames than the reader's default,
  * since together they hold twice as many.
  *
+ * What they hold are screen-sized copies, not the decoder's own frames: each
+ * decoded frame is drawn (with the file's rotation, as the forward path's
+ * CanvasSink applies it) and released straight away. A hardware decoder keeps
+ * only a few frames of its own and can stop producing more while they are
+ * held -- invisible in software decoding, where this was first measured, and
+ * exactly a reverse play that never starts on a real GPU.
+ *
  * Silent: reversed audio is not played.
  */
 
@@ -25,6 +32,10 @@ const FRAMES_PER_READER = 24;
 const PREFETCH_LEAD = 0.5;
 /** Two timestamps this close are the same instant. */
 const EPSILON = 1e-6;
+/** Closer than this to the start, there is nothing to play back from. */
+const AT_START = 0.05;
+/** Give up on starting if the first frames take longer than this. */
+const START_TIMEOUT_MS = 8000;
 
 export class ReversePlayback {
     constructor(player) {
@@ -32,29 +43,43 @@ export class ReversePlayback {
         this.active = false;
         this._raf = null;
         this._readers = null;
-        this._scratch = null;
+        this._canvas = null;
     }
 
-    /** Whether the loaded media can be played backwards. */
-    get available() {
+    /** Why the loaded media cannot be played backwards, or null if it can. */
+    get unavailableReason() {
         const p = this.player;
-        return !!p.videoTrack && !p.isLive && !p.isStreamMode && p.engine !== 'youtube';
+        if (p.engine === 'youtube') return 'YouTube videos cannot be played backwards.';
+        if (p.isLive || p.isStreamMode) return 'A live stream cannot be played backwards.';
+        if (!p.videoTrack) return 'There is no video to play backwards.';
+        return null;
     }
 
     /**
-     * Start playing backwards from the current position.
-     * @returns {Promise<boolean>} whether it started
+     * Start playing backwards from the current position -- or from the end,
+     * when at the start, where there is nothing behind to play.
+     * @returns {Promise<{started: boolean, reason?: string}>} a reason, meant
+     *   for the user, when it did not start
      */
     async start() {
         const p = this.player;
-        if (this.active || !this.available) return false;
+        if (this.active) return { started: true };
+        const unavailable = this.unavailableReason;
+        if (unavailable) return { started: false, reason: unavailable };
         if (p.isPlaying) p.pause(false);
+        // The forward pipeline's decoder is let go: a GPU allows only a few
+        // hardware decoders at once, and a third one opening behind the paused
+        // player's can wait for ever. Stopping rebuilds it at the new position.
+        p.frames?.abandon?.();
 
         this._start = Math.max(0, await p.videoTrack.getFirstTimestamp().catch(() => 0));
-        const from = Math.min(p.currentTime || 0, p.duration || Infinity);
-        if (from <= this._start + EPSILON) return false;
+        const end = p.duration || 0;
+        let from = Math.min(p.currentTime || 0, end);
+        if (from <= this._start + AT_START) from = end;
+        if (!(from > this._start + AT_START)) return { started: false, reason: 'This video is too short to play backwards.' };
 
-        this._readers = [0, 1].map(() => new BackwardFrameReader(p.videoTrack, { maxFrames: FRAMES_PER_READER }));
+        const toHeld = (sample) => this._copy(sample);
+        this._readers = [0, 1].map(() => new BackwardFrameReader(p.videoTrack, { maxFrames: FRAMES_PER_READER, toHeld }));
         this._shown = this._readers[0];
         this._lastDrawn = null;
         this._origin = { position: from, wall: performance.now(), rate: p.playbackRate || 1 };
@@ -64,11 +89,28 @@ export class ReversePlayback {
         p.trigger?.('reversechange', { active: true });
         Logger.log(`[Reverse] Playing backwards from ${from.toFixed(3)}s at ${this._origin.rate}x`);
 
-        // The first stretch is waited for, so the picture starts moving at once.
-        await this._shown.fill(from);
-        if (!this.active) return false;
+        // The first stretch is waited for, so the picture starts moving at
+        // once -- but not for ever: a decoder that never delivers would
+        // otherwise leave a button that seems to do nothing.
+        let timer;
+        const timedOut = new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), START_TIMEOUT_MS); });
+        let outcome;
+        try {
+            outcome = await Promise.race([this._fillLogged(this._shown, from).then(() => 'ok'), timedOut]);
+        } catch (error) {
+            Logger.warn('[Reverse] Could not decode the first stretch:', error);
+            outcome = 'error';
+        } finally {
+            clearTimeout(timer);
+        }
+        if (!this.active) return { started: false };
+        if (outcome !== 'ok' || this._shown.peek(from) === undefined) {
+            Logger.warn(`[Reverse] Gave up starting (${outcome})`);
+            await this.stop({ reposition: false });
+            return { started: false, reason: 'This video could not be decoded backwards here.' };
+        }
         this._raf = requestAnimationFrame(() => this._tick());
-        return true;
+        return { started: true };
     }
 
     /**
@@ -133,10 +175,13 @@ export class ReversePlayback {
             this._shown = other;
             frame = this._shown.peek(t);
         }
+        // One decoder at a time, for the same reason the forward one was let
+        // go: never two fills at once.
+        const decoding = a.busy || b.busy;
         if (frame === undefined) {
             // Neither has it: fetched now, and the last frame stays up until
             // it arrives. Only happens if decoding falls behind.
-            if (!this._shown.busy) this._shown.fill(t);
+            if (!decoding) this._fillLogged(this._shown, t).catch(error => Logger.warn('[Reverse] Decoding failed:', error));
             return;
         }
         if (frame && frame !== this._lastDrawn) {
@@ -150,23 +195,49 @@ export class ReversePlayback {
         const oldest = this._shown.oldest;
         const lead = PREFETCH_LEAD * this._origin.rate;
         if (oldest !== null && oldest > this._start + EPSILON && t - oldest < lead
-            && !next.busy && next.peek(oldest - EPSILON) === undefined) {
-            next.fill(oldest - EPSILON).catch(error => Logger.warn('[Reverse] Prefetch failed:', error));
+            && !decoding && next.peek(oldest - EPSILON) === undefined) {
+            this._fillLogged(next, oldest - EPSILON).catch(error => Logger.warn('[Reverse] Prefetch failed:', error));
         }
+    }
+
+    /**
+     * fill(), with a line before and after: where reverse playback is waiting,
+     * when it waits, is the first thing to know.
+     * @private
+     */
+    async _fillLogged(reader, t) {
+        const began = performance.now();
+        const decodedBefore = reader.decodedFrames;
+        Logger.log(`[Reverse] Decoding the stretch up to ${t.toFixed(3)}s`);
+        await reader.fill(t);
+        Logger.log(`[Reverse] Ready up to ${t.toFixed(3)}s: ${reader.held.length} frames held, `
+            + `${reader.decodedFrames - decodedBefore} decoded, ${Math.round(performance.now() - began)}ms`);
+    }
+
+    /**
+     * A decoded frame as a screen-sized image, so the decoder's frame can be
+     * released at once. Drawn with the file's rotation and flip, as the
+     * forward path's CanvasSink draws it.
+     * @private
+     */
+    async _copy(sample) {
+        const p = this.player;
+        const width = p.canvas?.width || sample.displayWidth;
+        const height = p.canvas?.height || sample.displayHeight;
+        if (!this._canvas || this._canvas.width !== width || this._canvas.height !== height) {
+            this._canvas = new OffscreenCanvas(width, height);
+            this._canvasCtx = this._canvas.getContext('2d');
+        }
+        this._canvasCtx.clearRect(0, 0, width, height);
+        sample.drawWithFit(this._canvasCtx, { fit: 'contain' });
+        // Synchronous, so two readers filling at once cannot interleave on
+        // the shared canvas.
+        const bitmap = this._canvas.transferToImageBitmap();
+        return { timestamp: sample.timestamp, bitmap, close: () => bitmap.close() };
     }
 
     /** Through the player's own presentFrame, so filters and overlays apply. @private */
     _draw(frame) {
-        const p = this.player;
-        if (!p.canvas) return;
-        if (!this._scratch || this._scratch.width !== p.canvas.width || this._scratch.height !== p.canvas.height) {
-            this._scratch = new OffscreenCanvas(p.canvas.width, p.canvas.height);
-            this._scratchCtx = this._scratch.getContext('2d');
-        }
-        this._scratchCtx.clearRect(0, 0, this._scratch.width, this._scratch.height);
-        // Applies the file's rotation and flip, as the forward path's
-        // CanvasSink does.
-        frame.drawWithFit(this._scratchCtx, { fit: 'contain' });
-        p.presentFrame(this._scratch, { clear: true });
+        this.player.presentFrame(frame.bitmap, { clear: true });
     }
 }

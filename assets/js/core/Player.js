@@ -463,7 +463,11 @@ export class CorePlayer {
         if (this.reverse?.active) { this.pause(); return; }
         togglePlayerPlay(this);
     }
-    /** Play backwards from here, or stop doing so. */
+    /**
+     * Play backwards from here, or stop doing so.
+     * @returns {Promise<{started: boolean, reason?: string}|undefined>} when
+     *   starting, whether it did, and if not, why, in words for the user
+     */
     async toggleReverse() {
         if (this.reverse.active) return this.reverse.stop();
         return this.reverse.start();

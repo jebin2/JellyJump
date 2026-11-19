@@ -195,9 +195,10 @@ export function attachPlayerBindings(player) {
         player.ui.speedValue.textContent = `${player.playbackRate.toFixed(2)}x`;
 
         if (player.ui.reverseBtn) {
-            player.ui.reverseBtn.addEventListener('click', () => {
-                player.toggleReverse();
+            player.ui.reverseBtn.addEventListener('click', async () => {
                 player.ui.reverseBtn.blur();
+                const result = await player.toggleReverse();
+                if (result?.reason) Toast.show(result.reason, 3500);
             });
         }
     }

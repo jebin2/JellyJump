@@ -45,8 +45,15 @@ export class BackwardFrameReader {
      * @param {Object} [options.decoderOptions] - passed to VideoSampleSink
      * @param {number} [options.maxFrames] - hold fewer than the default, for
      *   a caller that keeps two readers going at once
+     * @param {(sample: Object) => Promise<{timestamp: number, close: () => void}>} [options.toHeld]
+     *   turn each decoded frame into what is held, so the decoder's own frame
+     *   can be released at once. Hardware decoders keep only a small pool of
+     *   frames and can stall while too many are held; a caller that only needs
+     *   to draw a frame can hold a copy instead. sampleAt() needs the frames
+     *   themselves, so leave this out to use it.
      */
-    constructor(videoTrack, { decoderOptions, maxFrames = MAX_HELD_FRAMES } = {}) {
+    constructor(videoTrack, { decoderOptions, maxFrames = MAX_HELD_FRAMES, toHeld = null } = {}) {
+        this.toHeld = toHeld;
         this.track = videoTrack;
         this.sink = new MediaBunny.VideoSampleSink(videoTrack, decoderOptions);
         this.packets = new MediaBunny.EncodedPacketSink(videoTrack);
@@ -156,7 +163,7 @@ export class BackwardFrameReader {
      * keeping the last `capacity` frames.
      * @private
      */
-    async _fill(timestamp) {
+    async _fill(timestamp, { trustPackets = true } = {}) {
         const key = await this.packets.getKeyPacket(timestamp, { metadataOnly: true })
             ?? await this.packets.getFirstPacket({ metadataOnly: true });
         if (!key) {
@@ -167,16 +174,38 @@ export class BackwardFrameReader {
         // Up to and including the frame at `timestamp`; a little past it,
         // since the range's end is exclusive.
         const end = timestamp + 2 * SAME_INSTANT;
+        // With a conversion, only the frames that will be kept are converted:
+        // which ones that is comes from the packets' timestamps, read without
+        // decoding. Converting every decoded frame and dropping most of them
+        // cost far more than the decoding did.
+        const keep = this.toHeld && trustPackets ? await this._lastTimestamps(key, timestamp) : null;
+        let decodedInRange = 0;
         const kept = [];
         for await (const sample of this.sink.samples(key.timestamp, end)) {
             this.decodedFrames++;
             if (sample.timestamp > timestamp + SAME_INSTANT) { sample.close(); continue; }
-            kept.push(sample);
+            decodedInRange++;
+            if (keep && !keep.has(Math.round(sample.timestamp * 1e6))) { sample.close(); continue; }
+            if (this.toHeld) {
+                try {
+                    kept.push(await this.toHeld(sample));
+                } finally {
+                    sample.close();
+                }
+            } else {
+                kept.push(sample);
+            }
             if (kept.length > this.capacity) kept.shift().close();
         }
         if (this.closed) {
             for (const frame of kept) frame.close();
             return;
+        }
+        // Frames were decoded but none matched the packets' timestamps (a
+        // container whose timing the two disagree on): decode again,
+        // converting as it goes, rather than hold nothing and ask for ever.
+        if (keep && kept.length === 0 && decodedInRange > 0) {
+            return this._fill(timestamp, { trustPackets: false });
         }
         // Swapped in whole, so the old stretch stays drawable until the new
         // one is ready.
@@ -184,5 +213,22 @@ export class BackwardFrameReader {
         this.held = kept;
         this.heldUntil = timestamp;
         for (const frame of previous) frame.close();
+    }
+
+    /**
+     * The timestamps of the last `capacity` frames from `key` up to
+     * `timestamp`, in microseconds, read from the packets alone.
+     * @private
+     */
+    async _lastTimestamps(key, timestamp) {
+        const stamps = [];
+        for await (const packet of this.packets.packets(key, undefined, { metadataOnly: true })) {
+            // Decode order runs a little ahead of presentation order (B-frames),
+            // so read a couple of seconds past before stopping.
+            if (packet.timestamp > timestamp + 2) break;
+            if (packet.timestamp <= timestamp + SAME_INSTANT) stamps.push(packet.timestamp);
+        }
+        stamps.sort((a, b) => a - b);
+        return new Set(stamps.slice(-this.capacity).map(t => Math.round(t * 1e6)));
     }
 }
