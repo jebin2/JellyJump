@@ -4,7 +4,28 @@ import { AUDIO_BITRATE_BPS, createMediaBunnyInput } from '../shared/InputFactory
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
 import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../shared/Cancellation.js';
 import { copyMetadataTags } from '../shared/MetadataTags.js';
-import { BackwardFrameReader } from '../shared/BackwardFrames.js';
+import { backwardSamples } from '../shared/BackwardFrames.js';
+
+/**
+ * A decoded frame copied into ordinary memory, so the decoder's own frame can
+ * be released at once. Pixel format, size, timing, rotation and colour space
+ * carry over; a frame whose format cannot be read directly (some GPU frames)
+ * is copied as RGBX.
+ */
+async function copyOutOfDecoder(sample) {
+    const options = sample.format ? undefined : { format: 'RGBX' };
+    const data = new Uint8Array(sample.allocationSize(options));
+    await sample.copyTo(data, options);
+    return new MediaBunny.VideoSample(data, {
+        format: sample.format ?? 'RGBX',
+        codedWidth: sample.codedWidth,
+        codedHeight: sample.codedHeight,
+        timestamp: sample.timestamp,
+        duration: sample.duration,
+        rotation: sample.rotation,
+        colorSpace: sample.colorSpace,
+    });
+}
 
 async function processAudioWithSpeed(audioTrack, audioSource, speed = 1, signal) {
     const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
@@ -158,10 +179,13 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         await copyMetadataTags(input, output);
         await output.start();
 
-        // Frames come from BackwardFrameReader rather than samplesAtTimestamps:
+        // Frames come from backwardSamples rather than samplesAtTimestamps:
         // the latter re-decodes from the key frame for every frame when the
-        // timestamps fall, the reader decodes each stretch once.
-        const reader = new BackwardFrameReader(videoTrack);
+        // timestamps fall; this decodes each stretch once, and the next one
+        // back while the current one is being encoded. What it holds are
+        // copies in ordinary memory, not the decoder's own frames: a hardware
+        // decoder keeps only a few, and holding them is what left reverse
+        // playback waiting for ever on a real GPU.
         const reverseTimestampGenerator = (async function* () {
             for (let outputFrame = 0; outputFrame < totalOutputFrames; outputFrame++) {
                 const outputProgress = outputFrame / totalOutputFrames;
@@ -173,28 +197,24 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         let outputTimestamp = 0;
         let frameCount = 0;
 
-        try {
-            for await (const sample of reader.samplesAt(reverseTimestampGenerator)) {
-                if (!sample) continue;
-                try {
-                    sample.setTimestamp(outputTimestamp);
-                    sample.setDuration(frameDuration);
-                    await canvasSource.add(sample);
-                } finally {
-                    sample.close();
-                }
-                outputTimestamp += frameDuration;
-                frameCount++;
-
-                if (onProgress) {
-                    onProgress(frameCount / totalOutputFrames * 0.8);
-                }
+        for await (const sample of backwardSamples(videoTrack, reverseTimestampGenerator, { maxFrames: 24, toHeld: copyOutOfDecoder })) {
+            if (!sample) continue;
+            try {
+                sample.setTimestamp(outputTimestamp);
+                sample.setDuration(frameDuration);
+                await canvasSource.add(sample);
+            } finally {
+                sample.close();
             }
-        } finally {
-            reader.close();
+            outputTimestamp += frameDuration;
+            frameCount++;
+
+            if (onProgress) {
+                onProgress(frameCount / totalOutputFrames * 0.8);
+            }
         }
 
-        Logger.log(`[MediaProcessor] Encoded ${frameCount} frames (${reader.decodedFrames} decoded)`);
+        Logger.log(`[MediaProcessor] Encoded ${frameCount} frames`);
 
         if (includeAudio && audioSource) {
             Logger.log('[MediaProcessor] Reversing audio...');
