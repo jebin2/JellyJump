@@ -1,5 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { BackwardFrameReader } from '../../processing/shared/BackwardFrames.js';
+import { decodeTrackRange } from '../../processing/shared/AudioHelpers.js';
+import { initPlayerAudio } from '../audio/AudioEngine.js';
 
 /**
  * ReversePlayback - plays the loaded video backwards, from wherever it is.
@@ -23,7 +25,10 @@ import { BackwardFrameReader } from '../../processing/shared/BackwardFrames.js';
  * held -- invisible in software decoding, where this was first measured, and
  * exactly a reverse play that never starts on a real GPU.
  *
- * Silent: reversed audio is not played.
+ * The sound plays reversed too (ReverseAudio, below), and when it does, the
+ * picture follows its clock -- the AudioContext's -- as forward playback's
+ * does, so the two stay together. Without sound, or if the audio cannot be
+ * decoded, the picture keeps time by the wall clock.
  */
 
 /** Frames each reader holds; two readers run at once. */
@@ -36,6 +41,118 @@ const EPSILON = 1e-6;
 const AT_START = 0.05;
 /** Give up on starting if the first frames take longer than this. */
 const START_TIMEOUT_MS = 8000;
+/** Reversed audio is decoded and played in windows this long, in seconds. */
+const AUDIO_WINDOW = 2;
+/** Decode the next window once the current one has this little left to play. */
+const AUDIO_AHEAD = 1;
+
+/**
+ * The sound, backwards: decoded forwards a window at a time from the current
+ * position back, each window's samples reversed and played straight after
+ * the last, through the player's own audio graph -- so volume, mute and the
+ * equaliser apply, and the speed changes the pitch, as it does going forwards.
+ */
+class ReverseAudio {
+    constructor(player, track, from, start, rate) {
+        this.player = player;
+        this.track = track;
+        this.from = from;
+        this.start = start;
+        this.rate = rate;
+        this.ctx = null;
+        this.ctxStart = null;
+        this.sources = new Set();
+        this.nextHigh = from;
+        this.decoding = false;
+        this.failed = false;
+    }
+
+    /** Graph up, context running, first window decoded. @returns {Promise<boolean>} */
+    async prepare() {
+        const p = this.player;
+        if (!p.audioContext) await initPlayerAudio(p);
+        this.ctx = p.audioContext;
+        if (!this.ctx) return false;
+        await this.ctx.resume().catch(() => {});
+        this.first = await this._decodeNext();
+        return !!this.first;
+    }
+
+    /** Start the sound now; the clock runs from here. */
+    begin() {
+        this.ctxStart = this.ctx.currentTime + 0.05;
+        this._schedule(this.first);
+        this.first = null;
+    }
+
+    /** Where playback is, by the audio clock. */
+    position() {
+        if (this.ctxStart === null) return this.from;
+        return this.from - Math.max(0, this.ctx.currentTime - this.ctxStart) * this.rate;
+    }
+
+    /** Keep the next window decoded ahead of the one playing. */
+    pump() {
+        if (this.decoding || this.failed || this.nextHigh <= this.start + EPSILON) return;
+        const slot = this.ctxStart + (this.from - this.nextHigh) / this.rate;
+        if (slot - this.ctx.currentTime > AUDIO_AHEAD) return;
+        this._decodeNext()
+            .then(window => { if (window) this._schedule(window); })
+            .catch(error => {
+                this.failed = true;
+                Logger.warn('[Reverse] Audio decoding failed; carrying on without sound:', error);
+            });
+    }
+
+    stop() {
+        for (const source of this.sources) {
+            try { source.stop(); } catch { /* not started */ }
+            source.disconnect();
+        }
+        this.sources.clear();
+        this.stopped = true;
+    }
+
+    /** The next window back, reversed. @private */
+    async _decodeNext() {
+        if (this.stopped) return null;
+        this.decoding = true;
+        try {
+            const high = this.nextHigh;
+            const low = Math.max(this.start, high - AUDIO_WINDOW);
+            this.nextHigh = low;
+            const buffer = await decodeTrackRange(this.track, low, high);
+            if (!buffer || this.stopped) return null;
+            for (let ch = 0; ch < buffer.numberOfChannels; ch++) buffer.getChannelData(ch).reverse();
+            return { buffer, high };
+        } finally {
+            this.decoding = false;
+        }
+    }
+
+    /** Play a reversed window in its slot, or the rest of it if late. @private */
+    _schedule({ buffer, high }) {
+        if (this.stopped) return;
+        const p = this.player;
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = this.rate;
+        source.connect(p.audioEqualizer?.isInitialized ? p.audioEqualizer.getInputNode() : p.mixNode);
+        // Heard when the picture shows it: started early by the output
+        // latency, as forward playback starts its buffers.
+        const slot = this.ctxStart + (this.from - high) / this.rate - (this.ctx.outputLatency || 0);
+        const now = this.ctx.currentTime;
+        if (slot >= now) {
+            source.start(slot);
+        } else {
+            const offset = (now - slot) * this.rate;
+            if (offset >= buffer.duration) return;
+            source.start(now, offset);
+        }
+        this.sources.add(source);
+        source.onended = () => this.sources.delete(source);
+    }
+}
 
 export class ReversePlayback {
     constructor(player) {
@@ -89,6 +206,15 @@ export class ReversePlayback {
         p.trigger?.('reversechange', { active: true });
         Logger.log(`[Reverse] Playing backwards from ${from.toFixed(3)}s at ${this._origin.rate}x`);
 
+        // The sound, if there is any the player can decode. Its first window
+        // is decoded alongside the first stretch of picture.
+        this._audio = p.audioTrack && p.audioSink
+            ? new ReverseAudio(p, p.audioTrack, from, this._start, this._origin.rate)
+            : null;
+        const audioReady = this._audio
+            ? this._audio.prepare().catch(error => { Logger.warn('[Reverse] No reversed sound:', error); return false; })
+            : Promise.resolve(false);
+
         // The first stretch is waited for, so the picture starts moving at
         // once -- but not for ever: a decoder that never delivers would
         // otherwise leave a button that seems to do nothing.
@@ -109,6 +235,17 @@ export class ReversePlayback {
             await this.stop({ reposition: false });
             return { started: false, reason: 'This video could not be decoded backwards here.' };
         }
+        // The sound gets the same patience the picture got, and no more.
+        const withSound = await Promise.race([audioReady, new Promise(r => setTimeout(() => r(false), START_TIMEOUT_MS))]);
+        if (!this.active) return { started: false };
+        if (withSound) {
+            this._audio.begin();
+            Logger.log('[Reverse] With sound, timed by the audio clock');
+        } else {
+            this._audio?.stop();
+            this._audio = null;
+        }
+        this._origin.wall = performance.now();
         this._raf = requestAnimationFrame(() => this._tick());
         return { started: true };
     }
@@ -124,6 +261,8 @@ export class ReversePlayback {
         this.active = false;
         cancelAnimationFrame(this._raf);
         this._raf = null;
+        this._audio?.stop();
+        this._audio = null;
         for (const reader of this._readers ?? []) reader.close();
         this._readers = null;
         p._updatePlayPauseUI();
@@ -142,9 +281,20 @@ export class ReversePlayback {
     _tick() {
         if (!this.active) return;
         const p = this.player;
+        if (this._audio?.failed) {
+            // The sound gave out: the wall clock takes over from where it was.
+            this._origin = { position: this.position, wall: performance.now(), rate: this._origin.rate };
+            this._audio.stop();
+            this._audio = null;
+        }
+        // The audio clock when there is sound, as forward playback keeps
+        // time; otherwise the wall clock.
         const { position, wall, rate } = this._origin;
-        const t = Math.max(this._start, position - ((performance.now() - wall) / 1000) * rate);
+        const t = Math.max(this._start, this._audio
+            ? this._audio.position()
+            : position - ((performance.now() - wall) / 1000) * rate);
         this.position = t;
+        this._audio?.pump();
 
         this._show(t);
 

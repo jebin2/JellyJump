@@ -74,38 +74,51 @@ export async function decodeAudioRange(blob, start = 0, end = Infinity) {
     try {
         const from = firstTimestamp + Math.max(0, start);
         const to = firstTimestamp + Math.min(end, (await track.computeDuration()) - firstTimestamp);
-        if (!(to > from)) return null;
-
-        // Sized from the first decoded buffer rather than the container's
-        // figures: for HE-AAC the container can state the core rate, half of
-        // what the decoder puts out, and a buffer sized from that would be cut
-        // short and play at the wrong pitch.
-        let result = null;
-        let sampleRate = 0;
-
-        // Each decoded buffer is copied to where it belongs in the range, and
-        // whatever lies outside the range -- the ends of the first and last
-        // buffers -- is cut off.
-        for await (const { buffer, timestamp } of new MediaBunny.AudioBufferSink(track).buffers(from, to)) {
-            if (!result) {
-                sampleRate = buffer.sampleRate;
-                result = new AudioBuffer({
-                    length: Math.max(1, Math.round((to - from) * sampleRate)),
-                    sampleRate,
-                    numberOfChannels: buffer.numberOfChannels,
-                });
-            }
-            const offset = Math.round((timestamp - from) * sampleRate);
-            const skip = Math.max(0, -offset);
-            const count = Math.min(buffer.length - skip, result.length - Math.max(0, offset));
-            if (count <= 0) continue;
-            for (let ch = 0; ch < result.numberOfChannels; ch++) {
-                const source = buffer.getChannelData(Math.min(ch, buffer.numberOfChannels - 1));
-                result.getChannelData(ch).set(source.subarray(skip, skip + count), Math.max(0, offset));
-            }
-        }
-        return result;
+        return await decodeTrackRange(track, from, to);
     } finally {
         input.dispose();
     }
+}
+
+/**
+ * Decode `from`..`to` of an audio track already open, on the track's own
+ * timeline, into one AudioBuffer at the rate the decoder puts out. Only that
+ * range is decoded and held.
+ * @param {Object} track - a Mediabunny InputAudioTrack
+ * @param {number} from - seconds
+ * @param {number} to - seconds
+ * @returns {Promise<AudioBuffer|null>} null when the range holds no audio
+ */
+export async function decodeTrackRange(track, from, to) {
+    if (!(to > from)) return null;
+
+    // Sized from the first decoded buffer rather than the container's
+    // figures: for HE-AAC the container can state the core rate, half of
+    // what the decoder puts out, and a buffer sized from that would be cut
+    // short and play at the wrong pitch.
+    let result = null;
+    let sampleRate = 0;
+
+    // Each decoded buffer is copied to where it belongs in the range, and
+    // whatever lies outside the range -- the ends of the first and last
+    // buffers -- is cut off.
+    for await (const { buffer, timestamp } of new MediaBunny.AudioBufferSink(track).buffers(from, to)) {
+        if (!result) {
+            sampleRate = buffer.sampleRate;
+            result = new AudioBuffer({
+                length: Math.max(1, Math.round((to - from) * sampleRate)),
+                sampleRate,
+                numberOfChannels: buffer.numberOfChannels,
+            });
+        }
+        const offset = Math.round((timestamp - from) * sampleRate);
+        const skip = Math.max(0, -offset);
+        const count = Math.min(buffer.length - skip, result.length - Math.max(0, offset));
+        if (count <= 0) continue;
+        for (let ch = 0; ch < result.numberOfChannels; ch++) {
+            const source = buffer.getChannelData(Math.min(ch, buffer.numberOfChannels - 1));
+            result.getChannelData(ch).set(source.subarray(skip, skip + count), Math.max(0, offset));
+        }
+    }
+    return result;
 }
