@@ -9,6 +9,10 @@ export function updatePlayerPlayPauseUI(player) {
     const backward = player.direction === 'backward';
     player.ui.playBtn.classList.toggle('is-backward', backward);
     if (player.ui.directionBtn) {
+        // Hidden where playing backwards cannot work: a live stream (it
+        // keeps moving, so there is no fixed past to run back through), the
+        // camera, YouTube, or something with no picture.
+        player.ui.directionBtn.hidden = !!player.reverse?.unavailableReason;
         player.ui.directionBtn.classList.toggle('active', backward);
         player.ui.directionBtn.setAttribute('aria-pressed', String(backward));
         const label = backward ? 'Play forwards' : 'Play backwards';

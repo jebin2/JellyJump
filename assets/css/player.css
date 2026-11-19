@@ -487,6 +487,11 @@ button:focus-visible {
     color: var(--accent-primary);
 }
 
+/* `hidden` has to win over the display: flex above. */
+.jellyjump-btn[hidden] {
+    display: none;
+}
+
 /* Backward is set: the play arrow points back, so it is plain which way Play
    will go. The pause bars are symmetrical, so they read the same either way. */
 .jellyjump-btn.is-backward svg {
