@@ -5,7 +5,8 @@ export function updatePlayerPlayPauseUI(player) {
     if (!player.ui.playBtn) return;
 
     const use = player.ui.playBtn.querySelector('use');
-    if (player.isPlaying) {
+    // Playing backwards counts as playing: the button stops it.
+    if (player.isPlaying || player.reverse?.active) {
         player.ui.playBtn.setAttribute('aria-label', 'Pause');
         player.ui.playBtn.setAttribute('aria-pressed', 'true');
         if (use) use.setAttribute('href', 'assets/icons/sprite.svg#icon-pause');

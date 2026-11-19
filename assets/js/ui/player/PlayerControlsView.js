@@ -77,6 +77,7 @@ function initSpeedPanel(player) {
     player.ui.speedSlider = q('#mb-speed-slider');
     player.ui.speedValue = q('#mb-speed-value');
     player.ui.resetSpeedBtn = q('#mb-reset-speed-btn');
+    player.ui.reverseBtn = q('#mb-reverse-btn');
     player.ui.closeSpeedPanelBtn = q('.jellyjump-speed-panel .jellyjump-close-btn');
 }
 

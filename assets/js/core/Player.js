@@ -125,6 +125,7 @@ import { BroadcastStream } from './streaming/BroadcastStream.js';
 import { WatchParty } from './streaming/WatchParty.js';
 import { VideoFrameQueue } from './playback/VideoFrameQueue.js';
 import { AudioBufferQueue } from './audio/AudioBufferQueue.js';
+import { ReversePlayback } from './playback/ReversePlayback.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
@@ -275,6 +276,8 @@ export class CorePlayer {
         this.stream = new PlayerStream(this);
         this.keyboard = new PlayerKeyboard(this);
         this.subtitles = new PlayerSubtitles(this);
+        // Playing backwards runs beside the forward pipeline, not through it.
+        this.reverse = new ReversePlayback(this);
         this.loop = new PlayerLoopControl(this);
         this.thumbnails = new PlayerThumbnails(this);
         this.controlBar = new PlayerControlBar(this);
@@ -437,6 +440,8 @@ export class CorePlayer {
         return resetPlayer(this);
     }
     async _cleanupForLoad() {
+        // Nothing to hand back to: the media is being replaced.
+        await this.reverse?.stop({ reposition: false });
         // Always, not only when leaving YouTube: this runs before every load,
         // and a playing iframe left visible would sit on top of the next video.
         // Suspended rather than destroyed — load() destroys it once it knows
@@ -454,10 +459,20 @@ export class CorePlayer {
     // ─── Playback State ──────────────────────────────────────────────────────────
     _getPlaybackTime() { return getPlayerPlaybackTime(this); }
     async _handleVisibilityChange() { return handlePlayerVisibilityChange(this); }
-    togglePlay() { togglePlayerPlay(this); }
+    togglePlay() {
+        if (this.reverse?.active) { this.pause(); return; }
+        togglePlayerPlay(this);
+    }
+    /** Play backwards from here, or stop doing so. */
+    async toggleReverse() {
+        if (this.reverse.active) return this.reverse.stop();
+        return this.reverse.start();
+    }
     _cycleSpeed(direction) { cyclePlayerSpeed(this, direction); }
     _stepFrame(direction) { stepPlayerFrame(this, direction); }
     async _seekTo(time) {
+        // A seek while playing backwards stops it; the seek decides the position.
+        if (this.reverse?.active) await this.reverse.stop({ reposition: false });
         if (this.engine === 'youtube') {
             this.youtube?.seek(time);
             this.currentTime = Math.max(0, time);
@@ -484,11 +499,17 @@ export class CorePlayer {
     // ─── Play ────────────────────────────────────────────────────────────────────
     async play() {
         if (this.engine === 'youtube') { this.youtube?.play(); return; }
+        // Forwards from wherever playing backwards got to.
+        if (this.reverse?.active) await this.reverse.stop();
         return playPlayer(this);
     }
 
     // ─── Pause ───────────────────────────────────────────────────────────────────
     pause(showOverlay = true) {
+        if (this.reverse?.active) {
+            this.reverse.stop();
+            return;
+        }
         if (this.engine === 'youtube') {
             // Pausing overrules a pending autoplay retry: without this, a video
             // stopped within the retry window would start itself again.
