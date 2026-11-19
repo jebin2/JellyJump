@@ -4,6 +4,18 @@ import { Logger } from '../../shared/utils/Logger.js';
 export function updatePlayerPlayPauseUI(player) {
     if (!player.ui.playBtn) return;
 
+    // Which way Play goes: the direction button lit, and the play arrow
+    // pointing back, so it is plain before pressing Play.
+    const backward = player.direction === 'backward';
+    player.ui.playBtn.classList.toggle('is-backward', backward);
+    if (player.ui.directionBtn) {
+        player.ui.directionBtn.classList.toggle('active', backward);
+        player.ui.directionBtn.setAttribute('aria-pressed', String(backward));
+        const label = backward ? 'Play forwards' : 'Play backwards';
+        player.ui.directionBtn.setAttribute('aria-label', label);
+        player.ui.directionBtn.title = `${label} (Shift+J)`;
+    }
+
     const use = player.ui.playBtn.querySelector('use');
     // Playing backwards counts as playing: the button stops it.
     if (player.isPlaying || player.reverse?.active) {

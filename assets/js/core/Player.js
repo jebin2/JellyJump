@@ -278,6 +278,10 @@ export class CorePlayer {
         this.subtitles = new PlayerSubtitles(this);
         // Playing backwards runs beside the forward pipeline, not through it.
         this.reverse = new ReversePlayback(this);
+        // Which way Play goes. A setting, like speed: once backward, play,
+        // pause, seeks and speed changes all keep going backward until it is
+        // switched back, or another file is opened.
+        this.direction = 'forward';
         this.loop = new PlayerLoopControl(this);
         this.thumbnails = new PlayerThumbnails(this);
         this.controlBar = new PlayerControlBar(this);
@@ -440,8 +444,14 @@ export class CorePlayer {
         return resetPlayer(this);
     }
     async _cleanupForLoad() {
-        // Nothing to hand back to: the media is being replaced.
+        // Nothing to hand back to: the media is being replaced. A new file
+        // always starts forward, so it never surprises anyone by running
+        // backwards.
         await this.reverse?.stop({ reposition: false });
+        if (this.direction !== 'forward') {
+            this.direction = 'forward';
+            this._updatePlayPauseUI();
+        }
         // Always, not only when leaving YouTube: this runs before every load,
         // and a playing iframe left visible would sit on top of the next video.
         // Suspended rather than destroyed — load() destroys it once it knows
@@ -461,29 +471,53 @@ export class CorePlayer {
     async _handleVisibilityChange() { return handlePlayerVisibilityChange(this); }
     togglePlay() {
         if (this.reverse?.active) { this.pause(); return; }
+        if (this.direction === 'backward' && this.engine !== 'youtube') { this.play(); return; }
         togglePlayerPlay(this);
     }
+
     /**
-     * Play backwards from here, or stop doing so.
-     * @returns {Promise<{started: boolean, reason?: string}|undefined>} when
-     *   starting, whether it did, and if not, why, in words for the user
+     * Switch which way Play goes. While playing, the switch takes effect at
+     * once, from where playback is; while paused, the next Play goes the new
+     * way.
+     * @returns {Promise<{reason?: string}>} a reason, in words for the user,
+     *   when playing backwards is not possible for this media
      */
-    async toggleReverse() {
-        if (this.reverse.active) return this.reverse.stop();
-        return this.reverse.start();
+    async toggleDirection() {
+        if (this.direction === 'forward') {
+            const reason = this.reverse.unavailableReason;
+            if (reason) return { reason };
+            const wasPlaying = this.isPlaying;
+            this.direction = 'backward';
+            this._updatePlayPauseUI();
+            if (wasPlaying) {
+                const result = await this._playBackward();
+                return result.started ? {} : { reason: result.reason };
+            }
+            return {};
+        }
+        const wasReversing = this.reverse.active;
+        this.direction = 'forward';
+        this._updatePlayPauseUI();
+        if (wasReversing) {
+            await this.reverse.stop();
+            await this.play();
+        }
+        return {};
     }
     _cycleSpeed(direction) { cyclePlayerSpeed(this, direction); }
     _stepFrame(direction) { stepPlayerFrame(this, direction); }
     async _seekTo(time) {
-        // A seek while playing backwards stops it; the seek decides the position.
-        if (this.reverse?.active) await this.reverse.stop({ reposition: false });
+        // Playing backwards carries on from wherever the seek lands.
+        const wasReversing = !!this.reverse?.active;
+        if (wasReversing) await this.reverse.stop({ reposition: false });
         if (this.engine === 'youtube') {
             this.youtube?.seek(time);
             this.currentTime = Math.max(0, time);
             this._updateProgress();
             return;
         }
-        return seekPlayerTo(this, time);
+        await seekPlayerTo(this, time);
+        if (wasReversing) await this._playBackward();
     }
     _requestSeek(time) { requestPlayerSeek(this, time); }
     _completeMedia() { completePlayerMedia(this); }
@@ -503,9 +537,21 @@ export class CorePlayer {
     // ─── Play ────────────────────────────────────────────────────────────────────
     async play() {
         if (this.engine === 'youtube') { this.youtube?.play(); return; }
+        if (this.direction === 'backward') return this._playBackward();
         // Forwards from wherever playing backwards got to.
         if (this.reverse?.active) await this.reverse.stop();
         return playPlayer(this);
+    }
+
+    /**
+     * Play backwards, saying why if it cannot start.
+     * @private
+     */
+    async _playBackward() {
+        if (this.reverse.active) return { started: true };
+        const result = await this.reverse.start();
+        if (!result.started && result.reason) this.trigger('reversefailed', { reason: result.reason });
+        return result;
     }
 
     // ─── Pause ───────────────────────────────────────────────────────────────────
@@ -531,7 +577,11 @@ export class CorePlayer {
             this.youtube?.setRate(rate);
             return;
         }
-        return setPlayerPlaybackRate(this, rate);
+        // Playing backwards picks the new speed up from where it is.
+        const wasReversing = !!this.reverse?.active;
+        if (wasReversing) await this.reverse.stop({ reposition: false });
+        await setPlayerPlaybackRate(this, rate);
+        if (wasReversing) await this._playBackward();
     }
 
     // ─── Volume / Mute ───────────────────────────────────────────────────────────

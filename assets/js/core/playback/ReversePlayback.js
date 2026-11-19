@@ -305,7 +305,13 @@ export class ReversePlayback {
         if (p.subtitles?.enabled) p._renderSubtitles(t);
 
         if (t <= this._start + EPSILON) {
-            this.stop();
+            if (p.loopMode === 'one') {
+                // Looping, backwards: round again from the end, as forward
+                // looping goes round again from the start.
+                this.stop({ reposition: false }).then(() => this.start());
+            } else {
+                this.stop();
+            }
             return;
         }
         this._raf = requestAnimationFrame(() => this._tick());

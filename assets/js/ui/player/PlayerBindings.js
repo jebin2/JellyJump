@@ -194,13 +194,15 @@ export function attachPlayerBindings(player) {
         player.ui.speedSlider.value = player.playbackRate;
         player.ui.speedValue.textContent = `${player.playbackRate.toFixed(2)}x`;
 
-        if (player.ui.reverseBtn) {
-            player.ui.reverseBtn.addEventListener('click', async () => {
-                player.ui.reverseBtn.blur();
-                const result = await player.toggleReverse();
-                if (result?.reason) Toast.show(result.reason, 3500);
-            });
-        }
+    }
+
+    if (player.ui.directionBtn) {
+        player.ui.directionBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            player.ui.directionBtn.blur();
+            const result = await player.toggleDirection();
+            if (result?.reason) Toast.show(result.reason, 3500);
+        });
     }
 
     if (player.config.controls.fullscreen) {
@@ -508,10 +510,6 @@ export function attachPlayerBindings(player) {
     player._events = {};
 
     // After the event list exists; registered any earlier, it would be wiped.
-    if (player.ui.reverseBtn) {
-        player.on('reversechange', ({ active }) => {
-            player.ui.reverseBtn.textContent = active ? '■ Stop playing backwards' : '◀ Play backwards';
-            player.ui.reverseBtn.classList.toggle('active', active);
-        });
-    }
+    // Play pressed while backward is set, and backwards could not start.
+    player.on('reversefailed', ({ reason }) => Toast.show(reason, 3500));
 }

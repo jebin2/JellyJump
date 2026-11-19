@@ -31,7 +31,7 @@ export class PlayerKeyboard {
                 e.preventDefault();
                 // Shift+J plays backwards (and stops doing so); J alone steps back.
                 if (e.shiftKey) {
-                    p.toggleReverse().then(result => {
+                    p.toggleDirection().then(result => {
                         if (result?.reason) Toast.show(result.reason, 3500);
                     });
                 }

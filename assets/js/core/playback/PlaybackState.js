@@ -218,9 +218,10 @@ export function playerSeek(player, e) {
 
 export function playerScrubStart(player, e) {
     player.isScrubbing = true;
-    player.scrubWasPlaying = player.isPlaying;
+    // Playing backwards counts as playing: it resumes, backwards, on release.
+    player.scrubWasPlaying = player.isPlaying || !!player.reverse?.active;
 
-    if (player.isPlaying) player.pause(false);
+    if (player.scrubWasPlaying) player.pause(false);
 
     // Wake the context pause() just suspended while we are guaranteed to be
     // inside the input event (scrub start is always user input), so the
