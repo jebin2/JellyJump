@@ -28,7 +28,9 @@ export class PlayerKeyboard {
             // them far faster than a seek can complete.
             case 'j':
                 e.preventDefault();
-                p._requestSeek(p.currentTime - 10);
+                // Shift+J plays backwards (and stops doing so); J alone steps back.
+                if (e.shiftKey) p.toggleReverse();
+                else p._requestSeek(p.currentTime - 10);
                 break;
             case 'l':
                 if (e.shiftKey) {

@@ -193,6 +193,13 @@ export function attachPlayerBindings(player) {
 
         player.ui.speedSlider.value = player.playbackRate;
         player.ui.speedValue.textContent = `${player.playbackRate.toFixed(2)}x`;
+
+        if (player.ui.reverseBtn) {
+            player.ui.reverseBtn.addEventListener('click', () => {
+                player.toggleReverse();
+                player.ui.reverseBtn.blur();
+            });
+        }
     }
 
     if (player.config.controls.fullscreen) {
@@ -498,4 +505,12 @@ export function attachPlayerBindings(player) {
     }
 
     player._events = {};
+
+    // After the event list exists; registered any earlier, it would be wiped.
+    if (player.ui.reverseBtn) {
+        player.on('reversechange', ({ active }) => {
+            player.ui.reverseBtn.textContent = active ? '■ Stop playing backwards' : '◀ Play backwards';
+            player.ui.reverseBtn.classList.toggle('active', active);
+        });
+    }
 }

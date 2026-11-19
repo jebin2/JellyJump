@@ -43,19 +43,50 @@ export class BackwardFrameReader {
      * @param {Object} videoTrack - a Mediabunny InputVideoTrack
      * @param {Object} [options]
      * @param {Object} [options.decoderOptions] - passed to VideoSampleSink
+     * @param {number} [options.maxFrames] - hold fewer than the default, for
+     *   a caller that keeps two readers going at once
      */
-    constructor(videoTrack, { decoderOptions } = {}) {
+    constructor(videoTrack, { decoderOptions, maxFrames = MAX_HELD_FRAMES } = {}) {
         this.track = videoTrack;
         this.sink = new MediaBunny.VideoSampleSink(videoTrack, decoderOptions);
         this.packets = new MediaBunny.EncodedPacketSink(videoTrack);
         const frameBytes = Math.max(1, (videoTrack.codedWidth || 1920) * (videoTrack.codedHeight || 1080) * 1.5);
-        this.capacity = Math.max(4, Math.min(MAX_HELD_FRAMES, Math.floor(MAX_HELD_BYTES / frameBytes)));
+        this.capacity = Math.max(4, Math.min(maxFrames, Math.floor(MAX_HELD_BYTES / frameBytes)));
         /** Frames held, ascending by timestamp, all at or before `heldUntil`. */
         this.held = [];
         this.heldUntil = -Infinity;
-        this.heldKey = null;
         /** How many frames have been decoded, for the curious. */
         this.decodedFrames = 0;
+        /** Whether a fill is under way. */
+        this.busy = false;
+    }
+
+    /** The earliest held timestamp, or null when nothing is held. */
+    get oldest() {
+        return this.held.length ? this.held[0].timestamp : null;
+    }
+
+    /**
+     * The held frame for a time, without decoding: the frame itself (not a
+     * clone, so draw it and let it be), null if the held stretch covers the
+     * time but has no frame for it, or undefined if it does not cover it.
+     * For a caller that cannot wait, such as a render loop.
+     * @param {number} timestamp
+     */
+    peek(timestamp) {
+        return this._fromHeld(timestamp);
+    }
+
+    /**
+     * Decode and hold the stretch ending at `timestamp`. Resolves once held;
+     * a call while one is under way waits for that one instead.
+     * @param {number} timestamp
+     */
+    async fill(timestamp) {
+        if (this.busy) return this._filling;
+        this.busy = true;
+        this._filling = this._fill(timestamp).finally(() => { this.busy = false; });
+        return this._filling;
     }
 
     /**
@@ -71,7 +102,7 @@ export class BackwardFrameReader {
     async sampleAt(timestamp) {
         let frame = this._fromHeld(timestamp);
         if (frame === undefined) {
-            await this._fill(timestamp);
+            await this.fill(timestamp);
             frame = this._fromHeld(timestamp);
         }
         if (frame === undefined || frame === null) {
@@ -92,12 +123,15 @@ export class BackwardFrameReader {
         for await (const t of timestamps) yield await this.sampleAt(t);
     }
 
-    /** Release every held frame. */
+    /**
+     * Release every held frame. Final: a fill still under way releases what
+     * it decoded instead of holding it.
+     */
     close() {
+        this.closed = true;
         for (const frame of this.held) frame.close();
         this.held = [];
         this.heldUntil = -Infinity;
-        this.heldKey = null;
     }
 
     /**
@@ -123,10 +157,12 @@ export class BackwardFrameReader {
      * @private
      */
     async _fill(timestamp) {
-        this.close();
         const key = await this.packets.getKeyPacket(timestamp, { metadataOnly: true })
             ?? await this.packets.getFirstPacket({ metadataOnly: true });
-        if (!key) return;
+        if (!key) {
+            this.close();
+            return;
+        }
 
         // Up to and including the frame at `timestamp`; a little past it,
         // since the range's end is exclusive.
@@ -138,8 +174,15 @@ export class BackwardFrameReader {
             kept.push(sample);
             if (kept.length > this.capacity) kept.shift().close();
         }
+        if (this.closed) {
+            for (const frame of kept) frame.close();
+            return;
+        }
+        // Swapped in whole, so the old stretch stays drawable until the new
+        // one is ready.
+        const previous = this.held;
         this.held = kept;
         this.heldUntil = timestamp;
-        this.heldKey = key.timestamp;
+        for (const frame of previous) frame.close();
     }
 }
