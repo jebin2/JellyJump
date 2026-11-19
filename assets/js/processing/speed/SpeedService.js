@@ -4,6 +4,7 @@ import { AUDIO_BITRATE_BPS, createMediaBunnyInput } from '../shared/InputFactory
 import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
 import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../shared/Cancellation.js';
 import { copyMetadataTags } from '../shared/MetadataTags.js';
+import { BackwardFrameReader } from '../shared/BackwardFrames.js';
 
 async function processAudioWithSpeed(audioTrack, audioSource, speed = 1, signal) {
     const audioSink = new MediaBunny.AudioSampleSink(audioTrack);
@@ -88,7 +89,7 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
     // Checked at every progress report, which this pipeline makes per frame.
     const onProgress = cancellableProgress(reportProgress, signal);
     await ensureEncoders();
-    Logger.log('[MediaProcessor] Starting video reversal with samplesAtTimestamps...');
+    Logger.log('[MediaProcessor] Starting video reversal...');
 
     const input = createMediaBunnyInput(source);
 
@@ -157,8 +158,10 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         await copyMetadataTags(input, output);
         await output.start();
 
-        Logger.log('[MediaProcessor] Extracting frames in reverse order using samplesAtTimestamps...');
-        const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
+        // Frames come from BackwardFrameReader rather than samplesAtTimestamps:
+        // the latter re-decodes from the key frame for every frame when the
+        // timestamps fall, the reader decodes each stretch once.
+        const reader = new BackwardFrameReader(videoTrack);
         const reverseTimestampGenerator = (async function* () {
             for (let outputFrame = 0; outputFrame < totalOutputFrames; outputFrame++) {
                 const outputProgress = outputFrame / totalOutputFrames;
@@ -170,22 +173,28 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         let outputTimestamp = 0;
         let frameCount = 0;
 
-        for await (const sample of videoSink.samplesAtTimestamps(reverseTimestampGenerator)) {
-            if (!sample) continue;
+        try {
+            for await (const sample of reader.samplesAt(reverseTimestampGenerator)) {
+                if (!sample) continue;
+                try {
+                    sample.setTimestamp(outputTimestamp);
+                    sample.setDuration(frameDuration);
+                    await canvasSource.add(sample);
+                } finally {
+                    sample.close();
+                }
+                outputTimestamp += frameDuration;
+                frameCount++;
 
-            sample.setTimestamp(outputTimestamp);
-            sample.setDuration(frameDuration);
-            await canvasSource.add(sample);
-            outputTimestamp += frameDuration;
-            sample.close();
-            frameCount++;
-
-            if (onProgress) {
-                onProgress(frameCount / totalOutputFrames * 0.8);
+                if (onProgress) {
+                    onProgress(frameCount / totalOutputFrames * 0.8);
+                }
             }
+        } finally {
+            reader.close();
         }
 
-        Logger.log(`[MediaProcessor] Encoded ${frameCount} frames`);
+        Logger.log(`[MediaProcessor] Encoded ${frameCount} frames (${reader.decodedFrames} decoded)`);
 
         if (includeAudio && audioSource) {
             Logger.log('[MediaProcessor] Reversing audio...');
