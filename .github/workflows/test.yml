@@ -31,9 +31,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Quality check, library hashes, build, then every suite. The browser
-      # suites find the runner's preinstalled Google Chrome by themselves;
-      # the one needing Electron is skipped, as the desktop app's own
-      # dependencies are not installed here.
+      # Playwright's own Chromium, the browser the suites are run with
+      # locally. Left to themselves they take the first browser on the
+      # runner, and the one they found there could neither decode nor encode
+      # H.264, which the HLS, live and encryption suites need.
+      - name: Install Chromium
+        run: |
+          npx playwright-core install --with-deps chromium
+          echo "CHROMIUM_PATH=$(node --input-type=module -e "import { chromium } from 'playwright-core'; console.log(chromium.executablePath())")" >> "$GITHUB_ENV"
+
+      # Quality check, library hashes, build, then every suite. The one
+      # needing Electron is skipped, as the desktop app's own dependencies
+      # are not installed here.
       - name: Run tests
         run: npm test
