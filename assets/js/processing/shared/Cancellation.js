@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Cancellation - stopping a running export when the user asks.
  *

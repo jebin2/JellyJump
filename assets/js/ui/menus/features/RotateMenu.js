@@ -8,7 +8,7 @@ import {
 } from './BoxEditorUtils.js';
 
 import { MediaMetadata } from "../../../shared/utils/MediaMetadata.js";
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 export class RotateMenu {
     /**
@@ -123,56 +123,35 @@ export class RotateMenu {
             // Normalize Rotation
             let normRotation = rotation % 360;
 
-            // UI Update
-            progressSection.classList.remove('hidden');
+            // The action buttons make way for the progress until it fails.
             actionButtons.classList.add('hidden');
-            errorMsg.classList.add('hidden');
-            successMsg.classList.add('hidden');
             statusText.textContent = 'Processing...';
 
-            const job = startCancellableJob(progressSection);
-            try {
-                // Get source safely (fixes TypeError: blob must be a Blob)
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+            // Named after the original, beside it in the playlist.
+            const originalName = item.file ? item.file.name : (item.title || 'video.mp4');
+            const nameParts = originalName.split('.');
+            const ext = nameParts.pop();
+            const newName = `${nameParts.join('.')}_rotated.${ext}`;
 
-                // Filename generation
-                const originalName = item.file ? item.file.name : (item.title || 'video.mp4');
-                const nameParts = originalName.split('.');
-                const ext = nameParts.pop();
-                const baseName = nameParts.join('.');
-                const newName = `${baseName}_rotated.${ext}`;
-
-                const resultBlob = await MediaProcessor.process({
-                    source: source,
-                    format: 'mp4',
-                    quality: 'high',
-                    rotate: normRotation,
-                    flip: (flipH || flipV) ? { horizontal: flipH, vertical: flipV } : null,
-                    onProgress: (progress) => {
-                        percentageText.textContent = `${Math.round(progress * 100)}%`;
-                    },
-                    signal: job.signal,
-                });
-
-                // Success
-                progressSection.classList.add('hidden');
-                successMsg.classList.remove('hidden');
-
-                // Add to playlist (under source item as subfolder)
-                playlist.insertProcessedItem(item, resultBlob, newName);
-
-                isProcessing = false;
-
-            } catch (error) {
-                Logger.error('[RotateMenu] Processing failed', error);
-                progressSection.classList.add('hidden');
-                actionButtons.classList.remove('hidden');
-                errorMsg.textContent = job.isCancelled(error) ? CANCELLED_MESSAGE : 'Processing failed. See console.';
-                errorMsg.classList.remove('hidden');
-                isProcessing = false;
-            } finally {
-                job.end();
-            }
+            const outcome = await runMenuJob({
+                name: '[RotateMenu] Processing',
+                progress: { section: progressSection, text: percentageText },
+                error: errorMsg,
+                success: successMsg,
+                failureText: () => 'Processing failed. See console.',
+                work: async ({ signal, onProgress }) => {
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    return MediaProcessor.process({
+                        source, format: 'mp4', quality: 'high',
+                        rotate: normRotation,
+                        flip: (flipH || flipV) ? { horizontal: flipH, vertical: flipV } : null,
+                        onProgress, signal,
+                    });
+                },
+                done: (resultBlob) => playlist.insertProcessedItem(item, resultBlob, newName),
+            });
+            if (!outcome.ok) actionButtons.classList.remove('hidden');
+            isProcessing = false;
         });
 
         // Add listener to reset UI on interaction

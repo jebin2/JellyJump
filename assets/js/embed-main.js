@@ -9,6 +9,7 @@
  *   - muted: 1 to start muted (default: 0)
  */
 import './shared/utils/reload-on-stale-chunks.js';
+import { Logger } from './shared/utils/Logger.js';
 
 async function initEmbed() {
     // Parse query params
@@ -117,7 +118,7 @@ async function initEmbed() {
         }
 
     } catch (err) {
-        console.error('[Embed] Init error:', err);
+        Logger.error('[Embed] Init error:', err);
         showError('Failed to load player', err.message);
     }
 }

@@ -2,7 +2,7 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Resize Menu Handler  
@@ -155,66 +155,36 @@ export class ResizeMenu {
                 return;
             }
 
-            // Hide previous messages and show progress
-            errorDisplay.classList.add('hidden');
-            successDisplay.classList.add('hidden');
-            progressSection.classList.remove('hidden');
-            resizeBtn.disabled = true;
-            modal.closeBtn.disabled = true;
             progressStatus.textContent = `Resizing to ${targetW}x${targetH}...`;
-
-            const job = startCancellableJob(progressSection);
-            try {
-                // Get source with caching
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-                const blob = await MediaProcessor.process({
-                    source: source,
-                    format: 'mp4',
-                    quality: 100,
-                    resolution: { width: targetW, height: targetH },
-                    onProgress: (progress) => {
-                        const percent = Math.round(progress * 100);
-                        progressText.textContent = `${percent}%`;
-                    },
-                    signal: job.signal,
-                });
-
-                // Success
-                successDisplay.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-
-                // Configure Download
-                const ext = 'mp4';
-                const filename = item.title.replace(/\.[^/.]+$/, "") + `-${targetW}x${targetH}.${ext}`;
-
-                // Always add to Playlist
-                const { url } = playlist.insertProcessedItem(item, blob, filename, {
-                    type: `video/${ext}`,
-                });
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                // Reset for another resize
-                resizeBtn.disabled = false;
-                resizeBtn.classList.remove('hidden');
-                progressStatus.textContent = 'Processing...';
-                progressText.textContent = '0%';
-
-                modal.closeBtn.disabled = false;
-
-            } catch (e) {
-                Logger.error('Resize failed:', e);
-                errorDisplay.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Resize failed: ${e.message}`;
-                errorDisplay.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-                resizeBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-            } finally {
-                job.end();
-            }
+            await runMenuJob({
+                name: 'Resize',
+                progress: { section: progressSection, text: progressText },
+                error: errorDisplay,
+                success: successDisplay,
+                lock: [resizeBtn],
+                modal,
+                work: async ({ signal, onProgress }) => {
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    return MediaProcessor.process({
+                        source, format: 'mp4', quality: 100,
+                        resolution: { width: targetW, height: targetH },
+                        onProgress, signal,
+                    });
+                },
+                done: (blob) => {
+                    const ext = 'mp4';
+                    const filename = item.title.replace(/\.[^/.]+$/, "") + `-${targetW}x${targetH}.${ext}`;
+                    // Always add to Playlist
+                    const { url } = playlist.insertProcessedItem(item, blob, filename, { type: `video/${ext}` });
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
+                    // Ready for another resize.
+                    resizeBtn.classList.remove('hidden');
+                    progressStatus.textContent = 'Processing...';
+                    progressText.textContent = '0%';
+                },
+            });
         });
     }
 }

@@ -4,7 +4,7 @@ import { Toast } from '../../../shared/utils/Toast.js';
 import { MediaBunny } from '../../../core/MediaBunny.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { formatTime } from '../../../shared/utils/mediaUtils.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { startCancellableJob } from '../core/CancellableJob.js';
 
 /**
  * Optimize Menu

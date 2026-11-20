@@ -3,7 +3,7 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Speed & Reverse Menu Handler
@@ -123,123 +123,65 @@ export class SpeedReverseMenu {
                 const includeAudio = audioCheckbox ? audioCheckbox.checked : true;
                 const isReverse = modalContent.querySelector('input[name="direction"]:checked').value === 'reverse';
 
-                // UI Updates
-                processBtn.disabled = true;
                 processBtn.innerHTML = '<span>Processing...</span>';
-                if (downloadBtn) downloadBtn.disabled = true;
-                if (speedSlider) speedSlider.disabled = true;
-                if (audioCheckbox) audioCheckbox.disabled = true;
-                directionRadios.forEach(r => r.disabled = true);
 
-                // Hide previous messages and show progress
-                if (errorMessage) errorMessage.classList.add('hidden');
-                if (successMessage) successMessage.classList.add('hidden');
-                if (progressSection) progressSection.classList.remove('hidden');
-
-                // Prevent closing
+                // Not closable at all while working, not even by Escape or
+                // the backdrop.
                 const originalClose = modal.close;
                 modal.close = () => { };
                 const closeBtn = modal.modal.querySelector('.mb-modal-close');
                 if (closeBtn) closeBtn.style.display = 'none';
 
-                const job = startCancellableJob(progressSection);
                 try {
-                    // Get source
-                    let sourceFile;
-                    try {
-                        sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-                    } catch (e) {
-                        Logger.error('Failed to get source blob:', e);
-                        throw new Error('Cannot access video file');
-                    }
-
-                    let outputBlob;
-                    const onProgress = (progress) => {
-                        const pct = Math.round(progress * 100);
-                        if (progressText) progressText.textContent = `${pct}%`;
-                        if (progressBar) progressBar.style.width = `${pct}%`;
-
-                        if (progressStatus) {
-                            if (progress < 0.9) {
-                                progressStatus.textContent = isReverse ? "Reversing & Encoding..." : "Processing frames...";
-                            } else {
-                                progressStatus.textContent = "Finalizing...";
+                    await runMenuJob({
+                        name: 'Processing',
+                        progress: { section: progressSection, text: progressText, bar: progressBar, status: progressStatus },
+                        error: errorMessage,
+                        success: successMessage,
+                        lock: [processBtn, speedSlider, audioCheckbox, ...directionRadios],
+                        work: async ({ signal, onProgress }) => {
+                            let sourceFile;
+                            try {
+                                sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                            } catch (e) {
+                                Logger.error('Failed to get source blob:', e);
+                                throw new Error('Cannot access video file');
                             }
-                        }
-                    };
+                            const report = (progress) => onProgress(progress, progress < 0.9
+                                ? (isReverse ? 'Reversing & Encoding...' : 'Processing frames...')
+                                : 'Finalizing...');
+                            const options = { source: sourceFile, speed, includeAudio, onProgress: report, signal };
+                            return isReverse
+                                ? MediaProcessor.reverseVideo(options)
+                                : MediaProcessor.changeVideoSpeed(options);
+                        },
+                        done: async (outputBlob) => {
+                            const speedTag = isReverse ? `reversed-${speed}x` : (speed < 1 ? `slow-${speed}x` : `fast-${speed}x`);
+                            const filename = `${item.title.replace(/\.[^.]+$/, '')}-${speedTag}.mp4`;
+                            const { item: newItem, url } = playlist.insertProcessedItem(item, outputBlob, filename, {
+                                duration: null,
+                                mediaType: 'video/mp4',
+                                extra: { thumbnail: item.thumbnail },
+                            });
+                            await playlist._ensureMetadata(newItem);
 
-                    if (isReverse) {
-                        outputBlob = await MediaProcessor.reverseVideo({
-                            source: sourceFile,
-                            includeAudio: includeAudio,
-                            speed: speed,
-                            onProgress: onProgress,
-                            signal: job.signal,
-                        });
-                    } else {
-                        outputBlob = await MediaProcessor.changeVideoSpeed({
-                            source: sourceFile,
-                            speed: speed,
-                            includeAudio: includeAudio,
-                            onProgress: onProgress,
-                            signal: job.signal,
-                        });
-                    }
-
-                    // Success
-                    if (successMessage) successMessage.classList.remove('hidden');
-                    if (progressSection) progressSection.classList.add('hidden');
-
-                    // Filename
-                    const speedTag = isReverse ? `reversed-${speed}x` : (speed < 1 ? `slow-${speed}x` : `fast-${speed}x`);
-                    // @ts-ignore
-                    const filename = `${item.title.replace(/\.[^.]+$/, '')}-${speedTag}.mp4`;
-
-                    // Add to playlist
-                    const { item: newItem, url } = playlist.insertProcessedItem(item, outputBlob, filename, {
-                        duration: null,
-                        mediaType: 'video/mp4',
-                        extra: { thumbnail: item.thumbnail },
+                            if (downloadBtn) {
+                                downloadBtn.onclick = () => {
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = filename;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                };
+                                downloadBtn.classList.remove('hidden');
+                            }
+                        },
                     });
-                    await playlist._ensureMetadata(newItem);
-
-                    // Download Button
-                    if (downloadBtn) {
-                        downloadBtn.onclick = () => {
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                        };
-
-                        downloadBtn.disabled = false;
-                        downloadBtn.classList.remove('hidden');
-                    }
-
-                } catch (e) {
-                    Logger.error('Processing failed:', e);
-                    if (errorMessage) {
-                        errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Processing failed: ${e.message}`;
-                        errorMessage.classList.remove('hidden');
-                    }
-                    if (progressSection) progressSection.classList.add('hidden');
                 } finally {
-                    job.end();
                     modal.close = originalClose;
                     if (closeBtn) closeBtn.style.display = '';
-
-                    // Re-enable controls
-                    if (processBtn) {
-                        processBtn.disabled = false;
-                        // Determine label again based on current selection (which hasn't changed)
-                        const isReverseNow = modalContent.querySelector('input[name="direction"]:checked').value === 'reverse';
-                        processBtn.innerHTML = isReverseNow ? '<span>Reverse Video</span>' : '<span>Change Speed</span>';
-                    }
-                    if (speedSlider) speedSlider.disabled = false;
-                    if (audioCheckbox) audioCheckbox.disabled = false;
-                    directionRadios.forEach(r => r.disabled = false);
+                    processBtn.innerHTML = isReverse ? '<span>Reverse Video</span>' : '<span>Change Speed</span>';
                 }
             });
         }

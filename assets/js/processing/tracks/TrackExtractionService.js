@@ -76,22 +76,8 @@ export async function extractTrackStreamCopy({ source, trackIndex, trackType, fo
         const mimeType = trackType === 'video' ? `video/${format}` : `audio/${format}`;
         return new Blob([output.target.buffer], { type: mimeType });
     } finally {
-        if (conversion && typeof conversion.dispose === 'function') {
-            try {
-                conversion.dispose();
-            } catch (e) {
-                Logger.warn('Error disposing conversion in extractTrack:', e);
-            }
-        }
-
-        if (output && typeof output.dispose === 'function') {
-            try {
-                output.dispose();
-            } catch (e) {
-                Logger.warn('Error disposing output in extractTrack:', e);
-            }
-        }
-
+        // A conversion that fails or is cancelled can leave its output open.
+        await cancelUnfinished(output);
         if (input && typeof input.dispose === 'function') {
             try {
                 input.dispose();
@@ -298,15 +284,6 @@ export async function extractTrackWithSpeed({ source, trackIndex, trackType, for
         await cancelUnfinished(output);
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
-        }
-        if (output && typeof output.dispose === 'function') {
-            try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
-        }
-        if (canvasSource && typeof canvasSource.dispose === 'function') {
-            try { canvasSource.dispose(); } catch (e) { Logger.warn('Error disposing canvasSource:', e); }
-        }
-        if (audioSource && typeof audioSource.dispose === 'function') {
-            try { audioSource.dispose(); } catch (e) { Logger.warn('Error disposing audioSource:', e); }
         }
     }
 }

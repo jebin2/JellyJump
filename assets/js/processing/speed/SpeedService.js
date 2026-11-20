@@ -244,15 +244,6 @@ export async function reverseVideo({ source, includeAudio = false, speed = 1, on
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
         }
-        if (output && typeof output.dispose === 'function') {
-            try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
-        }
-        if (canvasSource && typeof canvasSource.dispose === 'function') {
-            try { canvasSource.dispose(); } catch (e) { Logger.warn('Error disposing canvasSource:', e); }
-        }
-        if (audioSource && typeof audioSource.dispose === 'function') {
-            try { audioSource.dispose(); } catch (e) { Logger.warn('Error disposing audioSource:', e); }
-        }
     }
 }
 
@@ -377,7 +368,5 @@ export async function changeVideoSpeed({ source, speed = 1, onProgress: reportPr
     } finally {
         await cancelUnfinished(output);
         try { if (input) input.dispose(); } catch (e) { Logger.warn('[MediaProcessor] input dispose failed:', e); }
-        try { if (output) output.dispose(); } catch (e) { Logger.warn('[MediaProcessor] output dispose failed:', e); }
-        try { if (canvasSource) canvasSource.dispose(); } catch (e) { Logger.warn('[MediaProcessor] canvasSource dispose failed:', e); }
     }
 }

@@ -13,7 +13,7 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { isTerminalInvocation, isQueryInvocation, stopHeadless, USAGE } = require('../desktop/cli.js');
+const { isTerminalInvocation, isQueryInvocation, isJellyJumpCommand, stopHeadless, USAGE } = require('../desktop/cli.js');
 
 let pass = 0, fail = 0;
 const check = (ok, label) => {
@@ -72,6 +72,21 @@ check(!USAGE.includes('--share-link'), 'a removed flag is not advertised');
 
 // --stop signals a pid recorded in the config. The pid can be stale or reused,
 // and the cost of getting that wrong is a SIGTERM to an unrelated process.
+console.log('\nwhich processes count as JellyJump');
+{
+    const is = (cmd) => isJellyJumpCommand(cmd.split(' '));
+    check(is('./JellyJump.AppImage --no-gui'), 'the AppImage');
+    check(is('/tmp/.mount_JellyJaTjvWX/jellyjump --no-gui'), 'the unpacked AppImage binary');
+    check(is('/opt/JellyJump/jellyjump --no-gui'), 'an installed executable');
+    check(is('/home/me/git/JellyJump/desktop/node_modules/electron/dist/electron . --no-gui'), 'development: Electron on the app folder');
+    check(is('node /tmp/jj-stop-x/jellyjump-fake.js'), 'a script named for it, run by an interpreter');
+    check(!is('node /home/me/git/JellyJump/scripts/cli-test.mjs'), 'not a test runner given a script inside the folder');
+    check(!is('nvim /home/me/git/JellyJump/desktop/cli.js'), 'not an editor with one of its files open');
+    check(!is('tmux new -s jellyjump'), 'not a tmux session named after it');
+    check(!is('bash -c cd /home/me/git/JellyJump && make'), 'not a shell working in its folder');
+    check(!is(''), 'not an empty command line');
+}
+
 console.log('\n--stop only ever signals a live process of ours');
 {
     const fs = require('node:fs');

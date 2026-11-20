@@ -3,6 +3,7 @@
  * Reduces duplicate footer templates by providing a single common template
  * that can be configured per-modal.
  */
+import { Logger } from './Logger.js';
 
 /**
  * Configuration for process footer
@@ -21,7 +22,7 @@ export function createProcessFooter(config) {
     const template = document.getElementById('common-process-footer-template');
 
     if (!template) {
-        console.error('FooterHelper: common-process-footer-template not found');
+        Logger.error('FooterHelper: common-process-footer-template not found');
         return null;
     }
 

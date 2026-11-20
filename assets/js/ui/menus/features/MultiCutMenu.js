@@ -1,10 +1,9 @@
-import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-import { formatTime, parseTime, generateId } from '../../../shared/utils/mediaUtils.js';
+import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * MultiCut Menu Handler
@@ -223,112 +222,74 @@ export class MultiCutMenu {
             if (clips.length === 0) return;
 
             modalContent.classList.add('processing');
-            multicutBtn.disabled = true;
-            modal.closeBtn.disabled = true;
-            errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
-            progressSection.classList.remove('hidden');
 
-            const job = startCancellableJob(progressSection);
-            const { signal } = job;
-            try {
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+            await runMenuJob({
+                name: 'Multi-cut',
+                progress: { section: progressSection, text: progressPercentage },
+                error: errorMessage,
+                success: successMessage,
+                lock: [multicutBtn],
+                unlock: 'onFailure',
+                modal,
+                failureText: (e) => `Failed: ${e.message}`,
+                work: async ({ signal, onProgress }) => {
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
-                // Sort clips by start time
-                const sortedClips = [...clips].sort((a, b) => a.start - b.start);
-
-                // Invert: create segments from the gaps (regions to KEEP)
-                const segments = [];
-                let lastEnd = 0;
-
-                for (const clip of sortedClips) {
-                    if (clip.start > lastEnd) {
-                        segments.push({ start: lastEnd, end: clip.start });
+                    // The cuts are what goes; what is kept is the gaps between them.
+                    const sortedClips = [...clips].sort((a, b) => a.start - b.start);
+                    const segments = [];
+                    let lastEnd = 0;
+                    for (const clip of sortedClips) {
+                        if (clip.start > lastEnd) segments.push({ start: lastEnd, end: clip.start });
+                        lastEnd = clip.end;
                     }
-                    lastEnd = clip.end;
-                }
+                    if (lastEnd < duration) segments.push({ start: lastEnd, end: duration });
+                    if (segments.length === 0) {
+                        throw new Error('No video remaining after removing all clips');
+                    }
 
-                // Add final segment if there's remaining video
-                if (lastEnd < duration) {
-                    segments.push({ start: lastEnd, end: duration });
-                }
-
-                if (segments.length === 0) {
-                    throw new Error('No video remaining after removing all clips');
-                }
-
-                let blob;
-                if (segments.length === 1) {
-                    // Single segment — simple trim
-                    blob = await MediaProcessor.process({
+                    const trimSegment = (seg, report) => MediaProcessor.process({
                         source,
                         format: 'mp4',
                         quality: 100,
-                        trim: { start: segments[0].start, end: segments[0].end },
-                        onProgress: (progress) => {
-                            progressPercentage.textContent = `${Math.round(progress * 100)}%`;
-                        },
+                        trim: { start: seg.start, end: seg.end },
+                        onProgress: report,
                         signal,
                     });
-                } else {
-                    // Multiple segments — trim each then merge
-                    const trimWeight = 0.8 / segments.length;
-                    const segmentBlobs = [];
-                    for (let i = 0; i < segments.length; i++) {
-                        const seg = segments[i];
-                        const segBlob = await MediaProcessor.process({
-                            source,
+
+                    let blob;
+                    if (segments.length === 1) {
+                        blob = await trimSegment(segments[0], onProgress);
+                    } else {
+                        // Each piece trimmed (80% of the bar), then joined (20%).
+                        const trimWeight = 0.8 / segments.length;
+                        const segmentBlobs = [];
+                        for (let i = 0; i < segments.length; i++) {
+                            segmentBlobs.push(await trimSegment(segments[i],
+                                (p) => onProgress(i * trimWeight + p * trimWeight)));
+                        }
+                        blob = await MediaProcessor.merge({
+                            inputs: segmentBlobs,
                             format: 'mp4',
-                            quality: 100,
-                            trim: { start: seg.start, end: seg.end },
-                            onProgress: (progress) => {
-                                const overall = (i * trimWeight + progress * trimWeight) * 100;
-                                progressPercentage.textContent = `${Math.round(overall)}%`;
-                            },
+                            onProgress: (p) => onProgress(0.8 + p * 0.2),
                             signal,
                         });
-                        segmentBlobs.push(segBlob);
                     }
-                    blob = await MediaProcessor.merge({
-                        inputs: segmentBlobs,
-                        format: 'mp4',
-                        onProgress: (progress) => {
-                            const overall = (0.8 + progress * 0.2) * 100;
-                            progressPercentage.textContent = `${Math.round(overall)}%`;
-                        },
-                        signal,
+                    const remaining = segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+                    return { blob, remaining };
+                },
+                done: ({ blob, remaining }) => {
+                    const ext = 'mp4';
+                    const filename = item.title.replace(/\.[^/.]+$/, "") + `- ${clips.length} removed.${ext}`;
+                    const { url } = playlist.insertProcessedItem(item, blob, filename, {
+                        type: `video/${ext}`,
+                        duration: formatTime(remaining),
                     });
-                }
-
-                progressSection.classList.add('hidden');
-                successMessage.classList.remove('hidden');
-
-                const ext = 'mp4';
-                const removedCount = clips.length;
-                const filename = item.title.replace(/\.[^/.]+$/, "") + `- ${removedCount} removed.${ext}`;
-
-                const remainingDuration = segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
-                const { url } = playlist.insertProcessedItem(item, blob, filename, {
-                    type: `video/${ext}`,
-                    duration: formatTime(remainingDuration),
-                });
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                modal.closeBtn.disabled = false;
-
-            } catch (e) {
-                Logger.error('Multi-cut failed:', e);
-                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Failed: ${e.message}`;
-                errorMessage.classList.remove('hidden');
-                multicutBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-                progressSection.classList.add('hidden');
-            } finally {
-                job.end();
-            }
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
+                },
+            });
         });
     }
 }

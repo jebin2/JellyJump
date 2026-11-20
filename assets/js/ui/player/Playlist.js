@@ -5,7 +5,6 @@ import { Toast } from "../../shared/utils/Toast.js";
 import { StorageService } from "../../shared/services/StorageService.js";
 import { CorePlayer } from '../../core/Player.js';
 import { ConfirmDialog } from '../../shared/utils/ConfirmDialog.js';
-import { Modal as DialogModal } from '../Modal.js';
 import { MenuRouter } from '../menus/core/MenuRouter.js';
 import { RecordMenu } from '../menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
@@ -14,29 +13,20 @@ import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
 import { formatTime, generateId, sanitizeFilename } from '../../shared/utils/mediaUtils.js';
-import { streamLibraryInto } from '../../shared/services/RemoteLibraryLoad.js';
 import { parseYouTubeUrl, fetchYouTubeInfo, buildYouTubeItem } from '../../shared/utils/YouTubeUrl.js';
 import { parseLinkListFile, linkListFolderName } from '../../shared/utils/LinkListFile.js';
 import { PlaylistRenderer } from './PlaylistRenderer.js';
 import { PlaylistState } from './PlaylistState.js';
 import { PlaylistUI } from './PlaylistUI.js';
 import { PlaylistNavigation } from './PlaylistNavigation.js';
+import { PlaylistRemoteLibraries } from './PlaylistRemoteLibraries.js';
 import { PlaylistProcessor } from "../../shared/services/PlaylistProcessor.js";
 import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
+import { DISCOVERED_FOLDER, discoveredItemFromScan } from './DiscoveredItems.js';
 import { ShareState } from '../../shared/services/ShareState.js';
 import {
-    looksLikeShareLink, probe as probeRemoteLibrary, fetchItems as fetchRemoteItems,
-    fetchItemsStreaming as fetchRemoteItemsStreaming,
-    savedLinks as savedRemoteLinks, rememberLink as rememberRemoteLink, forgetLink as forgetRemoteLink,
-    hostOf, reachHint,
+    looksLikeShareLink, probe as probeRemoteLibrary, forgetLink as forgetRemoteLink,
 } from '../../shared/services/RemoteLibrary.js';
-
-// Folder that scan results are grouped under in the playlist tree.
-const DISCOVERED_FOLDER = 'Discovered';
-
-// How many folder levels a discovered file may nest under that. Each level
-// indents, so an uncapped filesystem path can push rows off the right edge.
-const MAX_DISCOVERED_DEPTH = 3;
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
@@ -59,6 +49,7 @@ export class Playlist {
         this.renderer = new PlaylistRenderer(this);
         this.ui = new PlaylistUI(this);
         this.navigation = new PlaylistNavigation(this);
+        this.remoteLibraries = new PlaylistRemoteLibraries(this);
         
         this.processor = PlaylistProcessor;
         this.storage = new StorageService();
@@ -95,7 +86,7 @@ export class Playlist {
         (async () => {
             for (const [what, stage] of [
                 ['load the saved playlist', () => this._loadSavedPlaylist()],
-                ['restore shared libraries', () => this._restoreRemoteLibraries()],
+                ['restore shared libraries', () => this.remoteLibraries.restore()],
                 ['scan for media', () => this._startMediaScan()],
             ]) {
                 try {
@@ -278,7 +269,7 @@ export class Playlist {
         for (const file of files) {
             if (known.has(file.path)) continue; // already in the playlist, curated or not
             known.add(file.path);
-            newItems.push(this._buildDiscoveredItem(file));
+            newItems.push(discoveredItemFromScan(file));
         }
 
         if (newItems.length === 0) return;
@@ -418,70 +409,6 @@ export class Playlist {
         this._updatePlayerNavigationState();
         Toast.show(`Kept "${item.title}" in your playlist`);
         Logger.log('[Playlist] Kept discovered item:', item.title);
-    }
-
-    /**
-     * Turn a scan record into a playlist item.
-     * Cheap by design: no metadata probe and no thumbnail, so a scan of
-     * thousands of files stays fast. Duration fills in through the normal
-     * on-demand path once an item is actually opened.
-     * @private
-     */
-    _buildDiscoveredItem(file) {
-        const ext = file.ext?.replace('.', '') || '';
-        const mimeType = ext === 'mkv' ? 'video/x-matroska'
-            : ext === 'webm' ? 'video/webm'
-            : ext === 'ogv' ? 'video/ogg'
-            : 'video/mp4';
-
-        return {
-            title: file.name,
-            url: '',                  // created on demand from localPath
-            duration: '',             // unknown until opened; no probe here
-            thumbnail: '',
-            isLocal: true,
-            isAudio: false,
-            isDiscovered: true,       // keeps it out of the saved playlist
-            needsReload: false,
-            file: null,
-            fileSize: file.size,
-            fileType: mimeType,
-            mimeType,
-            path: this._discoveredPath(file.path),
-            localPath: file.path,
-            id: generateId(),
-            ...(Array.isArray(file.subtitles) && file.subtitles.length > 0
-                ? { subtitlePaths: file.subtitles.map((subtitle) => subtitle.path) }
-                : {}),
-        };
-    }
-
-    /**
-     * Virtual path that places a discovered file in the folder tree, e.g.
-     * /home/u/Videos/Trip/clip.mp4 -> Discovered/Videos/Trip/clip.mp4
-     * PlaylistRenderer builds folders by splitting this on "/".
-     * @private
-     */
-    _discoveredPath(absolutePath) {
-        const parts = absolutePath.split('/').filter(Boolean);
-        // Drop the leading home-directory segments; what matters to the user is
-        // the media folder the file sits in, not where their home lives.
-        const home = parts.indexOf('home');
-        const meaningful = home !== -1 ? parts.slice(home + 2) : parts;
-
-        const name = meaningful[meaningful.length - 1];
-        let folders = meaningful.slice(0, -1);
-
-        // Cap the nesting. A home scan reaches genuinely deep trees, and every
-        // level costs indent width — past a handful the rows run off the edge.
-        // Keeping the outermost folders preserves where the file came from,
-        // which is what makes the grouping useful; the rest is on the item's
-        // localPath if it is ever needed.
-        if (folders.length > MAX_DISCOVERED_DEPTH) {
-            folders = folders.slice(0, MAX_DISCOVERED_DEPTH);
-        }
-
-        return [DISCOVERED_FOLDER, ...folders, name].join('/');
     }
 
     /**
@@ -1359,37 +1286,7 @@ export class Playlist {
         }
 
         try {
-            // Capture if we were playing before switching
-            const wasPlaying = this.player.isPlaying;
-
-            // CRITICAL: Pause current video FIRST and wait for cleanup
-            // This prevents audio/video mismatch during rapid switching
-            // if (this.player.isPlaying || this.player.videoTrack || this.player.audioTrack) {
-            //     this.player.pause(false);
-            //     // Small delay to ensure audio context and iterators are properly cleaned up
-            //     await new Promise(resolve => setTimeout(resolve, 50));
-            // }
-
-            // Cleanup previous item's resources
-            if (this.activeIndex !== -1 && this.activeIndex !== index) {
-                const prevItem = this.items[this.activeIndex];
-                if (prevItem) {
-                    // Revoke (not just null) the playback blob URL, otherwise the
-                    // blob stays pinned in the browser's blob store for the page
-                    // lifetime. getProcessedSourceURL recreates it on revisit.
-                    if (prevItem.blob_url && prevItem.blob_url.startsWith('blob:')) {
-                        URL.revokeObjectURL(prevItem.blob_url);
-                    }
-                    prevItem.blob_url = null;
-
-                    if (prevItem.isLocal && prevItem.url) {
-                        Logger.log(`Releasing memory for: ${prevItem.title}`);
-                        URL.revokeObjectURL(prevItem.url);
-                        prevItem.url = null;
-                        prevItem.file = null; // Release Blob
-                    }
-                }
-            }
+            if (this.activeIndex !== index) this._releaseItem(this.items[this.activeIndex]);
 
             const video = this.items[index];
 
@@ -1467,52 +1364,19 @@ export class Playlist {
                 return;
             }
 
-            // Load video into player (always autoplay if autoplay param is true)
-            const shouldAutoplay = autoplay;
+            this._saveSubtitleChanges(video);
 
-            // Set up callback to save subtitles when user uploads them
-            this.player.onSubtitleChange = (subtitleTracks) => {
-                video.subtitleTracks = subtitleTracks.map(track => ({
-                    id: track.id,
-                    name: track.name,
-                    cues: [...track.cues]
-                }));
-                this._saveState();
-                Logger.log(`Saved ${subtitleTracks.length} subtitle track(s) for: ${video.title}`);
-            };
-
-            // Load video with saved subtitles (if any) - pass isAudio for audio files
-            await this.player.load(video.blob_url, shouldAutoplay, video.id, video.subtitleTracks || null);
-
+            // Subtitles saved with the item come back with it.
+            await this.player.load(video.blob_url, autoplay, video.id, video.subtitleTracks || null);
             this._clearLoadGuard();
-
-            const subtitleSources = [];
-            if (video.subtitleFile) {
-                if (video.subtitleUrl) URL.revokeObjectURL(video.subtitleUrl);
-                video.subtitleUrl = URL.createObjectURL(video.subtitleFile);
-                subtitleSources.push(video.subtitleUrl);
-            } else if (video.subtitlePath) {
-                subtitleSources.push(video.subtitlePath);
-            }
-            if (Array.isArray(video.subtitlePaths)) subtitleSources.push(...video.subtitlePaths);
-            if (Array.isArray(video.subtitleUrls)) subtitleSources.push(...video.subtitleUrls);
-
-            for (const subUrl of new Set(subtitleSources.filter(Boolean))) {
-                try {
-                    Logger.log(`[Playlist] Loading auto-detected subtitle: ${subUrl}`);
-                    await this.player.loadSubtitle(subUrl);
-                } catch (e) {
-                    Logger.error('[Playlist] Failed to load auto-detected subtitle:', e);
-                }
-            }
+            await this._loadFoundSubtitles(video);
 
             // Update item metadata (duration and thumbnail) after video loads
             this._updateLocalItemMetadata(video, index);
 
             this._saveState();
 
-            // Auto play if requested AND we were playing before
-            if (shouldAutoplay) {
+            if (autoplay) {
                 this.player.play();
             }
 
@@ -1520,6 +1384,74 @@ export class Playlist {
             this._prefetchMetadata(video);
         } finally {
             this._isSelectingItem = false;
+        }
+    }
+
+    /**
+     * Let go of an item's file once another is selected. The playback blob
+     * URL is revoked, not just dropped, or the blob stays pinned in the
+     * browser's blob store for the page's lifetime; getProcessedSourceURL
+     * recreates it on a revisit.
+     * @param {Object|undefined} item
+     * @private
+     */
+    _releaseItem(item) {
+        if (!item) return;
+        if (item.blob_url && item.blob_url.startsWith('blob:')) {
+            URL.revokeObjectURL(item.blob_url);
+        }
+        item.blob_url = null;
+
+        if (item.isLocal && item.url) {
+            Logger.log(`Releasing memory for: ${item.title}`);
+            URL.revokeObjectURL(item.url);
+            item.url = null;
+            item.file = null; // Release Blob
+        }
+    }
+
+    /**
+     * Keep the subtitle tracks the user adds to this item, so they come back
+     * when it is played again.
+     * @private
+     */
+    _saveSubtitleChanges(video) {
+        this.player.onSubtitleChange = (subtitleTracks) => {
+            video.subtitleTracks = subtitleTracks.map(track => ({
+                id: track.id,
+                name: track.name,
+                cues: [...track.cues]
+            }));
+            this._saveState();
+            Logger.log(`Saved ${subtitleTracks.length} subtitle track(s) for: ${video.title}`);
+        };
+    }
+
+    /**
+     * Load the subtitle files found beside the item -- uploaded with it,
+     * found by a scan, or listed by a shared library. One that fails to load
+     * is logged and skipped; the video plays either way.
+     * @private
+     */
+    async _loadFoundSubtitles(video) {
+        const sources = [];
+        if (video.subtitleFile) {
+            if (video.subtitleUrl) URL.revokeObjectURL(video.subtitleUrl);
+            video.subtitleUrl = URL.createObjectURL(video.subtitleFile);
+            sources.push(video.subtitleUrl);
+        } else if (video.subtitlePath) {
+            sources.push(video.subtitlePath);
+        }
+        if (Array.isArray(video.subtitlePaths)) sources.push(...video.subtitlePaths);
+        if (Array.isArray(video.subtitleUrls)) sources.push(...video.subtitleUrls);
+
+        for (const subUrl of new Set(sources.filter(Boolean))) {
+            try {
+                Logger.log(`[Playlist] Loading auto-detected subtitle: ${subUrl}`);
+                await this.player.loadSubtitle(subUrl);
+            } catch (e) {
+                Logger.error('[Playlist] Failed to load auto-detected subtitle:', e);
+            }
         }
     }
 
@@ -1658,7 +1590,7 @@ export class Playlist {
             if (looksLikeShareLink(url)) {
                 const info = await probeRemoteLibrary(url);
                 if (info.ok) {
-                    await this._addRemoteLibrary(url, info, onFirstItems);
+                    await this.remoteLibraries.add(url, info, onFirstItems);
                     return;
                 }
                 Logger.log(`[Playlist] Not a JellyJump library (${info.error}), treating as a media URL`);
@@ -1692,180 +1624,6 @@ export class Playlist {
     }
 
     /**
-     * Pull a shared library's listing into the playlist.
-     *
-     * Both callers -- adding a link and restoring saved ones at startup -- want
-     * the same thing, and used to carry their own copy of the batch loop and
-     * its render throttle. The policy lives in one place now, because the
-     * throttle was the bug: see RemoteLibraryLoad.js.
-     * @private
-     */
-    _streamRemoteLibrary(url, onAnnounce) {
-        return streamLibraryInto(url, {
-            fetchStreaming: fetchRemoteItemsStreaming,
-            addItems: (batch) => this.state.addItems(batch),
-            render: () => this.render(),
-            setLoading: (source, loading) => {
-                if (loading) this.state.loadingRemoteSources.add(source);
-                else this.state.loadingRemoteSources.delete(source);
-            },
-            onProgress: (source, count) => this.renderer.updateRemoteLibraryProgress(source, count),
-            onAnnounce,
-        });
-    }
-
-    /**
-     * Add every file from a shared library.
-     *
-     * Not persisted: the files live on the other machine, so a saved copy would
-     * reappear as broken entries whenever that machine is off or the link has
-     * been revoked. Re-paste the link to get them back.
-     * @private
-     */
-    async _addRemoteLibrary(url, info, onFirstItems) {
-        // The listing streams in, but it is deliberately not rendered as it
-        // arrives -- see RemoteLibraryLoad.js. The folder shows up once with a
-        // spinner, its count ticks up in place, and the tree is rebuilt only
-        // when the listing is complete.
-        const result = await this._streamRemoteLibrary(url, onFirstItems);
-        const total = result.streamed;
-
-        if (result.total === 0) {
-            Toast.show(`${info.name} has no videos to share`, 4000);
-            return;
-        }
-
-        rememberRemoteLink(url);
-        this._updatePlayerNavigationState();
-
-        if (result.complete) {
-            Toast.show(`Added ${total} file${total === 1 ? '' : 's'} from ${info.name}`);
-        } else {
-            // Said plainly rather than passed off as a finished library: the
-            // files that did arrive work, and reload fetches the rest.
-            Toast.show(
-                `Added ${total} of ${result.expected ?? '?'} files from ${info.name} — the connection dropped. `
-                + 'Use the reload button on the folder to get the rest.',
-                6000, true,
-            );
-        }
-        Logger.log(`[Playlist] Added remote library ${info.name} (${total} items, complete=${result.complete})`);
-    }
-
-    /**
-     * Re-add shared libraries that were added in an earlier session.
-     *
-     * The link is what persists, not the items: they live on another machine,
-     * so a saved copy would come back stale — files renamed or deleted there
-     * would linger as entries that fail when clicked. Re-fetching costs one
-     * request and gives whatever is actually there now.
-     *
-     * A library whose machine is unreachable is left out rather than failing
-     * the load, and the link is kept: the laptop is usually just off.
-     * @private
-     */
-    async _restoreRemoteLibraries() {
-        const links = savedRemoteLinks();
-        if (links.length === 0) return;
-
-        const unreachable = [];
-
-        for (const link of links) {
-            try {
-                // Streamed for the same reason adding one is: this runs at
-                // startup, and waiting for a whole large library first would
-                // hold the playlist empty exactly when the user is looking at
-                // it. An incomplete result is not treated as an error — what
-                // arrived is real, and the folder's reload button gets the rest.
-                const result = await this._streamRemoteLibrary(link);
-                Logger.log(`[Playlist] Restored shared library (${result.total} items, complete=${result.complete})`);
-                if (result.total === 0) {
-                    unreachable.push({ link, reason: 'the host answered with nothing' });
-                }
-            } catch (error) {
-                // "Failed to fetch" on its own tells nobody anything, and the
-                // likeliest cause for a library on a tailnet is the browser
-                // refusing the request rather than the host being down.
-                let reason = error.message || 'unreachable';
-                try { reason += reachHint(new URL(link)); } catch { /* unparseable link */ }
-                Logger.warn('[Playlist] Shared library unavailable, keeping the link:', reason);
-                unreachable.push({ link, reason });
-            }
-        }
-
-        // Said out loud rather than left in the console. A library that fails to
-        // come back leaves no folder and no reload button, so the only thing on
-        // screen is a playlist that is quietly missing everything the user
-        // added last session — indistinguishable from the app having lost it.
-        if (unreachable.length > 0) {
-            const names = unreachable.map(u => hostOf(u.link)).join(', ');
-            const why = unreachable[0].reason;
-            Toast.show(
-                `Couldn't reach ${unreachable.length === 1 ? 'the shared library on' : 'shared libraries on'} `
-                + `${names} (${why}). The link${unreachable.length === 1 ? ' is' : 's are'} kept — `
-                + 'add it again or reload once the machine is back.',
-                8000, true,
-            );
-        }
-
-        this.render();
-        this._updatePlayerNavigationState();
-    }
-
-    /**
-     * Re-fetch a shared library.
-     *
-     * The listing is a snapshot, and the other machine keeps scanning after it
-     * was taken, so this is how new files appear without re-pasting the link.
-     *
-     * Items are matched by remoteId, which is stable across scans: an item that
-     * is still there keeps its object, so whatever is playing is not torn out
-     * from under the player.
-     * @param {string} source - the share link the library came from
-     */
-    async refreshRemoteLibrary(source) {
-        try {
-            const fresh = await fetchRemoteItems(source);
-            const existing = this.state.items.filter(i => i.remoteSource === source);
-            const byRemoteId = new Map(existing.map(i => [i.remoteId, i]));
-
-            let added = 0;
-            const merged = fresh.map((item) => {
-                const previous = byRemoteId.get(item.remoteId);
-                if (previous) {
-                    if (item.subtitleUrls) previous.subtitleUrls = item.subtitleUrls;
-                    else delete previous.subtitleUrls;
-                    return previous;
-                }
-                added++;
-                item.id = generateId();
-                return item;
-            });
-            const removed = existing.length - (fresh.length - added);
-
-            const others = this.state.items.filter(i => i.remoteSource !== source);
-            this.state.setItems([...others, ...merged]);
-            this.render();
-            this._updatePlayerNavigationState();
-
-            if (added === 0 && removed === 0) {
-                Toast.show('Library is up to date');
-            } else {
-                const parts = [];
-                if (added) parts.push(`${added} added`);
-                if (removed > 0) parts.push(`${removed} gone`);
-                Toast.show(`Library reloaded — ${parts.join(', ')}`);
-            }
-            Logger.log(`[Playlist] Reloaded remote library: ${added} added, ${removed} removed`);
-        } catch (error) {
-            Logger.error('[Playlist] Could not reload remote library:', error);
-            // The other machine is usually just off or asleep; the items already
-            // listed stay, since they will work again when it is back.
-            Toast.show('Could not reach that library — is the other machine on?', 5000, true);
-        }
-    }
-
-    /**
      * Add a YouTube video as a playlist item.
      *
      * The item carries the watch URL, not a media URL — there is nothing to
@@ -1890,81 +1648,6 @@ export class Playlist {
         this._updatePlayerNavigationState();
         this.selectItem(this.items.length - 1, true);
         Logger.log(`[Playlist] Added YouTube video ${parsed.id}: ${info.title}`);
-    }
-
-    /**
-     * Show a shared library's details, including the link it came from.
-     *
-     * The link is not otherwise recoverable from the app: adding a library
-     * shows the files and nothing else, and the URL lives in localStorage where
-     * the user cannot reach it. Getting it back meant going to the machine that
-     * shared it, which is the one machine they may not be sitting at.
-     *
-     * The link carries the token, so this is showing a credential. It is shown
-     * rather than copied silently: the user should see what is going on the
-     * clipboard, and the clipboard API can be refused, in which case selecting
-     * the text is the fallback.
-     * @param {string} source - the share link the library came from
-     */
-    showRemoteLibraryInfo(source) {
-        const items = this.items.filter(i => i.remoteSource === source);
-        const serverName = items[0]?.remoteServer || 'Shared library';
-
-        let origin = source;
-        try { origin = new URL(source).origin; } catch { /* show it as given */ }
-
-        const modal = new DialogModal({ maxWidth: '520px' });
-        modal.setTitle(serverName);
-
-        // Same column layout the share dialog uses: the .share-* pieces below
-        // are spaced by its gap and overlap without it.
-        const body = document.createElement('div');
-        body.className = 'share-menu';
-
-        const note = document.createElement('p');
-        note.className = 'share-note';
-        note.textContent = `${items.length} file${items.length === 1 ? '' : 's'} from ${origin}. `
-            + 'Paste this link into Add Link on another device to open the same library there.';
-        body.appendChild(note);
-
-        const row = document.createElement('div');
-        row.className = 'share-link-row';
-
-        const link = document.createElement('input');
-        link.type = 'text';
-        link.readOnly = true;
-        link.className = 'share-link';
-        link.value = source;
-        link.addEventListener('focus', () => link.select());
-        row.appendChild(link);
-
-        const copy = document.createElement('button');
-        copy.className = 'share-btn share-btn--primary';
-        copy.textContent = 'Copy';
-        copy.addEventListener('click', async () => {
-            try {
-                await navigator.clipboard.writeText(source);
-                Toast.show('Link copied');
-            } catch {
-                // Refused clipboard: selecting it still lets them copy by hand
-                // rather than leaving them with no way to get the link.
-                link.select();
-                Toast.show('Press Ctrl+C to copy the selected link', 4000);
-            }
-            copy.textContent = 'Copied';
-            setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
-        });
-        row.appendChild(copy);
-        body.appendChild(row);
-
-        const warn = document.createElement('p');
-        warn.className = 'share-note share-note--warn';
-        warn.textContent = 'Anyone with this link can browse and play that library. Treat it like a password.';
-        body.appendChild(warn);
-
-        modal.setBody(body);
-        modal.open();
-        link.focus();
     }
 
     /**

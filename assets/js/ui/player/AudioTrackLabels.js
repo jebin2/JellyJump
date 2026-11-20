@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * AudioTrackLabels - names for the audio track menu that tell tracks apart.
  *

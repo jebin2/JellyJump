@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Fill the playlist from a shared library's streaming listing.
  *

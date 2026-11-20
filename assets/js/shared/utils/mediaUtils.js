@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Common Utility Functions
  * Shared helpers for formatting, parsing, and generating IDs
@@ -84,26 +85,3 @@ export function sanitizeFilename(filename) {
     return sanitized;
 }
 
-/**
- * Get MIME type for audio file extension
- * @param {string} url - URL or filename
- * @returns {string} MIME type
- */
-export function getAudioMimeType(url) {
-    const urlLower = url.toLowerCase();
-    const mimeTypes = {
-        '.mp3': 'audio/mpeg',
-        '.flac': 'audio/flac',
-        '.aac': 'audio/aac',
-        '.ogg': 'audio/ogg',
-        '.wav': 'audio/wav',
-        '.m4a': 'audio/mp4',
-        '.opus': 'audio/opus',
-        '.wma': 'audio/x-ms-wma'
-    };
-
-    for (const [ext, mime] of Object.entries(mimeTypes)) {
-        if (urlLower.endsWith(ext)) return mime;
-    }
-    return 'audio/mpeg'; // Default
-}

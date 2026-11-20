@@ -81,12 +81,14 @@ export async function resetPlayer(player) {
 
     player._cleanupThumbnails();
 
+    // A queue that will not close cleanly is left behind either way; the
+    // reset carries on, but a failure here is worth seeing while developing.
     try {
         await player.frames.close();
-    } catch (e) { }
+    } catch (e) { Logger.warn('[MediaLifecycle] Frame queue did not close cleanly:', e); }
     try {
         await player._closeAudioBufferIterator();
-    } catch (e) { }
+    } catch (e) { Logger.warn('[MediaLifecycle] Audio queue did not close cleanly:', e); }
 
     disposeMediaBunnyResources(player);
 
@@ -558,13 +560,15 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
 }
 
 export async function cleanupPlayerMediaBunny(player) {
+    // A queue that will not close cleanly is left behind either way; the
+    // reset carries on, but a failure here is worth seeing while developing.
     try {
         await player.frames.close();
-    } catch (e) { }
+    } catch (e) { Logger.warn('[MediaLifecycle] Frame queue did not close cleanly:', e); }
 
     try {
         await player._closeAudioBufferIterator();
-    } catch (e) { }
+    } catch (e) { Logger.warn('[MediaLifecycle] Audio queue did not close cleanly:', e); }
 
     disposeMediaBunnyResources(player);
 

@@ -1,4 +1,3 @@
-import { Logger } from '../../../shared/utils/Logger.js';
 
 /**
  * Validation Modal

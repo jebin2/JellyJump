@@ -370,14 +370,5 @@ export async function createSlideshowVideo({
 
     } finally {
         await cancelUnfinished(output);
-        if (output && typeof output.dispose === 'function') {
-            try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
-        }
-        if (canvasSource && typeof canvasSource.dispose === 'function') {
-            try { canvasSource.dispose(); } catch (e) { Logger.warn('Error disposing canvasSource:', e); }
-        }
-        if (audioSource && typeof audioSource.dispose === 'function') {
-            try { audioSource.dispose(); } catch (e) { Logger.warn('Error disposing audioSource:', e); }
-        }
     }
 }

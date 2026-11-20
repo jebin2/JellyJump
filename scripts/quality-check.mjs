@@ -1,5 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 
 const root = process.cwd();
 const failures = [];
@@ -81,14 +82,59 @@ const jsFiles = await walk(path.join(root, 'assets/js'), (filePath) => {
     return filePath.endsWith('.js') && !filePath.includes(`${path.sep}lib${path.sep}`);
 });
 
-for (const filePath of jsFiles) {
-    await checkDuplicateClassMethods(filePath);
+/**
+ * An empty catch hides a failure on purpose; the purpose has to be written
+ * down, or the next reader cannot tell a deliberate shrug from a forgotten
+ * handler. A comment inside the braces is enough.
+ */
+async function checkSilentCatches(filePath) {
+    const source = await readFile(filePath, 'utf8');
+    const pattern = /catch\s*(?:\([^)]*\))?\s*\{\s*\}/g;
+    let match;
+    while ((match = pattern.exec(source))) {
+        const line = source.slice(0, match.index).split('\n').length;
+        failures.push(`${path.relative(root, filePath)}:${line} empty catch block; say why it is safe to ignore`);
+    }
 }
 
-const markdownFiles = [
-    path.join(root, 'README.md'),
-    ...await walk(path.join(root, 'docs'), (filePath) => filePath.endsWith('.md')),
-];
+/**
+ * Browser code logs through Logger, which keeps production quiet and can be
+ * switched on with ?debug=1. A bare console call bypasses both.
+ */
+const LOGGER_FILE = path.join(root, 'assets/js/shared/utils/Logger.js');
+async function checkBareConsole(filePath) {
+    if (filePath === LOGGER_FILE) return;
+    const lines = (await readFile(filePath, 'utf8')).split(/\r?\n/);
+    lines.forEach((line, index) => {
+        if (/^\s*(\/\/|\*)/.test(line)) return;
+        if (/\bconsole\.(log|warn|error|info|debug)\(/.test(line)) {
+            failures.push(`${path.relative(root, filePath)}:${index + 1} uses console directly; use Logger`);
+        }
+    });
+}
+
+const desktopFiles = await walk(path.join(root, 'desktop'), (filePath) => {
+    return filePath.endsWith('.js')
+        && !filePath.includes(`${path.sep}node_modules${path.sep}`)
+        && !filePath.includes(`${path.sep}build${path.sep}`)
+        && !filePath.includes(`${path.sep}dist${path.sep}`);
+});
+
+for (const filePath of jsFiles) {
+    await checkDuplicateClassMethods(filePath);
+    await checkSilentCatches(filePath);
+    await checkBareConsole(filePath);
+}
+for (const filePath of desktopFiles) {
+    await checkSilentCatches(filePath);
+}
+
+// Every tracked Markdown file, wherever it lives: a hard-coded docs/ folder
+// made this whole check crash once that folder was removed.
+const markdownFiles = execSync('git ls-files "*.md"', { cwd: root, encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean)
+    .map((file) => path.join(root, file));
 
 for (const filePath of markdownFiles) {
     await checkAccidentalLocalCommands(filePath);
@@ -102,4 +148,4 @@ if (failures.length > 0) {
     process.exit(1);
 }
 
-console.log(`Quality check passed (${jsFiles.length} JavaScript files, ${markdownFiles.length} Markdown files).`);
+console.log(`Quality check passed (${jsFiles.length + desktopFiles.length} JavaScript files, ${markdownFiles.length} Markdown files).`);

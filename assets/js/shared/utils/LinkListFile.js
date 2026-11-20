@@ -1,3 +1,4 @@
+// @ts-check
 import { parseYouTubeUrl } from './YouTubeUrl.js';
 
 /**

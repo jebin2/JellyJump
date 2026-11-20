@@ -456,7 +456,7 @@ export class PlaylistRenderer {
             infoBtn.innerHTML = '<svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-info"></use></svg>';
             infoBtn.onclick = (e) => {
                 e.stopPropagation();
-                p.showRemoteLibraryInfo(folderData.remoteSource);
+                p.remoteLibraries.showInfo(folderData.remoteSource);
             };
             // Two icons side by side otherwise touch: the action buttons carry
             // no styling of their own, which is why the M3U branch below spaces
@@ -472,7 +472,7 @@ export class PlaylistRenderer {
             refreshBtn.onclick = (e) => {
                 e.stopPropagation();
                 refreshBtn.classList.add('spinning');
-                p.refreshRemoteLibrary(folderData.remoteSource)
+                p.remoteLibraries.refresh(folderData.remoteSource)
                     .finally(() => refreshBtn.classList.remove('spinning'));
             };
             header.insertBefore(refreshBtn, removeBtn);

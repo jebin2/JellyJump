@@ -1,4 +1,3 @@
-import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import {
@@ -15,7 +14,7 @@ import {
     setupAutoUpdate
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Crop Menu Handler - Fresh Implementation
@@ -165,55 +164,30 @@ function setupCropButton(elements, state, item, playlist, modal) {
             return;
         }
 
-        hideMessage(elements.messages.error);
-        hideMessage(elements.messages.success);
         showProgress(elements.progress, `Cropping to ${width}x${height}...`);
-        elements.buttons.crop.disabled = true;
-        modal.closeBtn.disabled = true;
-
-        const job = startCancellableJob(elements.progress.section);
-        try {
-            const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-            const blob = await MediaProcessor.process({
-                source: source,
-                format: 'mp4',
-                quality: 100,
-                crop: {
-                    left: Math.round(state.box.x),
-                    top: Math.round(state.box.y),
-                    width: width,
-                    height: height
-                },
-                onProgress: (progress) => {
-                    elements.progress.text.textContent = `${Math.round(progress * 100)}%`;
-                },
-                signal: job.signal,
-            });
-
-            // Success
-            hideProgress(elements.progress);
-            const filename = item.title.replace(/\.[^/.]+$/, "") + `-crop-${width}x${height}.mp4`;
-
-            // Add to playlist
-            const { url } = playlist.insertProcessedItem(item, blob, filename);
-
-            elements.buttons.download.href = url;
-            elements.buttons.download.download = filename;
-            elements.buttons.download.classList.remove('hidden');
-
-            showSuccess(elements.messages.success, 'Added to playlist');
-            elements.buttons.crop.disabled = false;
-            modal.closeBtn.disabled = false;
-
-        } catch (e) {
-            Logger.error('Crop failed:', e);
-            showError(elements.messages.error, job.isCancelled(e) ? CANCELLED_MESSAGE : `Crop failed: ${e.message}`);
-            hideProgress(elements.progress);
-            elements.buttons.crop.disabled = false;
-            modal.closeBtn.disabled = false;
-        } finally {
-            job.end();
-        }
+        await runMenuJob({
+            name: 'Crop',
+            progress: { section: elements.progress.section, text: elements.progress.text },
+            error: elements.messages.error,
+            success: elements.messages.success,
+            lock: [elements.buttons.crop],
+            modal,
+            work: async ({ signal, onProgress }) => {
+                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                return MediaProcessor.process({
+                    source, format: 'mp4', quality: 100,
+                    crop: { left: Math.round(state.box.x), top: Math.round(state.box.y), width, height },
+                    onProgress, signal,
+                });
+            },
+            done: (blob) => {
+                const filename = item.title.replace(/\.[^/.]+$/, "") + `-crop-${width}x${height}.mp4`;
+                const { url } = playlist.insertProcessedItem(item, blob, filename);
+                elements.buttons.download.href = url;
+                elements.buttons.download.download = filename;
+                elements.buttons.download.classList.remove('hidden');
+                elements.messages.success.textContent = '✓ Added to playlist';
+            },
+        });
     });
 }

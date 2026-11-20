@@ -2,6 +2,7 @@
  * PullToRefresh.js
  * Implements "Pull to Hard Reset" functionality.
  */
+import { Logger } from './shared/utils/Logger.js';
 
 export class PullToRefresh {
     constructor() {
@@ -103,14 +104,14 @@ export class PullToRefresh {
         this.setState('refreshing');
 
         try {
-            console.log('Starting hard refresh...');
+            Logger.log('Starting hard refresh...');
 
             // 1. Unregister service workers
             if ('serviceWorker' in navigator) {
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 for (const registration of registrations) {
                     await registration.unregister();
-                    console.log('Service Worker unregistered');
+                    Logger.log('Service Worker unregistered');
                 }
             }
 
@@ -118,22 +119,22 @@ export class PullToRefresh {
             if ('caches' in window) {
                 const keys = await caches.keys();
                 await Promise.all(keys.map(key => caches.delete(key)));
-                console.log('Caches cleared');
+                Logger.log('Caches cleared');
             }
 
             // 3. Clear LocalStorage
             localStorage.clear();
-            console.log('LocalStorage cleared');
+            Logger.log('LocalStorage cleared');
 
             // 4. Clear SessionStorage
             sessionStorage.clear();
-            console.log('SessionStorage cleared');
+            Logger.log('SessionStorage cleared');
 
             // 5. Clear Cookies
             document.cookie.split(";").forEach((c) => {
                 document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
             });
-            console.log('Cookies cleared');
+            Logger.log('Cookies cleared');
 
             // 6. Clear IndexedDB
             if ('indexedDB' in window && 'databases' in indexedDB) {
@@ -143,28 +144,28 @@ export class PullToRefresh {
                         return new Promise((resolve, reject) => {
                             const req = indexedDB.deleteDatabase(db.name);
                             req.onsuccess = () => {
-                                console.log(`Deleted IndexedDB: ${db.name}`);
+                                Logger.log(`Deleted IndexedDB: ${db.name}`);
                                 resolve();
                             };
                             req.onerror = () => {
-                                console.error(`Failed to delete IndexedDB: ${db.name}`);
+                                Logger.error(`Failed to delete IndexedDB: ${db.name}`);
                                 resolve(); // Resolve anyway to continue
                             };
                             req.onblocked = () => {
-                                console.warn(`Delete blocked for IndexedDB: ${db.name}`);
+                                Logger.warn(`Delete blocked for IndexedDB: ${db.name}`);
                                 resolve();
                             };
                         });
                     }));
                 } catch (e) {
-                    console.error('Error clearing IndexedDB:', e);
+                    Logger.error('Error clearing IndexedDB:', e);
                 }
             }
 
             // Hard reload
             window.location.reload(true);
         } catch (error) {
-            console.error('Hard refresh failed:', error);
+            Logger.error('Hard refresh failed:', error);
             window.location.reload();
         }
     }

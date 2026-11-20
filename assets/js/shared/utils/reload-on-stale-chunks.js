@@ -6,6 +6,7 @@
  * leaving dead menus. Rate-limited so a genuinely broken deploy cannot cause
  * a reload loop.
  */
+import { Logger } from './Logger.js';
 const LAST_RELOAD_KEY = 'jj-stale-chunk-reload-at';
 const MIN_RELOAD_INTERVAL_MS = 30_000;
 
@@ -15,6 +16,6 @@ window.addEventListener('vite:preloadError', (event) => {
 
     event.preventDefault();
     sessionStorage.setItem(LAST_RELOAD_KEY, String(Date.now()));
-    console.warn('[App] Build changed underneath us — reloading to fetch new chunks');
+    Logger.warn('[App] Build changed underneath us — reloading to fetch new chunks');
     window.location.reload();
 });

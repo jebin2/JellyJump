@@ -76,7 +76,9 @@ export async function suspendPlayerAudioContext(player) {
 
 export function stopPlayerQueuedAudio(player) {
     for (const node of player.queuedAudioNodes) {
-        try { node.stop(); } catch (e) { }
+        // stop() throws on a source that has already ended or never started;
+        // either way it is silent, which is all this is for.
+        try { node.stop(); } catch { /* already stopped */ }
     }
     player.queuedAudioNodes.clear();
 }

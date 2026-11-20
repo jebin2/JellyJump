@@ -4,15 +4,13 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { generateId, formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import {
     loadVideo,
-    setupDragHandlers,
-    setupOverlayDraw,
     updateBoxPosition,
     setupEditor,
     setupCleanup,
-    updateOverlay
+    setupAreaEditor,
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 export class BlurMenu {
     /**
@@ -143,197 +141,22 @@ export class BlurMenu {
         };
 
 
-        // === 5. Box Logic & Selection ===
+        // === 5. Box Logic, Selection & Drawing ===
 
-        // Render outline rectangles for ALL blur areas on the overlay
-        // Non-selected areas get a simple clickable outline; selected area uses the main box with handles
-        const renderOverlayRects = () => {
-            // Remove previous rect indicators (but not the main box or draw preview)
-            editorUI.overlay.querySelectorAll('.blur-area-rect').forEach(el => el.remove());
-
-            const scale = state.preview.scale || 1;
-            const ox = state.preview.offsetX || 0;
-            const oy = state.preview.offsetY || 0;
-            const currentTime = player ? player.currentTime : 0;
-
-            state.blurAreas.forEach((area, index) => {
-                // Skip the selected one — it uses the main editorUI.box with handles
-                if (index === state.selectedIndex) return;
-
-                // Only show areas active at the current playback time
-                if (currentTime < area.startTime || currentTime > area.endTime) return;
-
-                const rect = document.createElement('div');
-                rect.className = 'blur-area-rect';
-                rect.style.cssText = `
-                    position: absolute;
-                    left: ${ox + area.x * scale}px;
-                    top: ${oy + area.y * scale}px;
-                    width: ${area.width * scale}px;
-                    height: ${area.height * scale}px;
-                    border: 2px dashed rgba(255, 255, 255, 0.5);
-                    background: rgba(255, 255, 255, 0.08);
-                    cursor: pointer;
-                    pointer-events: auto;
-                    z-index: 998;
-                    box-sizing: border-box;
-                `;
-
-                // Area number label
-                const label = document.createElement('span');
-                label.textContent = `${index + 1}`;
-                label.style.cssText = `
-                    position: absolute;
-                    top: 2px; left: 4px;
-                    font-size: 10px;
-                    color: rgba(255,255,255,0.8);
-                    background: rgba(0,0,0,0.5);
-                    padding: 0 3px;
-                    border-radius: 2px;
-                    pointer-events: none;
-                `;
-                rect.appendChild(label);
-
-                // Click to select this area
-                rect.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                    updateSelection(index);
-                });
-
-                editorUI.overlay.appendChild(rect);
-            });
-        };
-
-        // Keep overlay always visible with pointer-events for drawing
-        const showOverlayAlways = () => {
-            editorUI.overlay.setAttribute('style', `
-                display: block;
-                position: absolute;
-                inset: 0;
-                pointer-events: auto !important;
-                z-index: 1000;
-                cursor: crosshair;
-            `);
-            updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-                if (state.selectedIndex >= 0) {
-                    updateBoxPosition(editorUI.box, state);
-                }
-                renderOverlayRects();
-            });
-        };
-
-        // Show overlay immediately (always visible for drawing)
-        showOverlayAlways();
-
-        // === Time-based overlay visibility ===
-        // Show blur controls (box, overlay rects) only during their active time ranges
-        let lastVisibilityCheck = -1;
-        player.addRenderCallback(() => {
-            const currentTime = player ? player.currentTime : 0;
-            if (Math.abs(currentTime - lastVisibilityCheck) < 0.05) return;
-            lastVisibilityCheck = currentTime;
-
-            // Update selected box visibility based on time range
-            if (state.selectedIndex >= 0 && state.selectedIndex < state.blurAreas.length) {
-                const area = state.blurAreas[state.selectedIndex];
-                const inRange = currentTime >= area.startTime && currentTime <= area.endTime;
-                editorUI.box.style.display = inRange ? 'block' : 'none';
-            }
-
-            // Re-render overlay rects (already time-filtered)
-            renderOverlayRects();
-        });
-
-        const updateSelection = (index) => {
-            state.selectedIndex = index;
-            renderList();
-
-            if (index >= 0 && index < state.blurAreas.length) {
-                const area = state.blurAreas[index];
-                state.box = {
-                    x: area.x,
-                    y: area.y,
-                    width: area.width,
-                    height: area.height
-                };
-
-                // Show box with handles
-                editorUI.box.style.display = 'block';
-                updateBoxPosition(editorUI.box, state);
-
-                updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-                    updateBoxPosition(editorUI.box, state);
-                });
-
-            } else {
-                // No selection — hide the box but keep overlay visible for drawing
-                editorUI.box.style.display = 'none';
-            }
-
-            // Re-render all area outlines on overlay
-            renderOverlayRects();
-
-            // Seek to area's start if current time is outside its range, else refresh current frame
-            if (player && player.duration) {
-                if (index >= 0 && index < state.blurAreas.length) {
-                    const area = state.blurAreas[index];
-                    const currentTime = player.currentTime;
-                    if (currentTime < area.startTime || currentTime > area.endTime) {
-                        player.seek(area.startTime);
-                    } else {
-                        player.seek(currentTime);
-                    }
-                } else {
-                    player.seek(player.currentTime);
-                }
-            }
-        };
-
-        const onBoxUpdate = () => {
-            if (state.selectedIndex !== -1) {
-                const area = state.blurAreas[state.selectedIndex];
-                area.x = state.box.x;
-                area.y = state.box.y;
-                area.width = state.box.width;
-                area.height = state.box.height;
-
-                // Sync values back to inputs
-                syncInputsFromArea(state.selectedIndex);
-
-                // Force canvas redraw so blur renders at the new position
-                if (player) player.seek(player.currentTime);
-            }
-        };
-
-        // Update overlay when video resizes
-        const resizeObserver = new ResizeObserver(() => {
-            showOverlayAlways();
-        });
-        resizeObserver.observe(videoPanel);
-
-        // Setup Drag (for selected box move/resize)
-        const cleanupDrag = setupDragHandlers(editorUI.overlay, editorUI.box, state, MIN_SIZE, () => {
-            updateBoxPosition(editorUI.box, state);
-            onBoxUpdate();
-        });
-
-
-        // === 5b. Drawing Rectangles on Overlay ===
-
-        const cleanupOverlayDraw = setupOverlayDraw(editorUI.overlay, state, {
-            excludeBoxSelector: '[data-blur-box]',
-            excludeRectSelector: '.blur-area-rect',
+        const { updateSelection, renderOverlayRects, cleanupDrag, dispose: disposeAreaEditor } = setupAreaEditor({
+            editorUI, state, player, videoPanel,
+            areas: () => state.blurAreas,
+            rectClass: 'blur-area-rect',
+            boxSelector: '[data-blur-box]',
             minSize: MIN_SIZE,
-            onDraw: (x, y, w, h) => {
-                const newArea = {
-                    id: generateId(),
-                    x, y, width: w, height: h,
-                    startTime: 0,
-                    endTime: player.duration || 10
-                };
-                state.blurAreas.push(newArea);
-                updateSelection(state.blurAreas.length - 1);
-            }
+            createArea: (box) => ({
+                id: generateId(),
+                ...box,
+                startTime: 0,
+                endTime: player.duration || 10,
+            }),
+            onSelectionChange: () => renderList(),
+            onAreaMoved: (index) => syncInputsFromArea(index),
         });
 
 
@@ -502,54 +325,31 @@ export class BlurMenu {
                 return;
             }
 
-            elements.processBtn.disabled = true;
-            elements.messages.error.classList.add('hidden');
-            elements.messages.success.classList.add('hidden');
-            elements.progress.section.classList.remove('hidden');
-
             // De-select to hide box overlay
             updateSelection(-1);
 
-            const job = startCancellableJob(elements.progress.section);
-            try {
-                const intensity = getBlurIntensity();
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-                const processedBlob = await MediaProcessor.process({
-                    source: source,
+            await runMenuJob({
+                name: 'Blur processing',
+                progress: elements.progress,
+                error: elements.messages.error,
+                success: elements.messages.success,
+                lock: [elements.processBtn],
+                failureText: (e) => e.message,
+                work: async ({ signal, onProgress }) => MediaProcessor.process({
+                    source: await MediaMetadata.getSourceBlob(item, () => playlist._saveState()),
                     format: 'mp4',
-                    blur: { areas: state.blurAreas, intensity },
-                    onProgress: (p) => {
-                        const pct = Math.round(p * 100);
-                        if (elements.progress.bar) elements.progress.bar.style.width = `${pct}%`;
-                        if (elements.progress.text) elements.progress.text.textContent = `${pct}%`;
-                        if (elements.progress.status) {
-                            elements.progress.status.textContent = p < 0.9 ? "Blurring..." : "Finalizing...";
-                        }
-                    },
-                    signal: job.signal,
-                });
-
-                // Success
-                elements.messages.success.classList.remove('hidden');
-                elements.progress.section.classList.add('hidden');
-
-                const filename = item.title.replace(/\.[^/.]+$/, '') + '-blurred.mp4';
-
-                const { url } = playlist.insertProcessedItem(item, processedBlob, filename);
-
-                elements.downloadBtn.href = url;
-                elements.downloadBtn.download = filename;
-                elements.downloadBtn.classList.remove('hidden');
-
-            } catch (e) {
-                Logger.error('Blur processing failed:', e);
-                elements.messages.error.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : e.message;
-                elements.messages.error.classList.remove('hidden');
-                elements.progress.section.classList.add('hidden');
-            } finally {
-                job.end();
-                elements.processBtn.disabled = false;
-            }
+                    blur: { areas: state.blurAreas, intensity: getBlurIntensity() },
+                    onProgress: (p) => onProgress(p, p < 0.9 ? 'Blurring...' : 'Finalizing...'),
+                    signal,
+                }),
+                done: (processedBlob) => {
+                    const filename = item.title.replace(/\.[^/.]+$/, '') + '-blurred.mp4';
+                    const { url } = playlist.insertProcessedItem(item, processedBlob, filename);
+                    elements.downloadBtn.href = url;
+                    elements.downloadBtn.download = filename;
+                    elements.downloadBtn.classList.remove('hidden');
+                },
+            });
         };
 
 
@@ -558,8 +358,7 @@ export class BlurMenu {
 
         const originalClose = modal.close.bind(modal);
         modal.close = () => {
-            cleanupOverlayDraw();
-            resizeObserver.disconnect();
+            disposeAreaEditor();
             originalClose();
         };
     }

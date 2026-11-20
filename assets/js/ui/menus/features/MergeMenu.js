@@ -3,7 +3,7 @@ import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId } from '../../../shared/utils/mediaUtils.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Merge Menu Handler
@@ -271,117 +271,73 @@ export class MergeMenu {
                 return;
             }
 
-            // UI State
-            // modalContent.querySelector('.options-group').classList.add('disabled'); // Removed
-            widthInput.disabled = true;
-            heightInput.disabled = true;
-            scaleSelect.disabled = true;
-            bgColorInput.disabled = true;
-
+            // The button stays locked after a merge, so the same one is not
+            // made twice; the options come back for the next.
             mergeBtn.disabled = true;
             mergeBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Merging...';
 
             const progressSection = modalContent.querySelector('.progress-section');
-            const progressText = progressSection.querySelector('.progress-percentage');
-            const errorMsg = modalContent.querySelector('.error-message');
             const successMsg = modalContent.querySelector('.success-message');
             const downloadBtn = modalContent.querySelector('.download-btn');
 
-            progressSection.classList.remove('hidden');
-            errorMsg.classList.add('hidden');
-            successMsg.classList.add('hidden');
+            const outcome = await runMenuJob({
+                name: 'Merge',
+                progress: { section: progressSection, text: progressSection.querySelector('.progress-percentage') },
+                error: modalContent.querySelector('.error-message'),
+                success: successMsg,
+                lock: [widthInput, heightInput, scaleSelect, bgColorInput],
+                modal,
+                work: async ({ signal, onProgress }) => {
+                    const inputs = [];
+                    for (const item of selectedVideos) {
+                        inputs.push(await MediaMetadata.getSourceBlob(item, () => playlist._saveState()));
+                    }
+                    return MediaProcessor.merge({
+                        inputs,
+                        format: 'mp4',
+                        resolution: { width: targetWidth, height: targetHeight },
+                        scaleMode,
+                        backgroundColor,
+                        onProgress,
+                        signal,
+                    });
+                },
+                done: (mergedBlob) => {
+                    successMsg.textContent = '✓ Added to playlist';
+                    mergeBtn.innerHTML = '<span>Added</span><svg width="16" height="16" fill="currentColor" class="ml-xs"><use href="assets/icons/sprite.svg#icon-check"></use></svg>';
 
-            const job = startCancellableJob(progressSection);
-            try {
-                // Prepare Inputs (with caching)
-                const inputs = [];
-                for (const item of selectedVideos) {
-                    const blob = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-                    inputs.push(blob);
-                }
+                    const url = URL.createObjectURL(mergedBlob);
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const filename = `merged-${timestamp}.mp4`;
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
 
-                // Merge
-                const mergedBlob = await MediaProcessor.merge({
-                    inputs: inputs,
-                    format: 'mp4',
-                    resolution: { width: targetWidth, height: targetHeight },
-                    scaleMode: scaleMode,
-                    backgroundColor: backgroundColor,
-                    onProgress: (progress) => {
-                        const pct = Math.round(progress * 100);
-                        progressText.textContent = `${pct}%`;
-                    },
-                    signal: job.signal,
-                });
-
-                // Success
-                progressSection.classList.add('hidden'); // Hide progress bar
-                successMsg.textContent = '✓ Added to playlist';
-                successMsg.classList.remove('hidden');
-
-                // Re-enable inputs for next operation
-                widthInput.disabled = false;
-                heightInput.disabled = false;
-                scaleSelect.disabled = false;
-                bgColorInput.disabled = false;
-
-                // Actually keep disabled to prevent double merge but maybe change icon
-                mergeBtn.innerHTML = '<span>Added</span><svg width="16" height="16" fill="currentColor" class="ml-xs"><use href="assets/icons/sprite.svg#icon-check"></use></svg>';
-
-                // Setup Download
-                const url = URL.createObjectURL(mergedBlob);
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `merged-${timestamp}.mp4`;
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                // Add to Playlist
-                if (addToPlaylist) {
+                    if (!addToPlaylist) return;
                     const firstSelected = selectedVideos[0];
                     const basePath = firstSelected?.path || firstSelected?.title || '';
                     const parentPath = basePath.includes('/') ? basePath.substring(0, basePath.lastIndexOf('/')) : '';
-
                     const newItem = {
                         title: filename,
-                        url: url,
+                        url,
                         duration: '...',
                         thumbnail: '',
                         isLocal: true,
                         file: new File([mergedBlob], filename, { type: 'video/mp4' }),
                         id: generateId(),
-                        path: parentPath ? `${parentPath}/${filename}` : filename
+                        path: parentPath ? `${parentPath}/${filename}` : filename,
                     };
-
                     const lastIndex = playlist.items.indexOf(selectedVideos[selectedVideos.length - 1]);
-                    if (lastIndex !== -1) {
-                        playlist.items.splice(lastIndex + 1, 0, newItem);
-                    } else {
-                        playlist.items.push(newItem);
-                    }
-
+                    if (lastIndex !== -1) playlist.items.splice(lastIndex + 1, 0, newItem);
+                    else playlist.items.push(newItem);
                     playlist._saveState();
                     playlist.render();
                     playlist._processMetadata([newItem]);
-                }
-
-            } catch (e) {
-                Logger.error('Merge failed:', e);
-                progressSection.classList.add('hidden'); // Hide progress bar on error
-                errorMsg.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Merge failed: ${e.message}`;
-                errorMsg.classList.remove('hidden');
-
-                // Re-enable inputs on error
-                widthInput.disabled = false;
-                heightInput.disabled = false;
-                scaleSelect.disabled = false;
-                bgColorInput.disabled = false;
-
+                },
+            });
+            if (!outcome.ok) {
                 mergeBtn.disabled = false;
                 mergeBtn.innerHTML = '<span class="mr-xs">Merge</span><svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-layers"></use></svg>';
-            } finally {
-                job.end();
             }
         });
     }

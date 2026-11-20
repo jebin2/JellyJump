@@ -1,5 +1,6 @@
 import { Modal } from '../../Modal.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../../shared/utils/FooterHelper.js';
+import { Logger } from '../../../shared/utils/Logger.js';
 
 export { FOOTER_CONFIGS };
 
@@ -15,7 +16,7 @@ export { FOOTER_CONFIGS };
 export function openProcessMenu(title, templateId, footerConfig, options = {}) {
     const template = document.getElementById(templateId);
     if (!template) {
-        console.error(`[MenuFactory] Template not found: ${templateId}`);
+        Logger.error(`[MenuFactory] Template not found: ${templateId}`);
         return { modal: null, content: null };
     }
 

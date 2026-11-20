@@ -185,20 +185,6 @@ export function parseTranscriptJSON(jsonContent) {
     throw new Error('Invalid transcript format: expected array or object with words/segments property');
 }
 
-/**
- * Load and convert a JSON transcript file to VTT.
- * 
- * @param {string} url - URL to the JSON transcript file
- * @param {Object} options - Options for jsonToVTT
- * @returns {Promise<string>} WebVTT formatted string
- */
-export async function loadJSONTranscript(url, options = {}) {
-    const response = await fetch(url);
-    const jsonContent = await response.text();
-    const words = parseTranscriptJSON(jsonContent);
-    return jsonToVTT(words, options);
-}
-
 /** HH:MM:SS.mmm from whole milliseconds, so 59.9996s cannot become "60.000". */
 function vttTimestamp(ms) {
     const total = Math.max(0, Math.round(ms));

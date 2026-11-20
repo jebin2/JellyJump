@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Visualizer Math Utilities
  * Pure audio-analysis helpers: beat detection and pitch estimation.
@@ -5,7 +6,7 @@
  */
 export class VisualizerMath {
     /**
-     * @param {AudioVisualizer} visualizer - The main visualizer instance
+     * @param {import('./AudioVisualizer.js').AudioVisualizer} visualizer - The main visualizer instance
      */
     constructor(visualizer) {
         this.visualizer = visualizer;

@@ -1,3 +1,4 @@
+// @ts-check
 import { isCancellation } from '../../../processing/shared/Cancellation.js';
 
 /** What a menu shows when the user stopped the job themselves. */

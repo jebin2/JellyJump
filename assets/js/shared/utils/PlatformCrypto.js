@@ -792,12 +792,10 @@ export class PlatformCrypto {
         // Streamed path: the writable is closed by finalize()'s stream close;
         // there is no in-RAM buffer to wrap, so signal completion with null.
         if (fileWritable) {
-            if (typeof output.dispose === 'function') output.dispose();
             return null;
         }
 
         const mp4Blob = new Blob([output.target.buffer], { type: 'video/mp4' });
-        if (typeof output.dispose === 'function') output.dispose();
 
         return mp4Blob;
     }

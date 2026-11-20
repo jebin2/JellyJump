@@ -1,9 +1,8 @@
-import { Logger } from "../../../shared/utils/Logger.js";
 import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId } from '../../../shared/utils/mediaUtils.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Combine Audio/Video Menu Handler
@@ -89,89 +88,68 @@ export class CombineAVMenu {
 
             const format = formatSelect.value;
 
-            videoSelect.disabled = true;
-            audioSelect.disabled = true;
-            formatSelect.disabled = true;
+            // The button stays locked after a success, so the same pair is
+            // not combined twice.
             combineBtn.disabled = true;
             combineBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Combining...';
 
             const progressSection = modalContent.querySelector('.progress-section');
-            const progressText = progressSection.querySelector('.progress-percentage');
-            const errorMsg = modalContent.querySelector('.error-message');
             const successMsg = modalContent.querySelector('.success-message');
             const downloadBtn = modalContent.querySelector('.download-btn');
 
-            progressSection.classList.remove('hidden');
-            errorMsg.classList.add('hidden');
-            successMsg.classList.add('hidden');
+            const outcome = await runMenuJob({
+                name: 'Combine',
+                progress: { section: progressSection, text: progressSection.querySelector('.progress-percentage') },
+                error: modalContent.querySelector('.error-message'),
+                success: successMsg,
+                lock: [videoSelect, audioSelect, formatSelect],
+                unlock: 'onFailure',
+                modal,
+                work: async ({ signal, onProgress }) => {
+                    const videoBlob = await MediaMetadata.getSourceBlob(videoItem, () => playlist._saveState());
+                    const audioBlob = await MediaMetadata.getSourceBlob(audioItem, () => playlist._saveState());
+                    return MediaProcessor.combineAudioVideo({
+                        videoSource: videoBlob,
+                        audioSource: audioBlob,
+                        format,
+                        onProgress,
+                        signal,
+                    });
+                },
+                done: (combinedBlob) => {
+                    successMsg.textContent = '✓ Added to playlist';
+                    combineBtn.innerHTML = '<span>Added</span><svg width="16" height="16" fill="currentColor" class="ml-xs"><use href="assets/icons/sprite.svg#icon-check"></use></svg>';
 
-            const job = startCancellableJob(progressSection);
-            try {
-                const videoBlob = await MediaMetadata.getSourceBlob(videoItem, () => playlist._saveState());
-                const audioBlob = await MediaMetadata.getSourceBlob(audioItem, () => playlist._saveState());
+                    const url = URL.createObjectURL(combinedBlob);
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const filename = `combined-${timestamp}.${format}`;
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
 
-                const combinedBlob = await MediaProcessor.combineAudioVideo({
-                    videoSource: videoBlob,
-                    audioSource: audioBlob,
-                    format,
-                    onProgress: (progress) => {
-                        progressText.textContent = `${Math.round(progress * 100)}%`;
-                    },
-                    signal: job.signal,
-                });
-
-                progressSection.classList.add('hidden');
-                successMsg.textContent = '✓ Added to playlist';
-                successMsg.classList.remove('hidden');
-
-                combineBtn.innerHTML = '<span>Added</span><svg width="16" height="16" fill="currentColor" class="ml-xs"><use href="assets/icons/sprite.svg#icon-check"></use></svg>';
-
-                const url = URL.createObjectURL(combinedBlob);
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `combined-${timestamp}.${format}`;
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                const basePath = videoItem?.path || videoItem?.title || '';
-                const parentPath = basePath.includes('/') ? basePath.substring(0, basePath.lastIndexOf('/')) : '';
-
-                const newItem = {
-                    title: filename,
-                    url,
-                    duration: '...',
-                    thumbnail: '',
-                    isLocal: true,
-                    file: new File([combinedBlob], filename, { type: `video/${format}` }),
-                    id: generateId(),
-                    path: parentPath ? `${parentPath}/${filename}` : filename
-                };
-
-                const lastIndex = playlist.items.indexOf(videoItem);
-                if (lastIndex !== -1) {
-                    playlist.items.splice(lastIndex + 1, 0, newItem);
-                } else {
-                    playlist.items.push(newItem);
-                }
-
-                playlist._saveState();
-                playlist.render();
-                playlist._processMetadata([newItem]);
-
-            } catch (e) {
-                Logger.error('Combine Audio/Video failed:', e);
-                progressSection.classList.add('hidden');
-                errorMsg.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Combine failed: ${e.message}`;
-                errorMsg.classList.remove('hidden');
-
-                videoSelect.disabled = false;
-                audioSelect.disabled = false;
-                formatSelect.disabled = false;
+                    const basePath = videoItem?.path || videoItem?.title || '';
+                    const parentPath = basePath.includes('/') ? basePath.substring(0, basePath.lastIndexOf('/')) : '';
+                    const newItem = {
+                        title: filename,
+                        url,
+                        duration: '...',
+                        thumbnail: '',
+                        isLocal: true,
+                        file: new File([combinedBlob], filename, { type: `video/${format}` }),
+                        id: generateId(),
+                        path: parentPath ? `${parentPath}/${filename}` : filename,
+                    };
+                    const lastIndex = playlist.items.indexOf(videoItem);
+                    if (lastIndex !== -1) playlist.items.splice(lastIndex + 1, 0, newItem);
+                    else playlist.items.push(newItem);
+                    playlist._saveState();
+                    playlist.render();
+                    playlist._processMetadata([newItem]);
+                },
+            });
+            if (!outcome.ok) {
                 combineBtn.disabled = false;
                 combineBtn.innerHTML = '<span class="mr-xs">Combine</span><svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-audio"></use></svg>';
-            } finally {
-                job.end();
             }
         });
     }

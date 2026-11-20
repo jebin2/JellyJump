@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Logger Utility
  * Only logs to console when running on localhost (development mode).

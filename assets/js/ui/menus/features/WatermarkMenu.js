@@ -4,15 +4,13 @@ import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId, formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import {
     loadVideo,
-    setupDragHandlers,
-    setupOverlayDraw,
     updateBoxPosition,
     setupEditor,
     setupCleanup,
-    updateOverlay
+    setupAreaEditor,
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Watermark Menu Handler - Multi-watermark with time ranges
@@ -145,188 +143,29 @@ export class WatermarkMenu {
         player.addRenderCallback(renderCallback);
 
 
-        // === 5. Box Logic & Selection ===
+        // === 5. Box Logic, Selection & Drawing ===
 
-        // Render outline rectangles for non-selected watermarks
-        const renderOverlayRects = () => {
-            editorUI.overlay.querySelectorAll('.wm-area-rect').forEach(el => el.remove());
-
-            const scale = state.preview.scale || 1;
-            const ox = state.preview.offsetX || 0;
-            const oy = state.preview.offsetY || 0;
-            const currentTime = player ? player.currentTime : 0;
-
-            state.watermarkAreas.forEach((area, index) => {
-                if (index === state.selectedIndex) return;
-                if (currentTime < area.startTime || currentTime > area.endTime) return;
-
-                const rect = document.createElement('div');
-                rect.className = 'wm-area-rect';
-                rect.style.cssText = `
-                    position: absolute;
-                    left: ${ox + area.x * scale}px;
-                    top: ${oy + area.y * scale}px;
-                    width: ${area.width * scale}px;
-                    height: ${area.height * scale}px;
-                    border: 2px dashed rgba(255, 255, 255, 0.5);
-                    background: rgba(255, 255, 255, 0.08);
-                    cursor: pointer;
-                    pointer-events: auto;
-                    z-index: 998;
-                    box-sizing: border-box;
-                `;
-
-                const label = document.createElement('span');
-                label.textContent = `${index + 1}`;
-                label.style.cssText = `
-                    position: absolute;
-                    top: 2px; left: 4px;
-                    font-size: 10px;
-                    color: rgba(255,255,255,0.8);
-                    background: rgba(0,0,0,0.5);
-                    padding: 0 3px;
-                    border-radius: 2px;
-                    pointer-events: none;
-                `;
-                rect.appendChild(label);
-
-                rect.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                    updateSelection(index);
-                });
-
-                editorUI.overlay.appendChild(rect);
-            });
-        };
-
-        // Keep overlay always visible with crosshair cursor for drawing
-        const showOverlayAlways = () => {
-            editorUI.overlay.setAttribute('style', `
-                display: block;
-                position: absolute;
-                inset: 0;
-                pointer-events: auto !important;
-                z-index: 1000;
-                cursor: crosshair;
-            `);
-            updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-                if (state.selectedIndex >= 0) {
-                    updateBoxPosition(editorUI.box, state);
-                }
-                renderOverlayRects();
-            });
-        };
-
-        showOverlayAlways();
-
-        // === Time-based overlay visibility ===
-        let lastVisibilityCheck = -1;
-        player.addRenderCallback(() => {
-            const currentTime = player ? player.currentTime : 0;
-            if (Math.abs(currentTime - lastVisibilityCheck) < 0.05) return;
-            lastVisibilityCheck = currentTime;
-
-            if (state.selectedIndex >= 0 && state.selectedIndex < state.watermarkAreas.length) {
-                const area = state.watermarkAreas[state.selectedIndex];
-                const inRange = currentTime >= area.startTime && currentTime <= area.endTime;
-                editorUI.box.style.display = inRange ? 'block' : 'none';
-            }
-
-            renderOverlayRects();
-        });
-
-
-        const updateSelection = (index) => {
-            state.selectedIndex = index;
-            renderList();
-
-            if (index >= 0 && index < state.watermarkAreas.length) {
-                const area = state.watermarkAreas[index];
-                state.box = {
-                    x: area.x,
-                    y: area.y,
-                    width: area.width,
-                    height: area.height
-                };
-
-                editorUI.box.style.display = 'block';
-                updateBoxPosition(editorUI.box, state);
-
-                updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-                    updateBoxPosition(editorUI.box, state);
-                });
-            } else {
-                editorUI.box.style.display = 'none';
-            }
-
-            renderOverlayRects();
-
-            // Seek to area's start if current time is outside its range
-            if (player && player.duration) {
-                if (index >= 0 && index < state.watermarkAreas.length) {
-                    const area = state.watermarkAreas[index];
-                    const currentTime = player.currentTime;
-                    if (currentTime < area.startTime || currentTime > area.endTime) {
-                        player.seek(area.startTime);
-                    } else {
-                        player.seek(currentTime);
-                    }
-                } else {
-                    player.seek(player.currentTime);
-                }
-            }
-        };
-
-        const onBoxUpdate = () => {
-            if (state.selectedIndex !== -1) {
-                const area = state.watermarkAreas[state.selectedIndex];
-                area.x = state.box.x;
-                area.y = state.box.y;
-                area.width = state.box.width;
-                area.height = state.box.height;
-
-                syncInputsFromArea(state.selectedIndex);
-
-                if (player) player.seek(player.currentTime);
-            }
-        };
-
-        // Update overlay when video resizes
-        const resizeObserver = new ResizeObserver(() => {
-            showOverlayAlways();
-        });
-        resizeObserver.observe(videoPanel);
-
-        // Setup Drag (for selected box move/resize)
-        const cleanupDrag = setupDragHandlers(editorUI.overlay, editorUI.box, state, MIN_SIZE, () => {
-            updateBoxPosition(editorUI.box, state);
-            onBoxUpdate();
-        });
-
-
-        // === 5b. Drawing Rectangles on Overlay ===
-
-        const cleanupOverlayDraw = setupOverlayDraw(editorUI.overlay, state, {
-            excludeBoxSelector: '[data-watermark-box]',
-            excludeRectSelector: '.wm-area-rect',
+        const { updateSelection, renderOverlayRects, cleanupDrag, dispose: disposeAreaEditor } = setupAreaEditor({
+            editorUI, state, player, videoPanel,
+            areas: () => state.watermarkAreas,
+            rectClass: 'wm-area-rect',
+            boxSelector: '[data-watermark-box]',
             minSize: MIN_SIZE,
-            onDraw: (x, y, w, h) => {
-                const newArea = {
-                    id: generateId(),
-                    x, y, width: w, height: h,
-                    startTime: 0,
-                    endTime: player.duration || 10,
-                    type: 'text',
-                    text: 'Watermark',
-                    color: '#ffffff',
-                    imageFile: null,
-                    imageDataUrl: null,
-                    opacity: 1.0,
-                    _previewImage: null
-                };
-                state.watermarkAreas.push(newArea);
-                updateSelection(state.watermarkAreas.length - 1);
-            }
+            createArea: (box) => ({
+                id: generateId(),
+                ...box,
+                startTime: 0,
+                endTime: player.duration || 10,
+                type: 'text',
+                text: 'Watermark',
+                color: '#ffffff',
+                imageFile: null,
+                imageDataUrl: null,
+                opacity: 1.0,
+                _previewImage: null,
+            }),
+            onSelectionChange: () => renderList(),
+            onAreaMoved: (index) => syncInputsFromArea(index),
         });
 
 
@@ -577,107 +416,36 @@ export class WatermarkMenu {
                 return;
             }
 
-            elements.processBtn.disabled = true;
-            elements.messages.error.classList.add('hidden');
-            elements.messages.success.classList.add('hidden');
-            elements.progress.section.classList.remove('hidden');
-
             updateSelection(-1);
 
-            const job = startCancellableJob(elements.progress.section);
-            try {
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+            const ext = item.title.split('.').pop().toLowerCase();
+            const format = ['mp4', 'webm', 'mov'].includes(ext) ? ext : 'mp4';
 
-                // Build watermark items config for MediaProcessor
-                const items = state.watermarkAreas.map(wm => {
-                    const wmConfig = {
-                        id: wm.id,
-                        type: wm.type,
-                        x: Math.round(wm.x),
-                        y: Math.round(wm.y),
-                        width: Math.round(wm.width),
-                        height: Math.round(wm.height),
-                        opacity: wm.opacity,
-                        startTime: wm.startTime,
-                        endTime: wm.endTime
-                    };
-
-                    if (wm.type === 'text') {
-                        // Pre-calculate font size and centering
-                        const heightConstraint = wm.height * 0.8;
-                        const charCount = Math.max(1, wm.text.length);
-                        const widthConstraint = (wm.width * 0.9) / (charCount * 0.5);
-                        const finalFontSize = Math.max(12, Math.min(heightConstraint, widthConstraint));
-
-                        // Measure text for centering
-                        const tempCanvas = document.createElement('canvas');
-                        const tempCtx = tempCanvas.getContext('2d');
-                        tempCtx.font = `bold ${finalFontSize}px sans-serif`;
-                        const textMetrics = tempCtx.measureText(wm.text);
-                        const textWidth = textMetrics.width;
-
-                        wmConfig.text = wm.text;
-                        wmConfig.x = Math.round(wm.x + (wm.width - textWidth) / 2);
-                        wmConfig.y = Math.round(wm.y + (wm.height - finalFontSize) / 2);
-                        wmConfig.fontSize = Math.round(finalFontSize);
-                        wmConfig.font = `bold ${Math.round(finalFontSize)}px sans-serif`;
-                        wmConfig.fillStyle = (() => {
-                            const rgb = hexToRgb(wm.color);
-                            return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
-                        })();
-                        wmConfig.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-                        wmConfig.lineWidth = Math.round(finalFontSize) * 0.05;
-                        wmConfig.textAlign = 'left';
-                        wmConfig.textBaseline = 'top';
-                    } else if (wm.type === 'image') {
-                        wmConfig.image = wm.imageFile;
-                    }
-
-                    return wmConfig;
-                });
-
-                const ext = item.title.split('.').pop().toLowerCase();
-                const format = ['mp4', 'webm', 'mov'].includes(ext) ? ext : 'mp4';
-
-                const blob = await MediaProcessor.process({
-                    source: source,
-                    format: format,
+            await runMenuJob({
+                name: 'Watermark processing',
+                progress: elements.progress,
+                error: elements.messages.error,
+                success: elements.messages.success,
+                lock: [elements.processBtn],
+                failureText: (e) => e.message,
+                work: async ({ signal, onProgress }) => MediaProcessor.process({
+                    source: await MediaMetadata.getSourceBlob(item, () => playlist._saveState()),
+                    format,
                     quality: 100,
-                    watermark: { items },
-                    onProgress: (p) => {
-                        const pct = Math.round(p * 100);
-                        if (elements.progress.bar) elements.progress.bar.style.width = `${pct}%`;
-                        if (elements.progress.text) elements.progress.text.textContent = `${pct}%`;
-                        if (elements.progress.status) {
-                            elements.progress.status.textContent = p < 0.9 ? "Watermarking..." : "Finalizing...";
-                        }
-                    },
-                    signal: job.signal,
-                });
-
-                // Success
-                elements.messages.success.classList.remove('hidden');
-                elements.progress.section.classList.add('hidden');
-
-                const filename = item.title.replace(/\.[^/.]+$/, '') + `-watermarked.${format}`;
-
-                const { url } = playlist.insertProcessedItem(item, blob, filename, {
-                    type: `video/${format}`,
-                });
-
-                elements.downloadBtn.href = url;
-                elements.downloadBtn.download = filename;
-                elements.downloadBtn.classList.remove('hidden');
-
-            } catch (e) {
-                Logger.error('Watermark processing failed:', e);
-                elements.messages.error.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : e.message;
-                elements.messages.error.classList.remove('hidden');
-                elements.progress.section.classList.add('hidden');
-            } finally {
-                job.end();
-                elements.processBtn.disabled = false;
-            }
+                    watermark: { items: state.watermarkAreas.map(toWatermarkConfig) },
+                    onProgress: (p) => onProgress(p, p < 0.9 ? 'Watermarking...' : 'Finalizing...'),
+                    signal,
+                }),
+                done: (blob) => {
+                    const filename = item.title.replace(/\.[^/.]+$/, '') + `-watermarked.${format}`;
+                    const { url } = playlist.insertProcessedItem(item, blob, filename, {
+                        type: `video/${format}`,
+                    });
+                    elements.downloadBtn.href = url;
+                    elements.downloadBtn.download = filename;
+                    elements.downloadBtn.classList.remove('hidden');
+                },
+            });
         };
 
 
@@ -686,11 +454,62 @@ export class WatermarkMenu {
 
         const originalClose = modal.close.bind(modal);
         modal.close = () => {
-            cleanupOverlayDraw();
-            resizeObserver.disconnect();
+            disposeAreaEditor();
             originalClose();
         };
     }
+}
+
+/**
+ * One watermark as the processor takes it: its box rounded to pixels, and a
+ * text one with its font sized to fit the box and placed in its middle.
+ * @param {Object} wm - a watermark area from the editor
+ */
+function toWatermarkConfig(wm) {
+    const wmConfig = {
+        id: wm.id,
+        type: wm.type,
+        x: Math.round(wm.x),
+        y: Math.round(wm.y),
+        width: Math.round(wm.width),
+        height: Math.round(wm.height),
+        opacity: wm.opacity,
+        startTime: wm.startTime,
+        endTime: wm.endTime
+    };
+
+    if (wm.type === 'text') {
+        // Pre-calculate font size and centering
+        const heightConstraint = wm.height * 0.8;
+        const charCount = Math.max(1, wm.text.length);
+        const widthConstraint = (wm.width * 0.9) / (charCount * 0.5);
+        const finalFontSize = Math.max(12, Math.min(heightConstraint, widthConstraint));
+
+        // Measure text for centering
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.font = `bold ${finalFontSize}px sans-serif`;
+        const textMetrics = tempCtx.measureText(wm.text);
+        const textWidth = textMetrics.width;
+
+        wmConfig.text = wm.text;
+        wmConfig.x = Math.round(wm.x + (wm.width - textWidth) / 2);
+        wmConfig.y = Math.round(wm.y + (wm.height - finalFontSize) / 2);
+        wmConfig.fontSize = Math.round(finalFontSize);
+        wmConfig.font = `bold ${Math.round(finalFontSize)}px sans-serif`;
+        wmConfig.fillStyle = (() => {
+            const rgb = hexToRgb(wm.color);
+            return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+        })();
+        wmConfig.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        wmConfig.lineWidth = Math.round(finalFontSize) * 0.05;
+        wmConfig.textAlign = 'left';
+        wmConfig.textBaseline = 'top';
+    } else if (wm.type === 'image') {
+        wmConfig.image = wm.imageFile;
+    }
+
+    return wmConfig;
 }
 
 function hexToRgb(hex) {

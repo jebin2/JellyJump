@@ -3,7 +3,7 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { decodeAudioRange, getAudioDuration } from '../../../processing/shared/AudioHelpers.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Slideshow Menu Handler
@@ -210,7 +210,7 @@ export class SlideshowMenu {
 
         const stopPreview = () => {
             if (previewNode) {
-                try { previewNode.stop(); } catch (_) {}
+                try { previewNode.stop(); } catch { /* the preview already ended */ }
                 previewNode = null;
             }
             playIcon.setAttribute('href', 'assets/icons/sprite.svg#icon-play');
@@ -318,81 +318,61 @@ export class SlideshowMenu {
 
                 stopPreview();
 
-                // Disable UI
-                processBtn.disabled = true;
-                transitionDropdown.setDisabled(true);
-                fpsDropdown.setDisabled(true);
-                if (downloadBtn) downloadBtn.disabled = true;
-                if (errorMessage) errorMessage.classList.add('hidden');
-                if (successMessage) successMessage.classList.add('hidden');
-                if (progressSection) progressSection.classList.remove('hidden');
                 if (progressStatus) progressStatus.textContent = 'Encoding...';
 
+                // Not closable at all while working, not even by Escape or
+                // the backdrop.
                 const closeBtn = modal.modal.querySelector('.mb-modal-close');
                 const originalClose = modal.close.bind(modal);
                 modal.close = () => { };
                 if (closeBtn) closeBtn.style.display = 'none';
 
-                const job = startCancellableJob(progressSection);
                 try {
-                    const onProgress = (progress) => {
-                        const pct = Math.round(progress * 100);
-                        if (progressText) progressText.textContent = `${pct}%`;
-                        if (progressStatus) {
-                            progressStatus.textContent = progress < 0.9 ? 'Rendering frames...' : 'Finalizing...';
-                        }
-                    };
+                    await runMenuJob({
+                        name: '[SlideshowMenu] Processing',
+                        progress: { section: progressSection, text: progressText, status: progressStatus },
+                        error: errorMessage,
+                        success: successMessage,
+                        lock: [processBtn, transitionDropdown, fpsDropdown],
+                        failureText: (e) => `Failed: ${e.message}`,
+                        work: ({ signal, onProgress }) => MediaProcessor.createSlideshowVideo({
+                            imageBlobs,
+                            imageDurations,
+                            transition,
+                            transitionDuration,
+                            audioBlob,
+                            audioLoop: true,
+                            audioStartTime,
+                            audioEndTime,
+                            fps,
+                            onProgress: (p) => onProgress(p, p < 0.9 ? 'Rendering frames...' : 'Finalizing...'),
+                            signal,
+                        }),
+                        done: async (outputBlob) => {
+                            const filename = `slideshow-${transition}-${Date.now()}.mp4`;
+                            const { item: newItem, url } = playlist.insertProcessedItem(null, outputBlob, filename, {
+                                mediaType: 'video/mp4',
+                                extra: { path: `Slideshow/${filename}` }
+                            });
+                            await playlist._ensureMetadata(newItem);
 
-                    const outputBlob = await MediaProcessor.createSlideshowVideo({
-                        imageBlobs,
-                        imageDurations,
-                        transition,
-                        transitionDuration,
-                        audioBlob,
-                        audioLoop: true,
-                        audioStartTime,
-                        audioEndTime,
-                        fps,
-                        onProgress,
-                        signal: job.signal,
+                            if (downloadBtn) {
+                                downloadBtn.onclick = () => {
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = filename;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                };
+                                downloadBtn.disabled = false;
+                                downloadBtn.classList.remove('hidden');
+                            }
+                        },
                     });
-
-                    if (successMessage) successMessage.classList.remove('hidden');
-                    if (progressSection) progressSection.classList.add('hidden');
-
-                    const filename = `slideshow-${transition}-${Date.now()}.mp4`;
-                    const { item: newItem, url } = playlist.insertProcessedItem(null, outputBlob, filename, {
-                        mediaType: 'video/mp4',
-                        extra: { path: `Slideshow/${filename}` }
-                    });
-                    await playlist._ensureMetadata(newItem);
-
-                    if (downloadBtn) {
-                        downloadBtn.onclick = () => {
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                        };
-                        downloadBtn.disabled = false;
-                        downloadBtn.classList.remove('hidden');
-                    }
-                } catch (e) {
-                    Logger.error('[SlideshowMenu] Processing failed:', e);
-                    if (errorMessage) {
-                        errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Failed: ${e.message}`;
-                        errorMessage.classList.remove('hidden');
-                    }
-                    if (progressSection) progressSection.classList.add('hidden');
                 } finally {
-                    job.end();
                     modal.close = originalClose;
                     if (closeBtn) closeBtn.style.display = '';
-                    if (processBtn) processBtn.disabled = false;
-                    transitionDropdown.setDisabled(false);
-                    fpsDropdown.setDisabled(false);
                 }
             });
         }

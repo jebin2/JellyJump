@@ -1,6 +1,5 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { Modal } from '../../Modal.js';
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaBunny, ensureDecodersFor } from '../../../core/MediaBunny.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 

@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "quality": "node scripts/quality-check.mjs",
     "verify:libs": "bash download_libs.sh verify",
-    "check": "npm run quality && npm run verify:libs && npm run build",
+    "typecheck": "tsc -p jsconfig.json",
+    "check": "npm run quality && npm run typecheck && npm run verify:libs && npm run build",
+    "test": "npm run quality && npm run typecheck && npm run verify:libs && npm run build && node scripts/run-tests.mjs",
     "clean": "rm -rf dist",
     "build:desktop": "./build-desktop.sh",
     "sim:jjc3": "bash scripts/jjc3-sim.sh",
@@ -38,6 +40,7 @@
   },
   "devDependencies": {
     "playwright-core": "^1.56.0",
+    "typescript": "^5.6.3",
     "vite": "^8.0.0"
   },
   "dependencies": {

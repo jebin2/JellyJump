@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Which of the player's loaders a playlist item belongs to.
  *

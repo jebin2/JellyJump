@@ -1,10 +1,9 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
-import { formatTime } from '../../../shared/utils/mediaUtils.js';
 import { loadVideo } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 export class RemoveBackgroundMenu {
     /**
@@ -309,85 +308,46 @@ export class RemoveBackgroundMenu {
                 return;
             }
 
-            // UI Updates
-            processBtn.disabled = true;
             downloadBtn.classList.add('hidden');
-            // Hide previous messages and show progress
-            errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
-            progressSection.classList.remove('hidden');
-
-            // Disable inputs
-            livePreviewToggle.disabled = true;
-            bgTypeRadios.forEach(r => r.disabled = true);
+            // Its own rule for coming back: only with a custom background.
             customBgColorInput.disabled = true;
-
-            // Pause player
             if (player) player.pause();
-            const job = startCancellableJob(progressSection);
-            try {
-                const bgType = Array.from(bgTypeRadios).find(r => r.checked).value;
-                const bgColor = customBgColorInput.value;
 
-                const processedBlob = await MediaProcessor.process({
+            const bgType = Array.from(bgTypeRadios).find(r => r.checked).value;
+            const bgColor = customBgColorInput.value;
+
+            await runMenuJob({
+                name: 'Processing',
+                progress: { section: progressSection, text: progressText, bar: progressBar, status: progressStatus },
+                error: errorMessage,
+                success: successMessage,
+                lock: [processBtn, livePreviewToggle, ...bgTypeRadios],
+                work: async ({ signal, onProgress }) => MediaProcessor.process({
                     source: await MediaMetadata.getProcessedSourceURL(item),
-                    removeBackgroundOptions: {
-                        colors: selectedColors,
-                        bgType: bgType,
-                        bgColor: bgColor
-                    },
-                    onProgress: (progress) => {
-                        const pct = Math.round(progress * 100);
-                        if (progressBar) progressBar.style.width = `${pct}%`;
-                        if (progressText) progressText.textContent = `${pct}%`;
-
-                        if (progress < 0.1) progressStatus.textContent = "Initializing...";
-                        else if (progress < 0.9) progressStatus.textContent = "Removing background...";
-                        else progressStatus.textContent = "Finalizing...";
-                    },
-                    signal: job.signal,
-                });
-
-                // Success
-                successMessage.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-
-                // Setup download
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                const ext = bgType === 'transparent' ? 'webm' : 'mp4';
-                const filename = `${item.title.replace(/\.[^.]+$/, '')}-nobg.${ext}`;
-
-                // Add to playlist
-                const { item: newItem, url } = playlist.insertProcessedItem(item, processedBlob, filename, {
-                    type: `video/${ext}`,
-                    mediaType: `video/${ext}`,
-                    duration: null,
-                    extra: { thumbnail: item.thumbnail },
-                });
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                downloadBtn.onclick = (e) => {
-                    e.stopPropagation(); // Allow default download action
-                };
-
-                await playlist._ensureMetadata(newItem);
-
-            } catch (e) {
-                Logger.error('Processing failed:', e);
-                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Processing failed: ${e.message}`;
-                errorMessage.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-            } finally {
-                job.end();
-                // Re-enable controls
-                processBtn.disabled = false;
-                livePreviewToggle.disabled = false;
-                bgTypeRadios.forEach(r => r.disabled = false);
-                if (bgTypeRadios[1].checked) customBgColorInput.disabled = false;
-            }
+                    removeBackgroundOptions: { colors: selectedColors, bgType, bgColor },
+                    onProgress: (p) => onProgress(p,
+                        p < 0.1 ? 'Initializing...' : p < 0.9 ? 'Removing background...' : 'Finalizing...'),
+                    signal,
+                }),
+                done: async (processedBlob) => {
+                    const ext = bgType === 'transparent' ? 'webm' : 'mp4';
+                    const filename = `${item.title.replace(/\.[^.]+$/, '')}-nobg.${ext}`;
+                    const { item: newItem, url } = playlist.insertProcessedItem(item, processedBlob, filename, {
+                        type: `video/${ext}`,
+                        mediaType: `video/${ext}`,
+                        duration: null,
+                        extra: { thumbnail: item.thumbnail },
+                    });
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
+                    downloadBtn.onclick = (e) => {
+                        e.stopPropagation(); // Allow default download action
+                    };
+                    await playlist._ensureMetadata(newItem);
+                },
+            });
+            if (bgTypeRadios[1].checked) customBgColorInput.disabled = false;
         };
     }
 }

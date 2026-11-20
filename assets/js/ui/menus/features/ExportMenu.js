@@ -1,11 +1,10 @@
-import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { STICKER_MOTIONS } from '../../player/StickerLayer.js';
 import { BORDER_PRESETS, RAIN_PRESETS } from '../../player/DecorationLayer.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Export Menu - writes a file with whatever is on screen baked into it.
@@ -77,65 +76,54 @@ export class ExportMenu {
         endInput.value = formatTime(duration);
 
         exportBtn.addEventListener('click', async () => {
-            exportBtn.disabled = true;
-            modal.closeBtn.disabled = true;
-            errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
-            progressSection.classList.remove('hidden');
+            await runMenuJob({
+                name: '[ExportMenu] Export',
+                progress: { section: progressSection, text: progressPercentage },
+                error: errorMessage,
+                success: successMessage,
+                lock: [exportBtn],
+                modal,
+                unlock: 'onFailure',
+                failureText: (err) => err.message || 'Export failed.',
+                work: async ({ signal, onProgress }) => {
+                    const start = parseTime(startInput.value) || 0;
+                    const end = parseTime(endInput.value) || duration;
+                    if (!(end > start)) throw new Error('The end has to come after the start.');
 
-            const job = startCancellableJob(progressSection);
-            try {
-                const start = parseTime(startInput.value) || 0;
-                const end = parseTime(endInput.value) || duration;
-                if (!(end > start)) throw new Error('The end has to come after the start.');
-
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-                const blob = await MediaProcessor.process({
-                    source,
-                    format: 'mp4',
-                    quality: 100,
-                    // Only pass a range when it is actually a range: a trim
-                    // covering the whole video still costs a seek and a
-                    // boundary decision for nothing.
-                    ...(start > 0 || end < duration ? { trim: { start, end } } : {}),
-                    overlays: {
-                        filters: player.videoFilters,
-                        stickers: player.stickers,
-                        decorations: player.decorations,
-                    },
-                    onProgress: (progress) => {
-                        progressPercentage.textContent = `${Math.round(progress * 100)}%`;
-                    },
-                    subtitles: subtitleTracks.length && subtitleToggle?.checked
-                        ? subtitleTracks.map(t => ({ name: t.name, cues: t.cues }))
-                        : null,
-                    signal: job.signal,
-                });
-
-                progressSection.classList.add('hidden');
-                successMessage.classList.remove('hidden');
-
-                const base = item.title.replace(/\.[^/.]+$/, '');
-                const filename = `${base} - effects.mp4`;
-                const { url } = playlist.insertProcessedItem(item, blob, filename, {
-                    type: 'video/mp4',
-                    duration: formatTime(end - start),
-                });
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-            } catch (err) {
-                Logger.error('[ExportMenu] Export failed:', err);
-                progressSection.classList.add('hidden');
-                errorMessage.textContent = job.isCancelled(err) ? CANCELLED_MESSAGE : (err.message || 'Export failed.');
-                errorMessage.classList.remove('hidden');
-                exportBtn.disabled = false;
-            } finally {
-                job.end();
-                modal.closeBtn.disabled = false;
-            }
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const blob = await MediaProcessor.process({
+                        source,
+                        format: 'mp4',
+                        quality: 100,
+                        // Only pass a range when it is actually a range: a trim
+                        // covering the whole video still costs a seek and a
+                        // boundary decision for nothing.
+                        ...(start > 0 || end < duration ? { trim: { start, end } } : {}),
+                        overlays: {
+                            filters: player.videoFilters,
+                            stickers: player.stickers,
+                            decorations: player.decorations,
+                        },
+                        subtitles: subtitleTracks.length && subtitleToggle?.checked
+                            ? subtitleTracks.map(t => ({ name: t.name, cues: t.cues }))
+                            : null,
+                        onProgress,
+                        signal,
+                    });
+                    return { blob, start, end };
+                },
+                done: ({ blob, start, end }) => {
+                    const base = item.title.replace(/\.[^/.]+$/, '');
+                    const filename = `${base} - effects.mp4`;
+                    const { url } = playlist.insertProcessedItem(item, blob, filename, {
+                        type: 'video/mp4',
+                        duration: formatTime(end - start),
+                    });
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
+                },
+            });
         });
     }
 

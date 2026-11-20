@@ -5,12 +5,14 @@
 //
 // No-op reload when the host already sets the headers (dev/preview server,
 // desktop), because crossOriginIsolated is already true on first load.
+import { Logger } from './Logger.js';
+
 export function registerServiceWorkerWithCOI() {
     if (!('serviceWorker' in navigator)) return;
 
     navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('[PWA] Service Worker registered'))
-        .catch(err => console.log('[PWA] Service Worker failed', err));
+        .then(() => Logger.log('[PWA] Service Worker registered'))
+        .catch(err => Logger.log('[PWA] Service Worker failed', err));
 
     if (window.crossOriginIsolated) {
         sessionStorage.removeItem('coi-reload');

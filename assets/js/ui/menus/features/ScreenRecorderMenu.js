@@ -338,7 +338,7 @@ export class ScreenRecorderMenu {
             Toast.show(`Webcam recording started (${audioStatus})`);
 
         } catch (err) {
-            console.error("Error starting webcam:", err);
+            Logger.error("Error starting webcam:", err);
             Toast.show('Webcam access denied or error.', 3000, true);
         }
     }

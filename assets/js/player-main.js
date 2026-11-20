@@ -3,6 +3,7 @@ import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
 import { DOMAIN } from './shared/config.js';
 import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
+import { Logger } from './shared/utils/Logger.js';
 
 // Moved out of an inline <script> in player.html so a strict CSP can apply.
 function hideLoader() {
@@ -83,7 +84,7 @@ window.addEventListener('pageshow', function (event) {
 // CRITICAL: Cleanup on page hide to prevent memory accumulation
 // pagehide replaces the deprecated unload event
 window.addEventListener('pagehide', function () {
-    console.log('[Player] pagehide - destroying player and playlist');
+    Logger.log('[Player] pagehide - destroying player and playlist');
     // Destroy playlist first (clears intervals, event listeners, blob URLs)
     if (window.playlist && typeof window.playlist.destroy === 'function') {
         window.playlist.destroy();

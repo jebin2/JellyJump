@@ -5,7 +5,7 @@ import { formatTime, parseTime, formatFileSize } from '../../../shared/utils/med
 import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * GIF Menu Handler
@@ -222,119 +222,71 @@ export class GifMenu {
             const sizePreset = sizeDropdown.getValue();
             const quality = parseInt(qualitySlider.value);
 
-            // Disable inputs
-            fpsDropdown.setDisabled(true);
-            sizeDropdown.setDisabled(true);
-            qualitySlider.disabled = true;
-            createBtn.disabled = true;
-            modal.closeBtn.disabled = true;
-
-            // Hide previous messages and show progress
-            errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
             gifPreviewSection.classList.add('hidden');
             downloadBtn.classList.add('hidden');
-            progressSection.classList.remove('hidden');
 
-            const job = startCancellableJob(progressSection);
-            try {
-                // Calculate dimensions
-                let targetWidth, targetHeight;
-                if (sizePreset === 'original') {
-                    targetWidth = item.videoInfo.width;
-                    targetHeight = item.videoInfo.height;
-                } else {
-                    const heightMap = { '720': 720, '480': 480, '360': 360 };
-                    targetHeight = heightMap[sizePreset];
-                    targetWidth = Math.round((item.videoInfo.width / item.videoInfo.height) * targetHeight);
-                }
+            await runMenuJob({
+                name: 'GIF creation',
+                progress: { section: progressSection, text: progressText },
+                error: errorMessage,
+                success: successMessage,
+                lock: [fpsDropdown, sizeDropdown, qualitySlider, createBtn],
+                modal,
+                work: async ({ signal, onProgress }) => {
+                    let targetWidth, targetHeight;
+                    if (sizePreset === 'original') {
+                        targetWidth = item.videoInfo.width;
+                        targetHeight = item.videoInfo.height;
+                    } else {
+                        const heightMap = { '720': 720, '480': 480, '360': 360 };
+                        targetHeight = heightMap[sizePreset];
+                        targetWidth = Math.round((item.videoInfo.width / item.videoInfo.height) * targetHeight);
+                    }
 
-                // Get source file
-                let sourceFile;
-                try {
-                    // Get source with caching
-                    sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-                } catch (e) {
-                    Logger.error('Failed to get source blob:', e);
-                    throw new Error('Cannot access video file');
-                }
+                    let sourceFile;
+                    try {
+                        sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    } catch (e) {
+                        Logger.error('Failed to get source blob:', e);
+                        throw new Error('Cannot access video file');
+                    }
 
-                // Create GIF
-                const gifBlob = await MediaProcessor.createGif({
-                    input: sourceFile,
-                    startTime: start,
-                    duration: end - start,
-                    fps: fps,
-                    width: targetWidth,
-                    height: targetHeight,
-                    quality: quality,
-                    onProgress: (progress) => {
-                        const pct = Math.round(progress * 100);
-                        progressText.textContent = `${pct}%`;
-                    },
-                    signal: job.signal,
-                });
+                    return MediaProcessor.createGif({
+                        input: sourceFile,
+                        startTime: start,
+                        duration: end - start,
+                        fps, width: targetWidth, height: targetHeight, quality,
+                        onProgress, signal,
+                    });
+                },
+                done: (gifBlob) => {
+                    const previewUrl = URL.createObjectURL(gifBlob);
+                    gifPreviewImage.src = previewUrl;
+                    gifFileSize.textContent = formatFileSize(gifBlob.size);
+                    gifPreviewSection.classList.remove('hidden');
 
-                // Success
-                progressSection.classList.add('hidden');
-                successMessage.classList.remove('hidden');
+                    // Scrolled into view once the layout has the preview in it.
+                    if (modal.body) {
+                        setTimeout(() => {
+                            modal.body.scrollTo({ top: modal.body.scrollHeight, behavior: 'smooth' });
+                        }, 50);
+                    }
 
-                // Show preview
-                const previewUrl = URL.createObjectURL(gifBlob);
-                gifPreviewImage.src = previewUrl;
-                gifFileSize.textContent = formatFileSize(gifBlob.size);
-                gifPreviewSection.classList.remove('hidden');
+                    const timestamp = Math.round(start).toString().padStart(2, '0') + '-' + Math.round(end).toString().padStart(2, '0');
+                    const filename = `${item.title.replace(/\.[^.]+$/, '')} -${timestamp}.gif`;
+                    downloadBtn.href = previewUrl;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
 
-                // Scroll to bottom of modal
-                if (modal.body) {
-                    // Small timeout to ensure layout is updated
-                    setTimeout(() => {
-                        modal.body.scrollTo({
-                            top: modal.body.scrollHeight,
-                            behavior: 'smooth'
-                        });
-                    }, 50);
-                }
-
-                // Setup download
-                const timestamp = Math.round(start).toString().padStart(2, '0') + '-' + Math.round(end).toString().padStart(2, '0');
-                const filename = `${item.title.replace(/\.[^.]+$/, '')} -${timestamp}.gif`;
-
-                downloadBtn.href = previewUrl;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                // Always add to playlist
-                playlist.insertProcessedItem(item, gifBlob, filename, {
-                    type: 'image/gif',
-                    mediaType: 'image/gif',
-                    duration: formatTime(end - start),
-                    extra: { url: previewUrl, thumbnail: previewUrl },
-                });
-
-                modal.closeBtn.disabled = false;
-
-                // Re-enable  inputs
-                fpsDropdown.setDisabled(false);
-                sizeDropdown.setDisabled(false);
-                qualitySlider.disabled = false;
-                createBtn.disabled = false;
-
-            } catch (e) {
-                Logger.error('GIF creation failed:', e);
-                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `GIF creation failed: ${e.message}`;
-                errorMessage.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-
-                // Re-enable inputs
-                fpsDropdown.setDisabled(false);
-                sizeDropdown.setDisabled(false);
-                qualitySlider.disabled = false;
-                createBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-            } finally {
-                job.end();
-            }
+                    // Always add to playlist
+                    playlist.insertProcessedItem(item, gifBlob, filename, {
+                        type: 'image/gif',
+                        mediaType: 'image/gif',
+                        duration: formatTime(end - start),
+                        extra: { url: previewUrl, thumbnail: previewUrl },
+                    });
+                },
+            });
         });
 
         // Register dropdown cleanup

@@ -289,13 +289,9 @@ export async function process({
 
         return new Blob([output.target.buffer], { type: format === 'prores' ? 'video/quicktime' : `video/${format}` });
     } finally {
-        // CRITICAL: Clean up all MediaBunny resources to prevent memory leaks
-        if (conversion && typeof conversion.dispose === 'function') {
-            try { conversion.dispose(); } catch (e) { Logger.warn('Error disposing conversion:', e); }
-        }
-        if (output && typeof output.dispose === 'function') {
-            try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
-        }
+        // A conversion that fails or is cancelled can leave its output open;
+        // the input is the other thing holding resources.
+        await cancelUnfinished(output);
         if (input && typeof input.dispose === 'function') {
             try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }
         }

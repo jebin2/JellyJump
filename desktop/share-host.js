@@ -91,7 +91,13 @@ function enable() {
 async function startSharing() {
 
     // The index is the allowlist, so it has to stay current while it is shared.
-    try { watcher.start(); } catch {}
+    try {
+        watcher.start();
+    } catch (error) {
+        // Sharing still starts, but files added from now on will not appear
+        // to viewers until the next scan: said, rather than left unexplained.
+        console.warn('[share] File watcher did not start; new files will not appear until the next scan:', error);
+    }
 
     const ts = await tailscale.status();
     if (!ts.available) {
@@ -218,7 +224,7 @@ async function disable() {
     shareState = { enabled: false, url: null, dnsName: shareState.dnsName, reason: null };
     clearShareEnv();
     // Nothing is shared, so nothing needs keeping current.
-    try { watcher.stop(); } catch {}
+    try { watcher.stop(); } catch { /* sharing is off; a watcher that will not stop has nothing left to update */ }
     return describe();
 }
 

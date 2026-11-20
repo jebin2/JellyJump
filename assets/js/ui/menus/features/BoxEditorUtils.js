@@ -558,3 +558,228 @@ export function setupEditor(parentElement, options = {}) {
         box
     };
 }
+
+/**
+ * The rectangle editor shared by the Blur and Watermark menus: an outline
+ * for each area active at the current time, the selected one in the box with
+ * handles, drawing a new area by dragging on the video, and moving or
+ * resizing the selected one.
+ *
+ * @param {Object} options
+ * @param {Object} options.editorUI - from setupEditor()
+ * @param {Object} options.state - the editor state; its `selectedIndex`,
+ *   `box` and `preview` are used
+ * @param {Object} options.player
+ * @param {Element} options.videoPanel - watched for size changes
+ * @param {() => Array<{x: number, y: number, width: number, height: number, startTime: number, endTime: number}>} options.areas
+ * @param {string} options.rectClass - class of an unselected area's outline
+ * @param {string} options.boxSelector - matches the selected area's box
+ * @param {number} options.minSize
+ * @param {(box: {x: number, y: number, width: number, height: number}) => Object} options.createArea
+ *   a new area for a drawn rectangle
+ * @param {() => void} options.onSelectionChange - e.g. re-render the list
+ * @param {(index: number) => void} options.onAreaMoved - the selected area
+ *   was moved or resized
+ * @returns {{updateSelection: (index: number) => void, renderOverlayRects: () => void,
+ *   cleanupDrag: Object, dispose: () => void}}
+ */
+export function setupAreaEditor({
+    editorUI, state, player, videoPanel, areas, rectClass, boxSelector, minSize,
+    createArea, onSelectionChange, onAreaMoved,
+}) {
+
+    // Render outline rectangles for ALL areas on the overlay
+    // Non-selected areas get a simple clickable outline; selected area uses the main box with handles
+    const renderOverlayRects = () => {
+        // Remove previous rect indicators (but not the main box or draw preview)
+        editorUI.overlay.querySelectorAll(`.${rectClass}`).forEach(el => el.remove());
+
+        const scale = state.preview.scale || 1;
+        const ox = state.preview.offsetX || 0;
+        const oy = state.preview.offsetY || 0;
+        const currentTime = player ? player.currentTime : 0;
+
+        areas().forEach((area, index) => {
+            // Skip the selected one — it uses the main editorUI.box with handles
+            if (index === state.selectedIndex) return;
+
+            // Only show areas active at the current playback time
+            if (currentTime < area.startTime || currentTime > area.endTime) return;
+
+            const rect = document.createElement('div');
+            rect.className = rectClass;
+            rect.style.cssText = `
+                position: absolute;
+                left: ${ox + area.x * scale}px;
+                top: ${oy + area.y * scale}px;
+                width: ${area.width * scale}px;
+                height: ${area.height * scale}px;
+                border: 2px dashed rgba(255, 255, 255, 0.5);
+                background: rgba(255, 255, 255, 0.08);
+                cursor: pointer;
+                pointer-events: auto;
+                z-index: 998;
+                box-sizing: border-box;
+            `;
+
+            // Area number label
+            const label = document.createElement('span');
+            label.textContent = `${index + 1}`;
+            label.style.cssText = `
+                position: absolute;
+                top: 2px; left: 4px;
+                font-size: 10px;
+                color: rgba(255,255,255,0.8);
+                background: rgba(0,0,0,0.5);
+                padding: 0 3px;
+                border-radius: 2px;
+                pointer-events: none;
+            `;
+            rect.appendChild(label);
+
+            // Click to select this area
+            rect.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                updateSelection(index);
+            });
+
+            editorUI.overlay.appendChild(rect);
+        });
+    };
+
+    // Keep overlay always visible with pointer-events for drawing
+    const showOverlayAlways = () => {
+        editorUI.overlay.setAttribute('style', `
+            display: block;
+            position: absolute;
+            inset: 0;
+            pointer-events: auto !important;
+            z-index: 1000;
+            cursor: crosshair;
+        `);
+        updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
+            if (state.selectedIndex >= 0) {
+                updateBoxPosition(editorUI.box, state);
+            }
+            renderOverlayRects();
+        });
+    };
+
+    // Show overlay immediately (always visible for drawing)
+    showOverlayAlways();
+
+    // === Time-based overlay visibility ===
+    // Show the box and outlines only during their areas' active time ranges
+    let lastVisibilityCheck = -1;
+    player.addRenderCallback(() => {
+        const currentTime = player ? player.currentTime : 0;
+        if (Math.abs(currentTime - lastVisibilityCheck) < 0.05) return;
+        lastVisibilityCheck = currentTime;
+
+        // Update selected box visibility based on time range
+        if (state.selectedIndex >= 0 && state.selectedIndex < areas().length) {
+            const area = areas()[state.selectedIndex];
+            const inRange = currentTime >= area.startTime && currentTime <= area.endTime;
+            editorUI.box.style.display = inRange ? 'block' : 'none';
+        }
+
+        // Re-render overlay rects (already time-filtered)
+        renderOverlayRects();
+    });
+
+    const updateSelection = (index) => {
+        state.selectedIndex = index;
+        onSelectionChange();
+
+        if (index >= 0 && index < areas().length) {
+            const area = areas()[index];
+            state.box = {
+                x: area.x,
+                y: area.y,
+                width: area.width,
+                height: area.height
+            };
+
+            // Show box with handles
+            editorUI.box.style.display = 'block';
+            updateBoxPosition(editorUI.box, state);
+
+            updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
+                updateBoxPosition(editorUI.box, state);
+            });
+
+        } else {
+            // No selection — hide the box but keep overlay visible for drawing
+            editorUI.box.style.display = 'none';
+        }
+
+        // Re-render all area outlines on overlay
+        renderOverlayRects();
+
+        // Seek to area's start if current time is outside its range, else refresh current frame
+        if (player && player.duration) {
+            if (index >= 0 && index < areas().length) {
+                const area = areas()[index];
+                const currentTime = player.currentTime;
+                if (currentTime < area.startTime || currentTime > area.endTime) {
+                    player.seek(area.startTime);
+                } else {
+                    player.seek(currentTime);
+                }
+            } else {
+                player.seek(player.currentTime);
+            }
+        }
+    };
+
+    const onBoxUpdate = () => {
+        if (state.selectedIndex !== -1) {
+            const area = areas()[state.selectedIndex];
+            area.x = state.box.x;
+            area.y = state.box.y;
+            area.width = state.box.width;
+            area.height = state.box.height;
+
+            // Sync values back to inputs
+            onAreaMoved(state.selectedIndex);
+
+            // Redraw, so the effect shows at the new position
+            if (player) player.seek(player.currentTime);
+        }
+    };
+
+    // Update overlay when video resizes
+    const resizeObserver = new ResizeObserver(() => {
+        showOverlayAlways();
+    });
+    resizeObserver.observe(videoPanel);
+
+    // Setup Drag (for selected box move/resize)
+    const cleanupDrag = setupDragHandlers(editorUI.overlay, editorUI.box, state, minSize, () => {
+        updateBoxPosition(editorUI.box, state);
+        onBoxUpdate();
+    });
+
+
+    // === 5b. Drawing Rectangles on Overlay ===
+
+    const cleanupOverlayDraw = setupOverlayDraw(editorUI.overlay, state, {
+        excludeBoxSelector: boxSelector,
+        excludeRectSelector: `.${rectClass}`,
+        minSize,
+        onDraw: (x, y, w, h) => {
+            areas().push(createArea({ x, y, width: w, height: h }));
+            updateSelection(areas().length - 1);
+        }
+    });
+
+    return {
+        updateSelection,
+        renderOverlayRects,
+        cleanupDrag,
+        dispose: () => {
+            cleanupOverlayDraw();
+            resizeObserver.disconnect();
+        },
+    };
+}

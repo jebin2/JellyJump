@@ -178,12 +178,44 @@ function isAlive(pid) {
  * @returns {boolean|null} null when it cannot be determined
  */
 function looksLikeJellyJump(pid) {
+    let argv;
     try {
-        return fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').toLowerCase().includes('jellyjump');
+        argv = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean);
     } catch {
         // No procfs (macOS, Windows) or no permission to read it.
         return null;
     }
+    return isJellyJumpCommand(argv);
+}
+
+/**
+ * Whether a command line is JellyJump itself, judged by the program rather
+ * than by the name appearing anywhere in it.
+ *
+ * Anywhere was the old test, and it matched far too much: an editor with a
+ * file from the JellyJump folder open, a shell or tmux session started in it,
+ * a test runner given a script's full path -- each has "JellyJump" in its
+ * command line, and --stop would have sent any of them SIGTERM had it reused
+ * the recorded pid, the very case this check exists to prevent. The test
+ * suite tripped it: run by full path, it was taken for JellyJump and stopped
+ * itself.
+ *
+ * What counts: the packaged app (the AppImage, its unpacked `jellyjump`, an
+ * installed executable), a script named for it run by an interpreter, and in
+ * development, Electron started on the app's own folder.
+ * @param {string[]} argv - the process's arguments, program first
+ * @returns {boolean}
+ */
+function isJellyJumpCommand(argv) {
+    const [program, ...args] = argv;
+    if (!program) return false;
+    const base = (p) => p.split(/[\\/]/).pop().toLowerCase();
+    if (base(program).includes('jellyjump')) return true;
+    if (args[0] && base(args[0]).includes('jellyjump')) return true;
+    if (/^electron(\.exe)?$/.test(base(program))) {
+        return argv.some((arg) => arg.toLowerCase().includes('jellyjump'));
+    }
+    return false;
 }
 
 /**
@@ -278,4 +310,6 @@ async function handleCliArgs(argv, configPath) {
     return null;
 }
 
-module.exports = { handleCliArgs, isTerminalInvocation, isQueryInvocation, stopHeadless, USAGE };
+module.exports = {
+    handleCliArgs, isTerminalInvocation, isQueryInvocation, isJellyJumpCommand, stopHeadless, USAGE,
+};

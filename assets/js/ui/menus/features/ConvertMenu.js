@@ -6,7 +6,7 @@ import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { ZipHelper } from '../../../shared/utils/ZipHelper.js';
 import { uploadToHuggingFace } from '../../../processing/hls/HuggingFaceUploader.js';
 import { MediaBunny } from '../../../core/MediaBunny.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Convert Menu Handler
@@ -117,16 +117,11 @@ export class ConvertMenu {
                 return;
             }
 
+            // Every input is locked; afterwards only those whose option is
+            // available come back.
             const allInputs = modalContent.querySelectorAll('input');
             allInputs.forEach(input => input.disabled = true);
-            qualitySlider.disabled = true;
-            formatDropdown.setDisabled(true);
-            convertBtn.disabled = true;
-            modal.closeBtn.disabled = true;
-            errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
             downloadBtn.classList.add('hidden');
-            progressSection.classList.remove('hidden');
 
             // Reset HLS cloud state
             hfUploadBtn._hlsFiles = null;
@@ -134,51 +129,31 @@ export class ConvertMenu {
             hfSuccessSection.classList.add('hidden');
             hfErrorMessage.classList.add('hidden');
 
-            const job = startCancellableJob(progressSection);
-            try {
-                await ConvertMenu._startConversion(item, format, quality, playlist, (progress) => {
-                    progressPercentage.textContent = Math.round(progress * 100) + '%';
-                }, downloadBtn, (hlsFiles) => {
+            await runMenuJob({
+                name: 'Conversion',
+                progress: { section: progressSection, text: progressPercentage },
+                error: errorMessage,
+                success: successMessage,
+                lock: [qualitySlider, formatDropdown, convertBtn],
+                modal,
+                failureText: (e) => `Operation failed: ${e.message}`,
+                work: ({ signal, onProgress }) => ConvertMenu._startConversion(item, format, quality, playlist, onProgress, downloadBtn, (hlsFiles) => {
                     // Store HLS files and enable upload once conversion is done
                     hfUploadBtn._hlsFiles = hlsFiles;
                     onCredentialsChange();
-                }, job.signal);
-
-                successMessage.textContent = format === 'hls' ? '✓ Ready for download (ZIP)' : '✓ Added to playlist';
-                successMessage.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-
-                downloadBtn.classList.remove('hidden');
-                const downloadFormat = (format === 'keep') ? item.title.split('.').pop()
-                    : (format === 'prores') ? 'mov' : format;
-                downloadBtn.title = `Download ${downloadFormat.toUpperCase()}`;
-                downloadBtn.setAttribute('aria-label', `Download ${downloadFormat.toUpperCase()}`);
-
-                allInputs.forEach(input => {
-                    if (!input.parentElement.classList.contains('disabled')) input.disabled = false;
-                });
-                qualitySlider.disabled = false;
-                formatDropdown.setDisabled(false);
-                convertBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-
-            } catch (error) {
-                Logger.error('Conversion failed:', error);
-                errorMessage.textContent = job.isCancelled(error) ? CANCELLED_MESSAGE : `Operation failed: ${error.message}`;
-                errorMessage.classList.remove('hidden');
-                progressSection.classList.add('hidden');
-
-                const allInputs2 = modalContent.querySelectorAll('input');
-                allInputs2.forEach(input => {
-                    if (!input.parentElement.classList.contains('disabled')) input.disabled = false;
-                });
-                qualitySlider.disabled = false;
-                formatDropdown.setDisabled(false);
-                convertBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-            } finally {
-                job.end();
-            }
+                }, signal),
+                done: () => {
+                    successMessage.textContent = format === 'hls' ? '✓ Ready for download (ZIP)' : '✓ Added to playlist';
+                    downloadBtn.classList.remove('hidden');
+                    const downloadFormat = (format === 'keep') ? item.title.split('.').pop()
+                        : (format === 'prores') ? 'mov' : format;
+                    downloadBtn.title = `Download ${downloadFormat.toUpperCase()}`;
+                    downloadBtn.setAttribute('aria-label', `Download ${downloadFormat.toUpperCase()}`);
+                },
+            });
+            allInputs.forEach(input => {
+                if (!input.parentElement.classList.contains('disabled')) input.disabled = false;
+            });
         });
 
         // HF Upload Handler

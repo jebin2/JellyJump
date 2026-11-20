@@ -3,7 +3,7 @@ import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Track Manager Menu Handler
@@ -221,56 +221,24 @@ export class TrackManagerMenu {
         const successMessage = modal.querySelector('.success-message');
         const errorMessage = modal.querySelector('.error-message');
 
-        // Disable UI
-        modal.querySelectorAll('button').forEach(btn => btn.disabled = true);
-        if (speedDropdown) speedDropdown.setDisabled(true);
-
-        // Hide previous messages and show progress
-        errorMessage.classList.add('hidden');
-        successMessage.classList.add('hidden');
-        progressSection.classList.remove('hidden');
         progressPercentage.textContent = '0%';
         progressStatus.textContent = 'Extracting...';
 
-        const job = startCancellableJob(progressSection);
-        try {
-            // Get source with caching
-            const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-            const blob = await MediaProcessor.extractTrack({
-                source,
-                trackIndex,
-                trackType,
-                format,
-                speed,
-                onProgress: (p) => {
-                    const percent = Math.round(p * 100) + '%';
-                    progressPercentage.textContent = percent;
-                },
-                signal: job.signal,
-            });
-
-            this.handleExtractionSuccess({
-                blob,
-                originalItem: item,
-                trackType,
-                trackIndex,
-                format,
-                addToPlaylist,
-                speed,
-                playlist,
-                modal
-            });
-        } catch (e) {
-            Logger.error('Extraction failed:', e);
-            errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Extraction failed: ${e.message}`;
-            errorMessage.classList.remove('hidden');
-            progressSection.classList.add('hidden');
-        } finally {
-            job.end();
-            modal.querySelectorAll('button').forEach(btn => btn.disabled = false);
-            if (speedDropdown) speedDropdown.setDisabled(false);
-        }
+        await runMenuJob({
+            name: 'Extraction',
+            progress: { section: progressSection, text: progressPercentage },
+            error: errorMessage,
+            // Not `success`: the success handler decides what to say, which
+            // depends on whether the track went to the playlist or a download.
+            lock: [...modal.querySelectorAll('button'), speedDropdown],
+            work: async ({ signal, onProgress }) => {
+                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                return MediaProcessor.extractTrack({ source, trackIndex, trackType, format, speed, onProgress, signal });
+            },
+            done: (blob) => this.handleExtractionSuccess({
+                blob, originalItem: item, trackType, trackIndex, format, addToPlaylist, speed, playlist, modal,
+            }),
+        });
     }
 
     /**

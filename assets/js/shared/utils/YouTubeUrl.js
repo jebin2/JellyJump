@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Recognising YouTube links.
  *

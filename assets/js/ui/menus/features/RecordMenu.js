@@ -1,5 +1,4 @@
 import { Logger } from "../../../shared/utils/Logger.js";
-import { Modal } from '../../Modal.js';
 import { initPlayerAudio, tapPlayerAudio } from '../../../core/audio/AudioEngine.js';
 
 /**

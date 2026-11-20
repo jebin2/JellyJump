@@ -1,0 +1,23 @@
+{
+  "//": [
+    "Type checking, one file at a time. Nothing is checked unless the file",
+    "starts with // @ts-check, so the large untyped parts of the app stay quiet",
+    "while each file that opts in is held to it. `npm run typecheck` runs it;",
+    "editors that read jsconfig.json show the same errors as you type."
+  ],
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "skipLibCheck": true,
+    "strict": false,
+    "types": [],
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": ["assets/js/**/*.js"],
+  "exclude": ["assets/js/lib/**", "node_modules", "dist"]
+}

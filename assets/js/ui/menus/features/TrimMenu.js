@@ -1,10 +1,9 @@
-import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { startCancellableJob, CANCELLED_MESSAGE } from '../core/CancellableJob.js';
+import { runMenuJob } from '../core/MenuJob.js';
 
 /**
  * Trim Menu Handler
@@ -163,61 +162,36 @@ export class TrimMenu {
 
         // Trim Action
         trimBtn.addEventListener('click', async () => {
-            // UI State
             modalContent.classList.add('processing');
-            trimBtn.disabled = true;
-            modal.closeBtn.disabled = true;
-            if (losslessToggle) losslessToggle.disabled = true;
-            // Hide previous messages and show progress
-            errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
-            progressSection.classList.remove('hidden');
-
-            const job = startCancellableJob(progressSection);
-            try {
-                // Get source with caching
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-                // Trim
-                const trimOpts = { start: startTime, end: endTime };
-                const onProgress = (progress) => {
-                    progressPercentage.textContent = `${Math.round(progress * 100)}%`;
-                };
-                const blob = losslessToggle?.checked
-                    ? await MediaProcessor.losslessTrim({ source, trim: trimOpts, onProgress, signal: job.signal })
-                    : await MediaProcessor.process({ source, format: 'mp4', quality: 100, trim: trimOpts, onProgress, signal: job.signal });
-
-                // Success
-                progressSection.classList.add('hidden');
-                successMessage.classList.remove('hidden');
-
-                // Configure Download
-                const ext = 'mp4';
-                const filename = item.title.replace(/\.[^/.]+$/, "") + `- trimmed - ${Math.round(startTime)} -${Math.round(endTime)}.${ext}`;
-
-                // Always add to Playlist
-                const { url } = playlist.insertProcessedItem(item, blob, filename, {
-                    type: `video/${ext}`,
-                    duration: formatTime(endTime - startTime),
-                });
-
-                downloadBtn.href = url;
-                downloadBtn.download = filename;
-                downloadBtn.classList.remove('hidden');
-
-                modal.closeBtn.disabled = false;
-
-            } catch (e) {
-                Logger.error('Trimming failed:', e);
-                errorMessage.textContent = job.isCancelled(e) ? CANCELLED_MESSAGE : `Trimming failed: ${e.message}`;
-                errorMessage.classList.remove('hidden');
-                trimBtn.disabled = false;
-                modal.closeBtn.disabled = false;
-                if (losslessToggle) losslessToggle.disabled = false;
-                progressSection.classList.add('hidden');
-            } finally {
-                job.end();
-            }
+            await runMenuJob({
+                name: 'Trimming',
+                progress: { section: progressSection, text: progressPercentage },
+                error: errorMessage,
+                success: successMessage,
+                lock: [trimBtn, losslessToggle],
+                modal,
+                // A finished trim is not run again by accident.
+                unlock: 'onFailure',
+                work: async ({ signal, onProgress }) => {
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const trim = { start: startTime, end: endTime };
+                    return losslessToggle?.checked
+                        ? MediaProcessor.losslessTrim({ source, trim, onProgress, signal })
+                        : MediaProcessor.process({ source, format: 'mp4', quality: 100, trim, onProgress, signal });
+                },
+                done: (blob) => {
+                    const ext = 'mp4';
+                    const filename = item.title.replace(/\.[^/.]+$/, "") + `- trimmed - ${Math.round(startTime)} -${Math.round(endTime)}.${ext}`;
+                    // Always add to Playlist
+                    const { url } = playlist.insertProcessedItem(item, blob, filename, {
+                        type: `video/${ext}`,
+                        duration: formatTime(endTime - startTime),
+                    });
+                    downloadBtn.href = url;
+                    downloadBtn.download = filename;
+                    downloadBtn.classList.remove('hidden');
+                },
+            });
         });
     }
 }

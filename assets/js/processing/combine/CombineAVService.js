@@ -97,14 +97,6 @@ export async function combineAudioVideo({ videoSource, audioSource, format = 'mp
     } finally {
         // Composable conversions leave their Output alone when cancelled.
         await cancelUnfinished(output);
-        for (const conversion of [videoConversion, audioConversion]) {
-            if (conversion && typeof conversion.dispose === 'function') {
-                try { conversion.dispose(); } catch (e) { Logger.warn('Error disposing conversion:', e); }
-            }
-        }
-        if (output && typeof output.dispose === 'function') {
-            try { output.dispose(); } catch (e) { Logger.warn('Error disposing output:', e); }
-        }
         for (const input of [videoInput, audioInput]) {
             if (input && typeof input.dispose === 'function') {
                 try { input.dispose(); } catch (e) { Logger.warn('Error disposing input:', e); }

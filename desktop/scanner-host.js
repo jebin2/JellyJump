@@ -44,7 +44,13 @@ function getScanner() {
             libraryIndex.setRoots(message.roots);
             // Only moves a watcher sharing already asked for; a scan alone
             // never starts one.
-            try { watcher.rootsChanged(); } catch {}
+            try {
+                watcher.rootsChanged();
+            } catch (error) {
+                // The scan itself is fine; only the live view of new files is
+                // not following the new folders, which is worth knowing.
+                console.warn('[scanner] Watcher could not follow the new folders:', error);
+            }
         }
         if (message?.type === 'batch') libraryIndex.addBatch(message.files);
         // Kept apart from the file index on purpose: that index is the sharing
@@ -110,7 +116,7 @@ function registerScannerIpc({ assertTrustedIpcEvent, normalizeUserFilePath }) {
 
 function stopScanner() {
     stoppingScanner = true;
-    try { watcher.stop(); } catch {}
+    try { watcher.stop(); } catch { /* shutting down; a watcher that will not stop is about to go anyway */ }
     scannerProcess?.kill();
     scannerProcess = null;
 }

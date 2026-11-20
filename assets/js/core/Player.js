@@ -772,8 +772,9 @@ export class CorePlayer {
     get isLive() { return this.stream?.isLive; }
     set isLive(value) { this.stream.isLive = value; }
 
+    // Read-only: the stream owns its video element. A setter used to sit
+    // here forwarding to a getter-only property, so calling it would throw.
     get streamVideo() { return this.stream?.streamVideo; }
-    set streamVideo(value) { this.stream.streamVideo = value; }
 
     get isWebcamMode() { return this.stream?.isWebcamMode; }
     set isWebcamMode(value) { this.stream.isWebcamMode = value; }
