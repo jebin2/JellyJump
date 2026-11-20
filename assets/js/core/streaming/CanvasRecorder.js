@@ -2,6 +2,10 @@ import { MediaBunny } from '../MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { RecordingClock } from './RecordingClock.js';
 
+/** In order of preference; all three go in an MP4. */
+const VIDEO_CODECS = ['avc', 'vp9', 'av1'];
+const VIDEO_BITRATE = 50_000_000;
+
 /**
  * CanvasRecorder - writes an MP4 from whatever is on the player's canvas.
  *
@@ -76,6 +80,17 @@ export class CanvasRecorder {
         if (this._isRecording) return;
         const player = this.player;
 
+        // H.264 first, as it plays everywhere, but not every browser can
+        // encode it -- Chrome on Linux without a hardware encoder cannot --
+        // and asking for it regardless failed the whole recording. VP9 and
+        // AV1 go in the same MP4.
+        const videoCodec = await MediaBunny.getFirstEncodableVideoCodec(VIDEO_CODECS, {
+            width: player.canvas.width,
+            height: player.canvas.height,
+            bitrate: VIDEO_BITRATE,
+        });
+        if (!videoCodec) throw new Error('This browser cannot encode video for a recording.');
+
         this._isRecording = true;
         this._chunks = [];
         this._audioSource = null;
@@ -98,10 +113,10 @@ export class CanvasRecorder {
         });
 
         const frameRate = 30;
-        Logger.log('[Record] Video bitrate: 50 Mbps (raw quality)');
+        Logger.log(`[Record] ${videoCodec} at 50 Mbps (raw quality)`);
         const videoSource = new MediaBunny.CanvasSource(player.canvas, {
-            codec: 'avc',
-            quality: new MediaBunny.Quality({ bitrate: 50_000_000 }),
+            codec: videoCodec,
+            quality: new MediaBunny.Quality({ bitrate: VIDEO_BITRATE }),
             keyFrameInterval: 2,
             latencyMode: 'realtime',
             width: player.canvas.width,

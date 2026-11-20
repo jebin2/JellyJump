@@ -197,9 +197,17 @@ try {
 }
 
 const origin = `http://127.0.0.1:${PORT}`;
-const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { cwd: ROOT, stdio: 'ignore' });
+// Bound to the address it is reached on: left to "localhost", vite can
+// listen on ::1 alone (as on GitHub's runners), where 127.0.0.1 never answers.
+// BROWSER=none stops it opening the page, as the config asks it to.
+const vite = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'], {
+    cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none' },
+});
+let viteOutput = '';
+vite.stdout.on('data', (d) => { viteOutput += d; });
+vite.stderr.on('data', (d) => { viteOutput += d; });
 if (!await waitForServer(origin)) {
-    console.error(`vite did not come up on :${PORT}`);
+    console.error(`vite did not come up on :${PORT}\n${viteOutput.trim()}`);
     vite.kill();
     process.exit(1);
 }
