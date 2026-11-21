@@ -1038,6 +1038,241 @@
     font-size: 0.7rem;
 }
 
+/* -----------------------------------------
+   Job tray: background jobs at the foot of the sidebar
+   ----------------------------------------- */
+.job-tray {
+    position: sticky;
+    bottom: 0;
+    flex-shrink: 0;
+    max-height: 40%;
+    overflow-y: auto;
+    padding: 10px var(--space-md) 12px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.job-tray.hidden {
+    display: none;
+}
+
+.playlist-section.collapsed .job-tray {
+    display: none;
+}
+
+.job-tray-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.job-tray-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.job-tray-count {
+    margin-left: 6px;
+    color: var(--accent-primary);
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.job-tray-clear,
+.job-text-btn,
+.job-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.job-text-btn:hover,
+.job-icon-btn:hover,
+.job-tray-clear:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.job-text-btn.job-play {
+    color: var(--accent-primary);
+}
+
+.job-tray-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.job-row {
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border-left: 3px solid var(--border-light);
+}
+
+.job-row--running { border-left-color: var(--accent-primary); }
+.job-row--done { border-left-color: var(--accent-primary); }
+.job-row--failed { border-left-color: var(--error-color); }
+
+.job-row-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.job-name {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.job-subject {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.job-row-head .job-icon-btn {
+    margin-left: auto;
+    padding: 2px;
+}
+
+.job-progress {
+    height: 4px;
+    margin: 8px 0 4px;
+    background: var(--bg-secondary);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.job-progress-bar {
+    height: 100%;
+    background: var(--accent-primary);
+    transition: width 0.2s linear;
+}
+
+.job-row-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+    min-width: 0;
+}
+
+.job-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.job-status-done { color: var(--text-primary); }
+.job-status-error { color: var(--error-color); white-space: normal; }
+
+.job-actions {
+    display: inline-flex;
+    flex-shrink: 0;
+    gap: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .job-progress-bar { transition: none; }
+}
+
+/* Tools menus, in titled sections. Six to a row on a wide screen puts each
+   section on one line; four on a phone fits the whole menu without a scroll. */
+.tools-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.tools-section-heading {
+    margin: 0 0 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.tools-grid-compact {
+    grid-template-columns: repeat(var(--tools-columns, 6), minmax(0, 1fr));
+    gap: 8px;
+}
+
+.tools-grid-compact .tools-tile-sm {
+    padding: 10px 4px;
+    gap: 4px;
+}
+
+.tools-grid-compact .tools-tile-sm .tools-tile-icon {
+    width: 28px;
+    height: 28px;
+}
+
+.tools-grid-compact .tools-tile-label {
+    line-height: 1.25;
+}
+
+@media (max-width: 520px) {
+    .tools-grid-compact {
+        grid-template-columns: repeat(min(var(--tools-columns, 6), 4), minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .tools-grid-compact .tools-tile-label {
+        font-size: 0.65rem;
+    }
+}
+
+/* Reset sits apart from the tools, as text rather than a tile. */
+.tools-reset-link {
+    display: block;
+    margin: 18px auto 0;
+    padding: 4px 8px;
+    background: none;
+    border: none;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.tools-reset-link:hover,
+.tools-reset-link:focus-visible {
+    color: var(--error-color);
+    text-decoration: underline;
+}
+
 /* Files this browser has no decoder for. Dimmed and badged rather than hidden:
    the file exists, and on desktop the same library plays it, so removing the row
    would look like the scan lost it. */
@@ -1436,4 +1671,279 @@
 .watch-party .wp-whose {
     color: var(--accent-primary);
     font-weight: 600;
+}
+
+/* -----------------------------------------
+   Edit panel: editing a video in the sidebar, the player as its preview
+   ----------------------------------------- */
+.edit-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    background: var(--bg-secondary);
+}
+
+.edit-panel.hidden,
+.playlist-section.editing > .playlist-header,
+.playlist-section.editing > .playlist-content {
+    display: none !important;
+}
+
+.playlist-section.collapsed .edit-panel {
+    display: none;
+}
+
+.edit-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+}
+
+.edit-panel-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    padding: 6px 10px 6px 6px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.edit-panel-back:hover:not(:disabled),
+.edit-panel-back:focus-visible {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.edit-panel-back:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.edit-panel-heading {
+    min-width: 0;
+}
+
+.edit-panel-title {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.2;
+    color: var(--text-primary);
+}
+
+.edit-panel-item {
+    margin: 2px 0 0;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.edit-panel-tools {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-md);
+}
+
+.edit-panel-tools.hidden {
+    display: none;
+}
+
+/* The tool: its settings scroll, its Apply stays in reach below them. */
+.edit-panel-tool {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.edit-panel-tool > .edit-panel-tool-body {
+    flex: 1;
+    min-height: 0;
+    padding: var(--space-md);
+}
+
+.edit-panel-tool > .edit-panel-tool-footer {
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    padding: 10px var(--space-md);
+    background: var(--bg-secondary);
+}
+
+/* Its own preview player is not needed: the big one is the preview. */
+.edit-panel .modal-video-panel {
+    display: none;
+}
+
+.edit-panel .modal-controls-panel > .p-md {
+    padding: 0;
+}
+
+.edit-panel-note {
+    flex-shrink: 0;
+    margin: 0 var(--space-md) 10px;
+    padding: 6px 10px;
+    border-left: 3px solid var(--accent-primary);
+    background: rgba(var(--accent-primary-rgb), 0.08);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+}
+
+.edit-panel-note.hidden {
+    display: none;
+}
+
+/* The edits made so far, with the way back. */
+.edit-panel-history {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 8px var(--space-md);
+    border-bottom: 1px solid var(--border-light);
+    background: rgba(var(--accent-primary-rgb), 0.06);
+}
+
+.edit-panel-history.hidden,
+.edit-panel-busy.hidden {
+    display: none;
+}
+
+.edit-panel-steps {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.edit-panel-steps::before {
+    content: 'Edits: ';
+    color: var(--text-secondary);
+}
+
+.edit-panel-undo,
+.edit-panel-reset,
+.edit-panel-busy-cancel {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.edit-panel-undo:hover:not(:disabled),
+.edit-panel-reset:hover:not(:disabled),
+.edit-panel-busy-cancel:hover,
+.edit-panel-undo:focus-visible,
+.edit-panel-reset:focus-visible,
+.edit-panel-busy-cancel:focus-visible {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.edit-panel-undo:disabled,
+.edit-panel-reset:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* An edit being applied: how far along, while the rest waits. */
+.edit-panel-busy {
+    flex-shrink: 0;
+    padding: 8px var(--space-md);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.edit-panel-busy-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-panel-busy-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+}
+
+.edit-panel-busy-bar {
+    height: 3px;
+    margin-top: 6px;
+    border-radius: 2px;
+    background: var(--border-light);
+    overflow: hidden;
+}
+
+.edit-panel-busy-bar > div {
+    width: 0;
+    height: 100%;
+    background: var(--accent-primary);
+    transition: width 0.2s ease;
+}
+
+.edit-panel.busy .edit-panel-tools,
+.edit-panel.busy .edit-panel-tool {
+    opacity: 0.45;
+}
+
+.edit-panel-history .hidden {
+    display: none;
+}
+
+.edit-panel-confirm {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.edit-panel-confirm-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+}
+
+.edit-panel-confirm-yes,
+.edit-panel-confirm-no {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.edit-panel-confirm-yes {
+    border-color: var(--accent-danger, #ff4d4d);
+    color: var(--accent-danger, #ff4d4d);
+}
+
+.edit-panel-confirm-no:hover,
+.edit-panel-confirm-no:focus-visible {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
 }

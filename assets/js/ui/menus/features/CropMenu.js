@@ -15,14 +15,18 @@ import {
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { lendPicture } from '../core/PreviewPlayer.js';
 
 /**
  * Crop Menu Handler - Fresh Implementation
  * Simple, clear flow: Load video -> Setup crop UI -> Drag to crop -> Process
+ *
+ * In the edit panel the box is drawn over the main player rather than over a
+ * player of the dialog's own.
  */
 export class CropMenu {
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Crop Video', 'crop-content-template', FOOTER_CONFIGS.crop, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Crop', 'crop-content-template', FOOTER_CONFIGS.crop, { splitLayout: true });
         if (!modal) return;
         const playerContainerId = 'crop-player-container';
         const playerContainer = modalContent.querySelector(`#${playerContainerId}`);
@@ -65,14 +69,23 @@ export class CropMenu {
         const MIN_SIZE = 40;
 
         // === STEP 1: Load Video ===
-        const player = await loadVideo(playerContainerId, item, playlist, state);
-        if (!player) {
-            showError(elements.messages.error, 'Failed to load video');
-            return;
+        let player = null;
+        if (modal.isPanel) {
+            const stage = await lendPicture(modal, playlist);
+            if (!stage) return;
+            stage.adopt(elements.cropOverlay);
+            elements.playerContainer = stage.wrapper;
+            state.video = { ...stage.video };
+        } else {
+            player = await loadVideo(playerContainerId, item, playlist, state);
+            if (!player) {
+                showError(elements.messages.error, 'Failed to load video');
+                return;
+            }
         }
 
         // === STEP 2: Setup Crop UI ===
-        setupCropUI(elements, state, player);
+        const observer = setupCropUI(elements, state, player);
 
         // === STEP 3: Handle Dragging ===
         const onUpdate = () => {
@@ -88,13 +101,20 @@ export class CropMenu {
         setupCropButton(elements, state, item, playlist, modal);
 
         // === STEP 6: Cleanup ===
-        setupCleanup(modal, player, cleanup);
+        if (player) setupCleanup(modal, player, cleanup);
+        else modal.onCleanup(() => {
+            cleanup.dispose();
+            clearTimeout(observer.timer);
+            observer.current?.disconnect();
+        });
     }
 }
 
 // === CROP-SPECIFIC FUNCTIONS ===
 
+/** @returns {{timer: any, current: ResizeObserver|null}} so the panel can stop it */
 function setupCropUI(elements, state, player) {
+    const observer = { timer: null, current: null };
     // Initialize box to full video
     state.box = {
         x: 0,
@@ -104,7 +124,7 @@ function setupCropUI(elements, state, player) {
     };
 
     // Update after player renders
-    setTimeout(() => {
+    observer.timer = setTimeout(() => {
         // Calculate scale and offsets
         updateScale(elements.cropOverlay, state);
         updateBoxPosition(elements.cropBox, state);
@@ -112,15 +132,17 @@ function setupCropUI(elements, state, player) {
 
         // Auto Update on Container Resize
         if (elements.playerContainer) {
-            const observer = setupAutoUpdate(
+            const autoUpdate = setupAutoUpdate(
                 elements.playerContainer,
                 elements.cropOverlay,
                 state,
                 () => updateBoxPosition(elements.cropBox, state)
             );
-            if (player) player.updateObserver = observer;
+            if (player) player.updateObserver = autoUpdate;
+            observer.current = autoUpdate;
         }
     }, 200);
+    return observer;
 }
 
 function updateInputs(elements, state) {
@@ -167,10 +189,8 @@ function setupCropButton(elements, state, item, playlist, modal) {
         showProgress(elements.progress, `Cropping to ${width}x${height}...`);
         await runMenuJob({
             name: 'Crop',
-            progress: { section: elements.progress.section, text: elements.progress.text },
-            error: elements.messages.error,
-            success: elements.messages.success,
-            lock: [elements.buttons.crop],
+            subject: item.title,
+            background: true,
             modal,
             work: async ({ signal, onProgress }) => {
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());

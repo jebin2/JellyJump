@@ -95,7 +95,7 @@ export function updateScale(overlay, state) {
 
     // Find the canvas element in the player container
     const wrapper = overlay.parentElement;
-    const canvas = wrapper?.querySelector('canvas');
+    const canvas = wrapper?.querySelector('canvas.jellyjump-video') || wrapper?.querySelector('canvas');
 
     if (!canvas) {
         // Fallback to container-based calculation
@@ -313,13 +313,19 @@ export function setupDragHandlers(overlay, box, state, minSize, onUpdate) {
         }
     };
 
-    overlay.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    // Pointer events, so a finger drags the box as a mouse does.
+    overlay.addEventListener('pointerdown', handleMouseDown);
+    document.addEventListener('pointermove', handleMouseMove);
+    document.addEventListener('pointerup', handleMouseUp);
 
     return {
         onMouseMove: handleMouseMove,
-        onMouseUp: handleMouseUp
+        onMouseUp: handleMouseUp,
+        dispose: () => {
+            overlay.removeEventListener('pointerdown', handleMouseDown);
+            document.removeEventListener('pointermove', handleMouseMove);
+            document.removeEventListener('pointerup', handleMouseUp);
+        },
     };
 }
 
@@ -332,7 +338,7 @@ export function setupDragHandlers(overlay, box, state, minSize, onUpdate) {
  * @param {string} options.excludeRectSelector - selector for existing area rects (skip draw on them)
  * @param {number} options.minSize - minimum draw size in video coords
  * @param {function(x,y,w,h):void} options.onDraw - called when a valid rect is drawn
- * @returns {function} cleanup — removes all three document listeners
+ * @returns {function} cleanup — removes all three listeners
  */
 export function setupOverlayDraw(overlay, state, { excludeBoxSelector, excludeRectSelector, minSize, onDraw }) {
     const getVideoPos = (e) => {
@@ -405,14 +411,14 @@ export function setupOverlayDraw(overlay, state, { excludeBoxSelector, excludeRe
         if (w >= minSize && h >= minSize) onDraw(x, y, w, h);
     };
 
-    overlay.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    overlay.addEventListener('pointerdown', onMouseDown);
+    document.addEventListener('pointermove', onMouseMove);
+    document.addEventListener('pointerup', onMouseUp);
 
     return () => {
-        overlay.removeEventListener('mousedown', onMouseDown);
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+        overlay.removeEventListener('pointerdown', onMouseDown);
+        document.removeEventListener('pointermove', onMouseMove);
+        document.removeEventListener('pointerup', onMouseUp);
     };
 }
 
@@ -432,10 +438,7 @@ export function setupCleanup(modal, player, cleanup) {
         if (player && player.updateObserver) {
             player.updateObserver.disconnect();
         }
-        if (cleanup) {
-            document.removeEventListener('mousemove', cleanup.onMouseMove);
-            document.removeEventListener('mouseup', cleanup.onMouseUp);
-        }
+        cleanup?.dispose?.();
         if (player) player.destroy();
         originalClose();
     };
@@ -524,27 +527,7 @@ export function setupEditor(parentElement, options = {}) {
     let box = null;
 
     if (options.enableOverlay !== false) {
-        // 4. Overlay
-        overlay = document.createElement('div');
-        overlay.className = `crop-overlay ${options.overlayClass || ''}`;
-        overlay.style.cssText = 'position: absolute; inset: 0; pointer-events: none; z-index: 10;';
-
-        // 5. Box
-        box = document.createElement('div');
-        box.className = 'crop-box';
-        if (options.boxDataAttr) box.setAttribute(options.boxDataAttr, '');
-        else box.setAttribute('data-crop-box', '');
-
-        // 6. Handles
-        const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-        handles.forEach(h => {
-            const handle = document.createElement('div');
-            handle.className = `crop-handle crop-handle-${h}`;
-            handle.dataset.handle = h;
-            box.appendChild(handle);
-        });
-
-        overlay.appendChild(box);
+        ({ overlay, box } = createBoxOverlay(options));
         playerContainer.appendChild(overlay);
     }
 
@@ -557,6 +540,31 @@ export function setupEditor(parentElement, options = {}) {
         overlay,
         box
     };
+}
+
+/**
+ * A layer to draw over a video, holding a box with eight resize handles.
+ * @param {{overlayClass?: string, boxDataAttr?: string}} [options]
+ * @returns {{overlay: HTMLElement, box: HTMLElement}}
+ */
+export function createBoxOverlay(options = {}) {
+    const overlay = document.createElement('div');
+    overlay.className = `crop-overlay ${options.overlayClass || ''}`;
+    overlay.style.cssText = 'position: absolute; inset: 0; pointer-events: none; z-index: 10;';
+
+    const box = document.createElement('div');
+    box.className = 'crop-box';
+    box.setAttribute(options.boxDataAttr || 'data-crop-box', '');
+
+    for (const h of ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']) {
+        const handle = document.createElement('div');
+        handle.className = `crop-handle crop-handle-${h}`;
+        handle.dataset.handle = h;
+        box.appendChild(handle);
+    }
+
+    overlay.appendChild(box);
+    return { overlay, box };
 }
 
 /**
@@ -580,12 +588,14 @@ export function setupEditor(parentElement, options = {}) {
  * @param {() => void} options.onSelectionChange - e.g. re-render the list
  * @param {(index: number) => void} options.onAreaMoved - the selected area
  *   was moved or resized
+ * @param {number} [options.zIndex] - the overlay's; under the player's
+ *   controls when it is drawn over the main player
  * @returns {{updateSelection: (index: number) => void, renderOverlayRects: () => void,
  *   cleanupDrag: Object, dispose: () => void}}
  */
 export function setupAreaEditor({
     editorUI, state, player, videoPanel, areas, rectClass, boxSelector, minSize,
-    createArea, onSelectionChange, onAreaMoved,
+    createArea, onSelectionChange, onAreaMoved, zIndex = 1000,
 }) {
 
     // Render outline rectangles for ALL areas on the overlay
@@ -638,7 +648,7 @@ export function setupAreaEditor({
             rect.appendChild(label);
 
             // Click to select this area
-            rect.addEventListener('mousedown', (e) => {
+            rect.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
                 updateSelection(index);
             });
@@ -654,8 +664,9 @@ export function setupAreaEditor({
             position: absolute;
             inset: 0;
             pointer-events: auto !important;
-            z-index: 1000;
+            z-index: ${zIndex};
             cursor: crosshair;
+            touch-action: none;
         `);
         updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
             if (state.selectedIndex >= 0) {
@@ -671,7 +682,7 @@ export function setupAreaEditor({
     // === Time-based overlay visibility ===
     // Show the box and outlines only during their areas' active time ranges
     let lastVisibilityCheck = -1;
-    player.addRenderCallback(() => {
+    const showActiveAreas = () => {
         const currentTime = player ? player.currentTime : 0;
         if (Math.abs(currentTime - lastVisibilityCheck) < 0.05) return;
         lastVisibilityCheck = currentTime;
@@ -685,7 +696,8 @@ export function setupAreaEditor({
 
         // Re-render overlay rects (already time-filtered)
         renderOverlayRects();
-    });
+    };
+    player.addRenderCallback(showActiveAreas);
 
     const updateSelection = (index) => {
         state.selectedIndex = index;
@@ -779,7 +791,9 @@ export function setupAreaEditor({
         cleanupDrag,
         dispose: () => {
             cleanupOverlayDraw();
+            cleanupDrag.dispose();
             resizeObserver.disconnect();
+            player.removeRenderCallback?.(showActiveAreas);
         },
     };
 }

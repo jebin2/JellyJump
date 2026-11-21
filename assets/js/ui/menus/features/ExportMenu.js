@@ -77,13 +77,10 @@ export class ExportMenu {
 
         exportBtn.addEventListener('click', async () => {
             await runMenuJob({
-                name: '[ExportMenu] Export',
-                progress: { section: progressSection, text: progressPercentage },
-                error: errorMessage,
-                success: successMessage,
-                lock: [exportBtn],
+                name: 'Export FX',
+                subject: item.title,
+                background: true,
                 modal,
-                unlock: 'onFailure',
                 failureText: (err) => err.message || 'Export failed.',
                 work: async ({ signal, onProgress }) => {
                     const start = parseTime(startInput.value) || 0;

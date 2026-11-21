@@ -1,9 +1,12 @@
 import { Modal } from '../../Modal.js';
 import { Logger } from '../../../shared/utils/Logger.js';
+import { ConfirmDialog } from '../../../shared/utils/ConfirmDialog.js';
+import { renderToolGrid } from '../core/ToolGrid.js';
 
 /**
- * Tools Menu
- * Handles the display and routing of application-wide utility tools.
+ * Create & share menu (the header's wrench button)
+ * Tools that are not about one playlist item: recording, making a video from
+ * several files, and sharing.
  */
 export class ToolsMenu {
     /**
@@ -11,43 +14,35 @@ export class ToolsMenu {
      * @param {Playlist} playlist - Playlist instance for context
      */
     static async show(playlist) {
-        // The same shape as the per-item tools modal: three columns of small
-        // tiles at 480px, rather than two columns of large ones at 320px. Eight
-        // tools in two columns was four rows and a scroll; in three it is three
-        // rows and none.
-        const modal = new Modal({ maxWidth: '480px' });
-        modal.setTitle('Tools');
+        const modal = new Modal({ maxWidth: '520px' });
+        modal.setTitle('Create & share');
 
-        // Listed rather than written out eight times, which is also how
-        // ItemToolsMenu builds its grid -- two copies of the same markup drift,
-        // and this one had already picked up a tile with a different icon size
-        // and no fill.
-        const tools = [
-            { action: 'screen-record', icon: 'icon-record', label: 'Record Screen', title: 'Record Screen' },
-            { action: 'camera-record', icon: 'icon-camera', label: 'Camera', title: 'Camera Recording' },
-            { action: 'merge', icon: 'icon-copy', label: 'Merge Videos', title: 'Merge Videos' },
-            { action: 'slideshow', icon: 'icon-image', label: 'Slideshow', title: 'Images to Video' },
-            { action: 'combine-av', icon: 'icon-audio', label: 'Combine A/V', title: 'Combine Audio/Video' },
-            { action: 'watch-party', icon: 'icon-link', label: 'Watch Together', title: 'Watch Together' },
-            { action: 'share', icon: 'icon-link', label: 'Share Library', title: 'Share Library' },
-            { action: 'reset', icon: 'icon-trash', label: 'Reset App', title: 'Reset App', danger: true },
-        ];
+        // Built by the same helper as the per-video menu, so the two grids
+        // cannot drift apart again.
+        const grid = renderToolGrid([
+            { heading: 'Create', tools: [
+                { action: 'screen-record', icon: 'icon-record', label: 'Record Screen' },
+                { action: 'camera-record', icon: 'icon-camera', label: 'Camera', title: 'Camera recording' },
+                { action: 'merge', icon: 'icon-copy', label: 'Merge Videos' },
+                { action: 'slideshow', icon: 'icon-image', label: 'Slideshow', title: 'Images to video' },
+                { action: 'combine-av', icon: 'icon-audio', label: 'Combine A/V', title: 'Combine audio and video' },
+            ] },
+            { heading: 'Share', tools: [
+                { action: 'watch-party', icon: 'icon-link', label: 'Watch Together' },
+                { action: 'share', icon: 'icon-folder', label: 'Share Library' },
+            ] },
+        ], { columns: 5 });
 
-        // Create tools grid content
+        // Wiping the app is not a tool, and sat in the grid looking like one,
+        // a click away from Slideshow. It is a plain link at the bottom now,
+        // and asks properly before doing anything.
+        const reset = document.createElement('button');
+        reset.className = 'tools-reset-link';
+        reset.dataset.action = 'reset';
+        reset.textContent = 'Reset app…';
+
         const content = document.createElement('div');
-        content.className = 'tools-grid tools-grid-3';
-        content.innerHTML = tools.map(tool => `
-            <button class="tools-tile tools-tile-sm${tool.danger ? ' tools-tile-danger' : ''}"
-                    data-action="${tool.action}" title="${tool.title}">
-                <div class="tools-tile-icon">
-                    <svg width="20" height="20" fill="currentColor" aria-hidden="true">
-                        <use href="assets/icons/sprite.svg#${tool.icon}"></use>
-                    </svg>
-                </div>
-                <span class="tools-tile-label">${tool.label}</span>
-            </button>
-        `).join('');
-
+        content.append(grid, reset);
         modal.setBody(content);
 
         // Sharing serves this machine's scanned library, so it only means
@@ -71,7 +66,7 @@ export class ToolsMenu {
         }
 
         // Handle tile clicks
-        content.querySelectorAll('.tools-tile').forEach(tile => {
+        content.querySelectorAll('[data-action]').forEach(tile => {
             tile.addEventListener('click', async (e) => {
                 const action = tile.dataset.action;
                 modal.close();
@@ -97,7 +92,13 @@ export class ToolsMenu {
                 } else if (action === 'share') {
                     ShareMenu.show();
                 } else if (action === 'reset') {
-                    if (confirm('Reset the app? This will clear all data and reload.')) {
+                    const confirmed = await ConfirmDialog.confirm({
+                        title: 'Reset the app?',
+                        message: 'This clears your playlist, settings and saved data, then reloads. It cannot be undone.',
+                        confirmText: 'Reset',
+                        confirmStyle: 'danger',
+                    });
+                    if (confirmed) {
                         try {
                             // Delete the entire IndexedDB database
                             await new Promise((resolve, reject) => {

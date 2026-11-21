@@ -98,12 +98,9 @@ export class CombineAVMenu {
             const downloadBtn = modalContent.querySelector('.download-btn');
 
             const outcome = await runMenuJob({
-                name: 'Combine',
-                progress: { section: progressSection, text: progressSection.querySelector('.progress-percentage') },
-                error: modalContent.querySelector('.error-message'),
-                success: successMsg,
-                lock: [videoSelect, audioSelect, formatSelect],
-                unlock: 'onFailure',
+                name: 'Combine A/V',
+                subject: videoItem.title,
+                background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
                     const videoBlob = await MediaMetadata.getSourceBlob(videoItem, () => playlist._saveState());

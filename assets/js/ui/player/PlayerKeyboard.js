@@ -1,4 +1,17 @@
 import { Toast } from '../../shared/utils/Toast.js';
+
+/**
+ * Keys that do nothing while a video is being edited (the edit panel open),
+ * as their buttons are put away then: another video, playing backwards,
+ * speed, subtitles, and the loop, which the tools set for themselves.
+ * @param {string} key - lower case
+ * @param {boolean} shift
+ */
+function blockedWhileEditing(key, shift) {
+    if (shift && ['j', 'l', 'n', 'p'].includes(key)) return true;
+    return ['<', '>', 'c', 'i', 'o', 'r'].includes(key);
+}
+
 export class PlayerKeyboard {
     constructor(player) {
         this.player = player;
@@ -14,6 +27,8 @@ export class PlayerKeyboard {
         if (p.screenshotManager && p.screenshotManager.isModalOpen()) return;
 
         const key = e.key.toLowerCase();
+        const editing = !!p.container?.classList.contains('jj-editing');
+        if (editing && blockedWhileEditing(key, e.shiftKey)) return;
 
         switch (key) {
             // Playback Controls
@@ -137,11 +152,12 @@ export class PlayerKeyboard {
                 break;
 
             // Editor Mode Controls
+            // Frame by frame, in the editor and while editing (to place a cut).
             case ',':
-                if (p.config.mode === 'editor') { e.preventDefault(); p._stepFrame(-1); }
+                if (p.config.mode === 'editor' || editing) { e.preventDefault(); p._stepFrame(-1); }
                 break;
             case '.':
-                if (p.config.mode === 'editor') { e.preventDefault(); p._stepFrame(1); }
+                if (p.config.mode === 'editor' || editing) { e.preventDefault(); p._stepFrame(1); }
                 break;
             case 'i':
                 e.preventDefault();

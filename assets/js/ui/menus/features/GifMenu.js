@@ -6,6 +6,7 @@ import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { borrowMainPlayer, setPreviewRange } from '../core/PreviewPlayer.js';
 
 /**
  * GIF Menu Handler
@@ -25,7 +26,7 @@ export class GifMenu {
         // Disable Outside Click Close
         // ---------------------------------------------------------
         // Remove the default overlay click handler to prevent closing on outside click
-        const modalOverlay = modal.overlay;
+        const modalOverlay = modal.isPanel ? null : modal.overlay;
         if (modalOverlay && modalOverlay._closeHandler) {
             modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
         }
@@ -102,14 +103,10 @@ export class GifMenu {
 
         // Load Video
         const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-        const player = await loadVideo('gif-player-container', item, playlist, state);
-
-        if (player) {
-            // Enable A-B Loop Mode
-            player.loopMode = 'ab';
-            player.loopStart = startTime;
-            player.loopEnd = endTime;
-        }
+        // In the edit panel the main player is the preview; a dialog has its own.
+        const player = modal.isPanel
+            ? borrowMainPlayer(modal, playlist)
+            : await loadVideo('gif-player-container', item, playlist, state);
 
         // Update UI
         const updateUI = () => {
@@ -121,12 +118,8 @@ export class GifMenu {
             const gifDuration = Math.max(0, endTime - startTime);
             durationDisplay.textContent = formatTime(gifDuration);
 
-            // Update Player Loop Points
-            if (player) {
-                player.loopStart = startTime;
-                player.loopEnd = endTime;
-                if (player.loopMode !== 'ab') player.loopMode = 'ab';
-            }
+            // The GIF's stretch, on the timeline and looping
+            setPreviewRange(player, startTime, endTime);
 
             // Validation
             validationError.classList.add('hidden');
@@ -159,7 +152,6 @@ export class GifMenu {
                 updateUI();
                 if (player) {
                     player.seek(startTime);
-                    player.loopStart = startTime;
                 }
             } else {
                 updateUI(); // Reset invalid input
@@ -174,7 +166,6 @@ export class GifMenu {
                 updateUI();
                 if (player) {
                     player.seek(endTime);
-                    player.loopEnd = endTime;
                 }
             } else {
                 updateUI(); // Reset invalid input
@@ -191,8 +182,6 @@ export class GifMenu {
                     endTime = Math.min(duration, startTime + 10);
                 }
                 updateUI();
-                player.loopStart = startTime;
-                player.loopEnd = endTime; // Ensure loop remains valid
             }
         });
 
@@ -203,7 +192,6 @@ export class GifMenu {
                 if (currentTime > startTime) {
                     endTime = Math.min(Math.max(0, currentTime), duration);
                     updateUI();
-                    player.loopEnd = endTime;
                 }
             }
         });
@@ -226,11 +214,9 @@ export class GifMenu {
             downloadBtn.classList.add('hidden');
 
             await runMenuJob({
-                name: 'GIF creation',
-                progress: { section: progressSection, text: progressText },
-                error: errorMessage,
-                success: successMessage,
-                lock: [fpsDropdown, sizeDropdown, qualitySlider, createBtn],
+                name: 'GIF',
+                subject: item.title,
+                background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
                     let targetWidth, targetHeight;
@@ -273,7 +259,7 @@ export class GifMenu {
                     }
 
                     const timestamp = Math.round(start).toString().padStart(2, '0') + '-' + Math.round(end).toString().padStart(2, '0');
-                    const filename = `${item.title.replace(/\.[^.]+$/, '')} -${timestamp}.gif`;
+                    const filename = `${item.title.replace(/\.[^.]+$/, '')}-${timestamp}.gif`;
                     downloadBtn.href = previewUrl;
                     downloadBtn.download = filename;
                     downloadBtn.classList.remove('hidden');
@@ -298,9 +284,7 @@ export class GifMenu {
         // Cleanup on close
         const originalClose = modal.close.bind(modal);
         modal.close = () => {
-            if (player) {
-                player.destroy();
-            }
+            if (player && !modal.isPanel) player.destroy();
             originalClose();
         };
     }

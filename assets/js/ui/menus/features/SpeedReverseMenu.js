@@ -4,6 +4,7 @@ import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { setActionLabel } from '../../../shared/utils/FooterHelper.js';
 
 /**
  * Speed & Reverse Menu Handler
@@ -99,7 +100,7 @@ export class SpeedReverseMenu {
 
             // Update Button Text
             if (processBtn && !processBtn.disabled) {
-                processBtn.innerHTML = isReverse ? '<span>Reverse Video</span>' : '<span>Change Speed</span>';
+                setActionLabel(processBtn, isReverse ? 'Reverse Video' : 'Change Speed');
             }
         };
 
@@ -123,66 +124,38 @@ export class SpeedReverseMenu {
                 const includeAudio = audioCheckbox ? audioCheckbox.checked : true;
                 const isReverse = modalContent.querySelector('input[name="direction"]:checked').value === 'reverse';
 
-                processBtn.innerHTML = '<span>Processing...</span>';
-
-                // Not closable at all while working, not even by Escape or
-                // the backdrop.
-                const originalClose = modal.close;
-                modal.close = () => { };
-                const closeBtn = modal.modal.querySelector('.mb-modal-close');
-                if (closeBtn) closeBtn.style.display = 'none';
-
-                try {
-                    await runMenuJob({
-                        name: 'Processing',
-                        progress: { section: progressSection, text: progressText, bar: progressBar, status: progressStatus },
-                        error: errorMessage,
-                        success: successMessage,
-                        lock: [processBtn, speedSlider, audioCheckbox, ...directionRadios],
-                        work: async ({ signal, onProgress }) => {
-                            let sourceFile;
-                            try {
-                                sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-                            } catch (e) {
-                                Logger.error('Failed to get source blob:', e);
-                                throw new Error('Cannot access video file');
-                            }
-                            const report = (progress) => onProgress(progress, progress < 0.9
-                                ? (isReverse ? 'Reversing & Encoding...' : 'Processing frames...')
-                                : 'Finalizing...');
-                            const options = { source: sourceFile, speed, includeAudio, onProgress: report, signal };
-                            return isReverse
-                                ? MediaProcessor.reverseVideo(options)
-                                : MediaProcessor.changeVideoSpeed(options);
-                        },
-                        done: async (outputBlob) => {
-                            const speedTag = isReverse ? `reversed-${speed}x` : (speed < 1 ? `slow-${speed}x` : `fast-${speed}x`);
-                            const filename = `${item.title.replace(/\.[^.]+$/, '')}-${speedTag}.mp4`;
-                            const { item: newItem, url } = playlist.insertProcessedItem(item, outputBlob, filename, {
-                                duration: null,
-                                mediaType: 'video/mp4',
-                                extra: { thumbnail: item.thumbnail },
-                            });
-                            await playlist._ensureMetadata(newItem);
-
-                            if (downloadBtn) {
-                                downloadBtn.onclick = () => {
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = filename;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                };
-                                downloadBtn.classList.remove('hidden');
-                            }
-                        },
-                    });
-                } finally {
-                    modal.close = originalClose;
-                    if (closeBtn) closeBtn.style.display = '';
-                    processBtn.innerHTML = isReverse ? '<span>Reverse Video</span>' : '<span>Change Speed</span>';
-                }
+                await runMenuJob({
+                    name: isReverse ? 'Reverse' : 'Speed',
+                    subject: item.title,
+                    background: true,
+                    modal,
+                    work: async ({ signal, onProgress }) => {
+                        let sourceFile;
+                        try {
+                            sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                        } catch (e) {
+                            Logger.error('Failed to get source blob:', e);
+                            throw new Error('Cannot access video file');
+                        }
+                        const report = (progress) => onProgress(progress, progress < 0.9
+                            ? (isReverse ? 'Reversing & Encoding...' : 'Processing frames...')
+                            : 'Finalizing...');
+                        const options = { source: sourceFile, speed, includeAudio, onProgress: report, signal };
+                        return isReverse
+                            ? MediaProcessor.reverseVideo(options)
+                            : MediaProcessor.changeVideoSpeed(options);
+                    },
+                    done: async (outputBlob) => {
+                        const speedTag = isReverse ? `reversed-${speed}x` : (speed < 1 ? `slow-${speed}x` : `fast-${speed}x`);
+                        const filename = `${item.title.replace(/\.[^.]+$/, '')}-${speedTag}.mp4`;
+                        const { item: newItem } = playlist.insertProcessedItem(item, outputBlob, filename, {
+                            duration: null,
+                            mediaType: 'video/mp4',
+                            extra: { thumbnail: item.thumbnail },
+                        });
+                        await playlist._ensureMetadata(newItem);
+                    },
+                });
             });
         }
     }

@@ -5,6 +5,32 @@ import { Logger } from "../shared/utils/Logger.js";
  */
 export class Modal {
     /**
+     * Open modals, oldest first. Escape closes only the last one, so a dialog
+     * opened from another closes back to it rather than taking both down.
+     * @type {Modal[]}
+     */
+    static _open = [];
+    static _escapeBound = false;
+
+    /**
+     * Escape closes the top modal. It goes through close(), so a menu that
+     * swaps close() out while a job runs (Speed, Slideshow) stays open here
+     * just as it does for its X button.
+     * @param {KeyboardEvent} e
+     */
+    static _onKeydown(e) {
+        if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+        const top = Modal._open[Modal._open.length - 1];
+        if (!top?.overlay) return;
+        // Something drawn over it that is not a Modal -- a confirm dialog, say
+        // -- owns the key, and handles it itself.
+        const overlays = document.querySelectorAll('.mb-modal-overlay');
+        if (overlays[overlays.length - 1] !== top.overlay) return;
+        e.preventDefault();
+        top.close();
+    }
+
+    /**
      * @param {Object} options
      * @param {string} [options.maxWidth] - Custom max-width (e.g. '700px')
      * @param {boolean} [options.splitLayout] - Use split layout (70% video / 30% controls)
@@ -20,6 +46,7 @@ export class Modal {
         this.body = null;
         this.footer = null;
         this._cleanupCallbacks = [];
+        this._closed = false;
 
         this._init();
     }
@@ -109,7 +136,11 @@ export class Modal {
     open() {
         if (this.overlay) {
             document.body.appendChild(this.overlay);
-            // Optional: Add animation class if needed
+            if (!Modal._open.includes(this)) Modal._open.push(this);
+            if (!Modal._escapeBound) {
+                document.addEventListener('keydown', Modal._onKeydown);
+                Modal._escapeBound = true;
+            }
         }
     }
 
@@ -128,6 +159,12 @@ export class Modal {
      * Close the modal
      */
     close() {
+        // Closing twice -- Escape and a menu's own key handler both reacting,
+        // say -- must not run onClose twice.
+        if (this._closed) return;
+        this._closed = true;
+        Modal._open = Modal._open.filter(m => m !== this);
+
         // Run registered cleanup callbacks
         for (const cb of this._cleanupCallbacks) {
             try { cb(); } catch (e) { Logger.warn('Modal cleanup error:', e); }

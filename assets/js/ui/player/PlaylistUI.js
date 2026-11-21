@@ -1,6 +1,8 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { ElectronHelper } from '../../shared/utils/ElectronHelper.js';
 import { UrlUploadMenu } from "../menus/features/UrlUploadMenu.js";
+import { JobTray } from './JobTray.js';
+import { EditPanel } from './EditPanel.js';
 
 /**
  * Playlist UI Helper
@@ -22,6 +24,28 @@ export class PlaylistUI {
         this._createListContainer();
         this._initMobileDrawer();
         this._initUrlUpload();
+        this._initJobTray();
+        this._initEditPanel();
+    }
+
+    /**
+     * The edit panel, which takes the playlist's place while a video is edited.
+     * @private
+     */
+    _initEditPanel() {
+        const sidebar = this.playlist.container.closest('.playlist-section');
+        if (!sidebar) return;
+        this.editPanel = new EditPanel(this.playlist, sidebar, this.jobTray?.el ?? null);
+        if (this.jobTray) this.jobTray.onEdit = (item) => this.editPanel.openItem(item);
+    }
+
+    /**
+     * The list of processing jobs, at the foot of the sidebar.
+     * @private
+     */
+    _initJobTray() {
+        const sidebar = this.playlist.container.closest('.playlist-section');
+        if (sidebar) this.jobTray = new JobTray(this.playlist, sidebar);
     }
 
     /**
@@ -315,5 +339,7 @@ export class PlaylistUI {
         if (this._keydownHandler) {
             document.removeEventListener('keydown', this._keydownHandler);
         }
+        this.jobTray?.destroy();
+        this.editPanel?.destroy();
     }
 }

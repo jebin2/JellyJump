@@ -282,10 +282,8 @@ export class MergeMenu {
 
             const outcome = await runMenuJob({
                 name: 'Merge',
-                progress: { section: progressSection, text: progressSection.querySelector('.progress-percentage') },
-                error: modalContent.querySelector('.error-message'),
-                success: successMsg,
-                lock: [widthInput, heightInput, scaleSelect, bgColorInput],
+                subject: `${selectedVideos.length} videos`,
+                background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
                     const inputs = [];
@@ -337,7 +335,7 @@ export class MergeMenu {
             });
             if (!outcome.ok) {
                 mergeBtn.disabled = false;
-                mergeBtn.innerHTML = '<span class="mr-xs">Merge</span><svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-layers"></use></svg>';
+                mergeBtn.innerHTML = '<span class="mr-xs">Merge</span><svg width="16" height="16" fill="currentColor"><use href="assets/icons/sprite.svg#icon-copy"></use></svg>';
             }
         });
     }

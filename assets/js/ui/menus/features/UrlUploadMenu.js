@@ -97,13 +97,10 @@ export const UrlUploadMenu = {
 
         addBtn.addEventListener('click', handleAdd);
 
-        // Keyboard shortcuts
+        // Enter adds. Escape is left to the modal, which closes on it.
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !addBtn.disabled) {
                 handleAdd();
-            }
-            if (e.key === 'Escape') {
-                modal.close();
             }
         });
     },

@@ -4,6 +4,7 @@ import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { borrowMainPlayer, setPreviewRange } from '../core/PreviewPlayer.js';
 
 /**
  * Trim Menu Handler
@@ -16,12 +17,13 @@ export class TrimMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Clip Video', 'trim-content-template', FOOTER_CONFIGS.trim, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Cut', 'trim-content-template', FOOTER_CONFIGS.trim, { splitLayout: true });
         if (!modal) return;
 
         // === SETUP EDITOR DOM (Unified) ===
-        const videoPanel = modalContent.querySelector('.modal-video-panel');
-        const editorUI = setupEditor(videoPanel, { type: 'trim', enableOverlay: false });
+        // In the edit panel the main player is the preview; a dialog has its own.
+        const editorUI = modal.isPanel ? null
+            : setupEditor(modalContent.querySelector('.modal-video-panel'), { type: 'trim', enableOverlay: false });
 
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
@@ -65,14 +67,9 @@ export class TrimMenu {
 
         // Load Video
         const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-        const player = await loadVideo(editorUI.containerId, item, playlist, state);
-
-        if (player) {
-            // Enable A-B Loop Mode
-            player.loopMode = 'ab';
-            player.loopStart = startTime;
-            player.loopEnd = endTime;
-        }
+        const player = modal.isPanel
+            ? borrowMainPlayer(modal, playlist)
+            : await loadVideo(editorUI.containerId, item, playlist, state);
 
         // Show Content
         trimLoading.classList.add('hidden');
@@ -91,12 +88,8 @@ export class TrimMenu {
 
 
 
-            // Update Player Loop Points
-            if (player) {
-                player.loopStart = startTime;
-                player.loopEnd = endTime;
-                if (player.loopMode !== 'ab') player.loopMode = 'ab';
-            }
+            // The clip, on the timeline and looping
+            setPreviewRange(player, startTime, endTime);
 
             // Validation
             const isValid = startTime < endTime && (endTime - startTime) >= 1;
@@ -154,9 +147,7 @@ export class TrimMenu {
         // Cleanup on close
         const originalClose = modal.close.bind(modal);
         modal.close = () => {
-            if (player) {
-                player.destroy();
-            }
+            if (player && !modal.isPanel) player.destroy();
             originalClose();
         };
 
@@ -164,14 +155,10 @@ export class TrimMenu {
         trimBtn.addEventListener('click', async () => {
             modalContent.classList.add('processing');
             await runMenuJob({
-                name: 'Trimming',
-                progress: { section: progressSection, text: progressPercentage },
-                error: errorMessage,
-                success: successMessage,
-                lock: [trimBtn, losslessToggle],
+                name: 'Cut',
+                subject: item.title,
+                background: true,
                 modal,
-                // A finished trim is not run again by accident.
-                unlock: 'onFailure',
                 work: async ({ signal, onProgress }) => {
                     const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
                     const trim = { start: startTime, end: endTime };
@@ -181,7 +168,7 @@ export class TrimMenu {
                 },
                 done: (blob) => {
                     const ext = 'mp4';
-                    const filename = item.title.replace(/\.[^/.]+$/, "") + `- trimmed - ${Math.round(startTime)} -${Math.round(endTime)}.${ext}`;
+                    const filename = item.title.replace(/\.[^/.]+$/, "") + `-trimmed-${Math.round(startTime)}-${Math.round(endTime)}.${ext}`;
                     // Always add to Playlist
                     const { url } = playlist.insertProcessedItem(item, blob, filename, {
                         type: `video/${ext}`,

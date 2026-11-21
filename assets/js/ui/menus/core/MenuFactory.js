@@ -1,12 +1,14 @@
 import { Modal } from '../../Modal.js';
 import { createProcessFooter, FOOTER_CONFIGS } from '../../../shared/utils/FooterHelper.js';
 import { Logger } from '../../../shared/utils/Logger.js';
+import { takePanelSurface } from './MenuSurface.js';
 
 export { FOOTER_CONFIGS };
 
 /**
- * Create and open a standard process menu modal.
- * Returns null if the content template is missing.
+ * Create and open a standard process menu modal -- or, when the edit panel
+ * opened this tool, a panel surface that behaves like one.
+ * Returns nulls if the content template is missing.
  * @param {string} title
  * @param {string} templateId - DOM id of the <template> element
  * @param {Object} footerConfig - One of FOOTER_CONFIGS values
@@ -17,10 +19,11 @@ export function openProcessMenu(title, templateId, footerConfig, options = {}) {
     const template = document.getElementById(templateId);
     if (!template) {
         Logger.error(`[MenuFactory] Template not found: ${templateId}`);
+        takePanelSurface();
         return { modal: null, content: null };
     }
 
-    const modal = new Modal({ ...options });
+    const modal = takePanelSurface() ?? new Modal({ ...options });
     modal.setTitle(title);
     modal.setBody(template.content.cloneNode(true));
     if (footerConfig) modal.setFooter(createProcessFooter(footerConfig));

@@ -32,7 +32,7 @@
                     <use href="assets/icons/sprite.svg#icon-trash"></use>
                 </svg>
             </button>
-            <button class="playlist-settings-btn" title="Tools" aria-label="Video tools">
+            <button class="playlist-settings-btn" title="Edit this video" aria-label="Edit this video">
                 <svg width="16" height="16" fill="currentColor">
                     <use href="assets/icons/sprite.svg#icon-sliders"></use>
                 </svg>
@@ -65,16 +65,20 @@
         </div>
         <!-- Action Buttons (Right) -->
         <div class="action-buttons flex gap-sm flex-shrink-0">
-            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+            <!-- Labelled, not icon-only: a scissors or a refresh arrow on its
+                 own left the user guessing what the button would do. -->
+            <a href="#" class="btn jellyjump-btn-small process-action-btn hidden download-btn" title="Download"
                 download>
-                <svg width="16" height="16" fill="currentColor">
+                <svg width="16" height="16" fill="currentColor" aria-hidden="true">
                     <use href="assets/icons/sprite.svg#icon-download"></use>
                 </svg>
+                <span>Download</span>
             </a>
-            <button class="btn jellyjump-btn-small primary-action-btn" title="" aria-label="">
-                <svg width="16" height="16" fill="currentColor">
+            <button class="btn jellyjump-btn-small process-action-btn primary-action-btn" title="">
+                <svg width="16" height="16" fill="currentColor" aria-hidden="true">
                     <use class="action-icon-use" href=""></use>
                 </svg>
+                <span class="action-label"></span>
             </button>
         </div>
     </div>
@@ -255,9 +259,11 @@
                     <use href="assets/icons/sprite.svg#icon-link"></use>
                 </svg>
             </button>
-            <button class="jellyjump-btn-small" id="mb-tools" title="Tools">
+            <!-- A wrench, not the sliders each playlist row uses for its own
+                 tools: two buttons that looked alike opened different menus. -->
+            <button class="jellyjump-btn-small" id="mb-tools" title="Create &amp; share" aria-label="Create and share">
                 <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-sliders"></use>
+                    <use href="assets/icons/sprite.svg#icon-tool"></use>
                 </svg>
             </button>
         </div>
@@ -346,12 +352,12 @@
                     <div class="tool-card-input">
                         <label>Start</label>
                         <input type="text" id="trim-start-input" class="mb-input font-mono" placeholder="0:00.000">
-                        <button id="trim-set-start-btn" class="jellyjump-btn-small">Set</button>
+                        <button id="trim-set-start-btn" class="jellyjump-btn-small" title="Set the start to the current time">Start here</button>
                     </div>
                     <div class="tool-card-input">
                         <label>End</label>
                         <input type="text" id="trim-end-input" class="mb-input font-mono" placeholder="0:00.000">
-                        <button id="trim-set-end-btn" class="jellyjump-btn-small">Set</button>
+                        <button id="trim-set-end-btn" class="jellyjump-btn-small" title="Set the end to the current time">End here</button>
                     </div>
                 </div>
                 <div class="tool-card-info">Duration: <span class="trim-duration">00:00:00</span></div>
@@ -1006,12 +1012,12 @@
                     <div class="tool-card-input">
                         <label>Start</label>
                         <input type="text" id="gif-start-input" class="mb-input font-mono" placeholder="0:00.000">
-                        <button id="gif-set-start-btn" class="jellyjump-btn-small">Set</button>
+                        <button id="gif-set-start-btn" class="jellyjump-btn-small" title="Set the start to the current time">Start here</button>
                     </div>
                     <div class="tool-card-input">
                         <label>End</label>
                         <input type="text" id="gif-end-input" class="mb-input font-mono" placeholder="0:00.000">
-                        <button id="gif-set-end-btn" class="jellyjump-btn-small">Set</button>
+                        <button id="gif-set-end-btn" class="jellyjump-btn-small" title="Set the end to the current time">End here</button>
                     </div>
                 </div>
                 <div class="tool-card-info">Duration: <span class="gif-duration">00:00:00</span></div>
@@ -1775,12 +1781,12 @@
             <div class="tool-card-input">
                 <label>Start</label>
                 <input type="text" class="mb-input font-mono wm-start-time" placeholder="0:00.000">
-                <button class="set-current-start jellyjump-btn-small">Set</button>
+                <button class="set-current-start jellyjump-btn-small" title="Set the start to the current time">Start here</button>
             </div>
             <div class="tool-card-input">
                 <label>End</label>
                 <input type="text" class="mb-input font-mono wm-end-time" placeholder="0:00.000">
-                <button class="set-current-end jellyjump-btn-small">Set</button>
+                <button class="set-current-end jellyjump-btn-small" title="Set the end to the current time">End here</button>
             </div>
         </div>
 
@@ -1887,12 +1893,12 @@
             <div class="tool-card-input">
                 <label>Start</label>
                 <input type="text" class="mb-input font-mono blur-start-time" placeholder="0:00.000">
-                <button class="set-current-start jellyjump-btn-small">Set</button>
+                <button class="set-current-start jellyjump-btn-small" title="Set the start to the current time">Start here</button>
             </div>
             <div class="tool-card-input">
                 <label>End</label>
                 <input type="text" class="mb-input font-mono blur-end-time" placeholder="0:00.000">
-                <button class="set-current-end jellyjump-btn-small">Set</button>
+                <button class="set-current-end jellyjump-btn-small" title="Set the end to the current time">End here</button>
             </div>
         </div>
 

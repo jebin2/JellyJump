@@ -8,7 +8,9 @@ import {
     setupEditor,
     setupCleanup,
     setupAreaEditor,
+    createBoxOverlay,
 } from './BoxEditorUtils.js';
+import { lendPicture } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 
@@ -30,13 +32,24 @@ export class WatermarkMenu {
         const MIN_SIZE = 40;
 
         // === 1. Setup Editor DOM (Left Panel) ===
-        const videoPanel = modalContent.querySelector('.modal-video-panel');
-        const editorUI = setupEditor(videoPanel, {
-            type: 'watermark',
-            overlayClass: 'watermark-overlay',
-            boxDataAttr: 'data-watermark-box',
-            enableOverlay: true
-        });
+        // In the edit panel the areas are drawn over the main player.
+        const stage = modal.isPanel ? await lendPicture(modal, playlist) : null;
+        if (modal.isPanel && !stage) return;
+        let videoPanel = modalContent.querySelector('.modal-video-panel');
+        let editorUI;
+        if (stage) {
+            const { overlay, box } = createBoxOverlay({ overlayClass: 'watermark-overlay', boxDataAttr: 'data-watermark-box' });
+            stage.adopt(overlay);
+            videoPanel = stage.wrapper;
+            editorUI = { containerId: null, playerContainer: stage.wrapper, wrapper: stage.wrapper, overlay, box };
+        } else {
+            editorUI = setupEditor(videoPanel, {
+                type: 'watermark',
+                overlayClass: 'watermark-overlay',
+                boxDataAttr: 'data-watermark-box',
+                enableOverlay: true
+            });
+        }
 
         // Add data-crop-box so setupDragHandlers recognizes it for move
         editorUI.box.setAttribute('data-crop-box', '');
@@ -75,7 +88,13 @@ export class WatermarkMenu {
 
 
         // === 3. Load Video ===
-        const player = await loadVideo(editorUI.containerId, item, playlist, state);
+        let player;
+        if (stage) {
+            player = stage.player;
+            state.video = { ...stage.video };
+        } else {
+            player = await loadVideo(editorUI.containerId, item, playlist, state);
+        }
         if (!player) {
             elements.messages.error.textContent = "Failed to load video.";
             elements.messages.error.classList.remove('hidden');
@@ -140,7 +159,8 @@ export class WatermarkMenu {
                 }
             });
         };
-        player.addRenderCallback(renderCallback);
+        if (stage) stage.addRenderCallback(renderCallback);
+        else player.addRenderCallback(renderCallback);
 
 
         // === 5. Box Logic, Selection & Drawing ===
@@ -166,6 +186,8 @@ export class WatermarkMenu {
             }),
             onSelectionChange: () => renderList(),
             onAreaMoved: (index) => syncInputsFromArea(index),
+            // Under the main player's controls.
+            zIndex: stage ? 5 : 1000,
         });
 
 
@@ -422,12 +444,11 @@ export class WatermarkMenu {
             const format = ['mp4', 'webm', 'mov'].includes(ext) ? ext : 'mp4';
 
             await runMenuJob({
-                name: 'Watermark processing',
-                progress: elements.progress,
-                error: elements.messages.error,
-                success: elements.messages.success,
-                lock: [elements.processBtn],
+                name: 'Watermark',
+                subject: item.title,
+                background: true,
                 failureText: (e) => e.message,
+                modal,
                 work: async ({ signal, onProgress }) => MediaProcessor.process({
                     source: await MediaMetadata.getSourceBlob(item, () => playlist._saveState()),
                     format,
@@ -450,13 +471,8 @@ export class WatermarkMenu {
 
 
         // === 8. Cleanup ===
-        const originalCleanup = setupCleanup(modal, player, cleanupDrag);
-
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            disposeAreaEditor();
-            originalClose();
-        };
+        modal.onCleanup(disposeAreaEditor);
+        if (!stage) setupCleanup(modal, player, cleanupDrag);
     }
 }
 

@@ -1,4 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
+import { PROCESSED_ITEM_EVENT } from '../../shared/services/JobQueue.js';
 import { unlockIfEncrypted } from './EncryptedPlayback.js';
 import { classifyPlaylistItem } from './PlaylistItemKind.js';
 import { Toast } from "../../shared/utils/Toast.js";
@@ -9,6 +10,7 @@ import { MenuRouter } from '../menus/core/MenuRouter.js';
 import { RecordMenu } from '../menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
 import { ItemToolsMenu } from "../menus/features/ItemToolsMenu.js";
+import { ITEM_SELECTED_EVENT } from "./EditPanel.js";
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
@@ -139,7 +141,12 @@ export class Playlist {
 
         // Auto-advance when the current item ends. On the last item this stops,
         // unless the loop mode is 'playlist', where it wraps to the first.
-        this.player.onEnded = () => this.playNext();
+        this.player.onEnded = () => {
+            // While a video is being edited the player is its preview; moving
+            // on to the next one would take the edit panel with it.
+            if (this.ui?.editPanel?.isOpen) return;
+            this.playNext();
+        };
 
         // Changing the loop mode changes whether a next item exists, so the
         // prev/next buttons have to be re-evaluated when it does.
@@ -901,6 +908,9 @@ export class Playlist {
         this.render();
         this._saveState();
 
+        // The job that made it, if any, lists it as its result.
+        window.dispatchEvent(new CustomEvent(PROCESSED_ITEM_EVENT, { detail: { item: newItem, url } }));
+
         return { item: newItem, url };
     }
 
@@ -1302,6 +1312,7 @@ export class Playlist {
             }
 
             this.activeIndex = index;
+            window.dispatchEvent(new CustomEvent(ITEM_SELECTED_EVENT, { detail: { index, item: video } }));
 
             // INSTANT FEEDBACK: Update UI immediately
             this._updateUI();
@@ -1698,7 +1709,10 @@ export class Playlist {
 
 
     _toggleSettingsMenu(index) {
-        ItemToolsMenu.show(index, this);
+        // The edit panel, in the sidebar; the dialog only where there is no
+        // sidebar to put it in.
+        if (this.ui?.editPanel) this.ui.editPanel.open(index);
+        else ItemToolsMenu.show(index, this);
     }
 
 

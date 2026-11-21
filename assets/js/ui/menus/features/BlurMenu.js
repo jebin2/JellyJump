@@ -8,7 +8,9 @@ import {
     setupEditor,
     setupCleanup,
     setupAreaEditor,
+    createBoxOverlay,
 } from './BoxEditorUtils.js';
+import { lendPicture } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 
@@ -32,13 +34,24 @@ export class BlurMenu {
         const MIN_SIZE = 20;
 
         // === 1. Setup Editor DOM (Left Panel) ===
-        const videoPanel = modalContent.querySelector('.modal-video-panel');
-        const editorUI = setupEditor(videoPanel, {
-            type: 'blur',
-            overlayClass: 'blur-overlay',
-            boxDataAttr: 'data-blur-box',
-            enableOverlay: true
-        });
+        // In the edit panel the areas are drawn over the main player.
+        const stage = modal.isPanel ? await lendPicture(modal, playlist) : null;
+        if (modal.isPanel && !stage) return;
+        let videoPanel = modalContent.querySelector('.modal-video-panel');
+        let editorUI;
+        if (stage) {
+            const { overlay, box } = createBoxOverlay({ overlayClass: 'blur-overlay', boxDataAttr: 'data-blur-box' });
+            stage.adopt(overlay);
+            videoPanel = stage.wrapper;
+            editorUI = { containerId: null, playerContainer: stage.wrapper, wrapper: stage.wrapper, overlay, box };
+        } else {
+            editorUI = setupEditor(videoPanel, {
+                type: 'blur',
+                overlayClass: 'blur-overlay',
+                boxDataAttr: 'data-blur-box',
+                enableOverlay: true
+            });
+        }
 
         // Add data-crop-box so setupDragHandlers recognizes it for move
         editorUI.box.setAttribute('data-crop-box', '');
@@ -81,7 +94,13 @@ export class BlurMenu {
         };
 
         // === 3. Load Video ===
-        const player = await loadVideo(editorUI.containerId, item, playlist, state);
+        let player;
+        if (stage) {
+            player = stage.player;
+            state.video = { ...stage.video };
+        } else {
+            player = await loadVideo(editorUI.containerId, item, playlist, state);
+        }
         if (!player) {
             elements.messages.error.textContent = "Failed to load video.";
             elements.messages.error.classList.remove('hidden');
@@ -132,7 +151,8 @@ export class BlurMenu {
                 }
             });
         };
-        player.addRenderCallback(renderCallback);
+        if (stage) stage.addRenderCallback(renderCallback);
+        else player.addRenderCallback(renderCallback);
 
         // Wire blur intensity slider
         elements.blurIntensity.oninput = () => {
@@ -157,6 +177,8 @@ export class BlurMenu {
             }),
             onSelectionChange: () => renderList(),
             onAreaMoved: (index) => syncInputsFromArea(index),
+            // Under the main player's controls.
+            zIndex: stage ? 5 : 1000,
         });
 
 
@@ -329,12 +351,11 @@ export class BlurMenu {
             updateSelection(-1);
 
             await runMenuJob({
-                name: 'Blur processing',
-                progress: elements.progress,
-                error: elements.messages.error,
-                success: elements.messages.success,
-                lock: [elements.processBtn],
+                name: 'Blur',
+                subject: item.title,
+                background: true,
                 failureText: (e) => e.message,
+                modal,
                 work: async ({ signal, onProgress }) => MediaProcessor.process({
                     source: await MediaMetadata.getSourceBlob(item, () => playlist._saveState()),
                     format: 'mp4',
@@ -354,12 +375,7 @@ export class BlurMenu {
 
 
         // === 8. Cleanup ===
-        const originalCleanup = setupCleanup(modal, player, cleanupDrag);
-
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            disposeAreaEditor();
-            originalClose();
-        };
+        modal.onCleanup(disposeAreaEditor);
+        if (!stage) setupCleanup(modal, player, cleanupDrag);
     }
 }

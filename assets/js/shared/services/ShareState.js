@@ -27,7 +27,7 @@ function applyToButton() {
     // Recording owns the same button and means something more urgent, so it
     // keeps its own title when both are somehow true.
     if (!button.classList.contains('recording-active')) {
-        button.title = enabled ? 'Tools — sharing library' : 'Tools';
+        button.title = enabled ? 'Create & share — sharing library' : 'Create & share';
     }
 }
 

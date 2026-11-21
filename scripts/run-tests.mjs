@@ -30,7 +30,7 @@ const QUICK = [
 ];
 const BROWSER = [
     'encrypt-test', 'source-failure-test', 'youtube-embed-test',
-    'smoke-test', 'watch-panel-test', 'watch-party-test',
+    'smoke-test', 'edit-panel-test', 'watch-panel-test', 'watch-party-test',
 ];
 /** Needs Electron, installed with the desktop app's own dependencies. */
 const ELECTRON = ['share-host-test'];

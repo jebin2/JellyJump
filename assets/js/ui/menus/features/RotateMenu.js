@@ -20,6 +20,19 @@ export class RotateMenu {
         const { modal, content: modalContent } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate, { splitLayout: true });
         if (!modal) return;
 
+        // In the edit panel the main player is the preview: it turns there,
+        // and turns back when the tool closes.
+        if (modal.isPanel) {
+            const canvas = playlist.player?.container?.querySelector('canvas.jellyjump-video');
+            modal.onCleanup(() => {
+                if (!canvas) return;
+                canvas.style.transform = '';
+                canvas.style.transition = '';
+            });
+            this._setup(modal, item, playlist, null, { previewEl: canvas });
+            return;
+        }
+
         // === Setup Editor DOM (Left Panel) ===
         const videoPanel = modalContent.querySelector('.modal-video-panel');
         // We use setupEditor to create the container structure, 
@@ -56,11 +69,11 @@ export class RotateMenu {
         let rotation = 0;
         let flipH = false;
         let flipV = false;
-        let isProcessing = false;
 
         // Target element for CSS transforms
         // Try to find canvas or video inside the player container
         const getMediaElement = () => {
+            if (editorUI.previewEl !== undefined) return editorUI.previewEl;
             return editorUI.playerContainer.querySelector('canvas') ||
                 editorUI.playerContainer.querySelector('video');
         };
@@ -72,9 +85,20 @@ export class RotateMenu {
             const mediaEl = getMediaElement();
 
             if (mediaEl) {
-                // Apply transform
+                // A quarter turn swaps the frame's width and height. The
+                // element shows the frame contained in its box; shrunk by how
+                // much smaller the turned frame must be to be contained in
+                // the same box, it stays inside it.
+                const W = mediaEl.offsetWidth, H = mediaEl.offsetHeight;
+                // The frame's own size: the main player's canvas is sized to
+                // its box, not to the video, so that comes from the item.
+                const vw = item.videoInfo?.width || mediaEl.videoWidth || mediaEl.width || W;
+                const vh = item.videoInfo?.height || mediaEl.videoHeight || mediaEl.height || H;
+                const fit = rotation % 180 !== 0 && W && H && vw && vh
+                    ? Math.min(W / vh, H / vw) / Math.min(W / vw, H / vh)
+                    : 1;
                 mediaEl.style.transition = 'transform 0.3s ease';
-                mediaEl.style.transform = `rotate(${rotation}deg) scale(${scaleX}, ${scaleY})`;
+                mediaEl.style.transform = `rotate(${rotation}deg) scale(${scaleX * fit}, ${scaleY * fit})`;
             }
 
             modalBody.querySelector('.rotation-value').textContent = `${rotation}°`;
@@ -87,7 +111,6 @@ export class RotateMenu {
         // Control Listeners
         modalBody.querySelectorAll('[data-action]').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                if (isProcessing) return;
                 // find button closest in case of SVG click
                 const target = e.target.closest('button');
                 const action = target.dataset.action;
@@ -108,24 +131,12 @@ export class RotateMenu {
         // Process Button
         const processBtn = modal.modal.querySelector('.rotate-process-btn');
         const footer = modal.modal.querySelector('.mb-modal-footer');
-        const progressSection = footer.querySelector('.progress-section');
-        const statusText = footer.querySelector('.progress-status');
-        const percentageText = footer.querySelector('.progress-percentage');
-
-        const errorMsg = footer.querySelector('.error-message');
         const successMsg = footer.querySelector('.success-message');
         const actionButtons = footer.querySelector('.action-buttons');
 
-        processBtn.addEventListener('click', async () => {
-            if (isProcessing) return;
-            isProcessing = true;
-
+        processBtn.addEventListener('click', () => {
             // Normalize Rotation
             let normRotation = rotation % 360;
-
-            // The action buttons make way for the progress until it fails.
-            actionButtons.classList.add('hidden');
-            statusText.textContent = 'Processing...';
 
             // Named after the original, beside it in the playlist.
             const originalName = item.file ? item.file.name : (item.title || 'video.mp4');
@@ -133,12 +144,11 @@ export class RotateMenu {
             const ext = nameParts.pop();
             const newName = `${nameParts.join('.')}_rotated.${ext}`;
 
-            const outcome = await runMenuJob({
-                name: '[RotateMenu] Processing',
-                progress: { section: progressSection, text: percentageText },
-                error: errorMsg,
-                success: successMsg,
-                failureText: () => 'Processing failed. See console.',
+            runMenuJob({
+                name: 'Rotate',
+                subject: item.title,
+                background: true,
+                modal,
                 work: async ({ signal, onProgress }) => {
                     const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
                     return MediaProcessor.process({
@@ -150,8 +160,6 @@ export class RotateMenu {
                 },
                 done: (resultBlob) => playlist.insertProcessedItem(item, resultBlob, newName),
             });
-            if (!outcome.ok) actionButtons.classList.remove('hidden');
-            isProcessing = false;
         });
 
         // Add listener to reset UI on interaction
@@ -167,6 +175,6 @@ export class RotateMenu {
         });
 
         // Cleanup
-        setupCleanup(modal, player, null);
+        if (player) setupCleanup(modal, player, null);
     }
 }

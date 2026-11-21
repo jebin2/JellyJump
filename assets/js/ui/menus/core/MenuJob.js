@@ -1,6 +1,7 @@
 // @ts-check
 import { Logger } from '../../../shared/utils/Logger.js';
 import { startCancellableJob, CANCELLED_MESSAGE } from './CancellableJob.js';
+import { JobQueue } from '../../../shared/services/JobQueue.js';
 
 /**
  * runMenuJob - the part every processing menu does the same way.
@@ -31,12 +32,34 @@ import { startCancellableJob, CANCELLED_MESSAGE } from './CancellableJob.js';
  * @param {(api: {signal: AbortSignal, onProgress: (fraction: number, label?: string) => void}) => Promise<*>} options.work
  * @param {(result: *) => (void|Promise<void>)} [options.done] - after success,
  *   with what `work` returned
+ * @param {boolean} [options.background] - hand the job to the JobQueue and
+ *   close the dialog, rather than run it inside the dialog. The job tray then
+ *   shows its progress and its result; progress, error, success and lock are
+ *   not used. A tool in the edit panel stays open instead, and the panel
+ *   takes the result.
+ * @param {string} [options.subject] - in the background, what the job works
+ *   on, shown beside its name in the tray (usually the item's title)
+ * @param {boolean} [options.keepOpen] - in the background, leave the dialog
+ *   open, for a menu that starts several jobs from one dialog
  * @returns {Promise<{ok: boolean, cancelled?: boolean, result?: *, error?: Error}>}
  */
 export async function runMenuJob({
     progress = {}, error, success, lock = [], modal, unlock = 'always',
     name = 'Processing', failureText, work, done,
+    background = false, subject = '', keepOpen = false,
 }) {
+    if (background) {
+        // The dialog was only for the settings. Closing it now gives the user
+        // the player back while the job runs, instead of a progress bar to
+        // watch; the tray shows how it is going and offers the result.
+        const { job, finished } = JobQueue.add({ name, subject, work, done, failureText });
+        // In the edit panel the tool stays open: the panel waits for the
+        // result, to edit further on top of it.
+        if (modal?.isPanel) modal.jobQueued?.(name, job, finished);
+        else if (!keepOpen) modal?.close();
+        return finished;
+    }
+
     const setLocked = (locked) => {
         for (const control of lock) {
             if (!control) continue;
