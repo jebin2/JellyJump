@@ -16,7 +16,8 @@
  *
  * 2. Counts of things the plan removes: calls into the player's and the
  *    playlist's private members from outside them, files touching
- *    localStorage, and files checking for Electron directly. A count may go
+ *    localStorage, files checking for Electron directly, and files writing
+ *    out an outside service's address (they belong in shared/config/services.js). A count may go
  *    down (lower it in the baseline when it does) but not up.
  *
  *   node scripts/architecture-check.mjs            check
@@ -90,7 +91,7 @@ const isPlaylistPart = (r) => /^ui\/player\/Playlist[A-Za-z]*\.js$/.test(r);
 const PLAYER_PRIVATE = /(?:\bplayer|\bp)\._[A-Za-z]\w*/g;
 const PLAYLIST_PRIVATE = /\bplaylist\._[A-Za-z]\w*/g;
 
-const counts = { playerPrivateCalls: 0, playlistPrivateCalls: 0, localStorageFiles: 0, directElectronChecks: 0 };
+const counts = { playerPrivateCalls: 0, playlistPrivateCalls: 0, localStorageFiles: 0, directElectronChecks: 0, externalUrlFiles: 0 };
 for (const file of files) {
     const r = rel(file);
     const source = (await readFile(file, 'utf8'))
@@ -99,6 +100,8 @@ for (const file of files) {
     if (!isPlaylistPart(r)) counts.playlistPrivateCalls += (source.match(PLAYLIST_PRIVATE) ?? []).length;
     if (/\blocalStorage\b/.test(source)) counts.localStorageFiles++;
     if (r !== 'shared/utils/ElectronHelper.js' && /window\.electronAPI/.test(source)) counts.directElectronChecks++;
+    // An outside address written out anywhere but the services list (comments excepted).
+    if (r !== 'shared/config/services.js' && /['"`]https?:\/\/(?!localhost|127\.0\.0\.1)[a-z0-9.-]+\.[a-z]{2,}/i.test(source)) counts.externalUrlFiles++;
 }
 
 // --- compare -------------------------------------------------------------------

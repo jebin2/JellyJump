@@ -1,4 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
+import { SERVICES } from '../../shared/config/services.js';
 
 /**
  * YouTube playback, through YouTube's own player.
@@ -18,7 +19,7 @@ import { Logger } from '../../shared/utils/Logger.js';
  * caller's animation frame, not here, to keep one clock driving the UI.
  */
 
-const API_SRC = 'https://www.youtube.com/iframe_api';
+const API_SRC = SERVICES.youtubeIframeApi;
 
 /** YT.PlayerState, inlined so this module can be reasoned about without it. */
 const STATE = { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 };
@@ -235,7 +236,7 @@ export class YouTubeEngine {
         const origin = webOrigin();
         if (origin) params.set('origin', origin);
 
-        return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(this.options.videoId)}?${params}`;
+        return `${SERVICES.youtubeEmbed}${encodeURIComponent(this.options.videoId)}?${params}`;
     }
 
     /**

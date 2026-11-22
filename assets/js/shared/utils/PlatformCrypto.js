@@ -35,7 +35,7 @@
 
 import { Logger } from './Logger.js';
 import { CryptoHelper } from './CryptoHelper.js';
-import { DOMAIN } from '../config.js';
+import { config } from '../config/index.js';
 import {
     AUDIO_SAMPLE_RATE,
 } from './AudioDataCodec.js';
@@ -883,7 +883,7 @@ export class PlatformCrypto {
 
         ctx.font = '13px "Courier New", monospace';
         ctx.fillStyle = '#666666';
-        ctx.fillText(DOMAIN, cx, ty);
+        ctx.fillText(config.domain, cx, ty);
 
         if (hasHint) {
             ty += 22;

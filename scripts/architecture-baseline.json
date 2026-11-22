@@ -3,7 +3,8 @@
     "playerPrivateCalls": 358,
     "playlistPrivateCalls": 50,
     "localStorageFiles": 14,
-    "directElectronChecks": 8
+    "directElectronChecks": 8,
+    "externalUrlFiles": 0
   },
   "wrongWayImports": [
     "core/MediaProcessor.js -> processing/combine/CombineAVService.js",

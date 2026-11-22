@@ -1,11 +1,28 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
+import { execSync } from 'child_process';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
+// A build id for cache-busting (the commit, or the time when there is no
+// git), and the version (from the release tag in CI, else package.json).
+// Read by shared/config/index.js.
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8'));
+const buildId = process.env.VITE_BUILD_ID || (() => {
+    try { return execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim(); }
+    catch { return String(Date.now()); }
+})();
+const appVersion = process.env.VITE_APP_VERSION || pkg.version;
+
 export default defineConfig({
     root: '.',
+
+    define: {
+        'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),
+        'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
+    },
     publicDir: 'public',
     base: './',
 

@@ -1,4 +1,5 @@
 // @ts-check
+import { SERVICES } from '../config/services.js';
 /**
  * Recognising YouTube links.
  *
@@ -97,7 +98,7 @@ export async function fetchYouTubeInfo(id) {
     const fallback = { title: `YouTube ${id}`, thumbnail: thumbnailUrl(id), author: '' };
     try {
         const response = await fetch(
-            `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`
+            `${SERVICES.youtubeOembed}?format=json&url=${encodeURIComponent(`${SERVICES.youtubeWatch}?v=${id}`)}`
         );
         if (!response.ok) return fallback;
 
@@ -115,7 +116,7 @@ export async function fetchYouTubeInfo(id) {
 
 /** Predictable thumbnail URL, used when oEmbed cannot be reached. */
 export function thumbnailUrl(id) {
-    return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+    return `${SERVICES.youtubeThumbnail}${id}/hqdefault.jpg`;
 }
 
 /**

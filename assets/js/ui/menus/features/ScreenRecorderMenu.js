@@ -2,6 +2,7 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { Toast } from "../../../shared/utils/Toast.js";
 import { startTrackRecording } from "../../../core/streaming/TrackRecorder.js";
 import { html } from '../../../shared/utils/html.js';
+import { SERVICES } from '../../../shared/config/services.js';
 
 /**
  * Recorder Menu Handler
@@ -255,7 +256,7 @@ export class ScreenRecorderMenu {
                                 <span class="block text-xs text-secondary">Use headphones to avoid echo.</span>
                             </div>
                         </label>
-                        <a href="https://webcammictest.com/mic/" target="_blank" rel="noopener noreferrer"
+                        <a href="${SERVICES.microphoneTest}" target="_blank" rel="noopener noreferrer"
                             class="text-xs text-accent hover-underline mt-xs inline-block">🎙️ Test your microphone</a>
                     </div>
                 </div>
