@@ -43,12 +43,17 @@ this; the ones that break it today are listed in
 ### `processing/` — editing and export
 
 One folder per operation (`trim/`, `speed/`, `merge/`, `transcode/`,
-`slideshow/`, `combine/`, `tracks/`, `export/`, `hls/`, `metadata/`,
-`frame/`, `subtitles/`), shared helpers in `shared/`, and the worker that
-runs them off the main thread in `worker/`. Tools reach them through
-`MediaProcessor` (today in `core/`; moving here, plan step C2).
+`slideshow/`, `combine/`, `tracks/`, `export/`, `hls/`, `frame/`,
+`subtitles/`), and the worker that runs them off the main thread in
+`worker/`. Tools reach them through `MediaProcessor.js`.
 
 ### `shared/` — used everywhere
+
+- `media/`: reading media, needed by the player and by processing alike —
+  the MediaBunny loader, inputs, metadata, the overlay compositor, subtitle
+  conversion, the helpers that read audio and frames backwards.
+- `config/`: the app's configuration and the list of outside services.
+- `errors/`: the error type, its codes, and the handler for uncaught errors.
 
 - `utils/`: stateless helpers — `Logger`, `html` (escaping), `mediaUtils`,
   `MediaMetadata`, parsers, `Toast`, `ConfirmDialog`.

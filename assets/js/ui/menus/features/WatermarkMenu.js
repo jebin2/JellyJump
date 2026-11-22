@@ -1,5 +1,5 @@
 import { Logger } from "../../../shared/utils/Logger.js";
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId, formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import {

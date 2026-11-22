@@ -1,7 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, ensureEncoders } from '../../shared/media/MediaBunny.js';
-import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
-import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
+import { AUDIO_BITRATE_BPS } from '../../shared/media/InputFactory.js';
+import { addAudioSamples, stretchAudioBuffer } from '../../shared/media/AudioHelpers.js';
 import { executeConversion, cancellableProgress, cancelUnfinished, throwIfCancelled } from '../../shared/utils/Cancellation.js';
 import { copyMetadataTags } from '../shared/MetadataTags.js';
 

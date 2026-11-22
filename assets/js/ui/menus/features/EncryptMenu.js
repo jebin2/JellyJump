@@ -215,7 +215,7 @@ export class EncryptMenu {
                         const eta = info?.etaSec !== undefined ? fmtDur(info.etaSec) : '';
                         onProgress(p, eta ? `${eta} left · ${Math.round(info.fps)} fps` : `${name}ing…`);
                     };
-                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
+                    const { MediaProcessor } = await import('../../../processing/MediaProcessor.js');
                     if (mode === 'encrypt') {
                         const blob = await MediaProcessor.encryptPlatform(source, password, {
                             filename: item.title,

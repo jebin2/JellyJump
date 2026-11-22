@@ -1,6 +1,6 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { MediaBunny, ensureEncoders } from '../../shared/media/MediaBunny.js';
-import { createMediaBunnyInput, chooseQuality } from '../shared/InputFactory.js';
+import { createMediaBunnyInput, chooseQuality } from '../../shared/media/InputFactory.js';
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
 import { buildOverlayStage } from '../../shared/media/OverlayCompositor.js';

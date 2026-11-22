@@ -1,6 +1,6 @@
 import { Logger } from "./Logger.js";
 import { MediaBunny } from '../media/MediaBunny.js';
-import { MediaProcessor } from '../../core/MediaProcessor.js';
+import { getMetadata } from '../media/MetadataService.js';
 import { StorageService } from "../services/StorageService.js";
 import { formatTime } from './mediaUtils.js';
 import { ElectronHelper } from './ElectronHelper.js';
@@ -224,7 +224,7 @@ export class MediaMetadata {
         const blobUrl = await MediaMetadata.sourceForReading(item, onSave);
 
         try {
-            const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await MediaProcessor.getMetadata(blobUrl);
+            const { videoInfo, audioInfo, duration, videoTracks, audioTracks } = await getMetadata(blobUrl);
             item.videoInfo = videoInfo;
             item.audioInfo = audioInfo;
             item.videoTracks = videoTracks;

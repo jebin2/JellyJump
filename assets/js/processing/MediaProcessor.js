@@ -1,21 +1,21 @@
 import { Logger } from "../shared/utils/Logger.js";
 import { MediaBunny } from '../shared/media/MediaBunny.js';
-import { getMetadata as getProcessingMetadata, getVideoStats as getProcessingVideoStats } from '../processing/metadata/MetadataService.js';
-import { createMediaBunnyInput, AUDIO_BITRATE_BPS } from '../processing/shared/InputFactory.js';
-import { createGif as createGifMedia } from '../processing/export/GifService.js';
-import { processHls as processHlsMedia } from '../processing/hls/HlsService.js';
-import { losslessTrim as losslessTrimMedia } from '../processing/trim/TrimService.js';
-import { reverseVideo as reverseProcessedVideo, changeVideoSpeed as changeProcessedVideoSpeed } from '../processing/speed/SpeedService.js';
+import { getMetadata as getProcessingMetadata, getVideoStats as getProcessingVideoStats } from '../shared/media/MetadataService.js';
+import { createMediaBunnyInput, AUDIO_BITRATE_BPS } from '../shared/media/InputFactory.js';
+import { createGif as createGifMedia } from './export/GifService.js';
+import { processHls as processHlsMedia } from './hls/HlsService.js';
+import { losslessTrim as losslessTrimMedia } from './trim/TrimService.js';
+import { reverseVideo as reverseProcessedVideo, changeVideoSpeed as changeProcessedVideoSpeed } from './speed/SpeedService.js';
 import {
     extractTrackStreamCopy as extractProcessedTrackStreamCopy,
     extractTrackWithSpeed as extractProcessedTrackWithSpeed
-} from '../processing/tracks/TrackExtractionService.js';
-import { createSlideshowVideo as createSlideshowVideoMedia } from '../processing/slideshow/SlideshowService.js';
-import { merge as mergeVideosMedia } from '../processing/merge/MergeService.js';
-import { combineAudioVideo as combineAudioVideoMedia } from '../processing/combine/CombineAVService.js';
-import { buildFrameProcessor as buildMediaFrameProcessor, applyChromaKey as applyMediaChromaKey } from '../processing/frame/FrameProcessorService.js';
-import { process as transcodeMedia } from '../processing/transcode/TranscodeService.js';
-import { canUseWorker, runInWorker } from '../processing/worker/WorkerClient.js';
+} from './tracks/TrackExtractionService.js';
+import { createSlideshowVideo as createSlideshowVideoMedia } from './slideshow/SlideshowService.js';
+import { merge as mergeVideosMedia } from './merge/MergeService.js';
+import { combineAudioVideo as combineAudioVideoMedia } from './combine/CombineAVService.js';
+import { buildFrameProcessor as buildMediaFrameProcessor, applyChromaKey as applyMediaChromaKey } from './frame/FrameProcessorService.js';
+import { process as transcodeMedia } from './transcode/TranscodeService.js';
+import { canUseWorker, runInWorker } from './worker/WorkerClient.js';
 
 // Above this, a job is too big to be quietly rerun on the main thread: doing so
 // locks the UI for the entire encode (hours, for a multi-GB payload) and tends

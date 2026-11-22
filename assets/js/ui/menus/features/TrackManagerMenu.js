@@ -1,6 +1,6 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { openToolSurface } from '../core/MenuFactory.js';
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { runMenuJob } from '../core/MenuJob.js';
