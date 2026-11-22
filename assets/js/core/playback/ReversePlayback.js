@@ -1,6 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { BackwardFrameReader } from '../../processing/shared/BackwardFrames.js';
-import { decodeTrackRange } from '../../processing/shared/AudioHelpers.js';
+import { BackwardFrameReader } from '../../shared/media/BackwardFrames.js';
+import { decodeTrackRange } from '../../shared/media/AudioHelpers.js';
 import { initPlayerAudio } from '../audio/AudioEngine.js';
 
 /**

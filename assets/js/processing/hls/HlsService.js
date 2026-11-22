@@ -1,6 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, ensureEncoders } from '../../shared/media/MediaBunny.js';
-import { createMediaBunnyInput } from '../shared/InputFactory.js';
+import { createMediaBunnyInput } from '../../shared/media/InputFactory.js';
 import { executeConversion } from '../../shared/utils/Cancellation.js';
 
 let currentConversion = null;

@@ -1,4 +1,4 @@
-import { MediaBunny } from '../../shared/media/MediaBunny.js';
+import { MediaBunny } from './MediaBunny.js';
 
 /**
  * BackwardFrames - video frames in reverse order, at the speed of forward

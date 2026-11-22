@@ -1,6 +1,6 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { lendPicture, canvasPoint } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';

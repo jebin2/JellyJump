@@ -1,8 +1,8 @@
 import { Logger } from "../../../shared/utils/Logger.js";
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { decodeAudioRange, getAudioDuration } from '../../../processing/shared/AudioHelpers.js';
+import { decodeAudioRange, getAudioDuration } from '../../../shared/media/AudioHelpers.js';
 import { runMenuJob } from '../core/MenuJob.js';
 
 /**

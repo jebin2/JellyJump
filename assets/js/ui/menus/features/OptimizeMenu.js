@@ -2,7 +2,7 @@ import { Logger } from '../../../shared/utils/Logger.js';
 import { Modal } from '../../Modal.js';
 import { Toast } from '../../../shared/utils/Toast.js';
 import { MediaBunny } from '../../../shared/media/MediaBunny.js';
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { formatTime } from '../../../shared/utils/mediaUtils.js';
 import { startCancellableJob } from '../core/CancellableJob.js';
 import { html } from '../../../shared/utils/html.js';

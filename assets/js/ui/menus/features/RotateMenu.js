@@ -1,5 +1,5 @@
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
-import { MediaProcessor } from "../../../core/MediaProcessor.js";
+import { MediaProcessor } from "../../../processing/MediaProcessor.js";
 import { MediaMetadata } from "../../../shared/utils/MediaMetadata.js";
 import { runMenuJob } from '../core/MenuJob.js';
 import { lendPicture } from '../core/PreviewPlayer.js';

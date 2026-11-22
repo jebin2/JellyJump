@@ -3,7 +3,7 @@ import { playRowsOnClick } from '../core/PreviewPlayer.js';
 import { Logger } from "../../../shared/utils/Logger.js";
 import { HardCutDetector } from "../../../shared/services/HardCutDetector.js";
 import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { html } from '../../../shared/utils/html.js';
 
