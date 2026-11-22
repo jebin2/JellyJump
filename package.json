@@ -46,6 +46,6 @@
   },
   "dependencies": {
     "@huggingface/hub": "^2.13.0",
-    "@huggingface/transformers": "^4.2.0"
+    "@huggingface/transformers": "^4.3.2"
   }
 }
