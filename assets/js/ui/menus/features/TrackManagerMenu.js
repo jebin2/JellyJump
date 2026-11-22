@@ -4,6 +4,7 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { html } from '../../../shared/utils/html.js';
 
 /**
  * Track Manager Menu Handler
@@ -76,7 +77,7 @@ export class TrackManagerMenu {
             }
 
             modalContent.querySelector('.tracks-loading').classList.add('hidden');
-            modalContent.querySelector('.mb-modal-body').insertAdjacentHTML('beforeend', `<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`);
+            modalContent.querySelector('.mb-modal-body').insertAdjacentHTML('beforeend', String(html`<div class="p-md text-danger">Failed to load tracks: ${e.message}</div>`));
         }
     }
 

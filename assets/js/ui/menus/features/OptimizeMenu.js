@@ -5,6 +5,7 @@ import { MediaBunny } from '../../../core/MediaBunny.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { formatTime } from '../../../shared/utils/mediaUtils.js';
 import { startCancellableJob } from '../core/CancellableJob.js';
+import { html } from '../../../shared/utils/html.js';
 
 /**
  * Optimize Menu
@@ -91,7 +92,7 @@ export const OptimizeMenu = {
             modal.setTitle('Optimize for this device?');
 
             const body = document.createElement('div');
-            body.innerHTML = `
+            body.innerHTML = html`
                 <p style="margin-bottom:10px;">"${item.title}" is ${w}×${h} — larger than this device can usually play smoothly.</p>
                 <p class="text-secondary" style="font-size:0.9em;margin-bottom:10px;">JellyJump can convert it to 1080p once, right on this device, and add the converted copy to the playlist. Your original file stays untouched on the device.</p>
                 <div class="optimize-progress" style="display:none;">

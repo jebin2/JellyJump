@@ -1,4 +1,6 @@
 // @ts-check
+import { escapeHtml } from '../../../shared/utils/html.js';
+
 
 /**
  * The tile grid both Tools menus are built from.
@@ -20,8 +22,6 @@
  * @property {Tool[]} tools
  */
 
-/** @param {string} text */
-const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /**
  * @param {ToolSection[]} sections - Empty sections are left out
