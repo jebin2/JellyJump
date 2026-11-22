@@ -165,6 +165,13 @@ export class EditPanel {
          * @type {Map<string, Object>}
          */
         this.histories = new Map();
+        /**
+         * Sessions left while an edit was being applied, by the id of the
+         * video it was applied to: opened again, the panel waits for it
+         * again and takes its result, rather than starting afresh.
+         * @type {Map<string, Object>}
+         */
+        this.waiting = new Map();
         this._historiesLoaded = false;
         this.storage = new StorageService();
         playlist.nameProcessedItem = (source, filename) => this._nameCopy(source, filename);
@@ -280,7 +287,8 @@ export class EditPanel {
         this.item = null;
         // The edits so far are remembered with the copy. An edit still being
         // applied finishes as an ordinary job, its result in the playlist,
-        // unless the copy is opened again before it is done.
+        // unless its video is opened again before it is done: the panel then
+        // waits for it again, locked, and takes the result as a step.
         if (this.session) this._shelve(this.session);
         this.session = null;
         this._renderSession();
@@ -399,6 +407,7 @@ export class EditPanel {
         }
         const source = this.item;
         session.pending = { job, name, action: surface.action };
+        this.waiting.set(source.id, session);
         this._renderSession();
         const unsubscribe = JobQueue.subscribe(() => {
             if (this.session === session) this._renderBusy();
@@ -407,6 +416,7 @@ export class EditPanel {
         finished.then((outcome) => {
             unsubscribe();
             session.pending = null;
+            if (this.waiting.get(source.id) === session) this.waiting.delete(source.id);
             // Left the panel, or went to another video: an ordinary job then.
             if (this.session !== session) return;
             this._renderSession();
@@ -556,6 +566,9 @@ export class EditPanel {
      * @returns {Object|null}
      */
     _resume(item) {
+        // Left mid-edit: the panel goes back to waiting for it.
+        const waiting = this.waiting.get(item.id);
+        if (waiting?.pending) return waiting;
         this._loadHistories();
         this._prune();
         const session = this.histories.get(item.id);
@@ -724,8 +737,16 @@ export class EditPanel {
     _quietPlayer() {
         const player = this.playlist.player;
         if (!player || this._playerSaved) return;
-        const saved = { filters: null, rate: null };
+        const saved = { filters: null, rate: null, pinned: false };
         player.container?.classList.add('jj-editing');
+        // The controls pinned below the picture, not laid over it: the
+        // tools draw on the whole picture, and the timeline is always there
+        // to find a frame on. Not saved: laid over is the user's setting.
+        if (player.controlBarMode === 'overlay' && player.controlBar) {
+            player.controlBarMode = 'fixed';
+            player.controlBar.applyMode();
+            saved.pinned = true;
+        }
         for (const panel of [player.ui?.filterPanel, player.ui?.speedPanel, player.ui?.ccPanel, player.ui?.loopPanel]) {
             if (panel) panel.style.display = 'none';
         }
@@ -755,6 +776,10 @@ export class EditPanel {
             player._updateFiltersButtonState?.();
         }
         if (saved.rate) player.setPlaybackRate(saved.rate);
+        if (saved.pinned && player.controlBarMode === 'fixed') {
+            player.controlBarMode = 'overlay';
+            player.controlBar.applyMode();
+        }
     }
 
     _renderSession() {

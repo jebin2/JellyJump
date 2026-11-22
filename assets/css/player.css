@@ -271,6 +271,9 @@ button:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Its glyph in the same 24px box as the other buttons' icons: taller,
+       it set the bar's height, which then changed whenever it was hidden. */
+    line-height: 24px;
 }
 
 .mode-toggle-btn:hover {

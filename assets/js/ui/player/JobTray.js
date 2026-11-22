@@ -178,7 +178,7 @@ export class JobTray {
                         <span class="job-status job-status-done" title="${escapeHtml(r.filename)}">${ICON('icon-check', 12)} ${escapeHtml(r.filename)}</span>
                         <span class="job-actions">
                             <button class="job-text-btn job-play" data-job-action="play" data-result="${i}">${ICON('icon-play', 12)} Play</button>
-                            ${this.onEdit ? `<button class="job-text-btn" data-job-action="edit" data-result="${i}" title="Edit this result">${ICON('icon-sliders', 12)} Edit</button>` : ''}
+                            ${this.onEdit ? `<button class="job-text-btn" data-job-action="edit" data-result="${i}" title="Edit this result">${ICON('icon-edit', 12)} Edit</button>` : ''}
                             <a class="job-text-btn" data-job-action="download" data-result="${i}" href="${escapeHtml(r.url)}" download="${escapeHtml(r.filename)}">${ICON('icon-download', 12)} Download</a>
                         </span>
                     </div>`).join('')

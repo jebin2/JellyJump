@@ -83,24 +83,13 @@ export async function lendPicture(surface, playlist) {
     const callbacks = [];
     const redraw = () => { if (!player.isPlaying) player.seek?.(player.currentTime); };
 
-    // Controls laid over the picture stay up while it is paused, which it is
-    // while editing, and would cover the bottom of it. Pinned below, the
-    // whole picture can be drawn on. Not saved: it is the user's setting.
-    const pinned = player.controlBarMode === 'overlay' && player.controlBar;
-    if (pinned) {
-        player.controlBarMode = 'fixed';
-        player.controlBar.applyMode();
-    }
+    // The controls are pinned below the picture while the edit panel is
+    // open (EditPanel._quietPlayer), so the whole picture can be drawn on.
 
     surface.onCleanup(() => {
         closed = true;
         for (const cb of callbacks) player.removeRenderCallback?.(cb);
         for (const el of layers) el.remove();
-        // Unless the user changed it meanwhile, with the pin button.
-        if (pinned && player.controlBarMode === 'fixed') {
-            player.controlBarMode = 'overlay';
-            player.controlBar.applyMode();
-        }
         redraw();
     });
 
