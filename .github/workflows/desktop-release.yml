@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload Linux Artifacts
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-artifacts
           path: |
@@ -100,7 +100,7 @@ jobs:
 
       - name: Upload Windows Artifacts
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-artifacts
           path: |
@@ -109,7 +109,7 @@ jobs:
 
       - name: Upload macOS Artifacts
         if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-artifacts
           path: |
