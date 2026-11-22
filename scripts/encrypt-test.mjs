@@ -16,6 +16,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { startCoverage, saveCoverage } from './lib/coverage.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const PORT = Number(process.env.PORT || 8188);
@@ -229,14 +230,17 @@ const browser = await chromium.launch({
     executablePath: browserPath,
     args: ['--no-sandbox', '--no-proxy-server', '--autoplay-policy=no-user-gesture-required'],
 });
+let page = null;
 try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
+    await startCoverage(page);
     page.on('pageerror', e => { fail++; console.log(`  FAIL  page error: ${String(e.message).slice(0, 160)}`); });
     await run(page, origin);
 } catch (error) {
     fail++;
     console.log(`  FAIL  the run itself threw: ${error.message}`);
 } finally {
+    if (page) await saveCoverage(page, 'encrypt-test');
     await browser.close();
     stopVite();
 }

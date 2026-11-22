@@ -15,6 +15,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
+import { startCoverage, saveCoverage } from './lib/coverage.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist');
@@ -316,12 +317,16 @@ const browser = await chromium.launch({
     executablePath: browserPath,
     args: ['--no-sandbox', '--no-proxy-server'],
 });
+let page = null;
 try {
-    await run(await browser.newPage(), origin);
+    page = await browser.newPage();
+    await startCoverage(page);
+    await run(page, origin);
 } catch (error) {
     fail++;
     console.log(`  FAIL  the run itself threw: ${error.message}`);
 } finally {
+    if (page) await saveCoverage(page, 'source-failure-test');
     await browser.close();
     server.close();
 }

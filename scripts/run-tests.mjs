@@ -15,7 +15,7 @@
  *   node scripts/run-tests.mjs            (after npm run build)
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -36,6 +36,12 @@ const BROWSER = [
 const ELECTRON = ['share-host-test'];
 
 const electronInstalled = existsSync(join(ROOT, 'desktop/node_modules/electron'));
+
+// Coverage (ARCHITECTURE_PLAN.md K3): Node writes its own for the Node suites,
+// and the browser suites that load source modules save Chromium's here too
+// (scripts/lib/coverage.mjs). Read by coverage-report.mjs at the end.
+const COVERAGE_DIR = join(ROOT, '.coverage');
+rmSync(COVERAGE_DIR, { recursive: true, force: true });
 const results = [];
 
 for (const name of [...QUICK, ...BROWSER, ...ELECTRON]) {
@@ -46,6 +52,7 @@ for (const name of [...QUICK, ...BROWSER, ...ELECTRON]) {
     const started = Date.now();
     const run = spawnSync(process.execPath, [join(ROOT, 'scripts', `${name}.mjs`)], {
         cwd: ROOT, encoding: 'utf8', timeout: 10 * 60 * 1000,
+        env: { ...process.env, NODE_V8_COVERAGE: COVERAGE_DIR, JJ_COVERAGE_DIR: COVERAGE_DIR },
     });
     const output = `${run.stdout ?? ''}${run.stderr ?? ''}`;
     const summary = output.trim().split('\n').reverse()
@@ -66,4 +73,7 @@ for (const r of results) {
 const failed = results.filter(r => r.status === 'FAILED');
 const ran = results.filter(r => r.status !== 'skipped').length;
 console.log(`\n${ran - failed.length}/${ran} suites passed${results.length > ran ? `, ${results.length - ran} skipped` : ''}`);
-process.exit(failed.length ? 1 : 0);
+if (failed.length) process.exit(1);
+
+const coverage = spawnSync(process.execPath, [join(ROOT, 'scripts/coverage-report.mjs'), COVERAGE_DIR], { cwd: ROOT, stdio: 'inherit' });
+process.exit(coverage.status ?? 1);

@@ -31,3 +31,4 @@ scripts/fixtures/.tune-720p30.webm
 # Local build overrides (see .env.example)
 .env.local
 .env.*.local
+.coverage/
