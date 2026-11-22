@@ -1,5 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { createRepo, uploadFilesWithProgress } from '@huggingface/hub';
+import { SERVICES } from '../../shared/config/services.js';
 
 /**
  * Convert a user-friendly repoId + type into the string format expected by @huggingface/hub.
@@ -20,9 +21,9 @@ function toHfRepoString(repoId, type) {
  * - bucket:  https://huggingface.co/buckets/{repoId}/resolve/{path}  (no branch)
  */
 function resolveUrl(repoId, type, branch, filePath) {
-    if (type === 'bucket') return `https://huggingface.co/buckets/${repoId}/resolve/${filePath}`;
-    if (type === 'model') return `https://huggingface.co/${repoId}/resolve/${branch}/${filePath}`;
-    return `https://huggingface.co/datasets/${repoId}/resolve/${branch}/${filePath}`;
+    if (type === 'bucket') return `${SERVICES.huggingFace}/buckets/${repoId}/resolve/${filePath}`;
+    if (type === 'model') return `${SERVICES.huggingFace}/${repoId}/resolve/${branch}/${filePath}`;
+    return `${SERVICES.huggingFace}/datasets/${repoId}/resolve/${branch}/${filePath}`;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { packSignal, unpackSignal } from './SignalCodec.js';
-import { BASE_URL } from '../../shared/config.js';
+import { config } from '../../shared/config/index.js';
 import { describeConnection, describeMedia } from './ConnectionReport.js';
 
 /** How long to wait for ICE gathering before sending what we have. */
@@ -220,7 +220,7 @@ export class WatchParty {
     _viewerPageUrl(here = window.location.href) {
         const beside = new URL('watch.html', here);
         if (beside.protocol === 'http:' || beside.protocol === 'https:') return beside.href;
-        return `${BASE_URL}/watch.html`;
+        return `${config.baseUrl}/watch.html`;
     }
 
     async invite({ baseUrl } = {}) {

@@ -1,4 +1,5 @@
 import { Logger } from "./Logger.js";
+import { SERVICES } from '../config/services.js';
 /**
  * M3U Playlist Parser
  * Parses IPTV channel lists in M3U/M3U8 format
@@ -174,37 +175,37 @@ export class M3UParser {
         return [
             {
                 name: 'IPTV-Org (All Countries)',
-                url: 'https://iptv-org.github.io/iptv/index.m3u',
+                url: SERVICES.iptvPlaylists + 'index.m3u',
                 description: 'Community-maintained collection of worldwide channels'
             },
             {
                 name: 'IPTV-Org (India)',
-                url: 'https://iptv-org.github.io/iptv/countries/in.m3u',
+                url: SERVICES.iptvPlaylists + 'countries/in.m3u',
                 description: 'Indian TV channels'
             },
             {
                 name: 'IPTV-Org (USA)',
-                url: 'https://iptv-org.github.io/iptv/countries/us.m3u',
+                url: SERVICES.iptvPlaylists + 'countries/us.m3u',
                 description: 'US TV channels'
             },
             {
                 name: 'IPTV-Org (UK)',
-                url: 'https://iptv-org.github.io/iptv/countries/uk.m3u',
+                url: SERVICES.iptvPlaylists + 'countries/uk.m3u',
                 description: 'UK TV channels'
             },
             {
                 name: 'IPTV-Org (News)',
-                url: 'https://iptv-org.github.io/iptv/categories/news.m3u',
+                url: SERVICES.iptvPlaylists + 'categories/news.m3u',
                 description: 'News channels worldwide'
             },
             {
                 name: 'IPTV-Org (Sports)',
-                url: 'https://iptv-org.github.io/iptv/categories/sports.m3u',
+                url: SERVICES.iptvPlaylists + 'categories/sports.m3u',
                 description: 'Sports channels worldwide'
             },
             {
                 name: 'IPTV-Org (Entertainment)',
-                url: 'https://iptv-org.github.io/iptv/categories/entertainment.m3u',
+                url: SERVICES.iptvPlaylists + 'categories/entertainment.m3u',
                 description: 'Entertainment channels worldwide'
             }
         ];

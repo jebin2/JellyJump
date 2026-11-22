@@ -1,7 +1,8 @@
 // Player page entry point
 import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
-import { DOMAIN } from './shared/config.js';
+import { config, isEnabled } from './shared/config/index.js';
+import { ElectronHelper } from './shared/utils/ElectronHelper.js';
 import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
 import { Logger } from './shared/utils/Logger.js';
 
@@ -18,16 +19,17 @@ window.addEventListener('load', registerServiceWorkerWithCOI);
 
 // Load templates first, then initialize player
 async function initializeApp() {
-    // Load templates first, then initialize player (v=2 forces refresh)
-    const playlistResponse = await fetch('assets/templates/playlist-templates.html?v=2');
+    // Load templates first, then initialize player. The build id in the URL
+    // makes a new build fetch them fresh rather than from the cache.
+    const playlistResponse = await fetch(`assets/templates/playlist-templates.html?v=${config.buildId}`);
     const playlistHtml = await playlistResponse.text();
 
     // Load screenshot templates
-    const screenshotResponse = await fetch('assets/templates/screenshot-templates.html?v=2');
+    const screenshotResponse = await fetch(`assets/templates/screenshot-templates.html?v=${config.buildId}`);
     const screenshotHtml = await screenshotResponse.text();
 
     // Load player templates
-    const playerResponse = await fetch('assets/templates/player-templates.html?v=2');
+    const playerResponse = await fetch(`assets/templates/player-templates.html?v=${config.buildId}`);
     const playerHtml = await playerResponse.text();
 
     const tempDiv = document.createElement('div');
@@ -53,16 +55,19 @@ async function initializeApp() {
     );
 
     // Demo Videos (optional)
-    if (!localStorage.getItem('JellyJumpDB-playlist') && (window.location.href.includes('//localhost:') || window.location.href.includes('//jebin2.github.io/JellyJump/') || window.location.href.includes('//www.voidall.com/JellyJump/') || window.location.href.includes(`//${DOMAIN}/`))) {
+    // A first visit gets a sample video, on the hosts that carry it (config).
+    // Not in the desktop app, and not when a build turns it off.
+    const isFirstVisit = !localStorage.getItem('JellyJumpDB-playlist');
+    const hostHasSample = config.sampleVideoHosts.includes(window.location.hostname);
+    if (isFirstVisit && hostHasSample && isEnabled('sampleVideo') && config.sampleVideoPath && !ElectronHelper.isElectron()) {
         playlist.addItems([
             {
                 title: 'Sample Video',
-                url: (window.location.href.includes('//localhost:') || window.location.href.includes(`//${DOMAIN}/`)) ? '/homepage.mp4' : '/JellyJump/homepage.mp4',
+                url: new URL(config.sampleVideoPath, window.location.href).href,
                 isLocal: true
             }
         ], true); // true = autoplay on page load
     }
-    // Hide loader only after app is fully initialized
     hideLoader();
 }
 
