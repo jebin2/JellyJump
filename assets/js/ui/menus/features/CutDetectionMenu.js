@@ -5,6 +5,10 @@ import { HardCutDetector } from "../../../shared/services/HardCutDetector.js";
 import { formatTime } from "../../../shared/utils/mediaUtils.js";
 import { addSegmentClip } from '../core/SegmentClip.js';
 import { html } from '../../../shared/utils/html.js';
+import { installTemplates } from '../core/Templates.js';
+import detectionTemplates from '../templates/detection.html?raw';
+
+installTemplates(detectionTemplates);
 
 export class CutDetectionMenu {
     static async init(item, playlist) {

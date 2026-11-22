@@ -10,6 +10,10 @@ import {
 import { lendPicture } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { installTemplates } from '../core/Templates.js';
+import watermarkTemplates from '../templates/watermark.html?raw';
+
+installTemplates(watermarkTemplates);
 
 /**
  * Watermark Menu Handler - Multi-watermark with time ranges

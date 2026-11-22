@@ -4,6 +4,10 @@ import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { Toast } from '../../../shared/utils/Toast.js';
+import { installTemplates } from '../core/Templates.js';
+import mergeTemplates from '../templates/merge.html?raw';
+
+installTemplates(mergeTemplates);
 
 /**
  * Merge Menu Handler

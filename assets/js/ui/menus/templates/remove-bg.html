@@ -1,0 +1,87 @@
+<!-- remove-bg: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Remove Background Content Template -->
+<template id="remove-bg-content-template">
+    <!-- Right Panel: Controls -->
+    <div class="modal-controls-panel">
+        <!-- Tools Section -->
+        <div class="tools-section mb-md p-sm bg-tertiary rounded flex-between items-center">
+            <span class="text-xs text-secondary font-bold">TOOLS</span>
+            <div class="flex gap-md items-center">
+                <label class="checkbox-option flex items-center cursor-pointer select-none">
+                    <input type="checkbox" id="live-preview-toggle" checked>
+
+                    <span class="checkbox-label text-xs text-secondary ml-xs">Live Preview</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Background Options -->
+        <div class="bg-options-section">
+            <div class="section-title text-sm font-bold text-secondary mb-sm">BACKGROUND</div>
+            <div class="flex flex-col gap-sm">
+                <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                    <input type="radio" name="bg-type" value="transparent" checked>
+
+                    <span class="text-sm">Transparent</span>
+                </label>
+                <label class="radio-option flex items-center gap-sm cursor-pointer p-xs hover:bg-tertiary rounded">
+                    <input type="radio" name="bg-type" value="custom">
+
+                    <span class="text-sm">Custom Color</span>
+                    <div class="flex items-center gap-xs ml-auto">
+                        <input type="color" id="custom-bg-color" value="#ffffff"
+                            class="w-8 h-8 p-0 border-0 rounded cursor-pointer" disabled>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Color Picker Section -->
+        <div class="color-picker-section" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            <div class="section-title text-sm font-bold text-secondary mb-sm">SELECTED COLORS</div>
+            <div class="selected-colors-list tool-cards-list mb-sm bg-tertiary p-sm rounded border border-border"
+                style="min-height: 0; flex: 1;">
+                <div class="empty-state text-xs text-muted text-center py-md">
+                    Click on the video to pick colors.
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Color Item Template -->
+<template id="color-item-template">
+    <div class="tool-card color-item flex gap-md items-center">
+        <!-- Left: Color Info -->
+        <div class="flex flex-col items-center gap-xs min-w-[60px]">
+            <div class="color-swatch border border-border shadow-sm flex-shrink-0 mb-0"
+                style="width: 32px; height: 32px;"></div>
+            <div class="color-hex font-mono text-xs font-bold">#000000</div>
+            <button class="tool-card-remove remove-color-btn p-xs hover:text-danger transition-colors"
+                title="Remove color">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-trash"></use>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Right: Sliders -->
+        <div class="flex-1 grid gap-sm w-full">
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Sim</span>
+                <input type="range" class="quality-slider similarity-slider flex-1" min="0" max="100" value="40">
+                <span class="similarity-value font-mono w-8 text-right text-primary">0.40</span>
+            </div>
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Smooth</span>
+                <input type="range" class="quality-slider smoothness-slider flex-1" min="0" max="100" value="8">
+                <span class="smoothness-value font-mono w-8 text-right text-primary">0.08</span>
+            </div>
+            <div class="flex items-center gap-sm text-xs text-secondary">
+                <span class="font-mono shrink-0 text-right" style="width: 80px;">Spill</span>
+                <input type="range" class="quality-slider spill-slider flex-1" min="0" max="100" value="10">
+                <span class="spill-value font-mono w-8 text-right text-primary">0.10</span>
+            </div>
+        </div>
+    </div>
+</template>

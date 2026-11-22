@@ -1,0 +1,63 @@
+<!-- crop: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Crop Content Template -->
+<template id="crop-content-template">
+    <!-- Left Panel: Video Preview with Crop Box -->
+    <div class="modal-video-panel">
+        <!-- The overlay moves over the main player's picture when Crop opens -->
+        <div class="crop-preview-wrapper" style="position: relative;">
+            <!-- Crop Overlay (sibling to player, positioned over it via CSS) -->
+            <div class="crop-overlay" data-crop-overlay>
+                <div class="crop-box" data-crop-box>
+                    <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
+                    <div class="crop-handle crop-handle-n" data-handle="n"></div>
+                    <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
+                    <div class="crop-handle crop-handle-e" data-handle="e"></div>
+                    <div class="crop-handle crop-handle-se" data-handle="se"></div>
+                    <div class="crop-handle crop-handle-s" data-handle="s"></div>
+                    <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
+                    <div class="crop-handle crop-handle-w" data-handle="w"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Crop Coordinates -->
+    <div class="modal-controls-panel">
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-card-title">Crop Position</span>
+            </div>
+            <div class="crop-coords-grid tool-card-grid">
+                <div class="tool-card-input">
+                    <label for="crop-left">LEFT (px)</label>
+                    <input type="number" id="crop-left" class="mb-input font-mono text-center" min="0" step="1"
+                        value="0">
+                </div>
+                <div class="tool-card-input">
+                    <label for="crop-top">TOP (px)</label>
+                    <input type="number" id="crop-top" class="mb-input font-mono text-center" min="0" step="1"
+                        value="0">
+                </div>
+            </div>
+        </div>
+
+        <div class="tool-card">
+            <div class="tool-card-header">
+                <span class="tool-card-title">Crop Size</span>
+            </div>
+            <div class="crop-coords-grid tool-card-grid">
+                <div class="tool-card-input">
+                    <label for="crop-width">WIDTH (px)</label>
+                    <input type="number" id="crop-width" class="mb-input font-mono text-center" min="64" step="2"
+                        value="0">
+                </div>
+                <div class="tool-card-input">
+                    <label for="crop-height">HEIGHT (px)</label>
+                    <input type="number" id="crop-height" class="mb-input font-mono text-center" min="64" step="2"
+                        value="0">
+                </div>
+            </div>
+            <div class="tool-card-info">Drag the corners to adjust the crop area</div>
+        </div>
+    </div>
+</template>

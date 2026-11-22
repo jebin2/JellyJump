@@ -3,6 +3,10 @@ import { Toast } from "../../../shared/utils/Toast.js";
 import { startTrackRecording } from "../../../core/streaming/TrackRecorder.js";
 import { html } from '../../../shared/utils/html.js';
 import { SERVICES } from '../../../shared/config/services.js';
+import { installTemplates } from '../core/Templates.js';
+import screenRecordTemplates from '../templates/screen-record.html?raw';
+
+installTemplates(screenRecordTemplates);
 
 /**
  * Recorder Menu Handler

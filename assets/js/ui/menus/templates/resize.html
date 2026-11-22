@@ -1,0 +1,51 @@
+<!-- resize: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Resize Content Template -->
+<template id="resize-content-template">
+    <div class="source-info mb-lg p-sm bg-tertiary rounded flex-between items-center">
+        <div class="flex flex-col">
+            <span class="text-xs text-secondary font-mono">CURRENT RESOLUTION</span>
+            <span class="current-resolution text-sm font-bold text-primary">Checking...</span>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-xs text-secondary font-mono">ASPECT RATIO</span>
+            <span class="current-aspect-ratio text-sm font-bold text-accent">--:--</span>
+        </div>
+    </div>
+
+    <!-- Dimension Inputs -->
+    <div class="tool-card mb-lg">
+        <div class="tool-card-header">
+            <span class="tool-card-title">Dimensions</span>
+        </div>
+        <div class="dimension-inputs-container">
+            <div class="tool-card-input">
+                <label for="resize-width">WIDTH (px)</label>
+                <input type="number" id="resize-width" class="mb-input font-mono text-center" placeholder="1920"
+                    min="128" max="7680" step="2">
+            </div>
+            <div class="aspect-lock-container flex flex-col items-center justify-end">
+                <button class="aspect-lock-btn btn jellyjump-btn-primary p-xs rounded aspect-lock-btn-container"
+                    title="Lock Aspect Ratio" aria-pressed="true">
+                    <svg width="20" height="20" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-link"></use>
+                    </svg>
+                </button>
+            </div>
+            <div class="tool-card-input">
+                <label for="resize-height">HEIGHT (px)</label>
+                <input type="number" id="resize-height" class="mb-input font-mono text-center" placeholder="1080"
+                    min="128" max="7680" step="2">
+            </div>
+        </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="presets-container mb-lg">
+        <label class="text-xs text-secondary font-mono mb-xs block">PRESETS</label>
+        <div class="presets-grid">
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="1080p">1080p (FHD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="720p">720p (HD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="480p">480p (SD)</button>
+            <button class="btn jellyjump-btn-secondary preset-btn" data-preset="360p">360p</button>
+        </div>
+</template>

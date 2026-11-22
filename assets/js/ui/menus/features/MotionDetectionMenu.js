@@ -5,6 +5,10 @@ import { MotionDetector } from "../../../shared/services/MotionDetector.js";
 import { formatTime } from "../../../shared/utils/mediaUtils.js";
 import { addSegmentClip } from '../core/SegmentClip.js';
 import { html } from '../../../shared/utils/html.js';
+import { installTemplates } from '../core/Templates.js';
+import detectionTemplates from '../templates/detection.html?raw';
+
+installTemplates(detectionTemplates);
 
 export class MotionDetectionMenu {
     static async init(item, playlist) {

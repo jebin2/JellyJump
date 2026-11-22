@@ -7,6 +7,10 @@ import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { html } from '../../../shared/utils/html.js';
 import { Toast } from '../../../shared/utils/Toast.js';
+import { installTemplates } from '../core/Templates.js';
+import tracksTemplates from '../templates/tracks.html?raw';
+
+installTemplates(tracksTemplates);
 
 /**
  * Track Manager Menu Handler

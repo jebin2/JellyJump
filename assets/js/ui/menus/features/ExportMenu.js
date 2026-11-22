@@ -6,6 +6,10 @@ import { STICKER_MOTIONS } from '../../player/StickerLayer.js';
 import { BORDER_PRESETS, RAIN_PRESETS } from '../../player/DecorationLayer.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { html } from '../../../shared/utils/html.js';
+import { installTemplates } from '../core/Templates.js';
+import exportFxTemplates from '../templates/export-fx.html?raw';
+
+installTemplates(exportFxTemplates);
 
 /**
  * Export Menu - writes a file with whatever is on screen baked into it.

@@ -10,6 +10,10 @@ import {
 import { lendPicture } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { installTemplates } from '../core/Templates.js';
+import blurTemplates from '../templates/blur.html?raw';
+
+installTemplates(blurTemplates);
 
 export class BlurMenu {
     /**

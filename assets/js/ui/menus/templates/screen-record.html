@@ -1,0 +1,120 @@
+<!-- screen-record: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Record Options Modal Template -->
+<template id="screen-record-options-modal-template">
+    <div class="mb-modal-overlay">
+        <div class="mb-modal" role="dialog" aria-modal="true">
+            <div class="mb-modal-header">
+                <h3 class="mb-modal-title">Recording Options</h3>
+                <button class="mb-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="mb-modal-body">
+                <div id="screen-record-options">
+                    <div class="options-group mb-lg">
+                        <!-- Source Constraint (Top) -->
+                        <div class="mb-md">
+                            <label class="radio-option flex items-center cursor-pointer mb-sm p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="record-entire-screen" value="monitor" class="mr-sm" checked>
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Record Entire Screen</span>
+                                    <span class="block text-xs text-secondary">Capture everything on your display.</span>
+                                </div>
+                            </label>
+                            <label class="radio-option flex items-center cursor-pointer mb-sm p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="prefer-current-tab" value="browser" class="mr-sm">
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Record this tab only</span>
+                                    <span class="block text-xs text-secondary">Only records content in this browser tab.</span>
+                                </div>
+                            </label>
+                            <label class="radio-option flex items-center cursor-pointer p-sm bg-bg-tertiary rounded-md border border-border-light">
+                                <input type="radio" name="record-surface" id="record-other" value="other" class="mr-sm">
+                                <div>
+                                    <span class="block text-sm font-bold text-primary">Other</span>
+                                    <span class="block text-xs text-secondary">Choose a window, app, or tab from the picker.</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Capture Audio Checkbox -->
+                        <label class="checkbox-option flex items-center mb-sm cursor-pointer">
+                            <input type="checkbox" id="capture-audio" class="mr-sm">
+                            <span class="block text-sm font-bold text-primary">Record Microphone</span>
+                        </label>
+
+                        <!-- Microphone Selector (shown when capture-audio is checked) -->
+                        <div id="mic-selector-container" style="display: none;" class="mb-md pl-md">
+                            <select id="mic-device-select" class="mb-select w-full">
+                                <option value="">Loading microphones...</option>
+                            </select>
+
+                            <!-- Echo Cancellation Toggle -->
+                            <label class="checkbox-option flex items-center mt-sm cursor-pointer">
+                                <input type="checkbox" id="disable-echo-cancel" class="mr-sm">
+                                <div>
+                                    <span class="block text-xs text-primary">Include system audio</span>
+                                    <span class="block text-xs text-secondary">Record audio playing through speakers
+                                        (music, videos). Use headphones to avoid echo.</span>
+                                </div>
+                            </label>
+
+                            <a href="https://webcammictest.com/mic/" target="_blank" rel="noopener noreferrer"
+                                class="text-xs text-accent hover-underline mt-xs inline-block">🎙️ Test your
+                                microphone: https://webcammictest.com/mic/</a>
+                        </div>
+
+                        <!-- Enable Facecam Checkbox -->
+                        <label class="checkbox-option flex items-center mb-md cursor-pointer">
+                            <input type="checkbox" id="enable-facecam" class="mr-sm">
+                            <span class="block text-sm font-bold text-primary">Enable Facecam</span>
+                        </label>
+
+                        <div id="facecam-options" style="display: none;"
+                            class="pl-md border-l-2 border-border-light ml-xs">
+                            <!-- Global PiP (Visible when Unchecked) -->
+                            <label class="radio-option option-pip flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="pip" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">Global PiP (Recommended)</span>
+                                    <span class="block text-xs text-secondary">Floating window, visible over all apps.
+                                        (Requires "Always on Top")</span>
+                                </div>
+                            </label>
+
+                            <!-- Popup Window (Visible when Unchecked) -->
+                            <label class="radio-option option-popup flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="popup" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">Popup Window</span>
+                                    <span class="block text-xs text-secondary">Separate popup window. Alternative for
+                                        Linux.</span>
+                                </div>
+                            </label>
+
+                            <!-- In-Page Bubble (Visible when Checked) -->
+                            <label class="radio-option option-in-page flex items-start mb-md cursor-pointer">
+                                <input type="radio" name="facecam-mode" value="in-page" class="mr-sm mt-xs">
+                                <div>
+                                    <span class="block text-sm font-medium">In-Page Bubble</span>
+                                    <span class="block text-xs text-secondary">Draggable bubble, only visible inside
+                                        this
+                                        tab.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info text-xs mb-lg" id="facecam-hint">
+                        <strong>Tip:</strong> If the Facecam hides behind other windows, try right-clicking it and
+                        selecting
+                        "Always on Top".
+                    </div>
+                </div>
+
+            </div>
+            <div class="mb-modal-footer flex justify-end gap-sm">
+                <button class="jellyjump-btn-secondary mb-modal-cancel">Cancel</button>
+                <button class="jellyjump-btn-primary mb-modal-start">Start Recording</button>
+            </div>
+        </div>
+    </div>
+</template>

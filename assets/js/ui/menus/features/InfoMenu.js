@@ -2,6 +2,10 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { Modal } from '../../Modal.js';
 import { MediaBunny, ensureDecodersFor } from '../../../shared/media/MediaBunny.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
+import { installTemplates } from '../core/Templates.js';
+import infoTemplates from '../templates/info.html?raw';
+
+installTemplates(infoTemplates);
 
 /**
  * Info Menu Handler

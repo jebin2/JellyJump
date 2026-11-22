@@ -1,0 +1,143 @@
+<!-- merge: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Merge Modal Content Template -->
+<template id="merge-modal-content-template">
+    <div class="merge-container">
+        <!-- Two-Column Grid for Video Selection -->
+        <div class="merge-grid-container">
+            <!-- Left Column: Available Videos -->
+            <div class="available-videos-section available-section">
+                <h4 class="text-sm font-bold mb-sm flex-between section-header">
+                    <span>Available Videos</span>
+                    <span class="text-xs text-muted selection-count">0 selected</span>
+                </h4>
+                <div
+                    class="available-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs scroll-list">
+                    <!-- Items injected here -->
+                    <div class="empty-state text-center p-md text-muted text-sm italic">No videos available</div>
+                </div>
+            </div>
+
+            <!-- Right Column: Selected Videos (Order) -->
+            <div class="selected-videos-section selected-section">
+                <h4 class="text-sm font-bold mb-sm section-header">
+                    Merge Order
+                    (Drag to Reorder)</h4>
+                <div
+                    class="selected-list overflow-y-auto flex-1 border border-border rounded bg-secondary p-xs scroll-list">
+                    <!-- Selected items injected here -->
+                    <div
+                        class="empty-selection-state text-center p-md text-muted text-sm italic h-full flex items-center justify-center">
+                        Select videos from the left to merge
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Merge Options (Outside Grid) -->
+        <div class="merge-options">
+            <!-- Merge Options (Flex Single Line) -->
+            <!-- Merge Options (Flex Single Line) -->
+            <div class="merge-options flex gap-lg items-end mb-md w-full">
+                <!-- Target Resolution -->
+                <div class="resolution-options flex flex-col gap-xs" style="flex: 3;">
+                    <div class="text-xs text-secondary font-mono uppercase text-nowrap">Target Resolution</div>
+                    <div class="flex items-center gap-xs">
+                        <input type="number" id="merge-width"
+                            class="mb-input font-mono text-center w-full p-1 box-border" placeholder="W" min="128"
+                            max="7680" step="2" style="height: 36px;">
+                        <span class="text-secondary font-bold select-none">&times;</span>
+                        <input type="number" id="merge-height"
+                            class="mb-input font-mono text-center w-full p-1 box-border" placeholder="H" min="128"
+                            max="7680" step="2" style="height: 36px;">
+                    </div>
+                    <div class="text-[10px] text-muted truncate max-w-[200px] min-h-[15px]">
+                        <span class="max-resolution-hint">Detecting...</span>
+                    </div>
+                </div>
+
+                <!-- Scale Mode -->
+                <div class="scale-options flex flex-col gap-xs" style="flex: 3;">
+                    <div class="text-xs text-secondary font-mono uppercase text-nowrap">Scale Mode</div>
+                    <select class="mb-select w-full py-0 px-2 text-sm scale-select box-border" style="height: 36px;">
+                        <option value="proportional">Scale Proportionally</option>
+                        <option value="center">Keep Original Size</option>
+                        <option value="fill">Scale to Fill</option>
+                    </select>
+                </div>
+
+                <!-- Background Color -->
+                <div class="bg-color-options flex flex-col gap-xs" style="flex: 1;">
+                    <div class="text-xs text-secondary font-mono uppercase text-nowrap">Bg Color</div>
+                    <div class="flex items-center">
+                        <input type="color" id="merge-bg-color"
+                            class="w-full rounded border border-border cursor-pointer p-0 box-border" value="#000000"
+                            title="Background Color" style="height: 36px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Options -->
+
+        </div>
+    </div>
+
+    <!-- Progress Section (Hidden by default) -->
+
+</template>
+
+<!-- Merge Modal Footer Template -->
+<template id="merge-modal-footer-template">
+    <div class="flex-between w-full h-full gap-md items-center">
+        <!-- Progress & Messages (Left) -->
+        <div class="flex-1 flex items-center">
+            <div class="progress-section hidden flex items-center gap-sm w-full">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Merging...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <a href="#" class="btn jellyjump-btn-small hidden download-btn" title="Download" aria-label="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </a>
+            <button class="btn jellyjump-btn-small merge-btn" title="Merge" aria-label="Merge" disabled>
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-copy"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Merge Item Template -->
+<template id="merge-item-template">
+    <div class="merge-item flex items-center gap-sm p-xs rounded hover:bg-tertiary cursor-pointer border border-transparent mb-xs"
+        draggable="true">
+        <div class="item-thumb w-8 h-8 bg-black rounded overflow-hidden flex-shrink-0">
+            <!-- Thumb or placeholder -->
+        </div>
+        <div class="item-info flex-1 merge-item__info">
+            <div class="item-title text-sm font-bold merge-item__title"></div>
+            <div class="item-meta text-xs text-muted">
+                <span class="item-dur"></span>
+            </div>
+        </div>
+        <button class="remove-item-btn text-muted hover:text-danger merge-item__remove" title="Remove">
+            &times;
+        </button>
+    </div>
+</template>
