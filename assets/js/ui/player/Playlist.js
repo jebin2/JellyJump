@@ -1294,9 +1294,12 @@ export class Playlist {
             this.player.resetUI();
         }
 
-        try {
-            if (this.activeIndex !== index) this._releaseItem(this.items[this.activeIndex]);
+        // The item being left is let go of once the player has moved off it
+        // (below, in finally). Revoking its URL here, while the player was
+        // still reading it, failed those reads and set off retries (BUG-14).
+        const previous = this.activeIndex !== index ? this.items[this.activeIndex] : null;
 
+        try {
             const video = this.items[index];
 
             // One decision, taken once and in a tested order; the side effects
@@ -1394,6 +1397,8 @@ export class Playlist {
             this._prefetchMetadata(video);
         } finally {
             this._isSelectingItem = false;
+            // Only if it really was left: a switch that stopped early keeps it.
+            if (previous && previous !== this.items[this.activeIndex]) this._releaseItem(previous);
         }
     }
 
@@ -1416,7 +1421,12 @@ export class Playlist {
             Logger.log(`Releasing memory for: ${item.title}`);
             URL.revokeObjectURL(item.url);
             item.url = null;
-            item.file = null; // Release Blob
+            // The file itself stays. Storage lets go of a file once it has
+            // kept it (IndexedDB) or can read it from disk again (desktop),
+            // so one still here is one it could not keep: a copy too large
+            // for IndexedDB, or an edited copy on desktop, which has no path
+            // on disk. Dropping it here lost that video for good (BUG-6);
+            // the URL is made again from it on the next visit.
         }
     }
 
