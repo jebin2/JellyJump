@@ -35,9 +35,18 @@ start (`78c1c90`); this table is where things stand now.
 | 0 | K5 flaky `encrypt-test` | done | #38 |
 | 0 | O4 audit clean, audit in CI, Dependabot | done | #39 |
 | 0 | B1–B4 architecture check, clock and storage tests | done | #40 |
-| 1 | A5 docs: `docs/` un-ignored, this plan moved here, code of conduct and `STRUCTURE.md` updated, README no longer implies offline (BUG-12 wording) | done | this PR |
-| 1 | A6 remove `remotion_test5/`, `use_case/`, `tests/*.html`, `scripts/jjc3-sim.sh` | done | this PR |
-| 1 | A7, C1–C5, R1–R5, N1–N3, P1–P2, L4, T1, T2 | to do | |
+| 1 | A5 docs: `docs/` un-ignored, this plan moved here, code of conduct and `STRUCTURE.md` updated, README no longer implies offline (BUG-12 wording) | done | #51 |
+| 1 | A6 remove `remotion_test5/`, `use_case/`, `tests/*.html`, `scripts/jjc3-sim.sh` | done | #51 |
+| 1 | C1, C3 MediaBunny, compositor, subtitle conversion, cancellation → `shared/` (wrong-way imports 59 → 30) | done | #52 |
+| 1 | R1–R5 config module, services list, build id, sample-video hosts in config | done | #53 |
+| 1 | N1–N3, P1, P2 `AppError`, codes, `ErrorReporter`, log ring with trace ids, `alert()` gone | done | #54 |
+| 1 | C2 `MediaProcessor` → `processing/`, media readers → `shared/media/` (30 → 14) | done | #55 |
+| 1 | C4 `shared/platform/` (direct Electron checks 8 → 0); desktop smoke test on its own profile | done | #56 |
+| 1 | C5 delete stubs | not needed: imports were rewritten, no stubs made | |
+| 1 | L4 ESLint; its 91 findings fixed | done | #57 |
+| 1 | A7 BUG-6 confirmed on desktop and fixed; BUG-14 found and fixed | done | #58 |
+| 1 | T1 README, T2 ADRs 0001–0011 | done | this PR |
+| 2 | D, E, F, G, N4–N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
@@ -299,6 +308,7 @@ Other modules call its private methods: `_saveState` 24 times,
 | BUG-11 | The app's version says 0.4.2; the latest release tag is v0.5.1 | `package.json` is only stamped by the desktop release job | phase S5 |
 | BUG-12 | The README calls the app a PWA; nothing works offline | `public/sw.js` only adds COOP/COEP headers; it caches nothing | phase Q4 or reword the README (decision §9) |
 | BUG-13 | Library code ships twice: `mediabunny`, the AAC encoder and the MP3 encoder each appear as two chunks (about 2.3 MB minified) | the worker bundle and the main bundle each get their own copy | phase Q2 |
+| BUG-14 | Switching between local videos failed the reads of the one being left, with retries and console errors | `selectItem` revoked the left item's URL before the player had stopped reading it | fixed in #58 (found while confirming BUG-6) |
 
 
 ### 2.14 Error handling
