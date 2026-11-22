@@ -139,12 +139,7 @@ export class Playlist {
 
         // Auto-advance when the current item ends. On the last item this stops,
         // unless the loop mode is 'playlist', where it wraps to the first.
-        this.player.onEnded = () => {
-            // While a video is being edited the player is its preview; moving
-            // on to the next one would take the edit panel with it.
-            if (this.ui?.editPanel?.isOpen) return;
-            this.playNext();
-        };
+        this.player.onEnded = () => this.playNext();
 
         // Changing the loop mode changes whether a next item exists, so the
         // prev/next buttons have to be re-evaluated when it does.
@@ -170,8 +165,11 @@ export class Playlist {
     }
 
     // Navigation convenience wrappers
-    playNext() { this.navigation.playNext(); }
-    playPrevious() { this.navigation.playPrevious(); }
+    // While a video is being edited the player is its preview: it stays on
+    // that video, whatever asks for the next one (the end of the video, a
+    // key, a button), or the edit panel would be taken along to another.
+    playNext() { if (!this.ui?.editPanel?.isOpen) this.navigation.playNext(); }
+    playPrevious() { if (!this.ui?.editPanel?.isOpen) this.navigation.playPrevious(); }
     scrollToPlaying() { return this.navigation.scrollToPlaying(); }
     _updatePlayerNavigationState() { this.navigation.updatePlayerNavigationState(); }
 

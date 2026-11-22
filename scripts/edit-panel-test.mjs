@@ -110,6 +110,8 @@ async function run(page, origin) {
             loop: [p.loopMode, p.loopStart, p.loopEnd],
             filters: p.videoFilters?.isActive() ?? false,
             rate: p.playbackRate,
+            mode: p.controlBarMode,
+            barHeight: Math.round(p.ui.controls.getBoundingClientRect().height),
             savedRate: localStorage.getItem('jellyjump-speed'),
             buttons: Object.fromEntries(['mb-play-btn', 'mb-prev-btn', 'mb-loop-btn', 'mb-filters-btn',
                 'mb-speed-btn', 'mb-cc-btn', 'mb-audio-settings-btn', 'mb-fullscreen-btn'].map(id => [id, shown(id)])),
@@ -138,6 +140,9 @@ async function run(page, origin) {
         const p = window.playlist.player;
         p.videoFilters.setBrightness(150);
         await p.setPlaybackRate(1.5);
+        // Controls laid over the picture: the user's setting, put back after.
+        p.controlBarMode = 'overlay';
+        p.controlBar.applyMode();
     });
     const before = await state();
 
@@ -153,6 +158,8 @@ async function run(page, origin) {
         && !s.buttons['mb-speed-btn'] && !s.buttons['mb-cc-btn'],
         'next/previous, loop, filters, speed and subtitles are put away');
     check(!s.filters, 'filters are off while editing');
+    check(before.mode === 'overlay' && s.mode === 'fixed', `the controls are pinned below the picture (${before.mode} -> ${s.mode})`);
+    check(s.barHeight === before.barHeight, `the control bar keeps its height (${before.barHeight} -> ${s.barHeight})`);
     check(s.rate === 1, `it plays at normal speed (${s.rate})`);
     check(s.savedRate === '1.5', `the saved speed is still the user's (${s.savedRate})`);
 
@@ -256,6 +263,12 @@ async function run(page, origin) {
     await page.waitForTimeout(300);
     s = await state();
     check(s.playing === 'holiday-clip.webm' && s.playlist.length === 2, `the player stays on the video (${s.playing})`);
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.keyboard.press('Shift+N');
+    await page.evaluate(() => window.playlist.player.onEnded());
+    await page.waitForTimeout(500);
+    s = await state();
+    check(s.playing === 'holiday-clip.webm', `neither Shift+N nor the video's end moves on to the next one (${s.playing})`);
 
     console.log('\nleaving gives the player back');
     await page.keyboard.press('Escape');
@@ -266,6 +279,7 @@ async function run(page, origin) {
     check(s.layers === 0, 'nothing is left over the picture');
     check(JSON.stringify(s.loop) === JSON.stringify(before.loop), `the loop is as it was (${JSON.stringify(s.loop)})`);
     check(s.filters && s.rate === 1.5, `filters and speed are back (${s.filters}, ${s.rate})`);
+    check(s.mode === 'overlay', `the controls are laid over the picture again (${s.mode})`);
     check(s.buttons['mb-loop-btn'] && s.buttons['mb-filters-btn'] && s.buttons['mb-speed-btn'], 'every button is back');
 
     console.log('\nevery tool but Info opens in the panel');
@@ -326,14 +340,28 @@ async function run(page, origin) {
     });
     await page.click('.edit-panel .reverse-btn');
     await page.waitForTimeout(100);
+    // Back to the playlist while it runs, and in again.
+    await page.click('.edit-panel-back');
+    await page.click('.edit-panel-back');
+    check(await page.isHidden('.edit-panel'), 'the playlist can be gone back to while it runs');
+    // Read as it opens: a 2x speed-up of a short clip does not take long.
+    const waitingAgain = await page.evaluate(() => {
+        const pl = window.playlist;
+        pl.ui.editPanel.open(pl.items.findIndex(i => i.title === 'holiday-clip.webm'));
+        return [
+            !document.querySelector('.edit-panel-busy').classList.contains('hidden'),
+            document.querySelector('.edit-panel-tools').inert,
+        ];
+    });
+    check(waitingAgain[0] && waitingAgain[1], `opened again, the panel still waits for it, the tools locked (${waitingAgain})`);
     await settled();
     await loaded();
     s = await state();
     check(s.steps === 'Speed' && Math.abs(s.duration - 6) < 0.5, `it is a step, half as long (${s.steps}, ${s.duration}s)`);
+    check(s.title === 'Edit', `it opens on the tool list, where it was left (${s.title})`);
     await page.click('.edit-panel-reset');
     await page.click('.edit-panel-confirm-yes');
     await loaded();
-    await page.click('.edit-panel-back');
 
     console.log('\nthe edits are remembered with the copy');
     await page.evaluate(() => window.playlist.player.pause());
