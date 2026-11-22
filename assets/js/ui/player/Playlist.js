@@ -26,6 +26,7 @@ import { ShareState } from '../../shared/services/ShareState.js';
 import {
     looksLikeShareLink, probe as probeRemoteLibrary, forgetLink as forgetRemoteLink,
 } from '../../shared/services/RemoteLibrary.js';
+import { isDesktop } from '../../shared/platform/Platform.js';
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
 
@@ -200,7 +201,7 @@ export class Playlist {
         if (!DiscoveredMedia.isSupported()) return;
         // The browser scanner needs a user gesture and a directory pick, so it
         // is started from the UI rather than on load.
-        if (!window.electronAPI?.isElectron) return;
+        if (!isDesktop()) return;
 
         this._discovered = new DiscoveredMedia();
         this.scanState = { scanning: true, found: 0, failed: false };

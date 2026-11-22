@@ -7,6 +7,7 @@ import { itemToolSections } from '../menus/features/ItemToolsMenu.js';
 import { JobQueue } from '../../shared/services/JobQueue.js';
 import { StorageService } from '../../shared/services/StorageService.js';
 import { html, trusted } from '../../shared/utils/html.js';
+import { isDesktop } from '../../shared/platform/Platform.js';
 
 /**
  * EditPanel - editing a video in the sidebar, with the main player as preview.
@@ -52,7 +53,7 @@ const HISTORY_KEY = 'jellyjump-edit-history';
  * stores no edited copy, so there Undo needs them in memory, and the edits
  * are not remembered past the session.
  */
-const STORES_COPIES = !(typeof window !== 'undefined' && window.electronAPI?.isElectron);
+const STORES_COPIES = !isDesktop();
 
 /** IndexedDBService stores no file larger than this; such a copy stays in memory. */
 const MAX_STORED_FILE = 500 * 1024 * 1024;

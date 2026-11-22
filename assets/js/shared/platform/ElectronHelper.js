@@ -1,4 +1,5 @@
-import { Logger } from "./Logger.js";
+import { Logger } from "../utils/Logger.js";
+import { isDesktop, desktopBridge } from './Platform.js';
 /**
  * ElectronHelper - Utility for Electron-specific operations
  * Provides a clean interface for detecting Electron and accessing its APIs
@@ -9,7 +10,7 @@ export class ElectronHelper {
      * @returns {boolean}
      */
     static isElectron() {
-        return Boolean(window.electronAPI?.isElectron);
+        return isDesktop();
     }
 
     /**
@@ -19,7 +20,7 @@ export class ElectronHelper {
      */
     static async fileExists(filePath) {
         if (!this.isElectron()) return false;
-        return window.electronAPI.fileExists(filePath);
+        return desktopBridge().fileExists(filePath);
     }
 
     /**
@@ -31,7 +32,7 @@ export class ElectronHelper {
         if (!this.isElectron()) {
             return { success: false, error: 'Not running in Electron' };
         }
-        return window.electronAPI.readFile(filePath);
+        return desktopBridge().readFile(filePath);
     }
 
     /**
@@ -43,7 +44,7 @@ export class ElectronHelper {
         if (!this.isElectron()) {
             return { success: false, error: 'Not running in Electron' };
         }
-        return window.electronAPI.getFileStats(filePath);
+        return desktopBridge().getFileStats(filePath);
     }
 
     /**
@@ -55,7 +56,7 @@ export class ElectronHelper {
         if (!this.isElectron()) {
             return { success: false, error: 'Not running in Electron' };
         }
-        return window.electronAPI.openFileDialog(options);
+        return desktopBridge().openFileDialog(options);
     }
 
     /**

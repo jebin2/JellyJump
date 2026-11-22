@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { ElectronHelper } from '../../shared/utils/ElectronHelper.js';
+import { ElectronHelper } from '../../shared/platform/ElectronHelper.js';
 import { UrlUploadMenu } from "../menus/features/UrlUploadMenu.js";
 import { JobTray } from './JobTray.js';
 import { EditPanel } from './EditPanel.js';
