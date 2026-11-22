@@ -1,7 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny } from '../../shared/media/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
-import { executeConversion } from '../shared/Cancellation.js';
+import { executeConversion } from '../../shared/utils/Cancellation.js';
 
 /**
  * Trim without re-encoding, through Mediabunny's copy conversion.

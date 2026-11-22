@@ -9,4 +9,4 @@
 -   **Video Editing**: Trim, resize, and convert videos locally.
 -   **GIF Creation**: Create high-quality GIFs from your videos.
 -   **Privacy First**: No data is uploaded to any server; everything happens in your browser.
--   **PWA Support**: Installable as a Progressive Web App for a native-like experience.
+-   **Installable**: Can be installed as an app from the browser. It needs an internet connection to open; working offline is planned.

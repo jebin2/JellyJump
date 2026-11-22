@@ -1,4 +1,4 @@
-import { MediaBunny } from '../MediaBunny.js';
+import { MediaBunny } from '../../shared/media/MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { RecordingClock } from './RecordingClock.js';
 

@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny, ensureDecodersFor, codecOf } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureDecodersFor, codecOf } from '../../shared/media/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
 
 async function getTrackDetails(input) {

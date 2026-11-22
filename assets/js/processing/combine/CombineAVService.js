@@ -1,6 +1,6 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny, ensureEncoders, codecOf } from '../../core/MediaBunny.js';
-import { executeConversion, cancelUnfinished } from '../shared/Cancellation.js';
+import { MediaBunny, ensureEncoders, codecOf } from '../../shared/media/MediaBunny.js';
+import { executeConversion, cancelUnfinished } from '../../shared/utils/Cancellation.js';
 import { copyMetadataTags } from '../shared/MetadataTags.js';
 
 /**

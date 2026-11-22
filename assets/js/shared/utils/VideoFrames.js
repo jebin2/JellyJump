@@ -37,7 +37,7 @@ const MAX_STICKER_SECONDS = 30;
 export async function decodeVideoSticker(blob, frameWidth) {
     // Loaded here rather than at the top: StickerLayer imports this module for
     // every sticker, and most are images that never need a decoder.
-    const { MediaBunny } = await import('../../core/MediaBunny.js');
+    const { MediaBunny } = await import('../media/MediaBunny.js');
     const input = new MediaBunny.Input({
         source: new MediaBunny.BlobSource(blob),
         formats: MediaBunny.ALL_FORMATS,

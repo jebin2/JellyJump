@@ -1,5 +1,5 @@
 import { Logger } from "./Logger.js";
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny } from '../media/MediaBunny.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { StorageService } from "../services/StorageService.js";
 import { formatTime } from './mediaUtils.js';

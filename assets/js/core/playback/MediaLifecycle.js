@@ -1,4 +1,4 @@
-import { MediaBunny, ensureDecodersFor } from '../MediaBunny.js';
+import { MediaBunny, ensureDecodersFor } from '../../shared/media/MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
 import { StreamDetector } from '../../shared/utils/StreamDetector.js';
