@@ -7,6 +7,7 @@ const { registerShareIpc, enable: enableShare, disable: disableShare, describe: 
 const { handleCliArgs, isTerminalInvocation, isQueryInvocation } = require('./cli');
 const libraryIndex = require('./library-index');
 const { createReadGrants } = require('./read-grants');
+const { createCopies } = require('./copies');
 
 /**
  * Answer a read-only flag as plain Node, with no Chromium at all.
@@ -190,10 +191,15 @@ function normalizeUserFilePath(filePath) {
 
 // What the window may read: files the user picked, files the media scan
 // found, and their subtitles (see read-grants.js).
+// Edited and converted copies, on disk (see copies.js).
+const copies = createCopies({ dir: path.join(app.getPath('userData'), 'copies') });
+copies.sweepPartial();
+
 const readGrants = createReadGrants({
     file: path.join(app.getPath('userData'), 'read-grants.json'),
     configPath,
     index: libraryIndex,
+    alsoAllows: (p) => copies.contains(p),
 });
 
 function assertReadableUserPath(resolvedPath) {
@@ -296,6 +302,29 @@ ipcMain.handle('read-file', async (event, filePath) => {
         return { success: false, error: error.message };
     }
 });
+
+// ============================================
+// IPC Handlers for edited copies (copies.js)
+// ============================================
+
+/** One handler per step; each answers { success, ... } like the rest. */
+function copyHandler(channel, run) {
+    ipcMain.handle(channel, async (event, ...args) => {
+        try {
+            assertTrustedIpcEvent(event);
+            return { success: true, value: await run(...args) };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    });
+}
+copyHandler('copy-begin', (id, name) => copies.begin(id, name));
+copyHandler('copy-write', (id, chunk) => copies.write(id, chunk));
+copyHandler('copy-finish', (id) => copies.finish(id));
+copyHandler('copy-abort', (id) => copies.abort(id));
+copyHandler('copy-path', (id) => copies.find(id));
+copyHandler('copy-delete', (id) => copies.remove(id));
+copyHandler('copy-list', () => copies.ids());
 
 /**
  * Check if a file exists at the given path

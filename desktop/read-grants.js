@@ -12,7 +12,8 @@
  * - found by the media scan (the library index), or a media file inside a
  *   folder the scan covers (one added since the scan);
  * - a subtitle file beside a video that is readable, named after it
- *   (`movie.mp4` → `movie.srt`, `movie.en.srt`).
+ *   (`movie.mp4` → `movie.srt`, `movie.en.srt`);
+ * - the app's own copies of edited videos (copies.js).
  *
  * The remembered picks are kept in their own file, not in jellyjump.json,
  * which the renderer writes: what the renderer may read is not the
@@ -41,8 +42,9 @@ const isSubtitle = (p) => SUBTITLE_EXTENSIONS.has(extOf(p));
  * @param {string} [options.configPath] - jellyjump.json, read once to keep
  *   the playlist that was there before this file existed playable
  * @param {{hasPath: (p: string) => boolean, getRoots: () => string[]}} options.index - the library index
+ * @param {(p: string) => boolean} [options.alsoAllows] - files the app made itself (copies.js)
  */
-function createReadGrants({ file, configPath, index }) {
+function createReadGrants({ file, configPath, index, alsoAllows = () => false }) {
     /** @type {Set<string>} insertion order = oldest first */
     let granted = new Set();
 
@@ -89,7 +91,7 @@ function createReadGrants({ file, configPath, index }) {
 
     /** @param {string} p - resolved */
     function allowsMedia(p) {
-        if (granted.has(p) || index.hasPath(p)) return true;
+        if (granted.has(p) || index.hasPath(p) || alsoAllows(p)) return true;
         return isMedia(p) && underScanRoot(p);
     }
 

@@ -26,5 +26,7 @@ blob (`DesktopStorageService`).
   files nothing refers to (`ui/player/PlaylistFiles.js`; BUG-4, wave 2).
 - When storage is full, the list is saved without the files that did not
   fit; they play until the page closes, and the user is told once.
-- Edited copies on desktop have no path on disk; plan step G4 gives them
-  one.
+- On desktop, a file a tool made is written to the app's copies folder
+  (`desktop/copies.js`) and read back by path, so it survives a restart and
+  the edit panel keeps its Undo history there too (G4). A file the user
+  dropped in is theirs and is not copied. Deleting reaches only that folder.

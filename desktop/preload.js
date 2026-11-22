@@ -14,6 +14,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
 
+    // Edited copies, written in chunks and named by item id (copies.js).
+    copyBegin: (id, name) => ipcRenderer.invoke('copy-begin', id, name),
+    copyWrite: (id, chunk) => ipcRenderer.invoke('copy-write', id, chunk),
+    copyFinish: (id) => ipcRenderer.invoke('copy-finish', id),
+    copyAbort: (id) => ipcRenderer.invoke('copy-abort', id),
+    copyPath: (id) => ipcRenderer.invoke('copy-path', id),
+    copyDelete: (id) => ipcRenderer.invoke('copy-delete', id),
+    copyList: () => ipcRenderer.invoke('copy-list'),
+
     readConfig: () => ipcRenderer.invoke('read-config'),
     writeConfig: (data) => ipcRenderer.invoke('write-config', data),
 

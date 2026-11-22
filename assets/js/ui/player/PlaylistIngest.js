@@ -363,6 +363,9 @@ export const PlaylistIngest = {
             type: options.mediaType || 'video',
             isLocal: true,
             isNew: true,
+            // A file the app made, not the user's: the desktop app keeps it
+            // in its copies folder (DesktopStorageService).
+            madeByTool: true,
             path: named?.path ?? (sourceItem ? (sourceItem.path || sourceItem.title) + '/' + filename : filename),
             ...options.extra,
         };
