@@ -183,7 +183,7 @@ export class InfoMenu {
             }
 
             // Ensure metadata is cached
-            await playlist._ensureMetadata(item);
+            await playlist.ensureMetadata(item);
 
             // Reading a file can take a while — long enough for the user to
             // close the dialog, and on an unreadable file long enough to give

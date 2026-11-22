@@ -43,7 +43,7 @@ export class TrackManagerMenu {
         // Fetch Tracks
         try {
             // Ensure metadata (including tracks) is loaded/cached
-            await playlist._ensureMetadata(item);
+            await playlist.ensureMetadata(item);
 
             // Hide loading, show content
             modalContent.querySelector('.tracks-loading').classList.add('hidden');
@@ -71,7 +71,7 @@ export class TrackManagerMenu {
                 if (itemIndex !== -1) {
                     playlist.items.splice(itemIndex, 1);
                     playlist.render();
-                    playlist._saveState();
+                    playlist.save();
                     Logger.log(`[TrackManagerMenu] Removed unavailable item: ${item.title}`);
                 }
                 return;
@@ -224,7 +224,7 @@ export class TrackManagerMenu {
             keepOpen: true,
             modal: modalInstance,
             work: async ({ signal, onProgress }) => {
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                 return MediaProcessor.extractTrack({ source, trackIndex, trackType, format, speed, onProgress, signal });
             },
             done: (blob) => this.handleExtractionSuccess({

@@ -278,7 +278,7 @@ export class CutDetectionMenu {
         Logger.log(`Trimming segment ${index}: ${start} -> ${end}`);
 
         // 1. Get Source
-        const source = await MediaMetadata.getSourceBlob(originalItem, () => playlist._saveState());
+        const source = await MediaMetadata.getSourceBlob(originalItem, () => playlist.save());
 
         // 2. Process (Trim)
         const blob = await MediaProcessor.process({

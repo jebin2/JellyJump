@@ -24,7 +24,7 @@ export class MultiCutMenu {
 
         multicutBtn.disabled = true;
 
-        await playlist._ensureMetadata(item);
+        await playlist.ensureMetadata(item);
 
         let duration = 0;
         if (item.duration && typeof item.duration === 'string' && item.duration !== '--:--') {
@@ -215,7 +215,7 @@ export class MultiCutMenu {
                 background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
-                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
 
                     // The cuts are what goes; what is kept is the gaps between them.
                     const sortedClips = [...clips].sort((a, b) => a.start - b.start);

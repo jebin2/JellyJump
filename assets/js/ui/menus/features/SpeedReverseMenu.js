@@ -42,7 +42,7 @@ export class SpeedReverseMenu {
         sourceFilename.title = item.title;
 
         // Ensure metadata
-        await playlist._ensureMetadata(item);
+        await playlist.ensureMetadata(item);
 
         // Hide loading
         if (loadingSection) loadingSection.classList.add('hidden');
@@ -130,7 +130,7 @@ export class SpeedReverseMenu {
                     work: async ({ signal, onProgress }) => {
                         let sourceFile;
                         try {
-                            sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                            sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                         } catch (e) {
                             Logger.error('Failed to get source blob:', e);
                             throw new Error('Cannot access video file');
@@ -151,7 +151,7 @@ export class SpeedReverseMenu {
                             mediaType: 'video/mp4',
                             extra: { thumbnail: item.thumbnail },
                         });
-                        await playlist._ensureMetadata(newItem);
+                        await playlist.ensureMetadata(newItem);
                     },
                 });
             });

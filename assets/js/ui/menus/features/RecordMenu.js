@@ -1,3 +1,4 @@
+import { Toast } from '../../../shared/utils/Toast.js';
 import { Logger } from "../../../shared/utils/Logger.js";
 import { initPlayerAudio, tapPlayerAudio } from '../../../core/audio/AudioEngine.js';
 
@@ -20,13 +21,13 @@ export class RecordMenu {
     static async init(item, playlist) {
         if (!playlist.player || !playlist.player.canvas) {
             Logger.error('RecordMenu: Player canvas not available');
-            playlist._showToast('Error: Player not ready', 'error');
+            Toast.show('Error: Player not ready', 3000, true);
             return;
         }
 
         // Check if item is active
         if (!this.checkActiveItem(item, playlist)) {
-            playlist._showToast('Please play this video to record it', 'warning');
+            Toast.show('Please play this video to record it', 3000, true);
             return;
         }
 
@@ -60,13 +61,10 @@ export class RecordMenu {
         try {
             await player.startCanvasRecording({ audioTrack: await this._tapAudio(player) });
 
-            playlist._showToast(
-                !player.isPlaying ? 'Recording started. Play video to capture.' : 'Recording started.',
-                'info',
-            );
+            Toast.show(!player.isPlaying ? 'Recording started. Play video to capture.' : 'Recording started.');
         } catch (err) {
             Logger.error('RecordMenu: Start Error', err);
-            playlist._showToast('Failed to start recording: ' + err.message, 'error');
+            Toast.show('Failed to start recording: ' + err.message, 4000, true);
             this._releaseAudioTap();
             this.isRecording = false;
         }
@@ -113,7 +111,7 @@ export class RecordMenu {
         }
         this.isRecording = false;
         const player = playlist.player;
-        playlist._showToast('Stopping recording...', 'info');
+        Toast.show('Stopping recording...');
 
         let blob = null;
         try {
@@ -125,7 +123,7 @@ export class RecordMenu {
         }
 
         if (!blob) {
-            playlist._showToast('Nothing was recorded. Play the video while recording.', 'warning');
+            Toast.show('Nothing was recorded. Play the video while recording.', 4000, true);
             return;
         }
         this._saveRecording(playlist, blob);
@@ -160,7 +158,7 @@ export class RecordMenu {
             window.URL.revokeObjectURL(url);
         }, 100);
 
-        playlist._showToast('Recording saved', 'success');
+        Toast.show('Recording saved');
     }
 
     /**

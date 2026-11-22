@@ -102,8 +102,8 @@ export class CombineAVMenu {
                 background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
-                    const videoBlob = await MediaMetadata.getSourceBlob(videoItem, () => playlist._saveState());
-                    const audioBlob = await MediaMetadata.getSourceBlob(audioItem, () => playlist._saveState());
+                    const videoBlob = await MediaMetadata.getSourceBlob(videoItem, () => playlist.save());
+                    const audioBlob = await MediaMetadata.getSourceBlob(audioItem, () => playlist.save());
                     return MediaProcessor.combineAudioVideo({
                         videoSource: videoBlob,
                         audioSource: audioBlob,
@@ -138,9 +138,9 @@ export class CombineAVMenu {
                     const lastIndex = playlist.items.indexOf(videoItem);
                     if (lastIndex !== -1) playlist.items.splice(lastIndex + 1, 0, newItem);
                     else playlist.items.push(newItem);
-                    playlist._saveState();
+                    playlist.save();
                     playlist.render();
-                    playlist._processMetadata([newItem]);
+                    playlist.processMetadata([newItem]);
                 },
             });
             if (!outcome.ok) {

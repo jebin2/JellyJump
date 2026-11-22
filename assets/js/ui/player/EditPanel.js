@@ -708,7 +708,7 @@ export class EditPanel {
         if (index === 0) index = this.playlist.items.length;
         this.playlist.state.insertItem(index, item);
         this.playlist.render();
-        this.playlist._saveState();
+        this.playlist.save();
         return item;
     }
 

@@ -64,10 +64,10 @@ export class MergeMenu {
                     item.duration = 'Loading...';
                     renderSelected();
 
-                    await playlist._ensureMetadata(item);
+                    await playlist.ensureMetadata(item);
                     renderSelected();
                 } else {
-                    await playlist._ensureMetadata(item);
+                    await playlist.ensureMetadata(item);
                 }
 
                 if (item.videoInfo) {
@@ -287,7 +287,7 @@ export class MergeMenu {
                 work: async ({ signal, onProgress }) => {
                     const inputs = [];
                     for (const item of selectedVideos) {
-                        inputs.push(await MediaMetadata.getSourceBlob(item, () => playlist._saveState()));
+                        inputs.push(await MediaMetadata.getSourceBlob(item, () => playlist.save()));
                     }
                     return MediaProcessor.merge({
                         inputs,
@@ -327,9 +327,9 @@ export class MergeMenu {
                     const lastIndex = playlist.items.indexOf(selectedVideos[selectedVideos.length - 1]);
                     if (lastIndex !== -1) playlist.items.splice(lastIndex + 1, 0, newItem);
                     else playlist.items.push(newItem);
-                    playlist._saveState();
+                    playlist.save();
                     playlist.render();
-                    playlist._processMetadata([newItem]);
+                    playlist.processMetadata([newItem]);
                 },
             });
             if (!outcome.ok) {

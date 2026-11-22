@@ -114,7 +114,7 @@ export class RotateMenu {
                 background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
-                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                     return MediaProcessor.process({
                         source, format: 'mp4', quality: 'high',
                         rotate: normRotation,

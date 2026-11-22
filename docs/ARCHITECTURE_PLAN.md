@@ -47,8 +47,9 @@ start (`78c1c90`); this table is where things stand now.
 | 1 | A7 BUG-6 confirmed on desktop and fixed; BUG-14 found and fixed | done | #58 |
 | 1 | T1 README, T2 ADRs 0001–0011 | done | this PR |
 | 2 | D1–D3 `Settings` (`jj:` keys, old ones moved; `localStorage` files 14 → 5), `player.override()`; edit panel and the timeline tools use it, its speed rewrite gone | done | #61 |
-| 2 | G1 delete a removed item's file, G2 sweep after load (BUG-4); G3 progress in one capped map (BUG-5); G5/N6 full disk keeps the list and says so once. `localStorage` only in settings and storage (now a rule: count 0) | done | this PR |
-| 2 | E, F, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
+| 2 | G1 delete a removed item's file, G2 sweep after load (BUG-4); G3 progress in one capped map (BUG-5); G5/N6 full disk keeps the list and says so once. `localStorage` only in settings and storage (now a rule: count 0) | done | #62 |
+| 2 | E1 public playlist names (`save`, `ensureMetadata`, `processMetadata`, `handleUrlUpload`); outside `playlist._*` calls 50 → 0. BUG-15 found and fixed: Record called a `playlist._showToast` that never existed, so its messages threw | done | this PR |
+| 2 | E2–E5, F, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
@@ -311,6 +312,7 @@ Other modules call its private methods: `_saveState` 24 times,
 | BUG-12 | The README calls the app a PWA; nothing works offline | `public/sw.js` only adds COOP/COEP headers; it caches nothing | phase Q4 or reword the README (decision §9) |
 | BUG-13 | Library code ships twice: `mediabunny`, the AAC encoder and the MP3 encoder each appear as two chunks (about 2.3 MB minified) | the worker bundle and the main bundle each get their own copy | phase Q2 |
 | BUG-14 | Switching between local videos failed the reads of the one being left, with retries and console errors | `selectItem` revoked the left item's URL before the player had stopped reading it | fixed in #58 (found while confirming BUG-6) |
+| BUG-15 | The Record tool threw instead of showing its messages ("Please play this video to record it", "Recording saved") | it called `playlist._showToast`, which no version of the playlist had | fixed in E1 (found by counting outside private calls) |
 
 
 ### 2.14 Error handling

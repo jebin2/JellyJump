@@ -1,7 +1,7 @@
 {
   "counts": {
     "playerPrivateCalls": 356,
-    "playlistPrivateCalls": 50,
+    "playlistPrivateCalls": 0,
     "localStorageFiles": 0,
     "directElectronChecks": 0,
     "externalUrlFiles": 0

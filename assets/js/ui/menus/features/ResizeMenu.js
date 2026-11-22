@@ -54,7 +54,7 @@ export class ResizeMenu {
 
         // Load Metadata
         try {
-            await playlist._ensureMetadata(item);
+            await playlist.ensureMetadata(item);
 
             if (item.videoInfo && item.videoInfo.width && item.videoInfo.height) {
                 originalWidth = item.videoInfo.width;
@@ -160,7 +160,7 @@ export class ResizeMenu {
                 background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
-                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                     return MediaProcessor.process({
                         source, format: 'mp4', quality: 100,
                         resolution: { width: targetW, height: targetH },

@@ -320,7 +320,7 @@ export class RemoveBackgroundMenu {
                     downloadBtn.onclick = (e) => {
                         e.stopPropagation(); // Allow default download action
                     };
-                    await playlist._ensureMetadata(newItem);
+                    await playlist.ensureMetadata(newItem);
                 },
             });
             if (bgTypeRadios[1].checked) customBgColorInput.disabled = false;

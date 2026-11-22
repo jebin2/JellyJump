@@ -81,7 +81,7 @@ export class JobTray {
      */
     async _download(result) {
         try {
-            const file = await MediaMetadata.getSourceBlob(result.item, () => this.playlist._saveState());
+            const file = await MediaMetadata.getSourceBlob(result.item, () => this.playlist.save());
             const url = URL.createObjectURL(file);
             const a = document.createElement('a');
             a.href = url;

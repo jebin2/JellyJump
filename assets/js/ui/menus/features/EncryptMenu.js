@@ -137,7 +137,7 @@ export class EncryptMenu {
             // used to fetch the whole thing before the dialog could even open,
             // which on a shared library meant waiting out a multi-gigabyte
             // download to be told the file is not encrypted.
-            const probeSource = await MediaMetadata.sourceForReading(item, () => playlist._saveState());
+            const probeSource = await MediaMetadata.sourceForReading(item, () => playlist.save());
             if (typeof probeSource === 'string' && probeSource.startsWith('blob:')) {
                 sourceBlob = await (await fetch(probeSource)).blob();
             }
@@ -210,7 +210,7 @@ export class EncryptMenu {
                 modal,
                 work: async ({ signal, onProgress }) => {
                     const source = sourceBlob ||
-                        await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                        await MediaMetadata.getSourceBlob(item, () => playlist.save());
                     const report = (p, info) => {
                         const eta = info?.etaSec !== undefined ? fmtDur(info.etaSec) : '';
                         onProgress(p, eta ? `${eta} left · ${Math.round(info.fps)} fps` : `${name}ing…`);

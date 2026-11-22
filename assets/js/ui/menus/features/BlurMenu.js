@@ -333,7 +333,7 @@ export class BlurMenu {
                 failureText: (e) => e.message,
                 modal,
                 work: async ({ signal, onProgress }) => MediaProcessor.process({
-                    source: await MediaMetadata.getSourceBlob(item, () => playlist._saveState()),
+                    source: await MediaMetadata.getSourceBlob(item, () => playlist.save()),
                     format: 'mp4',
                     blur: { areas: state.blurAreas, intensity: getBlurIntensity() },
                     onProgress: (p) => onProgress(p, p < 0.9 ? 'Blurring...' : 'Finalizing...'),

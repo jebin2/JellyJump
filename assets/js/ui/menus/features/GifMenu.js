@@ -66,7 +66,7 @@ export class GifMenu {
         const gifFileSize = modalContent.querySelector('.gif-file-size');
 
         // Ensure metadata
-        await playlist._ensureMetadata(item);
+        await playlist.ensureMetadata(item);
 
         // Get video duration
         let duration = 0;
@@ -212,7 +212,7 @@ export class GifMenu {
 
                     let sourceFile;
                     try {
-                        sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                        sourceFile = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                     } catch (e) {
                         Logger.error('Failed to get source blob:', e);
                         throw new Error('Cannot access video file');

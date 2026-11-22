@@ -226,7 +226,7 @@ export class ConvertMenu {
             const url = hfResultUrl.value;
             if (!url) return;
             modal.close();
-            await playlist._handleUrlUpload(url);
+            await playlist.handleUrlUpload(url);
         });
     }
 
@@ -245,7 +245,7 @@ export class ConvertMenu {
      */
     static async _startConversion(item, format, quality, playlist, onProgress, downloadBtn, onHlsFiles, signal) {
         // Get source with caching
-        const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+        const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
 
         // Determine Target Format
         let targetFormat = format;

@@ -37,7 +37,7 @@ export class TrimMenu {
 
 
         // Ensure metadata
-        await playlist._ensureMetadata(item);
+        await playlist.ensureMetadata(item);
 
         // Get Video Duration
         let duration = 0;
@@ -140,7 +140,7 @@ export class TrimMenu {
                 background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
-                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                     const trim = { start: startTime, end: endTime };
                     return losslessToggle?.checked
                         ? MediaProcessor.losslessTrim({ source, trim, onProgress, signal })
