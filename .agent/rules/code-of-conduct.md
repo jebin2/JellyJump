@@ -7,7 +7,7 @@ trigger: always_on
 This document serves as the "Constitution" for code quality in the **MediaBunny Player** project. All code, whether written by humans or LLMs, must strictly adhere to these rules.
 
 ## 1. Core Philosophy
-*   **Vanilla First**: No frameworks (React, Vue, etc.), no build steps (Webpack, Vite), no NPM dependencies (unless explicitly approved). Use pure ES Modules, HTML, and CSS.
+*   **Vanilla First**: No UI frameworks (React, Vue, etc.). Plain ES Modules, HTML and CSS, bundled by **Vite**. npm dependencies only when approved; the approved ones are Vite (build), Playwright (tests), TypeScript (type checking of `// @ts-check` files), ESLint (linting), and the Hugging Face packages used for subtitles and uploads. MediaBunny and its codecs are vendored in `assets/js/lib/`.
 *   **KISS (Keep It Simple, Stupid)**: Prefer simple, readable solutions over "clever" ones. Code should be easy to understand for a junior developer.
 *   **Consistency**: Follow the existing patterns in the codebase. If you see a pattern, follow it.
 
@@ -209,7 +209,17 @@ element.style.display = 'block';
     button.style.backgroundColor = 'blue'; // Use classes!
     ```
 
-## 15. Review Checklist
+## 15. Architecture
+
+The structure the code is moving to, and the rules that keep it there, are in
+`docs/ARCHITECTURE_PLAN.md`. The ones every change must follow now:
+
+*   **Layers**: a folder imports only from the layers below it — pages (`assets/js/*.js`) → `ui/` → `core/`, `processing/` → `shared/` → `lib/`; `core/` and `processing/` do not import each other. `npm run quality` checks it.
+*   **Private members stay private**: do not call another module's `_underscored` methods or read its internal fields; add a public method instead. The count of such calls is checked and may only go down.
+*   **HTML from values**: put values into HTML only through the `html` template (`shared/utils/html.js`), which escapes them. Never interpolate a title, name, URL or error message into `innerHTML` directly.
+*   **Tests**: a bug fix comes with a test that fails without it.
+
+## 16. Review Checklist
 - [ ] No CSS in JS files
 - [ ] No inline HTML styles (except dynamic values)
 - [ ] CSS variables used (no hardcoded colors/spacing)
@@ -217,6 +227,8 @@ element.style.display = 'block';
 - [ ] Semantic HTML + ARIA labels
 - [ ] Data attributes for JS hooks
 - [ ] Theme uses `data-theme`
+- [ ] `npm test` passes (quality, architecture, types, all suites)
+- [ ] Values put into HTML go through `html`
 
 ---
 **Enforcement**: Code that violates these rules will be rejected during review.
