@@ -46,9 +46,6 @@ export class MotionDetectionMenu {
         const sensitivitySlider = modalContent.querySelector('.sensitivity-slider');
         const sensitivityValue = modalContent.querySelector('.sensitivity-value');
         const statusArea = modalContent.querySelector('.detection-status-area');
-        const statusText = modalContent.querySelector('.status-text');
-        const statusPercent = modalContent.querySelector('.status-percent');
-        const progressBar = modalContent.querySelector('.progress-bar-fill');
         const segmentsList = modalContent.querySelector('.detected-items-list');
 
         // Footer Elements

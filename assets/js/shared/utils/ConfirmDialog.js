@@ -1,5 +1,5 @@
 import { Logger } from "./Logger.js";
-import { escapeHtml } from './html.js';
+import { html } from './html.js';
 /**
  * ConfirmDialog — static utility for confirm/alert dialogs.
  * Distinct from player/Modal.js which is instance-based for menu overlays.
@@ -43,7 +43,7 @@ export class ConfirmDialog {
 
             const titleEl = document.createElement('h3');
             titleEl.className = 'mb-modal-title';
-            titleEl.innerHTML = `<span class="mb-modal-icon">${icon}</span> ${this._escapeHtml(title)}`;
+            titleEl.innerHTML = String(html`<span class="mb-modal-icon">${icon}</span> ${title}`);
 
             const closeBtn = document.createElement('button');
             closeBtn.className = 'mb-modal-close';
@@ -178,7 +178,7 @@ export class ConfirmDialog {
 
             const titleEl = document.createElement('h3');
             titleEl.className = 'mb-modal-title';
-            titleEl.innerHTML = `<span class="mb-modal-icon">${icon}</span> ${this._escapeHtml(title)}`;
+            titleEl.innerHTML = String(html`<span class="mb-modal-icon">${icon}</span> ${title}`);
 
             const closeBtn = document.createElement('button');
             closeBtn.className = 'mb-modal-close';
@@ -274,12 +274,4 @@ export class ConfirmDialog {
         }, 200);
     }
 
-    /**
-     * Escape HTML to prevent XSS
-     * @param {string} text 
-     * @private
-     */
-    static _escapeHtml(text) {
-        return escapeHtml(text);
-    }
 }

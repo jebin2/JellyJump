@@ -29,11 +29,9 @@ export class ResizeMenu {
         const downloadBtn = modalContent.querySelector('.download-btn');
 
         // Footer elements (unified modal pattern)
-        const progressSection = modalContent.querySelector('.progress-section');
         const progressStatus = modalContent.querySelector('.progress-status');
         const progressText = modalContent.querySelector('.progress-percentage');
         const errorDisplay = modalContent.querySelector('.error-message');
-        const successDisplay = modalContent.querySelector('.success-message');
 
         // State
         let originalWidth = 0;

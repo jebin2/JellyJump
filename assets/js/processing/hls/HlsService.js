@@ -19,7 +19,6 @@ export async function processHls({ source, quality = 100, onProgress, signal }) 
     const filePromises = [];
     let bytesWritten = 0;
     let filesCreated = 0;
-    let latestFile = '-';
 
     try {
         input = createMediaBunnyInput(source);
@@ -37,7 +36,6 @@ export async function processHls({ source, quality = 100, onProgress, signal }) 
                     let fileBytes = 0;
 
                     filesCreated++;
-                    latestFile = path;
 
                     const target = new MediaBunny.BufferTarget({
                         onFinalize: (buffer) => {
@@ -91,7 +89,7 @@ export async function processHls({ source, quality = 100, onProgress, signal }) 
         if (onProgress) currentConversion.onProgress = onProgress;
         await executeConversion(currentConversion, signal);
 
-        Logger.log(`[MediaProcessor] HLS done — ${writtenFiles.size} files`);
+        Logger.log(`[MediaProcessor] HLS done — ${writtenFiles.size} files (${filesCreated} created), ${(bytesWritten / 1048576).toFixed(1)} MB in ${((performance.now() - startTime) / 1000).toFixed(1)} s`);
         return writtenFiles;
     } finally {
         if (input && typeof input.dispose === 'function') {

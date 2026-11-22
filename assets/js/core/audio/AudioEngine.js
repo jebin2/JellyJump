@@ -191,7 +191,7 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
             if (!player.isPlaying) break;
 
             sampleCount++;
-            const { buffer, timestamp } = bufferObj;
+            const { timestamp } = bufferObj;
             scheduleOne(bufferObj);
 
             if (sampleCount === 1) {

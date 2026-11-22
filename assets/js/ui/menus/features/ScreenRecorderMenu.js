@@ -231,7 +231,7 @@ export class ScreenRecorderMenu {
 
         const modalOverlay = document.createElement('div');
         modalOverlay.className = 'mb-modal-overlay';
-        modalOverlay.innerHTML = `
+        modalOverlay.innerHTML = String(html`
             <div class="mb-modal" role="dialog" aria-modal="true">
                 <div class="mb-modal-header">
                     <h3 class="mb-modal-title">Camera Recording</h3>
@@ -265,7 +265,7 @@ export class ScreenRecorderMenu {
                     <button class="jellyjump-btn-primary mb-modal-start">Start Recording</button>
                 </div>
             </div>
-        `;
+        `);
         document.body.appendChild(modalOverlay);
 
         const closeModal = () => { if (modalOverlay.parentNode) document.body.removeChild(modalOverlay); };

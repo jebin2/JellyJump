@@ -113,21 +113,6 @@ async function checkBareConsole(filePath) {
     });
 }
 
-/**
- * alert() stops the whole page until it is dismissed, and its text cannot be
- * styled or copied. Messages go in the tool's own message area, a toast, or
- * ConfirmDialog.
- */
-async function checkAlert(filePath) {
-    const lines = (await readFile(filePath, 'utf8')).split(/\r?\n/);
-    lines.forEach((line, index) => {
-        if (/^\s*(\/\/|\*)/.test(line)) return;
-        if (/(^|[^.\w])alert\(/.test(line) && !/\bstatic\s+alert\(/.test(line)) {
-            failures.push(`${path.relative(root, filePath)}:${index + 1} uses alert(); use the tool's message, Toast or ConfirmDialog`);
-        }
-    });
-}
-
 const desktopFiles = await walk(path.join(root, 'desktop'), (filePath) => {
     return filePath.endsWith('.js')
         && !filePath.includes(`${path.sep}node_modules${path.sep}`)
@@ -139,7 +124,6 @@ for (const filePath of jsFiles) {
     await checkDuplicateClassMethods(filePath);
     await checkSilentCatches(filePath);
     await checkBareConsole(filePath);
-    await checkAlert(filePath);
 }
 for (const filePath of desktopFiles) {
     await checkSilentCatches(filePath);

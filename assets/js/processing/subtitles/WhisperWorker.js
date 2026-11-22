@@ -35,7 +35,6 @@ const STRIDE_LENGTH_S = 5;
 const SAMPLE_RATE = 16000;
 
 let transcriberPromise = null;
-let activeDevice = null;
 
 /**
  * Lazily build the ASR pipeline, preferring WebGPU and transparently falling
@@ -71,7 +70,6 @@ async function getTranscriber() {
             },
             progress_callback,
         });
-        activeDevice = device;
         self.postMessage({ type: 'device', device });
         return t;
     };

@@ -1,5 +1,5 @@
 import { Logger } from "./Logger.js";
-import { MediaBunny } from '../media/MediaBunny.js';
+import '../media/MediaBunny.js'; // registers the codec plugins
 import { getMetadata } from '../media/MetadataService.js';
 import { StorageService } from "../services/StorageService.js";
 import { formatTime } from './mediaUtils.js';
