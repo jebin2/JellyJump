@@ -1,3 +1,4 @@
+import { fetchWithPolicy } from '../../shared/net/fetchWithPolicy.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, codecOf, ensureDecodersFor } from '../../shared/media/MediaBunny.js';
 import { Toast } from '../../shared/utils/Toast.js';
@@ -49,7 +50,7 @@ export class PlayerSubtitles {
         }
         try {
             Logger.log(`Loading subtitles: ${url}`);
-            const response = await fetch(url);
+            const response = await fetchWithPolicy(url);
             const content = await response.text();
 
             let vttContent = content;

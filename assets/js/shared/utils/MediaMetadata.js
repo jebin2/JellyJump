@@ -1,3 +1,4 @@
+import { AppError } from '../errors/AppError.js';
 import { Logger } from "./Logger.js";
 import '../media/MediaBunny.js'; // registers the codec plugins
 import { getMetadata } from '../media/MetadataService.js';
@@ -173,7 +174,7 @@ export class MediaMetadata {
             return blob;
         }
 
-        throw new Error('No source available for item');
+        throw new AppError('FILE_MISSING', { message: 'No source available for item', context: { title: item?.title } });
     }
 
     static async getProcessedSourceURL(item, onSave) {

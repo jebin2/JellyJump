@@ -1,4 +1,5 @@
 // @ts-check
+import { fetchWithPolicy } from '../net/fetchWithPolicy.js';
 import { SERVICES } from '../config/services.js';
 /**
  * Recognising YouTube links.
@@ -97,8 +98,9 @@ export function looksLikeYouTubeUrl(rawUrl) {
 export async function fetchYouTubeInfo(id) {
     const fallback = { title: `YouTube ${id}`, thumbnail: thumbnailUrl(id), author: '' };
     try {
-        const response = await fetch(
-            `${SERVICES.youtubeOembed}?format=json&url=${encodeURIComponent(`${SERVICES.youtubeWatch}?v=${id}`)}`
+        const response = await fetchWithPolicy(
+            `${SERVICES.youtubeOembed}?format=json&url=${encodeURIComponent(`${SERVICES.youtubeWatch}?v=${id}`)}`,
+            { timeoutMs: 8000, retries: 1 },
         );
         if (!response.ok) return fallback;
 

@@ -1,3 +1,4 @@
+import { fetchWithPolicy } from '../net/fetchWithPolicy.js';
 import { Logger } from "./Logger.js";
 import { SERVICES } from '../config/services.js';
 /**
@@ -110,9 +111,9 @@ export class M3UParser {
      * @returns {Promise<Array<Object>>}
      */
     static async fetchAndParse(url) {
-        const response = await fetch(url);
+        const response = await fetchWithPolicy(url);
         if (!response.ok) {
-            throw new Error(`Failed to fetch M3U: ${response.statusText}`);
+            throw new Error(`Failed to fetch M3U: ${response.status} ${response.statusText}`);
         }
         const content = await response.text();
         return this.parse(content);

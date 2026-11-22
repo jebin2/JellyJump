@@ -1,3 +1,4 @@
+import { AppError } from '../errors/AppError.js';
 import { Logger } from "../utils/Logger.js";
 import { MediaMetadata } from '../utils/MediaMetadata.js';
 import { M3UParser } from '../utils/M3UParser.js';
@@ -197,8 +198,13 @@ export class PlaylistProcessor {
             });
         } catch (error) {
             Logger.error('[PlaylistProcessor] Failed to import M3U:', error);
-            if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
-                throw new Error('CORS Error: Cannot access this M3U playlist. The server must allow cross-origin requests.');
+            // Reached nothing, with the device online: in a browser that is
+            // almost always the server not allowing other sites to read it.
+            if (AppError.from(error).code === 'NETWORK') {
+                throw new AppError('CORS', {
+                    message: 'CORS Error: Cannot access this M3U playlist. The server must allow cross-origin requests.',
+                    cause: error,
+                });
             }
             throw error;
         }

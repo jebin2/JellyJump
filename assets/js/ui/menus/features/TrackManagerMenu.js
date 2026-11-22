@@ -1,3 +1,4 @@
+import { AppError } from '../../../shared/errors/AppError.js';
 import { Logger } from "../../../shared/utils/Logger.js";
 import { openToolSurface } from '../core/MenuFactory.js';
 import { MediaProcessor } from '../../../processing/MediaProcessor.js';
@@ -60,7 +61,7 @@ export class TrackManagerMenu {
             Logger.error('Failed to load tracks:', e);
 
             // Check if this is a "no source" error (file missing from IndexedDB and no URL)
-            if (e.message && e.message.includes('No source available')) {
+            if (AppError.from(e).code === 'FILE_MISSING') {
                 modal.close();
 
                 // Show user-friendly popup
@@ -69,9 +70,7 @@ export class TrackManagerMenu {
                 // Remove the item from playlist
                 const itemIndex = playlist.items.indexOf(item);
                 if (itemIndex !== -1) {
-                    playlist.items.splice(itemIndex, 1);
-                    playlist.render();
-                    playlist.save();
+                    playlist.removeItem(itemIndex);
                     Logger.log(`[TrackManagerMenu] Removed unavailable item: ${item.title}`);
                 }
                 return;

@@ -50,8 +50,9 @@ start (`78c1c90`); this table is where things stand now.
 | 2 | G1 delete a removed item's file, G2 sweep after load (BUG-4); G3 progress in one capped map (BUG-5); G5/N6 full disk keeps the list and says so once. `localStorage` only in settings and storage (now a rule: count 0) | done | #62 |
 | 2 | E1 public playlist names (`save`, `ensureMetadata`, `processMetadata`, `handleUrlUpload`); outside `playlist._*` calls 50 → 0. BUG-15 found and fixed: Record called a `playlist._showToast` that never existed, so its messages threw | done | #63 |
 | 2 | E2–E5 `Playlist.js` 1,807 → 436 lines: `PlaylistStore`, `PlaylistMetadata`, `PlaylistIngest`, `PlaylistDiscovery`, `PlaylistPlayback`; `ITEM_SELECTED_EVENT` moved to the playlist; `ingest-test` (17) | done | #64 |
-| 2 | F1 Scenes/Motion Add clip as jobs (BUG-3); F3 Merge and Combine A/V results through `insertProcessedItem` (they spliced into `playlist.items`, so the tray never saw them); F2 left out (see F2) | done | this PR |
-| 2 | F4, F5, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
+| 2 | F1 Scenes/Motion Add clip as jobs (BUG-3); F3 Merge and Combine A/V results through `insertProcessedItem` (they spliced into `playlist.items`, so the tray never saw them); F2 left out (see F2) | done | #65 |
+| 2 | N4 the app's own errors are matched by code (`FILE_MISSING`, `CORS`), not message text. The `.message` checks left read messages from WebCodecs, MediaBunny and the Hugging Face client, which have no codes. N5 `shared/net/fetchWithPolicy.js` (time limit, GET retries with backoff, `TIMEOUT`/`OFFLINE`/`NETWORK`) for shared libraries, M3U, YouTube titles, subtitles; `net-test` (14). N7 partly: `codes.js` is the guide (what happened, what to do); messages written elsewhere move to it as their code is touched | done | this PR |
+| 2 | F4, F5, G4, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
