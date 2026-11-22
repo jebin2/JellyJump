@@ -2,14 +2,14 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime, formatFileSize } from '../../../shared/utils/mediaUtils.js';
-import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { borrowMainPlayer, setPreviewRange } from '../core/PreviewPlayer.js';
 
 /**
- * GIF Menu Handler
- * Handles GIF creation from video segments with timeline slider and player preview
+ * GIF: a stretch of the video as an animated GIF. The main player is the
+ * preview: its timeline shows the stretch, and the stretch plays on a loop.
  */
 export class GifMenu {
     /**
@@ -18,17 +18,8 @@ export class GifMenu {
      * @param {Playlist} playlist - Playlist instance  
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('GIF', 'gif-content-template', FOOTER_CONFIGS.gif, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('GIF', 'gif-content-template', FOOTER_CONFIGS.gif);
         if (!modal) return;
-
-        // ---------------------------------------------------------
-        // Disable Outside Click Close
-        // ---------------------------------------------------------
-        // Remove the default overlay click handler to prevent closing on outside click
-        const modalOverlay = modal.overlay;
-        if (modalOverlay && modalOverlay._closeHandler) {
-            modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
-        }
 
         // Elements
         const gifLoading = modalContent.querySelector('.gif-loading');
@@ -100,16 +91,7 @@ export class GifMenu {
         endInput.value = formatTime(endTime);
         durationDisplay.textContent = formatTime(endTime - startTime);
 
-        // Load Video
-        const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-        const player = await loadVideo('gif-player-container', item, playlist, state);
-
-        if (player) {
-            // Enable A-B Loop Mode
-            player.loopMode = 'ab';
-            player.loopStart = startTime;
-            player.loopEnd = endTime;
-        }
+        const player = borrowMainPlayer(modal, playlist);
 
         // Update UI
         const updateUI = () => {
@@ -121,12 +103,8 @@ export class GifMenu {
             const gifDuration = Math.max(0, endTime - startTime);
             durationDisplay.textContent = formatTime(gifDuration);
 
-            // Update Player Loop Points
-            if (player) {
-                player.loopStart = startTime;
-                player.loopEnd = endTime;
-                if (player.loopMode !== 'ab') player.loopMode = 'ab';
-            }
+            // The GIF's stretch, on the timeline and looping
+            setPreviewRange(player, startTime, endTime);
 
             // Validation
             validationError.classList.add('hidden');
@@ -159,7 +137,6 @@ export class GifMenu {
                 updateUI();
                 if (player) {
                     player.seek(startTime);
-                    player.loopStart = startTime;
                 }
             } else {
                 updateUI(); // Reset invalid input
@@ -174,7 +151,6 @@ export class GifMenu {
                 updateUI();
                 if (player) {
                     player.seek(endTime);
-                    player.loopEnd = endTime;
                 }
             } else {
                 updateUI(); // Reset invalid input
@@ -191,8 +167,6 @@ export class GifMenu {
                     endTime = Math.min(duration, startTime + 10);
                 }
                 updateUI();
-                player.loopStart = startTime;
-                player.loopEnd = endTime; // Ensure loop remains valid
             }
         });
 
@@ -203,7 +177,6 @@ export class GifMenu {
                 if (currentTime > startTime) {
                     endTime = Math.min(Math.max(0, currentTime), duration);
                     updateUI();
-                    player.loopEnd = endTime;
                 }
             }
         });
@@ -226,11 +199,9 @@ export class GifMenu {
             downloadBtn.classList.add('hidden');
 
             await runMenuJob({
-                name: 'GIF creation',
-                progress: { section: progressSection, text: progressText },
-                error: errorMessage,
-                success: successMessage,
-                lock: [fpsDropdown, sizeDropdown, qualitySlider, createBtn],
+                name: 'GIF',
+                subject: item.title,
+                background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
                     let targetWidth, targetHeight;
@@ -273,7 +244,7 @@ export class GifMenu {
                     }
 
                     const timestamp = Math.round(start).toString().padStart(2, '0') + '-' + Math.round(end).toString().padStart(2, '0');
-                    const filename = `${item.title.replace(/\.[^.]+$/, '')} -${timestamp}.gif`;
+                    const filename = `${item.title.replace(/\.[^.]+$/, '')}-${timestamp}.gif`;
                     downloadBtn.href = previewUrl;
                     downloadBtn.download = filename;
                     downloadBtn.classList.remove('hidden');
@@ -294,14 +265,5 @@ export class GifMenu {
             fpsDropdown.destroy();
             sizeDropdown.destroy();
         });
-
-        // Cleanup on close
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            if (player) {
-                player.destroy();
-            }
-            originalClose();
-        };
     }
 }

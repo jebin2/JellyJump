@@ -1,14 +1,8 @@
-import { Logger } from "../../../shared/utils/Logger.js";
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { MediaProcessor } from "../../../core/MediaProcessor.js";
-import {
-    loadVideo,
-    setupEditor,
-    setupCleanup
-} from './BoxEditorUtils.js';
-
 import { MediaMetadata } from "../../../shared/utils/MediaMetadata.js";
 import { runMenuJob } from '../core/MenuJob.js';
+import { lendPicture } from '../core/PreviewPlayer.js';
 
 export class RotateMenu {
     /**
@@ -17,53 +11,36 @@ export class RotateMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate, { splitLayout: true });
+        const { modal } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate);
         if (!modal) return;
 
-        // === Setup Editor DOM (Left Panel) ===
-        const videoPanel = modalContent.querySelector('.modal-video-panel');
-        // We use setupEditor to create the container structure, 
-        // but we disable the overlay since we are not drawing boxes.
-        const editorUI = setupEditor(videoPanel, {
-            type: 'rotate',
-            enableOverlay: false
+        // The main player is the preview: it turns there, and turns back when
+        // the tool closes. Lent like a drawing tool's, so controls laid over
+        // the picture are pinned below it and do not cover a turned frame.
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        const canvas = stage.canvas;
+        modal.onCleanup(() => {
+            canvas.style.transform = '';
+            canvas.style.transition = '';
         });
-
-        // === Load Video ===
-        // State object required by loadVideo
-        const state = {
-            video: { width: 0, height: 0 },
-            preview: { scale: 1 }
-        };
-
-        const player = await loadVideo(editorUI.containerId, item, playlist, state);
-        if (!player) {
-            Logger.error('[RotateMenu] Failed to load video');
-            return;
-        }
-
-        this._setup(modal, item, playlist, player, editorUI);
+        this._setup(modal, item, playlist, { previewEl: canvas });
     }
 
     /**
      * Setup UI and Event Listeners
      * @private
      */
-    static _setup(modal, item, playlist, player, editorUI) {
+    static _setup(modal, item, playlist, editorUI) {
         const modalBody = modal.modal.querySelector('.mb-modal-body');
 
         // State
         let rotation = 0;
         let flipH = false;
         let flipV = false;
-        let isProcessing = false;
 
-        // Target element for CSS transforms
-        // Try to find canvas or video inside the player container
-        const getMediaElement = () => {
-            return editorUI.playerContainer.querySelector('canvas') ||
-                editorUI.playerContainer.querySelector('video');
-        };
+        // The main player's picture, turned with CSS while the tool is open.
+        const getMediaElement = () => editorUI.previewEl;
 
         // Update Transform Helper
         const updateUI = () => {
@@ -72,9 +49,20 @@ export class RotateMenu {
             const mediaEl = getMediaElement();
 
             if (mediaEl) {
-                // Apply transform
+                // A quarter turn swaps the frame's width and height. The
+                // element shows the frame contained in its box; shrunk by how
+                // much smaller the turned frame must be to be contained in
+                // the same box, it stays inside it.
+                const W = mediaEl.offsetWidth, H = mediaEl.offsetHeight;
+                // The frame's own size: the main player's canvas is sized to
+                // its box, not to the video, so that comes from the item.
+                const vw = item.videoInfo?.width || mediaEl.videoWidth || mediaEl.width || W;
+                const vh = item.videoInfo?.height || mediaEl.videoHeight || mediaEl.height || H;
+                const fit = rotation % 180 !== 0 && W && H && vw && vh
+                    ? Math.min(W / vh, H / vw) / Math.min(W / vw, H / vh)
+                    : 1;
                 mediaEl.style.transition = 'transform 0.3s ease';
-                mediaEl.style.transform = `rotate(${rotation}deg) scale(${scaleX}, ${scaleY})`;
+                mediaEl.style.transform = `rotate(${rotation}deg) scale(${scaleX * fit}, ${scaleY * fit})`;
             }
 
             modalBody.querySelector('.rotation-value').textContent = `${rotation}°`;
@@ -87,7 +75,6 @@ export class RotateMenu {
         // Control Listeners
         modalBody.querySelectorAll('[data-action]').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                if (isProcessing) return;
                 // find button closest in case of SVG click
                 const target = e.target.closest('button');
                 const action = target.dataset.action;
@@ -108,24 +95,12 @@ export class RotateMenu {
         // Process Button
         const processBtn = modal.modal.querySelector('.rotate-process-btn');
         const footer = modal.modal.querySelector('.mb-modal-footer');
-        const progressSection = footer.querySelector('.progress-section');
-        const statusText = footer.querySelector('.progress-status');
-        const percentageText = footer.querySelector('.progress-percentage');
-
-        const errorMsg = footer.querySelector('.error-message');
         const successMsg = footer.querySelector('.success-message');
         const actionButtons = footer.querySelector('.action-buttons');
 
-        processBtn.addEventListener('click', async () => {
-            if (isProcessing) return;
-            isProcessing = true;
-
+        processBtn.addEventListener('click', () => {
             // Normalize Rotation
             let normRotation = rotation % 360;
-
-            // The action buttons make way for the progress until it fails.
-            actionButtons.classList.add('hidden');
-            statusText.textContent = 'Processing...';
 
             // Named after the original, beside it in the playlist.
             const originalName = item.file ? item.file.name : (item.title || 'video.mp4');
@@ -133,12 +108,11 @@ export class RotateMenu {
             const ext = nameParts.pop();
             const newName = `${nameParts.join('.')}_rotated.${ext}`;
 
-            const outcome = await runMenuJob({
-                name: '[RotateMenu] Processing',
-                progress: { section: progressSection, text: percentageText },
-                error: errorMsg,
-                success: successMsg,
-                failureText: () => 'Processing failed. See console.',
+            runMenuJob({
+                name: 'Rotate',
+                subject: item.title,
+                background: true,
+                modal,
                 work: async ({ signal, onProgress }) => {
                     const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
                     return MediaProcessor.process({
@@ -150,8 +124,6 @@ export class RotateMenu {
                 },
                 done: (resultBlob) => playlist.insertProcessedItem(item, resultBlob, newName),
             });
-            if (!outcome.ok) actionButtons.classList.remove('hidden');
-            isProcessing = false;
         });
 
         // Add listener to reset UI on interaction
@@ -166,7 +138,5 @@ export class RotateMenu {
             btn.addEventListener('click', resetSuccessState);
         });
 
-        // Cleanup
-        setupCleanup(modal, player, null);
     }
 }

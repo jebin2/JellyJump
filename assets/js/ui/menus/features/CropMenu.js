@@ -1,7 +1,6 @@
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import {
-    loadVideo,
     updateScale,
     setupDragHandlers,
     updateBoxPosition,
@@ -10,27 +9,24 @@ import {
     showProgress,
     hideProgress,
     showSuccess,
-    setupCleanup,
     setupAutoUpdate
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { lendPicture } from '../core/PreviewPlayer.js';
 
 /**
- * Crop Menu Handler - Fresh Implementation
- * Simple, clear flow: Load video -> Setup crop UI -> Drag to crop -> Process
+ * Crop: drag a box over the main player's picture, and keep what is inside.
  */
 export class CropMenu {
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Crop Video', 'crop-content-template', FOOTER_CONFIGS.crop, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Crop', 'crop-content-template', FOOTER_CONFIGS.crop);
         if (!modal) return;
-        const playerContainerId = 'crop-player-container';
-        const playerContainer = modalContent.querySelector(`#${playerContainerId}`);
         const cropWrapper = modalContent.querySelector('.crop-preview-wrapper');
 
         // Get elements from template (overlay is sibling to player container)
         const elements = {
-            playerContainer,
+            playerContainer: null,
             cropWrapper,
             cropOverlay: cropWrapper.querySelector('[data-crop-overlay]'),
             cropBox: cropWrapper.querySelector('[data-crop-box]'),
@@ -64,15 +60,15 @@ export class CropMenu {
 
         const MIN_SIZE = 40;
 
-        // === STEP 1: Load Video ===
-        const player = await loadVideo(playerContainerId, item, playlist, state);
-        if (!player) {
-            showError(elements.messages.error, 'Failed to load video');
-            return;
-        }
+        // === STEP 1: The box goes over the main player's picture ===
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        stage.adopt(elements.cropOverlay);
+        elements.playerContainer = stage.wrapper;
+        state.video = { ...stage.video };
 
         // === STEP 2: Setup Crop UI ===
-        setupCropUI(elements, state, player);
+        const observer = setupCropUI(elements, state);
 
         // === STEP 3: Handle Dragging ===
         const onUpdate = () => {
@@ -88,13 +84,19 @@ export class CropMenu {
         setupCropButton(elements, state, item, playlist, modal);
 
         // === STEP 6: Cleanup ===
-        setupCleanup(modal, player, cleanup);
+        modal.onCleanup(() => {
+            cleanup.dispose();
+            clearTimeout(observer.timer);
+            observer.current?.disconnect();
+        });
     }
 }
 
 // === CROP-SPECIFIC FUNCTIONS ===
 
-function setupCropUI(elements, state, player) {
+/** @returns {{timer: any, current: ResizeObserver|null}} so the panel can stop it */
+function setupCropUI(elements, state) {
+    const observer = { timer: null, current: null };
     // Initialize box to full video
     state.box = {
         x: 0,
@@ -104,7 +106,7 @@ function setupCropUI(elements, state, player) {
     };
 
     // Update after player renders
-    setTimeout(() => {
+    observer.timer = setTimeout(() => {
         // Calculate scale and offsets
         updateScale(elements.cropOverlay, state);
         updateBoxPosition(elements.cropBox, state);
@@ -112,15 +114,15 @@ function setupCropUI(elements, state, player) {
 
         // Auto Update on Container Resize
         if (elements.playerContainer) {
-            const observer = setupAutoUpdate(
+            observer.current = setupAutoUpdate(
                 elements.playerContainer,
                 elements.cropOverlay,
                 state,
                 () => updateBoxPosition(elements.cropBox, state)
             );
-            if (player) player.updateObserver = observer;
         }
     }, 200);
+    return observer;
 }
 
 function updateInputs(elements, state) {
@@ -167,10 +169,8 @@ function setupCropButton(elements, state, item, playlist, modal) {
         showProgress(elements.progress, `Cropping to ${width}x${height}...`);
         await runMenuJob({
             name: 'Crop',
-            progress: { section: elements.progress.section, text: elements.progress.text },
-            error: elements.messages.error,
-            success: elements.messages.success,
-            lock: [elements.buttons.crop],
+            subject: item.title,
+            background: true,
             modal,
             work: async ({ signal, onProgress }) => {
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());

@@ -3,12 +3,11 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId, formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import {
-    loadVideo,
     updateBoxPosition,
-    setupEditor,
-    setupCleanup,
     setupAreaEditor,
+    createBoxOverlay,
 } from './BoxEditorUtils.js';
+import { lendPicture } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 
@@ -19,7 +18,7 @@ import { runMenuJob } from '../core/MenuJob.js';
 export class WatermarkMenu {
     static async init(item, playlist) {
         const itemTemplate = document.getElementById('watermark-item-template');
-        const { modal, content: modalContent } = openProcessMenu('Watermark', 'watermark-content-template', FOOTER_CONFIGS.watermark, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Watermark', 'watermark-content-template', FOOTER_CONFIGS.watermark);
         if (!modal) return;
         if (!itemTemplate) {
             Logger.error('Watermark modal templates not found!');
@@ -30,13 +29,14 @@ export class WatermarkMenu {
         const MIN_SIZE = 40;
 
         // === 1. Setup Editor DOM (Left Panel) ===
-        const videoPanel = modalContent.querySelector('.modal-video-panel');
-        const editorUI = setupEditor(videoPanel, {
-            type: 'watermark',
-            overlayClass: 'watermark-overlay',
-            boxDataAttr: 'data-watermark-box',
-            enableOverlay: true
-        });
+        // In the edit panel the areas are drawn over the main player.
+        // The areas are drawn over the main player.
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        const videoPanel = stage.wrapper;
+        const { overlay, box } = createBoxOverlay({ overlayClass: 'watermark-overlay', boxDataAttr: 'data-watermark-box' });
+        stage.adopt(overlay);
+        const editorUI = { containerId: null, playerContainer: stage.wrapper, wrapper: stage.wrapper, overlay, box };
 
         // Add data-crop-box so setupDragHandlers recognizes it for move
         editorUI.box.setAttribute('data-crop-box', '');
@@ -74,13 +74,9 @@ export class WatermarkMenu {
         };
 
 
-        // === 3. Load Video ===
-        const player = await loadVideo(editorUI.containerId, item, playlist, state);
-        if (!player) {
-            elements.messages.error.textContent = "Failed to load video.";
-            elements.messages.error.classList.remove('hidden');
-            return;
-        }
+        // === 3. The player ===
+        const player = stage.player;
+        state.video = { ...stage.video };
 
 
         // === 4. Live Preview Render Callback ===
@@ -140,12 +136,12 @@ export class WatermarkMenu {
                 }
             });
         };
-        player.addRenderCallback(renderCallback);
+        stage.addRenderCallback(renderCallback);
 
 
         // === 5. Box Logic, Selection & Drawing ===
 
-        const { updateSelection, renderOverlayRects, cleanupDrag, dispose: disposeAreaEditor } = setupAreaEditor({
+        const { updateSelection, renderOverlayRects, dispose: disposeAreaEditor } = setupAreaEditor({
             editorUI, state, player, videoPanel,
             areas: () => state.watermarkAreas,
             rectClass: 'wm-area-rect',
@@ -166,6 +162,8 @@ export class WatermarkMenu {
             }),
             onSelectionChange: () => renderList(),
             onAreaMoved: (index) => syncInputsFromArea(index),
+            // Under the main player's controls.
+            zIndex: 5,
         });
 
 
@@ -422,12 +420,11 @@ export class WatermarkMenu {
             const format = ['mp4', 'webm', 'mov'].includes(ext) ? ext : 'mp4';
 
             await runMenuJob({
-                name: 'Watermark processing',
-                progress: elements.progress,
-                error: elements.messages.error,
-                success: elements.messages.success,
-                lock: [elements.processBtn],
+                name: 'Watermark',
+                subject: item.title,
+                background: true,
                 failureText: (e) => e.message,
+                modal,
                 work: async ({ signal, onProgress }) => MediaProcessor.process({
                     source: await MediaMetadata.getSourceBlob(item, () => playlist._saveState()),
                     format,
@@ -450,13 +447,7 @@ export class WatermarkMenu {
 
 
         // === 8. Cleanup ===
-        const originalCleanup = setupCleanup(modal, player, cleanupDrag);
-
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            disposeAreaEditor();
-            originalClose();
-        };
+        modal.onCleanup(disposeAreaEditor);
     }
 }
 

@@ -1,84 +1,11 @@
-import { Logger } from "../../../shared/utils/Logger.js";
-import { CorePlayer } from '../../../core/Player.js';
-import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-
 /**
- * Box Editor Utilities - Fresh Simplified Approach
- * 
+ * Box Editor Utilities: the boxes Crop, Blur and Watermark draw over the main
+ * player's picture.
+ *
  * Key Principle: Let CSS handle positioning. JS only handles:
- * 1. Loading video and detecting dimensions
- * 2. Scaling the crop box coordinates to display
- * 3. Drag/resize handlers
+ * 1. Scaling the box's video coordinates to the display
+ * 2. Drag/resize handlers
  */
-
-/**
- * Load video into a CorePlayer instance and guarantee valid dimensions
- * @param {string} containerId - DOM container ID
- * @param {Object} item - Playlist item
- * @param {Object} playlist - Playlist instance
- * @param {Object} state - State object to populate video: {width, height}
- * @returns {CorePlayer|null} Player instance
- */
-export async function loadVideo(containerId, item, playlist, state) {
-    const container = document.getElementById(containerId);
-    if (!container) return null;
-
-    const player = new CorePlayer(containerId, {
-        mode: 'player',
-        controlBarMode: 'fixed',
-        controls: {
-            playOverlay: false,
-            playPause: true, time: true, progress: true,
-            navigation: false, captions: false, settings: false,
-            fullscreen: false, loop: false, speed: false,
-            filters: false, equalizer: false, volumeOnly: true,
-            modeToggle: false, keyboard: false,
-            thumbnails: false
-        },
-        autoplay: false
-    });
-
-    try {
-        // Load Source
-        await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-        await player.load(item.blob_url, false);
-
-        // Strict Dimension Detection: Trust Canvas Only
-        state.video.width = 0;
-        state.video.height = 0;
-
-        for (let i = 0; i < 40; i++) { // Wait up to 2 seconds (50ms * 40)
-            const canvas = player.canvas;
-            // Check for valid intrinsic dimensions (default 300x150 is ignored unless explicit)
-            if (canvas && canvas.width > 0 && canvas.width !== 300) {
-                state.video.width = canvas.width;
-                state.video.height = canvas.height;
-                Logger.log(`[BoxEditor] Dimensions DETECTED from Canvas: ${state.video.width}x${state.video.height}`);
-                break;
-            } else {
-                if (i % 10 === 0) Logger.log(`[BoxEditor] Waiting for canvas dimensions... (${i}) current: ${canvas?.width}x${canvas?.height}`);
-            }
-            await new Promise(resolve => setTimeout(resolve, 50));
-        }
-
-        // Fallback (Rare)
-        if (!state.video.width) {
-            Logger.warn('[BoxEditor] Canvas detection failed. Fallback to metadata/default.');
-            state.video.width = item.videoInfo?.width || 1920;
-            state.video.height = item.videoInfo?.height || 1080;
-        }
-
-        return player;
-    } catch (e) {
-        Logger.error('[BoxEditor] Video load failed:', e);
-        return null;
-    } finally {
-        if (player) {
-            player.pause();
-            player.seek(0);
-        }
-    }
-}
 
 /**
  * Calculate scale factor based on overlay/container size vs video intrinsic size
@@ -95,7 +22,7 @@ export function updateScale(overlay, state) {
 
     // Find the canvas element in the player container
     const wrapper = overlay.parentElement;
-    const canvas = wrapper?.querySelector('canvas');
+    const canvas = wrapper?.querySelector('canvas.jellyjump-video') || wrapper?.querySelector('canvas');
 
     if (!canvas) {
         // Fallback to container-based calculation
@@ -313,13 +240,19 @@ export function setupDragHandlers(overlay, box, state, minSize, onUpdate) {
         }
     };
 
-    overlay.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    // Pointer events, so a finger drags the box as a mouse does.
+    overlay.addEventListener('pointerdown', handleMouseDown);
+    document.addEventListener('pointermove', handleMouseMove);
+    document.addEventListener('pointerup', handleMouseUp);
 
     return {
         onMouseMove: handleMouseMove,
-        onMouseUp: handleMouseUp
+        onMouseUp: handleMouseUp,
+        dispose: () => {
+            overlay.removeEventListener('pointerdown', handleMouseDown);
+            document.removeEventListener('pointermove', handleMouseMove);
+            document.removeEventListener('pointerup', handleMouseUp);
+        },
     };
 }
 
@@ -332,7 +265,7 @@ export function setupDragHandlers(overlay, box, state, minSize, onUpdate) {
  * @param {string} options.excludeRectSelector - selector for existing area rects (skip draw on them)
  * @param {number} options.minSize - minimum draw size in video coords
  * @param {function(x,y,w,h):void} options.onDraw - called when a valid rect is drawn
- * @returns {function} cleanup — removes all three document listeners
+ * @returns {function} cleanup — removes all three listeners
  */
 export function setupOverlayDraw(overlay, state, { excludeBoxSelector, excludeRectSelector, minSize, onDraw }) {
     const getVideoPos = (e) => {
@@ -405,14 +338,14 @@ export function setupOverlayDraw(overlay, state, { excludeBoxSelector, excludeRe
         if (w >= minSize && h >= minSize) onDraw(x, y, w, h);
     };
 
-    overlay.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    overlay.addEventListener('pointerdown', onMouseDown);
+    document.addEventListener('pointermove', onMouseMove);
+    document.addEventListener('pointerup', onMouseUp);
 
     return () => {
-        overlay.removeEventListener('mousedown', onMouseDown);
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
+        overlay.removeEventListener('pointerdown', onMouseDown);
+        document.removeEventListener('pointermove', onMouseMove);
+        document.removeEventListener('pointerup', onMouseUp);
     };
 }
 
@@ -425,21 +358,6 @@ export function showProgress(p, s = '') {
 }
 export function hideProgress(p) { p.section.classList.add('hidden'); }
 export function showSuccess(el, msg) { el.textContent = `✓ ${msg}`; el.classList.remove('hidden'); }
-
-export function setupCleanup(modal, player, cleanup) {
-    const originalClose = modal.close.bind(modal);
-    modal.close = () => {
-        if (player && player.updateObserver) {
-            player.updateObserver.disconnect();
-        }
-        if (cleanup) {
-            document.removeEventListener('mousemove', cleanup.onMouseMove);
-            document.removeEventListener('mouseup', cleanup.onMouseUp);
-        }
-        if (player) player.destroy();
-        originalClose();
-    };
-}
 
 /**
  * Setup auto-update for overlay on resize
@@ -456,107 +374,29 @@ export function setupAutoUpdate(playerContainer, overlay, state, onUpdate) {
     return observer;
 }
 
-// ============================================
-// BACKWARD COMPATIBILITY FUNCTIONS
-// Used by WatermarkMenu.js and TrimMenu.js
-// ============================================
-
 /**
- * updateOverlay - Legacy function for WatermarkMenu
- * Maps to updateScale and recalculates offsets
+ * A layer to draw over a video, holding a box with eight resize handles.
+ * @param {{overlayClass?: string, boxDataAttr?: string}} [options]
+ * @returns {{overlay: HTMLElement, box: HTMLElement}}
  */
-export function updateOverlay(overlay, playerContainer, state, onUpdate) {
-    if (!overlay) return;
+export function createBoxOverlay(options = {}) {
+    const overlay = document.createElement('div');
+    overlay.className = `crop-overlay ${options.overlayClass || ''}`;
+    overlay.style.cssText = 'position: absolute; inset: 0; pointer-events: none; z-index: 10;';
 
-    // Update scale calculations
-    updateScale(overlay, state);
+    const box = document.createElement('div');
+    box.className = 'crop-box';
+    box.setAttribute(options.boxDataAttr || 'data-crop-box', '');
 
-    if (onUpdate) onUpdate();
-}
-
-/**
- * setupEditor - Legacy DOM setup for Watermark/Trim
- * Creates the editor structure dynamically
- */
-export function setupEditor(parentElement, options = {}) {
-    // Clean parent
-    parentElement.innerHTML = '';
-
-    const suffix = options.type || 'crop';
-    const containerId = `${suffix}-player-container`;
-
-    // 1. Wrapper (for crop-preview-wrapper compatibility)
-    const wrapper = document.createElement('div');
-    wrapper.className = 'crop-preview-wrapper';
-
-    // 2. Player Container
-    const playerContainer = document.createElement('div');
-    playerContainer.className = 'crop-player-container';
-    wrapper.appendChild(playerContainer);
-
-    // 3. Inner Video Wrapper
-    const videoWrapper = document.createElement('div');
-    videoWrapper.id = containerId;
-    videoWrapper.className = 'jellyjump-video-wrapper';
-    videoWrapper.style.cssText = `
-        width: 100%; 
-        height: 100%; 
-        position: relative; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-    `;
-
-    // Style to ensure canvas fits
-    const style = document.createElement('style');
-    style.textContent = `
-        #${containerId} canvas, #${containerId} video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: contain !important;
-            display: block;
-        }
-    `;
-    playerContainer.appendChild(style);
-    playerContainer.appendChild(videoWrapper);
-
-    let overlay = null;
-    let box = null;
-
-    if (options.enableOverlay !== false) {
-        // 4. Overlay
-        overlay = document.createElement('div');
-        overlay.className = `crop-overlay ${options.overlayClass || ''}`;
-        overlay.style.cssText = 'position: absolute; inset: 0; pointer-events: none; z-index: 10;';
-
-        // 5. Box
-        box = document.createElement('div');
-        box.className = 'crop-box';
-        if (options.boxDataAttr) box.setAttribute(options.boxDataAttr, '');
-        else box.setAttribute('data-crop-box', '');
-
-        // 6. Handles
-        const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-        handles.forEach(h => {
-            const handle = document.createElement('div');
-            handle.className = `crop-handle crop-handle-${h}`;
-            handle.dataset.handle = h;
-            box.appendChild(handle);
-        });
-
-        overlay.appendChild(box);
-        playerContainer.appendChild(overlay);
+    for (const h of ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']) {
+        const handle = document.createElement('div');
+        handle.className = `crop-handle crop-handle-${h}`;
+        handle.dataset.handle = h;
+        box.appendChild(handle);
     }
 
-    parentElement.appendChild(wrapper);
-
-    return {
-        containerId,
-        playerContainer,
-        wrapper,
-        overlay,
-        box
-    };
+    overlay.appendChild(box);
+    return { overlay, box };
 }
 
 /**
@@ -566,7 +406,7 @@ export function setupEditor(parentElement, options = {}) {
  * resizing the selected one.
  *
  * @param {Object} options
- * @param {Object} options.editorUI - from setupEditor()
+ * @param {Object} options.editorUI - {overlay, box, playerContainer}, the box from createBoxOverlay()
  * @param {Object} options.state - the editor state; its `selectedIndex`,
  *   `box` and `preview` are used
  * @param {Object} options.player
@@ -580,12 +420,14 @@ export function setupEditor(parentElement, options = {}) {
  * @param {() => void} options.onSelectionChange - e.g. re-render the list
  * @param {(index: number) => void} options.onAreaMoved - the selected area
  *   was moved or resized
+ * @param {number} [options.zIndex] - the overlay's; under the player's
+ *   controls when it is drawn over the main player
  * @returns {{updateSelection: (index: number) => void, renderOverlayRects: () => void,
  *   cleanupDrag: Object, dispose: () => void}}
  */
 export function setupAreaEditor({
     editorUI, state, player, videoPanel, areas, rectClass, boxSelector, minSize,
-    createArea, onSelectionChange, onAreaMoved,
+    createArea, onSelectionChange, onAreaMoved, zIndex = 1000,
 }) {
 
     // Render outline rectangles for ALL areas on the overlay
@@ -638,7 +480,7 @@ export function setupAreaEditor({
             rect.appendChild(label);
 
             // Click to select this area
-            rect.addEventListener('mousedown', (e) => {
+            rect.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
                 updateSelection(index);
             });
@@ -654,15 +496,13 @@ export function setupAreaEditor({
             position: absolute;
             inset: 0;
             pointer-events: auto !important;
-            z-index: 1000;
+            z-index: ${zIndex};
             cursor: crosshair;
+            touch-action: none;
         `);
-        updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-            if (state.selectedIndex >= 0) {
-                updateBoxPosition(editorUI.box, state);
-            }
-            renderOverlayRects();
-        });
+        updateScale(editorUI.overlay, state);
+        if (state.selectedIndex >= 0) updateBoxPosition(editorUI.box, state);
+        renderOverlayRects();
     };
 
     // Show overlay immediately (always visible for drawing)
@@ -671,7 +511,7 @@ export function setupAreaEditor({
     // === Time-based overlay visibility ===
     // Show the box and outlines only during their areas' active time ranges
     let lastVisibilityCheck = -1;
-    player.addRenderCallback(() => {
+    const showActiveAreas = () => {
         const currentTime = player ? player.currentTime : 0;
         if (Math.abs(currentTime - lastVisibilityCheck) < 0.05) return;
         lastVisibilityCheck = currentTime;
@@ -685,7 +525,8 @@ export function setupAreaEditor({
 
         // Re-render overlay rects (already time-filtered)
         renderOverlayRects();
-    });
+    };
+    player.addRenderCallback(showActiveAreas);
 
     const updateSelection = (index) => {
         state.selectedIndex = index;
@@ -704,9 +545,8 @@ export function setupAreaEditor({
             editorUI.box.style.display = 'block';
             updateBoxPosition(editorUI.box, state);
 
-            updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-                updateBoxPosition(editorUI.box, state);
-            });
+            updateScale(editorUI.overlay, state);
+            updateBoxPosition(editorUI.box, state);
 
         } else {
             // No selection — hide the box but keep overlay visible for drawing
@@ -779,7 +619,9 @@ export function setupAreaEditor({
         cleanupDrag,
         dispose: () => {
             cleanupOverlayDraw();
+            cleanupDrag.dispose();
             resizeObserver.disconnect();
+            player.removeRenderCallback?.(showActiveAreas);
         },
     };
 }

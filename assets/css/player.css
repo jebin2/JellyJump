@@ -3664,3 +3664,52 @@ body.fullscreen-active {
     color: var(--text-secondary);
     opacity: 0.7;
 }
+
+/* Stretches a tool in the edit panel will take out (Multi-Cut). */
+.jj-timeline-marks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.jj-timeline-cut {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: repeating-linear-gradient(-45deg,
+            rgba(255, 82, 82, 0.75) 0 4px,
+            rgba(255, 82, 82, 0.4) 4px 8px);
+}
+
+/* A tool's layer over the main player's picture, from the edit panel (Crop's
+   box, Blur's and Watermark's areas, Remove BG's colour picker): over the
+   stickers, under the controls. */
+.jellyjump-video-wrapper > .jj-edit-layer {
+    z-index: 5;
+}
+
+.jj-pick-layer {
+    position: absolute;
+    inset: 0;
+}
+
+/* The boxes are dragged with pointer events; a finger on them must not
+   scroll the page instead. */
+.crop-box,
+.crop-handle {
+    touch-action: none;
+}
+
+/* Editing (the edit panel open): the controls a video being edited needs --
+   play, seek, time, volume (the speaker button), screenshot, fullscreen.
+   Going to another video, playing backwards, audio tracks, subtitles, speed,
+   filters (never in the saved file), loop (the tools set their own) and
+   pinning are put away. Export FX is the exception for filters: it saves
+   them, so they are back while it is open (jj-export-fx). */
+.jellyjump-container.jj-editing :is(#mb-direction-btn, #mb-prev-btn, #mb-next-btn,
+    #mb-audio-container, #mb-cc-btn, #mb-speed-btn,
+    #mb-loop-btn, #mb-mode-toggle-btn),
+.jellyjump-container.jj-editing:not(.jj-export-fx) #mb-filters-btn {
+    display: none !important;
+}

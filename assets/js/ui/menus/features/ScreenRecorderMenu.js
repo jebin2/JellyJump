@@ -793,10 +793,10 @@ export class ScreenRecorderMenu {
             btn.classList.remove('recording-active');
             btn.innerHTML = `
                 <svg width="16" height="16" fill="currentColor">
-                    <use href="assets/icons/sprite.svg#icon-sliders"></use>
+                    <use href="assets/icons/sprite.svg#icon-tool"></use>
                 </svg>
             `;
-            btn.title = "Tools";
+            btn.title = "Create & share";
         }
     }
 

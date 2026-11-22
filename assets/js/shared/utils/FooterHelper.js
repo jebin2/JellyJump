@@ -10,7 +10,7 @@ import { Logger } from './Logger.js';
  * @typedef {Object} FooterConfig
  * @property {string} actionClass - CSS class for the primary action button (e.g., 'convert-btn')
  * @property {string} icon - Icon name from sprite.svg (e.g., 'icon-convert')
- * @property {string} title - Button title and aria-label (e.g., 'Convert')
+ * @property {string} title - The button's visible label (e.g., 'Convert')
  */
 
 /**
@@ -36,7 +36,8 @@ export function createProcessFooter(config) {
         // Add the specific action class (e.g., 'convert-btn', 'trim-btn')
         actionBtn.classList.add(config.actionClass);
         actionBtn.title = config.title;
-        actionBtn.setAttribute('aria-label', config.title);
+        const label = actionBtn.querySelector('.action-label');
+        if (label) label.textContent = config.title;
     }
 
     if (iconUse) {
@@ -44,6 +45,21 @@ export function createProcessFooter(config) {
     }
 
     return footer;
+}
+
+/**
+ * Change what a footer's primary button says, for a menu whose action
+ * changes with its settings (Encrypt / Decrypt, Reverse / Change Speed).
+ * Leaves the icon in place, which rewriting innerHTML would not.
+ * @param {HTMLElement|null} button
+ * @param {string} text
+ */
+export function setActionLabel(button, text) {
+    if (!button) return;
+    button.title = text;
+    const label = button.querySelector('.action-label');
+    if (label) label.textContent = text;
+    else button.textContent = text;
 }
 
 /**
@@ -59,7 +75,7 @@ export const FOOTER_CONFIGS = {
     trim: {
         actionClass: 'trim-btn',
         icon: 'icon-scissors',
-        title: 'Trim'
+        title: 'Cut'
     },
     exportFx: {
         actionClass: 'export-fx-btn',
@@ -83,23 +99,23 @@ export const FOOTER_CONFIGS = {
     },
     reverse: {
         actionClass: 'reverse-btn',
-        icon: 'icon-rewind',
-        title: 'Reverse'
+        icon: 'icon-speed',
+        title: 'Apply'
     },
     removeBg: {
         actionClass: 'removebg-btn',
-        icon: 'icon-bg',
+        icon: 'icon-eyedropper',
         title: 'Remove Background'
     },
     blur: {
         actionClass: 'process-btn',
         icon: 'icon-blur',
-        title: 'Process Blur'
+        title: 'Apply Blur'
     },
     watermark: {
         actionClass: 'wm-process-btn',
-        icon: 'icon-droplet',
-        title: 'Watermark'
+        icon: 'icon-watermark',
+        title: 'Apply Watermark'
     },
     rotate: {
         actionClass: 'rotate-process-btn',
@@ -109,12 +125,12 @@ export const FOOTER_CONFIGS = {
     encrypt: {
         actionClass: 'encrypt-btn',
         icon: 'icon-lock',
-        title: 'Encrypt/Decrypt'
+        title: 'Start'
     },
     unlock: {
         actionClass: 'unlock-btn',
         icon: 'icon-lock',
-        title: 'Unlock and play'
+        title: 'Unlock'
     },
     multicut: {
         actionClass: 'multicut-btn',

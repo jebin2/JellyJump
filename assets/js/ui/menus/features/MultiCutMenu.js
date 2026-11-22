@@ -1,9 +1,9 @@
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
-import { loadVideo, setupEditor } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { borrowMainPlayer, timelineMarks } from '../core/PreviewPlayer.js';
 
 /**
  * MultiCut Menu Handler
@@ -11,11 +11,8 @@ import { runMenuJob } from '../core/MenuJob.js';
  */
 export class MultiCutMenu {
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Remove Clips', 'multicut-content-template', FOOTER_CONFIGS.multicut, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Multi-Cut', 'multicut-content-template', FOOTER_CONFIGS.multicut);
         if (!modal) return;
-
-        const videoPanel = modalContent.querySelector('.modal-video-panel');
-        const editorUI = setupEditor(videoPanel, { type: 'multicut', enableOverlay: false });
 
         const multicutLoading = modalContent.querySelector('.multicut-loading');
         const multicutContent = modalContent.querySelector('.multicut-content');
@@ -41,8 +38,10 @@ export class MultiCutMenu {
         const clips = [];
         let player = null;
         let currentClipIndex = -1;
+        let drawMarks = () => {};
 
         const updateTotalDuration = () => {
+            drawMarks(clips, duration);
             const removed = clips.reduce((sum, clip) => sum + (clip.end - clip.start), 0);
             const remaining = duration - removed;
             totalDuration.textContent = formatTime(remaining);
@@ -60,12 +59,12 @@ export class MultiCutMenu {
                         <div class="tool-card-input">
                             <label>Start</label>
                             <input type="text" class="clip-start-input font-mono" data-index="${index}" value="${formatTime(clip.start)}">
-                            <button class="clip-set-start-btn jellyjump-btn-small" data-index="${index}">Set</button>
+                            <button class="clip-set-start-btn jellyjump-btn-small" data-index="${index}" title="Set the start to the current time">Start here</button>
                         </div>
                         <div class="tool-card-input">
                             <label>End</label>
                             <input type="text" class="clip-end-input font-mono" data-index="${index}" value="${formatTime(clip.end)}">
-                            <button class="clip-set-end-btn jellyjump-btn-small" data-index="${index}">Set</button>
+                            <button class="clip-set-end-btn jellyjump-btn-small" data-index="${index}" title="Set the end to the current time">End here</button>
                         </div>
                     </div>
                     <div class="tool-card-info">Duration: ${formatTime(clip.end - clip.start)}</div>
@@ -136,17 +135,14 @@ export class MultiCutMenu {
                     const idx = parseInt(item.dataset.index);
                     currentClipIndex = idx;
                     renderClips();
-                    if (player) {
-                        player.loopMode = 'ab';
-                        player.loopStart = clips[idx].start;
-                        player.loopEnd = clips[idx].end;
-                    }
+                    // To just before it, so the skip over it can be seen.
+                    if (player) player.seek(Math.max(0, clips[idx].start - 2));
                 });
             });
         };
 
-        const state = { video: { width: 0, height: 0 } };
-        player = await loadVideo(editorUI.containerId, item, playlist, state);
+        player = borrowMainPlayer(modal, playlist);
+        drawMarks = timelineMarks(player, modal);
 
         if (player) {
             const onTimeUpdate = (data) => {
@@ -192,7 +188,6 @@ export class MultiCutMenu {
 
             modal.onCleanup(() => {
                 if (player.off) player.off('timeupdate', onTimeUpdate);
-                player.destroy();
             });
         }
 
@@ -210,12 +205,7 @@ export class MultiCutMenu {
             currentClipIndex = clips.length - 1;
             renderClips();
             updateTotalDuration();
-            if (player) {
-                player.loopMode = 'ab';
-                player.loopStart = newClip.start;
-                player.loopEnd = newClip.end;
-                player.seek(newClip.start);
-            }
+            if (player) player.seek(newClip.start);
         });
 
         multicutBtn.addEventListener('click', async () => {
@@ -224,14 +214,10 @@ export class MultiCutMenu {
             modalContent.classList.add('processing');
 
             await runMenuJob({
-                name: 'Multi-cut',
-                progress: { section: progressSection, text: progressPercentage },
-                error: errorMessage,
-                success: successMessage,
-                lock: [multicutBtn],
-                unlock: 'onFailure',
+                name: 'Multi-Cut',
+                subject: item.title,
+                background: true,
                 modal,
-                failureText: (e) => `Failed: ${e.message}`,
                 work: async ({ signal, onProgress }) => {
                     const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
 
@@ -280,7 +266,7 @@ export class MultiCutMenu {
                 },
                 done: ({ blob, remaining }) => {
                     const ext = 'mp4';
-                    const filename = item.title.replace(/\.[^/.]+$/, "") + `- ${clips.length} removed.${ext}`;
+                    const filename = item.title.replace(/\.[^/.]+$/, "") + `-${clips.length}-removed.${ext}`;
                     const { url } = playlist.insertProcessedItem(item, blob, filename, {
                         type: `video/${ext}`,
                         duration: formatTime(remaining),

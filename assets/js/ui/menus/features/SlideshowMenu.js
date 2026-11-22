@@ -318,62 +318,33 @@ export class SlideshowMenu {
 
                 stopPreview();
 
-                if (progressStatus) progressStatus.textContent = 'Encoding...';
-
-                // Not closable at all while working, not even by Escape or
-                // the backdrop.
-                const closeBtn = modal.modal.querySelector('.mb-modal-close');
-                const originalClose = modal.close.bind(modal);
-                modal.close = () => { };
-                if (closeBtn) closeBtn.style.display = 'none';
-
-                try {
-                    await runMenuJob({
-                        name: '[SlideshowMenu] Processing',
-                        progress: { section: progressSection, text: progressText, status: progressStatus },
-                        error: errorMessage,
-                        success: successMessage,
-                        lock: [processBtn, transitionDropdown, fpsDropdown],
-                        failureText: (e) => `Failed: ${e.message}`,
-                        work: ({ signal, onProgress }) => MediaProcessor.createSlideshowVideo({
-                            imageBlobs,
-                            imageDurations,
-                            transition,
-                            transitionDuration,
-                            audioBlob,
-                            audioLoop: true,
-                            audioStartTime,
-                            audioEndTime,
-                            fps,
-                            onProgress: (p) => onProgress(p, p < 0.9 ? 'Rendering frames...' : 'Finalizing...'),
-                            signal,
-                        }),
-                        done: async (outputBlob) => {
-                            const filename = `slideshow-${transition}-${Date.now()}.mp4`;
-                            const { item: newItem, url } = playlist.insertProcessedItem(null, outputBlob, filename, {
-                                mediaType: 'video/mp4',
-                                extra: { path: `Slideshow/${filename}` }
-                            });
-                            await playlist._ensureMetadata(newItem);
-
-                            if (downloadBtn) {
-                                downloadBtn.onclick = () => {
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = filename;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                };
-                                downloadBtn.disabled = false;
-                                downloadBtn.classList.remove('hidden');
-                            }
-                        },
-                    });
-                } finally {
-                    modal.close = originalClose;
-                    if (closeBtn) closeBtn.style.display = '';
-                }
+                await runMenuJob({
+                    name: 'Slideshow',
+                    subject: `${imageBlobs.length} images`,
+                    background: true,
+                    modal,
+                    work: ({ signal, onProgress }) => MediaProcessor.createSlideshowVideo({
+                        imageBlobs,
+                        imageDurations,
+                        transition,
+                        transitionDuration,
+                        audioBlob,
+                        audioLoop: true,
+                        audioStartTime,
+                        audioEndTime,
+                        fps,
+                        onProgress: (p) => onProgress(p, p < 0.9 ? 'Rendering frames...' : 'Finalizing...'),
+                        signal,
+                    }),
+                    done: async (outputBlob) => {
+                        const filename = `slideshow-${transition}-${Date.now()}.mp4`;
+                        const { item: newItem } = playlist.insertProcessedItem(null, outputBlob, filename, {
+                            mediaType: 'video/mp4',
+                            extra: { path: `Slideshow/${filename}` }
+                        });
+                        await playlist._ensureMetadata(newItem);
+                    },
+                });
             });
         }
 

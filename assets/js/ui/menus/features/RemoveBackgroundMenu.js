@@ -1,7 +1,7 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
-import { loadVideo } from './BoxEditorUtils.js';
+import { lendPicture, canvasPoint } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 
@@ -12,11 +12,10 @@ export class RemoveBackgroundMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Remove Background', 'remove-bg-content-template', FOOTER_CONFIGS.removeBg, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Remove Background', 'remove-bg-content-template', FOOTER_CONFIGS.removeBg);
         if (!modal) return;
 
         // Elements
-        const playerContainer = modalContent.querySelector('#remove-bg-player-container');
         const selectedColorsList = modalContent.querySelector('.selected-colors-list');
         const livePreviewToggle = modalContent.querySelector('#live-preview-toggle');
 
@@ -36,9 +35,15 @@ export class RemoveBackgroundMenu {
         let selectedColors = []; // Array of {r, g, b, tolerance}
         let sourceBlob = null;
 
-        // Load Video
-        const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-        const player = await loadVideo('remove-bg-player-container', item, playlist, state);
+        // The main player is the preview, and a clear layer over its picture
+        // takes the clicks that pick colours.
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        const player = stage.player;
+        const pickTarget = document.createElement('div');
+        pickTarget.className = 'jj-pick-layer';
+        pickTarget.title = 'Click a colour to remove it';
+        stage.adopt(pickTarget);
 
         // Render Callback
         const renderCallback = (canvas, ctx) => {
@@ -60,15 +65,10 @@ export class RemoveBackgroundMenu {
             ctx.putImageData(imageData, 0, 0);
         };
 
-        if (player) {
-            player.addRenderCallback(renderCallback);
-        }
+        stage.addRenderCallback(renderCallback);
 
         // Initialize Video
         try {
-            // Video is already loaded by loadVideo, but we need to ensure processed source URL logic (handled by loadVideo)
-            // loadVideo handles getting processed source URL internally.
-
             // Auto-detect background color
             if (player && player.canvas) {
                 // Wait a moment for the frame to render
@@ -132,19 +132,17 @@ export class RemoveBackgroundMenu {
         // --- Event Handlers ---
 
         // Direct click-to-pick: clicking on the video picks color
-        playerContainer.style.cursor = 'crosshair';
-        playerContainer.addEventListener('click', (e) => {
+        pickTarget.style.cursor = 'crosshair';
+        pickTarget.addEventListener('click', (e) => {
             if (!player || !player.canvas) return;
 
-            // Read pixel at click position from canvas
-            const rect = player.canvas.getBoundingClientRect();
-            const scaleX = player.canvas.width / rect.width;
-            const scaleY = player.canvas.height / rect.height;
-            const x = Math.floor((e.clientX - rect.left) * scaleX);
-            const y = Math.floor((e.clientY - rect.top) * scaleY);
+            // Read pixel at click position from canvas -- the picture is
+            // letterboxed in it, so a click on the bars picks nothing.
+            const point = canvasPoint(player.canvas, e);
+            if (!point) return;
 
             const ctx = player.canvas.getContext('2d', { willReadFrequently: true });
-            const pixel = ctx.getImageData(x, y, 1, 1).data;
+            const pixel = ctx.getImageData(point.x, point.y, 1, 1).data;
             if (pixel[3] > 0) {
                 addColor({ r: pixel[0], g: pixel[1], b: pixel[2] });
             }
@@ -293,13 +291,6 @@ export class RemoveBackgroundMenu {
             } : null;
         }
 
-        // Cleanup
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            if (player) player.destroy();
-            originalClose();
-        };
-
         // Process Video
         processBtn.onclick = async () => {
             if (selectedColors.length === 0) {
@@ -317,11 +308,10 @@ export class RemoveBackgroundMenu {
             const bgColor = customBgColorInput.value;
 
             await runMenuJob({
-                name: 'Processing',
-                progress: { section: progressSection, text: progressText, bar: progressBar, status: progressStatus },
-                error: errorMessage,
-                success: successMessage,
-                lock: [processBtn, livePreviewToggle, ...bgTypeRadios],
+                name: 'Remove BG',
+                subject: item.title,
+                background: true,
+                modal,
                 work: async ({ signal, onProgress }) => MediaProcessor.process({
                     source: await MediaMetadata.getProcessedSourceURL(item),
                     removeBackgroundOptions: { colors: selectedColors, bgType, bgColor },

@@ -36,7 +36,8 @@
     "test:desktop": "npm run build && rm -rf desktop/build && cp -r dist desktop/build && node scripts/desktop-smoke-test.mjs",
     "test:encrypt": "node scripts/encrypt-test.mjs",
     "test:source": "node scripts/source-failure-test.mjs",
-    "test:smoke": "node scripts/smoke-test.mjs"
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "test:edit": "node scripts/edit-panel-test.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.56.0",

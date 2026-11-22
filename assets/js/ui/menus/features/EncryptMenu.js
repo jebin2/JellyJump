@@ -2,6 +2,9 @@ import { Logger } from '../../../shared/utils/Logger.js';
 import { PlatformCrypto } from '../../../shared/utils/PlatformCrypto.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
+import { setActionLabel } from '../../../shared/utils/FooterHelper.js';
+import { runMenuJob } from '../core/MenuJob.js';
+import { Toast } from '../../../shared/utils/Toast.js';
 
 export class EncryptMenu {
     static async init(item, playlist) {
@@ -14,12 +17,11 @@ export class EncryptMenu {
 
         // ── Elements ────────────────────────────────────────────────────────
         const encryptBtn        = modalContent.querySelector('.encrypt-btn');
-        const downloadBtn       = modalContent.querySelector('.download-btn');
-        const progressSection   = modalContent.querySelector('.progress-section');
-        const progressPct       = modalContent.querySelector('.progress-percentage');
-        const progressStatus    = modalContent.querySelector('.progress-status');
-        const successMessage    = modalContent.querySelector('.success-message');
         const errorMessage      = modalContent.querySelector('.error-message');
+
+        // Start does nothing until the file has been looked at, below; a
+        // button that ignores a click is worse than one that is plainly off.
+        if (encryptBtn) encryptBtn.disabled = true;
 
         const toggleCheckbox    = modalContent.querySelector('.encrypt-mode-checkbox');
         const passwordInput     = modalContent.querySelector('.encrypt-password');
@@ -100,8 +102,7 @@ export class EncryptMenu {
                 hintSection.classList.remove('hidden');
                 hintDisplay.classList.add('hidden');
                 if (platformSection) platformSection.style.display = '';
-                encryptBtn.title = 'Encrypt';
-                encryptBtn.setAttribute('aria-label', 'Encrypt');
+                setActionLabel(encryptBtn, 'Encrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock');
                 infoText.textContent =
                     'Encrypts the file into a carrier MP4. External players (VLC, YouTube, etc) ' +
@@ -110,8 +111,7 @@ export class EncryptMenu {
                 confirmSection.classList.add('hidden');
                 hintSection.classList.add('hidden');
                 if (platformSection) platformSection.style.display = 'none';
-                encryptBtn.title = 'Decrypt';
-                encryptBtn.setAttribute('aria-label', 'Decrypt');
+                setActionLabel(encryptBtn, 'Decrypt');
                 if (actionIconUse) actionIconUse.setAttribute('href', 'assets/icons/sprite.svg#icon-lock-open');
                 infoText.textContent =
                     'Decrypts a previously encrypted file. Enter the same password used to encrypt it.';
@@ -152,6 +152,7 @@ export class EncryptMenu {
             Logger.log(`[EncryptMenu] Could not read metadata: ${e.message}`);
         }
 
+        if (encryptBtn) encryptBtn.disabled = false;
         updateModeUI();
         updatePlatformUI();
 
@@ -170,116 +171,75 @@ export class EncryptMenu {
                 return;
             }
 
-            // Disable UI
-            const abortController = new AbortController();
-            const { signal } = abortController;
-
-            const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.className = 'jellyjump-btn-secondary text-sm';
-            cancelBtn.addEventListener('click', () => abortController.abort());
-            progressSection.appendChild(cancelBtn);
-
-            encryptBtn.disabled        = true;
-            modal.closeBtn.disabled    = true;
-            passwordInput.disabled     = true;
-            confirmInput.disabled      = true;
-            hintInput.disabled         = true;
-            toggleCheckbox.disabled    = true;
             errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
-            downloadBtn.classList.add('hidden');
-            progressSection.classList.remove('hidden');
+            const mode = currentMode;
+            const name = mode === 'encrypt' ? 'Encrypt' : 'Decrypt';
+            const encryptedName = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
 
-            try {
-                const source = sourceBlob ||
-                    await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
-
-                // A percentage alone says nothing about a job that can run for
-                // minutes, so show how long is left as soon as there is enough
-                // of a rate to extrapolate from.
-                const fmtDur = (sec) => {
-                    if (!Number.isFinite(sec) || sec < 0) return '';
-                    if (sec >= 3600) return `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`;
-                    if (sec >= 60) return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
-                    return `${Math.max(1, Math.round(sec))}s`;
-                };
-                const onProgress = (p, info) => {
-                    progressPct.textContent = Math.round(p * 100) + '%';
-                    if (!progressStatus) return;
-                    const eta = info?.etaSec !== undefined ? fmtDur(info.etaSec) : '';
-                    progressStatus.textContent = eta
-                        ? `${eta} left · ${Math.round(info.fps)} fps`
-                        : (currentMode === 'encrypt' ? 'Encrypting...' : 'Decrypting...');
-                };
-
-                let resultBlob, newFilename, streamed = false;
-
-                if (currentMode === 'encrypt') {
-                    newFilename = item.title.replace(/\.[^/.]+$/, '') + '-encrypted.mp4';
-                    const encOpts = {
-                        filename: item.title,
-                        mimeType: source.type || item.type || 'video/mp4',
-                        hint:     hintInput.value.trim() || undefined,
-                        onProgress,
-                        signal,
-                    };
-                    // Large payloads stream the carrier straight to a disk file
-                    // the user picks (can't hold a >2 GB carrier in RAM).
-                    if (source.size > PlatformCrypto.IN_RAM_PAYLOAD_LIMIT) {
-                        encOpts.fileHandle = await window.showSaveFilePicker({
-                            suggestedName: newFilename,
-                            types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }],
-                        });
-                        streamed = true;
-                    }
-                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
-                    resultBlob = await MediaProcessor.encryptPlatform(source, password, encOpts);
-                } else {
-                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
-                    const result = await MediaProcessor.decryptPlatform(source, password, onProgress, signal);
-                    resultBlob  = result.blob;
-                    newFilename = result.metadata.name ||
-                        (item.title.replace(/\.[^/.]+$/, '') + '-decrypted');
+            // A carrier too big to hold in memory is written to a file the
+            // user picks. The picker needs this click, so it is asked for
+            // here, before the job is queued.
+            let fileHandle = null;
+            if (mode === 'encrypt' && needsStreaming()) {
+                try {
+                    fileHandle = await window.showSaveFilePicker({
+                        suggestedName: encryptedName,
+                        types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }],
+                    });
+                } catch (e) {
+                    if (e?.name !== 'AbortError') Logger.error('Save picker failed:', e);
+                    return;
                 }
-
-                progressSection.classList.add('hidden');
-                successMessage.classList.remove('hidden');
-
-                if (streamed || !resultBlob) {
-                    // Carrier was written directly to the user's chosen file.
-                    successMessage.textContent = `Encrypted and saved to “${newFilename}”.`;
-                    downloadBtn.classList.add('hidden');
-                } else {
-                    const { url } = playlist.insertProcessedItem(item, resultBlob, newFilename);
-                    if (downloadBtn) {
-                        downloadBtn.href     = url;
-                        downloadBtn.download = newFilename;
-                        downloadBtn.classList.remove('hidden');
-                        downloadBtn.title = `Download ${currentMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}`;
-                    }
-                }
-
-            } catch (error) {
-                progressSection.classList.add('hidden');
-                if (error.name === 'AbortError') {
-                    errorMessage.textContent = 'Operation cancelled.';
-                } else {
-                    Logger.error('Encrypt/Decrypt failed:', error);
-                    errorMessage.textContent = `Operation failed: ${error.message}`;
-                }
-                errorMessage.classList.remove('hidden');
-            } finally {
-                cancelBtn.remove();
             }
+            const hint = hintInput.value.trim() || undefined;
 
-            // Re-enable UI
-            encryptBtn.disabled        = false;
-            modal.closeBtn.disabled    = false;
-            passwordInput.disabled     = false;
-            confirmInput.disabled      = false;
-            hintInput.disabled         = false;
-            toggleCheckbox.disabled    = false;
+            // A percentage alone says nothing about a job that can run for
+            // minutes, so the tray shows how long is left as soon as there is
+            // enough of a rate to extrapolate from.
+            const fmtDur = (sec) => {
+                if (!Number.isFinite(sec) || sec < 0) return '';
+                if (sec >= 3600) return `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`;
+                if (sec >= 60) return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+                return `${Math.max(1, Math.round(sec))}s`;
+            };
+
+            runMenuJob({
+                name,
+                subject: item.title,
+                background: true,
+                modal,
+                work: async ({ signal, onProgress }) => {
+                    const source = sourceBlob ||
+                        await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const report = (p, info) => {
+                        const eta = info?.etaSec !== undefined ? fmtDur(info.etaSec) : '';
+                        onProgress(p, eta ? `${eta} left · ${Math.round(info.fps)} fps` : `${name}ing…`);
+                    };
+                    const { MediaProcessor } = await import('../../../core/MediaProcessor.js');
+                    if (mode === 'encrypt') {
+                        const blob = await MediaProcessor.encryptPlatform(source, password, {
+                            filename: item.title,
+                            mimeType: source.type || item.type || 'video/mp4',
+                            hint,
+                            onProgress: report,
+                            signal,
+                            ...(fileHandle ? { fileHandle } : {}),
+                        });
+                        return { blob: fileHandle ? null : blob, filename: encryptedName };
+                    }
+                    const result = await MediaProcessor.decryptPlatform(source, password, report, signal);
+                    return {
+                        blob: result.blob,
+                        filename: result.metadata.name || (item.title.replace(/\.[^/.]+$/, '') + '-decrypted'),
+                    };
+                },
+                done: ({ blob, filename }) => {
+                    // Written straight to the user's chosen file: nothing to
+                    // add to the playlist.
+                    if (!blob) Toast.show(`Encrypted and saved to “${filename}”.`, 5000);
+                    else playlist.insertProcessedItem(item, blob, filename);
+                },
+            });
         });
     }
 }

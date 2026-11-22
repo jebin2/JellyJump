@@ -117,6 +117,23 @@ export class ConvertMenu {
                 return;
             }
 
+            // Anything but HLS becomes a playlist item, so it runs as a
+            // background job and the dialog gets out of the way. HLS makes a
+            // ZIP to download or upload from this dialog, so it stays here.
+            if (format !== 'hls') {
+                await runMenuJob({
+                    name: 'Convert',
+                    subject: item.title,
+                    background: true,
+                    modal,
+                    work: ({ signal, onProgress }) =>
+                        ConvertMenu._startConversion(item, format, quality, playlist, onProgress, null, null, signal),
+                    done: ({ blob, targetFormat }) =>
+                        ConvertMenu._handleConversionSuccess(blob, item, targetFormat, playlist, null),
+                });
+                return;
+            }
+
             // Every input is locked; afterwards only those whose option is
             // available come back.
             const allInputs = modalContent.querySelectorAll('input');
@@ -130,7 +147,7 @@ export class ConvertMenu {
             hfErrorMessage.classList.add('hidden');
 
             await runMenuJob({
-                name: 'Conversion',
+                name: 'HLS conversion',
                 progress: { section: progressSection, text: progressPercentage },
                 error: errorMessage,
                 success: successMessage,
@@ -222,6 +239,8 @@ export class ConvertMenu {
      * @param {Playlist} playlist - Playlist instance
      * @param {Function} onProgress - Progress callback
      * @param {HTMLElement} downloadBtn - Download button element
+     * @returns {Promise<{blob: Blob, targetFormat: string}|null>} the file to
+     *   add to the playlist, or null for HLS, which is handled here
      * @private
      */
     static async _startConversion(item, format, quality, playlist, onProgress, downloadBtn, onHlsFiles, signal) {
@@ -251,6 +270,7 @@ export class ConvertMenu {
                 });
                 ConvertMenu._handleHlsSuccess(hlsFiles, item, downloadBtn);
                 onHlsFiles?.(hlsFiles);
+                return null;
             } else if (targetFormat === 'flac') {
                 const resultBlob = await MediaProcessor.extractTrack({
                     source: source,
@@ -260,7 +280,7 @@ export class ConvertMenu {
                     onProgress: onProgress,
                     signal,
                 });
-                ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
+                return { blob: resultBlob, targetFormat };
             } else {
                 const resultBlob = await MediaProcessor.process({
                     source: source,
@@ -269,7 +289,7 @@ export class ConvertMenu {
                     onProgress: onProgress,
                     signal,
                 });
-                ConvertMenu._handleConversionSuccess(resultBlob, item, targetFormat, playlist, downloadBtn);
+                return { blob: resultBlob, targetFormat };
             }
         } catch (error) {
             Logger.error("Conversion failed:", error);

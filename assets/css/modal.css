@@ -110,6 +110,21 @@
     gap: 10px;
 }
 
+/* A footer's main button says what it does, next to its icon. */
+.process-action-btn {
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.process-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .mb-modal-footer.hidden {
     display: none;
 }
@@ -670,4 +685,9 @@
 /* Info Footer */
 .info-footer-container {
     min-height: 32px;
+}
+/* The footer's buttons keep to the right, also where a narrow screen stacks
+   the status above them. */
+.process-footer-container .action-buttons {
+    margin-left: auto;
 }

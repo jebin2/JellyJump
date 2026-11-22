@@ -1,5 +1,5 @@
 import { Logger } from "../../../shared/utils/Logger.js";
-import { Modal } from '../../Modal.js';
+import { openToolSurface } from '../core/MenuFactory.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
@@ -20,7 +20,7 @@ export class TrackManagerMenu {
         const footerTemplate = document.getElementById('track-management-footer-template');
         if (!template || !footerTemplate) return;
 
-        const modal = new Modal({ maxWidth: '700px' });
+        const modal = openToolSurface({ maxWidth: '700px' });
         modal.setTitle('Video & Audio Tracks');
         modal.setBody(template.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
@@ -31,9 +31,10 @@ export class TrackManagerMenu {
         const sourceFilename = modalContent.querySelector('.source-filename');
         sourceFilename.textContent = `Source: ${item.title}`;
 
-        // Close button in footer
+        // Close button in footer. The panel has its own way back.
         const closeBtn = modal.querySelector('.mb-modal-close-btn');
-        if (closeBtn) closeBtn.addEventListener('click', () => modal.close());
+        if (closeBtn && modal.isPanel) closeBtn.remove();
+        else if (closeBtn) closeBtn.addEventListener('click', () => modal.close());
 
         modal.open();
 
@@ -162,7 +163,6 @@ export class TrackManagerMenu {
                         addToPlaylist: false,
                         speed: parseFloat(speedDropdown.getValue()),
                         modalInstance,
-                        speedDropdown,
                         playlist
                     });
                 });
@@ -187,7 +187,6 @@ export class TrackManagerMenu {
                         addToPlaylist: true,
                         speed: parseFloat(speedDropdown.getValue()),
                         modalInstance,
-                        speedDropdown,
                         playlist
                     });
                 });
@@ -210,27 +209,18 @@ export class TrackManagerMenu {
      * @param {Object} options
      * @private
      */
-    static async extractTrack({ index, trackIndex, trackType, format, addToPlaylist, speed, modalInstance, speedDropdown, playlist }) {
+    static async extractTrack({ index, trackIndex, trackType, format, addToPlaylist, speed, modalInstance, playlist }) {
         const item = playlist.items[index];
         const modal = modalInstance.modal;
 
-        // UI Elements from Footer
-        const progressSection = modal.querySelector('.progress-section');
-        const progressPercentage = modal.querySelector('.progress-percentage');
-        const progressStatus = modal.querySelector('.progress-status');
-        const successMessage = modal.querySelector('.success-message');
-        const errorMessage = modal.querySelector('.error-message');
-
-        progressPercentage.textContent = '0%';
-        progressStatus.textContent = 'Extracting...';
-
+        // In the background like every tool's job, but the dialog stays open:
+        // it lists every track, and taking more than one is the usual case.
         await runMenuJob({
-            name: 'Extraction',
-            progress: { section: progressSection, text: progressPercentage },
-            error: errorMessage,
-            // Not `success`: the success handler decides what to say, which
-            // depends on whether the track went to the playlist or a download.
-            lock: [...modal.querySelectorAll('button'), speedDropdown],
+            name: `Extract ${trackType} track ${trackIndex + 1}`,
+            subject: item.title,
+            background: true,
+            keepOpen: true,
+            modal: modalInstance,
             work: async ({ signal, onProgress }) => {
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
                 return MediaProcessor.extractTrack({ source, trackIndex, trackType, format, speed, onProgress, signal });

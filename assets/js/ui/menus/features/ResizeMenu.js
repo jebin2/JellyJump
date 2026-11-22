@@ -158,10 +158,8 @@ export class ResizeMenu {
             progressStatus.textContent = `Resizing to ${targetW}x${targetH}...`;
             await runMenuJob({
                 name: 'Resize',
-                progress: { section: progressSection, text: progressText },
-                error: errorDisplay,
-                success: successDisplay,
-                lock: [resizeBtn],
+                subject: item.title,
+                background: true,
                 modal,
                 work: async ({ signal, onProgress }) => {
                     const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());

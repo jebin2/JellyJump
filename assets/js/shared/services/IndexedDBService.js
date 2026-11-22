@@ -296,6 +296,20 @@ export class IndexedDBService {
     }
 
     /**
+     * Remove a stored file. The playlist never does this when it drops an
+     * item; the edit panel does, for the copies its Undo no longer needs.
+     * @param {string} id - Item ID
+     * @returns {Promise<void>}
+     */
+    async deleteFile(id) {
+        return this._withTransaction([this.STORES.FILES], 'readwrite', (transaction, resolve, reject) => {
+            transaction.objectStore(this.STORES.FILES).delete(id);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+        });
+    }
+
+    /**
      * Save playback state
      * @param {Object} state 
      */
