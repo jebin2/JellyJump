@@ -421,6 +421,17 @@ async function run(page, origin) {
     check(s.playing === 'holiday-clip.webm' && !s.playlist.includes('holiday-clip-edited.mp4'), `Reset goes back to the original (${s.playlist.join(', ')})`);
     check(remembered === null, 'and nothing is remembered any more');
 
+    console.log('\nnames from files are text, not markup');
+    const injected = await page.evaluate(async () => {
+        const vtt = 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nhi\n';
+        const url = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
+        await window.playlist.player.loadSubtitle(url, '<img id="pwn" src="x"><b>bold</b>');
+        const labels = [...document.querySelectorAll('.subtitle-radio-option .radio-label')].map(l => l.textContent);
+        return { markup: !!document.getElementById('pwn'), labels };
+    });
+    check(!injected.markup && injected.labels.some(l => l.includes('<img id="pwn"')),
+        `a subtitle track named with markup shows as text (${JSON.stringify(injected.labels)})`);
+
     console.log('\nno errors');
     check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 }

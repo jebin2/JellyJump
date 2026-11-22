@@ -1,4 +1,5 @@
 import { Logger } from "./Logger.js";
+import { escapeHtml } from './html.js';
 /**
  * ConfirmDialog — static utility for confirm/alert dialogs.
  * Distinct from player/Modal.js which is instance-based for menu overlays.
@@ -279,8 +280,6 @@ export class ConfirmDialog {
      * @private
      */
     static _escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return escapeHtml(text);
     }
 }

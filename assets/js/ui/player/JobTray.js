@@ -2,6 +2,7 @@ import { JobQueue } from '../../shared/services/JobQueue.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
+import { escapeHtml } from '../../shared/utils/html.js';
 
 /**
  * JobTray - the job list at the foot of the sidebar.
@@ -16,8 +17,6 @@ import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 
 const ICON = (name, size = 14) =>
     `<svg width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><use href="assets/icons/sprite.svg#${name}"></use></svg>`;
-
-const escapeHtml = (text) => String(text ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export class JobTray {
     /**

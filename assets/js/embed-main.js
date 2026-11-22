@@ -10,6 +10,7 @@
  */
 import './shared/utils/reload-on-stale-chunks.js';
 import { Logger } from './shared/utils/Logger.js';
+import { html } from './shared/utils/html.js';
 
 async function initEmbed() {
     // Parse query params
@@ -125,7 +126,8 @@ async function initEmbed() {
 
 function showError(title, message) {
     const container = document.getElementById('player-container');
-    container.innerHTML = `
+    // The message can carry the URL from the embed link: text, not markup.
+    container.innerHTML = html`
         <div class="embed-error">
             <div>
                 <h2>${title}</h2>

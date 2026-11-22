@@ -5,6 +5,7 @@ import { MotionDetector } from "../../../shared/services/MotionDetector.js";
 import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
+import { html } from '../../../shared/utils/html.js';
 
 export class MotionDetectionMenu {
     static async init(item, playlist) {
@@ -223,7 +224,7 @@ export class MotionDetectionMenu {
             if (isCancelled()) return;
             Logger.error('MotionDetectionMenu: Error', err);
             if (progressStatus) progressStatus.textContent = 'Error';
-            segmentsList.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
+            segmentsList.innerHTML = html`<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
         }
     }
 
