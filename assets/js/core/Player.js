@@ -5,6 +5,8 @@
  */
 
 import '../shared/media/MediaBunny.js'; // registers the codec plugins
+import { Settings } from '../shared/settings/Settings.js';
+import { PlayerOverrides } from './PlayerOverrides.js';
 import { ScreenWakeLock } from './playback/ScreenWakeLock.js';
 import {
     onPlayerEvent,
@@ -123,7 +125,7 @@ export class CorePlayer {
         this.isPlaying = false;
         this.currentTime = 0;
         this.duration = 0;
-        this.playbackRate = parseFloat(localStorage.getItem('jellyjump-speed')) || 1.0;
+        this.playbackRate = Number(Settings.get('speed', 1)) || 1.0;
         this.loopMode = this.config.controls ? this.config.controls.loopMode : 'off';
         this.loopStart = null;
         this.loopEnd = null;
@@ -552,7 +554,12 @@ export class CorePlayer {
     }
 
     // ─── Playback Rate ───────────────────────────────────────────────────────────
-    async setPlaybackRate(rate) {
+    /**
+     * @param {number} rate - 0.25–2
+     * @param {{persist?: boolean}} [options] - persist: false for a speed a
+     *   tool sets for a while (see override), not the user's choice
+     */
+    async setPlaybackRate(rate, { persist = true } = {}) {
         if (this.engine === 'youtube') {
             this.playbackRate = rate;
             this.youtube?.setRate(rate);
@@ -561,8 +568,21 @@ export class CorePlayer {
         // Playing backwards picks the new speed up from where it is.
         const wasReversing = !!this.reverse?.active;
         if (wasReversing) await this.reverse.stop({ reposition: false });
-        await setPlayerPlaybackRate(this, rate);
+        await setPlayerPlaybackRate(this, rate, { persist });
         if (wasReversing) await this._playBackward();
+    }
+
+    // ─── Temporary values ────────────────────────────────────────────────────────
+    /**
+     * Take on values for a while (speed, filters, control bar mode, loop)
+     * and give them back exactly on release, without saving anything.
+     * Overrides stack; see PlayerOverrides.
+     * @param {import('./PlayerOverrides.js').OverrideValues} values
+     * @returns {() => void} release
+     */
+    override(values) {
+        this._overrides ??= new PlayerOverrides(this);
+        return this._overrides.push(values);
     }
 
     // ─── Volume / Mute ───────────────────────────────────────────────────────────

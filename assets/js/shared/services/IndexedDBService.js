@@ -19,6 +19,19 @@ import { Logger } from "../utils/Logger.js";
  * @property {number} [fileSize] - File size in bytes
  * @property {number} [originalIndex] - Original position in playlist (for shuffle)
  */
+/**
+ * Whether a playlist has ever been saved on this device (a marker kept beside
+ * the database, readable before it opens). The desktop storage keeps it too.
+ * @returns {boolean}
+ */
+export function hasSavedPlaylist() {
+    try {
+        return !!localStorage.getItem('JellyJumpDB-playlist');
+    } catch {
+        return false;
+    }
+}
+
 export class IndexedDBService {
     constructor() {
         this.DB_NAME = 'JellyJumpDB';

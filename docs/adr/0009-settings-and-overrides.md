@@ -1,6 +1,6 @@
 # 0009. One settings module; tools override settings temporarily
 
-Status: Proposed (plan phase D)
+Status: Accepted (phase D, wave 2)
 
 ## Context
 
@@ -13,8 +13,10 @@ own change is not kept as the user's.
 
 ## Decision
 
-`app/settings/Settings.js` owns the user's preferences under one key prefix
-and is written only when the user changes something. The player gets
+`shared/settings/Settings.js` owns the user's preferences under one key
+prefix (`jj:`) and is written only when the user changes something. It is in
+`shared/`, not a new `app/` layer, because the player engine reads its
+starting speed from it and `core/` may only import from below. The player gets
 `override(values) → release`: a tool asks for values for as long as it needs
 them; overrides stack, and releasing one restores exactly what was under it,
 without saving anything.
@@ -22,4 +24,6 @@ without saving anything.
 ## Consequences
 
 - The edit panel's save-and-restore code and the speed rewrite go away.
-- Old keys are migrated once, and kept for one release.
+- Old keys are moved once, on first use, and removed.
+- Rotate's turned picture stays the tool's own CSS on the canvas: nothing
+  else changes it, so it does not need the stack.

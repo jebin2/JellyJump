@@ -1,3 +1,4 @@
+import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { MenuRouter } from '../menus/core/MenuRouter.js';
@@ -46,7 +47,6 @@ const STACKING_TOOLS = new Set([
 ]);
 
 /** Where the edits are remembered between visits, for the copies they made. */
-const HISTORY_KEY = 'jellyjump-edit-history';
 
 /**
  * Whether earlier copies can be read back from storage. The desktop app
@@ -270,7 +270,7 @@ export class EditPanel {
             this.session = this._resume(item) ?? { original: item, steps: [], pending: null };
         }
         this.section.classList.add('editing');
-        this._quietPlayer();
+        this._holdPlayer();
         this.el.classList.remove('hidden');
         this._showTools();
 
@@ -296,7 +296,7 @@ export class EditPanel {
         this._renderSession();
         this.el.classList.add('hidden');
         this.section.classList.remove('editing');
-        this._restorePlayer();
+        this._releasePlayer();
         this._note('');
         // Back to the row it was opened from.
         this.playlist.scrollToPlaying?.();
@@ -625,8 +625,8 @@ export class EditPanel {
     _loadHistories() {
         if (this._historiesLoaded) return;
         this._historiesLoaded = true;
-        let stored = {};
-        try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}') || {}; } catch { /* blocked, or not ours */ }
+        const saved = Settings.get('editHistory', {});
+        const stored = saved && typeof saved === 'object' ? saved : {};
         let dropped = false;
         for (const [id, entry] of Object.entries(stored)) {
             const original = this.playlist.items.find((i) => i.id === entry?.originalId);
@@ -664,10 +664,7 @@ export class EditPanel {
                 })),
             };
         }
-        try {
-            if (STORES_COPIES && Object.keys(stored).length) localStorage.setItem(HISTORY_KEY, JSON.stringify(stored));
-            else localStorage.removeItem(HISTORY_KEY);
-        } catch { /* blocked: remembered until the page closes */ }
+        Settings.set('editHistory', STORES_COPIES && Object.keys(stored).length ? stored : null);
     }
 
     /**
@@ -679,22 +676,18 @@ export class EditPanel {
      */
     _lendEffects(surface) {
         const player = this.playlist.player;
-        const saved = this._playerSaved;
-        if (!player || !saved) return;
+        const hold = this._playerHold;
+        if (!player || !hold) return;
         player.container?.classList.add('jj-export-fx');
-        if (saved.filters) {
-            player.videoFilters?.setState(saved.filters);
-            player._updateFiltersButtonState?.();
-        }
+        hold.filters?.();
+        hold.filters = null;
         surface.onCleanup(() => {
             player.container?.classList.remove('jj-export-fx');
             if (player.ui?.filterPanel) player.ui.filterPanel.style.display = 'none';
-            // Closed with the panel: _restorePlayer puts back what is saved.
-            const current = this._playerSaved;
-            if (!current) return;
-            current.filters = player.videoFilters?.isActive() ? player.videoFilters.getState() : null;
-            player.videoFilters?.reset();
-            player._updateFiltersButtonState?.();
+            // Closed with the panel: everything is given back already.
+            if (this._playerHold !== hold) return;
+            // Put away again; the filters as they are now are what comes back.
+            hold.filters = player.override({ filters: null });
         });
     }
 
@@ -734,54 +727,38 @@ export class EditPanel {
      * Editing shows the video as it will be saved, and leaves only the
      * controls for that. Filters, a playback speed and playing backwards are
      * the viewer's, never in the saved file, so they wait until the panel
-     * closes; their buttons are put away meanwhile (see player.css).
+     * closes; their buttons are put away meanwhile (see player.css). The
+     * controls are pinned below the picture, not laid over it: the tools
+     * draw on the whole picture, and the timeline is always there to find a
+     * frame on. All of it is the player's overrides: given back exactly,
+     * nothing saved as the user's choice.
      */
-    _quietPlayer() {
+    _holdPlayer() {
         const player = this.playlist.player;
-        if (!player || this._playerSaved) return;
-        const saved = { filters: null, rate: null, pinned: false };
+        if (!player?.override || this._playerHold) return;
         player.container?.classList.add('jj-editing');
-        // The controls pinned below the picture, not laid over it: the
-        // tools draw on the whole picture, and the timeline is always there
-        // to find a frame on. Not saved: laid over is the user's setting.
-        if (player.controlBarMode === 'overlay' && player.controlBar) {
-            player.controlBarMode = 'fixed';
-            player.controlBar.applyMode();
-            saved.pinned = true;
-        }
         for (const panel of [player.ui?.filterPanel, player.ui?.speedPanel, player.ui?.ccPanel, player.ui?.loopPanel]) {
             if (panel) panel.style.display = 'none';
         }
-        if (player.videoFilters?.isActive()) {
-            saved.filters = player.videoFilters.getState();
-            player.videoFilters.reset();
-        }
-        if (player.engine !== 'youtube' && player.playbackRate && player.playbackRate !== 1) {
-            saved.rate = player.playbackRate;
-            player.setPlaybackRate(1).finally(() => {
-                // The speed is saved as the user's choice; this one is not.
-                try { localStorage.setItem('jellyjump-speed', String(saved.rate)); } catch { /* blocked */ }
-            });
-        }
+        this._playerHold = {
+            // A YouTube video's speed is YouTube's; it has no saved copy to edit.
+            view: player.override(player.engine === 'youtube'
+                ? { controlBarMode: 'fixed' }
+                : { controlBarMode: 'fixed', playbackRate: 1 }),
+            // Apart, so Export FX can give them back while it is open.
+            filters: player.override({ filters: null }),
+        };
         if (player.reverse?.active) player.reverse.stop({ reposition: false });
-        this._playerSaved = saved;
     }
 
-    _restorePlayer() {
+    _releasePlayer() {
         const player = this.playlist.player;
-        const saved = this._playerSaved;
-        this._playerSaved = null;
+        const hold = this._playerHold;
+        this._playerHold = null;
         player?.container?.classList.remove('jj-editing');
-        if (!player || !saved) return;
-        if (saved.filters) {
-            player.videoFilters?.setState(saved.filters);
-            player._updateFiltersButtonState?.();
-        }
-        if (saved.rate) player.setPlaybackRate(saved.rate);
-        if (saved.pinned && player.controlBarMode === 'fixed') {
-            player.controlBarMode = 'overlay';
-            player.controlBar.applyMode();
-        }
+        if (!hold) return;
+        hold.filters?.();
+        hold.view();
     }
 
     _renderSession() {
@@ -835,7 +812,7 @@ export class EditPanel {
 
     destroy() {
         this.session = null;
-        this._restorePlayer();
+        this._releasePlayer();
         window.removeEventListener(ITEM_SELECTED_EVENT, this._onSelected);
         document.removeEventListener('keydown', this._onKeydown);
         this.surface?.close();

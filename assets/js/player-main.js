@@ -6,6 +6,7 @@ import { ElectronHelper } from './shared/platform/ElectronHelper.js';
 import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
 import { Logger } from './shared/utils/Logger.js';
 import { installErrorReporter } from './shared/errors/ErrorReporter.js';
+import { hasSavedPlaylist } from './shared/services/IndexedDBService.js';
 
 // Errors nothing else caught are recorded and shown once (shared/errors).
 installErrorReporter();
@@ -61,7 +62,7 @@ async function initializeApp() {
     // Demo Videos (optional)
     // A first visit gets a sample video, on the hosts that carry it (config).
     // Not in the desktop app, and not when a build turns it off.
-    const isFirstVisit = !localStorage.getItem('JellyJumpDB-playlist');
+    const isFirstVisit = !hasSavedPlaylist();
     const hostHasSample = config.sampleVideoHosts.includes(window.location.hostname);
     if (isFirstVisit && hostHasSample && isEnabled('sampleVideo') && config.sampleVideoPath && !ElectronHelper.isElectron()) {
         playlist.addItems([

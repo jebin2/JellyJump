@@ -5,6 +5,8 @@
  * In production, all log calls are silently ignored.
  */
 
+import { Settings } from '../settings/Settings.js';
+
 // globalThis.location works in both window and worker contexts
 const _hostname = globalThis.location?.hostname ?? '';
 const isLocalhost = _hostname === 'localhost' ||
@@ -26,15 +28,15 @@ function _readDebugFlag() {
         if (search) {
             const want = new URLSearchParams(search).get('debug');
             if (want === '1' || want === 'true') {
-                globalThis.localStorage?.setItem('jellyjump-debug', '1');
+                Settings.set('debug', true);
                 return true;
             }
             if (want === '0' || want === 'false') {
-                globalThis.localStorage?.removeItem('jellyjump-debug');
+                Settings.remove('debug');
                 return false;
             }
         }
-        return globalThis.localStorage?.getItem('jellyjump-debug') === '1';
+        return Settings.get('debug', false) === true;
     } catch {
         // Private windows and blocked storage both land here; the flag is a
         // convenience, so losing it must never break the page.

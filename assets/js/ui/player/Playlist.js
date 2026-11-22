@@ -1,3 +1,4 @@
+import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from "../../shared/utils/Logger.js";
 import { PROCESSED_ITEM_EVENT } from '../../shared/services/JobQueue.js';
 import { unlockIfEncrypted } from './EncryptedPlayback.js';
@@ -496,21 +497,21 @@ export class Playlist {
      */
     _setLoadGuard(item) {
         try {
-            localStorage.setItem('jellyjump-load-guard', JSON.stringify({ id: item.id, at: Date.now() }));
+            Settings.set('loadGuard', { id: item.id, at: Date.now() });
         } catch (e) { /* storage full/blocked - guard is best-effort */ }
     }
 
     /** @private */
     _clearLoadGuard() {
         try {
-            localStorage.removeItem('jellyjump-load-guard');
+            Settings.remove('loadGuard');
         } catch (e) { /* ignore */ }
     }
 
     /** @private */
     _readLoadGuard() {
         try {
-            return JSON.parse(localStorage.getItem('jellyjump-load-guard'));
+            return Settings.get('loadGuard', null);
         } catch (e) {
             return null;
         }

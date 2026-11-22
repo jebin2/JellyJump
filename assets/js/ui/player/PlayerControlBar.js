@@ -1,4 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
+import { Settings } from '../../shared/settings/Settings.js';
 
 export class PlayerControlBar {
     constructor(player) {
@@ -8,7 +9,7 @@ export class PlayerControlBar {
     loadMode() {
         const p = this.player;
         try {
-            const savedMode = localStorage.getItem('controlBarMode');
+            const savedMode = Settings.get('controlBarMode');
             if (savedMode === 'fixed' || savedMode === 'overlay') {
                 p.controlBarMode = savedMode;
             }
@@ -21,7 +22,7 @@ export class PlayerControlBar {
     saveMode() {
         const p = this.player;
         try {
-            localStorage.setItem('controlBarMode', p.controlBarMode);
+            Settings.set('controlBarMode', p.controlBarMode);
         } catch (e) {
             Logger.warn('Failed to save control bar mode:', e);
         }
