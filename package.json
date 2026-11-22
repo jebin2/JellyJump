@@ -40,8 +40,8 @@
     "test:edit": "node scripts/edit-panel-test.mjs"
   },
   "devDependencies": {
-    "playwright-core": "^1.56.0",
-    "typescript": "^5.6.3",
+    "playwright-core": "^1.65.1",
+    "typescript": "^7.0.2",
     "vite": "^8.0.0"
   },
   "dependencies": {
