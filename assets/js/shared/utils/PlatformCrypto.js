@@ -248,7 +248,7 @@ export class PlatformCrypto {
         Logger.log(`[PlatformCrypto] DECRYPT start — ${blob.size} bytes`);
         progress(0);
 
-        const { MediaBunny } = await import('../../core/MediaBunny.js');
+        const { MediaBunny } = await import('../media/MediaBunny.js');
 
         const blobSource = new MediaBunny.BlobSource(blob);
         const input = new MediaBunny.Input({
@@ -488,7 +488,7 @@ export class PlatformCrypto {
     static async looksLikeCarrier(blob, maxFrames = 4) {
         let input = null;
         try {
-            const { MediaBunny } = await import('../../core/MediaBunny.js');
+            const { MediaBunny } = await import('../media/MediaBunny.js');
             input = new MediaBunny.Input({
                 source: new MediaBunny.BlobSource(blob),
                 formats: MediaBunny.ALL_FORMATS,
@@ -524,7 +524,7 @@ export class PlatformCrypto {
      */
     static async readMetadata(source) {
         try {
-            const { MediaBunny } = await import('../../core/MediaBunny.js');
+            const { MediaBunny } = await import('../media/MediaBunny.js');
             const input = new MediaBunny.Input({
                 source: typeof source === 'string'
                     ? new MediaBunny.UrlSource(source)
@@ -579,7 +579,7 @@ export class PlatformCrypto {
         let t;
 
         t = performance.now();
-        const { MediaBunny, ensureEncoders } = await import('../../core/MediaBunny.js');
+        const { MediaBunny, ensureEncoders } = await import('../media/MediaBunny.js');
         await ensureEncoders();
         Logger.log(`[PlatformCrypto] [${rel()}] MediaBunny import: ${ms(t, performance.now())}`);
 
@@ -931,6 +931,6 @@ export class PlatformCrypto {
 // Module-level mediabunny cache so _feedAudio can use AudioSample.fromAudioBuffer
 let _MB;
 async function _getMediaBunny() {
-    if (!_MB) _MB = (await import('../../core/MediaBunny.js')).MediaBunny;
+    if (!_MB) _MB = (await import('../media/MediaBunny.js')).MediaBunny;
     return _MB;
 }

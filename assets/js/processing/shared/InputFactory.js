@@ -1,4 +1,4 @@
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny } from '../../shared/media/MediaBunny.js';
 
 export const AUDIO_BITRATE_BPS = 128000;
 

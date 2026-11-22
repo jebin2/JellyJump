@@ -4,7 +4,7 @@
  * playback state, UI updates, and stream/media lifecycle management.
  */
 
-import { MediaBunny } from './MediaBunny.js';
+import { MediaBunny } from '../shared/media/MediaBunny.js';
 import { ScreenWakeLock } from './playback/ScreenWakeLock.js';
 import {
     onPlayerEvent,
@@ -18,7 +18,7 @@ import {
     CONTROL_BAR_MODE_DEFAULT
 } from './config.js';
 import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
-import { hasOverlays } from '../ui/player/OverlayCompositor.js';
+import { hasOverlays } from '../shared/media/OverlayCompositor.js';
 import {
     closePlayerAudioBufferIterator,
     closePlayerAudioBufferIteratorSoon,

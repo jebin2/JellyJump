@@ -2,7 +2,7 @@ import { Toast } from "../../shared/utils/Toast.js";
 import { Logger } from "../../shared/utils/Logger.js";
 import { Modal } from "../Modal.js";
 import { formatTime } from "../../shared/utils/mediaUtils.js";
-import { composeFrame, hasOverlays } from "./OverlayCompositor.js";
+import { composeFrame, hasOverlays } from "../../shared/media/OverlayCompositor.js";
 
 /**
  * Screenshot Manager

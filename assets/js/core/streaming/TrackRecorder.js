@@ -1,4 +1,4 @@
-import { MediaBunny, ensureEncoders } from '../MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../shared/media/MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
 
 /**

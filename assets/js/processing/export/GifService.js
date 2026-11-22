@@ -1,7 +1,7 @@
 import GIF from '../../lib/gif.js';
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny } from '../../shared/media/MediaBunny.js';
 import { createMediaBunnyInput } from '../shared/InputFactory.js';
-import { throwIfCancelled, cancelledError } from '../shared/Cancellation.js';
+import { throwIfCancelled, cancelledError } from '../../shared/utils/Cancellation.js';
 
 export async function createGif(options) {
     const {

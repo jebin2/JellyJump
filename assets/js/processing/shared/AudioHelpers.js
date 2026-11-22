@@ -1,4 +1,4 @@
-import { MediaBunny, ensureDecodersFor } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureDecodersFor } from '../../shared/media/MediaBunny.js';
 
 export async function stretchAudioBuffer(buffer, speed) {
     const targetFrames = Math.ceil((buffer.duration / speed) * buffer.sampleRate);

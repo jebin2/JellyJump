@@ -1,4 +1,4 @@
-import { MediaBunny } from '../MediaBunny.js';
+import { MediaBunny } from '../../shared/media/MediaBunny.js';
 import { PlaybackAnchor } from '../playback/PlaybackAnchor.js';
 import { scheduleLiveFrame } from './LiveFrameSchedule.js';
 import { StreamVideoSource } from './StreamVideoSource.js';

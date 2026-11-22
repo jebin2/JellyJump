@@ -4,7 +4,7 @@
  * playback and UI stay responsive during conversions. Used by the desktop app
  * as well as the browser — both run the same WebCodecs backend.
  *
- * Importing core/MediaBunny.js here registers the browser codec plugins in
+ * Importing shared/media/MediaBunny.js here registers the browser codec plugins in
  * this worker's own mediabunny instance.
  */
 import { Logger } from '../../shared/utils/Logger.js';
@@ -20,7 +20,7 @@ const OPS = {
      * that the answer would describe a worker no real job ever runs in.
      */
     codecSupport: async () => {
-        const { MediaBunny, ensureEncoders } = await import('../../core/MediaBunny.js');
+        const { MediaBunny, ensureEncoders } = await import('../../shared/media/MediaBunny.js');
         await ensureEncoders();
         return {
             video: await MediaBunny.getEncodableVideoCodecs(),

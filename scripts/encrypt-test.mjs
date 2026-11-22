@@ -51,7 +51,7 @@ async function run(page, origin) {
     // ── Round trip, straight through the module ──────────────────────────
     const trip = await page.evaluate(async ({ origin, password }) => {
         const { PlatformCrypto } = await import(`${origin}/assets/js/shared/utils/PlatformCrypto.js`);
-        const { ensureEncoders } = await import(`${origin}/assets/js/core/MediaBunny.js`);
+        const { ensureEncoders } = await import(`${origin}/assets/js/shared/media/MediaBunny.js`);
         await ensureEncoders();
 
         // Seeded, so a failure is reproducible rather than a one-off.

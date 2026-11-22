@@ -1,8 +1,8 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../shared/media/MediaBunny.js';
 import { AUDIO_BITRATE_BPS } from '../shared/InputFactory.js';
 import { decodeAudioRange } from '../shared/AudioHelpers.js';
-import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../shared/Cancellation.js';
+import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../../shared/utils/Cancellation.js';
 
 
 /**
