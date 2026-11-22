@@ -91,5 +91,15 @@ check(report.startsWith('JellyJump ') && report.includes('Error: NETWORK'), 'say
 check(!report.includes('example.com') && !report.includes('blob:') && report.includes('<url>'), 'addresses are replaced');
 check(report.includes('Recent log:') && report.includes('Loading <url> from <url>'), 'includes the recent log');
 
+console.log('\nsecrets in log lines');
+{
+    Logger.clearEntries();
+    Logger.log('[Player] Loading media: https://box.ts.net/api/stream/abc?sig=0123456789abcdef0123456789abcdef');
+    Logger.warn('[Library] probe', 'https://box.ts.net/?token=' + 'f'.repeat(64) + '&x=1');
+    const text = Logger.entries().map((e) => e.message).join('\n');
+    check(!/0123456789abcdef0123|ffffffff/.test(text), 'a token or a file key in a URL is not kept in the log');
+    check(/sig=…/.test(text) && /token=…&x=1/.test(text), 'the rest of the line is');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

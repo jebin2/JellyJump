@@ -125,6 +125,17 @@ check((await fetch(`${base}/api/stream/${'0'.repeat(16)}`, { headers: auth })).s
 check((await fetch(`${base}/api/stream/../../etc/passwd`, { headers: auth })).status === 404,
     'a path instead of an id is refused');
 
+console.log('\na file\'s own key (stream URLs carry it instead of the token)');
+check(/^[a-f0-9]{32}$/.test(clip.sig) && /^[a-f0-9]{32}$/.test(clip.subtitles?.[0]?.sig ?? ''),
+    'the listing gives each file, and each subtitle, a key');
+check(!JSON.stringify(listing).includes(TOKEN), 'and never the token');
+check((await fetch(`${base}/api/stream/${clip.id}?sig=${clip.sig}`)).status === 200, 'a file streams with its key and no token');
+check((await fetch(`${base}/api/stream/${subtitleId}?sig=${clip.subtitles[0].sig}`)).status === 200, 'so does its subtitle');
+check((await fetch(`${base}/api/stream/${escape.id}?sig=${clip.sig}`)).status === 401, 'one file\'s key does not open another');
+check((await fetch(`${base}/api/library?sig=${clip.sig}`)).status === 401, 'nor the listing');
+check((await fetch(`${base}/api/stream/${clip.id}?sig=${'0'.repeat(32)}`)).status === 401, 'a made-up key is refused');
+check((await fetch(`${base}/api/stream/${clip.id}?token=${TOKEN}`)).status === 200, 'the token in the URL still works, for older clients');
+
 console.log('\nrange requests (seeking depends on these)');
 const whole = await fetch(`${base}/api/stream/${clip.id}`, { headers: auth });
 check(whole.headers.get('accept-ranges') === 'bytes', 'advertises byte ranges');

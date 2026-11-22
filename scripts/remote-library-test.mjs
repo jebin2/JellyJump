@@ -86,11 +86,12 @@ check(item.isLocal === false && item.isStream === false,
     'shaped for the direct-URL path, which uses range requests');
 check(item.path === 'testbox/Series/ep1.mp4', `grouped under the server (${item.path})`);
 check(item.url.includes('/api/stream/'), 'points at the stream endpoint');
-check(item.url.includes(`token=${TOKEN}`), 'carries the token, which UrlSource cannot send as a header');
+check(/[?&]sig=[a-f0-9]{32}$/.test(item.url) && !item.url.includes(TOKEN),
+    'carries the file\'s own key, not the token (UrlSource cannot send headers)');
 check(item.subtitleUrls?.length === 1, 'carries its sidecar subtitle');
 check(item.subtitleUrls?.[0]?.includes('/api/stream/')
-    && item.subtitleUrls?.[0]?.includes(`token=${TOKEN}`),
-    'as a stream URL with the same token');
+    && /[?&]sig=[a-f0-9]{32}$/.test(item.subtitleUrls?.[0] ?? '') && !item.subtitleUrls?.[0]?.includes(TOKEN),
+    'as a stream URL with its own key');
 
 console.log('\nthe item actually streams');
 const full = await fetch(item.url);

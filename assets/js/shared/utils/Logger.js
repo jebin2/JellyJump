@@ -91,10 +91,14 @@ function renderArg(arg, detailed) {
     }
 }
 
+const SECRET_PARAM = /([?&](?:token|sig)=)[^&\s"']+/g;
+
 /** @param {string} level @param {unknown[]} args */
 function record(level, args) {
     const detailed = level === 'warn' || level === 'error';
-    const message = args.map((a) => renderArg(a, detailed)).join(' ');
+    // A share link's token, or a file's key, never stays in the log: the log
+    // is what a bug report is made of.
+    const message = args.map((a) => renderArg(a, detailed)).join(' ').replace(SECRET_PARAM, '$1…');
     const scope = /^\[([^\]]+)\]/.exec(message)?.[1] ?? '';
     /** @type {{time: number, level: string, scope: string, message: string, trace?: Record<string, string|number>}} */
     const entry = { time: Date.now(), level, scope, message: message.length > 2000 ? `${message.slice(0, 2000)}…` : message };
