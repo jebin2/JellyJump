@@ -2,7 +2,7 @@
 import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
 import { config, isEnabled } from './shared/config/index.js';
-import { ElectronHelper } from './shared/utils/ElectronHelper.js';
+import { ElectronHelper } from './shared/platform/ElectronHelper.js';
 import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
 import { Logger } from './shared/utils/Logger.js';
 import { installErrorReporter } from './shared/errors/ErrorReporter.js';

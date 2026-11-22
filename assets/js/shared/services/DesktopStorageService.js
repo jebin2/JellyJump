@@ -1,4 +1,5 @@
 import { Logger } from "../utils/Logger.js";
+import { desktopBridge } from '../platform/Platform.js';
 
 /**
  * DesktopStorageService
@@ -22,7 +23,7 @@ export class DesktopStorageService {
 
     async _load() {
         try {
-            const data = await window.electronAPI.readConfig();
+            const data = await desktopBridge().readConfig();
             this._cache = data || { playlist: [], playbackState: null };
         } catch (e) {
             Logger.warn('[DesktopStorage] Failed to read config, starting fresh:', e);
@@ -32,7 +33,7 @@ export class DesktopStorageService {
 
     async _persist() {
         try {
-            await window.electronAPI.writeConfig(this._cache);
+            await desktopBridge().writeConfig(this._cache);
         } catch (e) {
             Logger.error('[DesktopStorage] Failed to write config:', e);
         }
@@ -107,7 +108,7 @@ export class DesktopStorageService {
 
         if (item.localPath) {
             try {
-                const result = await window.electronAPI.readFile(item.localPath);
+                const result = await desktopBridge().readFile(item.localPath);
                 if (result.success) {
                     return new File([result.buffer], item.title || 'file', {
                         type: item.mimeType || '',

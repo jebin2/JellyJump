@@ -1,4 +1,5 @@
 import { Logger } from '../utils/Logger.js';
+import { desktopBridge } from '../platform/Platform.js';
 
 /**
  * ShareState
@@ -17,7 +18,7 @@ let enabled = false;
 const listeners = new Set();
 
 function isSupported() {
-    return typeof window !== 'undefined' && !!window.electronAPI?.getShareStatus;
+    return !!desktopBridge()?.getShareStatus;
 }
 
 function applyToButton() {
@@ -57,7 +58,7 @@ export const ShareState = {
     async refresh() {
         if (!isSupported()) return false;
         try {
-            const result = await window.electronAPI.getShareStatus();
+            const result = await desktopBridge().getShareStatus();
             set(!!(result?.success && result.state?.enabled));
         } catch (error) {
             Logger.warn('[ShareState] Could not read share status:', error);

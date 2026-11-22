@@ -1,4 +1,5 @@
 import { Logger } from '../utils/Logger.js';
+import { desktopBridge } from '../platform/Platform.js';
 
 /**
  * DesktopMediaScanner
@@ -15,7 +16,7 @@ export class DesktopMediaScanner {
     }
 
     static isSupported() {
-        return typeof window !== 'undefined' && !!window.electronAPI?.startMediaScan;
+        return !!desktopBridge()?.startMediaScan;
     }
 
     get isScanning() {
@@ -41,7 +42,7 @@ export class DesktopMediaScanner {
             onDone?.(summary);
         };
 
-        this._unsubscribe = window.electronAPI.onMediaScanEvent((event) => {
+        this._unsubscribe = desktopBridge().onMediaScanEvent((event) => {
             switch (event?.type) {
                 case 'started':
                     Logger.log(`[Scanner] Scanning ${event.roots.length} folder(s)`);
@@ -70,7 +71,7 @@ export class DesktopMediaScanner {
             }
         });
 
-        const result = await window.electronAPI.startMediaScan({ roots });
+        const result = await desktopBridge().startMediaScan({ roots });
         if (!result?.success) {
             const error = new Error(result?.error || 'Failed to start media scan');
             Logger.error('[Scanner]', error.message);
@@ -81,6 +82,6 @@ export class DesktopMediaScanner {
 
     async cancel() {
         if (!this._scanning) return;
-        await window.electronAPI.cancelMediaScan();
+        await desktopBridge().cancelMediaScan();
     }
 }
