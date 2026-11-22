@@ -426,7 +426,7 @@ export class WatermarkMenu {
                 failureText: (e) => e.message,
                 modal,
                 work: async ({ signal, onProgress }) => MediaProcessor.process({
-                    source: await MediaMetadata.getSourceBlob(item, () => playlist._saveState()),
+                    source: await MediaMetadata.getSourceBlob(item, () => playlist.save()),
                     format,
                     quality: 100,
                     watermark: { items: state.watermarkAreas.map(toWatermarkConfig) },

@@ -74,7 +74,7 @@ export const UrlUploadMenu = {
 
             try {
                 // Delegate the business logic to playlist
-                await playlist._handleUrlUpload(url, closeEarly);
+                await playlist.handleUrlUpload(url, closeEarly);
                 closeEarly();
             } catch (error) {
                 if (closed) {

@@ -163,7 +163,7 @@ function setupCropButton(elements, state, item, playlist, modal) {
             background: true,
             modal,
             work: async ({ signal, onProgress }) => {
-                const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                 return MediaProcessor.process({
                     source, format: 'mp4', quality: 100,
                     crop: { left: Math.round(state.box.x), top: Math.round(state.box.y), width, height },

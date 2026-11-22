@@ -72,7 +72,7 @@ export class Playlist {
 
         // Lifecycle management
         this._beforeUnloadHandler = () => {
-            this._saveState();
+            this.save();
             this._revokeAllBlobUrls();
         };
         window.addEventListener('beforeunload', this._beforeUnloadHandler);
@@ -408,7 +408,7 @@ export class Playlist {
         // Top level, matching how a file added through the open dialog looks.
         item.path = item.title;
 
-        this._saveState();
+        this.save();
         this.render();
         this._updatePlayerNavigationState();
         Toast.show(`Kept "${item.title}" in your playlist`);
@@ -489,10 +489,9 @@ export class Playlist {
     }
 
     /**
-     * Save current state
-     * @private
+     * Save the playlist and where playback is. Call after changing items.
      */
-    _saveState() {
+    save() {
         const currentTime = this.player?.currentTime || 0;
         PlaylistStorage.savePlaylist(this.items, this.activeIndex, currentTime);
     }
@@ -560,7 +559,7 @@ export class Playlist {
         }
 
         this.addItems(newItems);
-        this._processMetadata(newItems);
+        this.processMetadata(newItems);
     }
 
     /**
@@ -659,7 +658,7 @@ export class Playlist {
         this.addItems(newItems);
 
         // Process metadata for new items
-        this._processMetadata(newItems);
+        this.processMetadata(newItems);
 
         // If playlist was empty, play the first new file
         if (this.items.length === newItems.length) {
@@ -667,16 +666,24 @@ export class Playlist {
         }
     }
 
-    async _processMetadata(items) {
+    /**
+     * Read the duration and details of new items, showing each as it comes.
+     * @param {Object[]} items
+     */
+    async processMetadata(items) {
         await this.processor.processMetadata(
             items,
             (item) => this._updateItemUI(item),
-            () => this._saveState()
+            () => this.save()
         );
     }
 
-    async _ensureMetadata(item) {
-        await this.processor.ensureMetadata(item, () => this._saveState());
+    /**
+     * Read one item's details if it has none yet (tools need them).
+     * @param {Object} item
+     */
+    async ensureMetadata(item) {
+        await this.processor.ensureMetadata(item, () => this.save());
     }
 
     /**
@@ -701,7 +708,7 @@ export class Playlist {
         // Don't block - this runs in background
         try {
             Logger.log('[Playlist] Prefetching metadata for:', item.title);
-            await this._ensureMetadata(item);
+            await this.ensureMetadata(item);
             Logger.log('[Playlist] Metadata prefetch complete:', item.title);
         } catch (error) {
             Logger.warn('[Playlist] Metadata prefetch failed for:', item.title, error);
@@ -734,7 +741,7 @@ export class Playlist {
                 if (this.player.duration && this.player.duration > 0) {
                     video.duration = formatTime(this.player.duration);
                     this._updateItemUI(video);
-                    this._saveState();
+                    this.save();
                 }
             };
             // Check after a short delay for metadata to load
@@ -809,7 +816,7 @@ export class Playlist {
                 video.thumbnail = canvas.toDataURL('image/jpeg', 0.7);
 
                 this._updateItemUI(video);
-                this._saveState();
+                this.save();
                 Logger.log(`[Playlist] Captured thumbnail via render loop for: ${video.title}`);
 
                 // Remove the callback since we're done
@@ -847,7 +854,7 @@ export class Playlist {
                 if (video.duration !== newDuration) {
                     video.duration = newDuration;
                     this._updateItemUI(video);
-                    this._saveState();
+                    this.save();
                 }
             }
         };
@@ -867,7 +874,7 @@ export class Playlist {
     addItem(video) {
         if (!video.id) video.id = generateId();
         this.state.addItem(video);
-        this._saveState();
+        this.save();
         this.render();
         this._updatePlayerNavigationState();
     }
@@ -881,7 +888,7 @@ export class Playlist {
      * @param {Object} [options]
      * @param {string} [options.type] - File MIME type override (default: blob.type || 'video/mp4')
      * @param {string} [options.mediaType] - Playlist type field ('video', 'audio', 'image/gif', etc.)
-     * @param {string|null} [options.duration] - Duration string; null to skip (caller may _ensureMetadata)
+     * @param {string|null} [options.duration] - Duration string; null to skip (caller may ensureMetadata)
      * @param {Object} [options.extra] - Additional fields merged into the item
      * @returns {{ item: Object, url: string }}
      */
@@ -914,7 +921,7 @@ export class Playlist {
         }
 
         this.render();
-        this._saveState();
+        this.save();
 
         // The job that made it, if any, lists it as its result.
         window.dispatchEvent(new CustomEvent(PROCESSED_ITEM_EVENT, { detail: { item: newItem, url } }));
@@ -952,7 +959,7 @@ export class Playlist {
         if (regularItems.length > 0) {
             const startIndex = this.state.items.length;
             this.state.addItems(regularItems);
-            this._saveState();
+            this.save();
             this.render();
             this._updatePlayerNavigationState();
 
@@ -970,7 +977,7 @@ export class Playlist {
                 // Add as a regular item if expansion fails
                 if (!m3u.id) m3u.id = generateId();
                 this.state.addItem(m3u);
-                this._saveState();
+                this.save();
                 this.render();
             }
         }
@@ -1000,7 +1007,7 @@ export class Playlist {
         // 1. Data Removal (handles activeIndex adjustment)
         const wasActive = this.activeIndex === index;
         this.state.removeItem(index);
-        this._saveState();
+        this.save();
         discardStoredFiles(this.storage, [removedItem], this.state.items);
         this._updatePlayerNavigationState();
 
@@ -1049,7 +1056,7 @@ export class Playlist {
         const newItems = this.state.items.filter(item => !(item.path || '').startsWith(prefix));
         this.state.setItems(newItems);
         
-        this._saveState();
+        this.save();
         discardStoredFiles(this.storage, itemsToRemove, newItems);
         this._updatePlayerNavigationState();
 
@@ -1161,7 +1168,7 @@ export class Playlist {
     async _playYouTubeItem(video, autoplay) {
         await this.player.load(video.url, autoplay, video.id, null);
         this._clearLoadGuard();
-        this._saveState();
+        this.save();
     }
 
     /**
@@ -1193,7 +1200,7 @@ export class Playlist {
 
         this._updateStreamItemMetadata(video, index);
         this._clearLoadGuard();
-        this._saveState();
+        this.save();
     }
 
     /**
@@ -1234,7 +1241,7 @@ export class Playlist {
                     // copy of someone else's library.
                     if (!video.isRemoteLibrary) MediaMetadata.cacheInBackground(video, () => {
                         Logger.log(`[Playlist] Background cache complete for: ${video.title}`);
-                        this._saveState();
+                        this.save();
                     });
                 }
             } else {
@@ -1275,7 +1282,7 @@ export class Playlist {
 
             // 1. Data Removal (handles activeIndex adjustment)
             this.state.removeItem(index);
-            this._saveState();
+            this.save();
             this.render();
 
             // 2. Play next or loop back
@@ -1398,7 +1405,7 @@ export class Playlist {
             // Update item metadata (duration and thumbnail) after video loads
             this._updateLocalItemMetadata(video, index);
 
-            this._saveState();
+            this.save();
 
             if (autoplay) {
                 this.player.play();
@@ -1453,7 +1460,7 @@ export class Playlist {
                 name: track.name,
                 cues: [...track.cues]
             }));
-            this._saveState();
+            this.save();
             Logger.log(`Saved ${subtitleTracks.length} subtitle track(s) for: ${video.title}`);
         };
     }
@@ -1529,7 +1536,7 @@ export class Playlist {
             if (newItems.length < countBefore) {
                 const removed = this.state.items.filter(item => item.path.startsWith(prefix));
                 this.state.setItems(newItems);
-                this._saveState();
+                this.save();
                 discardStoredFiles(this.storage, removed, newItems);
                 this.render();
             }
@@ -1571,7 +1578,7 @@ export class Playlist {
                 }
 
                 Logger.log(`Getting source for download: ${item.title}`);
-                await MediaMetadata.getProcessedSourceURL(item, () => this._saveState());
+                await MediaMetadata.getProcessedSourceURL(item, () => this.save());
 
                 if (downloadBtn) downloadBtn.classList.remove('loading');
             }
@@ -1594,14 +1601,14 @@ export class Playlist {
 
 
     /**
-     * Handle URL Upload logic
-     * @private
+     * Add what a URL points to: a video, a stream, an M3U or link list, a
+     * YouTube link, or a shared library.
      * @param {string} url
      * @param {Function} [onFirstItems] - called as soon as something is on
      *   screen, so a dialog waiting on this can get out of the way. A shared
      *   library keeps streaming after it fires.
      */
-    async _handleUrlUpload(url, onFirstItems) {
+    async handleUrlUpload(url, onFirstItems) {
         try {
             // A share link is a library, not a media file. Handing it to the
             // normal path makes the demuxer fetch a web page and fail with
@@ -1640,7 +1647,7 @@ export class Playlist {
             // and duration arrived, where this used to rebuild the whole tree
             // and throw away the reader's place in it.
             if (!result.isStream) {
-                this._processMetadata([result]);
+                this.processMetadata([result]);
             }
 
             // Always select and play the new item
@@ -1671,7 +1678,7 @@ export class Playlist {
             thumbnail: info.thumbnail,
         }));
 
-        this._saveState();
+        this.save();
         this.render();
         this._updatePlayerNavigationState();
         this.selectItem(this.items.length - 1, true);
@@ -1696,7 +1703,7 @@ export class Playlist {
 
             // Add all items at once
             this.state.addItems(newItems);
-            this._saveState();
+            this.save();
             this.render();
             this._updatePlayerNavigationState();
 
@@ -1768,7 +1775,7 @@ export class Playlist {
         Logger.log(`[Playlist] Marked as broken: ${item.title}`);
 
         this.renderer.markItemBrokenInDOM(item.id);
-        this._saveState();
+        this.save();
     }
 
     /**
@@ -1791,7 +1798,7 @@ export class Playlist {
             processor: this.processor,
             onToast: (msg) => Toast.show(msg),
             onComplete: () => {
-                this._saveState();
+                this.save();
                 this.render();
             }
         });

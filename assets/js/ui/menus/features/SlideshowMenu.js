@@ -337,7 +337,7 @@ export class SlideshowMenu {
                             mediaType: 'video/mp4',
                             extra: { path: `Slideshow/${filename}` }
                         });
-                        await playlist._ensureMetadata(newItem);
+                        await playlist.ensureMetadata(newItem);
                     },
                 });
             });

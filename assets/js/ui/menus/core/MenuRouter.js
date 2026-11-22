@@ -153,9 +153,7 @@ export class MenuRouter {
         }
         } catch (err) {
             Logger.error(`MenuRouter: Error in "${action}" for "${item.title}":`, err);
-            if (playlist._showToast) {
-                playlist._showToast(`Failed to open ${action}: ${err.message}`, 'error');
-            }
+            Toast.show(`Failed to open ${action}: ${err.message}`, 4000, true);
         }
     }
 }

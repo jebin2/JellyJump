@@ -80,7 +80,7 @@ export class ExportMenu {
             });
         }
 
-        await playlist._ensureMetadata(item);
+        await playlist.ensureMetadata(item);
         let duration = 0;
         if (typeof item.duration === 'string' && item.duration !== '--:--') {
             duration = parseTime(item.duration);
@@ -105,7 +105,7 @@ export class ExportMenu {
                     const end = parseTime(endInput.value) || duration;
                     if (!(end > start)) throw new Error('The end has to come after the start.');
 
-                    const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
+                    const source = await MediaMetadata.getSourceBlob(item, () => playlist.save());
                     const blob = await MediaProcessor.process({
                         source,
                         format: 'mp4',
