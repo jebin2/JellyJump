@@ -39,9 +39,16 @@ const KEYS = {
     remoteLibraries: { old: 'jellyjump-remote-libraries' },
     /** The item being loaded, so a load that crashed the page is not retried on the next start (Playlist). */
     loadGuard: { old: 'jellyjump-load-guard' },
+    /** Where each video was left, by item id: {time, at} (Progress.js). */
+    progress: {},
 };
 
+/** One key per video before `progress` (BUG-5), moved into it once. */
+const OLD_PROGRESS_PREFIX = 'jellyjump-state-';
+
 const PREFIX = 'jj:';
+/** How many videos' progress is kept (Progress.js). */
+export const PROGRESS_CAP = 200;
 
 /** @type {Map<string, unknown>} values for when storage cannot be used */
 const memory = new Map();
@@ -86,6 +93,48 @@ function migrate() {
             s.removeItem(old);
         } catch { /* blocked or full: the old key stays and is tried again next load */ }
     }
+    migrateProgress(s);
+}
+
+/**
+ * The per-video keys, into one map. Only what fits the map's cap is kept;
+ * the keys all go.
+ * @param {Storage} s
+ */
+function migrateProgress(s) {
+    try {
+        const old = [];
+        for (let i = 0; i < s.length; i++) {
+            const key = s.key(i);
+            if (key?.startsWith(OLD_PROGRESS_PREFIX)) old.push(key);
+        }
+        if (!old.length) return;
+        const raw = s.getItem(PREFIX + 'progress');
+        /** @type {Record<string, {time: number, at: number}>} */
+        const map = (raw && JSON.parse(raw)) || {};
+        for (const key of old) {
+            try {
+                const value = JSON.parse(s.getItem(key) ?? 'null');
+                const id = key.slice(OLD_PROGRESS_PREFIX.length);
+                if (Number.isFinite(value?.timestamp) && !map[id]) {
+                    map[id] = { time: value.timestamp, at: Date.parse(value.savedAt) || 0 };
+                }
+            } catch { /* not ours */ }
+        }
+        s.setItem(PREFIX + 'progress', JSON.stringify(capProgress(map)));
+        for (const key of old) s.removeItem(key);
+    } catch { /* blocked or full: tried again next load */ }
+}
+
+/**
+ * The most recently played PROGRESS_CAP videos of a progress map, the rest
+ * dropped (Progress.js, and the move from the old keys).
+ * @param {Record<string, {time: number, at: number}>} map
+ */
+export function capProgress(map) {
+    const ids = Object.keys(map).sort((a, b) => map[b].at - map[a].at);
+    for (const id of ids.slice(PROGRESS_CAP)) delete map[id];
+    return map;
 }
 
 /** @param {string} name @param {unknown} value */

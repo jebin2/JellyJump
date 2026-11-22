@@ -1,3 +1,4 @@
+import { saveProgress, loadProgress } from '../../shared/settings/Progress.js';
 import { Logger } from '../../shared/utils/Logger.js';
 
 
@@ -261,25 +262,10 @@ export function playerScrubEnd(player, e) {
 export function savePlayerPlaybackState(player) {
     if (!player.currentVideoId || player.duration < 1) return;
 
-    const state = {
-        videoIdentifier: player.currentVideoId,
-        timestamp: player.currentTime,
-        savedAt: new Date().toISOString()
-    };
-
-    try {
-        localStorage.setItem(`jellyjump-state-${player.currentVideoId}`, JSON.stringify(state));
-    } catch (e) {
-        Logger.warn('Failed to save playback state:', e);
-    }
+    saveProgress(player.currentVideoId, player.currentTime);
 }
 
 export function loadPlayerPlaybackState(player) {
-    if (!player.currentVideoId) return null;
-    try {
-        const item = localStorage.getItem(`jellyjump-state-${player.currentVideoId}`);
-        return item ? JSON.parse(item) : null;
-    } catch (e) {
-        return null;
-    }
+    const time = loadProgress(player.currentVideoId);
+    return time === null ? null : { videoIdentifier: player.currentVideoId, timestamp: time };
 }

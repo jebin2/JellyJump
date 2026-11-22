@@ -15,8 +15,8 @@
  *    and one that is fixed must come off the list (so the list only shrinks).
  *
  * 2. Counts of things the plan removes: calls into the player's and the
- *    playlist's private members from outside them, files touching
- *    localStorage, files checking for Electron directly, and files writing
+ *    playlist's private members from outside them, files other than the
+ *    settings and the storage layer touching localStorage, files checking for Electron directly, and files writing
  *    out an outside service's address (they belong in shared/config/services.js). A count may go
  *    down (lower it in the baseline when it does) but not up.
  *
@@ -85,6 +85,8 @@ wrongWay.sort();
 // --- 2. counts ----------------------------------------------------------------
 
 const PLAYER_FILE = 'core/Player.js';
+/** Rule 4 of §3.1: only the settings and the storage layer touch localStorage. */
+const LOCAL_STORAGE_OWNERS = /^shared\/(settings\/|services\/(IndexedDB|DesktopStorage)Service\.js$)/;
 const isPlaylistPart = (r) => /^ui\/player\/Playlist[A-Za-z]*\.js$/.test(r);
 
 /** `player._x`, `this.player._x`, `….player._x`, and `p._x` where p is the player by convention. */
@@ -98,7 +100,7 @@ for (const file of files) {
         .split('\n').filter((line) => !/^\s*(\/\/|\*)/.test(line)).join('\n');
     if (r !== PLAYER_FILE) counts.playerPrivateCalls += (source.match(PLAYER_PRIVATE) ?? []).length;
     if (!isPlaylistPart(r)) counts.playlistPrivateCalls += (source.match(PLAYLIST_PRIVATE) ?? []).length;
-    if (/\blocalStorage\b/.test(source)) counts.localStorageFiles++;
+    if (/\blocalStorage\b/.test(source) && !LOCAL_STORAGE_OWNERS.test(r)) counts.localStorageFiles++;
     if (r !== 'shared/platform/Platform.js' && /\belectronAPI\b/.test(source)) counts.directElectronChecks++;
     // An outside address written out anywhere but the services list (comments excepted).
     if (r !== 'shared/config/services.js' && /['"`]https?:\/\/(?!localhost|127\.0\.0\.1)[a-z0-9.-]+\.[a-z]{2,}/i.test(source)) counts.externalUrlFiles++;

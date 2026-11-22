@@ -20,6 +20,8 @@ function fakeStorage(initial = {}, { blocked = false } = {}) {
         setItem: (k, v) => { guard(); data.set(k, String(v)); },
         removeItem: (k) => { guard(); data.delete(k); },
         clear: () => { guard(); data.clear(); },
+        key: (i) => { guard(); return [...data.keys()][i] ?? null; },
+        get length() { guard(); return data.size; },
     };
 }
 
@@ -39,7 +41,6 @@ console.log('\nmoving the old keys');
         'jellyjump-edit-history': JSON.stringify({ x: { originalId: 'a', steps: [] } }),
         'jellyjump-remote-libraries': JSON.stringify(['https://lib.example/s/1']),
         'jellyjump-load-guard': JSON.stringify({ id: 'q', at: 5 }),
-        'jellyjump-state-abc': JSON.stringify({ time: 3 }), // not a setting (phase G3): left alone
         'JellyJumpDB-playlist': 'true',                     // the storage layer's marker: left alone
     });
     const Settings = await load(s);
@@ -53,7 +54,7 @@ console.log('\nmoving the old keys');
         'jellyjump-remote-libraries', 'jellyjump-load-guard'].filter((k) => s.data.has(k));
     check(oldLeft.length === 0, `the old keys are gone (${oldLeft})`);
     check(s.data.get('jj:speed') === '1.5', 'stored under the jj: prefix, as JSON');
-    check(s.data.has('jellyjump-state-abc') && s.data.has('JellyJumpDB-playlist'), 'keys that are not preferences are left alone');
+    check(s.data.has('JellyJumpDB-playlist'), 'the storage layer\'s marker is left alone');
 }
 
 console.log('\na value under the new name wins over an old one');
@@ -133,6 +134,29 @@ console.log('\nclearAll');
     const Settings = await load(s);
     Settings.clearAll();
     check(s.data.size === 0, 'empties the site\'s localStorage (reset the app)');
+}
+
+console.log('\nwhere each video was left (BUG-5)');
+{
+    const s = fakeStorage({
+        'jellyjump-state-a': JSON.stringify({ videoIdentifier: 'a', timestamp: 42.5, savedAt: '2026-01-02T00:00:00Z' }),
+        'jellyjump-state-b': JSON.stringify({ videoIdentifier: 'b', timestamp: 7, savedAt: '2026-01-01T00:00:00Z' }),
+        'jellyjump-state-junk': 'not json',
+    });
+    const Settings = await load(s);
+    const { saveProgress, loadProgress, MAX_VIDEOS } = await import(`../assets/js/shared/settings/Progress.js?fresh=${fresh++}`);
+    // Progress.js imports its own copy of Settings; read through this one to trigger the move.
+    Settings.get('progress');
+    check([...s.data.keys()].every((k) => !k.startsWith('jellyjump-state-')), 'the per-video keys are gone');
+    const map = JSON.parse(s.data.get('jj:progress'));
+    check(map.a?.time === 42.5 && map.b?.time === 7 && !map.junk, 'their times are in one map; one that was not readable is dropped');
+    check(loadProgress('a') === 42.5 && loadProgress('none') === null, 'read back by id; nothing saved reads as null');
+    saveProgress('c', 3);
+    check(loadProgress('c') === 3, 'a new one is saved');
+    for (let i = 0; i < MAX_VIDEOS + 20; i++) saveProgress(`v${i}`, i);
+    const after = JSON.parse(s.data.get('jj:progress'));
+    check(Object.keys(after).length === MAX_VIDEOS, `capped at ${MAX_VIDEOS} videos (${Object.keys(after).length})`);
+    check(after[`v${MAX_VIDEOS + 19}`] && !after.a, 'the oldest go first');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

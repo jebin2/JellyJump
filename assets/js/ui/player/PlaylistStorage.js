@@ -1,5 +1,45 @@
 import { Logger } from "../../shared/utils/Logger.js";
 import { StorageService } from "../../shared/services/StorageService.js";
+import { saveProgress } from "../../shared/settings/Progress.js";
+import { Toast } from "../../shared/utils/Toast.js";
+import { AppError } from "../../shared/errors/AppError.js";
+import { ERROR_CODES } from "../../shared/errors/codes.js";
+
+let toldFull = false;
+
+/**
+ * Save the playlist, and what to do when the browser's storage is full: the
+ * list is saved without the files that did not fit, which stay in memory and
+ * play until the page closes, and the user is told once (BUG-4's other half;
+ * before, the whole save failed and nothing said so).
+ * @param {{savePlaylist: (items: Array, options?: {withFiles?: boolean}) => Promise<void>}} storage
+ * @param {Array} items
+ * @param {(message: string) => void} [tell] - shows the message (a toast by default)
+ * @returns {Promise<'saved'|'without-files'|'failed'>}
+ */
+export async function savePlaylistItems(storage, items, tell = (message) => Toast.show(message, 8000, true)) {
+    try {
+        await storage.savePlaylist(items);
+        return 'saved';
+    } catch (error) {
+        const appError = AppError.from(error);
+        if (appError.code !== 'STORAGE_FULL') {
+            Logger.error('[PlaylistStorage] Could not save the playlist:', error);
+            return 'failed';
+        }
+        if (!toldFull) {
+            toldFull = true;
+            tell(ERROR_CODES.NOT_KEPT);
+        }
+        try {
+            await storage.savePlaylist(items, { withFiles: false });
+            return 'without-files';
+        } catch (again) {
+            Logger.error('[PlaylistStorage] Could not save the playlist, even without its files:', again);
+            return 'failed';
+        }
+    }
+}
 
 /**
  * Playlist Storage Service
@@ -8,7 +48,7 @@ import { StorageService } from "../../shared/services/StorageService.js";
 export class PlaylistStorage {
     /**
      * Load saved playlist from IndexedDB
-     * @returns {Promise<Object>} { items: Array, playbackState: Object }
+     * @returns {Promise<Object>} { ok: boolean, items: Array, playbackState: Object }
      */
     static async loadPlaylist() {
         const storage = new StorageService();
@@ -18,12 +58,15 @@ export class PlaylistStorage {
             const playbackState = await storage.loadPlaybackState();
 
             return {
+                ok: true,
                 items: savedItems || [],
                 playbackState: playbackState || null
             };
         } catch (e) {
             Logger.error('Error loading playlist:', e);
+            // ok: false, so nothing takes the empty list for the real one.
             return {
+                ok: false,
                 items: [],
                 playbackState: null
             };
@@ -52,7 +95,7 @@ export class PlaylistStorage {
         const persistentItems = items.filter(item => !item.isWebcam && !item.isDiscovered && !item.isRemoteLibrary);
 
         // Save playlist items
-        storage.savePlaylist(persistentItems);
+        savePlaylistItems(storage, persistentItems);
 
         // 2. Save playback state for the currently active persistent item
         const activeItem = items[activeIndex];
@@ -86,18 +129,8 @@ export class PlaylistStorage {
             time: currentTime
         });
 
-        // 2. Save to localStorage (for Player.js internal restoration)
-        // This ensures Player.js finds the state on reload
-        try {
-            const state = {
-                videoIdentifier: activeItem.id,
-                timestamp: currentTime,
-                savedAt: new Date().toISOString()
-            };
-            localStorage.setItem(`jellyjump-state-${activeItem.id}`, JSON.stringify(state));
-        } catch (e) {
-            Logger.warn('Failed to sync state to localStorage:', e);
-        }
+        // 2. Where this video was left, for the player to start there on reload.
+        saveProgress(activeItem.id, currentTime);
     }
 
     /**

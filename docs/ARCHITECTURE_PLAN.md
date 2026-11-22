@@ -46,8 +46,9 @@ start (`78c1c90`); this table is where things stand now.
 | 1 | L4 ESLint; its 91 findings fixed | done | #57 |
 | 1 | A7 BUG-6 confirmed on desktop and fixed; BUG-14 found and fixed | done | #58 |
 | 1 | T1 README, T2 ADRs 0001–0011 | done | this PR |
-| 2 | D1–D3 `Settings` (`jj:` keys, old ones moved; `localStorage` files 14 → 5), `player.override()`; edit panel and the timeline tools use it, its speed rewrite gone | done | this PR |
-| 2 | E, F, G, N4–N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
+| 2 | D1–D3 `Settings` (`jj:` keys, old ones moved; `localStorage` files 14 → 5), `player.override()`; edit panel and the timeline tools use it, its speed rewrite gone | done | #61 |
+| 2 | G1 delete a removed item's file, G2 sweep after load (BUG-4); G3 progress in one capped map (BUG-5); G5/N6 full disk keeps the list and says so once. `localStorage` only in settings and storage (now a rule: count 0) | done | this PR |
+| 2 | E, F, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
@@ -299,8 +300,8 @@ Other modules call its private methods: `_saveState` 24 times,
 | BUG-1 | Tracks shows the resolution under "Codec" and "—" under "Details" | the Codec `<span>` has both `meta-codec` and `meta-details` classes; `querySelector('.meta-details')` finds it first | drop `meta-details` from the Codec span |
 | BUG-2 | Cancelling Scenes or Motion does not stop the result being rendered | `isCancelled` is passed by value into `runDetection`, so its checks always see `false` | pass a getter or an `AbortSignal` |
 | BUG-3 | Scenes and Motion "add clip" has no Cancel and no tray entry; the edit panel and tray never see the clip | runs `MediaProcessor.process` inline and adds the item with `playlist.addItem` | `runMenuJob` + `insertProcessedItem` (phase F) |
-| BUG-4 | IndexedDB grows forever | files never deleted on remove (§2.7) | phase G |
-| BUG-5 | localStorage grows by one key per video | `jellyjump-state-<id>` never removed | phase G |
+| BUG-4 | IndexedDB grows forever | files never deleted on remove (§2.7) | fixed (G1, G2) |
+| BUG-5 | localStorage grows by one key per video | `jellyjump-state-<id>` never removed | fixed (G3) |
 | BUG-6 | Desktop: an edited copy may stop playing after switching away | §2.8 | confirm, then phase G |
 | BUG-7 | The GIF preview never shows in the edit panel | it is inside `.modal-video-panel`, which the panel hides | move it out of that panel in the template |
 | BUG-8 | A-B loop region is faint over the played part of the timeline | the played bar is drawn over the loop range | z-order / colour in `player.css` |

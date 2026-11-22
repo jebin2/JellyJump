@@ -21,7 +21,10 @@ blob (`DesktopStorageService`).
 
 - A file still in memory is one storage could not keep; it must not be
   dropped (BUG-6, fixed in #58).
-- Removed items' files are not yet deleted from IndexedDB (BUG-4); plan
-  phase G adds their lifecycle.
+- A file is deleted when its item leaves the playlist, unless the edit
+  panel's Undo history still needs it, and a sweep after each load deletes
+  files nothing refers to (`ui/player/PlaylistFiles.js`; BUG-4, wave 2).
+- When storage is full, the list is saved without the files that did not
+  fit; they play until the page closes, and the user is told once.
 - Edited copies on desktop have no path on disk; plan step G4 gives them
   one.

@@ -10,6 +10,7 @@ import { RecordMenu } from '../menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
 import { ITEM_SELECTED_EVENT } from "./EditPanel.js";
 import { PlaylistStorage } from './PlaylistStorage.js';
+import { discardStoredFiles, sweepStoredFiles } from './PlaylistFiles.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 import { FileDropHandler } from '../../shared/utils/FileDropHandler.js';
 import { formatTime, generateId, sanitizeFilename } from '../../shared/utils/mediaUtils.js';
@@ -420,7 +421,14 @@ export class Playlist {
      */
     async _loadSavedPlaylist() {
         try {
-            const { items, playbackState } = await PlaylistStorage.loadPlaylist();
+            const { ok, items, playbackState } = await PlaylistStorage.loadPlaylist();
+            // Once the page has settled: files nothing refers to any more.
+            if (ok) {
+                setTimeout(() => {
+                    sweepStoredFiles(this.storage, () => this.state.items)
+                        .catch((error) => Logger.warn('[Playlist] Stored-file sweep failed:', error));
+                }, 5000);
+            }
 
             if (items.length > 0) {
                 this.items = items;
@@ -993,6 +1001,7 @@ export class Playlist {
         const wasActive = this.activeIndex === index;
         this.state.removeItem(index);
         this._saveState();
+        discardStoredFiles(this.storage, [removedItem], this.state.items);
         this._updatePlayerNavigationState();
 
         // 2. Surgical DOM Removal
@@ -1041,6 +1050,7 @@ export class Playlist {
         this.state.setItems(newItems);
         
         this._saveState();
+        discardStoredFiles(this.storage, itemsToRemove, newItems);
         this._updatePlayerNavigationState();
 
         // 2. Surgical DOM Removal
@@ -1517,8 +1527,10 @@ export class Playlist {
             const newItems = this.state.items.filter(item => !item.path.startsWith(prefix));
 
             if (newItems.length < countBefore) {
+                const removed = this.state.items.filter(item => item.path.startsWith(prefix));
                 this.state.setItems(newItems);
                 this._saveState();
+                discardStoredFiles(this.storage, removed, newItems);
                 this.render();
             }
         }
