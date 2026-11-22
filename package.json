@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
-    "quality": "node scripts/quality-check.mjs",
+    "quality": "node scripts/quality-check.mjs && node scripts/architecture-check.mjs",
     "verify:libs": "bash download_libs.sh verify",
     "typecheck": "tsc -p jsconfig.json",
     "check": "npm run quality && npm run typecheck && npm run verify:libs && npm run build",
