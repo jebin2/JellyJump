@@ -12,8 +12,18 @@
  *   npm run build && cp -r dist desktop/build && node scripts/desktop-smoke-test.mjs
  */
 import { _electron as electron } from 'playwright-core';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+// A profile of its own, thrown away after: the test must not read or write
+// the user's real config, and must not collide with a JellyJump already
+// running (the app allows one instance per profile).
+const PROFILE = mkdtempSync(join(tmpdir(), 'jellyjump-smoke-'));
+process.on('exit', () => {
+    rmSync(PROFILE, { recursive: true, force: true });
+    rmSync(`${PROFILE}-plain`, { recursive: true, force: true });
+});
 
 const ROOT = resolve(import.meta.dirname, '..');
 let pass = 0, fail = 0;
@@ -50,7 +60,9 @@ if (!existsSync(resolve(ROOT, 'desktop/build/player.html'))) {
 // of lines is noise, a flood is a hung app.
 if (process.platform === 'linux') {
     const { spawn } = await import('node:child_process');
-    const child = spawn(resolve(ROOT, 'desktop/node_modules/electron/dist/electron'), ['.'], {
+    // No sandbox flags; only the throwaway profile, without which a JellyJump
+    // already running makes this launch exit at once and prove nothing.
+    const child = spawn(resolve(ROOT, 'desktop/node_modules/electron/dist/electron'), ['.', `--user-data-dir=${PROFILE}-plain`], {
         cwd: resolve(ROOT, 'desktop'), stdio: ['ignore', 'ignore', 'pipe'],
         env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' },
     });
@@ -63,7 +75,7 @@ if (process.platform === 'linux') {
 }
 
 const app = await electron.launch({
-    args: ['.', '--no-sandbox'],
+    args: ['.', '--no-sandbox', `--user-data-dir=${PROFILE}`],
     cwd: resolve(ROOT, 'desktop'),
     executablePath: resolve(ROOT, 'desktop/node_modules/electron/dist/electron'),
     env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' },

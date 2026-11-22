@@ -99,7 +99,7 @@ for (const file of files) {
     if (r !== PLAYER_FILE) counts.playerPrivateCalls += (source.match(PLAYER_PRIVATE) ?? []).length;
     if (!isPlaylistPart(r)) counts.playlistPrivateCalls += (source.match(PLAYLIST_PRIVATE) ?? []).length;
     if (/\blocalStorage\b/.test(source)) counts.localStorageFiles++;
-    if (r !== 'shared/utils/ElectronHelper.js' && /window\.electronAPI/.test(source)) counts.directElectronChecks++;
+    if (r !== 'shared/platform/Platform.js' && /\belectronAPI\b/.test(source)) counts.directElectronChecks++;
     // An outside address written out anywhere but the services list (comments excepted).
     if (r !== 'shared/config/services.js' && /['"`]https?:\/\/(?!localhost|127\.0\.0\.1)[a-z0-9.-]+\.[a-z]{2,}/i.test(source)) counts.externalUrlFiles++;
 }

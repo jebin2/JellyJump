@@ -9,7 +9,8 @@
 
 import { IndexedDBService } from './IndexedDBService.js';
 import { DesktopStorageService } from './DesktopStorageService.js';
+import { isDesktop } from '../platform/Platform.js';
 
-const isDesktop = typeof window !== 'undefined' && window.electronAPI?.isElectron;
+const runsOnDesktop = isDesktop();
 
-export const StorageService = isDesktop ? DesktopStorageService : IndexedDBService;
+export const StorageService = runsOnDesktop ? DesktopStorageService : IndexedDBService;

@@ -11,7 +11,8 @@
 
 import { DesktopMediaScanner } from './DesktopMediaScanner.js';
 import { BrowserMediaScanner } from './BrowserMediaScanner.js';
+import { isDesktop } from '../platform/Platform.js';
 
-const isDesktop = typeof window !== 'undefined' && window.electronAPI?.isElectron;
+const runsOnDesktop = isDesktop();
 
-export const MediaScanner = isDesktop ? DesktopMediaScanner : BrowserMediaScanner;
+export const MediaScanner = runsOnDesktop ? DesktopMediaScanner : BrowserMediaScanner;

@@ -2,6 +2,7 @@ import { Modal } from '../../Modal.js';
 import { Toast } from '../../../shared/utils/Toast.js';
 import { Logger } from '../../../shared/utils/Logger.js';
 import { ShareState } from '../../../shared/services/ShareState.js';
+import { desktopBridge } from '../../../shared/platform/Platform.js';
 
 /**
  * Share Menu
@@ -16,7 +17,7 @@ import { ShareState } from '../../../shared/services/ShareState.js';
 export class ShareMenu {
     /** Whether this runtime can share at all — the browser has nothing to serve. */
     static isSupported() {
-        return typeof window !== 'undefined' && !!window.electronAPI?.getShareStatus;
+        return !!desktopBridge()?.getShareStatus;
     }
 
     static async show() {
@@ -32,7 +33,7 @@ export class ShareMenu {
         const render = (state) => this._render(body, state, render);
 
         try {
-            const result = await window.electronAPI.getShareStatus();
+            const result = await desktopBridge().getShareStatus();
             render(result.success ? result.state : { error: result.error });
         } catch (error) {
             Logger.error('[Share] Status failed:', error);
@@ -88,7 +89,7 @@ export class ShareMenu {
             enable.addEventListener('click', async () => {
                 enable.disabled = true;
                 enable.textContent = 'Starting…';
-                const result = await window.electronAPI.enableShare();
+                const result = await desktopBridge().enableShare();
                 rerender(result.success ? result.state : { error: result.error });
             });
             body.appendChild(enable);
@@ -142,7 +143,7 @@ export class ShareMenu {
         stop.addEventListener('click', async () => {
             stop.disabled = true;
             stop.textContent = 'Stopping…';
-            const result = await window.electronAPI.disableShare();
+            const result = await desktopBridge().disableShare();
             rerender(result.success ? result.state : { error: result.error });
         });
         actions.appendChild(stop);
@@ -152,7 +153,7 @@ export class ShareMenu {
         regenerate.addEventListener('click', async () => {
             regenerate.disabled = true;
             regenerate.textContent = 'Working…';
-            const result = await window.electronAPI.regenerateShareToken();
+            const result = await desktopBridge().regenerateShareToken();
             rerender(result.success ? result.state : { error: result.error });
             Toast.show('Previous links no longer work');
         });

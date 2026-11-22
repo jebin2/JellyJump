@@ -3,7 +3,7 @@ import { MediaBunny } from '../media/MediaBunny.js';
 import { MediaProcessor } from '../../core/MediaProcessor.js';
 import { StorageService } from "../services/StorageService.js";
 import { formatTime } from './mediaUtils.js';
-import { ElectronHelper } from './ElectronHelper.js';
+import { ElectronHelper } from '../platform/ElectronHelper.js';
 
 // Shared IndexedDB instance for caching remote blobs
 const _dbService = new StorageService();
