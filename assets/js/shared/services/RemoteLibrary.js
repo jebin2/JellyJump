@@ -1,3 +1,4 @@
+import { fetchWithPolicy } from '../net/fetchWithPolicy.js';
 import { Logger } from '../utils/Logger.js';
 import { Settings } from '../settings/Settings.js';
 import { parseLinkListFile, linkListFolderName } from '../utils/LinkListFile.js';
@@ -86,7 +87,7 @@ export async function probe(rawUrl) {
     if (!token) return { ok: false, error: 'Link has no token' };
 
     try {
-        const response = await fetch(`${url.origin}/api/info?token=${encodeURIComponent(token)}`);
+        const response = await fetchWithPolicy(`${url.origin}/api/info?token=${encodeURIComponent(token)}`, { timeoutMs: 8000 });
         if (response.status === 401) return { ok: false, error: 'This link is no longer valid' };
         if (!response.ok) return { ok: false, error: `Server responded ${response.status}` };
 
@@ -109,7 +110,7 @@ export async function fetchItems(rawUrl) {
     const url = new URL(rawUrl);
     const token = url.searchParams.get('token');
 
-    const response = await fetch(`${url.origin}/api/library?token=${encodeURIComponent(token)}`);
+    const response = await fetchWithPolicy(`${url.origin}/api/library?token=${encodeURIComponent(token)}`);
     if (!response.ok) throw new Error(`Library request failed (${response.status})`);
 
     const data = await response.json();
@@ -225,7 +226,8 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
 
     let response;
     try {
-        response = await fetch(endpoint);
+        // Not retried: the plain endpoint below is the fallback.
+        response = await fetchWithPolicy(endpoint, { retries: 0 });
     } catch {
         // Unreachable host, blocked mixed content, CORS. The plain endpoint
         // fails the same way and reports it properly, so let it.

@@ -11,6 +11,7 @@ export const ERROR_CODES = Object.freeze({
     UNSUPPORTED_CODEC: 'This browser cannot play or edit this video\'s format. Try converting it, or another browser.',
     DECODE_FAILED: 'The video could not be read. The file may be damaged or incomplete.',
     NETWORK: 'Could not reach the server. Check the connection and try again.',
+    OFFLINE: 'This device is offline. Connect to the internet and try again.',
     TIMEOUT: 'The server took too long to answer. Try again in a moment.',
     CORS: 'That site does not allow its videos to be played from another site.',
     STORAGE_FULL: 'The browser\'s storage is full. Remove some videos from the playlist and try again.',
