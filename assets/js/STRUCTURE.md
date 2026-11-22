@@ -67,7 +67,15 @@ One folder per operation (`trim/`, `speed/`, `merge/`, `transcode/`,
 ### `ui/` — what the user sees and touches
 
 - `player/`: the player's controls, panels, keyboard, overlays; the
-  playlist (`Playlist` and its parts); the edit panel; the job tray.
+  playlist; the edit panel; the job tray. The playlist is `Playlist.js`
+  (the list, removing, clearing) and its parts, each a set of `Playlist`
+  methods in a file of its own: `PlaylistStore` (saving and restoring),
+  `PlaylistMetadata` (durations, thumbnails, broken items),
+  `PlaylistIngest` (files, URLs, M3U and link lists, tool results),
+  `PlaylistDiscovery` (the desktop media scan) and `PlaylistPlayback`
+  (selecting and playing an item). Helpers with state of their own are
+  classes: `PlaylistState`, `PlaylistRenderer`, `PlaylistUI`,
+  `PlaylistNavigation`, `PlaylistRemoteLibraries`.
 - `menus/`: `core/` (the router, the tool surface, the job runner) and
   `features/` (one file per tool).
 - `Modal.js`: dialogs.

@@ -48,8 +48,9 @@ start (`78c1c90`); this table is where things stand now.
 | 1 | T1 README, T2 ADRs 0001–0011 | done | this PR |
 | 2 | D1–D3 `Settings` (`jj:` keys, old ones moved; `localStorage` files 14 → 5), `player.override()`; edit panel and the timeline tools use it, its speed rewrite gone | done | #61 |
 | 2 | G1 delete a removed item's file, G2 sweep after load (BUG-4); G3 progress in one capped map (BUG-5); G5/N6 full disk keeps the list and says so once. `localStorage` only in settings and storage (now a rule: count 0) | done | #62 |
-| 2 | E1 public playlist names (`save`, `ensureMetadata`, `processMetadata`, `handleUrlUpload`); outside `playlist._*` calls 50 → 0. BUG-15 found and fixed: Record called a `playlist._showToast` that never existed, so its messages threw | done | this PR |
-| 2 | E2–E5, F, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
+| 2 | E1 public playlist names (`save`, `ensureMetadata`, `processMetadata`, `handleUrlUpload`); outside `playlist._*` calls 50 → 0. BUG-15 found and fixed: Record called a `playlist._showToast` that never existed, so its messages threw | done | #63 |
+| 2 | E2–E5 `Playlist.js` 1,807 → 436 lines: `PlaylistStore`, `PlaylistMetadata`, `PlaylistIngest`, `PlaylistDiscovery`, `PlaylistPlayback`; `ITEM_SELECTED_EVENT` moved to the playlist; `ingest-test` (17) | done | this PR |
+| 2 | F, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
@@ -756,6 +757,13 @@ M, L.
 
 Watch the order of `render()` and `_saveState()` calls inside moved methods;
 some flows depend on it.
+
+How it was done: each part is a set of `Playlist` methods in its own file,
+added to `Playlist.prototype`, so `this` and the order of calls are exactly
+as before and the move is a pure cut and paste. The parts still share the
+playlist's fields; giving each part its own state (and moving the logic to
+an `app/` layer with no DOM) is a later step, when there is a reason to
+change one of them.
 
 ### Phase F — Tools behave the same (M)
 

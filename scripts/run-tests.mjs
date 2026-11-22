@@ -29,7 +29,7 @@ const QUICK = [
     'rs-selftest', 'shard-pipeline-test', 'playback-clock-test', 'errors-test', 'settings-test', 'override-test',
 ];
 const BROWSER = [
-    'encrypt-test', 'storage-test', 'source-failure-test', 'youtube-embed-test',
+    'encrypt-test', 'storage-test', 'ingest-test', 'source-failure-test', 'youtube-embed-test',
     'smoke-test', 'edit-panel-test', 'watch-panel-test', 'watch-party-test',
 ];
 /** Needs Electron, installed with the desktop app's own dependencies. */

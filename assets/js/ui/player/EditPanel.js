@@ -1,3 +1,4 @@
+import { ITEM_SELECTED_EVENT } from './PlaylistPlayback.js';
 import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { Toast } from '../../shared/utils/Toast.js';
@@ -58,8 +59,6 @@ const STORES_COPIES = !isDesktop();
 /** IndexedDBService stores no file larger than this; such a copy stays in memory. */
 const MAX_STORED_FILE = 500 * 1024 * 1024;
 
-/** Fired by Playlist.selectItem, so the panel can follow what is playing. */
-export const ITEM_SELECTED_EVENT = 'jellyjump:item-selected';
 
 const ICON = (name, size = 16) =>
     `<svg width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><use href="assets/icons/sprite.svg#${name}"></use></svg>`;
