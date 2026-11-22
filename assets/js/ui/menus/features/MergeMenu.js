@@ -43,7 +43,7 @@ export class MergeMenu {
         const bgColorInput = modalContent.querySelector('#merge-bg-color');
 
         // State
-        let selectedVideos = []; // Array of playlist items
+        const selectedVideos = []; // Array of playlist items
 
         // Helper: Detect Max Resolution
         const detectMaxResolution = async () => {
@@ -61,7 +61,6 @@ export class MergeMenu {
 
             for (const item of selectedVideos) {
                 if (!item.videoInfo) {
-                    const oldDuration = item.duration;
                     item.duration = 'Loading...';
                     renderSelected();
 
@@ -277,7 +276,6 @@ export class MergeMenu {
             mergeBtn.disabled = true;
             mergeBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Merging...';
 
-            const progressSection = modalContent.querySelector('.progress-section');
             const successMsg = modalContent.querySelector('.success-message');
             const downloadBtn = modalContent.querySelector('.download-btn');
 

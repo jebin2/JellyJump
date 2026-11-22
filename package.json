@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
-    "quality": "node scripts/quality-check.mjs && node scripts/architecture-check.mjs",
+    "quality": "node scripts/quality-check.mjs && node scripts/architecture-check.mjs && eslint assets/js",
     "verify:libs": "bash download_libs.sh verify",
     "typecheck": "tsc -p jsconfig.json",
     "check": "npm run quality && npm run typecheck && npm run verify:libs && npm run build",
@@ -39,6 +39,8 @@
     "test:edit": "node scripts/edit-panel-test.mjs"
   },
   "devDependencies": {
+    "eslint": "^10.14.0",
+    "globals": "^17.13.0",
     "playwright-core": "^1.56.0",
     "typescript": "^5.6.3",
     "vite": "^8.0.0"

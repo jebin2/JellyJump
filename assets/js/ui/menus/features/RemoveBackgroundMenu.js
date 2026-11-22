@@ -24,16 +24,10 @@ export class RemoveBackgroundMenu {
 
         const processBtn = modalContent.querySelector('.removebg-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.progress-section');
-        const progressBar = modalContent.querySelector('.progress-bar-fill');
-        const progressText = modalContent.querySelector('.progress-percentage');
-        const progressStatus = modalContent.querySelector('.progress-status');
         const errorMessage = modalContent.querySelector('.error-message');
-        const successMessage = modalContent.querySelector('.success-message');
 
         // State
-        let selectedColors = []; // Array of {r, g, b, tolerance}
-        let sourceBlob = null;
+        const selectedColors = []; // Array of {r, g, b, tolerance}
 
         // The main player is the preview, and a clear layer over its picture
         // takes the clicks that pick colours.
@@ -282,14 +276,6 @@ export class RemoveBackgroundMenu {
             return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
         }
 
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : null;
-        }
 
         // Process Video
         processBtn.onclick = async () => {

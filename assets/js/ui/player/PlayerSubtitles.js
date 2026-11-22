@@ -180,7 +180,6 @@ export class PlayerSubtitles {
     }
 
     switchSubtitleTrack(trackId) {
-        const p = this.player;
         const track = this.tracks.find(t => t.id === trackId);
         if (!track) return;
 
@@ -351,7 +350,6 @@ export class PlayerSubtitles {
     }
 
     restoreSavedSubtitles(savedSubtitles) {
-        const p = this.player;
         this.tracks = savedSubtitles.map(track => ({
             id: track.id,
             name: track.name,

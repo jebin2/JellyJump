@@ -31,13 +31,6 @@ export class SpeedReverseMenu {
         const directionRadios = modalContent.querySelectorAll('input[name="direction"]');
 
         const processBtn = modalContent.querySelector('.reverse-btn');
-        const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.progress-section');
-        const progressBar = modalContent.querySelector('.progress-bar-fill');
-        const progressText = modalContent.querySelector('.progress-percentage');
-        const progressStatus = modalContent.querySelector('.progress-status');
-        const errorMessage = modalContent.querySelector('.error-message');
-        const successMessage = modalContent.querySelector('.success-message');
 
         const loadingSection = modalContent.querySelector('.reverse-loading');
         const contentSection = modalContent.querySelector('.reverse-content');

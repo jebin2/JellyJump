@@ -30,10 +30,7 @@ export class TrimMenu {
         const losslessToggle = modalContent.querySelector('#trim-lossless-toggle');
         const trimBtn = modalContent.querySelector('.trim-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.progress-section');
-        const progressPercentage = modalContent.querySelector('.progress-percentage');
         const errorMessage = modalContent.querySelector('.error-message');
-        const successMessage = modalContent.querySelector('.success-message');
 
         // Initial State
         trimBtn.disabled = true;

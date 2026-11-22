@@ -4,7 +4,7 @@
  * playback state, UI updates, and stream/media lifecycle management.
  */
 
-import { MediaBunny } from '../shared/media/MediaBunny.js';
+import '../shared/media/MediaBunny.js'; // registers the codec plugins
 import { ScreenWakeLock } from './playback/ScreenWakeLock.js';
 import {
     onPlayerEvent,
@@ -19,18 +19,7 @@ import {
 } from './config.js';
 import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
 import { hasOverlays } from '../shared/media/OverlayCompositor.js';
-import {
-    closePlayerAudioBufferIterator,
-    closePlayerAudioBufferIteratorSoon,
-    closePlayerAudioContext,
-    initPlayerAudio,
-    restorePlayerAutoplayAudio,
-    runPlayerAudioIterator,
-    startPlayerAudioVisualizer,
-    stopPlayerQueuedAudio,
-    suspendPlayerAudioContext,
-    syncPlayerAudioGain
-} from './audio/AudioEngine.js';
+import { closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, closePlayerAudioContext, initPlayerAudio, restorePlayerAutoplayAudio, runPlayerAudioIterator, stopPlayerQueuedAudio, suspendPlayerAudioContext, syncPlayerAudioGain } from './audio/AudioEngine.js';
 import {
     clearPlayerCanvas,
     disposeMediaBunnyResources,
@@ -71,14 +60,7 @@ import {
     startPlayerRenderLoop,
     updatePlayerNextFrame
 } from './playback/RenderLoop.js';
-import { parseYouTubeUrl } from '../shared/utils/YouTubeUrl.js';
-import {
-    loadPlayerYouTube,
-    cancelYouTubeAutoplayRetry,
-    suspendPlayerYouTube,
-    teardownPlayerYouTube,
-    syncYouTubeAudio
-} from './youtube/YouTubePlayback.js';
+import { cancelYouTubeAutoplayRetry, suspendPlayerYouTube, teardownPlayerYouTube, syncYouTubeAudio } from './youtube/YouTubePlayback.js';
 import { PlayerStream } from './streaming/PlayerStream.js';
 import {
     mountPlayerShell,
@@ -116,7 +98,6 @@ import { PlayerLoopControl } from '../ui/player/PlayerLoopControl.js';
 import { PlayerThumbnails } from '../ui/player/PlayerThumbnails.js';
 import { PlayerControlBar } from '../ui/player/PlayerControlBar.js';
 
-import { StreamDetector } from '../shared/utils/StreamDetector.js';
 import { Logger } from '../shared/utils/Logger.js';
 import { MediaTracks } from './playback/MediaTracks.js';
 import { PlaybackEpoch } from './playback/PlaybackEpoch.js';

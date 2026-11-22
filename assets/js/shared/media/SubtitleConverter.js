@@ -40,7 +40,6 @@ export function jsonToVTT(words, options = {}) {
     }
 
     let vtt = 'WEBVTT\n\n';
-    let cueIndex = 1;
     let i = 0;
 
     while (i < words.length) {

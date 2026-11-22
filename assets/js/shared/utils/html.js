@@ -43,6 +43,17 @@ function render(value) {
 }
 
 /**
+ * Markup the code itself built (an icon's SVG, rows already escaped piece by
+ * piece), to put into an html`` template as markup. Never for text that
+ * came from outside: that is what html`` escapes.
+ * @param {string} markup
+ * @returns {SafeHtml}
+ */
+export function trusted(markup) {
+    return new SafeHtml(markup);
+}
+
+/**
  * @param {TemplateStringsArray} strings
  * @param {...unknown} values
  * @returns {SafeHtml}

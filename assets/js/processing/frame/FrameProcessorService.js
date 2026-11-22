@@ -1,4 +1,3 @@
-import { Logger } from "../../shared/utils/Logger.js";
 
 /**
  * Apply chroma key to image data
@@ -9,8 +8,6 @@ import { Logger } from "../../shared/utils/Logger.js";
  */
 export function applyChromaKey(imageData, colors, bgType = 'transparent', bgColor = '#000000') {
     const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
     const maxDist = 441.67; // Sqrt(255^2 + 255^2 + 255^2)
 
     // Parse custom background color if needed

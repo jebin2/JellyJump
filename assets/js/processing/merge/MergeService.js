@@ -212,7 +212,7 @@ export async function merge({ inputs, format = 'mp4', resolution, scaleMode = 'p
         output.addVideoTrack(canvasSource);
 
         let audioCodec;
-        let audioBitrate = AUDIO_BITRATE_BPS;
+        const audioBitrate = AUDIO_BITRATE_BPS;
         const targetSampleRate = 48000;
         const targetChannels = 2;
 

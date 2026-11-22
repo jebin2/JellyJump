@@ -4,7 +4,6 @@ import { unlockIfEncrypted } from './EncryptedPlayback.js';
 import { classifyPlaylistItem } from './PlaylistItemKind.js';
 import { Toast } from "../../shared/utils/Toast.js";
 import { StorageService } from "../../shared/services/StorageService.js";
-import { CorePlayer } from '../../core/Player.js';
 import { ConfirmDialog } from '../../shared/utils/ConfirmDialog.js';
 import { RecordMenu } from '../menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
@@ -29,7 +28,6 @@ import {
 } from '../../shared/services/RemoteLibrary.js';
 
 // Performance config for large playlists (e.g., 10K+ IPTV channels)
-const LAZY_FOLDER_THRESHOLD = 50; // Use lazy rendering for folders with more children
 
 /**
  * Playlist Manager
@@ -1491,14 +1489,9 @@ export class Playlist {
     }
 
     async _removeFolder(folderData) {
-        // Find items that start with folder path
+        // Folders are virtual: an item is inside one when its path starts
+        // with the folder's path and a slash.
         const prefix = folderData.path + '/';
-        // And exact path matches? Folders are virtual.
-        // Actually filtering strategy:
-        // Remove all items where item.path startsWith prefix OR item.path == folderData.path?
-        // Items inside: `Playlist/Group/Item`.
-        // Folder: `Playlist/Group`.
-        // Check if item.path includes the folder segments.
 
         const confirmed = await ConfirmDialog.confirm({
             title: 'Delete Folder',
@@ -1509,7 +1502,7 @@ export class Playlist {
 
         if (confirmed) {
             const countBefore = this.state.items.length;
-            const newItems = this.state.items.filter(item => !item.path.startsWith(folderData.path + '/'));
+            const newItems = this.state.items.filter(item => !item.path.startsWith(prefix));
 
             if (newItems.length < countBefore) {
                 this.state.setItems(newItems);
