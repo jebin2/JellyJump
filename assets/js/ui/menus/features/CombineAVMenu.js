@@ -1,7 +1,6 @@
 import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-import { generateId } from '../../../shared/utils/mediaUtils.js';
 import { runMenuJob } from '../core/MenuJob.js';
 
 /**
@@ -93,9 +92,6 @@ export class CombineAVMenu {
             combineBtn.disabled = true;
             combineBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Combining...';
 
-            const successMsg = modalContent.querySelector('.success-message');
-            const downloadBtn = modalContent.querySelector('.download-btn');
-
             const outcome = await runMenuJob({
                 name: 'Combine A/V',
                 subject: videoItem.title,
@@ -112,35 +108,20 @@ export class CombineAVMenu {
                         signal,
                     });
                 },
-                done: (combinedBlob) => {
-                    successMsg.textContent = '✓ Added to playlist';
-                    combineBtn.innerHTML = '<span>Added</span><svg width="16" height="16" fill="currentColor" class="ml-xs"><use href="assets/icons/sprite.svg#icon-check"></use></svg>';
-
-                    const url = URL.createObjectURL(combinedBlob);
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    const filename = `combined-${timestamp}.${format}`;
-                    downloadBtn.href = url;
-                    downloadBtn.download = filename;
-                    downloadBtn.classList.remove('hidden');
-
-                    const basePath = videoItem?.path || videoItem?.title || '';
+                done: async (combinedBlob) => {
+                    // The dialog is closed by now (a background job); the
+                    // result goes in after the video, and the job tray
+                    // offers it (download, edit).
+                    const anchor = videoItem;
+                    const filename = `combined-${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`;
+                    const basePath = anchor?.path || anchor?.title || '';
                     const parentPath = basePath.includes('/') ? basePath.substring(0, basePath.lastIndexOf('/')) : '';
-                    const newItem = {
-                        title: filename,
-                        url,
-                        duration: '...',
-                        thumbnail: '',
-                        isLocal: true,
-                        file: new File([combinedBlob], filename, { type: `video/${format}` }),
-                        id: generateId(),
-                        path: parentPath ? `${parentPath}/${filename}` : filename,
-                    };
-                    const lastIndex = playlist.items.indexOf(videoItem);
-                    if (lastIndex !== -1) playlist.items.splice(lastIndex + 1, 0, newItem);
-                    else playlist.items.push(newItem);
-                    playlist.save();
-                    playlist.render();
-                    playlist.processMetadata([newItem]);
+                    const { item: newItem } = playlist.insertProcessedItem(anchor, combinedBlob, filename, {
+                        type: `video/${format}`,
+                        duration: null,
+                        extra: { path: parentPath ? `${parentPath}/${filename}` : filename },
+                    });
+                    await playlist.ensureMetadata(newItem);
                 },
             });
             if (!outcome.ok) {
