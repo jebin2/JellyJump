@@ -1,9 +1,14 @@
 name: Build and Deploy
 
+# A merge to main deploys only once the Test workflow has passed on that same
+# commit. Deploying on the push itself published commits whose tests then
+# failed: the two workflows ran side by side and nothing connected them.
+# Pull requests still run the build here, as a check that the site builds.
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+    branches: [main]
   pull_request:
     branches:
       - main
@@ -16,27 +21,59 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+    # After Test on main: only when it passed, and only for a push (Test also
+    # runs for pull requests, whose completion must not deploy anything).
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    env:
+      # The commit to build: the one Test passed on, or the event's own.
+      BUILD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ env.BUILD_SHA }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
+      # Deploy after Test passed on main, or on a manual run on main -- and
+      # only the newest commit there. Two merges close together finish their
+      # tests in either order, and an older build must not replace a newer one
+      # on the live site.
+      - name: Decide whether to deploy
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          deploy=false
+          if [ "$EVENT" = "workflow_run" ] || { [ "$EVENT" = "workflow_dispatch" ] && [ "$REF" = "refs/heads/main" ]; }; then
+            deploy=true
+            git fetch origin main
+            tip=$(git rev-parse origin/main)
+            if [ "$tip" != "$BUILD_SHA" ]; then
+              echo "main is now at $tip, newer than $BUILD_SHA; its own run will deploy."
+              deploy=false
+            fi
+          fi
+          echo "Deploy: $deploy"
+          echo "DEPLOY=$deploy" >> "$GITHUB_ENV"
+
+      # The same Node the tests ran on, so what is deployed is what was tested.
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '22'
       
       - name: Install dependencies
-        run: npm install
-      
+        run: npm ci
       - name: Build with Vite
         run: npm run build
 
       - name: Note the current Pages build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: env.DEPLOY == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -48,9 +85,9 @@ jobs:
         # A pull request against main triggers this workflow too, and without
         # this guard the step force-pushed the PR's build to `release` -- which
         # is the branch Pages serves, so proposing a change published it to the
-        # live site. The two steps around this one were already guarded; this
-        # one, the only one that actually deploys, was not.
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # live site. DEPLOY is true only after Test passed on main (or a manual
+        # run on main), and only for the newest commit there.
+        if: env.DEPLOY == 'true'
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
@@ -100,7 +137,7 @@ jobs:
       # green run published nothing, and the symptom was indistinguishable
       # from slow CDN propagation. Without this step there is no signal at all.
       - name: Verify GitHub Pages published
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.PAGES_EXPECT_BUILD == 'yes'
+        if: env.DEPLOY == 'true' && env.PAGES_EXPECT_BUILD == 'yes'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
