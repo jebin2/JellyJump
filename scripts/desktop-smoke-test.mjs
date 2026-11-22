@@ -147,8 +147,58 @@ const copy = await page.evaluate(async (b64) => {
 check(copy.first > 11 && copy.again > 11 && copy.playing === 'smoke-edited.webm',
     `an edited copy still plays after switching away and back (${copy.first}s, then ${copy.again}s, ${copy.playing})`);
 
+// G4: a tool's result gets a file of its own in the app's copies folder; a
+// file the user dropped in is theirs and is not copied.
+const stored = await page.evaluate(async () => {
+    const find = (title) => window.playlist.items.find(i => i.title === title);
+    for (let i = 0; i < 50 && !find('smoke-edited.webm')?.localPath; i++) await new Promise(r => setTimeout(r, 100));
+    return { edited: find('smoke-edited.webm')?.localPath ?? null, original: find('smoke-original.webm')?.localPath ?? null };
+});
+check(!!stored.edited && stored.edited.startsWith(join(PROFILE, 'copies')) && existsSync(stored.edited),
+    `the edited copy is kept on disk, in the app's copies folder (${stored.edited?.split('/').slice(-2).join('/')})`);
+check(!stored.original, 'the dropped original is not copied');
+
 check(errs.length === 0, `nothing failed quietly${errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''}`);
+await app.close();
+
+// And after a restart, the copy plays: before G4 it was gone with the window.
+const again = await electron.launch({
+    args: ['.', '--no-sandbox', `--user-data-dir=${PROFILE}`],
+    cwd: resolve(ROOT, 'desktop'),
+    executablePath: resolve(ROOT, 'desktop/node_modules/electron/dist/electron'),
+    env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' },
+});
+try {
+    const page2 = await again.firstWindow({ timeout: 60000 });
+    await page2.waitForFunction(() => !!window.player && !!window.playlist?.items.length, null, { timeout: 60000 });
+    const restarted = await page2.evaluate(async () => {
+        const pl = window.playlist, p = window.player;
+        await pl.cancelMediaScan?.();
+        const at = pl.items.findIndex(i => i.title === 'smoke-edited.webm');
+        if (at === -1) return { found: false };
+        await pl.selectItem(at, false);
+        for (let i = 0; i < 100 && !(p.duration > 0 && !p.isLoading); i++) await new Promise(r => setTimeout(r, 100));
+        return { found: true, duration: p.duration, playing: pl.items[pl.activeIndex]?.title };
+    });
+    check(restarted.found && restarted.duration > 11 && restarted.playing === 'smoke-edited.webm',
+        `after a restart the edited copy is still there and plays (${JSON.stringify(restarted)})`);
+
+    // What the edit panel's Undo reads (by item id), and what removing the
+    // item does: its copy goes (G1, now on desktop too).
+    const removed = await page2.evaluate(async () => {
+        const pl = window.playlist;
+        const item = pl.items.find(i => i.title === 'smoke-edited.webm');
+        const read = await pl.storage.loadFile(item.id);
+        await pl.selectItem(pl.items.findIndex(i => i !== item && !i.isDiscovered), false).catch(() => {});
+        pl.removeItem(pl.items.indexOf(item));
+        await new Promise(r => setTimeout(r, 800));
+        return { readSize: read?.size ?? 0 };
+    });
+    check(removed.readSize > 100000, `a copy reads back by its item id (${removed.readSize} bytes)`);
+    check(!existsSync(stored.edited), 'removing the item from the playlist deletes its copy');
+} finally {
+    await again.close();
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
-await app.close();
 process.exit(fail ? 1 : 0);

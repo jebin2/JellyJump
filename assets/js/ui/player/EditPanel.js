@@ -9,7 +9,6 @@ import { itemToolSections } from '../menus/features/ItemToolsMenu.js';
 import { JobQueue } from '../../shared/services/JobQueue.js';
 import { StorageService } from '../../shared/services/StorageService.js';
 import { html, trusted } from '../../shared/utils/html.js';
-import { isDesktop } from '../../shared/platform/Platform.js';
 
 /**
  * EditPanel - editing a video in the sidebar, with the main player as preview.
@@ -47,18 +46,8 @@ const STACKING_TOOLS = new Set([
     'crop', 'blur', 'watermark', 'remove-bg',
 ]);
 
-/** Where the edits are remembered between visits, for the copies they made. */
-
-/**
- * Whether earlier copies can be read back from storage. The desktop app
- * stores no edited copy, so there Undo needs them in memory, and the edits
- * are not remembered past the session.
- */
-const STORES_COPIES = !isDesktop();
-
 /** IndexedDBService stores no file larger than this; such a copy stays in memory. */
 const MAX_STORED_FILE = 500 * 1024 * 1024;
-
 
 const ICON = (name, size = 16) =>
     `<svg width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><use href="assets/icons/sprite.svg#${name}"></use></svg>`;
@@ -585,7 +574,7 @@ export class EditPanel {
      * @param {Object} session
      */
     _shelve(session) {
-        if (!STORES_COPIES || session.pending) return;
+        if (session.pending) return;
         for (const step of session.steps) {
             if (step.file && step.file.size < MAX_STORED_FILE) step.file = null;
         }
@@ -663,7 +652,7 @@ export class EditPanel {
                 })),
             };
         }
-        Settings.set('editHistory', STORES_COPIES && Object.keys(stored).length ? stored : null);
+        Settings.set('editHistory', Object.keys(stored).length ? stored : null);
     }
 
     /**
