@@ -1,6 +1,6 @@
-import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny, ensureDecodersFor, codecOf } from '../../shared/media/MediaBunny.js';
-import { createMediaBunnyInput } from '../shared/InputFactory.js';
+import { Logger } from '../utils/Logger.js';
+import { MediaBunny, ensureDecodersFor, codecOf } from './MediaBunny.js';
+import { createMediaBunnyInput } from './InputFactory.js';
 
 async function getTrackDetails(input) {
     const videoTracks = await input.getVideoTracks();

@@ -7,19 +7,6 @@
     "externalUrlFiles": 0
   },
   "wrongWayImports": [
-    "core/MediaProcessor.js -> processing/combine/CombineAVService.js",
-    "core/MediaProcessor.js -> processing/export/GifService.js",
-    "core/MediaProcessor.js -> processing/frame/FrameProcessorService.js",
-    "core/MediaProcessor.js -> processing/hls/HlsService.js",
-    "core/MediaProcessor.js -> processing/merge/MergeService.js",
-    "core/MediaProcessor.js -> processing/metadata/MetadataService.js",
-    "core/MediaProcessor.js -> processing/shared/InputFactory.js",
-    "core/MediaProcessor.js -> processing/slideshow/SlideshowService.js",
-    "core/MediaProcessor.js -> processing/speed/SpeedService.js",
-    "core/MediaProcessor.js -> processing/tracks/TrackExtractionService.js",
-    "core/MediaProcessor.js -> processing/transcode/TranscodeService.js",
-    "core/MediaProcessor.js -> processing/trim/TrimService.js",
-    "core/MediaProcessor.js -> processing/worker/WorkerClient.js",
     "core/Player.js -> ui/player/PlayerBindings.js",
     "core/Player.js -> ui/player/PlayerControlBar.js",
     "core/Player.js -> ui/player/PlayerControlsView.js",
@@ -33,9 +20,6 @@
     "core/Player.js -> ui/player/PlayerUIUpdates.js",
     "core/Player.js -> ui/player/ScreenshotManager.js",
     "core/audio/AudioEngine.js -> ui/player/AudioVisualizer.js",
-    "core/audio/AudioEngine.js -> ui/player/AudioVisualizer.js",
-    "core/playback/ReversePlayback.js -> processing/shared/AudioHelpers.js",
-    "core/playback/ReversePlayback.js -> processing/shared/BackwardFrames.js",
-    "shared/utils/MediaMetadata.js -> core/MediaProcessor.js"
+    "core/audio/AudioEngine.js -> ui/player/AudioVisualizer.js"
   ]
 }

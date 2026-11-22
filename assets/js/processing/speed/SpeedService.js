@@ -1,10 +1,10 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaBunny, ensureEncoders } from '../../shared/media/MediaBunny.js';
-import { AUDIO_BITRATE_BPS, createMediaBunnyInput } from '../shared/InputFactory.js';
-import { addAudioSamples, stretchAudioBuffer } from '../shared/AudioHelpers.js';
+import { AUDIO_BITRATE_BPS, createMediaBunnyInput } from '../../shared/media/InputFactory.js';
+import { addAudioSamples, stretchAudioBuffer } from '../../shared/media/AudioHelpers.js';
 import { cancellableProgress, cancelUnfinished, throwIfCancelled, isCancellation } from '../../shared/utils/Cancellation.js';
 import { copyMetadataTags } from '../shared/MetadataTags.js';
-import { backwardSamples } from '../shared/BackwardFrames.js';
+import { backwardSamples } from '../../shared/media/BackwardFrames.js';
 
 /**
  * A decoded frame copied into ordinary memory, so the decoder's own frame can

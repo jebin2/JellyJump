@@ -1,10 +1,11 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { openToolSurface } from '../core/MenuFactory.js';
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { html } from '../../../shared/utils/html.js';
+import { Toast } from '../../../shared/utils/Toast.js';
 
 /**
  * Track Manager Menu Handler
@@ -63,7 +64,7 @@ export class TrackManagerMenu {
                 modal.close();
 
                 // Show user-friendly popup
-                alert(`The file "${item.title}" is no longer available and will be removed from the playlist.\n\nThis can happen when the browser cache is cleared or the file was not properly saved.`);
+                Toast.show(`"${item.title}" is no longer available (the browser's storage may have been cleared), so it was removed from the playlist.`, 6000, true);
 
                 // Remove the item from playlist
                 const itemIndex = playlist.items.indexOf(item);
@@ -176,7 +177,7 @@ export class TrackManagerMenu {
 
                     const exists = playlist.items.some(it => it.title === newFilename);
                     if (exists) {
-                        alert(`Track "${newFilename}" is already in the playlist.`);
+                        Toast.show(`"${newFilename}" is already in the playlist.`, 4000, true);
                         return;
                     }
 

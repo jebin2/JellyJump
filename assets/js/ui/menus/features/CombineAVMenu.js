@@ -1,5 +1,5 @@
 import { Modal } from '../../Modal.js';
-import { MediaProcessor } from '../../../core/MediaProcessor.js';
+import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId } from '../../../shared/utils/mediaUtils.js';
 import { runMenuJob } from '../core/MenuJob.js';

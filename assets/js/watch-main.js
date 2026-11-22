@@ -2,6 +2,10 @@ import { WatchViewer } from './core/streaming/WatchParty.js';
 import { describeConnection, describeMedia } from './core/streaming/ConnectionReport.js';
 import { viewerView, joiningNote, WAITING_NOTE } from './core/streaming/ViewerView.js';
 import { Logger } from './shared/utils/Logger.js';
+import { installErrorReporter } from './shared/errors/ErrorReporter.js';
+
+// Errors nothing else caught are recorded and shown once (shared/errors).
+installErrorReporter();
 
 /**
  * The viewer side of a watch party.

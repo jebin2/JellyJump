@@ -588,7 +588,11 @@ export async function cleanupPlayerMediaBunny(player) {
  * `{ isAudio }` and no one looked, because isAudioMode is decided from the
  * tracks the file actually has rather than from what the playlist believed.
  */
+/** Numbers each load, so its log entries can be told from the next one's. */
+let loadCount = 0;
+
 export async function loadPlayerMedia(player, url, autoplay = false, videoId = null, savedSubtitles = null) {
+    Logger.setTrace('load', ++loadCount);
     player.sourceUrl = url;
     try {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);

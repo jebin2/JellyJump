@@ -5,6 +5,10 @@ import { config, isEnabled } from './shared/config/index.js';
 import { ElectronHelper } from './shared/platform/ElectronHelper.js';
 import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
 import { Logger } from './shared/utils/Logger.js';
+import { installErrorReporter } from './shared/errors/ErrorReporter.js';
+
+// Errors nothing else caught are recorded and shown once (shared/errors).
+installErrorReporter();
 
 // Moved out of an inline <script> in player.html so a strict CSP can apply.
 function hideLoader() {
