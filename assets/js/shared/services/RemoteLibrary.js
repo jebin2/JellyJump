@@ -87,7 +87,7 @@ export async function probe(rawUrl) {
     if (!token) return { ok: false, error: 'Link has no token' };
 
     try {
-        const response = await fetchWithPolicy(`${url.origin}/api/info?token=${encodeURIComponent(token)}`, { timeoutMs: 8000 });
+        const response = await fetchWithPolicy(`${url.origin}/api/info`, { timeoutMs: 8000, headers: bearer(token) });
         if (response.status === 401) return { ok: false, error: 'This link is no longer valid' };
         if (!response.ok) return { ok: false, error: `Server responded ${response.status}` };
 
@@ -110,7 +110,7 @@ export async function fetchItems(rawUrl) {
     const url = new URL(rawUrl);
     const token = url.searchParams.get('token');
 
-    const response = await fetchWithPolicy(`${url.origin}/api/library?token=${encodeURIComponent(token)}`);
+    const response = await fetchWithPolicy(`${url.origin}/api/library`, { headers: bearer(token) });
     if (!response.ok) throw new Error(`Library request failed (${response.status})`);
 
     const data = await response.json();
@@ -159,15 +159,36 @@ function shapeLinkList(list, serverName, rawUrl) {
 }
 
 /**
+ * The token goes in a header, not the URL: URLs end up in logs, history and
+ * bug reports. The server takes it either way.
+ * @param {string|null} token
+ */
+function bearer(token) {
+    return { Authorization: `Bearer ${token}` };
+}
+
+/**
+ * A file's stream URL, with its own key when the server gave one.
+ * @param {URL} url - the share link
+ * @param {{id: string, sig?: string}} entry
+ * @param {string|null} token
+ */
+function streamUrl(url, entry, token) {
+    const key = entry.sig ? `sig=${encodeURIComponent(entry.sig)}` : `token=${encodeURIComponent(token ?? '')}`;
+    return `${url.origin}/api/stream/${entry.id}?${key}`;
+}
+
+/**
  * One listing entry as a playlist item. Shared by both fetch paths so a
  * streamed library and a whole-response one are indistinguishable afterwards.
  */
 function shapeItem(item, url, token, serverName, rawUrl) {
     return {
         title: item.name,
-        // The stream URL carries the token: mediabunny's UrlSource issues its
-        // own range requests and cannot attach headers to them.
-        url: `${url.origin}/api/stream/${item.id}?token=${encodeURIComponent(token)}`,
+        // MediaBunny's UrlSource makes its own range requests and cannot send
+        // headers, so the URL carries a key: the file's own (sig), which opens
+        // only it, or the token from a server too old to sign.
+        url: streamUrl(url, item, token),
         duration: '',
         thumbnail: '',
         isLocal: false,
@@ -184,8 +205,7 @@ function shapeItem(item, url, token, serverName, rawUrl) {
         remoteServer: serverName,
         ...(Array.isArray(item.subtitles) && item.subtitles.length > 0
             ? {
-                subtitleUrls: item.subtitles.map((subtitle) =>
-                    `${url.origin}/api/stream/${subtitle.id}?token=${encodeURIComponent(token)}`),
+                subtitleUrls: item.subtitles.map((subtitle) => streamUrl(url, subtitle, token)),
             }
             : {}),
     };
@@ -216,7 +236,7 @@ function shapeItem(item, url, token, serverName, rawUrl) {
 export async function fetchItemsStreaming(rawUrl, onBatch) {
     const url = new URL(rawUrl);
     const token = url.searchParams.get('token');
-    const endpoint = `${url.origin}/api/library/stream?token=${encodeURIComponent(token)}`;
+    const endpoint = `${url.origin}/api/library/stream`;
 
     const wholeResponse = async () => {
         const all = await fetchItems(rawUrl);
@@ -227,7 +247,7 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
     let response;
     try {
         // Not retried: the plain endpoint below is the fallback.
-        response = await fetchWithPolicy(endpoint, { retries: 0 });
+        response = await fetchWithPolicy(endpoint, { retries: 0, headers: bearer(token) });
     } catch {
         // Unreachable host, blocked mixed content, CORS. The plain endpoint
         // fails the same way and reports it properly, so let it.
