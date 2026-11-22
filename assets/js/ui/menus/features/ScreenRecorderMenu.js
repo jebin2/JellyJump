@@ -124,7 +124,7 @@ export class ScreenRecorderMenu {
             } catch (err) {
                 // Uncheck the checkbox since permission was denied
                 if (checkbox) checkbox.checked = false;
-                alert('Camera access denied. Please allow camera access in your browser settings and try again.');
+                Toast.show('Camera access was refused. Allow the camera in the browser\'s site settings and try again.', 6000, true);
                 return false;
             }
         };
@@ -774,7 +774,7 @@ export class ScreenRecorderMenu {
         } catch {
             if (checkboxEl) checkboxEl.checked = false;
             containerEl.style.display = 'none';
-            alert('Microphone access denied. Please allow microphone access in your browser settings and try again.');
+            Toast.show('Microphone access was refused. Allow the microphone in the browser\'s site settings and try again.', 6000, true);
             return false;
         }
     }

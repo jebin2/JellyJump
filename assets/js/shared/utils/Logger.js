@@ -49,8 +49,63 @@ if (debugRequested && !isLocalhost) {
 }
 
 /**
+ * The last log entries, kept whether or not the console shows them, so a
+ * bug report from production has something behind it (Diagnostics → Copy).
+ * A fixed ring: old entries are overwritten, never piled up.
+ *
+ * Plain log lines keep their text only; objects in them are named, not
+ * kept, so nothing big (a decoded frame, a file) stays alive because it was
+ * logged. Warnings and errors keep a short rendering of their objects.
+ */
+const MAX_ENTRIES = 1000;
+/** @type {Array<{time: number, level: string, scope: string, message: string, trace?: Record<string, string|number>}>} */
+const ring = [];
+let ringNext = 0;
+
+/**
+ * What the app is doing now, stamped on every entry: the playback load
+ * (`load`) and the job (`job`) in progress. Jobs run one at a time and a
+ * load replaces the one before, so one value per kind is exact; with both,
+ * the entries of one load or one job can be picked out of the log.
+ * @type {Record<string, string|number>}
+ */
+const trace = {};
+
+/** @param {unknown} arg @param {boolean} detailed */
+function renderArg(arg, detailed) {
+    if (typeof arg === 'string') return arg;
+    if (typeof arg === 'number' || typeof arg === 'boolean' || arg == null) return String(arg);
+    if (arg instanceof Error) {
+        const code = /** @type {{code?: string}} */ (arg).code;
+        return `${arg.name}${code ? ` [${code}]` : ''}: ${arg.message}`;
+    }
+    if (!detailed) return `[${arg?.constructor?.name ?? typeof arg}]`;
+    try {
+        const json = JSON.stringify(arg);
+        return json.length > 500 ? `${json.slice(0, 500)}…` : json;
+    } catch {
+        // Circular or exotic objects are named rather than rendered.
+        return `[${arg?.constructor?.name ?? typeof arg}]`;
+    }
+}
+
+/** @param {string} level @param {unknown[]} args */
+function record(level, args) {
+    const detailed = level === 'warn' || level === 'error';
+    const message = args.map((a) => renderArg(a, detailed)).join(' ');
+    const scope = /^\[([^\]]+)\]/.exec(message)?.[1] ?? '';
+    /** @type {{time: number, level: string, scope: string, message: string, trace?: Record<string, string|number>}} */
+    const entry = { time: Date.now(), level, scope, message: message.length > 2000 ? `${message.slice(0, 2000)}…` : message };
+    if (Object.keys(trace).length) entry.trace = { ...trace };
+    if (ring.length < MAX_ENTRIES) ring.push(entry);
+    else ring[ringNext] = entry;
+    ringNext = (ringNext + 1) % MAX_ENTRIES;
+}
+
+/**
  * Logger with automatic environment detection
- * Logs only appear when running on localhost
+ * Logs only appear in the console when running on localhost (or ?debug=1);
+ * every entry is also kept in the ring above.
  */
 export const Logger = {
     /**
@@ -66,6 +121,7 @@ export const Logger = {
      * @param  {...any} args 
      */
     log(...args) {
+        record('log', args);
         if (loggingOn) {
             console.log(...args);
         }
@@ -76,6 +132,7 @@ export const Logger = {
      * @param  {...any} args 
      */
     warn(...args) {
+        record('warn', args);
         if (loggingOn) {
             console.warn(...args);
         }
@@ -87,6 +144,7 @@ export const Logger = {
      * @param  {...any} args 
      */
     error(...args) {
+        record('error', args);
         // Errors always get logged
         console.error(...args);
     },
@@ -96,6 +154,7 @@ export const Logger = {
      * @param  {...any} args 
      */
     debug(...args) {
+        record('debug', args);
         if (loggingOn) {
             console.debug(...args);
         }
@@ -106,6 +165,7 @@ export const Logger = {
      * @param  {...any} args 
      */
     info(...args) {
+        record('info', args);
         if (loggingOn) {
             console.info(...args);
         }
@@ -136,10 +196,38 @@ export const Logger = {
      * @param  {...any} args 
      */
     tagged(tag, ...args) {
+        record('log', [`[${tag}]`, ...args]);
         if (loggingOn) {
             console.log(`[${tag}]`, ...args);
         }
-    }
+    },
+
+    /**
+     * The kept entries, oldest first.
+     * @param {number} [limit] - only the newest this many
+     * @returns {Array<{time: number, level: string, scope: string, message: string, trace?: Record<string, string|number>}>}
+     */
+    entries(limit = MAX_ENTRIES) {
+        const ordered = ring.length < MAX_ENTRIES ? ring.slice() : [...ring.slice(ringNext), ...ring.slice(0, ringNext)];
+        return ordered.slice(-limit);
+    },
+
+    /**
+     * Set or clear what the app is doing now (see `trace` above).
+     * @param {'load'|'job'} key
+     * @param {string|number|null} value - null to clear
+     */
+    setTrace(key, value) {
+        if (value === null || value === undefined) delete trace[key];
+        else trace[key] = value;
+    },
+
+    /** Forget the kept entries (tests). */
+    clearEntries() {
+        ring.length = 0;
+        ringNext = 0;
+        for (const key of Object.keys(trace)) delete trace[key];
+    },
 };
 
 export default Logger;

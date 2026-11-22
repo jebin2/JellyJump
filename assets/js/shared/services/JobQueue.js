@@ -1,6 +1,7 @@
 // @ts-check
 import { Logger } from '../utils/Logger.js';
 import { isCancellation } from '../utils/Cancellation.js';
+import { AppError } from '../errors/AppError.js';
 
 /**
  * JobQueue - processing jobs that run behind the app, one at a time.
@@ -34,6 +35,7 @@ import { isCancellation } from '../utils/Cancellation.js';
  * @property {number} progress - 0 to 1
  * @property {string} [label] - The work's own word for where it is
  * @property {string} [error]
+ * @property {string} [errorCode] - the AppError code of the failure (shared/errors/codes.js)
  * @property {JobResult[]} results
  * @property {() => void} cancel
  *
@@ -94,6 +96,7 @@ async function pump() {
         if (detail?.item) job.results.push({ item: detail.item, url: detail.url, filename: detail.item.title, file: detail.item.file });
     };
 
+    Logger.setTrace('job', job.id);
     try {
         const result = await spec.work({ signal: controller.signal, onProgress });
         // Whatever done() adds to the playlist is this job's result.
@@ -110,10 +113,12 @@ async function pump() {
         } else {
             Logger.error(`${spec.name} failed:`, error);
             job.status = 'failed';
+            job.errorCode = AppError.from(error).code;
             job.error = spec.failureText ? spec.failureText(error) : `${spec.name} failed: ${error?.message ?? error}`;
             resolve({ ok: false, cancelled: false, error });
         }
     } finally {
+        Logger.setTrace('job', null);
         pending.delete(job.id);
         running = false;
         emit();

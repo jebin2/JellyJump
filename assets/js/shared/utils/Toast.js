@@ -10,8 +10,9 @@ export const Toast = {
      * @param {string} message - Message to display
      * @param {number} duration - Duration in ms (default: 2000)
      * @param {boolean} isError - Whether to show as an error state
+     * @param {{action?: {label: string, onClick: () => void}}} [options] - a button on the toast
      */
-    show(message, duration = 2000, isError = false) {
+    show(message, duration = 2000, isError = false, { action } = {}) {
         const toast = document.createElement('div');
         toast.className = `mb-toast ${isError ? 'mb-toast--error' : ''}`;
         toast.textContent = message;
@@ -36,6 +37,19 @@ export const Toast = {
             min-width: 200px;
         `;
         
+        // An action (e.g. "Copy details") makes the toast clickable; plain
+        // toasts stay click-through so they never cover a control.
+        if (action) {
+            toast.style.pointerEvents = 'auto';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'mb-toast-action';
+            button.textContent = action.label;
+            button.style.cssText = 'margin-left:12px;background:none;border:1px solid currentColor;color:inherit;border-radius:4px;padding:2px 8px;cursor:pointer;font:inherit;';
+            button.addEventListener('click', () => action.onClick());
+            toast.appendChild(button);
+        }
+
         document.body.appendChild(toast);
         
         // Trigger entrance animation

@@ -2,6 +2,10 @@
 import './shared/utils/reload-on-stale-chunks.js';
 import './pull-to-refresh.js';
 import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
+import { installErrorReporter } from './shared/errors/ErrorReporter.js';
+
+// Errors nothing else caught are recorded and shown once (shared/errors).
+installErrorReporter();
 
 // Register Service Worker for PWA + cross-origin isolation (multi-threaded WASM)
 window.addEventListener('load', registerServiceWorkerWithCOI);
