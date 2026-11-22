@@ -26,10 +26,10 @@ const QUICK = [
     'live-schedule-test', 'linklist-test', 'linklist-scan-test', 'youtube-url-test', 'html-escape-test',
     'camera-effects-test', 'sticker-test', 'decoration-test', 'recording-clock-test',
     'cli-test', 'library-server-test', 'remote-library-test', 'remote-library-load-test',
-    'rs-selftest', 'shard-pipeline-test',
+    'rs-selftest', 'shard-pipeline-test', 'playback-clock-test',
 ];
 const BROWSER = [
-    'encrypt-test', 'source-failure-test', 'youtube-embed-test',
+    'encrypt-test', 'storage-test', 'source-failure-test', 'youtube-embed-test',
     'smoke-test', 'edit-panel-test', 'watch-panel-test', 'watch-party-test',
 ];
 /** Needs Electron, installed with the desktop app's own dependencies. */
