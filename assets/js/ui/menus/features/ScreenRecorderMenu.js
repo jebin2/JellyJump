@@ -1,6 +1,7 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { Toast } from "../../../shared/utils/Toast.js";
 import { startTrackRecording } from "../../../core/streaming/TrackRecorder.js";
+import { html } from '../../../shared/utils/html.js';
 
 /**
  * Recorder Menu Handler
@@ -764,9 +765,9 @@ export class ScreenRecorderMenu {
             stream.getTracks().forEach(t => t.stop());
             const devices = await navigator.mediaDevices.enumerateDevices();
             const inputs = devices.filter(d => d.kind === 'audioinput');
-            selectEl.innerHTML = inputs.map((d, i) =>
-                `<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
-            ).join('');
+            selectEl.innerHTML = html`${inputs.map((d, i) =>
+                html`<option value="${d.deviceId}">${d.label || 'Microphone ' + (i + 1)}</option>`
+            )}`;
             containerEl.style.display = 'block';
             return true;
         } catch {

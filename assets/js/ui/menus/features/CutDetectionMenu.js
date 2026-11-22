@@ -5,6 +5,7 @@ import { HardCutDetector } from "../../../shared/services/HardCutDetector.js";
 import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
+import { html } from '../../../shared/utils/html.js';
 
 export class CutDetectionMenu {
     static async init(item, playlist) {
@@ -267,7 +268,7 @@ export class CutDetectionMenu {
             Logger.error('CutDetectionMenu: Error', err);
             statusText.textContent = 'Error: ' + err.message;
             statusText.classList.add('text-danger');
-            cutsList.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
+            cutsList.innerHTML = html`<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
         }
     }
 

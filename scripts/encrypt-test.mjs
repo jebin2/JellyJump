@@ -150,8 +150,18 @@ async function run(page, origin) {
     await press();
     const played = await page.waitForFunction(() => {
         const p = window.player;
-        return p && p.duration > 0 ? { duration: p.duration, canvas: `${p.canvas.width}x${p.canvas.height}` } : null;
+        return p && p.duration > 0 ? { duration: p.duration } : null;
     }, null, { timeout: 180000 }).then(h => h.jsonValue()).catch(() => null);
+    // The duration is known before the first frame is drawn, and the canvas
+    // is sized by that frame: read straight away it was still the element's
+    // default 300x150, which failed this suite now and then on CI.
+    if (played) {
+        played.canvas = await page.waitForFunction(() => {
+            const c = window.player?.canvas;
+            return c && !(c.width === 300 && c.height === 150) ? `${c.width}x${c.height}` : null;
+        }, null, { timeout: 10000 }).then(h => h.jsonValue())
+            .catch(() => page.evaluate(() => `${window.player.canvas.width}x${window.player.canvas.height}`));
+    }
 
     console.log('\nthe right password plays the hidden video');
     // The carrier is ~40s of 1280x720 placeholder; the file inside is 2s of
@@ -200,15 +210,18 @@ const origin = `http://127.0.0.1:${PORT}`;
 // Bound to the address it is reached on: left to "localhost", vite can
 // listen on ::1 alone (as on GitHub's runners), where 127.0.0.1 never answers.
 // BROWSER=none stops it opening the page, as the config asks it to.
+// Its own process group, so stopping it stops vite too and not only npx:
+// a vite left behind kept the port, and the next run met it shutting down.
 const vite = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'], {
-    cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none' },
+    cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: 'none' }, detached: true,
 });
+const stopVite = () => { try { process.kill(-vite.pid, 'SIGTERM'); } catch { vite.kill(); } };
 let viteOutput = '';
 vite.stdout.on('data', (d) => { viteOutput += d; });
 vite.stderr.on('data', (d) => { viteOutput += d; });
 if (!await waitForServer(origin)) {
     console.error(`vite did not come up on :${PORT}\n${viteOutput.trim()}`);
-    vite.kill();
+    stopVite();
     process.exit(1);
 }
 
@@ -225,7 +238,7 @@ try {
     console.log(`  FAIL  the run itself threw: ${error.message}`);
 } finally {
     await browser.close();
-    vite.kill();
+    stopVite();
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

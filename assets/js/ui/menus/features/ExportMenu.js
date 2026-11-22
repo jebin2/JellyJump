@@ -5,6 +5,7 @@ import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { STICKER_MOTIONS } from '../../player/StickerLayer.js';
 import { BORDER_PRESETS, RAIN_PRESETS } from '../../player/DecorationLayer.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { html } from '../../../shared/utils/html.js';
 
 /**
  * Export Menu - writes a file with whatever is on screen baked into it.
@@ -62,7 +63,7 @@ export class ExportMenu {
         // What is on the player, listed again whenever it changes.
         const refresh = () => {
             const applied = isPlayingThis ? ExportMenu._describe(player) : [];
-            summary.innerHTML = applied.map(line => `<li>${line}</li>`).join('');
+            summary.innerHTML = html`${applied.map(line => html`<li>${line}</li>`)}`;
             // Subtitles alone are worth exporting: they turn a video and a
             // separate caption file into one file that carries both.
             const nothing = !isPlayingThis || (applied.length === 0 && !subtitleTracks.length);
