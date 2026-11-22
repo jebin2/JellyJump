@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:watch": "vite build --watch",
     "preview": "vite preview",
-    "quality": "node scripts/quality-check.mjs",
+    "quality": "node scripts/quality-check.mjs && node scripts/architecture-check.mjs",
     "verify:libs": "bash download_libs.sh verify",
     "typecheck": "tsc -p jsconfig.json",
     "check": "npm run quality && npm run typecheck && npm run verify:libs && npm run build",
@@ -46,6 +46,6 @@
   },
   "dependencies": {
     "@huggingface/hub": "^2.13.0",
-    "@huggingface/transformers": "^4.2.0"
+    "@huggingface/transformers": "^4.3.2"
   }
 }

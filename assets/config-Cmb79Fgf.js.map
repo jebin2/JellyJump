@@ -1,0 +1,1 @@
+{"version":3,"file":"config-Cmb79Fgf.js","names":["DOMAIN","BASE_URL"],"sources":["../../assets/js/shared/config.js"],"sourcesContent":["export const DOMAIN = 'jellyjump.voidall.com';\nexport const BASE_URL = `https://${DOMAIN}`;\n"],"mappings":"AAAA,IAAaA,EAAS,wBACTC,EAAW,WAAWD,I"}

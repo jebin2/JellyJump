@@ -1,1 +1,0 @@
-{"version":3,"file":"config-I9HkvqJs.js","names":[],"sources":["../../assets/js/shared/config.js"],"sourcesContent":["export const DOMAIN = 'jellyjump.voidall.com';\nexport const BASE_URL = `https://${DOMAIN}`;\n"],"mappings":"AAAA,IAAa,EAAS,wBACT,EAAW,WAAW"}
