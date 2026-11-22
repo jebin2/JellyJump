@@ -49,8 +49,9 @@ start (`78c1c90`); this table is where things stand now.
 | 2 | D1–D3 `Settings` (`jj:` keys, old ones moved; `localStorage` files 14 → 5), `player.override()`; edit panel and the timeline tools use it, its speed rewrite gone | done | #61 |
 | 2 | G1 delete a removed item's file, G2 sweep after load (BUG-4); G3 progress in one capped map (BUG-5); G5/N6 full disk keeps the list and says so once. `localStorage` only in settings and storage (now a rule: count 0) | done | #62 |
 | 2 | E1 public playlist names (`save`, `ensureMetadata`, `processMetadata`, `handleUrlUpload`); outside `playlist._*` calls 50 → 0. BUG-15 found and fixed: Record called a `playlist._showToast` that never existed, so its messages threw | done | #63 |
-| 2 | E2–E5 `Playlist.js` 1,807 → 436 lines: `PlaylistStore`, `PlaylistMetadata`, `PlaylistIngest`, `PlaylistDiscovery`, `PlaylistPlayback`; `ITEM_SELECTED_EVENT` moved to the playlist; `ingest-test` (17) | done | this PR |
-| 2 | F, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
+| 2 | E2–E5 `Playlist.js` 1,807 → 436 lines: `PlaylistStore`, `PlaylistMetadata`, `PlaylistIngest`, `PlaylistDiscovery`, `PlaylistPlayback`; `ITEM_SELECTED_EVENT` moved to the playlist; `ingest-test` (17) | done | #64 |
+| 2 | F1 Scenes/Motion Add clip as jobs (BUG-3); F3 Merge and Combine A/V results through `insertProcessedItem` (they spliced into `playlist.items`, so the tray never saw them); F2 left out (see F2) | done | this PR |
+| 2 | F4, F5, G4, N4, N5, N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
@@ -301,7 +302,7 @@ Other modules call its private methods: `_saveState` 24 times,
 |---|---|---|---|
 | BUG-1 | Tracks shows the resolution under "Codec" and "—" under "Details" | the Codec `<span>` has both `meta-codec` and `meta-details` classes; `querySelector('.meta-details')` finds it first | drop `meta-details` from the Codec span |
 | BUG-2 | Cancelling Scenes or Motion does not stop the result being rendered | `isCancelled` is passed by value into `runDetection`, so its checks always see `false` | pass a getter or an `AbortSignal` |
-| BUG-3 | Scenes and Motion "add clip" has no Cancel and no tray entry; the edit panel and tray never see the clip | runs `MediaProcessor.process` inline and adds the item with `playlist.addItem` | `runMenuJob` + `insertProcessedItem` (phase F) |
+| BUG-3 | Scenes and Motion "add clip" has no Cancel and no tray entry; the edit panel and tray never see the clip | runs `MediaProcessor.process` inline and adds the item with `playlist.addItem` | fixed (F1): `ui/menus/core/SegmentClip.js` |
 | BUG-4 | IndexedDB grows forever | files never deleted on remove (§2.7) | fixed (G1, G2) |
 | BUG-5 | localStorage grows by one key per video | `jellyjump-state-<id>` never removed | fixed (G3) |
 | BUG-6 | Desktop: an edited copy may stop playing after switching away | §2.8 | confirm, then phase G |
@@ -770,7 +771,7 @@ change one of them.
 | Step | Work | Done when |
 |---|---|---|
 | F1 | BUG-3: Scenes, Motion "add clip" through `runMenuJob` and `insertProcessedItem` | clips appear in the tray, can be cancelled, and open in the edit panel |
-| F2 | Optimize through `runMenuJob` | in the tray, cancellable |
+| F2 | ~~Optimize through `runMenuJob`~~ Not done, on purpose: Optimize is a gate that runs before a file enters the playlist on a phone (a 4K file can get the page killed), so the file cannot be added first and converted after (an empty playlist plays what is added), and it cannot wait behind other jobs in the one-at-a-time queue (adding files would stall). It has its own Cancel. | — |
 | F3 | App-wide tools (Merge, Slideshow, Combine A/V) stay dialogs (decision 4); their results go through `insertProcessedItem` | one way to add a processed item |
 | F4 | Templates: split `playlist-templates.html` per tool (one `<template>` file per tool, loaded with the tool); delete markup the panel hides | no hidden player markup in tool templates |
 | F5 | CSS: move tool styles out of `player.css` into `tools.css` | `player.css` holds only the player |

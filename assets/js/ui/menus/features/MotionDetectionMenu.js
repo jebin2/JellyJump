@@ -2,9 +2,8 @@ import { openToolSurface } from '../core/MenuFactory.js';
 import { playRowsOnClick } from '../core/PreviewPlayer.js';
 import { Logger } from "../../../shared/utils/Logger.js";
 import { MotionDetector } from "../../../shared/services/MotionDetector.js";
-import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
-import { MediaProcessor } from '../../../processing/MediaProcessor.js';
-import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
+import { formatTime } from "../../../shared/utils/mediaUtils.js";
+import { addSegmentClip } from '../core/SegmentClip.js';
 import { html } from '../../../shared/utils/html.js';
 
 export class MotionDetectionMenu {
@@ -94,7 +93,7 @@ export class MotionDetectionMenu {
             segmentsList.innerHTML = '<div class="flex-center flex-col gap-sm h-full text-muted italic py-xl"><div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-6 h-6 animate-spin opacity-50"></div><span class="text-sm">Scanning video...</span></div>';
 
             await MotionDetectionMenu.runDetection(item, videoUrl, detector, playlist, { threshold }, () => isCancelled, {
-                segmentsList, progressSection, progressPercentage, successMessage, errorMessage, modalContent
+                segmentsList, progressSection, progressPercentage, successMessage, errorMessage, modalContent, modal
             });
 
             isDetecting = false;
@@ -113,7 +112,7 @@ export class MotionDetectionMenu {
     static async runDetection(item, videoUrl, detector, playlist, options, isCancelled, ui) {
         // A function, not the flag itself: passed as a boolean it was copied
         // at the call, and leaving the tool mid-detection was never seen here.
-        const { segmentsList, progressSection, progressPercentage, successMessage, errorMessage, modalContent } = ui;
+        const { segmentsList, progressPercentage, modalContent, modal } = ui;
 
         const progressStatus = modalContent.querySelector('.progress-status');
         if (progressStatus) progressStatus.textContent = 'Scanning video...';
@@ -175,44 +174,17 @@ export class MotionDetectionMenu {
 
                 const addBtns = segmentsList.querySelectorAll('.add-segment-btn');
                 addBtns.forEach(btn => {
-                    btn.onclick = async (e) => {
+                    btn.onclick = (e) => {
                         e.stopPropagation();
-
-                        if (!progressSection.classList.contains('hidden')) return;
-
-                        // Hide previous messages and show progress
-                        successMessage.classList.add('hidden');
-                        errorMessage.classList.add('hidden');
-                        progressSection.classList.remove('hidden');
-                        addBtns.forEach(b => b.disabled = true);
-
-                        // Update footer status text
-                        const footerStatus = modalContent.querySelector('.progress-status');
-                        const footerPct = modalContent.querySelector('.progress-percentage');
-                        if (footerStatus) footerStatus.textContent = 'Processing...';
-                        if (footerPct) footerPct.textContent = '0%';
-
-                        const start = parseFloat(btn.dataset.start);
-                        const end = parseFloat(btn.dataset.end);
-                        const index = parseInt(btn.dataset.index);
-
-                        try {
-                            await MotionDetectionMenu.addSegmentToPlaylist(item, start, end, index, btn, playlist, (pct) => {
-                                if (footerPct) footerPct.textContent = `${Math.round(pct * 100)}%`;
-                                if (footerStatus) footerStatus.textContent = 'Processing...';
-                            });
-                            successMessage.classList.remove('hidden');
-                        } catch (err) {
-                            Logger.error('Failed to add segment', err);
-                            errorMessage.textContent = err.message;
-                            errorMessage.classList.remove('hidden');
-                            btn.disabled = false;
-                        } finally {
-                            progressSection.classList.add('hidden');
-                            addBtns.forEach(b => {
-                                if (!b.classList.contains('bg-success')) b.disabled = false;
-                            });
-                        }
+                        addSegmentClip({
+                            item, playlist, surface: modal,
+                            start: parseFloat(btn.dataset.start),
+                            end: parseFloat(btn.dataset.end),
+                            index: parseInt(btn.dataset.index),
+                            kind: 'Motion',
+                            folder: `Motion from ${item.title}`,
+                            button: btn,
+                        });
                     };
                 });
             }
@@ -223,53 +195,5 @@ export class MotionDetectionMenu {
             if (progressStatus) progressStatus.textContent = 'Error';
             segmentsList.innerHTML = html`<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
         }
-    }
-
-    static async addSegmentToPlaylist(originalItem, start, end, index, btn, playlist, onProgress) {
-        Logger.log(`Adding motion segment ${index}: ${start} -> ${end}`);
-
-        // 1. Get Source
-        const source = await MediaMetadata.getSourceBlob(originalItem, () => playlist.save());
-
-        // 2. Process (Trim)
-        const blob = await MediaProcessor.process({
-            source: source,
-            format: 'mp4',
-            quality: 100,
-            trim: {
-                start: start,
-                end: end
-            },
-            onProgress: onProgress
-        });
-
-        // 3. Create Item
-        const cleanTitle = originalItem.title.replace(/\.[^/.]+$/, "");
-        const segmentTitle = `${cleanTitle} - Motion ${index}.mp4`;
-        const folderName = `Motion from ${originalItem.title}`;
-        const newPath = `${folderName}/${segmentTitle}`;
-        const url = URL.createObjectURL(blob);
-
-        const newItem = {
-            id: generateId(),
-            title: segmentTitle,
-            url: url,
-            file: new File([blob], segmentTitle, { type: 'video/mp4' }),
-            duration: formatTime(end - start),
-            type: 'video',
-            isLocal: true,
-            isNew: true,
-            path: newPath
-        };
-
-        // 4. Add to Playlist
-        playlist.addItem(newItem);
-
-        // Feedback
-        const useEl = btn.querySelector('use');
-        if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-check');
-        btn.classList.add('text-success');
-        btn.classList.remove('jellyjump-btn-small');
-        btn.title = "Added";
     }
 }

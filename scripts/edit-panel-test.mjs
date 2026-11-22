@@ -331,6 +331,23 @@ async function run(page, origin) {
     await page.waitForTimeout(300);
     s = await state();
     check(s.loop[0] === 'one' && s.loop[2] > s.loop[1], `a scene clicked plays on a loop in the main player (${JSON.stringify(s.loop)})`);
+    // BUG-3: Add clip is a job like any other tool's.
+    await page.click('.edit-panel .add-segment-btn');
+    await page.waitForSelector('.job-tray .job-row:has-text("Scene 1")', { timeout: 10000 });
+    check(true, 'Add clip shows in the job tray');
+    await page.waitForFunction(() => !document.querySelector('.job-tray [data-job-action=cancel]'), null, { timeout: 300000 });
+    await page.waitForTimeout(300);
+    const clip = await page.evaluate(() => {
+        const titles = window.playlist.items.map(i => i.title);
+        const at = titles.findIndex(t => / - Scene 1\.mp4$/.test(t));
+        return { titles, at, after: titles[at - 1], added: document.querySelector('.edit-panel .add-segment-btn')?.title };
+    });
+    check(clip.at > 0 && clip.after === 'holiday-clip.webm', `its clip goes in right after the video (${clip.titles.join(', ')})`);
+    check(clip.added === 'Added', `and the row says so (${clip.added})`);
+    await page.evaluate(() => {
+        const pl = window.playlist;
+        pl.removeItem(pl.items.findIndex(i => / - Scene 1\.mp4$/.test(i.title)));
+    });
     await page.click('.edit-panel-back');
     await page.waitForTimeout(200);
     s = await state();

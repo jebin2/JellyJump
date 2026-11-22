@@ -2,7 +2,6 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-import { generateId } from '../../../shared/utils/mediaUtils.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { Toast } from '../../../shared/utils/Toast.js';
 
@@ -263,7 +262,6 @@ export class MergeMenu {
             const targetHeight = parseInt(heightInput.value);
             const scaleMode = scaleSelect.value;
             const backgroundColor = bgColorInput.value;
-            const addToPlaylist = true; // Always add to playlist by default now
 
             // Validate
             if (!targetWidth || !targetHeight || targetWidth < 128 || targetHeight < 128) {
@@ -275,9 +273,6 @@ export class MergeMenu {
             // made twice; the options come back for the next.
             mergeBtn.disabled = true;
             mergeBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Merging...';
-
-            const successMsg = modalContent.querySelector('.success-message');
-            const downloadBtn = modalContent.querySelector('.download-btn');
 
             const outcome = await runMenuJob({
                 name: 'Merge',
@@ -299,37 +294,20 @@ export class MergeMenu {
                         signal,
                     });
                 },
-                done: (mergedBlob) => {
-                    successMsg.textContent = '✓ Added to playlist';
-                    mergeBtn.innerHTML = '<span>Added</span><svg width="16" height="16" fill="currentColor" class="ml-xs"><use href="assets/icons/sprite.svg#icon-check"></use></svg>';
-
-                    const url = URL.createObjectURL(mergedBlob);
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                    const filename = `merged-${timestamp}.mp4`;
-                    downloadBtn.href = url;
-                    downloadBtn.download = filename;
-                    downloadBtn.classList.remove('hidden');
-
-                    if (!addToPlaylist) return;
-                    const firstSelected = selectedVideos[0];
-                    const basePath = firstSelected?.path || firstSelected?.title || '';
+                done: async (mergedBlob) => {
+                    // The dialog is closed by now (a background job); the
+                    // result goes in after the last video merged, and the job tray
+                    // offers it (download, edit).
+                    const anchor = selectedVideos[selectedVideos.length - 1];
+                    const filename = `merged-${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`;
+                    const basePath = anchor?.path || anchor?.title || '';
                     const parentPath = basePath.includes('/') ? basePath.substring(0, basePath.lastIndexOf('/')) : '';
-                    const newItem = {
-                        title: filename,
-                        url,
-                        duration: '...',
-                        thumbnail: '',
-                        isLocal: true,
-                        file: new File([mergedBlob], filename, { type: 'video/mp4' }),
-                        id: generateId(),
-                        path: parentPath ? `${parentPath}/${filename}` : filename,
-                    };
-                    const lastIndex = playlist.items.indexOf(selectedVideos[selectedVideos.length - 1]);
-                    if (lastIndex !== -1) playlist.items.splice(lastIndex + 1, 0, newItem);
-                    else playlist.items.push(newItem);
-                    playlist.save();
-                    playlist.render();
-                    playlist.processMetadata([newItem]);
+                    const { item: newItem } = playlist.insertProcessedItem(anchor, mergedBlob, filename, {
+                        type: 'video/mp4',
+                        duration: null,
+                        extra: { path: parentPath ? `${parentPath}/${filename}` : filename },
+                    });
+                    await playlist.ensureMetadata(newItem);
                 },
             });
             if (!outcome.ok) {

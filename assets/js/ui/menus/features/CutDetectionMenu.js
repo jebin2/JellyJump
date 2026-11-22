@@ -2,9 +2,8 @@ import { openToolSurface } from '../core/MenuFactory.js';
 import { playRowsOnClick } from '../core/PreviewPlayer.js';
 import { Logger } from "../../../shared/utils/Logger.js";
 import { HardCutDetector } from "../../../shared/services/HardCutDetector.js";
-import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
-import { MediaProcessor } from '../../../processing/MediaProcessor.js';
-import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
+import { formatTime } from "../../../shared/utils/mediaUtils.js";
+import { addSegmentClip } from '../core/SegmentClip.js';
 import { html } from '../../../shared/utils/html.js';
 
 export class CutDetectionMenu {
@@ -100,7 +99,7 @@ export class CutDetectionMenu {
                 adaptiveMode: true
             }, () => isCancelled, {
                 statusText: progressStatus, statusPercent: progressPercentage, cutsList,
-                progressSection, successMessage, errorMessage, modalContent
+                progressSection, successMessage, errorMessage, modalContent, modal
             });
 
             isDetecting = false;
@@ -119,8 +118,7 @@ export class CutDetectionMenu {
     static async runDetection(item, videoUrl, detector, playlist, options, isCancelled, ui) {
         // A function, not the flag itself: passed as a boolean it was copied
         // at the call, and leaving the tool mid-detection was never seen here.
-        const { statusText, statusPercent, cutsList,
-            progressSection, successMessage, errorMessage, modalContent } = ui;
+        const { statusText, statusPercent, cutsList, modal } = ui;
 
         if (statusText) statusText.textContent = 'Analyzing video...';
 
@@ -223,44 +221,17 @@ export class CutDetectionMenu {
 
                 const addBtns = cutsList.querySelectorAll('.add-segment-btn');
                 addBtns.forEach(btn => {
-                    btn.onclick = async (e) => {
+                    btn.onclick = (e) => {
                         e.stopPropagation();
-
-                        if (!progressSection.classList.contains('hidden')) return;
-
-                        // Hide previous messages and show progress
-                        successMessage.classList.add('hidden');
-                        errorMessage.classList.add('hidden');
-                        progressSection.classList.remove('hidden');
-                        addBtns.forEach(b => b.disabled = true);
-
-                        // Update footer status text
-                        const footerStatus = modalContent.querySelector('.progress-status');
-                        const footerPct = modalContent.querySelector('.progress-percentage');
-                        if (footerStatus) footerStatus.textContent = 'Processing...';
-                        if (footerPct) footerPct.textContent = '0%';
-
-                        const start = parseFloat(btn.dataset.start);
-                        const end = parseFloat(btn.dataset.end);
-                        const index = parseInt(btn.dataset.index);
-
-                        try {
-                            await CutDetectionMenu.addSegmentToPlaylist(item, start, end, index, btn, playlist, (pct) => {
-                                if (footerPct) footerPct.textContent = `${Math.round(pct * 100)}%`;
-                                if (footerStatus) footerStatus.textContent = 'Processing...';
-                            });
-                            successMessage.classList.remove('hidden');
-                        } catch (err) {
-                            Logger.error('Failed to add segment', err);
-                            errorMessage.textContent = err.message;
-                            errorMessage.classList.remove('hidden');
-                            btn.disabled = false;
-                        } finally {
-                            progressSection.classList.add('hidden');
-                            addBtns.forEach(b => {
-                                if (!b.classList.contains('bg-success')) b.disabled = false;
-                            });
-                        }
+                        addSegmentClip({
+                            item, playlist, surface: modal,
+                            start: parseFloat(btn.dataset.start),
+                            end: parseFloat(btn.dataset.end),
+                            index: parseInt(btn.dataset.index),
+                            kind: 'Scene',
+                            folder: `Cuts from ${item.title}`,
+                            button: btn,
+                        });
                     };
                 });
             }
@@ -272,53 +243,5 @@ export class CutDetectionMenu {
             statusText.classList.add('text-danger');
             cutsList.innerHTML = html`<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
         }
-    }
-
-    static async addSegmentToPlaylist(originalItem, start, end, index, btn, playlist, onProgress) {
-        Logger.log(`Trimming segment ${index}: ${start} -> ${end}`);
-
-        // 1. Get Source
-        const source = await MediaMetadata.getSourceBlob(originalItem, () => playlist.save());
-
-        // 2. Process (Trim)
-        const blob = await MediaProcessor.process({
-            source: source,
-            format: 'mp4',
-            quality: 100,
-            trim: {
-                start: start,
-                end: end
-            },
-            onProgress: onProgress
-        });
-
-        // 3. Create Item
-        const cleanTitle = originalItem.title.replace(/\.[^/.]+$/, "");
-        const segmentTitle = `${cleanTitle} - Scene ${index}.mp4`;
-        const folderName = `Cuts from ${originalItem.title}`;
-        const newPath = `${folderName}/${segmentTitle}`;
-        const url = URL.createObjectURL(blob);
-
-        const newItem = {
-            id: generateId(),
-            title: segmentTitle,
-            url: url,
-            file: new File([blob], segmentTitle, { type: 'video/mp4' }),
-            duration: formatTime(end - start),
-            type: 'video',
-            isLocal: true,
-            isNew: true,
-            path: newPath
-        };
-
-        // 4. Add to Playlist
-        playlist.addItem(newItem);
-
-        // Feedback
-        const useEl = btn.querySelector('use');
-        if (useEl) useEl.setAttribute('href', 'assets/icons/sprite.svg#icon-check');
-        btn.classList.add('text-success');
-        btn.classList.remove('jellyjump-btn-small'); // Optional: remove style if needed, or keep for checkmark
-        btn.title = "Added";
     }
 }
