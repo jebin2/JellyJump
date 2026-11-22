@@ -15,7 +15,9 @@
  *                                 opens it in a browser
  *   GET /api/info                 { name, count } — cheap reachability check
  *   GET /api/library              listing, plus any .jjlist files as text
- *   GET /api/stream/:id           the file, with Range support
+ *   GET /api/stream/:id           the file, with Range support; by the token,
+ *                                 or by the file's own key (?sig=, from the
+ *                                 listing), so a stream URL is not the token
  */
 const http = require('http');
 const fs = require('fs');
@@ -44,11 +46,42 @@ function tokenMatches(provided) {
     return crypto.timingSafeEqual(a, b);
 }
 
+/**
+ * A file's own key: what its stream URL carries instead of the share token.
+ *
+ * A stream URL ends up where URLs go — the player's source, the browser's
+ * history and network log, a bug report. With the token in it, any of those
+ * was the key to the whole library. A signature opens one file, and stops
+ * working when the token is regenerated, like everything else. No expiry: a
+ * playlist plays an item hours after the listing was fetched.
+ * @param {string} id
+ */
+function streamSig(id) {
+    return crypto.createHmac('sha256', shareToken).update(`stream:${id}`).digest('hex').slice(0, 32);
+}
+
+/** @param {string} id @param {unknown} provided */
+function sigMatches(id, provided) {
+    if (!shareToken || typeof provided !== 'string' || provided.length !== 32) return false;
+    return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(streamSig(id)));
+}
+
+/** Listing entries with their files' keys (the item's, and each subtitle's). */
+function signed(items) {
+    return items.map((item) => ({
+        ...item,
+        sig: streamSig(item.id),
+        ...(item.subtitles
+            ? { subtitles: item.subtitles.map((subtitle) => ({ ...subtitle, sig: streamSig(subtitle.id) })) }
+            : {}),
+    }));
+}
+
 function presentedToken(req, url) {
     const header = req.headers.authorization;
     if (header && header.startsWith('Bearer ')) return header.slice(7);
-    // Also accepted in the query string: mediabunny's UrlSource issues its own
-    // range requests and cannot be given custom headers.
+    // Also accepted in the query string: the share link itself carries it, and
+    // clients from before stream URLs were signed put it in those.
     return url.searchParams.get('token');
 }
 
@@ -251,7 +284,7 @@ function streamFile(req, res, entry) {
  * and this endpoint simply 404s for it, which it already handles.
  */
 function streamLibrary(req, res) {
-    const items = libraryIndex.list();
+    const items = signed(libraryIndex.list());
 
     res.writeHead(200, {
         'Content-Type': 'application/x-ndjson; charset=utf-8',
@@ -322,7 +355,10 @@ function handle(req, res) {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
         return sendJson(res, 405, { error: 'Method not allowed' });
     }
-    if (!tokenMatches(presentedToken(req, url))) {
+    // A file, by its own key: that file and nothing else.
+    const stream = /^\/api\/stream\/([a-f0-9]{16})$/.exec(url.pathname);
+    const bySig = !!stream && sigMatches(stream[1], url.searchParams.get('sig'));
+    if (!bySig && !tokenMatches(presentedToken(req, url))) {
         return sendJson(res, 401, { error: 'Unauthorized' });
     }
 
@@ -342,7 +378,7 @@ function handle(req, res) {
     if (url.pathname === '/api/library') {
         return sendJson(res, 200, {
             name: serverName,
-            items: libraryIndex.list(),
+            items: signed(libraryIndex.list()),
             // Sent as text for the client to parse, so the rules for reading a
             // link list live in one module rather than one per process.
             linkLists: libraryIndex.listLinkLists(),
@@ -353,7 +389,6 @@ function handle(req, res) {
         return streamLibrary(req, res);
     }
 
-    const stream = /^\/api\/stream\/([a-f0-9]{16})$/.exec(url.pathname);
     if (stream) {
         const entry = libraryIndex.resolveServable(stream[1]);
         if (!entry) return sendJson(res, 404, { error: 'Not found' });
