@@ -58,8 +58,9 @@ start (`78c1c90`); this table is where things stand now.
 | 2 | K1 `processing-test`: every `MediaProcessor` operation on the fixture in a real browser (cut, lossless cut, convert, resize, speed with and without audio, reverse, merge, track extraction to M4A/WAV/MP4, combine A/V, GIF, slideshow, HLS), each read back for duration, tracks and size; cancelling. K2 the same conversion in the worker and on the page gives the same result | done | #70 |
 | 2 | F4 each tool's templates in `ui/menus/templates/<tool>.html`, imported with the tool's lazily loaded code and installed then (`ui/menus/core/Templates.js`); `playlist-templates.html`, fetched before the player starts, 125 KB → 8 KB; 4 unused templates deleted; `template-test` (39) checks every template asked for exists and is loaded with its tool. F5 tool styles (convert, cut, crop, resize, GIF, Remove BG, tracks, M3U validation, their form controls) from `player.css` to `tools.css`, loaded right after it; no selector sets the same property in both | done | #71 |
 | 2 | K3 coverage in every `npm test`, no new dependencies: Node's V8 coverage for the Node suites, Chromium's for the browser suites (checkpointed before each navigation), built chunks carried back to their sources through the source maps; printed per folder after the suites (`scripts/coverage-report.mjs`); fails when the total drops more than a point below `scripts/coverage-baseline.json`. Today 55.7% of the code in `assets/js` (outside `lib/`). Not counted: code run inside workers (the media worker, Whisper), and suites on other pages (watch party, YouTube embed) | done | #72 (CI also 55.7%) |
-| 2 | G4 desktop: a tool's result is written in chunks to `userData/copies/<id>__<name>` (`desktop/copies.js`) and read back by path; it survives a restart, the edit panel's Undo history is kept on desktop too (its desktop special case is gone), removing an item deletes its copy and the sweep covers the folder. Dropped files are the user's and are not copied; deleting reaches only the copies folder. `desktop-copies-test` (15); desktop smoke test: copy on disk, original not copied, plays after a restart, reads back by id, deleted with its item (17) | done | this PR |
-| 2 | Q2 | to do | |
+| 2 | G4 desktop: a tool's result is written in chunks to `userData/copies/<id>__<name>` (`desktop/copies.js`) and read back by path; it survives a restart, the edit panel's Undo history is kept on desktop too (its desktop special case is gone), removing an item deletes its copy and the sweep covers the folder. Dropped files are the user's and are not copied; deleting reaches only the copies folder. `desktop-copies-test` (15); desktop smoke test: copy on disk, original not copied, plays after a restart, reads back by id, deleted with its item (17) | done | #73 |
+| 2 | Q2 moved to wave 4 (see Q2) | moved | this PR |
+| 3 | H, I, P3–P6, Q5, Q6, S4–S8, T3–T6, O7, O8, K4, K5 | to do | |
 
 ---
 
@@ -888,7 +889,7 @@ by the same rule — state with its owner, DOM in the UI.
 | Step | Work | Done when |
 |---|---|---|
 | Q1 | `scripts/size-report.mjs`: sizes of every chunk (raw, gzip), duplicates, against the budgets in §3.9 and against `main`; run in CI | report on every PR; fails on a breach |
-| Q2 | BUG-13: one copy of MediaBunny and the encoders shared by the worker and the page (Vite worker format / shared chunk), or load the encoders only in the worker | duplicate count 0 |
+| Q2 | BUG-13: one copy of MediaBunny and the encoders shared by the worker and the page (Vite worker format / shared chunk), or load the encoders only in the worker. **Moved to wave 4** (measured in wave 2): the page needs its own copies (it records, exports HLS, encrypts and extracts tracks), each copy loads only when used and is cached after, so the cost is ~540 KB once per browser, on the first edit job. Vite builds the worker on its own, so sharing one file means the worker loading the page's MediaBunny at run time through a generated module re-exporting its names: a fragile build change on the path every edit takes, for a one-time saving. `size-report` holds the count at 7 meanwhile | duplicate count 0 |
 | Q3 | Ship less: drop unused `public/` videos (`homepage_old.mp4`, the ad videos if no page uses them); keep publishing source maps (decision 8); confirm Whisper's 23 MB runtime loads only for subtitle generation | `dist/` size in the report goes down |
 | Q4 | Offline (decision 7, wave 4): cache the app shell and decoders in the service worker so the player opens offline after a first visit, with the version check (P6) so nobody is stuck on an old copy | the player opens and plays a local file with the network off |
 | Q5 | Runtime benchmarks in a browser suite: time to first frame, seek latency, dropped frames, memory after 20 loads, 2,000-item playlist render; reported per run | numbers in CI output; budgets set from the baseline |
@@ -941,7 +942,7 @@ parallel; a wave starts when the one before it is done, except where noted.
 | **1. Foundations** | rules and tools the rest builds on | C1–C5, R1–R5, N1–N3, P1–P2, L4, T1, T2, A5–A7 | layering, config, errors and logging are used by every later step |
 | **2. App structure** | settings, playlist, tools and storage done properly | D1–D3, E1–E5, F1–F5, G1–G5, N4–N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | the biggest files and the edit-panel workarounds; storage needs B4's test |
 | **3. Player surface** | the player is used only through its API | H1–H4, I1–I2, P3–P6, Q5–Q6, S4–S8, T3–T6, O7, O8, K4, K5 | needs D (overrides) and E (playlist) in place |
-| **4. Ongoing** | the risky internals and long tails | J1–J4 (each with a device check, when a bug there is next fixed), M, L1–L3, L5, Q4, P7 | high risk or low urgency |
+| **4. Ongoing** | the risky internals and long tails | J1–J4 (each with a device check, when a bug there is next fixed), M, L1–L3, L5, Q2, Q4, P7 | high risk or low urgency |
 
 ```
 Wave 0 ──► Wave 1 ──► Wave 2 ──► Wave 3 ──► Wave 4 (ongoing)
