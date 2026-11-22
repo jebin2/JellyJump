@@ -15,6 +15,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { startCoverage, saveCoverage } from './lib/coverage.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const PORT = Number(process.env.PORT || 8189);
@@ -209,11 +210,13 @@ if (!await waitForServer(origin)) {
     process.exit(1);
 }
 
+let page = null;
 const browser = await chromium.launch({ executablePath: browserPath, args: ['--no-sandbox', '--no-proxy-server'] });
 try {
     // The page's CSP forbids building functions from strings, which is how
     // the steps above reach the module; the test opens it with CSP off.
-    const page = await browser.newPage({ bypassCSP: true });
+    page = await browser.newPage({ bypassCSP: true });
+    await startCoverage(page);
     page.on('pageerror', e => { fail++; console.log(`  FAIL  page error: ${String(e.message).slice(0, 160)}`); });
     await page.route('**/*', r => r.request().url().startsWith(origin) ? r.continue() : r.abort());
     await run(page, origin);
@@ -221,6 +224,7 @@ try {
     fail++;
     console.log(`  FAIL  the run itself threw: ${error.message}`);
 } finally {
+    if (page) await saveCoverage(page, 'storage-test');
     await browser.close();
     stopVite();
 }

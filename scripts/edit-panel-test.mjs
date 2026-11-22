@@ -19,6 +19,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { existsSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
+import { startCoverage, saveCoverage } from './lib/coverage.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist');
@@ -486,13 +487,16 @@ try {
 
 const { server, origin } = await serveDist();
 const browser = await chromium.launch({ executablePath: browserPath, args: ['--no-sandbox', '--no-proxy-server'] });
+let page = null;
 try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await startCoverage(page);
     await run(page, origin);
 } catch (error) {
     fail++;
     console.log(`  FAIL  the run itself threw: ${error.message}`);
 } finally {
+    if (page) await saveCoverage(page, 'edit-panel-test');
     await browser.close();
     server.close();
 }
