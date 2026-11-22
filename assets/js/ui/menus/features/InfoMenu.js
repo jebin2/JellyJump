@@ -104,7 +104,7 @@ export class InfoMenu {
             if (item.isStream || item.isLive) {
                 const isPlaying = playlist.player && playlist.player.src === item.url;
                 let resolution = 'N/A';
-                let videoCodec = 'N/A';
+                const videoCodec = 'N/A';
 
                 // If currently playing, try to get info from video element
                 if (isPlaying && playlist.player.videoElement) {
@@ -263,7 +263,7 @@ export class InfoMenu {
             const audioTrackCount = item.audioTracks ? `(${item.audioTracks.length} track${item.audioTracks.length !== 1 ? 's' : ''})` : '';
 
             // Extended metadata: initialize defaults
-            let metaTags = {
+            const metaTags = {
                 title: null,
                 artist: null,
                 album: null,

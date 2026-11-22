@@ -56,12 +56,7 @@ export class SlideshowMenu {
         const playIcon = modalContent.querySelector('.slideshow-play-icon');
 
         const processBtn = modalContent.querySelector('.slideshow-btn');
-        const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.progress-section');
-        const progressText = modalContent.querySelector('.progress-percentage');
-        const progressStatus = modalContent.querySelector('.progress-status');
         const errorMessage = modalContent.querySelector('.error-message');
-        const successMessage = modalContent.querySelector('.success-message');
 
         // --- State ---
         const images = []; // { file, objectUrl, name }

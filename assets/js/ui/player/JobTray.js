@@ -2,7 +2,7 @@ import { JobQueue } from '../../shared/services/JobQueue.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
-import { escapeHtml } from '../../shared/utils/html.js';
+import { escapeHtml, html, trusted } from '../../shared/utils/html.js';
 
 /**
  * JobTray - the job list at the foot of the sidebar.
@@ -125,15 +125,16 @@ export class JobTray {
         const active = jobs.filter(j => j.status === 'queued' || j.status === 'running').length;
         const finished = jobs.length - active;
 
-        this.el.innerHTML = `
+        // Each row escapes its own values (_row), so the rows go in as markup.
+        this.el.innerHTML = String(html`
             <header class="job-tray-header">
-                <span class="job-tray-title">Jobs${active ? ` <span class="job-tray-count">${active} running</span>` : ''}</span>
-                ${finished ? '<button class="job-tray-clear" data-job-action="clear">Clear finished</button>' : ''}
+                <span class="job-tray-title">Jobs${active ? html` <span class="job-tray-count">${active} running</span>` : ''}</span>
+                ${finished ? html`<button class="job-tray-clear" data-job-action="clear">Clear finished</button>` : ''}
             </header>
             <ul class="job-tray-list">
-                ${jobs.slice().reverse().map(job => this._row(job)).join('')}
+                ${jobs.slice().reverse().map(job => trusted(this._row(job)))}
             </ul>
-        `;
+        `);
     }
 
     _statusText(job) {

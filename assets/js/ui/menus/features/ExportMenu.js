@@ -36,10 +36,6 @@ export class ExportMenu {
         const endInput = content.querySelector('#export-fx-end');
         const exportBtn = content.querySelector('.export-fx-btn');
         const downloadBtn = content.querySelector('.download-btn');
-        const progressSection = content.querySelector('.progress-section');
-        const progressPercentage = content.querySelector('.progress-percentage');
-        const errorMessage = content.querySelector('.error-message');
-        const successMessage = content.querySelector('.success-message');
 
         // Subtitles loaded into or generated on the player go into the file
         // as tracks of their own, switchable in the viewer's player.

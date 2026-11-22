@@ -1,4 +1,3 @@
-import { Logger } from '../../shared/utils/Logger.js';
 
 /** Key for the outer list in the batch-depth map, which is otherwise by path. */
 const ROOT_LIST = '\u0000root';

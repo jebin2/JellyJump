@@ -100,7 +100,7 @@ export class RotateMenu {
 
         processBtn.addEventListener('click', () => {
             // Normalize Rotation
-            let normRotation = rotation % 360;
+            const normRotation = rotation % 360;
 
             // Named after the original, beside it in the playlist.
             const originalName = item.file ? item.file.name : (item.title || 'video.mp4');

@@ -60,14 +60,10 @@ export class GifMenu {
         const createBtn = modalContent.querySelector('.create-gif-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
 
-        const progressSection = modalContent.querySelector('.progress-section');
-        const progressText = modalContent.querySelector('.progress-percentage');
 
         const gifPreviewSection = modalContent.querySelector('.gif-preview-section');
         const gifPreviewImage = modalContent.querySelector('.gif-preview-image');
         const gifFileSize = modalContent.querySelector('.gif-file-size');
-        const errorMessage = modalContent.querySelector('.error-message');
-        const successMessage = modalContent.querySelector('.success-message');
 
         // Ensure metadata
         await playlist._ensureMetadata(item);

@@ -667,7 +667,7 @@ export class PlatformCrypto {
 
         // RS shards: data shards are zero-copy views of the ciphertext; only
         // the 25% parity is newly allocated. One shard per frame, no repeats.
-        let t2 = performance.now();
+        const t2 = performance.now();
         const shards = buildShards(ciphertext, plan);
         const shardOrder = schedule.filter((slot) => slot.shard !== undefined);
         Logger.log(`[PlatformCrypto] [${rel()}] RS encode (${plan.totalShards} shards, ${plan.generations.length} generations): ${ms(t2, performance.now())}`);
@@ -764,7 +764,7 @@ export class PlatformCrypto {
                     `| elapsed ${fmtDur(elapsedSec)} ETA ${fmtDur(etaSec)} ` +
                     `| ${(REPORT_EVERY / (windowMs / 1000)).toFixed(0)} fps` +
                     (bytesWritten ? ` | ${(bytesWritten / 1048576).toFixed(0)}MB on disk` : '') +
-                    ` | pixelWrite=${tPixelWrite.toFixed(0)}ms sampleCreate=${tSampleCreate.toFixed(0)}ms videoSourceAdd=${tVideoSourceAdd.toFixed(0)}ms`
+                    ` | memcpy=${tMemcpy.toFixed(0)}ms pixelWrite=${tPixelWrite.toFixed(0)}ms sampleCreate=${tSampleCreate.toFixed(0)}ms videoSourceAdd=${tVideoSourceAdd.toFixed(0)}ms`
                 );
                 tMemcpy = 0; tPixelWrite = 0; tSampleCreate = 0; tVideoSourceAdd = 0;
                 windowStart = now;

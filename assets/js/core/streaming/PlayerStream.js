@@ -1,4 +1,4 @@
-import { MediaBunny } from '../../shared/media/MediaBunny.js';
+import '../../shared/media/MediaBunny.js'; // registers the codec plugins
 import { PlaybackAnchor } from '../playback/PlaybackAnchor.js';
 import { scheduleLiveFrame } from './LiveFrameSchedule.js';
 import { StreamVideoSource } from './StreamVideoSource.js';

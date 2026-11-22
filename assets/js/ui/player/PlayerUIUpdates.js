@@ -1,5 +1,6 @@
 import { formatTime } from '../../shared/utils/mediaUtils.js';
 import { Logger } from '../../shared/utils/Logger.js';
+import { html } from '../../shared/utils/html.js';
 
 export function updatePlayerPlayPauseUI(player) {
     if (!player.ui.playBtn) return;
@@ -96,7 +97,7 @@ export function showPlayerBezel(player, icon, text) {
     const textContainer = player.ui.bezelOverlay.querySelector('.bezel-text');
 
     if (iconContainer) {
-        iconContainer.innerHTML = `<svg width="100%" height="100%" fill="currentColor"><use href="assets/icons/sprite.svg#${icon}"></use></svg>`;
+        iconContainer.innerHTML = String(html`<svg width="100%" height="100%" fill="currentColor"><use href="assets/icons/sprite.svg#${icon}"></use></svg>`);
     }
     if (textContainer) {
         textContainer.textContent = text;

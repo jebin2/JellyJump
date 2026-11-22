@@ -6,6 +6,7 @@ import { offerPanelSurface, takePanelSurface } from '../menus/core/MenuSurface.j
 import { itemToolSections } from '../menus/features/ItemToolsMenu.js';
 import { JobQueue } from '../../shared/services/JobQueue.js';
 import { StorageService } from '../../shared/services/StorageService.js';
+import { html, trusted } from '../../shared/utils/html.js';
 import { isDesktop } from '../../shared/platform/Platform.js';
 
 /**
@@ -180,9 +181,9 @@ export class EditPanel {
         this.el = document.createElement('section');
         this.el.className = 'edit-panel hidden';
         this.el.setAttribute('aria-label', 'Edit video');
-        this.el.innerHTML = `
+        this.el.innerHTML = String(html`
             <header class="edit-panel-header">
-                <button class="edit-panel-back" type="button">${ICON('icon-chevron-left', 14)}<span class="edit-panel-back-label">Playlist</span></button>
+                <button class="edit-panel-back" type="button">${trusted(ICON('icon-chevron-left', 14))}<span class="edit-panel-back-label">Playlist</span></button>
                 <div class="edit-panel-heading">
                     <h2 class="edit-panel-title">Edit</h2>
                     <p class="edit-panel-item"></p>
@@ -207,7 +208,7 @@ export class EditPanel {
             </div>
             <div class="edit-panel-tools"></div>
             <div class="edit-panel-note hidden" role="status" aria-live="polite"></div>
-        `;
+        `);
         section.insertBefore(this.el, before);
 
         this.backBtn = this.el.querySelector('.edit-panel-back');

@@ -93,7 +93,6 @@ export class CombineAVMenu {
             combineBtn.disabled = true;
             combineBtn.innerHTML = '<span class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin mr-xs"></span> Combining...';
 
-            const progressSection = modalContent.querySelector('.progress-section');
             const successMsg = modalContent.querySelector('.success-message');
             const downloadBtn = modalContent.querySelector('.download-btn');
 
