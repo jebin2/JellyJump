@@ -96,7 +96,7 @@ export class MotionDetectionMenu {
 
             segmentsList.innerHTML = '<div class="flex-center flex-col gap-sm h-full text-muted italic py-xl"><div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-6 h-6 animate-spin opacity-50"></div><span class="text-sm">Scanning video...</span></div>';
 
-            await MotionDetectionMenu.runDetection(item, videoUrl, detector, playlist, { threshold }, isCancelled, {
+            await MotionDetectionMenu.runDetection(item, videoUrl, detector, playlist, { threshold }, () => isCancelled, {
                 segmentsList, progressSection, progressPercentage, successMessage, errorMessage, modalContent
             });
 
@@ -114,13 +114,15 @@ export class MotionDetectionMenu {
     }
 
     static async runDetection(item, videoUrl, detector, playlist, options, isCancelled, ui) {
+        // A function, not the flag itself: passed as a boolean it was copied
+        // at the call, and leaving the tool mid-detection was never seen here.
         const { segmentsList, progressSection, progressPercentage, successMessage, errorMessage, modalContent } = ui;
 
         const progressStatus = modalContent.querySelector('.progress-status');
         if (progressStatus) progressStatus.textContent = 'Scanning video...';
 
         detector.progressCallback = (progress) => {
-            if (isCancelled) return;
+            if (isCancelled()) return;
             const pct = Math.round(progress * 100);
             if (progressPercentage) progressPercentage.textContent = `${pct}%`;
             if (progressStatus) {
@@ -134,7 +136,7 @@ export class MotionDetectionMenu {
 
         try {
             const results = await detector.detect(videoUrl, options);
-            if (isCancelled) return;
+            if (isCancelled()) return;
 
             if (progressStatus) progressStatus.textContent = `Found ${results.length} events`;
 
@@ -219,7 +221,7 @@ export class MotionDetectionMenu {
             }
 
         } catch (err) {
-            if (isCancelled) return;
+            if (isCancelled()) return;
             Logger.error('MotionDetectionMenu: Error', err);
             if (progressStatus) progressStatus.textContent = 'Error';
             segmentsList.innerHTML = html`<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;

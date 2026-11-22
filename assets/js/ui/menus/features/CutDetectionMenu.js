@@ -98,7 +98,7 @@ export class CutDetectionMenu {
             await CutDetectionMenu.runDetection(item, videoUrl, detector, playlist, {
                 sensitivity,
                 adaptiveMode: true
-            }, isCancelled, {
+            }, () => isCancelled, {
                 statusText: progressStatus, statusPercent: progressPercentage, cutsList,
                 progressSection, successMessage, errorMessage, modalContent
             });
@@ -117,13 +117,15 @@ export class CutDetectionMenu {
     }
 
     static async runDetection(item, videoUrl, detector, playlist, options, isCancelled, ui) {
+        // A function, not the flag itself: passed as a boolean it was copied
+        // at the call, and leaving the tool mid-detection was never seen here.
         const { statusText, statusPercent, cutsList,
             progressSection, successMessage, errorMessage, modalContent } = ui;
 
         if (statusText) statusText.textContent = 'Analyzing video...';
 
         detector.progressCallback = (progress) => {
-            if (isCancelled) return;
+            if (isCancelled()) return;
             const pct = Math.round(progress * 100);
             if (statusPercent) statusPercent.textContent = `${pct}%`;
 
@@ -159,7 +161,7 @@ export class CutDetectionMenu {
                 sensitivity: options.sensitivity
             });
 
-            if (isCancelled) return;
+            if (isCancelled()) return;
 
             // Show statistics if adaptive mode was used
             const stats = detector.getLastStats();
@@ -264,7 +266,7 @@ export class CutDetectionMenu {
             }
 
         } catch (err) {
-            if (isCancelled) return;
+            if (isCancelled()) return;
             Logger.error('CutDetectionMenu: Error', err);
             statusText.textContent = 'Error: ' + err.message;
             statusText.classList.add('text-danger');
