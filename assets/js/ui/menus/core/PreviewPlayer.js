@@ -168,3 +168,30 @@ export function timelineMarks(player, surface) {
         }));
     };
 }
+
+/**
+ * Scenes and Motion list the stretches they find. Clicking a row plays that
+ * stretch in the main player, on a loop; the player goes back to how it was
+ * when the tool closes.
+ * @param {Object} surface - the tool's panel surface
+ * @param {Object} playlist
+ * @param {HTMLElement} list - the rows, each with its Add button holding the times
+ */
+export function playRowsOnClick(surface, playlist, list) {
+    const player = borrowMainPlayer(surface, playlist);
+    if (!player) return;
+    list.addEventListener('click', (e) => {
+        const target = /** @type {Element} */ (e.target);
+        const row = target.closest('.segment-item');
+        const times = /** @type {HTMLElement|null} */ (row?.querySelector('.add-segment-btn'))?.dataset;
+        if (!row || !times || target.closest('.add-segment-btn')) return;
+        const start = parseFloat(times.start);
+        const end = parseFloat(times.end);
+        if (!(end > start)) return;
+        for (const other of list.querySelectorAll('.segment-item.is-previewing')) other.classList.remove('is-previewing');
+        row.classList.add('is-previewing');
+        setPreviewRange(player, start, end);
+        player.seek(start);
+        player.play?.();
+    });
+}

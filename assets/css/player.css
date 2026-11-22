@@ -3705,9 +3705,11 @@ body.fullscreen-active {
    play, seek, time, volume (the speaker button), screenshot, fullscreen.
    Going to another video, playing backwards, audio tracks, subtitles, speed,
    filters (never in the saved file), loop (the tools set their own) and
-   pinning are put away. */
+   pinning are put away. Export FX is the exception for filters: it saves
+   them, so they are back while it is open (jj-export-fx). */
 .jellyjump-container.jj-editing :is(#mb-direction-btn, #mb-prev-btn, #mb-next-btn,
-    #mb-audio-container, #mb-cc-btn, #mb-speed-btn, #mb-filters-btn,
-    #mb-loop-btn, #mb-mode-toggle-btn) {
+    #mb-audio-container, #mb-cc-btn, #mb-speed-btn,
+    #mb-loop-btn, #mb-mode-toggle-btn),
+.jellyjump-container.jj-editing:not(.jj-export-fx) #mb-filters-btn {
     display: none !important;
 }

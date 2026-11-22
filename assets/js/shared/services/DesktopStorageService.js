@@ -130,6 +130,9 @@ export class DesktopStorageService {
         return false;
     }
 
+    /** No-op on desktop, where no blob is stored (see saveFile). */
+    async deleteFile(_id) {}
+
     // ─── Playback state ───────────────────────────────────────────────────────
 
     async savePlaybackState(state) {

@@ -5,6 +5,7 @@ import { renderToolGrid } from '../menus/core/ToolGrid.js';
 import { offerPanelSurface, takePanelSurface } from '../menus/core/MenuSurface.js';
 import { itemToolSections } from '../menus/features/ItemToolsMenu.js';
 import { JobQueue } from '../../shared/services/JobQueue.js';
+import { StorageService } from '../../shared/services/StorageService.js';
 
 /**
  * EditPanel - editing a video in the sidebar, with the main player as preview.
@@ -17,19 +18,20 @@ import { JobQueue } from '../../shared/services/JobQueue.js';
  * Edits stack. When an applied edit is done, its result takes the original's
  * place in the player and the panel, so the next edit is made on top of it.
  * The playlist holds one edited copy beside the original, replaced at each
- * step; Undo goes one step back and Reset back to the original, which is
- * never changed.
+ * step, and named after the original ("clip-edited.mp4"); Undo goes one step
+ * back and Reset back to the original, which is never changed.
  *
- * Tools move here a few at a time. Those that still open a dialog are opened
- * from the panel just the same.
+ * The edits are remembered with the copy: the panel opened on it again, after
+ * going back to the playlist or after a reload, can still undo them. The
+ * earlier copies' files stay in storage for that, until Undo or Reset no
+ * longer needs them.
  */
 
-/** Tools whose settings draw in the panel. The rest still open a dialog. */
-const PANEL_TOOLS = new Set([
-    'convert', 'reverse', 'resize', 'rotate', 'encrypt',
-    'trim', 'multicut', 'create-gif',
-    'crop', 'blur', 'watermark', 'remove-bg',
-]);
+/**
+ * Tools that open in a dialog even from the panel: Info is a report to read,
+ * and Record belongs to a stream, which has no edits.
+ */
+const DIALOG_TOOLS = new Set(['info', 'record']);
 
 /**
  * Tools whose result is the edited video, to edit further. A GIF and an
@@ -40,6 +42,19 @@ const STACKING_TOOLS = new Set([
     'trim', 'multicut',
     'crop', 'blur', 'watermark', 'remove-bg',
 ]);
+
+/** Where the edits are remembered between visits, for the copies they made. */
+const HISTORY_KEY = 'jellyjump-edit-history';
+
+/**
+ * Whether earlier copies can be read back from storage. The desktop app
+ * stores no edited copy, so there Undo needs them in memory, and the edits
+ * are not remembered past the session.
+ */
+const STORES_COPIES = !(typeof window !== 'undefined' && window.electronAPI?.isElectron);
+
+/** IndexedDBService stores no file larger than this; such a copy stays in memory. */
+const MAX_STORED_FILE = 500 * 1024 * 1024;
 
 /** Fired by Playlist.selectItem, so the panel can follow what is playing. */
 export const ITEM_SELECTED_EVENT = 'jellyjump:item-selected';
@@ -137,13 +152,22 @@ export class EditPanel {
         /** @type {PanelSurface|null} the open tool */
         this.surface = null;
         /**
-         * The edits made since the panel opened on `original`: each step's
-         * result, with its file kept for Undo (the playlist lets go of the
-         * file of an item it moves away from), and the edit being applied.
-         * @type {{original: Object, steps: Array<{item: Object, file: File, name: string}>,
-         *   pending: {job: Object, name: string}|null}|null}
+         * The edits made to `original`: each step's result, with its file
+         * kept for Undo (the playlist lets go of the file of an item it moves
+         * away from; after a reload it is read back from storage), and the
+         * edit being applied.
+         * @type {{original: Object, steps: Array<{item: Object, file: File|null, name: string}>,
+         *   pending: {job: Object, name: string, action: string, named?: boolean}|null}|null}
          */
         this.session = null;
+        /**
+         * Sessions to go back to, by the id of the copy they made last.
+         * @type {Map<string, Object>}
+         */
+        this.histories = new Map();
+        this._historiesLoaded = false;
+        this.storage = new StorageService();
+        playlist.nameProcessedItem = (source, filename) => this._nameCopy(source, filename);
 
         this.el = document.createElement('section');
         this.el.className = 'edit-panel hidden';
@@ -232,7 +256,10 @@ export class EditPanel {
     openItem(item, { focus = true, step = false } = {}) {
         if (!this._leaveTool()) return;
         this.item = item;
-        if (!step) this.session = { original: item, steps: [], pending: null };
+        if (!step) {
+            if (this.session) this._shelve(this.session);
+            this.session = this._resume(item) ?? { original: item, steps: [], pending: null };
+        }
         this.section.classList.add('editing');
         this._quietPlayer();
         this.el.classList.remove('hidden');
@@ -251,8 +278,10 @@ export class EditPanel {
     close() {
         if (!this._leaveTool()) return;
         this.item = null;
-        // An edit still being applied finishes as an ordinary job, its
-        // result in the playlist.
+        // The edits so far are remembered with the copy. An edit still being
+        // applied finishes as an ordinary job, its result in the playlist,
+        // unless the copy is opened again before it is done.
+        if (this.session) this._shelve(this.session);
         this.session = null;
         this._renderSession();
         this.el.classList.add('hidden');
@@ -307,8 +336,8 @@ export class EditPanel {
         }
         this._note('');
 
-        if (!PANEL_TOOLS.has(action)) {
-            // Still a dialog, with its own preview, so the big player waits.
+        if (DIALOG_TOOLS.has(action)) {
+            // A dialog over the player, which waits meanwhile.
             this.playlist.player?.pause();
             MenuRouter.init(action, index, this.playlist);
             return;
@@ -327,6 +356,7 @@ export class EditPanel {
     _mountTool(surface) {
         if (this.surface && this.surface !== surface) this.surface.close();
         this.surface = surface;
+        if (surface.action === 'export-fx') this._lendEffects(surface);
         this.toolsEl.classList.add('hidden');
         this.el.insertBefore(surface.modal, this.noteEl);
         this.backLabel.textContent = 'All tools';
@@ -368,7 +398,7 @@ export class EditPanel {
             return;
         }
         const source = this.item;
-        session.pending = { job, name };
+        session.pending = { job, name, action: surface.action };
         this._renderSession();
         const unsubscribe = JobQueue.subscribe(() => {
             if (this.session === session) this._renderBusy();
@@ -384,8 +414,12 @@ export class EditPanel {
                 this._note(outcome.cancelled ? `${name} cancelled` : (job.error || `${name} failed`));
                 return;
             }
-            const result = job.results.length === 1 ? job.results[0].item : null;
-            if (!result?.file || this.item !== source) {
+            // The file as the job made it: by now the playlist may have
+            // stored it and let go of the item's own.
+            const collected = job.results.length === 1 ? job.results[0] : null;
+            const result = collected?.item ?? null;
+            const file = collected?.file ?? result?.file ?? null;
+            if (!result || !file || this.item !== source) {
                 this._note(`${name} added to Jobs`);
                 return;
             }
@@ -396,7 +430,8 @@ export class EditPanel {
                 return;
             }
             const replaced = session.steps.at(-1)?.item;
-            session.steps.push({ item: result, file: result.file, name });
+            session.steps.push({ item: result, file, name });
+            this._remember(session);
             this._step(result, tool);
             if (replaced) this._discard(replaced);
             this._note(`${name} applied. Keep editing, or Undo.`);
@@ -404,17 +439,35 @@ export class EditPanel {
     }
 
     /** Take back the last edit. */
-    undo() {
+    async undo() {
         const session = this.session;
-        if (!session?.steps.length || session.pending) return;
+        if (!session?.steps.length || session.pending || this._undoing) return;
         const before = session.steps.at(-2);
         if (!before && !this._inPlaylist(session.original)) return;
+        // After a reload the earlier copy's file is in storage, not in memory.
+        if (before && !before.file) {
+            this._undoing = true;
+            this.undoBtn.disabled = true;
+            try {
+                before.file = await this.storage.loadFile(before.item.id).catch(() => null);
+            } finally {
+                this._undoing = false;
+                this._renderBusy();
+            }
+            if (this.session !== session || session.pending || session.steps.at(-2) !== before) return;
+            if (!before.file) {
+                Toast.show('The copy before this edit is no longer stored, so it cannot be undone. Reset still goes back to the original.', 5000, true);
+                return;
+            }
+        }
         const tool = this.surface?.action;
         if (!this._leaveTool()) return;
         const last = session.steps.pop();
         const target = before ? this._restore(before, last.item) : session.original;
+        this._remember(session, last.item);
         this._step(target, tool);
         this._discard(last.item);
+        this._forget([last.item]);
         this._note(`${last.name} undone`);
     }
 
@@ -425,10 +478,13 @@ export class EditPanel {
         if (!this._inPlaylist(session.original)) return;
         const tool = this.surface?.action;
         if (!this._leaveTool()) return;
-        const last = session.steps.at(-1).item;
+        const steps = session.steps;
+        const last = steps.at(-1).item;
         session.steps = [];
+        this._remember(session, last);
         this._step(session.original, tool);
         this._discard(last);
+        this._forget(steps.map((s) => s.item));
         this._note('Back to the original');
     }
 
@@ -448,6 +504,183 @@ export class EditPanel {
     _discard(item) {
         const index = this.playlist.items.indexOf(item);
         if (index !== -1) this.playlist.removeItem(index);
+    }
+
+    /**
+     * The name of an edit's result, when it is a step of the open session:
+     * the original's, as an edited copy, whatever the tool would call it.
+     * @param {Object} source - the item the tool worked on
+     * @param {string} filename - the tool's name for the result
+     * @returns {{title: string, path: string}|null} null to keep the tool's
+     */
+    _nameCopy(source, filename) {
+        const session = this.session;
+        const pending = session?.pending;
+        // Only the pending edit's own result: a job queued before it (a GIF of
+        // the same video, say) finishes first and keeps its name.
+        if (!pending || pending.named || pending.job.status !== 'running'
+            || source !== this.item || !STACKING_TOOLS.has(pending.action)) return null;
+        pending.named = true;
+        const { original } = session;
+        const ext = /\.[^/.]+$/.exec(filename)?.[0] ?? /\.[^/.]+$/.exec(original.title)?.[0] ?? '.mp4';
+        // The copy keeps its name from step to step...
+        const current = session.steps.at(-1)?.item;
+        const currentBase = current?.title.replace(/\.[^/.]+$/, '');
+        const base = original.title.replace(/\.[^/.]+$/, '').replace(/-edited(-\d+)?$/, '');
+        // ...and another session's copy of the same video gets a number.
+        const taken = new Set(this.playlist.items.filter((i) => i !== current).map((i) => i.title));
+        let stem = currentBase ?? `${base}-edited`;
+        for (let n = 2; taken.has(`${stem}${ext}`); n++) stem = `${base}-edited-${n}`;
+        const title = `${stem}${ext}`;
+        return { title, path: `${original.path || original.title}/${title}` };
+    }
+
+    /**
+     * Remember the session under the copy it made last, for the panel to
+     * pick up there again, here or after a reload.
+     * @param {Object} session
+     * @param {Object} [previous] - the copy it was remembered under before
+     */
+    _remember(session, previous) {
+        this._loadHistories();
+        if (previous) this.histories.delete(previous.id);
+        for (const [id, s] of this.histories) if (s === session) this.histories.delete(id);
+        const last = session.steps.at(-1)?.item;
+        if (last) this.histories.set(last.id, session);
+        this._saveHistories();
+    }
+
+    /**
+     * The session that made this copy, if it is one the panel remembers.
+     * @param {Object} item
+     * @returns {Object|null}
+     */
+    _resume(item) {
+        this._loadHistories();
+        this._prune();
+        const session = this.histories.get(item.id);
+        if (!session) return null;
+        // The stored copy stands in for its last step from now on.
+        session.steps.at(-1).item = item;
+        return session;
+    }
+
+    /**
+     * A session left for later: its copies' files go from memory, since Undo
+     * reads them back from storage. Not where storage cannot hold them.
+     * @param {Object} session
+     */
+    _shelve(session) {
+        if (!STORES_COPIES || session.pending) return;
+        for (const step of session.steps) {
+            if (step.file && step.file.size < MAX_STORED_FILE) step.file = null;
+        }
+    }
+
+    /**
+     * Drop what is remembered for copies no longer in the playlist (removed
+     * from it outside the panel), and the files kept for their Undo.
+     */
+    _prune() {
+        const ids = new Set(this.playlist.items.map((i) => i.id));
+        let changed = false;
+        for (const [id, session] of this.histories) {
+            if (session === this.session) continue;
+            // Reset goes back to the original, so without it there is nothing to go on with.
+            if (ids.has(id) && ids.has(session.original.id)) continue;
+            this.histories.delete(id);
+            this._forget(session.steps.map((s) => s.item));
+            changed = true;
+        }
+        if (changed) this._saveHistories();
+    }
+
+    /**
+     * The files of copies gone from the playlist for good, out of storage.
+     * @param {Object[]} items
+     */
+    _forget(items) {
+        for (const item of items) {
+            if (this.playlist.items.includes(item)) continue;
+            if (this.playlist.items.some((i) => i.id === item.id)) continue;
+            this.storage.deleteFile?.(item.id)?.catch?.(() => {});
+        }
+    }
+
+    _loadHistories() {
+        if (this._historiesLoaded) return;
+        this._historiesLoaded = true;
+        let stored = {};
+        try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}') || {}; } catch { /* blocked, or not ours */ }
+        let dropped = false;
+        for (const [id, entry] of Object.entries(stored)) {
+            const original = this.playlist.items.find((i) => i.id === entry?.originalId);
+            if (!original || !Array.isArray(entry?.steps) || !entry.steps.length) {
+                // Its original is gone: nothing to go on with, and the
+                // earlier copies kept for its Undo are not wanted any more.
+                if (Array.isArray(entry?.steps)) this._forget(entry.steps.filter((s) => s?.id).map((s) => ({ id: s.id })));
+                dropped = true;
+                continue;
+            }
+            this.histories.set(id, {
+                original,
+                pending: null,
+                steps: entry.steps.map((s) => ({
+                    name: s.name,
+                    file: null,
+                    item: {
+                        id: s.id, title: s.title, duration: s.duration, path: s.path, type: s.type || 'video',
+                        mimeType: s.mimeType, fileType: s.fileType, fileSize: s.fileSize, isLocal: true,
+                    },
+                })),
+            });
+        }
+        if (dropped) this._saveHistories();
+    }
+
+    _saveHistories() {
+        const stored = {};
+        for (const [id, session] of this.histories) {
+            stored[id] = {
+                originalId: session.original.id,
+                steps: session.steps.map(({ item, name }) => ({
+                    id: item.id, title: item.title, duration: item.duration, path: item.path, type: item.type,
+                    mimeType: item.mimeType, fileType: item.fileType, fileSize: item.fileSize, name,
+                })),
+            };
+        }
+        try {
+            if (STORES_COPIES && Object.keys(stored).length) localStorage.setItem(HISTORY_KEY, JSON.stringify(stored));
+            else localStorage.removeItem(HISTORY_KEY);
+        } catch { /* blocked: remembered until the page closes */ }
+    }
+
+    /**
+     * Export FX saves the player's own effects, which the panel otherwise
+     * puts away while editing: they are back, with the Filters button, for
+     * as long as it is open, and whatever they are then is what comes back
+     * when the panel closes.
+     * @param {PanelSurface} surface
+     */
+    _lendEffects(surface) {
+        const player = this.playlist.player;
+        const saved = this._playerSaved;
+        if (!player || !saved) return;
+        player.container?.classList.add('jj-export-fx');
+        if (saved.filters) {
+            player.videoFilters?.setState(saved.filters);
+            player._updateFiltersButtonState?.();
+        }
+        surface.onCleanup(() => {
+            player.container?.classList.remove('jj-export-fx');
+            if (player.ui?.filterPanel) player.ui.filterPanel.style.display = 'none';
+            // Closed with the panel: _restorePlayer puts back what is saved.
+            const current = this._playerSaved;
+            if (!current) return;
+            current.filters = player.videoFilters?.isActive() ? player.videoFilters.getState() : null;
+            player.videoFilters?.reset();
+            player._updateFiltersButtonState?.();
+        });
     }
 
     /**
@@ -541,6 +774,7 @@ export class EditPanel {
         this.toolsEl.inert = !!pending;
         if (this.surface) this.surface.modal.inert = !!pending;
         this.undoBtn.disabled = this.resetBtn.disabled = !!pending;
+        if (this._undoing) this.undoBtn.disabled = true;
         if (!pending) return;
         const { job, name } = pending;
         const pct = Math.round((job.progress || 0) * 100);

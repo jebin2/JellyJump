@@ -23,6 +23,8 @@ import { isCancellation } from '../../processing/shared/Cancellation.js';
  * @property {Object} item - The playlist item the job added
  * @property {string} url - Its blob URL, for Download
  * @property {string} filename
+ * @property {File} [file] - Its file as made; the playlist lets go of the
+ *   item's own once the file is stored
  *
  * @typedef {Object} Job
  * @property {number} id
@@ -89,7 +91,7 @@ async function pump() {
     /** @param {Event} e */
     const collect = (e) => {
         const detail = /** @type {CustomEvent} */ (e).detail;
-        if (detail?.item) job.results.push({ item: detail.item, url: detail.url, filename: detail.item.title });
+        if (detail?.item) job.results.push({ item: detail.item, url: detail.url, filename: detail.item.title, file: detail.item.file });
     };
 
     try {

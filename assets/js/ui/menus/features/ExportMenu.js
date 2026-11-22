@@ -40,8 +40,6 @@ export class ExportMenu {
         const errorMessage = content.querySelector('.error-message');
         const successMessage = content.querySelector('.success-message');
 
-        const applied = isPlayingThis ? ExportMenu._describe(player) : [];
-
         // Subtitles loaded into or generated on the player go into the file
         // as tracks of their own, switchable in the viewer's player.
         const subtitleTracks = isPlayingThis ? (player.subtitles?.tracks ?? []).filter(t => t.cues?.length) : [];
@@ -56,16 +54,34 @@ export class ExportMenu {
         if (!isPlayingThis) {
             empty.textContent = 'Play this video first. The effects live on the player, '
                 + 'so they can only be baked into the video that is on screen.';
-            empty.classList.remove('hidden');
-        } else if (applied.length === 0 && !subtitleTracks.length) {
-            empty.classList.remove('hidden');
-        } else if (applied.length) {
-            summary.innerHTML = applied.map(line => `<li>${line}</li>`).join('');
+        } else if (modal.isPanel) {
+            empty.textContent = 'Nothing is applied yet. Add a colour effect, a sticker, a border '
+                + 'or some rain with the player\'s Filters button.';
         }
 
-        // Subtitles alone are worth exporting: they turn a video and a
-        // separate caption file into one file that carries both.
-        exportBtn.disabled = !isPlayingThis || (applied.length === 0 && !subtitleTracks.length);
+        // What is on the player, listed again whenever it changes.
+        const refresh = () => {
+            const applied = isPlayingThis ? ExportMenu._describe(player) : [];
+            summary.innerHTML = applied.map(line => `<li>${line}</li>`).join('');
+            // Subtitles alone are worth exporting: they turn a video and a
+            // separate caption file into one file that carries both.
+            const nothing = !isPlayingThis || (applied.length === 0 && !subtitleTracks.length);
+            empty.classList.toggle('hidden', !nothing);
+            exportBtn.disabled = nothing;
+        };
+        refresh();
+
+        // In the edit panel the player's Filters panel stays usable beside
+        // this one, so what it lists can change while it is open.
+        if (modal.isPanel && isPlayingThis && player.container) {
+            let frame = 0;
+            const later = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(refresh); };
+            for (const type of ['input', 'change', 'click']) player.container.addEventListener(type, later);
+            modal.onCleanup(() => {
+                cancelAnimationFrame(frame);
+                for (const type of ['input', 'change', 'click']) player.container.removeEventListener(type, later);
+            });
+        }
 
         await playlist._ensureMetadata(item);
         let duration = 0;
@@ -76,6 +92,11 @@ export class ExportMenu {
         endInput.value = formatTime(duration);
 
         exportBtn.addEventListener('click', async () => {
+            // The colour effects as they are now. The job may wait behind
+            // another, and the edit panel puts the player's effects away
+            // again when this tool closes; a copy keeps what was asked for.
+            const live = player.videoFilters;
+            const filters = live ? Object.assign(Object.create(Object.getPrototypeOf(live)), live) : null;
             await runMenuJob({
                 name: 'Export FX',
                 subject: item.title,
@@ -97,7 +118,7 @@ export class ExportMenu {
                         // boundary decision for nothing.
                         ...(start > 0 || end < duration ? { trim: { start, end } } : {}),
                         overlays: {
-                            filters: player.videoFilters,
+                            filters,
                             stickers: player.stickers,
                             decorations: player.decorations,
                         },

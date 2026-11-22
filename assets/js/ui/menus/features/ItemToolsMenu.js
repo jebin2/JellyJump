@@ -1,13 +1,8 @@
-import { Logger } from '../../../shared/utils/Logger.js';
-import { Modal } from '../../Modal.js';
-import { MenuRouter } from '../core/MenuRouter.js';
-import { renderToolGrid } from '../core/ToolGrid.js';
 import { RecordMenu } from './RecordMenu.js';
 
 /**
  * The tools for one playlist item, grouped, and whether it is a limited item
- * (a stream or a YouTube link) that only has a few. Shared by the edit panel
- * and this menu, so the two lists cannot drift apart.
+ * (a stream or a YouTube link) that only has a few. The edit panel shows them.
  * @param {Object} item - Playlist item
  * @returns {{sections: Array, limited: boolean}}
  */
@@ -67,53 +62,3 @@ export function itemToolSections(item) {
         limited,
     };
 }
-
-/**
- * Item Tools Menu
- * Handles the display of the tools grid modal for a specific playlist item.
- */
-export const ItemToolsMenu = {
-    /**
-     * Show the tools menu for a specific item
-     * @param {number} index - Index of the item
-     * @param {Playlist} playlist - Playlist instance
-     */
-    async show(index, playlist) {
-        const item = playlist.items[index];
-        if (!item) {
-            Logger.error('[ItemToolsMenu] Item not found for index:', index);
-            return;
-        }
-
-        const { sections, limited } = itemToolSections(item);
-        const modal = new Modal({ maxWidth: limited ? '400px' : '600px' });
-
-        // Truncate title if too long
-        const displayTitle = item.title.length > 30 ? item.title.substring(0, 30) + '...' : item.title;
-        modal.setTitle(`Edit: ${displayTitle}`);
-
-        const content = renderToolGrid(sections, { columns: limited ? 3 : 6 });
-
-        modal.setBody(content);
-
-        // Handle tile clicks
-        content.querySelectorAll('.tools-tile').forEach(tile => {
-            tile.addEventListener('click', () => {
-                const action = tile.dataset.action;
-                modal.close();
-                
-                // Route to the specific feature menu
-                MenuRouter.init(action, index, playlist);
-                
-                // Pause player when opening tools
-                if (playlist.player) playlist.player.pause();
-                
-                // Restore audio if it was muted for autoplay (first user interaction)
-                const player = playlist.player;
-                player?._restoreAutoplayAudio('Tools menu opened');
-            });
-        });
-
-        modal.open();
-    }
-};

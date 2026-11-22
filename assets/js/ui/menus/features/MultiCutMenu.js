@@ -1,7 +1,6 @@
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
-import { loadVideo, setupEditor } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { borrowMainPlayer, timelineMarks } from '../core/PreviewPlayer.js';
@@ -12,12 +11,8 @@ import { borrowMainPlayer, timelineMarks } from '../core/PreviewPlayer.js';
  */
 export class MultiCutMenu {
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Multi-Cut', 'multicut-content-template', FOOTER_CONFIGS.multicut, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Multi-Cut', 'multicut-content-template', FOOTER_CONFIGS.multicut);
         if (!modal) return;
-
-        // In the edit panel the main player is the preview; a dialog has its own.
-        const editorUI = modal.isPanel ? null
-            : setupEditor(modalContent.querySelector('.modal-video-panel'), { type: 'multicut', enableOverlay: false });
 
         const multicutLoading = modalContent.querySelector('.multicut-loading');
         const multicutContent = modalContent.querySelector('.multicut-content');
@@ -146,11 +141,8 @@ export class MultiCutMenu {
             });
         };
 
-        const state = { video: { width: 0, height: 0 } };
-        player = modal.isPanel
-            ? borrowMainPlayer(modal, playlist)
-            : await loadVideo(editorUI.containerId, item, playlist, state);
-        if (modal.isPanel) drawMarks = timelineMarks(player, modal);
+        player = borrowMainPlayer(modal, playlist);
+        drawMarks = timelineMarks(player, modal);
 
         if (player) {
             const onTimeUpdate = (data) => {
@@ -196,7 +188,6 @@ export class MultiCutMenu {
 
             modal.onCleanup(() => {
                 if (player.off) player.off('timeupdate', onTimeUpdate);
-                if (!modal.isPanel) player.destroy();
             });
         }
 

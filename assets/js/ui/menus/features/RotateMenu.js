@@ -1,14 +1,8 @@
-import { Logger } from "../../../shared/utils/Logger.js";
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { MediaProcessor } from "../../../core/MediaProcessor.js";
-import {
-    loadVideo,
-    setupEditor,
-    setupCleanup
-} from './BoxEditorUtils.js';
-
 import { MediaMetadata } from "../../../shared/utils/MediaMetadata.js";
 import { runMenuJob } from '../core/MenuJob.js';
+import { lendPicture } from '../core/PreviewPlayer.js';
 
 export class RotateMenu {
     /**
@@ -17,52 +11,27 @@ export class RotateMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate, { splitLayout: true });
+        const { modal } = openProcessMenu('Rotate & Flip', 'rotate-content-template', FOOTER_CONFIGS.rotate);
         if (!modal) return;
 
-        // In the edit panel the main player is the preview: it turns there,
-        // and turns back when the tool closes.
-        if (modal.isPanel) {
-            const canvas = playlist.player?.container?.querySelector('canvas.jellyjump-video');
-            modal.onCleanup(() => {
-                if (!canvas) return;
-                canvas.style.transform = '';
-                canvas.style.transition = '';
-            });
-            this._setup(modal, item, playlist, null, { previewEl: canvas });
-            return;
-        }
-
-        // === Setup Editor DOM (Left Panel) ===
-        const videoPanel = modalContent.querySelector('.modal-video-panel');
-        // We use setupEditor to create the container structure, 
-        // but we disable the overlay since we are not drawing boxes.
-        const editorUI = setupEditor(videoPanel, {
-            type: 'rotate',
-            enableOverlay: false
+        // The main player is the preview: it turns there, and turns back when
+        // the tool closes. Lent like a drawing tool's, so controls laid over
+        // the picture are pinned below it and do not cover a turned frame.
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        const canvas = stage.canvas;
+        modal.onCleanup(() => {
+            canvas.style.transform = '';
+            canvas.style.transition = '';
         });
-
-        // === Load Video ===
-        // State object required by loadVideo
-        const state = {
-            video: { width: 0, height: 0 },
-            preview: { scale: 1 }
-        };
-
-        const player = await loadVideo(editorUI.containerId, item, playlist, state);
-        if (!player) {
-            Logger.error('[RotateMenu] Failed to load video');
-            return;
-        }
-
-        this._setup(modal, item, playlist, player, editorUI);
+        this._setup(modal, item, playlist, { previewEl: canvas });
     }
 
     /**
      * Setup UI and Event Listeners
      * @private
      */
-    static _setup(modal, item, playlist, player, editorUI) {
+    static _setup(modal, item, playlist, editorUI) {
         const modalBody = modal.modal.querySelector('.mb-modal-body');
 
         // State
@@ -70,13 +39,8 @@ export class RotateMenu {
         let flipH = false;
         let flipV = false;
 
-        // Target element for CSS transforms
-        // Try to find canvas or video inside the player container
-        const getMediaElement = () => {
-            if (editorUI.previewEl !== undefined) return editorUI.previewEl;
-            return editorUI.playerContainer.querySelector('canvas') ||
-                editorUI.playerContainer.querySelector('video');
-        };
+        // The main player's picture, turned with CSS while the tool is open.
+        const getMediaElement = () => editorUI.previewEl;
 
         // Update Transform Helper
         const updateUI = () => {
@@ -174,7 +138,5 @@ export class RotateMenu {
             btn.addEventListener('click', resetSuccessState);
         });
 
-        // Cleanup
-        if (player) setupCleanup(modal, player, null);
     }
 }

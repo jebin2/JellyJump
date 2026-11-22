@@ -1,14 +1,13 @@
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
-import { loadVideo, setupEditor } from './BoxEditorUtils.js'; // Added setupEditor
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { borrowMainPlayer, setPreviewRange } from '../core/PreviewPlayer.js';
 
 /**
- * Trim Menu Handler
- * Handles video trimming functionality with timeline slider and player preview
+ * Cut: keep one clip of the video. The main player is the preview: its
+ * timeline shows the clip, and the clip plays on a loop.
  */
 export class TrimMenu {
     /**
@@ -17,13 +16,8 @@ export class TrimMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Cut', 'trim-content-template', FOOTER_CONFIGS.trim, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Cut', 'trim-content-template', FOOTER_CONFIGS.trim);
         if (!modal) return;
-
-        // === SETUP EDITOR DOM (Unified) ===
-        // In the edit panel the main player is the preview; a dialog has its own.
-        const editorUI = modal.isPanel ? null
-            : setupEditor(modalContent.querySelector('.modal-video-panel'), { type: 'trim', enableOverlay: false });
 
         // Elements
         const trimLoading = modalContent.querySelector('.trim-loading');
@@ -65,11 +59,7 @@ export class TrimMenu {
         let startTime = 0;
         let endTime = duration;
 
-        // Load Video
-        const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-        const player = modal.isPanel
-            ? borrowMainPlayer(modal, playlist)
-            : await loadVideo(editorUI.containerId, item, playlist, state);
+        const player = borrowMainPlayer(modal, playlist);
 
         // Show Content
         trimLoading.classList.add('hidden');
@@ -142,13 +132,6 @@ export class TrimMenu {
                 endTime = player.currentTime;
                 updateUI();
             }
-        };
-
-        // Cleanup on close
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            if (player && !modal.isPanel) player.destroy();
-            originalClose();
         };
 
         // Trim Action

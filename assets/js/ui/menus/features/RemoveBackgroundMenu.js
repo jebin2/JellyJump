@@ -1,7 +1,6 @@
 import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
-import { loadVideo } from './BoxEditorUtils.js';
 import { lendPicture, canvasPoint } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
@@ -13,11 +12,10 @@ export class RemoveBackgroundMenu {
      * @param {Playlist} playlist - Playlist instance
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Remove Background', 'remove-bg-content-template', FOOTER_CONFIGS.removeBg, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Remove Background', 'remove-bg-content-template', FOOTER_CONFIGS.removeBg);
         if (!modal) return;
 
         // Elements
-        const playerContainer = modalContent.querySelector('#remove-bg-player-container');
         const selectedColorsList = modalContent.querySelector('.selected-colors-list');
         const livePreviewToggle = modalContent.querySelector('#live-preview-toggle');
 
@@ -37,22 +35,15 @@ export class RemoveBackgroundMenu {
         let selectedColors = []; // Array of {r, g, b, tolerance}
         let sourceBlob = null;
 
-        // Load Video. In the edit panel the main player is the preview, and
-        // a clear layer over its picture takes the clicks that pick colours.
-        const stage = modal.isPanel ? await lendPicture(modal, playlist) : null;
-        if (modal.isPanel && !stage) return;
-        let player;
-        let pickTarget = playerContainer;
-        if (stage) {
-            player = stage.player;
-            pickTarget = document.createElement('div');
-            pickTarget.className = 'jj-pick-layer';
-            pickTarget.title = 'Click a colour to remove it';
-            stage.adopt(pickTarget);
-        } else {
-            const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-            player = await loadVideo('remove-bg-player-container', item, playlist, state);
-        }
+        // The main player is the preview, and a clear layer over its picture
+        // takes the clicks that pick colours.
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        const player = stage.player;
+        const pickTarget = document.createElement('div');
+        pickTarget.className = 'jj-pick-layer';
+        pickTarget.title = 'Click a colour to remove it';
+        stage.adopt(pickTarget);
 
         // Render Callback
         const renderCallback = (canvas, ctx) => {
@@ -74,14 +65,10 @@ export class RemoveBackgroundMenu {
             ctx.putImageData(imageData, 0, 0);
         };
 
-        if (stage) stage.addRenderCallback(renderCallback);
-        else if (player) player.addRenderCallback(renderCallback);
+        stage.addRenderCallback(renderCallback);
 
         // Initialize Video
         try {
-            // Video is already loaded by loadVideo, but we need to ensure processed source URL logic (handled by loadVideo)
-            // loadVideo handles getting processed source URL internally.
-
             // Auto-detect background color
             if (player && player.canvas) {
                 // Wait a moment for the frame to render
@@ -302,15 +289,6 @@ export class RemoveBackgroundMenu {
                 g: parseInt(result[2], 16),
                 b: parseInt(result[3], 16)
             } : null;
-        }
-
-        // Cleanup (the main player is only lent, and goes back as it was)
-        if (!stage) {
-            const originalClose = modal.close.bind(modal);
-            modal.close = () => {
-                if (player) player.destroy();
-                originalClose();
-            };
         }
 
         // Process Video

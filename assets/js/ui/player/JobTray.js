@@ -1,5 +1,7 @@
 import { JobQueue } from '../../shared/services/JobQueue.js';
 import { Toast } from '../../shared/utils/Toast.js';
+import { Logger } from '../../shared/utils/Logger.js';
+import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
 
 /**
  * JobTray - the job list at the foot of the sidebar.
@@ -58,16 +60,40 @@ export class JobTray {
         } else if (action === 'play') {
             this._play(job.results[Number(button.dataset.result) || 0]);
         } else if (action === 'download') {
-            // Out of the playlist (an edit undone, say), its file is gone and
-            // the link would download nothing.
             const result = job.results[Number(button.dataset.result) || 0];
-            if (result && !this.playlist.items.includes(result.item)) {
-                e.preventDefault();
+            if (!result) return;
+            e.preventDefault();
+            // Out of the playlist (an edit undone, say), its file is gone.
+            if (!this.playlist.items.includes(result.item)) {
                 Toast.show('That file was removed from the playlist, so it can no longer be downloaded.', 3500, true);
+                return;
             }
+            this._download(result);
         } else if (action === 'edit') {
             const result = job.results[Number(button.dataset.result) || 0];
             if (result && this._inPlaylist(result)) this.onEdit?.(result.item);
+        }
+    }
+
+    /**
+     * Download a result from its file as it is now. The link made when the
+     * job finished does not last: the playlist revokes an item's blob URL
+     * when the player moves off it, and an item Undo put back has a new one.
+     */
+    async _download(result) {
+        try {
+            const file = await MediaMetadata.getSourceBlob(result.item, () => this.playlist._saveState());
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = result.item.title || result.filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (err) {
+            Logger.warn('Job tray download failed:', err);
+            Toast.show('That file could not be read, so it was not downloaded.', 3500, true);
         }
     }
 

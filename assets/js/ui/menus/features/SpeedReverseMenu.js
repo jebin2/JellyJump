@@ -99,8 +99,12 @@ export class SpeedReverseMenu {
             }
 
             // Update Button Text
-            if (processBtn && !processBtn.disabled) {
+            if (processBtn) {
                 setActionLabel(processBtn, isReverse ? 'Reverse Video' : 'Change Speed');
+                // Forward at 1x with the audio is the same video again.
+                const unchanged = !isReverse && speed === 1 && audioCheckbox?.checked !== false;
+                processBtn.disabled = unchanged;
+                if (unchanged) processBtn.title = 'Pick another speed, reverse it, or leave out the audio';
             }
         };
 
@@ -113,6 +117,7 @@ export class SpeedReverseMenu {
         directionRadios.forEach(radio => {
             radio.addEventListener('change', updateUI);
         });
+        audioCheckbox?.addEventListener('change', updateUI);
 
         // Initialize UI
         updateUI();

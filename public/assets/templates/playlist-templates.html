@@ -339,12 +339,6 @@
     </div>
 
     <div class="trim-content hidden" style="display: contents;">
-        <!-- Left Panel: Video Player -->
-        <div class="modal-video-panel">
-            <div id="trim-player-container" class="aspect-video bg-black rounded overflow-hidden relative">
-            </div>
-        </div>
-
         <!-- Right Panel: Inputs -->
         <div class="modal-controls-panel">
             <div class="tool-card">
@@ -380,11 +374,6 @@
     </div>
 
     <div class="multicut-content hidden" style="display: contents;">
-        <div class="modal-video-panel">
-            <div id="multicut-player-container" class="aspect-video bg-black rounded overflow-hidden relative">
-            </div>
-        </div>
-
         <div class="modal-controls-panel">
             <button id="multicut-add-clip-btn" class="jellyjump-btn-large w-full mb-md">+ Add Segments</button>
 
@@ -702,10 +691,8 @@
 <template id="crop-content-template">
     <!-- Left Panel: Video Preview with Crop Box -->
     <div class="modal-video-panel">
-        <!-- Wrapper for positioning (overlay is sibling, not child of player) -->
+        <!-- The overlay moves over the main player's picture when Crop opens -->
         <div class="crop-preview-wrapper" style="position: relative;">
-            <!-- Player Container (CorePlayer renders here) -->
-            <div id="crop-player-container" class="crop-player-container"></div>
             <!-- Crop Overlay (sibling to player, positioned over it via CSS) -->
             <div class="crop-overlay" data-crop-overlay>
                 <div class="crop-box" data-crop-box>
@@ -990,9 +977,6 @@
     <div class="gif-content hidden" style="display: contents;">
         <!-- Left Panel: Video Player -->
         <div class="modal-video-panel">
-            <div id="gif-player-container" class="aspect-video bg-black rounded overflow-hidden relative">
-            </div>
-
             <!-- GIF Preview Section (shows after generation) -->
             <div class="gif-preview-section hidden mt-sm">
                 <div class="gif-preview-container border border-border rounded p-sm bg-tertiary flex justify-center">
@@ -1643,12 +1627,6 @@
 
 <!-- Remove Background Content Template -->
 <template id="remove-bg-content-template">
-    <!-- Left Panel: Video Player -->
-    <div class="modal-video-panel">
-        <div id="remove-bg-player-container" class="bg-black rounded overflow-hidden relative">
-        </div>
-    </div>
-
     <!-- Right Panel: Controls -->
     <div class="modal-controls-panel">
         <!-- Tools Section -->
@@ -1744,10 +1722,6 @@
 
 <!-- Watermark Content Template -->
 <template id="watermark-content-template">
-    <!-- Left Panel: Video Preview (built dynamically by setupEditor) -->
-    <div class="modal-video-panel">
-    </div>
-
     <!-- Right Panel: Watermark Controls -->
     <div class="modal-controls-panel">
         <label class="toggle-switch" style="flex-shrink: 0; padding: 4px 0;">
@@ -1847,11 +1821,6 @@
 </template>
 <!-- Blur Content Template (Split Layout) -->
 <template id="blur-content-template">
-    <!-- Left Panel: Video Preview with Blur Overlay -->
-    <div class="modal-video-panel">
-        <!-- Built dynamically by BoxEditorUtils.setupEditor() -->
-    </div>
-
     <!-- Right Panel: Blur Controls -->
     <div class="modal-controls-panel">
         <div style="flex-shrink: 0;">
@@ -2046,11 +2015,6 @@
 
 <!-- Rotate Content Template -->
 <template id="rotate-content-template">
-    <!-- Left Panel: Video Preview -->
-    <div class="modal-video-panel">
-        <!-- Built dynamically by BoxEditorUtils.setupEditor() -->
-    </div>
-
     <!-- Right Panel: Rotate Controls -->
     <div class="modal-controls-panel">
         <div class="rotate-controls flex flex-col gap-md p-md">

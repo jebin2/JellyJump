@@ -6,10 +6,8 @@ import { Toast } from "../../shared/utils/Toast.js";
 import { StorageService } from "../../shared/services/StorageService.js";
 import { CorePlayer } from '../../core/Player.js';
 import { ConfirmDialog } from '../../shared/utils/ConfirmDialog.js';
-import { MenuRouter } from '../menus/core/MenuRouter.js';
 import { RecordMenu } from '../menus/features/RecordMenu.js';
 import { ScreenRecorderMenu } from '../menus/features/ScreenRecorderMenu.js';
-import { ItemToolsMenu } from "../menus/features/ItemToolsMenu.js";
 import { ITEM_SELECTED_EVENT } from "./EditPanel.js";
 import { PlaylistStorage } from './PlaylistStorage.js';
 import { MediaMetadata } from '../../shared/utils/MediaMetadata.js';
@@ -882,6 +880,10 @@ export class Playlist {
      * @returns {{ item: Object, url: string }}
      */
     insertProcessedItem(sourceItem, blob, filename, options = {}) {
+        // The edit panel names a copy it edits on itself, so that the name
+        // does not grow with every edit made on top of it.
+        const named = this.nameProcessedItem?.(sourceItem, filename) ?? null;
+        if (named) filename = named.title;
         const url = URL.createObjectURL(blob);
         const mimeType = options.type || blob.type || 'video/mp4';
         const newItem = {
@@ -894,7 +896,7 @@ export class Playlist {
             type: options.mediaType || 'video',
             isLocal: true,
             isNew: true,
-            path: sourceItem ? (sourceItem.path || sourceItem.title) + '/' + filename : filename,
+            path: named?.path ?? (sourceItem ? (sourceItem.path || sourceItem.title) + '/' + filename : filename),
             ...options.extra,
         };
 
@@ -1709,10 +1711,8 @@ export class Playlist {
 
 
     _toggleSettingsMenu(index) {
-        // The edit panel, in the sidebar; the dialog only where there is no
-        // sidebar to put it in.
-        if (this.ui?.editPanel) this.ui.editPanel.open(index);
-        else ItemToolsMenu.show(index, this);
+        // The edit panel, in the sidebar.
+        this.ui?.editPanel?.open(index);
     }
 
 

@@ -3,10 +3,7 @@ import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { generateId, formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import {
-    loadVideo,
     updateBoxPosition,
-    setupEditor,
-    setupCleanup,
     setupAreaEditor,
     createBoxOverlay,
 } from './BoxEditorUtils.js';
@@ -22,7 +19,7 @@ export class BlurMenu {
      */
     static async init(item, playlist) {
         const itemTemplate = document.getElementById('blur-item-template');
-        const { modal, content: modalContent } = openProcessMenu('Blur', 'blur-content-template', FOOTER_CONFIGS.blur, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Blur', 'blur-content-template', FOOTER_CONFIGS.blur);
         if (!modal) return;
         if (!itemTemplate) {
             Logger.error('Blur modal templates not found!');
@@ -35,23 +32,13 @@ export class BlurMenu {
 
         // === 1. Setup Editor DOM (Left Panel) ===
         // In the edit panel the areas are drawn over the main player.
-        const stage = modal.isPanel ? await lendPicture(modal, playlist) : null;
-        if (modal.isPanel && !stage) return;
-        let videoPanel = modalContent.querySelector('.modal-video-panel');
-        let editorUI;
-        if (stage) {
-            const { overlay, box } = createBoxOverlay({ overlayClass: 'blur-overlay', boxDataAttr: 'data-blur-box' });
-            stage.adopt(overlay);
-            videoPanel = stage.wrapper;
-            editorUI = { containerId: null, playerContainer: stage.wrapper, wrapper: stage.wrapper, overlay, box };
-        } else {
-            editorUI = setupEditor(videoPanel, {
-                type: 'blur',
-                overlayClass: 'blur-overlay',
-                boxDataAttr: 'data-blur-box',
-                enableOverlay: true
-            });
-        }
+        // The areas are drawn over the main player.
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        const videoPanel = stage.wrapper;
+        const { overlay, box } = createBoxOverlay({ overlayClass: 'blur-overlay', boxDataAttr: 'data-blur-box' });
+        stage.adopt(overlay);
+        const editorUI = { containerId: null, playerContainer: stage.wrapper, wrapper: stage.wrapper, overlay, box };
 
         // Add data-crop-box so setupDragHandlers recognizes it for move
         editorUI.box.setAttribute('data-crop-box', '');
@@ -93,19 +80,9 @@ export class BlurMenu {
             selectedIndex: -1
         };
 
-        // === 3. Load Video ===
-        let player;
-        if (stage) {
-            player = stage.player;
-            state.video = { ...stage.video };
-        } else {
-            player = await loadVideo(editorUI.containerId, item, playlist, state);
-        }
-        if (!player) {
-            elements.messages.error.textContent = "Failed to load video.";
-            elements.messages.error.classList.remove('hidden');
-            return;
-        }
+        // === 3. The player ===
+        const player = stage.player;
+        state.video = { ...stage.video };
 
         // === 4. Live Blur & Render Callback (with dynamic intensity) ===
         const getBlurIntensity = () => {
@@ -151,8 +128,7 @@ export class BlurMenu {
                 }
             });
         };
-        if (stage) stage.addRenderCallback(renderCallback);
-        else player.addRenderCallback(renderCallback);
+        stage.addRenderCallback(renderCallback);
 
         // Wire blur intensity slider
         elements.blurIntensity.oninput = () => {
@@ -163,7 +139,7 @@ export class BlurMenu {
 
         // === 5. Box Logic, Selection & Drawing ===
 
-        const { updateSelection, renderOverlayRects, cleanupDrag, dispose: disposeAreaEditor } = setupAreaEditor({
+        const { updateSelection, renderOverlayRects, dispose: disposeAreaEditor } = setupAreaEditor({
             editorUI, state, player, videoPanel,
             areas: () => state.blurAreas,
             rectClass: 'blur-area-rect',
@@ -178,7 +154,7 @@ export class BlurMenu {
             onSelectionChange: () => renderList(),
             onAreaMoved: (index) => syncInputsFromArea(index),
             // Under the main player's controls.
-            zIndex: stage ? 5 : 1000,
+            zIndex: 5,
         });
 
 
@@ -376,6 +352,5 @@ export class BlurMenu {
 
         // === 8. Cleanup ===
         modal.onCleanup(disposeAreaEditor);
-        if (!stage) setupCleanup(modal, player, cleanupDrag);
     }
 }

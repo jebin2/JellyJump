@@ -1,84 +1,11 @@
-import { Logger } from "../../../shared/utils/Logger.js";
-import { CorePlayer } from '../../../core/Player.js';
-import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-
 /**
- * Box Editor Utilities - Fresh Simplified Approach
- * 
+ * Box Editor Utilities: the boxes Crop, Blur and Watermark draw over the main
+ * player's picture.
+ *
  * Key Principle: Let CSS handle positioning. JS only handles:
- * 1. Loading video and detecting dimensions
- * 2. Scaling the crop box coordinates to display
- * 3. Drag/resize handlers
+ * 1. Scaling the box's video coordinates to the display
+ * 2. Drag/resize handlers
  */
-
-/**
- * Load video into a CorePlayer instance and guarantee valid dimensions
- * @param {string} containerId - DOM container ID
- * @param {Object} item - Playlist item
- * @param {Object} playlist - Playlist instance
- * @param {Object} state - State object to populate video: {width, height}
- * @returns {CorePlayer|null} Player instance
- */
-export async function loadVideo(containerId, item, playlist, state) {
-    const container = document.getElementById(containerId);
-    if (!container) return null;
-
-    const player = new CorePlayer(containerId, {
-        mode: 'player',
-        controlBarMode: 'fixed',
-        controls: {
-            playOverlay: false,
-            playPause: true, time: true, progress: true,
-            navigation: false, captions: false, settings: false,
-            fullscreen: false, loop: false, speed: false,
-            filters: false, equalizer: false, volumeOnly: true,
-            modeToggle: false, keyboard: false,
-            thumbnails: false
-        },
-        autoplay: false
-    });
-
-    try {
-        // Load Source
-        await MediaMetadata.getProcessedSourceURL(item, () => playlist._saveState());
-        await player.load(item.blob_url, false);
-
-        // Strict Dimension Detection: Trust Canvas Only
-        state.video.width = 0;
-        state.video.height = 0;
-
-        for (let i = 0; i < 40; i++) { // Wait up to 2 seconds (50ms * 40)
-            const canvas = player.canvas;
-            // Check for valid intrinsic dimensions (default 300x150 is ignored unless explicit)
-            if (canvas && canvas.width > 0 && canvas.width !== 300) {
-                state.video.width = canvas.width;
-                state.video.height = canvas.height;
-                Logger.log(`[BoxEditor] Dimensions DETECTED from Canvas: ${state.video.width}x${state.video.height}`);
-                break;
-            } else {
-                if (i % 10 === 0) Logger.log(`[BoxEditor] Waiting for canvas dimensions... (${i}) current: ${canvas?.width}x${canvas?.height}`);
-            }
-            await new Promise(resolve => setTimeout(resolve, 50));
-        }
-
-        // Fallback (Rare)
-        if (!state.video.width) {
-            Logger.warn('[BoxEditor] Canvas detection failed. Fallback to metadata/default.');
-            state.video.width = item.videoInfo?.width || 1920;
-            state.video.height = item.videoInfo?.height || 1080;
-        }
-
-        return player;
-    } catch (e) {
-        Logger.error('[BoxEditor] Video load failed:', e);
-        return null;
-    } finally {
-        if (player) {
-            player.pause();
-            player.seek(0);
-        }
-    }
-}
 
 /**
  * Calculate scale factor based on overlay/container size vs video intrinsic size
@@ -432,18 +359,6 @@ export function showProgress(p, s = '') {
 export function hideProgress(p) { p.section.classList.add('hidden'); }
 export function showSuccess(el, msg) { el.textContent = `✓ ${msg}`; el.classList.remove('hidden'); }
 
-export function setupCleanup(modal, player, cleanup) {
-    const originalClose = modal.close.bind(modal);
-    modal.close = () => {
-        if (player && player.updateObserver) {
-            player.updateObserver.disconnect();
-        }
-        cleanup?.dispose?.();
-        if (player) player.destroy();
-        originalClose();
-    };
-}
-
 /**
  * Setup auto-update for overlay on resize
  */
@@ -457,89 +372,6 @@ export function setupAutoUpdate(playerContainer, overlay, state, onUpdate) {
 
     observer.observe(playerContainer);
     return observer;
-}
-
-// ============================================
-// BACKWARD COMPATIBILITY FUNCTIONS
-// Used by WatermarkMenu.js and TrimMenu.js
-// ============================================
-
-/**
- * updateOverlay - Legacy function for WatermarkMenu
- * Maps to updateScale and recalculates offsets
- */
-export function updateOverlay(overlay, playerContainer, state, onUpdate) {
-    if (!overlay) return;
-
-    // Update scale calculations
-    updateScale(overlay, state);
-
-    if (onUpdate) onUpdate();
-}
-
-/**
- * setupEditor - Legacy DOM setup for Watermark/Trim
- * Creates the editor structure dynamically
- */
-export function setupEditor(parentElement, options = {}) {
-    // Clean parent
-    parentElement.innerHTML = '';
-
-    const suffix = options.type || 'crop';
-    const containerId = `${suffix}-player-container`;
-
-    // 1. Wrapper (for crop-preview-wrapper compatibility)
-    const wrapper = document.createElement('div');
-    wrapper.className = 'crop-preview-wrapper';
-
-    // 2. Player Container
-    const playerContainer = document.createElement('div');
-    playerContainer.className = 'crop-player-container';
-    wrapper.appendChild(playerContainer);
-
-    // 3. Inner Video Wrapper
-    const videoWrapper = document.createElement('div');
-    videoWrapper.id = containerId;
-    videoWrapper.className = 'jellyjump-video-wrapper';
-    videoWrapper.style.cssText = `
-        width: 100%; 
-        height: 100%; 
-        position: relative; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-    `;
-
-    // Style to ensure canvas fits
-    const style = document.createElement('style');
-    style.textContent = `
-        #${containerId} canvas, #${containerId} video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: contain !important;
-            display: block;
-        }
-    `;
-    playerContainer.appendChild(style);
-    playerContainer.appendChild(videoWrapper);
-
-    let overlay = null;
-    let box = null;
-
-    if (options.enableOverlay !== false) {
-        ({ overlay, box } = createBoxOverlay(options));
-        playerContainer.appendChild(overlay);
-    }
-
-    parentElement.appendChild(wrapper);
-
-    return {
-        containerId,
-        playerContainer,
-        wrapper,
-        overlay,
-        box
-    };
 }
 
 /**
@@ -574,7 +406,7 @@ export function createBoxOverlay(options = {}) {
  * resizing the selected one.
  *
  * @param {Object} options
- * @param {Object} options.editorUI - from setupEditor()
+ * @param {Object} options.editorUI - {overlay, box, playerContainer}, the box from createBoxOverlay()
  * @param {Object} options.state - the editor state; its `selectedIndex`,
  *   `box` and `preview` are used
  * @param {Object} options.player
@@ -668,12 +500,9 @@ export function setupAreaEditor({
             cursor: crosshair;
             touch-action: none;
         `);
-        updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-            if (state.selectedIndex >= 0) {
-                updateBoxPosition(editorUI.box, state);
-            }
-            renderOverlayRects();
-        });
+        updateScale(editorUI.overlay, state);
+        if (state.selectedIndex >= 0) updateBoxPosition(editorUI.box, state);
+        renderOverlayRects();
     };
 
     // Show overlay immediately (always visible for drawing)
@@ -716,9 +545,8 @@ export function setupAreaEditor({
             editorUI.box.style.display = 'block';
             updateBoxPosition(editorUI.box, state);
 
-            updateOverlay(editorUI.overlay, editorUI.playerContainer, state, () => {
-                updateBoxPosition(editorUI.box, state);
-            });
+            updateScale(editorUI.overlay, state);
+            updateBoxPosition(editorUI.box, state);
 
         } else {
             // No selection — hide the box but keep overlay visible for drawing

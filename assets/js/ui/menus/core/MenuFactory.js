@@ -31,3 +31,17 @@ export function openProcessMenu(title, templateId, footerConfig, options = {}) {
 
     return { modal, content: modal.modal };
 }
+
+/**
+ * A tool's surface, for a tool that fills it itself rather than through
+ * openProcessMenu: the edit panel's when the panel opened the tool, a dialog
+ * otherwise.
+ * @param {Object} [options] - Modal options; `onClose` is honoured by both
+ * @returns {Modal|Object}
+ */
+export function openToolSurface(options = {}) {
+    const surface = takePanelSurface();
+    if (!surface) return new Modal(options);
+    if (options.onClose) surface.options.onClose = options.onClose;
+    return surface;
+}

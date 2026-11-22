@@ -2,15 +2,14 @@ import { Logger } from "../../../shared/utils/Logger.js";
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { formatTime, parseTime, formatFileSize } from '../../../shared/utils/mediaUtils.js';
-import { loadVideo } from './BoxEditorUtils.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { borrowMainPlayer, setPreviewRange } from '../core/PreviewPlayer.js';
 
 /**
- * GIF Menu Handler
- * Handles GIF creation from video segments with timeline slider and player preview
+ * GIF: a stretch of the video as an animated GIF. The main player is the
+ * preview: its timeline shows the stretch, and the stretch plays on a loop.
  */
 export class GifMenu {
     /**
@@ -19,17 +18,8 @@ export class GifMenu {
      * @param {Playlist} playlist - Playlist instance  
      */
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('GIF', 'gif-content-template', FOOTER_CONFIGS.gif, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('GIF', 'gif-content-template', FOOTER_CONFIGS.gif);
         if (!modal) return;
-
-        // ---------------------------------------------------------
-        // Disable Outside Click Close
-        // ---------------------------------------------------------
-        // Remove the default overlay click handler to prevent closing on outside click
-        const modalOverlay = modal.isPanel ? null : modal.overlay;
-        if (modalOverlay && modalOverlay._closeHandler) {
-            modalOverlay.removeEventListener('click', modalOverlay._closeHandler);
-        }
 
         // Elements
         const gifLoading = modalContent.querySelector('.gif-loading');
@@ -101,12 +91,7 @@ export class GifMenu {
         endInput.value = formatTime(endTime);
         durationDisplay.textContent = formatTime(endTime - startTime);
 
-        // Load Video
-        const state = { video: { width: 0, height: 0 } }; // Dummy state for loadVideo
-        // In the edit panel the main player is the preview; a dialog has its own.
-        const player = modal.isPanel
-            ? borrowMainPlayer(modal, playlist)
-            : await loadVideo('gif-player-container', item, playlist, state);
+        const player = borrowMainPlayer(modal, playlist);
 
         // Update UI
         const updateUI = () => {
@@ -280,12 +265,5 @@ export class GifMenu {
             fpsDropdown.destroy();
             sizeDropdown.destroy();
         });
-
-        // Cleanup on close
-        const originalClose = modal.close.bind(modal);
-        modal.close = () => {
-            if (player && !modal.isPanel) player.destroy();
-            originalClose();
-        };
     }
 }

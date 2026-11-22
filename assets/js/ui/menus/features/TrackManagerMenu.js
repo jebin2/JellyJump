@@ -1,5 +1,5 @@
 import { Logger } from "../../../shared/utils/Logger.js";
-import { Modal } from '../../Modal.js';
+import { openToolSurface } from '../core/MenuFactory.js';
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
@@ -20,7 +20,7 @@ export class TrackManagerMenu {
         const footerTemplate = document.getElementById('track-management-footer-template');
         if (!template || !footerTemplate) return;
 
-        const modal = new Modal({ maxWidth: '700px' });
+        const modal = openToolSurface({ maxWidth: '700px' });
         modal.setTitle('Video & Audio Tracks');
         modal.setBody(template.content.cloneNode(true));
         modal.setFooter(footerTemplate.content.cloneNode(true));
@@ -31,9 +31,10 @@ export class TrackManagerMenu {
         const sourceFilename = modalContent.querySelector('.source-filename');
         sourceFilename.textContent = `Source: ${item.title}`;
 
-        // Close button in footer
+        // Close button in footer. The panel has its own way back.
         const closeBtn = modal.querySelector('.mb-modal-close-btn');
-        if (closeBtn) closeBtn.addEventListener('click', () => modal.close());
+        if (closeBtn && modal.isPanel) closeBtn.remove();
+        else if (closeBtn) closeBtn.addEventListener('click', () => modal.close());
 
         modal.open();
 
@@ -219,6 +220,7 @@ export class TrackManagerMenu {
             subject: item.title,
             background: true,
             keepOpen: true,
+            modal: modalInstance,
             work: async ({ signal, onProgress }) => {
                 const source = await MediaMetadata.getSourceBlob(item, () => playlist._saveState());
                 return MediaProcessor.extractTrack({ source, trackIndex, trackType, format, speed, onProgress, signal });

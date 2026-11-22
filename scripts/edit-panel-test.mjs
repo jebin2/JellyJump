@@ -5,9 +5,10 @@
  * What it guards is the flow, which no unit test sees: Apply locks the panel
  * until the job is done, then the result opens in the same player and the
  * same tool to go on from; the playlist keeps the original and one edited
- * copy; Undo and Reset walk back; a tool that draws on the video leaves
- * nothing behind; and the player's own settings (filters, speed, loop, the
- * buttons for them) are put away while editing and come back after.
+ * copy, named after the original; Undo and Reset walk back, after a reload
+ * too; a tool that draws on the video leaves nothing behind; every tool but
+ * Info opens in the panel; and the player's own settings (filters, speed,
+ * loop, the buttons for them) are put away while editing and come back after.
  *
  * It needs a Chromium or Chrome binary. Point CHROMIUM_PATH at one if it is
  * somewhere unusual.
@@ -16,7 +17,7 @@
  */
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -183,7 +184,7 @@ async function run(page, origin) {
     await settled();
     await loaded();
     s = await state();
-    check(s.playing === 'holiday-clip-trimmed-2-6.mp4', `the player is on the result (${s.playing})`);
+    check(s.playing === 'holiday-clip-edited.mp4', `the player is on the result, named after the original (${s.playing})`);
     check(Math.abs(s.duration - 4) < 0.3, `which is 4s long (${s.duration})`);
     check(s.title === 'Cut', `the same tool is open on it (${s.title})`);
     check(s.steps === 'Cut', `the edits so far: ${s.steps}`);
@@ -207,19 +208,27 @@ async function run(page, origin) {
     await loaded();
     s = await state();
     check(s.steps === 'Cut → Crop', `the edits so far: ${s.steps}`);
-    check(s.playlist.length === 2 && /crop/.test(s.playlist[1]), `still one copy (${s.playlist.join(', ')})`);
+    check(s.playlist.length === 2 && s.playlist[1] === 'holiday-clip-edited.mp4', `still one copy, its name the same (${s.playlist.join(', ')})`);
     check(s.layers === 1 && s.players === 1, `one crop layer, one player (${s.layers}, ${s.players})`);
 
     console.log('\nundo goes one step back');
     await page.click('.edit-panel-undo');
     await loaded();
     s = await state();
-    check(s.playing === 'holiday-clip-trimmed-2-6.mp4' && Math.abs(s.duration - 4) < 0.3, `the cut copy is back (${s.playing}, ${s.duration})`);
+    check(s.playing === 'holiday-clip-edited.mp4' && Math.abs(s.duration - 4) < 0.3, `the cut copy is back (${s.playing}, ${s.duration})`);
     check(s.steps === 'Cut' && s.playlist.length === 2, `edits: ${s.steps}; playlist: ${s.playlist.join(', ')}`);
     await page.locator('.job-tray .job-row', { hasText: 'Crop' }).locator('[data-job-action=download]').click();
     await page.waitForTimeout(300);
     const toast = await page.evaluate(() => [...document.querySelectorAll('.mb-toast')].map(t => t.textContent).join(' | '));
     check(/no longer be downloaded/.test(toast), 'the undone copy\'s Download says it is gone');
+    // The cut copy was replaced, then put back by Undo: its first link was revoked.
+    const [download] = await Promise.all([
+        page.waitForEvent('download', { timeout: 15000 }),
+        page.locator('.job-tray .job-row', { hasText: 'Cut' }).locator('[data-job-action=download]').click(),
+    ]);
+    const bytes = statSync(await download.path()).size;
+    check(download.suggestedFilename() === 'holiday-clip-edited.mp4' && bytes > 1000,
+        `the copy Undo put back still downloads (${download.suggestedFilename()}, ${bytes} bytes)`);
 
     console.log('\nreset asks, then goes back to the original');
     await page.click('.edit-panel-reset');
@@ -258,6 +267,120 @@ async function run(page, origin) {
     check(JSON.stringify(s.loop) === JSON.stringify(before.loop), `the loop is as it was (${JSON.stringify(s.loop)})`);
     check(s.filters && s.rate === 1.5, `filters and speed are back (${s.filters}, ${s.rate})`);
     check(s.buttons['mb-loop-btn'] && s.buttons['mb-filters-btn'] && s.buttons['mb-speed-btn'], 'every button is back');
+
+    console.log('\nevery tool but Info opens in the panel');
+    const openPanel = (title) => page.evaluate((title) => {
+        const pl = window.playlist;
+        pl.ui.editPanel.open(pl.items.findIndex(i => i.title === title));
+    }, title).then(() => page.waitForTimeout(500));
+    const openTool = async (action) => {
+        await page.click(`.edit-panel .tools-tile[data-action=${action}]`);
+        await page.waitForSelector('.edit-panel .edit-panel-tool');
+        await page.waitForTimeout(500);
+        return page.evaluate(() => !document.querySelector('.mb-modal-overlay'));
+    };
+    await openPanel('holiday-clip.webm');
+
+    check(await openTool('export-fx'), 'Export FX opens in the panel');
+    s = await state();
+    const summary = await page.evaluate(() => [
+        document.querySelector('.export-fx-summary')?.textContent ?? '',
+        document.querySelector('.export-fx-btn')?.disabled,
+    ]);
+    check(s.filters && s.buttons['mb-filters-btn'], 'the player\'s filters, and their button, are back while it is open');
+    check(/Colour adjustments/.test(summary[0]) && summary[1] === false, `it lists them, ready to export (${summary[0]})`);
+    await page.click('.edit-panel-back');
+    await page.waitForTimeout(200);
+    s = await state();
+    check(!s.filters && !s.buttons['mb-filters-btn'], 'they are put away again after it');
+
+    check(await openTool('download-manage'), 'Tracks opens in the panel');
+    await page.waitForSelector('.edit-panel .track-card', { timeout: 30000 });
+    check(await page.locator('.edit-panel .track-card').count() >= 1, 'it lists the tracks');
+    await page.click('.edit-panel-back');
+
+    check(await openTool('detect-cuts'), 'Scenes opens in the panel');
+    await page.click('.edit-panel .detect-btn');
+    await page.waitForSelector('.edit-panel .segment-item', { timeout: 120000 });
+    await page.click('.edit-panel .segment-item .font-mono');
+    await page.waitForTimeout(300);
+    s = await state();
+    check(s.loop[0] === 'one' && s.loop[2] > s.loop[1], `a scene clicked plays on a loop in the main player (${JSON.stringify(s.loop)})`);
+    await page.click('.edit-panel-back');
+    await page.waitForTimeout(200);
+    s = await state();
+    check(JSON.stringify(s.loop) === JSON.stringify(before.loop), `the loop is as it was after it (${JSON.stringify(s.loop)})`);
+
+    check(await openTool('detect-motion'), 'Motion opens in the panel');
+    await page.click('.edit-panel-back');
+
+    console.log('\nspeed stacks, though it reads its result back before it is done');
+    await page.click('.edit-panel .tools-tile[data-action=reverse]');
+    await page.waitForTimeout(800);
+    check(await page.evaluate(() => document.querySelector('.edit-panel .reverse-btn').disabled),
+        'at 1x forward with audio there is nothing to apply');
+    await page.evaluate(() => {
+        const slider = document.querySelector('.edit-panel .quality-slider');
+        slider.value = '2';
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.click('.edit-panel .reverse-btn');
+    await page.waitForTimeout(100);
+    await settled();
+    await loaded();
+    s = await state();
+    check(s.steps === 'Speed' && Math.abs(s.duration - 6) < 0.5, `it is a step, half as long (${s.steps}, ${s.duration}s)`);
+    await page.click('.edit-panel-reset');
+    await page.click('.edit-panel-confirm-yes');
+    await loaded();
+    await page.click('.edit-panel-back');
+
+    console.log('\nthe edits are remembered with the copy');
+    await page.evaluate(() => window.playlist.player.pause());
+    const cut = async (from, to) => {
+        await page.click('.edit-panel .tools-tile[data-action=trim]');
+        await page.waitForTimeout(800);
+        await seek(from);
+        await page.click('.edit-panel #trim-set-start-btn');
+        await seek(to);
+        await page.click('.edit-panel #trim-set-end-btn');
+        await page.click('.edit-panel .trim-btn');
+        await page.waitForTimeout(100);
+        await settled();
+        await loaded();
+        await page.click('.edit-panel-back');
+    };
+    await cut(2, 6);
+    await cut(1, 3);
+    s = await state();
+    check(s.steps === 'Cut → Cut' && Math.abs(s.duration - 2) < 0.3, `two cuts made (${s.steps}, ${s.duration}s)`);
+    check(s.playlist.filter(t => t === 'holiday-clip-edited.mp4').length === 1, `one copy, by the same name (${s.playlist.join(', ')})`);
+    await page.click('.edit-panel-back');
+    await openPanel('holiday-clip-edited.mp4');
+    s = await state();
+    check(s.steps === 'Cut → Cut', `opened again on the copy, the edits are there (${s.steps})`);
+    await page.click('.edit-panel-back');
+
+    await page.reload();
+    await page.waitForFunction(() => window.playlist?.items?.length >= 3, null, { timeout: 60000 });
+    await page.waitForTimeout(1000);
+    await openPanel('holiday-clip-edited.mp4');
+    await loaded();
+    s = await state();
+    check(s.steps === 'Cut → Cut', `after a reload as well (${s.steps})`);
+    await page.click('.edit-panel-undo');
+    await page.waitForFunction(() => document.querySelector('.edit-panel-steps')?.textContent === 'Cut', null, { timeout: 30000 });
+    await loaded();
+    s = await state();
+    check(s.playing === 'holiday-clip-edited.mp4' && Math.abs(s.duration - 4) < 0.3,
+        `Undo brings back the first cut, from storage (${s.playing}, ${s.duration}s)`);
+    await page.click('.edit-panel-reset');
+    await page.click('.edit-panel-confirm-yes');
+    await loaded();
+    s = await state();
+    const remembered = await page.evaluate(() => localStorage.getItem('jellyjump-edit-history'));
+    check(s.playing === 'holiday-clip.webm' && !s.playlist.includes('holiday-clip-edited.mp4'), `Reset goes back to the original (${s.playlist.join(', ')})`);
+    check(remembered === null, 'and nothing is remembered any more');
 
     console.log('\nno errors');
     check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join(' | ')}` : ''}`);

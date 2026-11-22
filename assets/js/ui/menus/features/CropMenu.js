@@ -1,7 +1,6 @@
 import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import {
-    loadVideo,
     updateScale,
     setupDragHandlers,
     updateBoxPosition,
@@ -10,7 +9,6 @@ import {
     showProgress,
     hideProgress,
     showSuccess,
-    setupCleanup,
     setupAutoUpdate
 } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
@@ -18,23 +16,17 @@ import { runMenuJob } from '../core/MenuJob.js';
 import { lendPicture } from '../core/PreviewPlayer.js';
 
 /**
- * Crop Menu Handler - Fresh Implementation
- * Simple, clear flow: Load video -> Setup crop UI -> Drag to crop -> Process
- *
- * In the edit panel the box is drawn over the main player rather than over a
- * player of the dialog's own.
+ * Crop: drag a box over the main player's picture, and keep what is inside.
  */
 export class CropMenu {
     static async init(item, playlist) {
-        const { modal, content: modalContent } = openProcessMenu('Crop', 'crop-content-template', FOOTER_CONFIGS.crop, { splitLayout: true });
+        const { modal, content: modalContent } = openProcessMenu('Crop', 'crop-content-template', FOOTER_CONFIGS.crop);
         if (!modal) return;
-        const playerContainerId = 'crop-player-container';
-        const playerContainer = modalContent.querySelector(`#${playerContainerId}`);
         const cropWrapper = modalContent.querySelector('.crop-preview-wrapper');
 
         // Get elements from template (overlay is sibling to player container)
         const elements = {
-            playerContainer,
+            playerContainer: null,
             cropWrapper,
             cropOverlay: cropWrapper.querySelector('[data-crop-overlay]'),
             cropBox: cropWrapper.querySelector('[data-crop-box]'),
@@ -68,24 +60,15 @@ export class CropMenu {
 
         const MIN_SIZE = 40;
 
-        // === STEP 1: Load Video ===
-        let player = null;
-        if (modal.isPanel) {
-            const stage = await lendPicture(modal, playlist);
-            if (!stage) return;
-            stage.adopt(elements.cropOverlay);
-            elements.playerContainer = stage.wrapper;
-            state.video = { ...stage.video };
-        } else {
-            player = await loadVideo(playerContainerId, item, playlist, state);
-            if (!player) {
-                showError(elements.messages.error, 'Failed to load video');
-                return;
-            }
-        }
+        // === STEP 1: The box goes over the main player's picture ===
+        const stage = await lendPicture(modal, playlist);
+        if (!stage) return;
+        stage.adopt(elements.cropOverlay);
+        elements.playerContainer = stage.wrapper;
+        state.video = { ...stage.video };
 
         // === STEP 2: Setup Crop UI ===
-        const observer = setupCropUI(elements, state, player);
+        const observer = setupCropUI(elements, state);
 
         // === STEP 3: Handle Dragging ===
         const onUpdate = () => {
@@ -101,8 +84,7 @@ export class CropMenu {
         setupCropButton(elements, state, item, playlist, modal);
 
         // === STEP 6: Cleanup ===
-        if (player) setupCleanup(modal, player, cleanup);
-        else modal.onCleanup(() => {
+        modal.onCleanup(() => {
             cleanup.dispose();
             clearTimeout(observer.timer);
             observer.current?.disconnect();
@@ -113,7 +95,7 @@ export class CropMenu {
 // === CROP-SPECIFIC FUNCTIONS ===
 
 /** @returns {{timer: any, current: ResizeObserver|null}} so the panel can stop it */
-function setupCropUI(elements, state, player) {
+function setupCropUI(elements, state) {
     const observer = { timer: null, current: null };
     // Initialize box to full video
     state.box = {
@@ -132,14 +114,12 @@ function setupCropUI(elements, state, player) {
 
         // Auto Update on Container Resize
         if (elements.playerContainer) {
-            const autoUpdate = setupAutoUpdate(
+            observer.current = setupAutoUpdate(
                 elements.playerContainer,
                 elements.cropOverlay,
                 state,
                 () => updateBoxPosition(elements.cropBox, state)
             );
-            if (player) player.updateObserver = autoUpdate;
-            observer.current = autoUpdate;
         }
     }, 200);
     return observer;

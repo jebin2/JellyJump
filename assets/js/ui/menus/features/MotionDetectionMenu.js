@@ -1,4 +1,5 @@
-import { Modal as ModalDialog } from '../../Modal.js';
+import { openToolSurface } from '../core/MenuFactory.js';
+import { playRowsOnClick } from '../core/PreviewPlayer.js';
 import { Logger } from "../../../shared/utils/Logger.js";
 import { MotionDetector } from "../../../shared/services/MotionDetector.js";
 import { formatTime, generateId } from "../../../shared/utils/mediaUtils.js";
@@ -21,7 +22,7 @@ export class MotionDetectionMenu {
         let isCancelled = false;
         let isDetecting = false;
 
-        const modal = new ModalDialog({
+        const modal = openToolSurface({
             maxWidth: '600px',
             onClose: () => {
                 isCancelled = true;
@@ -103,6 +104,10 @@ export class MotionDetectionMenu {
             // detectBtn.textContent = 'Re-detect';
             progressSection.classList.add('hidden');
         });
+
+        // In the edit panel the video is in the main player: a found stretch
+        // plays there, on a loop, when its row is clicked.
+        if (modal.isPanel) playRowsOnClick(modal, playlist, segmentsList);
 
         modal.open();
     }
