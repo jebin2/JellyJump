@@ -7,4 +7,4 @@ import"./common-BafvDNbj.js";import{t as e}from"./Logger-DTBTlbds.js";import"./r
             </div>
         </div>
     `}document.readyState===`loading`?document.addEventListener(`DOMContentLoaded`,r):r(),window.addEventListener(`beforeunload`,()=>{window.player&&typeof window.player.destroy==`function`&&(window.player.destroy(),window.player=null)});
-//# sourceMappingURL=embed-B3QRweSy.js.map
+//# sourceMappingURL=embed-D3noDLZo.js.map
