@@ -1,12 +1,12 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny, ensureEncoders } from '../../core/MediaBunny.js';
+import { MediaBunny, ensureEncoders } from '../../shared/media/MediaBunny.js';
 import { createMediaBunnyInput, chooseQuality } from '../shared/InputFactory.js';
 import { createGif } from '../export/GifService.js';
 import { buildFrameProcessor } from '../frame/FrameProcessorService.js';
-import { buildOverlayStage } from '../../ui/player/OverlayCompositor.js';
-import { executeConversion, cancelUnfinished } from '../shared/Cancellation.js';
+import { buildOverlayStage } from '../../shared/media/OverlayCompositor.js';
+import { executeConversion, cancelUnfinished } from '../../shared/utils/Cancellation.js';
 import { copyMetadataTags } from '../shared/MetadataTags.js';
-import { cuesToVTT } from '../../core/subtitles/SubtitleConverter.js';
+import { cuesToVTT } from '../../shared/media/SubtitleConverter.js';
 
 /**
  * Process video (transcode, trim, resize, crop, etc.)

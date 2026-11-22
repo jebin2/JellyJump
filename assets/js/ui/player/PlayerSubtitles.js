@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { MediaBunny, codecOf, ensureDecodersFor } from '../../core/MediaBunny.js';
+import { MediaBunny, codecOf, ensureDecodersFor } from '../../shared/media/MediaBunny.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { SubtitleManager } from '../../core/subtitles/SubtitleManager.js';
 import { labelAudioTracks } from './AudioTrackLabels.js';
@@ -55,7 +55,7 @@ export class PlayerSubtitles {
             let vttContent = content;
             if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
                 try {
-                    const { parseTranscriptJSON, jsonToVTT } = await import('../../core/subtitles/SubtitleConverter.js');
+                    const { parseTranscriptJSON, jsonToVTT } = await import('../../shared/media/SubtitleConverter.js');
                     const words = parseTranscriptJSON(content);
                     vttContent = jsonToVTT(words);
                     Logger.log('Converted JSON transcript to VTT format');

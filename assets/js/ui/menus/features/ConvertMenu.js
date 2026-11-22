@@ -5,7 +5,7 @@ import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { ZipHelper } from '../../../shared/utils/ZipHelper.js';
 import { uploadToHuggingFace } from '../../../processing/hls/HuggingFaceUploader.js';
-import { MediaBunny } from '../../../core/MediaBunny.js';
+import { MediaBunny } from '../../../shared/media/MediaBunny.js';
 import { runMenuJob } from '../core/MenuJob.js';
 
 /**

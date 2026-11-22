@@ -235,7 +235,7 @@ console.log('\nan animation follows the video, not the wall clock');
 
 console.log('\nbaking is decided by what sits above the colour');
 {
-    const { hasOverlays } = await import('../assets/js/ui/player/OverlayCompositor.js');
+    const { hasOverlays } = await import('../assets/js/shared/media/OverlayCompositor.js');
     check(hasOverlays({}) === false, 'a bare frame has nothing above it');
     check(hasOverlays({ stickers: { stickers: [1] } }) === true, 'a sticker does');
     check(hasOverlays({ decorations: { isActive: () => true } }) === true, 'so does a decoration');

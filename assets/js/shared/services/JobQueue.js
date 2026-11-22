@@ -1,6 +1,6 @@
 // @ts-check
 import { Logger } from '../utils/Logger.js';
-import { isCancellation } from '../../processing/shared/Cancellation.js';
+import { isCancellation } from '../utils/Cancellation.js';
 
 /**
  * JobQueue - processing jobs that run behind the app, one at a time.

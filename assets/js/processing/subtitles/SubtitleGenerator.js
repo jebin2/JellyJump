@@ -6,9 +6,9 @@
 // All of the heavy lifting (model download + inference) happens in the worker,
 // so the render loop, EQ and UI stay smooth throughout.
 
-import { MediaBunny } from '../../core/MediaBunny.js';
+import { MediaBunny } from '../../shared/media/MediaBunny.js';
 import { Logger } from '../../shared/utils/Logger.js';
-import { wordChunksToVTT } from '../../core/subtitles/SubtitleConverter.js';
+import { wordChunksToVTT } from '../../shared/media/SubtitleConverter.js';
 
 const TARGET_RATE = 16000;      // Whisper input rate
 

@@ -7,7 +7,7 @@
  *
  *   node scripts/subtitle-vtt-test.mjs
  */
-import { cuesToVTT } from '../assets/js/core/subtitles/SubtitleConverter.js';
+import { cuesToVTT } from '../assets/js/shared/media/SubtitleConverter.js';
 
 let pass = 0, fail = 0;
 const check = (ok, label) => {

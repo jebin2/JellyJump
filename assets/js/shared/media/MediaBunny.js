@@ -20,10 +20,10 @@
  *               those decoders.
  */
 
-import * as MediaBunny from '../lib/mediabunny.js';
-import { registerAc3Decoder } from '../lib/mediabunny-ac3.js';
-import { registerProresDecoder } from '../lib/mediabunny-prores.js';
-import { Logger } from '../shared/utils/Logger.js';
+import * as MediaBunny from '../../lib/mediabunny.js';
+import { registerAc3Decoder } from '../../lib/mediabunny-ac3.js';
+import { registerProresDecoder } from '../../lib/mediabunny-prores.js';
+import { Logger } from '../utils/Logger.js';
 
 // Match the project Logger convention: full logs in dev, errors only in production.
 if (!Logger.isEnabled()) {
@@ -67,7 +67,7 @@ function ensureDecoder(name, load) {
  * and most libraries never hit a DTS track at all.
  */
 export function ensureDtsDecoder() {
-    return ensureDecoder('dts', () => import('../lib/mediabunny-dts.js')
+    return ensureDecoder('dts', () => import('../../lib/mediabunny-dts.js')
         .then(({ registerDtsDecoder }) => registerDtsDecoder()));
 }
 
@@ -80,7 +80,7 @@ export function ensureDtsDecoder() {
  * on-demand treatment, and cheaper to load than DTS at ~730 KB.
  */
 export function ensureTrueHdDecoder() {
-    return ensureDecoder('truehd', () => import('../lib/mediabunny-truehd.js')
+    return ensureDecoder('truehd', () => import('../../lib/mediabunny-truehd.js')
         .then(({ registerTrueHdDecoder }) => registerTrueHdDecoder()));
 }
 
@@ -147,9 +147,9 @@ export function ensureEncoders() {
                 return;
             }
             return Promise.all([
-                import('../lib/mediabunny-mp3-encoder.js'),
-                import('../lib/mediabunny-flac-encoder.js'),
-                import('../lib/mediabunny-aac-encoder.js'),
+                import('../../lib/mediabunny-mp3-encoder.js'),
+                import('../../lib/mediabunny-flac-encoder.js'),
+                import('../../lib/mediabunny-aac-encoder.js'),
             ]).then(([mp3, flac, aac]) => {
                 mp3.registerMp3Encoder();
                 flac.registerFlacEncoder();

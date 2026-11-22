@@ -1,5 +1,5 @@
 // @ts-check
-import { isCancellation } from '../../../processing/shared/Cancellation.js';
+import { isCancellation } from '../../../shared/utils/Cancellation.js';
 
 /** What a menu shows when the user stopped the job themselves. */
 export const CANCELLED_MESSAGE = 'Operation cancelled.';

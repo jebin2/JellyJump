@@ -1,5 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
-import { MediaBunny } from "../../core/MediaBunny.js";
+import { MediaBunny } from "../../shared/media/MediaBunny.js";
 
 const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink, EncodedPacketSink } = MediaBunny;
 
