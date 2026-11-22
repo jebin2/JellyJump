@@ -51,8 +51,9 @@ start (`78c1c90`); this table is where things stand now.
 | 2 | E1 public playlist names (`save`, `ensureMetadata`, `processMetadata`, `handleUrlUpload`); outside `playlist._*` calls 50 → 0. BUG-15 found and fixed: Record called a `playlist._showToast` that never existed, so its messages threw | done | #63 |
 | 2 | E2–E5 `Playlist.js` 1,807 → 436 lines: `PlaylistStore`, `PlaylistMetadata`, `PlaylistIngest`, `PlaylistDiscovery`, `PlaylistPlayback`; `ITEM_SELECTED_EVENT` moved to the playlist; `ingest-test` (17) | done | #64 |
 | 2 | F1 Scenes/Motion Add clip as jobs (BUG-3); F3 Merge and Combine A/V results through `insertProcessedItem` (they spliced into `playlist.items`, so the tray never saw them); F2 left out (see F2) | done | #65 |
-| 2 | N4 the app's own errors are matched by code (`FILE_MISSING`, `CORS`), not message text. The `.message` checks left read messages from WebCodecs, MediaBunny and the Hugging Face client, which have no codes. N5 `shared/net/fetchWithPolicy.js` (time limit, GET retries with backoff, `TIMEOUT`/`OFFLINE`/`NETWORK`) for shared libraries, M3U, YouTube titles, subtitles; `net-test` (14). N7 partly: `codes.js` is the guide (what happened, what to do); messages written elsewhere move to it as their code is touched | done | this PR |
-| 2 | F4, F5, G4, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
+| 2 | N4 the app's own errors are matched by code (`FILE_MISSING`, `CORS`), not message text. The `.message` checks left read messages from WebCodecs, MediaBunny and the Hugging Face client, which have no codes. N5 `shared/net/fetchWithPolicy.js` (time limit, GET retries with backoff, `TIMEOUT`/`OFFLINE`/`NETWORK`) for shared libraries, M3U, YouTube titles, subtitles; `net-test` (14). N7 partly: `codes.js` is the guide (what happened, what to do); messages written elsewhere move to it as their code is touched | done | #66 |
+| 2 | O2 done by ESLint (#57). O3 one CSP module (`shared/config/csp.js`), written into the four pages at build (they carry a placeholder); `csp-test` (21). O5 desktop `read-file`: only files the user picked (remembered in `read-grants.json`, not the renderer-written config), the scan found or covers, and their subtitles; was any media file on the disk. `read-grants-test` (14), desktop smoke test refuses an unpicked file | done | this PR |
+| 2 | F4, F5, G4, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
@@ -857,7 +858,7 @@ by the same rule — state with its owner, DOM in the UI.
 |---|---|---|
 | O1 | BUG-9: `html` tagged template that escapes; use it for every `innerHTML` with values (subtitle track names, Optimize title, embed error, Scenes/Motion/Tracks errors, microphone labels, the rest found by the rule) | a test inserts `<img src=x>` as a title, a track name and an M3U entry and finds it shown as text |
 | O2 | Quality rule (ESLint, L4): `innerHTML` / `insertAdjacentHTML` with `${…}` only through `html` | rule on, 0 violations |
-| O3 | One CSP from `services.js` (§3.8), written into all four pages at build time; document each allowed source | the four pages' CSPs are identical and generated |
+| O3 | One CSP from `services.js` (§3.8), written into all four pages at build time; document each allowed source | the four pages' CSPs are generated from one module (the watch page keeps a tighter one on purpose) |
 | O4 | Dependencies: resolve the 4 high issues (check whether `@huggingface/transformers`' Node-only dependencies are used at all; drop or override them); `npm audit --omit=dev --audit-level=high` in CI for web and desktop; Dependabot for npm and actions | audit clean in CI |
 | O5 | Desktop `read-file`: allow only granted roots (picked files, library folders, dropped files); media extension alone no longer enough | IPC test: a media file outside granted roots is refused |
 | O6 | Share token: `Authorization` header from the web client; short-lived signed URLs for `<video src>`; tokens never logged | library-server-test covers both |

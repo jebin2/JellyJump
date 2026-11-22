@@ -5,6 +5,8 @@ const os = require('os');
 const { registerScannerIpc } = require('./scanner-host');
 const { registerShareIpc, enable: enableShare, disable: disableShare, describe: describeShare } = require('./share-host');
 const { handleCliArgs, isTerminalInvocation, isQueryInvocation } = require('./cli');
+const libraryIndex = require('./library-index');
+const { createReadGrants } = require('./read-grants');
 
 /**
  * Answer a read-only flag as plain Node, with no Chromium at all.
@@ -186,21 +188,16 @@ function normalizeUserFilePath(filePath) {
     return path.resolve(filePath);
 }
 
-// Paths the user has explicitly granted through the open-file dialog this
-// session. Restored playlist items reference paths from earlier sessions, so
-// media-typed files are also allowed; everything else (keys, configs, source
-// code) is off-limits to the renderer.
-const grantedPaths = new Set();
-const MEDIA_EXTENSIONS = new Set([
-    '.mp4', '.mkv', '.avi', '.webm', '.mov', '.m4v', '.wmv', '.flv', '.ts', '.m2ts', '.mts', '.3gp', '.ogv',
-    '.mp3', '.flac', '.wav', '.m4a', '.aac', '.ogg', '.opus', '.ac3', '.wma',
-    '.srt', '.vtt', '.ass', '.ssa',
-    '.gif', '.png', '.jpg', '.jpeg', '.webp', '.m3u8'
-]);
+// What the window may read: files the user picked, files the media scan
+// found, and their subtitles (see read-grants.js).
+const readGrants = createReadGrants({
+    file: path.join(app.getPath('userData'), 'read-grants.json'),
+    configPath,
+    index: libraryIndex,
+});
 
 function assertReadableUserPath(resolvedPath) {
-    if (grantedPaths.has(resolvedPath)) return;
-    if (MEDIA_EXTENSIONS.has(path.extname(resolvedPath).toLowerCase())) return;
+    if (readGrants.allows(resolvedPath)) return;
     throw new Error('Access denied: path was not granted by the user');
 }
 
@@ -358,7 +355,7 @@ ipcMain.handle('open-file-dialog', async (event, options = {}) => {
         }
 
         // Grant read access to the files the user just picked
-        result.filePaths.forEach((filePath) => grantedPaths.add(path.resolve(filePath)));
+        readGrants.grant(result.filePaths.map((filePath) => path.resolve(filePath)));
 
         // Get file stats for each selected file
         const files = await Promise.all(result.filePaths.map(async (filePath) => {

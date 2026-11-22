@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 import { execSync } from 'child_process';
+import { cspFor } from './assets/js/shared/config/csp.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -16,8 +17,21 @@ const buildId = process.env.VITE_BUILD_ID || (() => {
 })();
 const appVersion = process.env.VITE_APP_VERSION || pkg.version;
 
+/**
+ * Each page's Content-Security-Policy from shared/config/csp.js, written into
+ * its <meta> tag (the pages carry a %JJ_CSP% placeholder), in dev and build.
+ */
+const contentSecurityPolicy = {
+    name: 'jellyjump-csp',
+    transformIndexHtml(html, ctx) {
+        if (!html.includes('%JJ_CSP%')) return html;
+        return html.replace('%JJ_CSP%', cspFor(basename(ctx.filename, '.html')));
+    },
+};
+
 export default defineConfig({
     root: '.',
+    plugins: [contentSecurityPolicy],
 
     define: {
         'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),

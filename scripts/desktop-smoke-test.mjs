@@ -12,7 +12,7 @@
  *   npm run build && cp -r dist desktop/build && node scripts/desktop-smoke-test.mjs
  */
 import { _electron as electron } from 'playwright-core';
-import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -111,6 +111,13 @@ const party = await page.evaluate(async () => {
 check(!party.missing && party.supported, 'a watch party can be started from the desktop app');
 check(/^https:\/\//.test(party.viewerPage || ''),
     `and the link it sends points at the web, not at this machine's disk (${party.viewerPage})`);
+
+// O5: a media file nobody picked or scanned is not readable from the window.
+const stray = join(PROFILE, 'not-picked.mp4');
+writeFileSync(stray, 'x');
+const strayRead = await page.evaluate((p) => window.electronAPI.readFile(p), stray);
+check(strayRead?.success === false && /not granted/.test(strayRead.error || ''),
+    `a media file the user never picked cannot be read from the window (${strayRead?.error})`);
 
 const real = await page.evaluate(() => fetch('assets/icons/sprite.svg').then(r => r.ok).catch(() => false));
 check(real, 'assets load over file:// as well, so the icons are not blank');

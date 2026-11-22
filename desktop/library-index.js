@@ -7,9 +7,10 @@
  * accumulates them as they pass.
  *
  * The index doubles as the sharing allowlist: a request names an id, never a
- * path, so nothing outside what the scan actually walked can be addressed. That
- * matters because the app's read-file IPC deliberately allows any media file on
- * disk — fine for a local renderer, far too broad to expose over a network.
+ * path, so nothing outside what the scan actually walked can be addressed. The
+ * window's own read-file IPC is wider (files the user picked, and what the
+ * scan covers: read-grants.js), which is fine locally and too broad for a
+ * network.
  */
 const crypto = require('crypto');
 const fs = require('fs');
