@@ -1,3 +1,4 @@
+import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { startPlayerAudioVisualizer } from '../audio/AudioEngine.js';
 
@@ -218,7 +219,7 @@ export function pausePlayer(player, showOverlay = true) {
     }
 }
 
-export async function setPlayerPlaybackRate(player, rate) {
+export async function setPlayerPlaybackRate(player, rate, { persist = true } = {}) {
     if (rate < 0.25 || rate > 2) return;
     if (player.isLive) {
         if (player.playbackRate !== 1) {
@@ -237,7 +238,7 @@ export async function setPlayerPlaybackRate(player, rate) {
     }
 
     player.playbackRate = rate;
-    localStorage.setItem('jellyjump-speed', rate);
+    if (persist) Settings.set('speed', rate);
     player._updateSpeedMenu();
 
     if (wasPlaying) {

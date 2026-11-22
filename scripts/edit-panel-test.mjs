@@ -112,7 +112,7 @@ async function run(page, origin) {
             rate: p.playbackRate,
             mode: p.controlBarMode,
             barHeight: Math.round(p.ui.controls.getBoundingClientRect().height),
-            savedRate: localStorage.getItem('jellyjump-speed'),
+            savedRate: localStorage.getItem('jj:speed'),
             buttons: Object.fromEntries(['mb-play-btn', 'mb-prev-btn', 'mb-loop-btn', 'mb-filters-btn',
                 'mb-speed-btn', 'mb-cc-btn', 'mb-audio-settings-btn', 'mb-fullscreen-btn'].map(id => [id, shown(id)])),
         };
@@ -417,7 +417,7 @@ async function run(page, origin) {
     await page.click('.edit-panel-confirm-yes');
     await loaded();
     s = await state();
-    const remembered = await page.evaluate(() => localStorage.getItem('jellyjump-edit-history'));
+    const remembered = await page.evaluate(() => localStorage.getItem('jj:editHistory'));
     check(s.playing === 'holiday-clip.webm' && !s.playlist.includes('holiday-clip-edited.mp4'), `Reset goes back to the original (${s.playlist.join(', ')})`);
     check(remembered === null, 'and nothing is remembered any more');
 

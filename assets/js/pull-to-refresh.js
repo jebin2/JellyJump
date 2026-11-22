@@ -2,6 +2,7 @@
  * PullToRefresh.js
  * Implements "Pull to Hard Reset" functionality.
  */
+import { Settings } from './shared/settings/Settings.js';
 import { Logger } from './shared/utils/Logger.js';
 
 export class PullToRefresh {
@@ -123,7 +124,7 @@ export class PullToRefresh {
             }
 
             // 3. Clear LocalStorage
-            localStorage.clear();
+            Settings.clearAll();
             Logger.log('LocalStorage cleared');
 
             // 4. Clear SessionStorage

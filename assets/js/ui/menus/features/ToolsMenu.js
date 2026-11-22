@@ -1,3 +1,4 @@
+import { Settings } from '../../../shared/settings/Settings.js';
 import { Modal } from '../../Modal.js';
 import { Logger } from '../../../shared/utils/Logger.js';
 import { ConfirmDialog } from '../../../shared/utils/ConfirmDialog.js';
@@ -109,7 +110,7 @@ export class ToolsMenu {
                             });
 
                             // Clear all localStorage
-                            localStorage.clear();
+                            Settings.clearAll();
 
                             // Reload the page
                             window.location.reload();

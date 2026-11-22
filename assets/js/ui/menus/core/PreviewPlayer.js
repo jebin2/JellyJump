@@ -18,12 +18,13 @@
 export function borrowMainPlayer(surface, playlist) {
     const player = playlist.player;
     if (!player) return null;
-    const saved = { loopMode: player.loopMode, loopStart: player.loopStart, loopEnd: player.loopEnd };
+    // The loop is the tool's while it is open (setPreviewRange), and the
+    // player's own comes back when it closes.
+    const release = player.override?.({ loop: { mode: player.loopMode, start: player.loopStart, end: player.loopEnd } });
     player.pause?.();
     surface.onCleanup(() => {
         clearTimeout(player._previewRangeTimer);
-        Object.assign(player, saved);
-        player._updateLoopUI?.();
+        release?.();
     });
     return player;
 }
@@ -84,7 +85,7 @@ export async function lendPicture(surface, playlist) {
     const redraw = () => { if (!player.isPlaying) player.seek?.(player.currentTime); };
 
     // The controls are pinned below the picture while the edit panel is
-    // open (EditPanel._quietPlayer), so the whole picture can be drawn on.
+    // open (EditPanel._holdPlayer), so the whole picture can be drawn on.
 
     surface.onCleanup(() => {
         closed = true;

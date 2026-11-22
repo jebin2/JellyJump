@@ -46,7 +46,8 @@ start (`78c1c90`); this table is where things stand now.
 | 1 | L4 ESLint; its 91 findings fixed | done | #57 |
 | 1 | A7 BUG-6 confirmed on desktop and fixed; BUG-14 found and fixed | done | #58 |
 | 1 | T1 README, T2 ADRs 0001–0011 | done | this PR |
-| 2 | D, E, F, G, N4–N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
+| 2 | D1–D3 `Settings` (`jj:` keys, old ones moved; `localStorage` files 14 → 5), `player.override()`; edit panel and the timeline tools use it, its speed rewrite gone | done | this PR |
+| 2 | E, F, G, N4–N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | to do | |
 
 ---
 
@@ -448,7 +449,7 @@ Rules, enforced by the quality check from phase B on:
 2. `core/` and `processing/` do not import each other's internals; both
    use `shared/media/`.
 3. Nothing outside a module calls its `_private` members.
-4. Only `shared/storage/` and `app/settings` touch `localStorage` and
+4. Only `shared/storage/` and `shared/settings` touch `localStorage` and
    IndexedDB.
 5. Only `shared/platform/` (today's `ElectronHelper`) checks for Electron.
 
@@ -497,7 +498,7 @@ pages (player-main.js / embed-main.js)
 
 ### 3.4 Settings and temporary overrides
 
-One module, `app/settings/Settings.js`, owns the user's saved preferences
+One module, `shared/settings/Settings.js` (in `shared/`, since the player engine reads it), owns the user's saved preferences
 (speed, control bar mode, volume, filters if persisted, panel state) with one
 key prefix, `jj:`. The player reads its starting values from it and writes
 to it only when the **user** changes something.
@@ -595,7 +596,7 @@ Nothing leaves the device unless the user turns it on (decision §9).
 - `shared/config/services.js` lists every external service with its URL
   and purpose; the CSP (§3.6) and `fetchWithPolicy` read it.
 - Three kinds of settings, never mixed: **app config** (per build), **player
-  defaults** (`core/config/`, code), **user preferences** (`app/settings`,
+  defaults** (`core/config/`, code), **user preferences** (`shared/settings`,
   stored, §3.4).
 - Feature flags are config values, read through one `isEnabled(flag)`.
 - No hand-written cache-busters; anything versioned gets the build version.
@@ -736,7 +737,7 @@ M, L.
 
 | Step | Work | Done when |
 |---|---|---|
-| D1 | `app/settings/Settings.js`: get/set/subscribe, `jj:` prefix, migration from the old keys on first load | old keys read once and moved; one module writes preferences |
+| D1 | `shared/settings/Settings.js`: get/set/subscribe, `jj:` prefix, migration from the old keys on first load | old keys read once and moved; one module writes preferences |
 | D2 | `CorePlayer.override(values) → release`, stacked; speed, filters, control bar mode, loop, preview transform | unit test: override, stack, release in any order restores exactly |
 | D3 | Edit panel, `borrowMainPlayer`, `lendPicture`, Rotate, Export FX use overrides; delete their workarounds | `EditPanel._quietPlayer` / `_restorePlayer` gone; `edit-panel-test` unchanged and passing |
 

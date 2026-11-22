@@ -1,4 +1,5 @@
 import { Logger } from '../utils/Logger.js';
+import { Settings } from '../settings/Settings.js';
 import { parseLinkListFile, linkListFolderName } from '../utils/LinkListFile.js';
 import { buildYouTubeItem } from '../utils/YouTubeUrl.js';
 
@@ -336,7 +337,6 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
     return { total, expected, complete };
 }
 
-const SAVED_LINKS_KEY = 'jellyjump-remote-libraries';
 
 /**
  * Share links to restore on next load.
@@ -367,7 +367,7 @@ export function hostOf(rawUrl) {
 
 export function savedLinks() {
     try {
-        const raw = JSON.parse(localStorage.getItem(SAVED_LINKS_KEY));
+        const raw = Settings.get('remoteLibraries');
         return Array.isArray(raw) ? raw : [];
     } catch {
         return [];
@@ -379,7 +379,7 @@ export function rememberLink(rawUrl) {
     if (links.includes(rawUrl)) return;
     links.push(rawUrl);
     try {
-        localStorage.setItem(SAVED_LINKS_KEY, JSON.stringify(links));
+        Settings.set('remoteLibraries', links);
     } catch {
         // Storage full or blocked; the library still works this session.
     }
@@ -387,7 +387,7 @@ export function rememberLink(rawUrl) {
 
 export function forgetLink(rawUrl) {
     try {
-        localStorage.setItem(SAVED_LINKS_KEY, JSON.stringify(savedLinks().filter(l => l !== rawUrl)));
+        Settings.set('remoteLibraries', savedLinks().filter(l => l !== rawUrl));
     } catch {
         // Nothing to do; it simply stays remembered.
     }

@@ -54,6 +54,9 @@ One folder per operation (`trim/`, `speed/`, `merge/`, `transcode/`,
   conversion, the helpers that read audio and frames backwards.
 - `config/`: the app's configuration and the list of outside services.
 - `errors/`: the error type, its codes, and the handler for uncaught errors.
+- `settings/`: the user's saved preferences (`Settings`); the only place
+  that writes them. A tool that needs a value for a while uses the
+  player's `override()` (`core/PlayerOverrides.js`) instead.
 
 - `utils/`: stateless helpers — `Logger`, `html` (escaping), `mediaUtils`,
   `MediaMetadata`, parsers, `Toast`, `ConfirmDialog`.
