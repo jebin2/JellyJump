@@ -360,8 +360,13 @@ button:focus-visible {
     position: absolute;
     top: 0;
     height: 100%;
-    background-color: rgba(0, 255, 136, 0.3);
-    /* Semi-transparent accent */
+    /* Light stripes and a white edge rather than a tint of the accent: the
+       played part of the bar is that same accent, so a tint vanished over
+       it. These show on the played part and on the dark track alike. */
+    background: repeating-linear-gradient(45deg,
+            rgba(255, 255, 255, 0.5) 0 3px,
+            rgba(255, 255, 255, 0.15) 3px 6px);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.85);
     z-index: 1;
     pointer-events: none;
 }

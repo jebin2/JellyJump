@@ -616,7 +616,7 @@
         <div class="tool-card-grid" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="tool-card-input">
                 <label>Codec</label>
-                <span class="meta-codec meta-details text-sm">—</span>
+                <span class="meta-codec text-sm">—</span>
             </div>
             <div class="tool-card-input">
                 <label>Details</label>
@@ -975,20 +975,6 @@
     </div>
 
     <div class="gif-content hidden" style="display: contents;">
-        <!-- Left Panel: Video Player -->
-        <div class="modal-video-panel">
-            <!-- GIF Preview Section (shows after generation) -->
-            <div class="gif-preview-section hidden mt-sm">
-                <div class="gif-preview-container border border-border rounded p-sm bg-tertiary flex justify-center">
-                    <img class="gif-preview-image" src="" alt="GIF preview"
-                        style="max-width: 100%; height: auto; max-height: 200px;">
-                </div>
-                <div class="text-xs text-muted mt-xs">
-                    GIF size: <span class="gif-file-size">-</span>
-                </div>
-            </div>
-        </div>
-
         <!-- Right Panel: Controls -->
         <div class="modal-controls-panel">
             <div class="tool-card mb-md">
@@ -1077,6 +1063,16 @@
                         <span>High</span>
                         <span>Original</span>
                     </div>
+                </div>
+            </div>
+            <!-- The GIF made, shown here once its job is done -->
+            <div class="gif-preview-section hidden mt-sm">
+                <div class="gif-preview-container border border-border rounded p-sm bg-tertiary flex justify-center">
+                    <img class="gif-preview-image" src="" alt="GIF preview"
+                        style="max-width: 100%; height: auto; max-height: 200px;">
+                </div>
+                <div class="text-xs text-muted mt-xs">
+                    GIF size: <span class="gif-file-size">-</span>
                 </div>
             </div>
         </div>

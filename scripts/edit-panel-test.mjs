@@ -263,6 +263,13 @@ async function run(page, origin) {
     await page.waitForTimeout(300);
     s = await state();
     check(s.playing === 'holiday-clip.webm' && s.playlist.length === 2, `the player stays on the video (${s.playing})`);
+    const gifShown = await page.evaluate(() => {
+        const section = document.querySelector('.edit-panel .gif-preview-section');
+        const img = section?.querySelector('.gif-preview-image');
+        return !!section && !section.classList.contains('hidden') && section.offsetParent !== null
+            && !!img?.getAttribute('src');
+    });
+    check(gifShown, 'the GIF made shows in the panel');
     await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.press('Shift+N');
     await page.evaluate(() => window.playlist.player.onEnded());
@@ -311,6 +318,10 @@ async function run(page, origin) {
     check(await openTool('download-manage'), 'Tracks opens in the panel');
     await page.waitForSelector('.edit-panel .track-card', { timeout: 30000 });
     check(await page.locator('.edit-panel .track-card').count() >= 1, 'it lists the tracks');
+    const columns = await page.evaluate(() => [...document.querySelectorAll('.edit-panel .track-card')]
+        .map(c => [c.querySelector('.meta-codec')?.textContent, c.querySelector('.meta-details')?.textContent]));
+    check(columns.length && columns.every(([codec, details]) => !/^\d+x\d+$|ch,/.test(codec) && details && details !== '—'),
+        `each track's codec and details are in their own columns (${JSON.stringify(columns)})`);
     await page.click('.edit-panel-back');
 
     check(await openTool('detect-cuts'), 'Scenes opens in the panel');
