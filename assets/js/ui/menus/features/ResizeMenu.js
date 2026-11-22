@@ -3,6 +3,10 @@ import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { installTemplates } from '../core/Templates.js';
+import resizeTemplates from '../templates/resize.html?raw';
+
+installTemplates(resizeTemplates);
 
 /**
  * Resize Menu Handler  

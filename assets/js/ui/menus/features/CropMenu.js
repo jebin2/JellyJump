@@ -4,6 +4,10 @@ import { updateScale, setupDragHandlers, updateBoxPosition, showError, showProgr
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { lendPicture } from '../core/PreviewPlayer.js';
+import { installTemplates } from '../core/Templates.js';
+import cropTemplates from '../templates/crop.html?raw';
+
+installTemplates(cropTemplates);
 
 /**
  * Crop: drag a box over the main player's picture, and keep what is inside.

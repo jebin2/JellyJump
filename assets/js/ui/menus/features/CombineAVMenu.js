@@ -2,6 +2,10 @@ import { Modal } from '../../Modal.js';
 import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { installTemplates } from '../core/Templates.js';
+import combineAvTemplates from '../templates/combine-av.html?raw';
+
+installTemplates(combineAvTemplates);
 
 /**
  * Combine Audio/Video Menu Handler

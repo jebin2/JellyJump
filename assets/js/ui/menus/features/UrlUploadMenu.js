@@ -1,6 +1,10 @@
 import { Logger } from '../../../shared/utils/Logger.js';
 import { Modal } from '../../Modal.js';
 import { Toast } from '../../../shared/utils/Toast.js';
+import { installTemplates } from '../core/Templates.js';
+import urlUploadTemplates from '../templates/url-upload.html?raw';
+
+installTemplates(urlUploadTemplates);
 
 /**
  * URL Upload Menu

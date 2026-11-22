@@ -5,6 +5,10 @@ import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { setActionLabel } from '../../../shared/utils/FooterHelper.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { Toast } from '../../../shared/utils/Toast.js';
+import { installTemplates } from '../core/Templates.js';
+import encryptTemplates from '../templates/encrypt.html?raw';
+
+installTemplates(encryptTemplates);
 
 export class EncryptMenu {
     static async init(item, playlist) {

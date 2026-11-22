@@ -4,6 +4,10 @@ import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { borrowMainPlayer, timelineMarks } from '../core/PreviewPlayer.js';
+import { installTemplates } from '../core/Templates.js';
+import multicutTemplates from '../templates/multicut.html?raw';
+
+installTemplates(multicutTemplates);
 
 /**
  * MultiCut Menu Handler

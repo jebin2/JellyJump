@@ -1,0 +1,97 @@
+<!-- watermark: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Watermark Content Template -->
+<template id="watermark-content-template">
+    <!-- Right Panel: Watermark Controls -->
+    <div class="modal-controls-panel">
+        <label class="toggle-switch" style="flex-shrink: 0; padding: 4px 0;">
+            <span class="toggle-label label-left">LIVE PREVIEW</span>
+            <input type="checkbox" id="wm-live-preview-toggle" checked>
+            <span class="toggle-slider"></span>
+        </label>
+
+        <label class="text-xs text-secondary font-mono mb-xs block" style="flex-shrink: 0;">WATERMARK AREAS</label>
+        <div id="watermark-areas-list" class="tool-cards-list">
+            <div class="empty-state text-center py-xl text-muted text-xs italic">No watermarks added. Draw on the video
+                to add a watermark.</div>
+        </div>
+    </div>
+</template>
+
+<!-- Watermark Item Template -->
+<template id="watermark-item-template">
+    <div class="watermark-item tool-card" style="cursor: pointer;">
+        <!-- Header: Title + Remove -->
+        <div class="tool-card-header">
+            <span class="wm-item-title tool-card-title">Watermark</span>
+            <button class="remove-wm-btn tool-card-remove">✕</button>
+        </div>
+
+        <!-- Time: Start / End -->
+        <div class="tool-card-times">
+            <div class="tool-card-input">
+                <label>Start</label>
+                <input type="text" class="mb-input font-mono wm-start-time" placeholder="0:00.000">
+                <button class="set-current-start jellyjump-btn-small" title="Set the start to the current time">Start here</button>
+            </div>
+            <div class="tool-card-input">
+                <label>End</label>
+                <input type="text" class="mb-input font-mono wm-end-time" placeholder="0:00.000">
+                <button class="set-current-end jellyjump-btn-small" title="Set the end to the current time">End here</button>
+            </div>
+        </div>
+
+        <!-- Type Toggle -->
+        <div style="margin-bottom: 8px;">
+            <label class="toggle-switch" style="padding: 2px 0;">
+                <span class="toggle-label label-left active-text" style="font-size: 11px;">TEXT</span>
+                <input type="checkbox" class="wm-item-type-toggle">
+                <span class="toggle-slider"></span>
+                <span class="toggle-label label-right" style="font-size: 11px;">IMAGE</span>
+            </label>
+        </div>
+
+        <!-- Text Controls -->
+        <div class="wm-item-text-group" style="margin-bottom: 8px;">
+            <div class="tool-card-input">
+                <input type="text" class="mb-input wm-item-text" placeholder="Watermark text" value="Watermark">
+                <input type="color" class="wm-item-color" value="#ffffff">
+            </div>
+        </div>
+
+        <!-- Image Controls (hidden by default) -->
+        <div class="wm-item-image-group hidden" style="margin-bottom: 8px;">
+            <input type="file" class="mb-input wm-item-image mb-input-file-choose"
+                style="width: 100%; font-size: 0.85em;" accept="image/png,image/jpeg,image/webp">
+        </div>
+
+        <!-- Opacity -->
+        <div style="margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span class="text-xs text-secondary font-mono">Opacity</span>
+                <span class="wm-item-opacity-value text-xs font-bold">100%</span>
+            </div>
+            <input type="range" class="quality-slider wm-item-opacity" style="width: 100%;" min="10" max="100"
+                value="100">
+        </div>
+
+        <!-- Position & Size: 2x2 grid -->
+        <div class="tool-card-grid">
+            <div class="tool-card-input">
+                <label>X</label>
+                <input type="number" class="mb-input font-mono text-center wm-x" min="0" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>Y</label>
+                <input type="number" class="mb-input font-mono text-center wm-y" min="0" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>W</label>
+                <input type="number" class="mb-input font-mono text-center wm-width" min="1" step="1" value="0">
+            </div>
+            <div class="tool-card-input">
+                <label>H</label>
+                <input type="number" class="mb-input font-mono text-center wm-height" min="1" step="1" value="0">
+            </div>
+        </div>
+    </div>
+</template>

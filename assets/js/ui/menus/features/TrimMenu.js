@@ -4,6 +4,10 @@ import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { borrowMainPlayer, setPreviewRange } from '../core/PreviewPlayer.js';
+import { installTemplates } from '../core/Templates.js';
+import trimTemplates from '../templates/trim.html?raw';
+
+installTemplates(trimTemplates);
 
 /**
  * Cut: keep one clip of the video. The main player is the preview: its

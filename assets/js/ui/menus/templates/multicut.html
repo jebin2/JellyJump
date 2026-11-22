@@ -1,0 +1,24 @@
+<!-- multicut: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- MultiCut Content Template -->
+<template id="multicut-content-template">
+    <div class="multicut-loading flex flex-col items-center justify-center p-xl text-muted"
+        style="grid-column: 1 / -1;">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Loading video info...</span>
+    </div>
+
+    <div class="multicut-content hidden" style="display: contents;">
+        <div class="modal-controls-panel">
+            <button id="multicut-add-clip-btn" class="jellyjump-btn-large w-full mb-md">+ Add Segments</button>
+
+            <div class="duration-display bg-tertiary p-sm rounded border border-border mb-md">
+                <span class="text-xs text-secondary font-mono block mb-xs">REMAINING DURATION</span>
+                <span class="multicut-total-duration text-accent font-bold text-lg">00:00:00</span>
+            </div>
+
+            <div id="multicut-clips-list" class="tool-cards-list">
+            </div>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,115 @@
+<!-- tracks: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Track Management Content Template -->
+<template id="track-management-content-template">
+    <div class="source-filename text-sm text-muted mb-md font-mono break-all"></div>
+
+    <!-- Loading State -->
+    <div class="tracks-loading flex flex-col items-center justify-center p-xl text-muted">
+        <div class="spinner-md border-4 border-current border-t-transparent rounded-full w-8 h-8 animate-spin mb-sm">
+        </div>
+        <span>Scanning media tracks...</span>
+    </div>
+
+    <div class="tracks-content hidden">
+        <div class="track-section video-tracks-section">
+            <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                <span>📹 Video Tracks</span>
+                <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+            </h4>
+            <div class="track-list video-track-list grid gap-sm">
+                <!-- Video tracks injected here -->
+                <div class="no-tracks-message text-muted text-sm italic hidden">No video tracks available
+                </div>
+            </div>
+        </div>
+
+        <div class="track-section audio-tracks-section mt-lg">
+            <h4 class="track-section-title flex items-center gap-sm mb-sm font-bold">
+                <span>🎵 Audio Tracks</span>
+                <span class="track-count badge bg-primary text-white text-xs px-xs rounded-full">0</span>
+            </h4>
+            <div class="track-list audio-track-list grid gap-sm">
+                <!-- Audio tracks injected here -->
+                <div class="no-tracks-message text-muted text-sm italic hidden">No audio tracks available
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Track Management Footer Template -->
+<template id="track-management-footer-template">
+    <div class="track-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="track-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+                </div>
+                <span class="progress-status text-sm font-mono text-primary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm"></div>
+            <div class="success-message hidden text-success text-sm font-bold">✓ Added to playlist</div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <!-- No redundant close button here -->
+        </div>
+    </div>
+</template>
+
+<template id="track-card-template">
+    <div class="track-card tool-card">
+        <div class="tool-card-header">
+            <span class="track-title tool-card-title">Track #<span class="track-index">1</span></span>
+            <div class="track-actions flex gap-xs items-center">
+                <!-- Speed Menu -->
+                <div class="jellyjump-menu-btn mb-speed-dropdown-container">
+                    <button class="btn jellyjump-btn-small mb-speed-dropdown-btn" data-speed-btn aria-label="Speed"
+                        aria-haspopup="true" aria-expanded="false" title="Playback Speed">
+                        1x
+                    </button>
+                    <div class="jellyjump-menu mb-speed-dropdown" data-speed-menu role="menu">
+                        <div class="jellyjump-menu-item" data-value="0.25" role="menuitem" tabindex="0">0.25x</div>
+                        <div class="jellyjump-menu-item" data-value="0.5" role="menuitem" tabindex="0">0.5x</div>
+                        <div class="jellyjump-menu-item" data-value="0.75" role="menuitem" tabindex="0">0.75x</div>
+                        <div class="jellyjump-menu-item active" data-value="1" role="menuitem" tabindex="0">1x</div>
+                        <div class="jellyjump-menu-item" data-value="1.25" role="menuitem" tabindex="0">1.25x</div>
+                        <div class="jellyjump-menu-item" data-value="1.5" role="menuitem" tabindex="0">1.5x</div>
+                        <div class="jellyjump-menu-item" data-value="1.75" role="menuitem" tabindex="0">1.75x</div>
+                        <div class="jellyjump-menu-item" data-value="2" role="menuitem" tabindex="0">2x</div>
+                    </div>
+                </div>
+                <button class="btn jellyjump-btn-small download-track-btn" title="Download Track">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-download"></use>
+                    </svg>
+                </button>
+                <button class="btn jellyjump-btn-small add-to-playlist-btn" title="Add to Playlist">
+                    <svg width="16" height="16" fill="currentColor">
+                        <use href="assets/icons/sprite.svg#icon-plus"></use>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="tool-card-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="tool-card-input">
+                <label>Codec</label>
+                <span class="meta-codec text-sm">—</span>
+            </div>
+            <div class="tool-card-input">
+                <label>Details</label>
+                <span class="meta-details text-sm">—</span>
+            </div>
+            <div class="tool-card-input">
+                <label>Language</label>
+                <span class="meta-language text-sm">—</span>
+            </div>
+        </div>
+        <div class="progress-container hidden flex items-center gap-xs text-primary mt-xs">
+            <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin">
+            </div>
+            <span class="text-xs font-bold">Extracting...</span>
+        </div>
+    </div>
+</template>

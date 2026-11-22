@@ -6,6 +6,10 @@ import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { borrowMainPlayer, setPreviewRange } from '../core/PreviewPlayer.js';
+import { installTemplates } from '../core/Templates.js';
+import gifTemplates from '../templates/gif.html?raw';
+
+installTemplates(gifTemplates);
 
 /**
  * GIF: a stretch of the video as an animated GIF. The main player is the

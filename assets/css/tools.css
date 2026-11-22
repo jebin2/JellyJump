@@ -1,0 +1,1062 @@
+/* =========================================
+   Tool styles: the editing tools' panels and dialogs (convert, cut,
+   multi-cut, crop, resize, GIF, Remove BG, tracks, M3U validation) and
+   the form controls they use. Out of player.css (ARCHITECTURE_PLAN.md, F5),
+   which keeps the player itself. Loaded right after player.css, so the
+   order of rules between the two is as it was.
+   ========================================= */
+
+/* -----------------------------------------
+   Conversion Modal (Phase 33)
+   ----------------------------------------- */
+.radio-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.radio-option {
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    background: var(--bg-primary);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.radio-option:hover {
+    border-color: var(--accent-primary);
+    background: rgba(0, 255, 136, 0.05);
+}
+
+.radio-option input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.radio-custom {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-secondary);
+    border-radius: 50%;
+    margin-right: 12px;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.radio-option input:checked~.radio-custom {
+    border-color: var(--accent-primary);
+    background: var(--accent-primary);
+    box-shadow: 0 0 10px var(--accent-primary);
+}
+
+.radio-label {
+    display: flex;
+    flex-direction: column;
+}
+
+.format-name {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.format-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Checkbox */
+.checkbox-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-option input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkbox-custom {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-secondary);
+    border-radius: 4px;
+    margin-right: 10px;
+    position: relative;
+    transition: all 0.2s;
+    background: var(--bg-primary);
+    flex-shrink: 0;
+}
+
+.checkbox-option:hover .checkbox-custom {
+    border-color: var(--accent-primary);
+}
+
+.checkbox-option input:checked~.checkbox-custom {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.checkbox-option input:checked~.checkbox-custom:after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid #000;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.checkbox-label {
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* Progress Bar */
+.progress-bar-container {
+    height: 8px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    width: 0%;
+    transition: width 0.2s linear;
+    box-shadow: 0 0 10px var(--accent-primary);
+}
+
+/* Modal Footer */
+.modal-footer {
+    padding: 20px;
+    border-top: 2px solid var(--border-color);
+    background: var(--bg-tertiary);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.border-danger {
+    border: 1px solid var(--accent-danger);
+}
+
+.text-danger {
+    color: var(--accent-danger);
+}
+
+.border-success {
+    border: 1px solid var(--accent-primary);
+}
+
+.text-success {
+    color: var(--accent-primary);
+}
+
+
+
+/* Quality Slider */
+.quality-section {
+    background: var(--bg-primary);
+    padding: 15px;
+    border-radius: 6px;
+}
+
+.quality-slider {
+    width: 100%;
+    height: 6px;
+    background: var(--border-dark);
+    border-radius: 3px;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.quality-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -6px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    transition: transform 0.1s;
+}
+
+.quality-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.text-accent {
+    color: var(--accent-primary);
+}
+
+/* Disabled State */
+.radio-option.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--bg-tertiary);
+    border-color: transparent;
+}
+
+.radio-option.disabled:hover {
+    border-color: transparent;
+    background: var(--bg-tertiary);
+}
+
+.radio-option.disabled input {
+    pointer-events: none;
+}
+
+.radio-option.disabled .format-name,
+.radio-option.disabled .format-desc {
+    color: var(--text-secondary);
+}
+
+/* Responsive Grid for Formats */
+.format-group {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+
+/* Track Management */
+.track-section-title {
+    font-size: 1.1em;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.track-card {
+    transition: border-color 0.2s;
+}
+
+.track-card:hover {
+    border-color: var(--accent-primary);
+}
+
+.track-index {
+    color: var(--accent-primary);
+}
+
+.meta-label {
+    color: var(--text-secondary);
+    margin-right: 4px;
+}
+
+/* Trim Modal Styles */
+.time-inputs-container {
+    background: var(--bg-tertiary);
+    padding: var(--space-md);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+}
+
+.time-input-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.time-input-group input {
+    width: 100px;
+    font-family: monospace;
+    font-size: 1.1em;
+    padding: var(--space-xs) var(--space-sm);
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+}
+
+.time-input-group input:focus {
+    border-color: var(--accent-primary);
+    outline: none;
+}
+
+.time-input-group input.invalid {
+    border-color: var(--error-color);
+    animation: shake 0.3s;
+}
+
+.trim-duration {
+    font-family: monospace;
+    font-size: 1.2em;
+}
+
+/* Tool Card Shared Classes */
+.tool-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+}
+
+.tool-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xs);
+}
+
+.tool-card-title {
+    font-weight: bold;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.tool-card-remove {
+    background: none;
+    border: none;
+    color: var(--error-color);
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.tool-card-remove:hover {
+    opacity: 0.8;
+}
+
+.tool-card-times {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.tool-card-input {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tool-card-input label {
+    font-size: 0.7em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.tool-card-input input {
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 0.85em;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+.tool-card-input .jellyjump-btn-small {
+    padding: 2px 6px;
+    font-size: 0.7em;
+    margin-top: 2px;
+}
+
+.tool-card-info {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.tool-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.tool-cards-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+/* Timeline Slider */
+.timeline-slider-container {
+    padding: 0 var(--space-sm);
+}
+
+.timeline-slider {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    height: 60px;
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: visible;
+    /* Allow handles to overflow slightly */
+}
+
+.timeline-track {
+    background: linear-gradient(to right, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+}
+
+.timeline-range {
+    background: var(--accent-primary);
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.timeline-handle {
+    width: 16px;
+    height: 100%;
+    /* Full height of slider */
+    top: 0;
+    background: var(--accent-primary);
+    border: 2px solid var(--text-primary);
+    border-radius: 4px;
+    /* Rectangular with rounded corners */
+    cursor: ew-resize;
+    position: absolute;
+    z-index: 10;
+    transform: translateX(-50%);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+.timeline-handle:hover,
+.timeline-handle:focus {
+    transform: translateX(-50%) scale(1.1);
+    background: var(--accent-primary);
+    outline: none;
+}
+
+.timeline-handle:focus {
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.5);
+}
+
+/* Preview Controls */
+.preview-controls button {
+    min-width: 140px;
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+/* -----------------------------------------
+   Modal Refactoring Utilities (Phase 37)
+   ----------------------------------------- */
+.mb-modal-body-scrollable {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.mb-modal-error-text {
+    color: var(--error-color);
+    font-size: 0.7em;
+}
+
+.mb-modal-loading-container {
+    display: none;
+}
+
+.mb-modal-large {
+    max-width: 700px;
+}
+
+.mb-modal-max-500 {
+    max-width: 500px;
+}
+
+/* Time Inputs */
+.time-inputs-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 4px;
+    align-items: end;
+}
+
+.time-input-group {
+    min-width: 0;
+}
+
+.duration-display-container {
+    padding: 0 4px;
+}
+
+.time-input-field {
+    width: 100%;
+    padding: 8px 4px;
+    font-size: 0.9em;
+}
+
+/* Timeline */
+.timeline-range-initial {
+    left: 0%;
+    width: 100%;
+}
+
+.timeline-handle-start {
+    left: 0%;
+}
+
+.timeline-handle-end {
+    left: 100%;
+}
+
+/* Resize Modal */
+.dimension-inputs-container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 10px;
+    align-items: end;
+}
+
+.aspect-lock-btn-container {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.presets-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+/* -----------------------------------------
+   Stream Validation Modal
+   ----------------------------------------- */
+.validation-modal-content {
+    padding: 20px;
+    text-align: center;
+}
+
+.validation-progress-container {
+    margin: 20px 0;
+}
+
+.validation-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.validation-progress-fill {
+    height: 100%;
+    background: var(--accent-primary);
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.validation-status {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.validation-counts {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.validation-counts .count-broken {
+    color: var(--error-color);
+}
+
+.validation-counts .count-working {
+    color: var(--accent-primary);
+}
+
+.validation-current-item {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.validation-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.validation-ok-btn {
+    background: var(--accent-primary);
+    border: none;
+    color: #000;
+    padding: 10px 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+
+.validation-ok-btn:hover {
+    background: var(--accent-secondary);
+}
+
+/* -----------------------------------------
+   Crop Modal Styles
+   ----------------------------------------- */
+.crop-preview-container {
+    position: relative;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+}
+
+.crop-preview-wrapper {
+    position: relative;
+    display: block;
+    line-height: 0;
+    width: 100%;
+}
+
+.crop-player-container {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.crop-player-container .jellyjump-video-wrapper {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Canvas should maintain video aspect ratio, not stretch */
+.crop-player-container canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.crop-overlay {
+    position: absolute;
+    /* JS controls left/top/width/height */
+    pointer-events: none;
+    z-index: 10;
+}
+
+.crop-box {
+    position: absolute;
+    border: 2px dashed var(--accent-primary);
+    background: rgba(0, 175, 240, 0.1);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+    cursor: move;
+    /* min-width: 40px; not need fix for extending to right
+    min-height: 40px; */
+    box-sizing: border-box;
+}
+
+.crop-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--accent-primary);
+    border: 2px solid var(--text-primary);
+    border-radius: 50%;
+    pointer-events: auto;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s, background-color 0.1s;
+}
+
+.crop-handle:hover {
+    transform: scale(1.2);
+    background: var(--accent-secondary);
+}
+
+/* Corner handles */
+.crop-handle-nw {
+    top: -6px;
+    left: -6px;
+    cursor: nw-resize;
+}
+
+.crop-handle-ne {
+    top: -6px;
+    right: -6px;
+    cursor: ne-resize;
+}
+
+.crop-handle-se {
+    bottom: -6px;
+    right: -6px;
+    cursor: se-resize;
+}
+
+.crop-handle-sw {
+    bottom: -6px;
+    left: -6px;
+    cursor: sw-resize;
+}
+
+/* Edge handles */
+.crop-handle-n {
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: n-resize;
+}
+
+.crop-handle-n:hover {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.crop-handle-e {
+    top: 50%;
+    right: -6px;
+    transform: translateY(-50%);
+    cursor: e-resize;
+}
+
+.crop-handle-e:hover {
+    transform: translateY(-50%) scale(1.2);
+}
+
+.crop-handle-s {
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: s-resize;
+}
+
+.crop-handle-s:hover {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.crop-handle-w {
+    top: 50%;
+    left: -6px;
+    transform: translateY(-50%);
+    cursor: w-resize;
+}
+
+.crop-handle-w:hover {
+    transform: translateY(-50%) scale(1.2);
+}
+
+/* Crop coordinates grid */
+.crop-coords-container {
+    padding: 0 5px;
+}
+
+.crop-coords-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.crop-coords-grid .input-group {
+    min-width: 0;
+}
+
+.crop-coords-grid .mb-input {
+    width: 100%;
+    padding: 8px 4px;
+    font-size: 0.85em;
+}
+
+@media (max-width: 500px) {
+    .crop-coords-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* -----------------------------------------
+   Quality Slider (Remove Background / GIF)
+   ----------------------------------------- */
+.quality-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border-dark);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    border: none;
+}
+
+.quality-slider::-webkit-slider-runnable-track {
+    height: 6px;
+    background: var(--border-dark);
+    border-radius: 3px;
+}
+
+.quality-slider::-moz-range-track {
+    height: 6px;
+    background: var(--border-dark);
+    border-radius: 3px;
+}
+
+.quality-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -4px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    transition: transform 0.15s, background-color 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.quality-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: var(--accent-secondary);
+}
+
+.quality-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    transition: transform 0.15s, background-color 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.quality-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    background: var(--accent-secondary);
+}
+
+.speed-display {
+    margin-left: 10px;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 8px;
+    user-select: none;
+    position: relative;
+    padding: 10px;
+}
+
+.toggle-switch input {
+    display: none;
+}
+
+.toggle-slider {
+    position: relative;
+    width: 36px;
+    height: 18px;
+    background-color: var(--border-dark);
+    border-radius: 9px;
+    border: 1px solid var(--border-dark);
+    transition: all 0.2s ease;
+}
+
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    background-color: var(--text-secondary);
+    border-radius: 50%;
+    transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch input:checked+.toggle-slider {
+    background-color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.toggle-switch input:checked+.toggle-slider::after {
+    transform: translateX(18px);
+    background-color: #000;
+}
+
+.toggle-label {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+}
+
+.toggle-switch input:checked~.label-right {
+    color: var(--text-primary);
+}
+
+.toggle-switch input:not(:checked)~.label-left {
+    color: var(--text-primary);
+}
+
+/* -----------------------------------------
+   Form Elements (Radio & Checkbox)
+   ----------------------------------------- */
+/* -----------------------------------------
+   Form Elements (Radio & Checkbox)
+   ----------------------------------------- */
+.radio-option {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.radio-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Use :has() if supported, or fallback logic if needed. 
+   Since this is a modern environment, :has is likely fine, 
+   but simplistic JS or adjacent sibling approach is safer for broader compat if needed.
+   For now, we will rely on :has() or just the input feedback. */
+
+.radio-option:has(input[type='radio']:checked) {
+    background: rgba(var(--accent-primary-rgb), 0.1);
+    border-color: var(--accent-primary);
+}
+
+.radio-option input[type='radio'] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-secondary);
+    border-radius: 50%;
+    margin-right: 12px;
+    margin-top: 2px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.radio-option input[type='radio']:checked {
+    border-color: var(--accent-primary);
+    background-color: transparent;
+}
+
+.radio-option input[type='radio']:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    background-color: var(--accent-primary);
+    border-radius: 50%;
+    box-shadow: 0 0 5px var(--accent-primary);
+}
+
+.radio-option:hover input[type='radio'] {
+    border-color: var(--text-primary);
+}
+
+
+/* -----------------------------------------
+   Checkbox Option Styles (Similar to Radio)
+   ----------------------------------------- */
+.checkbox-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+    /* Add slight hit area */
+}
+
+/* Force visibility and reset styles */
+.checkbox-option input[type='checkbox'] {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    display: inline-block !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    /* prevent shrinking */
+    min-height: 20px !important;
+    border: 2px solid var(--text-secondary) !important;
+    border-radius: 4px !important;
+    margin-right: 12px;
+    position: relative;
+    cursor: pointer;
+    background-color: transparent;
+    opacity: 1 !important;
+    visibility: visible !important;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.checkbox-option input[type='checkbox']:checked {
+    border-color: var(--accent-primary) !important;
+    background-color: var(--accent-primary) !important;
+}
+
+.checkbox-option input[type='checkbox']:checked::after {
+    content: '';
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    width: 6px;
+    height: 12px;
+    border: solid #000;
+    border-width: 0 2px 2px 0;
+    display: block !important;
+}
+
+.checkbox-option:hover input[type='checkbox'] {
+    border-color: var(--text-primary) !important;
+}

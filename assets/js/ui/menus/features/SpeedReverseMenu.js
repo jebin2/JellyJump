@@ -5,6 +5,10 @@ import { formatTime, parseTime } from '../../../shared/utils/mediaUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { setActionLabel } from '../../../shared/utils/FooterHelper.js';
+import { installTemplates } from '../core/Templates.js';
+import speedReverseTemplates from '../templates/speed-reverse.html?raw';
+
+installTemplates(speedReverseTemplates);
 
 /**
  * Speed & Reverse Menu Handler

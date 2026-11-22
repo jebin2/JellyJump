@@ -26,7 +26,7 @@ const QUICK = [
     'live-schedule-test', 'linklist-test', 'linklist-scan-test', 'youtube-url-test', 'html-escape-test',
     'camera-effects-test', 'sticker-test', 'decoration-test', 'recording-clock-test',
     'cli-test', 'library-server-test', 'remote-library-test', 'remote-library-load-test',
-    'rs-selftest', 'shard-pipeline-test', 'playback-clock-test', 'errors-test', 'settings-test', 'override-test', 'net-test', 'csp-test', 'read-grants-test',
+    'rs-selftest', 'shard-pipeline-test', 'playback-clock-test', 'errors-test', 'settings-test', 'override-test', 'net-test', 'csp-test', 'read-grants-test', 'template-test',
 ];
 const BROWSER = [
     'encrypt-test', 'storage-test', 'ingest-test', 'processing-test', 'source-failure-test', 'youtube-embed-test',

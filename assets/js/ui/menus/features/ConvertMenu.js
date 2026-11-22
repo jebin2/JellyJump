@@ -7,6 +7,10 @@ import { ZipHelper } from '../../../shared/utils/ZipHelper.js';
 import { uploadToHuggingFace } from '../../../processing/hls/HuggingFaceUploader.js';
 import { MediaBunny } from '../../../shared/media/MediaBunny.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { installTemplates } from '../core/Templates.js';
+import convertTemplates from '../templates/convert.html?raw';
+
+installTemplates(convertTemplates);
 
 /**
  * Convert Menu Handler

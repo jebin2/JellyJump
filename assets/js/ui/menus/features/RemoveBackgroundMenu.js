@@ -4,6 +4,10 @@ import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { lendPicture, canvasPoint } from '../core/PreviewPlayer.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { installTemplates } from '../core/Templates.js';
+import removeBgTemplates from '../templates/remove-bg.html?raw';
+
+installTemplates(removeBgTemplates);
 
 export class RemoveBackgroundMenu {
     /**

@@ -1,0 +1,115 @@
+<!-- convert: loaded with its tool (ui/menus/core/Templates.js) -->
+<!-- Conversion Content Template -->
+<template id="conversion-content-template">
+    <!-- Format Selection -->
+    <div class="format-selection flex-start mb-lg">
+        <div class="text-secondary text-sm font-mono whitespace-nowrap">SELECT FORMAT:</div>
+        <div class="jellyjump-menu-btn-container">
+            <div class="mb-select jellyjump-menu-btn" id="conversion-format-btn" aria-haspopup="true"
+                aria-expanded="false">
+                <span>Original</span>
+            </div>
+            <div class="jellyjump-menu" id="conversion-format-menu" role="menu">
+                <div class="jellyjump-menu-item active" data-value="keep" role="menuitem">
+                    <span class="menu-label text-primary font-bold">Original</span>
+                    <span class="text-xs text-secondary ml-auto">Keep Format</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item" data-value="mp4" role="menuitem">
+                    <span class="menu-label font-bold">MP4</span>
+                    <span class="text-xs text-secondary ml-auto">H.264 / AAC</span>
+                </div>
+                <div class="jellyjump-menu-item" data-value="webm" role="menuitem">
+                    <span class="menu-label font-bold">WebM</span>
+                    <span class="text-xs text-secondary ml-auto">VP9 / Opus</span>
+                </div>
+                <div class="jellyjump-menu-item" data-value="mov" role="menuitem">
+                    <span class="menu-label font-bold">MOV</span>
+                    <span class="text-xs text-secondary ml-auto">QuickTime</span>
+                </div>
+                <div class="jellyjump-menu-item disabled" data-value="prores" role="menuitem"
+                    title="ProRes encoding requires the desktop app">
+                    <span class="menu-label font-bold">MOV</span>
+                    <span class="text-xs text-secondary ml-auto">ProRes</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item disabled" data-value="avi" role="menuitem" title="Coming Soon">
+                    <span class="menu-label">AVI</span>
+                    <span class="text-xs text-secondary ml-auto">Legacy</span>
+                </div>
+                <div class="jellyjump-menu-item" data-value="mkv" role="menuitem">
+                    <span class="menu-label font-bold">MKV</span>
+                    <span class="text-xs text-secondary ml-auto">Matroska</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item" data-value="flac" role="menuitem">
+                    <span class="menu-label font-bold">FLAC</span>
+                    <span class="text-xs text-secondary ml-auto">Audio Only</span>
+                </div>
+                <div class="menu-divider"></div>
+                <div class="jellyjump-menu-item" data-value="hls" role="menuitem">
+                    <span class="menu-label font-bold">HLS</span>
+                    <span class="text-xs text-secondary ml-auto">Stream (.zip)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quality Slider (Always Visible) -->
+    <div class="quality-section">
+        <div class="flex-between mb-sm">
+            <span class="text-secondary text-sm font-mono">QUALITY:</span>
+            <span class="quality-value text-sm font-bold">Original (100%)</span>
+        </div>
+        <input type="range" class="quality-slider" min="1" max="100" step="1" value="100">
+        <div class="flex-between mt-xs text-xs text-secondary">
+            <span>Low</span>
+            <span>Medium</span>
+            <span>High</span>
+            <span>Original</span>
+        </div>
+        <div class="estimated-reduction text-xs text-accent mt-sm">No size reduction</div>
+    </div>
+
+    <!-- HLS Cloud Upload (shown only when HLS format is selected) -->
+    <div class="hls-cloud-section hidden mt-lg">
+        <div class="text-secondary text-sm font-mono mb-sm">UPLOAD TO CLOUD:</div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">HF TOKEN:</label>
+            <input type="password" class="hf-token-input mb-input w-full text-sm" placeholder="hf_..." autocomplete="off" spellcheck="false">
+        </div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">DATASET REPO:</label>
+            <input type="text" class="hf-repo-input mb-input w-full text-sm" placeholder="username/my-videos" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="mb-sm">
+            <label class="text-xs text-secondary font-mono block mb-sm">FOLDER <span class="text-secondary font-normal">(optional)</span>:</label>
+            <input type="text" class="hf-folder-input mb-input w-full text-sm" placeholder="e.g. movie-title" spellcheck="false">
+        </div>
+        <button class="hf-upload-btn btn jellyjump-btn-small w-full text-sm" disabled>
+            Upload to Hugging Face
+        </button>
+        <div class="hf-progress-section hidden flex items-center gap-sm mt-sm">
+            <div class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary"></div>
+            <span class="text-sm font-mono text-secondary">Uploading...</span>
+            <span class="hf-progress-pct text-sm font-bold text-accent">0%</span>
+        </div>
+        <div class="hf-error-message hidden text-danger text-sm mt-sm"></div>
+        <div class="hf-success-section hidden mt-sm">
+            <div class="text-success text-sm font-bold mb-sm flex items-center gap-sm">
+                <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-check"></use></svg>
+                Upload complete!
+            </div>
+            <div class="text-xs text-secondary font-mono mb-sm">M3U8 URL:</div>
+            <div class="flex gap-sm mb-sm">
+                <input type="text" class="hf-result-url mb-input w-full text-xs font-mono" readonly>
+                <button class="hf-copy-btn btn jellyjump-btn-small" title="Copy URL" aria-label="Copy URL">
+                    <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-copy"></use></svg>
+                </button>
+                <button class="hf-play-btn btn jellyjump-btn-small" title="Play in JellyJump" aria-label="Play">
+                    <svg width="14" height="14" fill="currentColor"><use href="assets/icons/sprite.svg#icon-play"></use></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>

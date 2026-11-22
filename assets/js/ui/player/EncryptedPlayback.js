@@ -15,6 +15,10 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { PlatformCrypto } from '../../shared/utils/PlatformCrypto.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../menus/core/MenuFactory.js';
+import { installTemplates } from '../menus/core/Templates.js';
+import unlockTemplates from '../menus/templates/unlock.html?raw';
+
+installTemplates(unlockTemplates);
 
 /**
  * Ask for the password and decrypt, returning the plaintext file.

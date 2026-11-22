@@ -4,6 +4,10 @@ import { CustomDropdown } from '../../../shared/utils/CustomDropdown.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { decodeAudioRange, getAudioDuration } from '../../../shared/media/AudioHelpers.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { installTemplates } from '../core/Templates.js';
+import slideshowTemplates from '../templates/slideshow.html?raw';
+
+installTemplates(slideshowTemplates);
 
 /**
  * Slideshow Menu Handler
