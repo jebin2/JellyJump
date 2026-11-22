@@ -115,6 +115,31 @@ check(/^https:\/\//.test(party.viewerPage || ''),
 const real = await page.evaluate(() => fetch('assets/icons/sprite.svg').then(r => r.ok).catch(() => false));
 check(real, 'assets load over file:// as well, so the icons are not blank');
 
+// BUG-6: an edited copy has no path on disk and nothing stores its blob, so
+// once the player moved off it, it could never play again.
+const copy = await page.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const pl = window.playlist, p = window.player;
+    await pl.cancelMediaScan?.(); // its finds would shift the items about
+    const at = (title) => pl.items.findIndex(i => i.title === title);
+    const loaded = async () => {
+        for (let i = 0; i < 100 && !(p.duration > 0 && !p.isLoading); i++) await new Promise(r => setTimeout(r, 100));
+        return p.duration;
+    };
+    await pl.handleFiles([new File([bytes], 'smoke-original.webm', { type: 'video/webm' })]);
+    pl.insertProcessedItem(pl.items[at('smoke-original.webm')], new Blob([bytes], { type: 'video/webm' }), 'smoke-edited.webm');
+    await new Promise(r => setTimeout(r, 1500)); // the playlist saves meanwhile
+    await pl.selectItem(at('smoke-edited.webm'), false);
+    const first = await loaded();
+    await pl.selectItem(at('smoke-original.webm'), false);
+    await loaded();
+    await pl.selectItem(at('smoke-edited.webm'), false);
+    const again = await loaded();
+    return { first, again, playing: pl.items[pl.activeIndex]?.title };
+}, readFileSync(resolve(ROOT, 'scripts/fixtures/smoke-av.webm')).toString('base64'));
+check(copy.first > 11 && copy.again > 11 && copy.playing === 'smoke-edited.webm',
+    `an edited copy still plays after switching away and back (${copy.first}s, then ${copy.again}s, ${copy.playing})`);
+
 check(errs.length === 0, `nothing failed quietly${errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''}`);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

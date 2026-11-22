@@ -69,9 +69,13 @@ export class DesktopStorageService {
             localPath: item.localPath,
         }));
 
-        // Release in-memory blobs after saving (mirrors IndexedDBService behaviour)
+        // Release in-memory blobs after saving, as IndexedDBService does --
+        // but only files that can be read back from disk. Nothing here
+        // stores a blob, so an item without a path on disk (an edited or
+        // converted copy) keeps its file, or it could never play again
+        // (BUG-6). Plan step G4 gives such copies a file on disk.
         for (const item of items) {
-            if (item.isLocal && item.file) {
+            if (item.isLocal && item.file && item.localPath) {
                 Logger.log(`[DesktopStorage] Releasing memory for persisted file: ${item.title}`);
                 item.file = null;
             }
