@@ -12,7 +12,7 @@
     "verify:libs": "bash download_libs.sh verify",
     "typecheck": "tsc -p jsconfig.json",
     "check": "npm run quality && npm run typecheck && npm run verify:libs && npm run build",
-    "test": "npm run quality && npm run typecheck && npm run verify:libs && npm run build && node scripts/run-tests.mjs",
+    "test": "npm run quality && npm run typecheck && npm run verify:libs && npm run build && node scripts/size-report.mjs && node scripts/run-tests.mjs",
     "clean": "rm -rf dist",
     "build:desktop": "./build-desktop.sh",
     "test:rs": "node scripts/rs-selftest.mjs && node scripts/shard-pipeline-test.mjs",
