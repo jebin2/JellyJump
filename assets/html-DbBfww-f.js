@@ -1,0 +1,2 @@
+var e=class{constructor(e){this.markup=e}toString(){return this.markup}},t=/[&<>"'`]/g;function n(e){return String(e??``).replace(t,e=>`&#${e.charCodeAt(0)};`)}function r(t){return t instanceof e?t.markup:Array.isArray(t)?t.map(r).join(``):n(t)}function i(t,...n){let i=t[0];for(let e=0;e<n.length;e++)i+=r(n[e])+t[e+1];return new e(i)}export{i as n,n as t};
+//# sourceMappingURL=html-DbBfww-f.js.map
