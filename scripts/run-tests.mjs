@@ -23,7 +23,7 @@ const ROOT = join(import.meta.dirname, '..');
 const QUICK = [
     'audio-track-label-test', 'playlist-kind-test', 'subtitle-scan-test', 'subtitle-vtt-test',
     'css-token-test', 'signal-codec-test', 'connection-report-test', 'viewer-view-test',
-    'live-schedule-test', 'linklist-test', 'linklist-scan-test', 'youtube-url-test',
+    'live-schedule-test', 'linklist-test', 'linklist-scan-test', 'youtube-url-test', 'html-escape-test',
     'camera-effects-test', 'sticker-test', 'decoration-test', 'recording-clock-test',
     'cli-test', 'library-server-test', 'remote-library-test', 'remote-library-load-test',
     'rs-selftest', 'shard-pipeline-test',

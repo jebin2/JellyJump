@@ -3,6 +3,7 @@ import { MediaBunny, codecOf, ensureDecodersFor } from '../../core/MediaBunny.js
 import { Toast } from '../../shared/utils/Toast.js';
 import { SubtitleManager } from '../../core/subtitles/SubtitleManager.js';
 import { labelAudioTracks } from './AudioTrackLabels.js';
+import { html } from '../../shared/utils/html.js';
 
 export class PlayerSubtitles {
     constructor(player) {
@@ -159,7 +160,8 @@ export class PlayerSubtitles {
             const label = document.createElement('label');
             label.className = 'subtitle-radio-option';
             label.setAttribute('data-track-id', track.id);
-            label.innerHTML = `
+            // Track names come from subtitle files and shared libraries.
+            label.innerHTML = html`
                 <input type="radio" name="subtitle-track" value="${track.id}">
                 <span class="radio-label">${track.name}</span>
             `;
