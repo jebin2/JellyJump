@@ -21,10 +21,6 @@ export class MultiCutMenu {
         const totalDuration = modalContent.querySelector('.multicut-total-duration');
         const multicutBtn = modalContent.querySelector('.multicut-btn');
         const downloadBtn = modalContent.querySelector('.download-btn');
-        const progressSection = modalContent.querySelector('.progress-section');
-        const progressPercentage = modalContent.querySelector('.progress-percentage');
-        const errorMessage = modalContent.querySelector('.error-message');
-        const successMessage = modalContent.querySelector('.success-message');
 
         multicutBtn.disabled = true;
 

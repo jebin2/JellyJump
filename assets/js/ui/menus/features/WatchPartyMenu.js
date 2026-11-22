@@ -101,7 +101,6 @@ export class WatchPartyMenu {
         const whose = body.querySelector('.wp-whose');
 
         const party = player.watchParty;
-        let currentInvite = null;
         let pollId = null;
 
         // A count is not enough once there is more than one friend: with three
@@ -153,7 +152,6 @@ export class WatchPartyMenu {
         };
 
         const showInvite = (invite) => {
-            currentInvite = invite;
             linkField.value = invite.link;
             copyButton.disabled = false;
             copyButton.textContent = 'Copy';

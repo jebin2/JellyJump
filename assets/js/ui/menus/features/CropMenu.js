@@ -1,16 +1,6 @@
 import { MediaProcessor } from '../../../processing/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
-import {
-    updateScale,
-    setupDragHandlers,
-    updateBoxPosition,
-    showError,
-    hideMessage,
-    showProgress,
-    hideProgress,
-    showSuccess,
-    setupAutoUpdate
-} from './BoxEditorUtils.js';
+import { updateScale, setupDragHandlers, updateBoxPosition, showError, showProgress, setupAutoUpdate } from './BoxEditorUtils.js';
 import { openProcessMenu, FOOTER_CONFIGS } from '../core/MenuFactory.js';
 import { runMenuJob } from '../core/MenuJob.js';
 import { lendPicture } from '../core/PreviewPlayer.js';
@@ -158,8 +148,8 @@ function setupInputHandlers(elements, state) {
 function setupCropButton(elements, state, item, playlist, modal) {
     elements.buttons.crop.addEventListener('click', async () => {
         // Ensure even dimensions
-        let width = Math.floor(state.box.width / 2) * 2;
-        let height = Math.floor(state.box.height / 2) * 2;
+        const width = Math.floor(state.box.width / 2) * 2;
+        const height = Math.floor(state.box.height / 2) * 2;
 
         if (width < 64 || height < 64) {
             showError(elements.messages.error, 'Crop must be at least 64px');

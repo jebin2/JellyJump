@@ -1,7 +1,6 @@
 import { Logger } from "../shared/utils/Logger.js";
-import { MediaBunny } from '../shared/media/MediaBunny.js';
+import '../shared/media/MediaBunny.js'; // registers the codec plugins
 import { getMetadata as getProcessingMetadata, getVideoStats as getProcessingVideoStats } from '../shared/media/MetadataService.js';
-import { createMediaBunnyInput, AUDIO_BITRATE_BPS } from '../shared/media/InputFactory.js';
 import { createGif as createGifMedia } from './export/GifService.js';
 import { processHls as processHlsMedia } from './hls/HlsService.js';
 import { losslessTrim as losslessTrimMedia } from './trim/TrimService.js';
