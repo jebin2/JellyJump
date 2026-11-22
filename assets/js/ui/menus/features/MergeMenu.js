@@ -4,6 +4,7 @@ import { MediaProcessor } from '../../../core/MediaProcessor.js';
 import { MediaMetadata } from '../../../shared/utils/MediaMetadata.js';
 import { generateId } from '../../../shared/utils/mediaUtils.js';
 import { runMenuJob } from '../core/MenuJob.js';
+import { Toast } from '../../../shared/utils/Toast.js';
 
 /**
  * Merge Menu Handler
@@ -267,7 +268,7 @@ export class MergeMenu {
 
             // Validate
             if (!targetWidth || !targetHeight || targetWidth < 128 || targetHeight < 128) {
-                alert('Please enter valid resolution dimensions (minimum 128×128)');
+                Toast.show('Enter a resolution of at least 128×128.', 4000, true);
                 return;
             }
 

@@ -11,6 +11,10 @@
 import './shared/utils/reload-on-stale-chunks.js';
 import { Logger } from './shared/utils/Logger.js';
 import { html } from './shared/utils/html.js';
+import { installErrorReporter } from './shared/errors/ErrorReporter.js';
+
+// Errors nothing else caught are recorded and shown once (shared/errors).
+installErrorReporter();
 
 async function initEmbed() {
     // Parse query params

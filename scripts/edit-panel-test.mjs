@@ -432,8 +432,19 @@ async function run(page, origin) {
     check(!injected.markup && injected.labels.some(l => l.includes('<img id="pwn"')),
         `a subtitle track named with markup shows as text (${JSON.stringify(injected.labels)})`);
 
+    console.log('\nan error nothing caught is reported once');
+    await page.evaluate(() => {
+        for (let i = 0; i < 3; i++) setTimeout(() => { throw new Error('reporter-probe'); }, 0);
+    });
+    await page.waitForSelector('.mb-toast .mb-toast-action', { timeout: 5000 }).catch(() => null);
+    const reported = await page.evaluate(() => [...document.querySelectorAll('.mb-toast')]
+        .filter(t => t.querySelector('.mb-toast-action')).map(t => t.querySelector('.mb-toast-action').textContent));
+    check(reported.length === 1 && reported[0] === 'Copy details', `one toast with Copy details for three errors (${JSON.stringify(reported)})`);
+
     console.log('\nno errors');
-    check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join(' | ')}` : ''}`);
+    // The probe above is thrown on purpose.
+    const unexpected = errors.filter(e => !e.includes('reporter-probe'));
+    check(unexpected.length === 0, `no page errors${unexpected.length ? `: ${unexpected.join(' | ')}` : ''}`);
 }
 
 // --- the harness --------------------------------------------------------------
