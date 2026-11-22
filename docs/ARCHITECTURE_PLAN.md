@@ -1,0 +1,1030 @@
+# JellyJump Production-Readiness Plan
+
+A full, staged plan to take the web app (player page, embed, watch page)
+and the parts of the desktop app it shares code with to a production-ready
+foundation: clear architecture, clean boundaries, proper error handling,
+security, testing, observability, performance, configuration, CI/CD and
+documentation — not only a reorganisation of the code.
+
+It covers:
+
+- what the code looks like now, measured, in every one of those areas (§2);
+- the structure and the standards to aim for (§3) and the public APIs that
+  hold it together (§4);
+- the work, as phases of PR-sized steps, each with tasks, a "done when"
+  check, tests and risk (§5), in five waves (§6);
+- testing (§7), risks (§8), decisions only the owner can make (§9);
+- the criteria that say the plan is done, each one checkable (§10).
+
+Measurements are from `main` at `78c1c90` (after PR #34).
+
+---
+
+## 0. Progress
+
+Updated with each PR. Findings in §2 describe the code as measured at the
+start (`78c1c90`); this table is where things stand now.
+
+| Wave | Step | Status | PR |
+|---|---|---|---|
+| 0 | S1 protect `main` | done (PR + `test` check required, admin bypass on) | repo settings |
+| 0 | S2 deploy only after tests (BUG-10) | done, verified on `e6910ad` / `bcc7b5a` | #35 |
+| 0 | S3 `npm ci`, actions pinned to SHAs | done | #35 |
+| 0 | A1–A4 (BUG-1, BUG-2, BUG-7, BUG-8) | done | #36 |
+| 0 | O1 escape HTML (BUG-9) | done | #37 |
+| 0 | K5 flaky `encrypt-test` | done | #38 |
+| 0 | O4 audit clean, audit in CI, Dependabot | done | #39 |
+| 0 | B1–B4 architecture check, clock and storage tests | done | #40 |
+| 1 | A5 docs: `docs/` un-ignored, this plan moved here, code of conduct and `STRUCTURE.md` updated, README no longer implies offline (BUG-12 wording) | done | this PR |
+| 1 | A6 remove `remotion_test5/`, `use_case/`, `tests/*.html`, `scripts/jjc3-sim.sh` | done | this PR |
+| 1 | A7, C1–C5, R1–R5, N1–N3, P1–P2, L4, T1, T2 | to do | |
+
+---
+
+## 1. Summary
+
+**Where the app stands.** The player, editing and processing work, and
+there is a real test suite (30 suites, run on every PR). The weak points are
+structural and operational:
+
+- **Structure:** two very large objects (`Playlist` 1,783 lines,
+  `CorePlayer` 902), imports going the wrong way between layers, 24 files
+  reaching into the player's private methods, and workarounds in the edit
+  panel because the player cannot change a setting temporarily.
+- **Errors:** no global handler, errors shown four different ways, 17 empty
+  `catch` blocks, no timeouts on network reads.
+- **Security:** text from files and playlists put into the page as HTML
+  without escaping (the CSP stops it running code); desktop file reads
+  wider than needed; 4 high-severity dependency issues; no audit in CI.
+- **Observability:** in production every log line is dropped; no error
+  record, no metrics, no diagnostics a user could send.
+- **Performance:** no budgets; about 2.3 MB of library code shipped twice;
+  unused videos and source maps published.
+- **Configuration:** one constant, hostnames hard-coded in the page boot,
+  external URLs spread through the code.
+- **Delivery:** `main` unprotected, and a merge deploys even when the tests
+  fail on it; versions out of step.
+- **Docs:** no decision records; project rules and structure docs out of
+  date; docs folder gitignored.
+- 13 bugs found while measuring (§2.13).
+
+**What the plan delivers.** Each of the twelve goals in §10 gets
+measurable criteria, a phase that meets them, and a check in CI or a test
+that keeps them met afterwards.
+
+**What it does not change.** Phone browser rules (autoplay, iOS audio) and
+codecs a browser cannot decode stay handled case by case — with diagnostics
+to see them. The app has no server and promises nothing is uploaded, so
+observability is on the device, with an optional opt-in.
+
+**Shape of the work.** Twenty phases (A–T), about 100 steps, mostly small
+PRs, in five waves: a safety net first (protect `main`, fix the injection
+and the deploy gate, guard rails), then foundations (layering, config,
+errors, logging), then app structure (settings, playlist, tools, storage),
+then the player's surface, then the risky player internals one at a time
+with device testing.
+
+---
+
+## 2. Findings
+
+### 2.1 Repository and docs
+
+| Finding | Detail |
+|---|---|
+| Large generated media tracked in git | `remotion_test5/` — 54 tracked files, 37 MB, including rendered `out/*.mp4` ads. Nothing in the build, CI or `package.json` uses it. |
+| Stray files at the root | `medibunny-llms-full.txt` (328 KB), `examples/`, `use_case/`, `tests/` (seven HTML probe pages, not run by anything), `clauderesumeid.txt`, `codexresumeid.txt`. Some are ignored, some tracked. |
+| Plans that are not in the repo | `REPO_RESTRUCTURING_PLAN.md`, `REPO_RESTRUCTURING_CHECKLIST.md`, `reading-hls.md` and everything in `docs/` are in `.gitignore`. |
+| Project rules out of date | `.agent/rules/code-of-conduct.md` says "no build steps (Webpack, Vite), no NPM dependencies" — the app is built with Vite and tested with Playwright. It also says "no inline styles"; there are 249 `.style.x =` writes. |
+| Structure doc out of date | `assets/js/STRUCTURE.md` lists a `vendor/` folder that does not exist and does not describe `processing/`'s services, the edit panel or the job queue. |
+
+### 2.2 Layering
+
+Imports between the top-level folders of `assets/js/`:
+
+| From → to | Imports | Should it? |
+|---|---|---|
+| ui → shared | 139 | yes |
+| ui → core | 30 | yes |
+| core → shared | 28 | yes |
+| processing → core | 17 | **no** — 16 are `core/MediaBunny.js`, one `core/subtitles/SubtitleConverter.js` |
+| core → ui | 15 | **no** — `Player.js` imports 13 UI modules; `AudioEngine` imports `AudioVisualizer` |
+| core → processing | 15 | partly — `MediaProcessor.js` (the processing facade) lives in `core/`; `ReversePlayback` uses two processing helpers |
+| shared → core | 10 | **no** — `MediaBunny.js` (5), `MediaProcessor.js` (from `MediaMetadata`) |
+| ui → processing | 4 | yes |
+| shared → processing | 1 | no — `JobQueue` → `processing/shared/Cancellation.js` |
+| processing → ui | 1 | **no** — `TranscodeService` → `ui/player/OverlayCompositor.js` |
+
+Almost all of the wrong-way imports come from three files in the wrong
+folder: `core/MediaBunny.js` (a library loader every layer needs),
+`core/MediaProcessor.js` (the processing facade) and
+`ui/player/OverlayCompositor.js` (pure drawing code used by the player and by
+export). Moving those three fixes most of the table without touching logic.
+
+### 2.3 The player core
+
+- `core/Player.js`: 902 lines, 153 methods — 83 one-line pass-throughs, 86
+  private by name.
+- Its state is a flat set of fields (`audioContext`, `gainNode`, `mixNode`,
+  `nextAudioTime`, `activeSources`, `queuedAudioNodes`, `vodAnchor`, `epoch`,
+  `frames`, `audioBuffers`, `playbackTimeAtStart`, `isScrubbing`,
+  `isLoading`, …). The modules in `core/playback`, `core/audio` and
+  `core/streaming` are functions such as `seekPlayerTo(player, t)` that read
+  and write those fields. The files are split; the ownership is not.
+- 24 files besides `Player.js` call its private methods. Most used:
+  `_setLoading` 32, `_liveStartTimestamp` 19, `_updatePlayPauseUI` 17,
+  `_getPlaybackTime` 15, `_updateVolumeUI` 13, `_updateFiltersButtonState` 11,
+  `_updateProgress` 10, `_startVideoIterator` 9, `_seekTo` 8.
+- Fields used outside `Player.js`: `audioContext` 11 files, `playbackRate` 11,
+  `epoch` 6, `vodAnchor` 5, `playbackTimeAtStart` 4, `gainNode` 3.
+- The player emits three events (`timeupdate`, `loopmodechange`,
+  `reversefailed`). Everything else reaches the UI by direct calls.
+- Two pages construct it: `player-main.js` and `embed-main.js`.
+
+Its other parts, by size: `MediaLifecycle` 676 lines (load, decode, first
+frame), `PlayerStream` 500 (webcam, live, HLS, recording), `WatchParty` 469,
+`ReversePlayback` 399, YouTube 665 (`YouTubePlayback` + `YouTubeEngine`),
+`AudioEngine` 294, `PlaybackState` 285, `PlaybackTransport` 247,
+`RenderLoop` 180.
+
+### 2.4 The playlist
+
+`ui/player/Playlist.js` is 1,783 lines. It already delegates to
+`PlaylistState`, `PlaylistRenderer` (911), `PlaylistUI` (345),
+`PlaylistNavigation`, `PlaylistStorage` and `PlaylistRemoteLibraries`, but
+still holds most behaviour:
+
+| Lines | Concern | Methods |
+|---|---|---|
+| 43–200 | construction, navigation | `constructor`, `_initPlayerNavigation`, `playNext`, `playPrevious`, `_stopPlayback` |
+| 201–420 | folder scan, discovered items, link lists | `_startMediaScan`, `cancelMediaScan`, `addDiscoveredItems`, `keepDiscoveredItem`, `addLinkListItems`, `_fillMissingYouTubeTitles` |
+| 421–533 | saving and restoring | `_loadSavedPlaylist`, `_saveState`, load guard, `_savePlaybackProgress` |
+| 534–661 | adding files | `handleFiles`, `handleElectronFiles` |
+| 662–858 | metadata | `_processMetadata`, `_ensureMetadata`, `_prefetchMetadata`, `_updateItemUI`, `_updateStreamItemMetadata`, `_captureStreamThumbnail`, `_updateLocalItemMetadata` |
+| 859–1150 | the list | `addItem`, `insertProcessedItem`, `addItems`, `removeItem`, `removeFolder`, `clear`, `destroy` |
+| 1151–1468 | playing an item | `_playYouTubeItem`, `_playStreamItem`, `_ensureItemSource`, `selectItem`, `_releaseItem`, `_saveSubtitleChanges`, `_loadFoundSubtitles` |
+| 1469–1586 | list UI | `render`, `_toggleFolder`, `_removeFolder`, `_updateUI`, `setRecordingState`, `_downloadItem` |
+| 1587–1710 | adding by URL | `_handleUrlUpload`, `_addYouTubeVideo`, `_handleM3UPlaylist`, `_syncM3UPlaylist` |
+| 1711–1783 | misc | `_toggleSettingsMenu`, `_setupToolsButton`, `markItemBroken`, `_validateStreams` |
+
+Other modules call its private methods: `_saveState` 24 times,
+`_ensureMetadata` 13, `_showToast` 9, `_processMetadata` 2,
+`_handleUrlUpload` 2.
+
+### 2.5 Edit panel, menus and jobs
+
+- 28 menu files in `ui/menus/features/` (8,480 lines). Per-video tools open
+  in the edit panel through `openProcessMenu` / `openToolSurface`; app-wide
+  tools (Merge, Slideshow, Combine A/V, Record Screen, Camera, Watch
+  Together, Share Library) and Info, Optimize, URL upload open a `Modal`.
+- 17 menus run their work through `runMenuJob` and the `JobQueue`.
+  **Scenes, Motion and Optimize do not**: Scenes and Motion trim the clips
+  they add inline, with no Cancel, nothing in the job tray, and build the
+  playlist item by hand with `playlist.addItem` instead of
+  `insertProcessedItem` (so the job tray and the edit panel never hear of
+  the result).
+- The edit panel (`EditPanel.js`, 842 lines) works around the player:
+  - it sets the speed to 1 and then rewrites `jellyjump-speed` in
+    localStorage so its change is not saved as the user's;
+  - it saves, resets and restores the filters itself;
+  - it pins the controls by writing `controlBarMode` and calling
+    `controlBar.applyMode()`;
+  - `borrowMainPlayer` saves and restores `loopMode` / `loopStart` /
+    `loopEnd` by assigning the fields;
+  - Rotate turns the picture by setting a CSS transform on the player's
+    canvas;
+  - Export FX copies the `VideoFilters` object by prototype so a later reset
+    does not change the export.
+
+  All of these are the same missing feature: a way to change a player setting
+  for a while without it becoming the user's setting (§3.4).
+- Large UI files to keep an eye on: `ScreenRecorderMenu` 831, `InfoMenu` 643,
+  `BoxEditorUtils` 627, `WatermarkMenu` 513.
+
+### 2.6 Media processing
+
+- `core/MediaProcessor.js` is the facade; the work is in
+  `processing/*/` services (transcode, trim, speed, merge, slideshow, combine,
+  tracks, GIF, HLS, metadata, frame) and a worker (`processing/worker/`)
+  with a main-thread fallback.
+- Exports with on-screen effects run on the main thread on purpose (live
+  layer objects, SVG filters) — documented in `MediaProcessor.process`.
+- The only processing test is `encrypt-test`. Trim, speed, reverse, merge,
+  transcode and GIF are exercised indirectly by `edit-panel-test` (Cut, Crop,
+  Speed, GIF) and not at all for merge, slideshow, combine, HLS export or
+  track extraction.
+
+### 2.7 Storage and persistence
+
+- Browser: `IndexedDBService` (playlist, files, playback state). Desktop:
+  `DesktopStorageService` (a JSON config through IPC; files read from disk by
+  `localPath`; `saveFile` is a no-op). `StorageService` picks one.
+- **File leak.** `IndexedDBService.savePlaylist` adds files but never removes
+  them, and `Playlist.removeItem` does not delete one. Every file ever added,
+  converted or edited stays in IndexedDB until "clear". (The edit panel now
+  deletes its own discarded copies; nothing else does.)
+- **Key leak.** `jellyjump-state-<item id>` is written to localStorage for
+  every video played and never removed.
+- **Inconsistent keys.** `jellyjump-speed`, `controlBarMode`,
+  `JellyJumpDB-playlist`, `jellyjump-load-guard`, `jellyjump-edit-history`,
+  `SAVED_LINKS_KEY`, `jellyjump-state-*` — three naming styles, written from
+  16 files.
+- **Blob URL lifetime.** `Playlist._releaseItem` revokes an item's blob URL
+  whenever the player moves off it. Anything holding that URL breaks (the job
+  tray's Download did, fixed in #33).
+
+### 2.8 Desktop
+
+- Electron is detected two ways: through `ElectronHelper` (`PlaylistUI`,
+  `MediaMetadata`) and by checking `window.electronAPI` directly in six
+  files (`StorageService`, `MediaScanner`, `DesktopMediaScanner`,
+  `ShareMenu`, `Playlist`, `EditPanel`).
+- **Suspected bug:** an edited or converted copy on desktop has no
+  `localPath`, `DesktopStorageService.saveFile` does not store it, and
+  `savePlaylist` drops its in-memory file. Once the player moves off it
+  (`_releaseItem` revokes the blob URL), `getSourceBlob` has nothing left to
+  read. Needs confirming in the desktop app.
+
+### 2.9 Globals and events
+
+- Globals: `window.player` (set in 2 roots, read 17 times, mostly by tests,
+  `embed-main.js` and `ScreenRecorderMenu`), `window.playlist` (tests).
+- Window events: `jellyjump:item-selected`, `jellyjump:processed-item`,
+  `closeAllMenus`. `ITEM_SELECTED_EVENT` is defined in `EditPanel.js` but
+  fired by `Playlist` (the event belongs to the playlist).
+
+### 2.10 Tests and CI
+
+- 30 suites run by `scripts/run-tests.mjs` (22 quick Node, 7 browser, 1
+  Electron, skipped in CI), plus quality check, typecheck, library hashes
+  and a build. CI runs all of it on every PR.
+- Covered well: smoke (boot, open, seek, end, broadcast, overlays, camera,
+  HLS, live), edit panel, Watch Party, remote libraries, CLI, encryption,
+  sources that fail.
+- Not covered: playlist ingest parsing beyond link lists and YouTube URLs,
+  processing correctness (merge, slideshow, combine, tracks, HLS export),
+  storage (save/restore round trip, file cleanup), the player clock in
+  isolation, mobile behaviour (no suite can run iOS Safari).
+- `tests/*.html` are manual probe pages and not run.
+
+### 2.11 Types and quality tooling
+
+- `@ts-check` in 17 of 174 files (`jsconfig.json` checks only files that opt
+  in, `strict: false`).
+- `scripts/quality-check.mjs` checks formatting rules; it does not check
+  layering or private-member access.
+
+### 2.12 CSS and templates
+
+- CSS 7,691 lines: `player.css` 3,718 (player and every tool's styles),
+  `player_page.css` 1,962, `modal.css` 693.
+- Templates 3,006 lines, `playlist-templates.html` alone 2,424: every tool's
+  markup in one file. After #33 some tool templates still carry markup the
+  edit panel hides (`.modal-video-panel` and the GIF preview inside it).
+
+### 2.13 Bugs found while measuring
+
+| # | Bug | Cause | Fix |
+|---|---|---|---|
+| BUG-1 | Tracks shows the resolution under "Codec" and "—" under "Details" | the Codec `<span>` has both `meta-codec` and `meta-details` classes; `querySelector('.meta-details')` finds it first | drop `meta-details` from the Codec span |
+| BUG-2 | Cancelling Scenes or Motion does not stop the result being rendered | `isCancelled` is passed by value into `runDetection`, so its checks always see `false` | pass a getter or an `AbortSignal` |
+| BUG-3 | Scenes and Motion "add clip" has no Cancel and no tray entry; the edit panel and tray never see the clip | runs `MediaProcessor.process` inline and adds the item with `playlist.addItem` | `runMenuJob` + `insertProcessedItem` (phase F) |
+| BUG-4 | IndexedDB grows forever | files never deleted on remove (§2.7) | phase G |
+| BUG-5 | localStorage grows by one key per video | `jellyjump-state-<id>` never removed | phase G |
+| BUG-6 | Desktop: an edited copy may stop playing after switching away | §2.8 | confirm, then phase G |
+| BUG-7 | The GIF preview never shows in the edit panel | it is inside `.modal-video-panel`, which the panel hides | move it out of that panel in the template |
+| BUG-8 | A-B loop region is faint over the played part of the timeline | the played bar is drawn over the loop range | z-order / colour in `player.css` |
+| BUG-9 | Text from files, playlists and peers is put into the page as HTML: subtitle track names, the Optimize dialog's video title, the embed page's error message, Scenes/Motion/Tracks error messages, microphone names | `innerHTML` with `${…}` and no escaping. The page's Content-Security-Policy blocks inline scripts, so this cannot run code, but markup and styling can be injected (e.g. by a crafted M3U or a shared library's file names) | escape at every interpolation (phase O1) |
+| BUG-10 | A merge to `main` deploys even if the tests fail on it | `build-deploy.yml` and `test.yml` are separate workflows and the deploy does not wait for the tests; `main` has no branch protection | phase S1–S2 |
+| BUG-11 | The app's version says 0.4.2; the latest release tag is v0.5.1 | `package.json` is only stamped by the desktop release job | phase S5 |
+| BUG-12 | The README calls the app a PWA; nothing works offline | `public/sw.js` only adds COOP/COEP headers; it caches nothing | phase Q4 or reword the README (decision §9) |
+| BUG-13 | Library code ships twice: `mediabunny`, the AAC encoder and the MP3 encoder each appear as two chunks (about 2.3 MB minified) | the worker bundle and the main bundle each get their own copy | phase Q2 |
+
+
+### 2.14 Error handling
+
+- No global handler: nothing listens for `error` or `unhandledrejection`, so
+  an exception outside a `try` disappears unless the console is open.
+- 338 `catch` blocks; 17 are empty or comment-only. Errors reach the user
+  four different ways: a toast (29 places), an inline message in a tool,
+  `alert()` (5 places, including the Tracks and Merge tools and the screen
+  recorder), or not at all.
+- No error types or codes: callers tell errors apart by matching message
+  text (`e.message.includes('No source available')`).
+- Resilience that exists and works: the worker falls back to the main thread
+  when it cannot start; a decoder stall no longer wedges a seek; live
+  streams that stop sending give up; `runMenuJob` turns failures and cancels
+  into messages. Missing: timeouts and retries on network reads (remote
+  libraries, M3U, YouTube info), a message when the browser is offline, and
+  a clear message when storage is full.
+
+### 2.15 Security
+
+The threat model for a local-first media app: a crafted media file, a
+crafted playlist or link list from the internet, a shared library on another
+machine, URL parameters on the embed page, and — on desktop — anything that
+can run in the renderer and reach the IPC bridge.
+
+- **Good:** every page has a Content-Security-Policy with
+  `script-src 'self' 'wasm-unsafe-eval' https://www.youtube.com`,
+  `object-src 'none'`, `base-uri 'self'`. Electron runs with
+  `contextIsolation: true`, `nodeIntegration: false`, `webSecurity: true`,
+  a window-open handler and a navigation guard; IPC calls check the sender.
+  The library server requires a token and compares it in constant time.
+- **HTML injection:** BUG-9. 16 uses of `escapeHtml` exist, so the helper is
+  there; it is not used everywhere, and nothing enforces it.
+- **CSP is broad where it has to be** (`connect-src *`, `img-src`/`media-src`
+  with `http:` for user URLs and IPTV) and is copied by hand into four HTML
+  files.
+- **Desktop file reads:** `read-file` allows any path the user granted *or
+  any path with a media extension*, so code in the renderer could read any
+  video or audio file on the disk, not only the user's library.
+- **Share token in the URL:** the library server accepts the token as a
+  query parameter (needed for `<video src>`), where it can end up in logs and
+  history.
+- **Dependencies:** `npm audit --omit=dev` reports 4 high-severity issues,
+  all through `@huggingface/transformers` (its Node-only dependencies
+  `onnxruntime-node`, `adm-zip`, `sharp`). The desktop app's dependencies
+  report none. No Dependabot, no audit in CI.
+- **Encryption:** `PlatformCrypto.js` (936 lines) has a test
+  (`encrypt-test`) but no written design or review.
+
+### 2.16 Observability
+
+- `Logger` prints only on localhost or with `?debug=1`; in production every
+  log line is dropped, so a user's bug report has nothing behind it.
+- No error reporting, no performance marks (0 uses of `performance.mark`), no
+  record of how long jobs or loads take.
+- The only telemetry is a self-hosted page-visit script
+  (`/js/analytics-embed.js`) on the landing and player pages.
+- The desktop share host checks its own tailnet mapping on a timer; the
+  library server has no health endpoint.
+- The "nothing is uploaded" promise rules out sending logs anywhere by
+  default.
+
+### 2.17 Performance and resources
+
+- The player page's first JS is small (3 KB entry; the rest is loaded on
+  demand). CSS: 51 KB + 35 KB minified.
+- Heavy chunks are lazy and large: the DTS decoder 1.6 MB, the media worker
+  1.4 MB, MediaBunny 1.35 MB, Whisper's ONNX runtime 23 MB (only for
+  subtitle generation). BUG-13 duplicates about 2.3 MB.
+- `dist/` is 69 MB; source maps are published (about 15 MB); `public/`
+  ships 7 MB of videos, including `homepage_old.mp4` and two ad videos.
+- No performance budget or size report in CI; no measurement of time to
+  first frame, seek latency, memory or playlist rendering with many items.
+- Memory: blob files are released after they are stored (good); the edit
+  history now drops files it can read back (#33).
+
+### 2.18 Configuration
+
+- `shared/config.js` holds one constant (`DOMAIN`). `player-main.js` decides
+  whether to add the sample video by matching four hard-coded hostnames.
+- No build-time configuration: 0 uses of `import.meta.env`, no `.env` files.
+- External services are spread through the code: YouTube (4 files),
+  Hugging Face model URLs (6), iptv-org (7), webcammictest.com, i.ytimg.com.
+- Player defaults are in `core/config/`, user preferences in seven
+  localStorage keys (§2.7), and feature switches nowhere.
+- Templates are fetched with a hand-maintained `?v=2` cache-buster.
+
+### 2.19 CI/CD
+
+- `test.yml`: quality, typecheck, library hashes, build, 30 suites — on PRs
+  and pushes to `main`. Good.
+- `build-deploy.yml`: on push to `main`, builds and force-pushes `release`,
+  which GitHub Pages serves; then checks the Pages build. It does not wait
+  for `test.yml` (BUG-10).
+- `desktop-release.yml`: on a `v*` tag, builds Linux, Windows and macOS
+  apps and launches the Linux one; it runs no test suite.
+- `main` is not protected; workflows use `npm install` (not `npm ci`) and
+  actions pinned to major versions (`@v4`), not commits.
+- No preview deploy for a PR, so the only way to try a change on the real
+  site is to merge it.
+- Versions: tags drive the desktop build; the web build carries no version.
+
+### 2.20 Documentation
+
+- `README.md` (features, how to run) is short and partly out of date
+  (BUG-12).
+- No architecture decision records; the reasons behind the big choices
+  (the MediaBunny/WebCodecs pipeline instead of `<video>`, the audio clock,
+  COOP/COEP through a service worker, the job queue running one job at a
+  time, IndexedDB for files) live only in code comments and commit messages.
+- `docs/` and the older restructuring plans are gitignored (§2.1).
+- No CONTRIBUTING, SECURITY or release runbook.
+
+---
+
+## 3. Target
+
+### 3.1 Layers
+
+```
+pages        player-main.js, embed-main.js, watch, index      (composition roots)
+  ↓
+ui           ui/player/*, ui/menus/*, ui/Modal.js               (DOM, user input)
+  ↓
+app          playlist/*, jobs, settings, edit session            (app behaviour, no DOM)
+  ↓
+core         player engine: playback, audio, pipeline, streams   (no DOM except the canvas)
+processing   transcode, trim, speed, … , worker                  (no DOM)
+  ↓
+shared       media/ (MediaBunny loader, compositor, metadata), storage/, utils/
+```
+
+Rules, enforced by the quality check from phase B on:
+
+1. A layer imports only from layers below it.
+2. `core/` and `processing/` do not import each other's internals; both
+   use `shared/media/`.
+3. Nothing outside a module calls its `_private` members.
+4. Only `shared/storage/` and `app/settings` touch `localStorage` and
+   IndexedDB.
+5. Only `shared/platform/` (today's `ElectronHelper`) checks for Electron.
+
+### 3.2 Folder map (where things move)
+
+| Today | Target |
+|---|---|
+| `core/MediaBunny.js` | `shared/media/MediaBunny.js` |
+| `core/MediaProcessor.js` | `processing/MediaProcessor.js` |
+| `ui/player/OverlayCompositor.js` | `shared/media/OverlayCompositor.js` |
+| `processing/shared/Cancellation.js` | `shared/utils/Cancellation.js` |
+| `core/subtitles/SubtitleConverter.js` | `shared/media/SubtitleConverter.js` |
+| `shared/utils/MediaMetadata.js` | `shared/media/MediaMetadata.js` (no longer imports `MediaProcessor`; the one call goes through a passed-in function or moves to `processing/`) |
+| `ui/player/Playlist.js` + `Playlist*.js` | `app/playlist/` (logic) and `ui/playlist/` (renderer, UI) |
+| `shared/services/JobQueue.js` | `app/jobs/JobQueue.js` |
+| `ui/player/EditPanel.js` | `ui/edit/EditPanel.js`, with its session logic in `app/edit/EditSession.js` |
+| `shared/utils/ElectronHelper.js` | `shared/platform/Platform.js` |
+| `shared/services/IndexedDBService.js`, `DesktopStorageService.js`, `StorageService.js` | `shared/storage/` |
+
+Moves are done with re-export stubs at the old path for one release, so
+nothing breaks mid-way; the stubs are deleted at the end of the phase.
+
+### 3.3 Player and playlist structure
+
+```
+pages (player-main.js / embed-main.js)
+  createPlayer()            builds CorePlayer and attaches the player UI
+  Playlist                  the list and its order; delegates:
+    PlaylistIngest          files, desktop files, URLs, M3U, YouTube, link lists
+    PlaylistDiscovery       folder scan, discovered items
+    PlaylistPlayback        selectItem, per-kind play, release, subtitles
+    PlaylistMetadata        probe, prefetch, stream thumbnails
+    PlaylistStore           save/restore, load guard, playback progress
+  CorePlayer                public API (§4.1), events, setting overrides (§3.4)
+    AudioSession            context, gain, mix, EQ, queues, scheduling, clock
+    PlaybackSession         time, rate, epoch, seek, scrub, frame step
+    MediaPipeline           load, tracks, decode, render loop, frame queue
+    ReversePlayback         backwards, driven by PlaybackSession
+    YouTubeBackend          the YouTube engine behind the same transport
+    PlayerStream            webcam, live, HLS, recording (exists)
+    WatchParty, BroadcastStream (exist; public API only)
+  Player UI                 shell, controls, panels, keyboard, loop, thumbnails,
+                            subtitles UI, overlays, screenshot — listen to
+                            events, call the public API
+```
+
+### 3.4 Settings and temporary overrides
+
+One module, `app/settings/Settings.js`, owns the user's saved preferences
+(speed, control bar mode, volume, filters if persisted, panel state) with one
+key prefix, `jj:`. The player reads its starting values from it and writes
+to it only when the **user** changes something.
+
+Tools that need a different value for a while ask the player for an
+override:
+
+```js
+const release = player.override({
+    playbackRate: 1,
+    filters: null,          // none while editing
+    controlBarMode: 'fixed',
+    loop: { mode: 'one', start, end },
+    previewTransform: { rotate: 90, flipH: false },
+});
+// … later
+release();                 // everything back exactly as it was, nothing saved
+```
+
+Overrides stack (the edit panel's, then a tool's on top); releasing one
+restores the values under it. This replaces every workaround listed in §2.5.
+
+
+### 3.5 Errors
+
+- One error type, `AppError` (`shared/errors/AppError.js`): `code`,
+  `userMessage`, `cause`, `recoverable`, `context`. Codes are a closed list in
+  `shared/errors/codes.js`: `FILE_MISSING`, `UNSUPPORTED_CODEC`,
+  `DECODE_FAILED`, `NETWORK`, `TIMEOUT`, `CORS`, `STORAGE_FULL`,
+  `PERMISSION_DENIED`, `WORKER_CRASHED`, `CANCELLED`, `INVALID_INPUT`,
+  `INTERNAL`.
+- Errors are created where they happen, carried up unchanged, and shown in
+  exactly one place: the tool's inline message for a tool, a toast for
+  anything else. `alert()` is not used.
+- A global `ErrorReporter` (`shared/errors/ErrorReporter.js`) listens for
+  `error` and `unhandledrejection`, records every error in the diagnostics
+  log (§3.7), and shows one rate-limited toast with "Copy details".
+- An empty `catch` is allowed only with a comment saying why the error is
+  safe to ignore; the quality check enforces it.
+- Network reads go through one `fetchWithPolicy(url, {timeout, retries})`
+  with a timeout, retries with backoff for idempotent reads, and `AppError`
+  codes for offline, CORS and HTTP failures.
+
+### 3.6 Security baseline
+
+- All HTML built from strings goes through an `html` tagged template
+  (`shared/utils/html.js`) that escapes every value; `innerHTML` with
+  `${…}` outside it fails the quality check.
+- One CSP, generated at build time from the list of external services
+  (§3.8) and written into every page, with a comment per source explaining
+  why it is allowed.
+- Desktop: `read-file` reads only paths the user granted (dialogs, library
+  folders, dropped files); media extension alone is not enough. Share tokens
+  go in the `Authorization` header wherever the client can set one; links
+  that must carry it in the URL get a short-lived, single-purpose token.
+- Dependencies: `npm audit --omit=dev --audit-level=high` in CI for the web
+  app and the desktop app; Dependabot for npm and GitHub Actions; actions
+  pinned to commit SHAs.
+- `SECURITY.md`: how to report a problem, the threat model in §2.15, what
+  data the app keeps and where.
+- The encryption format has a written design (algorithms, key derivation,
+  nonce handling, header layout) and test vectors.
+
+### 3.7 Observability (on the device)
+
+Nothing leaves the device unless the user turns it on (decision §9).
+
+- **Logs:** `Logger` writes structured entries (`time`, `level`, `scope`,
+  `event`, `data`, `traceId`) to a ring buffer of the last 1,000 entries,
+  always; the console only shows them in debug mode, as now.
+- **Trace ids:** each playback load and each job gets an id; every log entry
+  and error made during it carries the id, so one session or one job can be
+  followed end to end.
+- **Metrics:** `performance.mark` / `measure` for the journeys that matter —
+  page ready, time to first frame, seek latency, frames dropped per minute,
+  job duration and frames per second, storage used
+  (`navigator.storage.estimate`). Kept in memory as recent values.
+- **Diagnostics:** a "Diagnostics" view (in Info, or `?debug=1`) shows the
+  app version and build, browser and codec support, storage use, recent
+  errors, recent jobs and the metrics, with "Copy" for a bug report. No file
+  names or URLs unless the user includes them.
+- **Health:** the desktop library server answers `GET /health` (no token;
+  status and version only). The web build writes `version.json`; the app
+  compares it on focus and offers a reload when a new version is live. A
+  post-deploy check (§3.10) opens the live site.
+- **Optional, opt-in:** anonymous error counts by code and browser through
+  the existing analytics endpoint.
+
+### 3.8 Configuration
+
+- `shared/config/index.js` is the only place app configuration is read. It
+  combines build-time values from Vite (`import.meta.env`: base URL, domain,
+  analytics on/off, sample video URL, feature flags) with fixed defaults.
+  `.env.example` documents every value; `.env.production` holds the site's.
+- `shared/config/services.js` lists every external service with its URL
+  and purpose; the CSP (§3.6) and `fetchWithPolicy` read it.
+- Three kinds of settings, never mixed: **app config** (per build), **player
+  defaults** (`core/config/`, code), **user preferences** (`app/settings`,
+  stored, §3.4).
+- Feature flags are config values, read through one `isEnabled(flag)`.
+- No hand-written cache-busters; anything versioned gets the build version.
+
+### 3.9 Performance budgets
+
+Enforced by a size report in CI that fails on a breach and prints the
+change against `main`:
+
+| Budget | Limit |
+|---|---|
+| Player page: JS before first paint (gzip) | 60 KB |
+| Player page: CSS (gzip) | 25 KB |
+| Any lazy chunk except decoders, Whisper and the worker (gzip) | 150 KB |
+| Duplicate library chunks | 0 |
+| `public/` media shipped with the site | only files the pages use |
+
+Measured in the browser suites, reported (not failing) at first, then
+gated once stable: time to first frame for the 1080p fixture, seek latency,
+frames dropped in 30 s of playback, memory after opening and closing 20
+videos, rendering a 2,000-item playlist.
+
+### 3.10 Delivery
+
+```
+PR ──► test.yml (quality, types, audit, size, suites) ──► required to merge
+         └─► preview deploy of the PR (decision §9)
+merge to main ──► test.yml again ──► build-deploy.yml (only if tests passed)
+         └─► release branch ──► Pages ──► post-deploy smoke on the live URL
+tag vX.Y.Z ──► version stamped into web + desktop ──► tests ──► desktop builds,
+         checksums, GitHub release with changelog
+```
+
+- `main` protected: PR required, `test` required, no force-push.
+- `npm ci` everywhere; actions pinned to SHAs; Dependabot weekly.
+- One version, from the tag, in `package.json`, `desktop/package.json`,
+  `version.json` and the diagnostics view. `CHANGELOG.md` generated from the
+  `feat:` / `fix:` commit subjects already in use.
+- Rollback: revert the merge on `main`; the deploy publishes the previous
+  build. Written down in `docs/runbooks/release.md`.
+
+### 3.11 Documentation
+
+- `README.md`: what the app does (accurately), how to run, test and build,
+  where the architecture is described.
+- `ARCHITECTURE.md` (this plan's §3–§4 once done): layers, modules, public
+  APIs, data flow for "open a file", "apply an edit", "export".
+- `adr/NNNN-title.md`: one record per significant decision — context,
+  decision, consequences. Written for the existing big decisions first
+  (phase T2), then for every new one.
+- `CONTRIBUTING.md` (setup, the PR checklist, the device checklist),
+  `SECURITY.md`, `docs/runbooks/` (release and rollback, triaging a bug
+  report with diagnostics).
+- JSDoc on every public API in §4; `@ts-check` makes it checked.
+
+---
+
+## 4. Public APIs
+
+### 4.1 `CorePlayer`
+
+| Area | Members |
+|---|---|
+| Lifecycle | `load(url, options)`, `reset()`, `destroy()` |
+| Transport | `play()`, `pause()`, `togglePlay()`, `seek(t)`, `stepFrame(dir)`, `setPlaybackRate(r)`, `toggleDirection()` |
+| State (read-only) | `currentTime`, `duration`, `playbackRate`, `isPlaying`, `isLoading`, `isLive`, `isStreamMode`, `isWebcamMode`, `canvas`, `engine`, `capabilities` (`canReverse`, `canChangeRate`, `canDecodeFrames`) |
+| Audio | `volume`, `setVolume(v)`, `isMuted`, `toggleMute()`, `restoreAutoplayAudio()`, `tapAudio()` |
+| Loop | `loopMode`, `loopStart`, `loopEnd`, `setLoop(mode, start, end)` |
+| Overrides | `override(values) → release` (§3.4) |
+| Frames | `addRenderCallback(cb)`, `removeRenderCallback(cb)`, `redraw()` |
+| Streams | `loadWebcamStream()`, `startCanvasRecording()`, `stopCanvasRecording()`, `stopWebcamStreamMode()` |
+| Tracks | `loadSubtitle()`, `generateSubtitles()`, `switchAudioTrack()`, `switchSubtitleTrack()` |
+| Wiring | `on(event, fn)`, `off(event, fn)`, `setNavigationCallbacks()`, `setPlayCallback()` |
+| Layers | `videoFilters`, `stickers`, `decorations`, `subtitles` |
+
+Events: `play`, `pause`, `timeupdate`, `durationchange`, `loadingchange`,
+`volumechange`, `ratechange`, `loopmodechange`, `ended`, `trackschange`,
+`streamstatechange`, `controlbarmodechange`, `filterschange`, `reversefailed`.
+
+### 4.2 `Playlist`
+
+| Area | Members |
+|---|---|
+| Items | `items` (read-only), `activeIndex`, `activeItem`, `addItems(items, autoplay)`, `insertProcessedItem(source, blob, name, options)`, `removeItem(i)`, `removeFolder(path)`, `clear()` |
+| Playing | `selectItem(i, autoplay)`, `playNext()`, `playPrevious()` |
+| Adding | `ingest.files(list)`, `ingest.url(text)`, `ingest.youtube(url)`, `ingest.m3u(url)`, `ingest.linkList(file)` |
+| Data | `ensureMetadata(item)`, `getSource(item)` (wraps `MediaMetadata.getSourceBlob`), `save()` |
+| UI | `render()`, `scrollToPlaying()`, `showToast(text)` |
+| Hooks | `nameProcessedItem` (used by the edit panel) |
+| Events | `itemselected`, `itemadded`, `itemremoved`, `processeditem` |
+
+### 4.3 Jobs
+
+Every tool that makes a file uses `runMenuJob({ background: true, … })` and
+adds its result with `playlist.insertProcessedItem`. Nothing else adds
+processed items.
+
+---
+
+## 5. Phases
+
+Each step is one PR off `main`, with no behaviour change unless it says it
+fixes a bug, and with `npm test` passing. Size: S (under a day of review),
+M, L.
+
+### Phase A — Bugs and hygiene (S each, any order)
+
+| Step | Work | Files | Done when |
+|---|---|---|---|
+| A1 | BUG-1: Tracks columns | `playlist-templates.html` | Tracks shows codec and details in their columns; add a check to `edit-panel-test` |
+| A2 | BUG-2: Scenes/Motion cancel | `CutDetectionMenu.js`, `MotionDetectionMenu.js` | leaving the tool mid-detection renders nothing; test |
+| A3 | BUG-7: GIF preview in the panel | `playlist-templates.html`, `GifMenu.js` | the made GIF shows in the panel |
+| A4 | BUG-8: A-B loop visibility | `player.css` | loop range visible over the played bar (screenshot check) |
+| A5 | Docs: update `code-of-conduct.md` (Vite and Playwright allowed; inline styles allowed for coordinates and sizes), rewrite `assets/js/STRUCTURE.md` to §3, move this plan to the place the team keeps plans | docs | docs match the code |
+| A6 | Repo: decide on `remotion_test5/` and root strays (§9) and remove or move them | — | only source, tests and docs at the root |
+| A7 | Confirm BUG-6 on desktop; if real, keep edited copies in memory on desktop until G3 | `DesktopStorageService.js`, `Playlist.js` | an edited copy still plays after switching away and back, on desktop |
+
+### Phase B — Guard rails (S)
+
+| Step | Work | Done when |
+|---|---|---|
+| B1 | Quality check: fail on a wrong-way import (§3.1 rule 1), with today's offenders in an allow-list that may only shrink | `npm run quality` prints the allow-list size |
+| B2 | Quality check: count outside calls to `player._*` / `playlist._*` and `localStorage` users; print them; fail if a count goes up | counts printed in CI |
+| B3 | Unit test for the playback clock (`getPlayerPlaybackTime`) with a fake audio context; seek, pause, rate | `playback-clock-test` in `npm test` |
+| B4 | Storage round-trip test: save a playlist with files, reload, read a file back, remove an item | `storage-test` in `npm test` |
+
+### Phase C — Layering moves (S–M, mechanical)
+
+| Step | Work | Done when |
+|---|---|---|
+| C1 | Move `MediaBunny.js`, `OverlayCompositor.js`, `SubtitleConverter.js` to `shared/media/`; stubs at old paths | `processing → core`, `processing → ui`, `shared → core` (MediaBunny) gone from the allow-list |
+| C2 | Move `MediaProcessor.js` to `processing/`; cut `MediaMetadata`'s import of it | `core → processing` only `ReversePlayback`'s helpers, which move to `shared/media/` |
+| C3 | Move `Cancellation.js` to `shared/utils/` | `shared → processing` gone |
+| C4 | Move `ElectronHelper` to `shared/platform/Platform.js`; route the six files' direct `window.electronAPI` checks through it | rule 5 passes |
+| C5 | Delete the stubs | no import of an old path |
+
+### Phase D — Settings and overrides (M)
+
+| Step | Work | Done when |
+|---|---|---|
+| D1 | `app/settings/Settings.js`: get/set/subscribe, `jj:` prefix, migration from the old keys on first load | old keys read once and moved; one module writes preferences |
+| D2 | `CorePlayer.override(values) → release`, stacked; speed, filters, control bar mode, loop, preview transform | unit test: override, stack, release in any order restores exactly |
+| D3 | Edit panel, `borrowMainPlayer`, `lendPicture`, Rotate, Export FX use overrides; delete their workarounds | `EditPanel._quietPlayer` / `_restorePlayer` gone; `edit-panel-test` unchanged and passing |
+
+### Phase E — Playlist split (M, five PRs)
+
+| Step | Work | Done when |
+|---|---|---|
+| E1 | Public names for what others call (`save`, `ensureMetadata`, `processMetadata`, `showToast`, `handleUrlUpload`); old names as aliases; move the 50 outside calls | no outside `playlist._*` call |
+| E2 | `PlaylistStore` out (save/restore, load guard, progress) | moved methods gone from `Playlist.js` |
+| E3 | `PlaylistMetadata` out | ditto |
+| E4 | `PlaylistIngest` and `PlaylistDiscovery` out; unit tests for URL / M3U / link-list → items | ditto; `ingest-test` |
+| E5 | `PlaylistPlayback` out; `ITEM_SELECTED_EVENT` moves to the playlist | `Playlist.js` under 500 lines |
+
+Watch the order of `render()` and `_saveState()` calls inside moved methods;
+some flows depend on it.
+
+### Phase F — Tools behave the same (M)
+
+| Step | Work | Done when |
+|---|---|---|
+| F1 | BUG-3: Scenes, Motion "add clip" through `runMenuJob` and `insertProcessedItem` | clips appear in the tray, can be cancelled, and open in the edit panel |
+| F2 | Optimize through `runMenuJob` | in the tray, cancellable |
+| F3 | App-wide tools (Merge, Slideshow, Combine A/V) stay dialogs (decision 4); their results go through `insertProcessedItem` | one way to add a processed item |
+| F4 | Templates: split `playlist-templates.html` per tool (one `<template>` file per tool, loaded with the tool); delete markup the panel hides | no hidden player markup in tool templates |
+| F5 | CSS: move tool styles out of `player.css` into `tools.css` | `player.css` holds only the player |
+
+### Phase G — Storage lifecycle (M)
+
+| Step | Work | Done when |
+|---|---|---|
+| G1 | Delete an item's stored file when it leaves the playlist for good (remove, clear, folder remove), except files still referenced by the edit history | BUG-4 fixed; `storage-test` checks it |
+| G2 | One-time sweep on load: delete stored files whose id is in no playlist item and no edit history | IndexedDB size drops after a reload |
+| G3 | `jellyjump-state-*` → one `jj:progress` map with a size cap (last 200 videos), via Settings | BUG-5 fixed |
+| G4 | Desktop: store processed copies on disk (app data folder) with a `localPath`, so they survive release and restart | BUG-6 fixed for good; Undo history can persist on desktop too |
+| G5 | Quota handling: when IndexedDB refuses a file, tell the user once and keep it in memory | no silent loss |
+
+### Phase H — Player UI attached, events out (M–L)
+
+| Step | Work | Done when |
+|---|---|---|
+| H1 | Add the events in §4.1; fire them where the UI calls are today (both, during the move) | events covered by a unit test |
+| H2 | UI modules subscribe instead of being called: play/pause, progress, time, volume, loading, filters button, loop UI, auto-hide | the matching `_update*` calls gone from `core/` |
+| H3 | `createPlayer()` in `ui/player/`; both roots use it; `Player.js` stops importing UI | `core → ui` allow-list empty |
+| H4 | Delete the one-line pass-throughs whose callers have moved | `Player.js` under 600 lines |
+
+### Phase I — Player public API (S per file, many)
+
+| Step | Work | Done when |
+|---|---|---|
+| I1 | Move outside callers to §4.1, folder by folder (`ui/player`, `ui/menus`, `core/streaming`, layers) | B2's `player._*` count reaches 0 |
+| I2 | Test that lists `CorePlayer`'s public members against §4.1 | adding a member needs a doc change |
+
+### Phase J — Player internals (L each; one at a time, when next fixing a bug there)
+
+| Step | Work | Done when | Device check |
+|---|---|---|---|
+| J1 | `AudioSession` class from `AudioEngine.js`; owns the audio fields; `tapAudio()` for recorders and the visualizer | no `audioContext` / `gainNode` / `mixNode` read outside `core/audio` | iPhone: play, seek playing and paused, switch video, unmute after autoplay |
+| J2 | `PlaybackSession` from `PlaybackState` + `PlaybackTransport` + anchor + epoch; clock injected from `AudioSession` | `epoch`, `vodAnchor`, `playbackTimeAtStart` only in `core/playback` | iPhone + Android: scrub, seek during play, frame step, reverse, A-B loop, Cut loop, Multi-Cut skip, rate |
+| J3 | `MediaPipeline` from `MediaLifecycle` + `RenderLoop` + frame queue + tracks | tracks and sinks not read outside `core/playback` | load, fast switching, HLS, HEVC / AC-3 file, 4K on a phone |
+| J4 | `YouTubeBackend` behind the transport; `capabilities` replaces `engine === 'youtube'` checks | no `engine === 'youtube'` outside the backend | YouTube on a phone: autoplay, unmute, second video |
+
+### Phase K — Testing (M)
+
+| Step | Work | Done when |
+|---|---|---|
+| K1 | A `processing-test` suite in the browser runner: trim, speed, reverse, merge, slideshow, combine, track extraction, GIF, HLS export on the fixtures; checks duration, size, tracks | every `MediaProcessor` operation has a test |
+| K2 | Worker vs main-thread: the same operation both ways gives the same output | fallback path covered |
+| K3 | Coverage: V8 coverage for the Node suites and Playwright's JS coverage for the browser suites, merged into one report per CI run; record the baseline | coverage printed in CI; PRs may not lower it by more than 1 point |
+| K4 | A device checklist in the PR template, required for PRs touching `core/playback`, `core/audio`, `PlaylistPlayback` or storage | template in `.github/` |
+| K5 | Flake policy: a browser suite that fails is retried once and reported as flaky; a suite flaky twice in a week is fixed before new work | `run-tests.mjs` reports retries |
+
+### Phase L — Types and code quality (S per folder)
+
+| Step | Work | Done when |
+|---|---|---|
+| L1 | `@ts-check` on every file touched by phases C–J as it is touched | — |
+| L2 | `@ts-check` on `shared/` and `app/` entirely | 0 errors |
+| L3 | Typedefs for the playlist item, job and settings shapes in one `types.js` | items typed across playlist, jobs, edit panel |
+| L4 | ESLint with a small rule set (`eqeqeq`, `no-empty` with comment allowed, `no-alert`, `no-unused-vars`, `no-restricted-syntax` for `innerHTML` with `${…}`, import boundaries from §3.1) run by `npm run quality`; the custom checks that overlap move into it | `npm run quality` runs ESLint; 0 errors |
+| L5 | `strict: true` for `shared/` and `app/` once they are fully checked | 0 errors under strict |
+
+### Phase M — Large UI files (opportunistic)
+
+`ScreenRecorderMenu` (831), `InfoMenu` (643), `BoxEditorUtils` (627),
+`WatermarkMenu` (513), `PlaylistRenderer` (911): split when next changed,
+by the same rule — state with its owner, DOM in the UI.
+
+
+### Phase N — Errors and resilience (M)
+
+| Step | Work | Files | Done when |
+|---|---|---|---|
+| N1 | `AppError` and the codes (§3.5); `runMenuJob` and the job queue keep `code` and `userMessage` | `shared/errors/` | unit test: every code has a user message |
+| N2 | `ErrorReporter`: global `error` / `unhandledrejection`, one rate-limited toast with "Copy details", entry in the diagnostics log | `shared/errors/`, both page roots | throwing in a click handler shows the toast and is in the log (test) |
+| N3 | Replace the 5 `alert()` calls with the tool's inline message or `ConfirmDialog`; give each of the 17 empty `catch` blocks a reason or a report | Tracks, Merge, screen recorder, others | quality check bans `alert(` and bare empty catches |
+| N4 | Replace message matching (`includes('No source available')`) with codes: `MediaMetadata.getSourceBlob`, storage, worker client, decoders throw `AppError` | `shared/media/`, `processing/worker/` | no `.message.includes(` checks left |
+| N5 | `fetchWithPolicy`: timeout, retries with backoff for GETs, offline / CORS / HTTP codes; used by remote libraries, M3U, link lists, YouTube info, model downloads | `shared/net/` | `source-failure-test` extended: timeout, offline, CORS |
+| N6 | Storage full: catch quota errors from IndexedDB, tell the user once, keep the file in memory (with G5) | `shared/storage/` | `storage-test`: simulated quota error keeps the item playable |
+| N7 | Error copy guide: what a message says (what happened, what to do), one per code, in `shared/errors/codes.js` | — | every user-facing message comes from the guide |
+
+### Phase O — Security (S–M)
+
+| Step | Work | Done when |
+|---|---|---|
+| O1 | BUG-9: `html` tagged template that escapes; use it for every `innerHTML` with values (subtitle track names, Optimize title, embed error, Scenes/Motion/Tracks errors, microphone labels, the rest found by the rule) | a test inserts `<img src=x>` as a title, a track name and an M3U entry and finds it shown as text |
+| O2 | Quality rule (ESLint, L4): `innerHTML` / `insertAdjacentHTML` with `${…}` only through `html` | rule on, 0 violations |
+| O3 | One CSP from `services.js` (§3.8), written into all four pages at build time; document each allowed source | the four pages' CSPs are identical and generated |
+| O4 | Dependencies: resolve the 4 high issues (check whether `@huggingface/transformers`' Node-only dependencies are used at all; drop or override them); `npm audit --omit=dev --audit-level=high` in CI for web and desktop; Dependabot for npm and actions | audit clean in CI |
+| O5 | Desktop `read-file`: allow only granted roots (picked files, library folders, dropped files); media extension alone no longer enough | IPC test: a media file outside granted roots is refused |
+| O6 | Share token: `Authorization` header from the web client; short-lived signed URLs for `<video src>`; tokens never logged | library-server-test covers both |
+| O7 | Write the encryption design (`adr/` + `SECURITY.md` section) and add fixed test vectors to `encrypt-test` | review checklist done |
+| O8 | `SECURITY.md`: reporting, threat model, data kept and where; GitHub secret scanning and push protection on | file exists; settings on |
+
+### Phase P — Observability (M)
+
+| Step | Work | Done when |
+|---|---|---|
+| P1 | `Logger`: structured entries and a ring buffer of 1,000, always on; console only in debug | unit test: buffer keeps the last 1,000, drops the oldest |
+| P2 | Trace ids: one per playback load (from `PlaybackEpoch`) and per job; carried by every log entry and `AppError` made during it | a job's log entries and its error share one id (test) |
+| P3 | Metrics with `performance.mark`/`measure`: page ready, time to first frame, seek latency, dropped frames, job duration and fps, storage use | values visible in diagnostics; browser suite reads them |
+| P4 | Diagnostics view (Info → Diagnostics, or `?debug=1`) with "Copy": version, build, browser, codecs, storage, recent errors, jobs, metrics — no file names or URLs | `edit-panel-test` or a new suite opens it and copies |
+| P5 | Desktop library server `GET /health` (status, version; no token) | library-server-test covers it |
+| P6 | `version.json` at build; the app checks it on focus and offers a reload when a new version is live (alongside `reload-on-stale-chunks`) | test with two builds |
+| P7 | Not now (decision 6). If revisited: opt-in anonymous error counts by code and browser, off by default | — |
+
+### Phase Q — Performance (M)
+
+| Step | Work | Done when |
+|---|---|---|
+| Q1 | `scripts/size-report.mjs`: sizes of every chunk (raw, gzip), duplicates, against the budgets in §3.9 and against `main`; run in CI | report on every PR; fails on a breach |
+| Q2 | BUG-13: one copy of MediaBunny and the encoders shared by the worker and the page (Vite worker format / shared chunk), or load the encoders only in the worker | duplicate count 0 |
+| Q3 | Ship less: drop unused `public/` videos (`homepage_old.mp4`, the ad videos if no page uses them); keep publishing source maps (decision 8); confirm Whisper's 23 MB runtime loads only for subtitle generation | `dist/` size in the report goes down |
+| Q4 | Offline (decision 7, wave 4): cache the app shell and decoders in the service worker so the player opens offline after a first visit, with the version check (P6) so nobody is stuck on an old copy | the player opens and plays a local file with the network off |
+| Q5 | Runtime benchmarks in a browser suite: time to first frame, seek latency, dropped frames, memory after 20 loads, 2,000-item playlist render; reported per run | numbers in CI output; budgets set from the baseline |
+| Q6 | Fix what Q5 finds first: likely candidates are the playlist rendering every row on change (`PlaylistRenderer`, 911 lines) and allocation in the render loop | budget met |
+
+### Phase R — Configuration (S)
+
+| Step | Work | Done when |
+|---|---|---|
+| R1 | `shared/config/index.js` over `import.meta.env`; `.env.example`, `.env.production`; `DOMAIN` and `BASE_URL` move in | nothing else reads hostnames |
+| R2 | Sample-video logic in `player-main.js` uses `SAMPLE_VIDEO_URL` and a first-run flag instead of four hostname checks | hostnames gone from page roots |
+| R3 | `shared/config/services.js`: YouTube, Hugging Face, iptv-org, webcammictest, i.ytimg; code reads URLs from it | grep finds external URLs only there |
+| R4 | `isEnabled(flag)` and the flags in config; first flags: diagnostics view, opt-in telemetry, offline cache | flags documented in `.env.example` |
+| R5 | Remove `?v=2` cache-busters; templates get the build version or are bundled | no hand-written versions |
+
+### Phase S — CI/CD (S)
+
+| Step | Work | Done when |
+|---|---|---|
+| S1 | Protect `main`: PR required, `test` check required, no force-push, linear history optional (owner action, §9) | a PR cannot merge with a red check |
+| S2 | BUG-10: deploy only after tests pass on the same commit (`workflow_run` on `test`, or one workflow with `needs: test`) | a failing test on `main` stops the deploy |
+| S3 | `npm ci` in every workflow; actions pinned to SHAs; Dependabot (O4) keeps them current | workflows reproducible |
+| S4 | Desktop release runs the quick and browser suites before building; publishes SHA-256 checksums with the artifacts | release job has a test step |
+| S5 | BUG-11: version from the tag stamped into `package.json`, `desktop/package.json` and `version.json`; `CHANGELOG.md` from commit subjects at release | diagnostics shows the same version as the release |
+| S6 | Preview deploys for PRs (decision 9): build each PR into `previews/<pr>/` on the Pages branch, comment the link on the PR, delete it when the PR closes; check the service worker works under a sub-path | every PR has a link to try it on a phone |
+| S7 | Post-deploy smoke: after Pages publishes, a short Playwright run against the live URL (boot, open the sample, seek) | deploy job fails loudly when the live site is broken |
+| S8 | Runbook `docs/runbooks/release.md`: release, rollback (revert + redeploy), hotfix | written and tried once |
+
+### Phase T — Documentation (S)
+
+| Step | Work | Done when |
+|---|---|---|
+| T1 | `README.md` rewritten: accurate features, requirements (Node 22, Chromium for tests), scripts, layout, links | a new contributor can run and test the app from it |
+| T2 | ADRs for the existing decisions: 0001 vanilla JS with Vite; 0002 MediaBunny/WebCodecs instead of `<video>`; 0003 the audio clock as master; 0004 COOP/COEP through a service worker; 0005 IndexedDB for files and their lifecycle; 0006 one job at a time; 0007 the edit panel and stacked edits; 0008 layering rules; 0009 settings and overrides; 0010 no telemetry by default; 0011 the encryption format | eleven records |
+| T3 | `ARCHITECTURE.md` from §3–§4 as they land, with data-flow diagrams for open, edit, export | updated in the PR that changes the structure |
+| T4 | `CONTRIBUTING.md` (setup, PR checklist, device checklist, commit style), PR template (K4) | in repo |
+| T5 | Runbook for bug reports: ask for Diagnostics → Copy, read the trace, reproduce | in `docs/runbooks/` |
+| T6 | Every public API in §4 has JSDoc; the API listing test (I2) points at it | `@ts-check` on the API files |
+
+---
+
+## 6. Order
+
+The phases are grouped into five waves. Inside a wave, steps can run in
+parallel; a wave starts when the one before it is done, except where noted.
+
+| Wave | Goal | Steps | Why first |
+|---|---|---|---|
+| **0. Safety net** | nothing broken can ship; known bugs gone | S1, S2, S3, O1, O4, A1–A4, B1–B4 | protects every later PR; BUG-9 and BUG-10 are the riskiest findings |
+| **1. Foundations** | rules and tools the rest builds on | C1–C5, R1–R5, N1–N3, P1–P2, L4, T1, T2, A5–A7 | layering, config, errors and logging are used by every later step |
+| **2. App structure** | settings, playlist, tools and storage done properly | D1–D3, E1–E5, F1–F5, G1–G5, N4–N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | the biggest files and the edit-panel workarounds; storage needs B4's test |
+| **3. Player surface** | the player is used only through its API | H1–H4, I1–I2, P3–P6, Q5–Q6, S4–S8, T3–T6, O7, O8, K4, K5 | needs D (overrides) and E (playlist) in place |
+| **4. Ongoing** | the risky internals and long tails | J1–J4 (each with a device check, when a bug there is next fixed), M, L1–L3, L5, Q4, P7 | high risk or low urgency |
+
+```
+Wave 0 ──► Wave 1 ──► Wave 2 ──► Wave 3 ──► Wave 4 (ongoing)
+                         │
+                         └─ K, L1 run alongside from wave 1 on
+```
+
+About 100 steps; most are small PRs. Waves 0–3 bring the app to the
+criteria in §10, except where §10 says a criterion depends on wave 4.
+
+---
+
+## 7. Testing
+
+**Layers of tests**
+
+| Layer | What | Where | Runs |
+|---|---|---|---|
+| Unit (Node) | pure logic: parsers, clock, settings and overrides, errors, storage with a fake IndexedDB, ingest, the html template | `scripts/*-test.mjs` (quick list) | every PR |
+| Browser (headless Chromium) | the app as built: smoke, edit panel, Watch Party, sources that fail, processing outputs, diagnostics, injection, benchmarks | `scripts/*-test.mjs` (browser list) | every PR |
+| Desktop (Electron) | share host, IPC rules, storage on disk | `share-host-test`, new IPC test | release job and locally |
+| Live | the deployed site boots and plays | post-deploy smoke (S7) | after each deploy |
+| Devices (manual) | iPhone Safari and home-screen app, Android Chrome, desktop app | PR template checklist (K4) | PRs touching playback, audio, storage |
+
+**New suites from this plan:** `playback-clock-test` (B3), `storage-test`
+(B4, G1, N6), `settings-test` and override tests (D1, D2), `ingest-test`
+(E4), `processing-test` (K1, K2), public-API listing (I2), `errors-test`
+(N1, N2), `injection-test` (O1), IPC rules (O5), `diagnostics-test` (P1–P4),
+benchmarks (Q5).
+
+**Rules**
+
+- Coverage is measured (K3) and may not drop by more than 1 point in a PR.
+- A bug fix comes with a test that fails without it.
+- Flaky suites are retried once, reported, and fixed before new work (K5).
+
+**Device checklist** (K4) — none of this runs headless:
+
+- iPhone, Safari and the home-screen app: autoplay muted then unmute, seek
+  while playing and paused, switch video, reverse, the edit panel's Cut loop
+  and Multi-Cut skip, a 4K file, the screen going off during playback.
+- Android Chrome: the same, plus the camera and screen recorder.
+- Desktop app: open from disk, edit, switch away and back, restart, Undo,
+  share a library to another machine.
+
+---
+
+## 8. Risks
+
+| Risk | Where | Mitigation |
+|---|---|---|
+| iOS audio silent or out of sync after a seek | J1, J2 | device checklist; move scheduling code verbatim; one step per PR |
+| Playlist order or save timing changes | E | whole-method moves; `smoke-test`, `source-failure-test`, `edit-panel-test` |
+| Deleting a file still needed | G1, G2 | never delete an id referenced by the playlist or an edit history; `storage-test` |
+| Settings migration loses a preference | D1 | read old keys, write new ones, keep old ones one release |
+| Desktop paths missed | C4, G4, O5 | desktop checklist per PR touching storage, platform or IPC |
+| Tightening `read-file` breaks a desktop flow (dropped files, scans) | O5 | list every way a path reaches the renderer first; IPC test per way |
+| Branch protection blocks an urgent fix | S1 | admins can bypass; the runbook (S8) says when |
+| CSP generation drops a source a feature needs | O3 | `services.js` lists every source with the feature that needs it; smoke tests YouTube, HLS, remote libraries |
+| Budgets fail on unrelated PRs | Q1 | start as a report; turn into a gate only after a baseline week |
+| Diagnostics leak private data | P4, P7 | no file names or URLs by default; opt-in only for anything sent |
+| PRs too large to review | all | one concern per PR; re-export stubs and aliases between steps |
+| Scope creep | all | bug fixes and features found on the way go in their own PRs |
+
+---
+
+## 9. Decisions
+
+Answers recorded 2026-11-22.
+
+| # | Question | Decision | Affects |
+|---|---|---|---|
+| 1 | `remotion_test5/` (37 MB of tracked video ads) | **delete** | A6 |
+| 2 | Root strays (`medibunny-llms-full.txt`, `examples/`, `use_case/`, `tests/*.html`) | **delete** | A6 |
+| 3 | Where docs live — `docs/` is gitignored | **un-ignore `docs/`**; plans, ADRs and runbooks live there | A5, S8, T* |
+| 4 | Merge, Slideshow, Combine A/V | **keep as dialogs** | F3 |
+| 5 | Player internals (J) | **when next fixing a bug in that area**, with a reminder each time such a bug is worked on | J |
+| 6 | Telemetry | **none** — nothing is sent; bug reports come through "Copy diagnostics". Opt-in counts can be revisited later | P7 (dropped for now) |
+| 7 | Offline | **say it does not now** (README, wave 0); **make it work offline later** (Q4, wave 4) | A5, Q4, BUG-12 |
+| 8 | Source maps on the live site | **publish** | Q3 |
+| 9 | Preview deploys for PRs | **a path on the Pages branch** (`/previews/<pr>/`), removed when the PR closes | S6 |
+| 10 | ESLint as a dev dependency | **yes**, and update the code of conduct | L4, A5 |
+| 11 | Branch protection on `main` | **turn on** | S1 |
+
+---
+
+## 10. Production-readiness criteria
+
+The plan is done when each line below can be checked. "How checked" is
+something a person or CI can run, not an opinion.
+
+| Goal | Criteria | How checked | Phases |
+|---|---|---|---|
+| **Defined architecture and structure** | layers and folders as §3.1–§3.2; `STRUCTURE.md` and `ARCHITECTURE.md` match the code | quality check: 0 wrong-way imports (allow-list empty); docs reviewed in the PR that changes structure | C, H, T3, A5 |
+| **Modular, reusable, little duplication** | `Playlist.js` < 500 lines, `Player.js` < 350; no file over 600 lines in `app/`, `core/`, `shared/`; one way to add a processed item; one settings module; one error type | size check in the quality script; ESLint rules; grep checks for `addItem` with processed blobs, `localStorage` outside settings/storage | D, E, F, H, I, M |
+| **Separation of concerns, module boundaries** | no outside `_private` calls; core imports no UI; Electron checked only in `shared/platform` | quality check counts all 0 | B2, C, E1, H, I |
+| **Scalable, maintainable, extensible** | a new tool needs only a menu file, a template and a test (no edits to the player, playlist or router beyond one entry); a new player feature uses public API and events | ADR 0007 describes adding a tool; I2 API test | D, F, H, I |
+| **Error handling and resilience** | every error is an `AppError` with a code; global handler on; no `alert`, no unexplained empty `catch`; network reads have timeouts and retries; storage full handled | ESLint rules; `errors-test`; `source-failure-test` (timeout, offline, CORS); `storage-test` (quota) | N, G5 |
+| **Security** | no unescaped HTML; one generated CSP; audit clean (high) for web and desktop; desktop reads only granted paths; tokens not in logs; `SECURITY.md`; encryption design written | `injection-test`; CI audit; IPC test; library-server-test | O |
+| **Testing and code quality** | unit, browser, desktop and live layers as §7; coverage measured and not dropping; ESLint and typecheck clean; `@ts-check` on all of `shared/`, `app/`, `core/` | CI | B, K, L |
+| **Observability** | structured logs in a ring buffer; trace ids per load and job; metrics for load, seek, frames, jobs, storage; diagnostics view with Copy; `/health` on the desktop server; version check | `diagnostics-test`; library-server-test | P |
+| **Performance and resources** | budgets in §3.9 met; no duplicate chunks; benchmarks reported per run with budgets; files and blob URLs released; storage swept | size report gate; Q5 numbers; `storage-test` | G, Q |
+| **Central configuration** | one config module over Vite env; services list; flags; no hostnames or external URLs elsewhere | grep checks in the quality script | R |
+| **CI/CD and deployment** | protected `main`; deploy only after tests; `npm ci`, pinned actions, Dependabot; one version from the tag; post-deploy smoke; release runs tests; rollback runbook | repo settings; workflow files; S7 run on each deploy | S |
+| **Documentation and decisions** | README accurate; ARCHITECTURE; ADRs 0001–0011 and one per new decision; CONTRIBUTING, SECURITY, runbooks; JSDoc on public APIs | files exist and are linked from the README; I2 test | T, A5 |
+
+**What "production-ready" will not mean here**
+
+- It will not remove the phone browsers' own rules (autoplay, iOS audio)
+  or make every codec decode; those stay handled case by case, now with
+  diagnostics to see them.
+- It will not add server-side metrics or tracing: the app has no server
+  of its own, and it promises that nothing is uploaded. Observability is on
+  the device, with an optional opt-in (decision 6).
+- Phase J (player internals) is done step by step after wave 3. Until each
+  J step lands, that part of the player meets the boundary criteria through
+  its public API but keeps its internal shape.

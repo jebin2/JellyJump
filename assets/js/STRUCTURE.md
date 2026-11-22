@@ -1,49 +1,76 @@
 # JellyJump JS Structure
 
-## Purpose
+What each folder under `assets/js/` owns, and which folders it may import
+from. The target structure, and the steps to get there, are in
+[`docs/ARCHITECTURE_PLAN.md`](../../docs/ARCHITECTURE_PLAN.md).
 
-This document defines the intended ownership of the top-level JavaScript folders under `assets/js/`.
+## Layers
 
-## Folder Ownership
+```
+pages        index-main.js, player-main.js, embed-main.js, watch-main.js
+  ↓
+ui/          DOM and user input: the player's controls, the playlist, the
+             edit panel, the job tray, the tool menus
+  ↓
+core/        the player engine        processing/   media editing and export
+  ↓                                     ↓
+shared/      utilities and services used everywhere
+  ↓
+lib/         vendored MediaBunny, its codecs, gif.js
+```
 
-### `core/`
+A folder imports only from the layers below it, and `core/` and
+`processing/` do not import each other. `npm run quality` runs
+`scripts/architecture-check.mjs`, which fails on a new import that breaks
+this; the ones that break it today are listed in
+`scripts/architecture-baseline.json` and are being removed.
 
-Media playback engine and low-level runtime logic.
+## Folders
 
-- **`playback/`**: Render loop, media lifecycle, and transport.
-- **`audio/`**: Web Audio engine and processing.
-- **`streaming/`**: Stream controller and segment management.
-- **`subtitles/`**: Format conversion and display management.
+### `core/` — the player engine
 
-### `shared/`
+- `Player.js`: `CorePlayer`, the player's public face.
+- `playback/`: loading and decoding (`MediaLifecycle`), the render loop, the
+  playback clock (`PlaybackState`, `PlaybackAnchor`, `PlaybackEpoch`),
+  transport, reverse playback, the frame queue.
+- `audio/`: the Web Audio graph, scheduling, the equalizer.
+- `streaming/`: webcam, live streams, HLS, recording, broadcasting, Watch
+  Party.
+- `youtube/`: the YouTube engine behind the same player API.
+- `subtitles/`: subtitle parsing and conversion.
+- `config/`: player defaults and control presets.
 
-Reusable code shared across entry points.
+### `processing/` — editing and export
 
-- **`utils/`**: Stateless helper functions (Logger, mediaUtils, M3UParser, etc.).
-- **`services/`**: Stateful application services (IndexedDB, PlaylistProcessor, CutDetection).
+One folder per operation (`trim/`, `speed/`, `merge/`, `transcode/`,
+`slideshow/`, `combine/`, `tracks/`, `export/`, `hls/`, `metadata/`,
+`frame/`, `subtitles/`), shared helpers in `shared/`, and the worker that
+runs them off the main thread in `worker/`. Tools reach them through
+`MediaProcessor` (today in `core/`; moving here, plan step C2).
 
-### `ui/`
+### `shared/` — used everywhere
 
-UI components and interaction logic.
+- `utils/`: stateless helpers — `Logger`, `html` (escaping), `mediaUtils`,
+  `MediaMetadata`, parsers, `Toast`, `ConfirmDialog`.
+- `services/`: stateful services — storage (`IndexedDBService`,
+  `DesktopStorageService`, `StorageService`), `JobQueue`, scanners, remote
+  libraries, cut and motion detection.
 
-- **`player/`**: Feature controllers for the main player interface (Playlist, Keyboard, Overlays).
-- **`menus/`**: Hierarchical menu system (Core router, Feature modals).
-- **`Modal.js`**: Base component for all application dialogs.
+### `ui/` — what the user sees and touches
 
-### `processing/`
-
-Media editing and export pipelines (Trim, Convert, GIF, etc.).
+- `player/`: the player's controls, panels, keyboard, overlays; the
+  playlist (`Playlist` and its parts); the edit panel; the job tray.
+- `menus/`: `core/` (the router, the tool surface, the job runner) and
+  `features/` (one file per tool).
+- `Modal.js`: dialogs.
 
 ### `lib/`
 
-WASM binaries and worker threads (AAC, MP3, AC3).
+Vendored libraries, checked by `npm run verify:libs`.
 
-### `vendor/`
+## Entry points
 
-Third-party libraries used directly in the browser.
-
-## Entry Points
-
-- `index-main.js`: Landing page bootstrap.
-- `player-main.js`: Main player application bootstrap.
-- `embed-main.js`: Minimal player embed bootstrap.
+- `index-main.js`: the landing page.
+- `player-main.js`: the player page.
+- `embed-main.js`: the player embedded in another site.
+- `watch-main.js`: watching a shared stream or Watch Party.
