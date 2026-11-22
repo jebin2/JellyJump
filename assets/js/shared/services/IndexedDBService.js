@@ -144,7 +144,12 @@ export class IndexedDBService {
      * Save playlist items and their files
      * @param {Array} items 
      */
-    async savePlaylist(items) {
+    /**
+     * @param {Array} items
+     * @param {{withFiles?: boolean}} [options] - withFiles: false saves the
+     *   list alone, when storage is too full for the files (PlaylistStorage)
+     */
+    async savePlaylist(items, { withFiles = true } = {}) {
         return this._withTransaction(
             [this.STORES.PLAYLIST, this.STORES.FILES],
             'readwrite',
@@ -171,6 +176,9 @@ export class IndexedDBService {
                     resolve();
                 };
                 transaction.onerror = (event) => reject(event.target.error);
+                // A full disk aborts the transaction when it commits, which
+                // fires abort, not error.
+                transaction.onabort = () => reject(transaction.error);
 
                 const playlistStore = transaction.objectStore(this.STORES.PLAYLIST);
                 const fileStore = transaction.objectStore(this.STORES.FILES);
@@ -203,7 +211,7 @@ export class IndexedDBService {
                     playlistStore.put(storedItem);
 
                     // 2. If local and has file in memory, save it to files store
-                    if (item.isLocal && item.file) {
+                    if (withFiles && item.isLocal && item.file) {
                         if (item.file.size < MAX_SIZE) {
                             fileStore.put({
                                 id: item.id,
@@ -305,12 +313,25 @@ export class IndexedDBService {
                 resolve(true);
             };
             transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error);
         });
     }
 
     /**
-     * Remove a stored file. The playlist never does this when it drops an
-     * item; the edit panel does, for the copies its Undo no longer needs.
+     * The ids of every stored file (for the sweep in PlaylistFiles).
+     * @returns {Promise<string[]>}
+     */
+    async fileIds() {
+        return this._withTransaction([this.STORES.FILES], 'readonly', (transaction, resolve, reject) => {
+            const request = transaction.objectStore(this.STORES.FILES).getAllKeys();
+            request.onsuccess = () => resolve(/** @type {string[]} */ (request.result));
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    /**
+     * Remove a stored file: an item that left the playlist (PlaylistFiles),
+     * or a copy the edit panel's Undo no longer needs.
      * @param {string} id - Item ID
      * @returns {Promise<void>}
      */

@@ -14,6 +14,7 @@ export const ERROR_CODES = Object.freeze({
     TIMEOUT: 'The server took too long to answer. Try again in a moment.',
     CORS: 'That site does not allow its videos to be played from another site.',
     STORAGE_FULL: 'The browser\'s storage is full. Remove some videos from the playlist and try again.',
+    NOT_KEPT: 'The browser\'s storage is full, so new videos play until this page closes but are not kept. Remove some videos from the playlist to make room.',
     PERMISSION_DENIED: 'Permission was refused. Allow it in the browser\'s site settings and try again.',
     WORKER_CRASHED: 'The video was too much for this device to process. Try a smaller or shorter one.',
     CANCELLED: 'Cancelled.',

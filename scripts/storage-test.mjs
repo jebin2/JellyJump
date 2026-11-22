@@ -2,9 +2,10 @@
  * Tests the browser's storage of the playlist and its files (IndexedDBService),
  * in a real browser, across a page reload.
  *
- * Nothing tested this before, and the next changes to storage (deleting a
- * removed item's file, sweeping orphans, handling a full disk — phase G of
- * ARCHITECTURE_PLAN.md) need it: a mistake there loses the user's videos.
+ * Also what phase G of ARCHITECTURE_PLAN.md added: a removed item's file is
+ * deleted, files nothing refers to are swept, the Undo history's files are
+ * kept, and a full disk keeps the list. A mistake here loses the user's
+ * videos.
  *
  * Runs against the vite dev server, importing the module itself, on the
  * landing page (which does not use the playlist's storage).
@@ -101,16 +102,69 @@ async function run(page, origin) {
 
     console.log('\nremoving an item from the playlist');
     const removed = await withStorage(origin, `
+        const { discardStoredFiles } = await import('${origin}/assets/js/ui/player/PlaylistFiles.js');
         const items = await db.loadPlaylist();
-        await db.savePlaylist(items.filter(i => i.id !== 'a'));
+        const remaining = items.filter(i => i.id !== 'a');
+        await db.savePlaylist(remaining);
+        discardStoredFiles(db, items.filter(i => i.id === 'a'), remaining);
+        await new Promise(r => setTimeout(r, 200));
         const ids = (await db.loadPlaylist()).map(i => i.id);
         const fileStillStored = !!(await db.loadFile('a'));
         return { ids, fileStillStored };
     `)(page);
     check(removed.ids.join() === 'b', 'the item is gone from the saved playlist');
-    // BUG-4: nothing deletes a removed item's file. Phase G1 changes this
-    // check to expect it gone.
-    check(removed.fileStillStored, 'its file is still stored (BUG-4, until phase G1 deletes it)');
+    check(!removed.fileStillStored, 'and so is its file (BUG-4)');
+
+    console.log('\nwhat is kept, and the sweep');
+    const swept = await withStorage(origin, `
+        const { discardStoredFiles, sweepStoredFiles } = await import('${origin}/assets/js/ui/player/PlaylistFiles.js');
+        const { Settings } = await import('${origin}/assets/js/shared/settings/Settings.js');
+        const blob = () => new Blob([new Uint8Array(16)]);
+        await db.clear();
+        // An item in the playlist, an earlier copy kept for Undo, and a file
+        // nothing refers to (left from before files were deleted).
+        await db.saveFile('kept', blob(), 'kept.mp4', 'video/mp4');
+        await db.saveFile('undo-step', blob(), 'step.mp4', 'video/mp4');
+        await db.saveFile('orphan', blob(), 'old.mp4', 'video/mp4');
+        Settings.set('editHistory', { current: { originalId: 'kept', steps: [{ id: 'undo-step', name: 'Cut' }] } });
+
+        // Removing an item whose file the Undo history still needs keeps it.
+        discardStoredFiles(db, [{ id: 'undo-step', isLocal: true }], [{ id: 'kept' }]);
+        await new Promise(r => setTimeout(r, 200));
+        const stepKeptOnRemove = !!(await db.loadFile('undo-step'));
+
+        const count = await sweepStoredFiles(db, () => [{ id: 'kept' }]);
+        const left = (await db.fileIds()).sort();
+        Settings.remove('editHistory');
+        return { stepKeptOnRemove, count, left };
+    `)(page);
+    check(swept.stepKeptOnRemove, 'a file the Undo history needs is kept when its item is removed');
+    check(swept.count === 1 && swept.left.join() === 'kept,undo-step', `the sweep deletes only the file nothing refers to (${swept.left})`);
+
+    console.log('\na full disk');
+    const full = await withStorage(origin, `
+        const { savePlaylistItems } = await import('${origin}/assets/js/ui/player/PlaylistStorage.js');
+        const told = [];
+        const calls = [];
+        // Storage that refuses the files, as a full disk does, and takes the list alone.
+        const fullStore = {
+            async savePlaylist(items, options = {}) {
+                calls.push(options.withFiles !== false);
+                if (options.withFiles !== false) throw new DOMException('quota', 'QuotaExceededError');
+            },
+        };
+        const file = new File([new Uint8Array(8)], 'big.mp4', { type: 'video/mp4' });
+        const items = [{ id: 'big', isLocal: true, file, title: 'big.mp4' }];
+        const first = await savePlaylistItems(fullStore, items, (m) => told.push(m));
+        const second = await savePlaylistItems(fullStore, items, (m) => told.push(m));
+        const other = await savePlaylistItems({ async savePlaylist() { throw new Error('boom'); } }, items, (m) => told.push(m));
+        return { first, second, other, calls, told, kept: items[0].file === file };
+    `)(page);
+    check(full.first === 'without-files' && full.calls.slice(0, 2).join() === 'true,false', 'refused: the list is saved again without its files');
+    check(full.kept, 'the file stays in memory, so the video still plays');
+    check(full.told.length === 1 && /storage is full/.test(full.told[0]), 'the user is told, once');
+    check(full.second === 'without-files', 'later saves still save the list');
+    check(full.other === 'failed' && full.told.length === 1, 'another failure is logged, not shown as a full disk');
 
     console.log('\nplayback state');
     const state = await withStorage(origin, `
