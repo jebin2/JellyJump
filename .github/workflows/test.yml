@@ -29,6 +29,15 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # What ships, and what the desktop app installs, may not carry a known
+      # high or critical vulnerability. Dev tools are left out: they run on
+      # the build machine, not in anything a user gets. The desktop audit
+      # reads its lockfile; nothing needs installing for it.
+      - name: Audit dependencies
+        run: |
+          npm audit --omit=dev --audit-level=high
+          (cd desktop && npm audit --omit=dev --audit-level=high)
       # Playwright's own Chromium, the browser the suites are run with
       # locally. Left to themselves they take the first browser on the
       # runner, and the one they found there could neither decode nor encode
