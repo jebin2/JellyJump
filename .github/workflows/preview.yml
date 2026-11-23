@@ -1,0 +1,111 @@
+name: Preview
+
+# Every pull request gets its build at
+# https://<site>/previews/<number>/player.html, to try on a phone before
+# merging (plan S6). Rebuilt on each push, removed when the pull request
+# closes. The preview keeps its own storage (VITE_STORAGE_NAMESPACE): it is
+# served from the live site's domain, and would otherwise share, migrate and
+# reset the user's real playlist and settings.
+#
+# Only for branches of this repository: a fork's pull request runs with a
+# read-only token and must not publish to the site's domain. Dependabot's
+# pull requests are skipped for the same reason.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  pages: read
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: |
+          echo "BUILD_ID=pr$PR-${HEAD_SHA::8}" >> "$GITHUB_ENV"
+          VITE_STORAGE_NAMESPACE="pr-$PR" VITE_BUILD_ID="pr$PR-${HEAD_SHA::8}" npm run build
+
+      - name: Publish
+        run: bash scripts/ci/publish-pages.sh preview "$PR" dist
+
+      - name: Link on the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          site=$(gh api "repos/${{ github.repository }}/pages" --jq '.html_url')
+          url="${site%/}/previews/$PR/player.html"
+          echo "PREVIEW_URL=$url" >> "$GITHUB_ENV"
+          body="<!-- jj-preview -->
+          **Preview:** $url
+          Build \`$BUILD_ID\` (${HEAD_SHA::8}). Live a few minutes after this comment; it keeps its own playlist and settings, apart from the real site's. Removed when the pull request closes."
+          id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- jj-preview -->")) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/${{ github.repository }}/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+
+      # The same check as after a deploy, at the preview's sub-path: the
+      # service worker and cross-origin isolation have to work there too.
+      - name: Check the preview
+        if: env.PUBLISHED_SHA != ''
+        run: |
+          npx playwright-core install --with-deps chromium
+          export CHROMIUM_PATH=$(node --input-type=module -e "import { chromium } from 'playwright-core'; console.log(chromium.executablePath())")
+          node scripts/live-smoke-test.mjs "${PREVIEW_URL%player.html}" "$BUILD_ID"
+
+  remove:
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    env:
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Remove the preview
+        run: bash scripts/ci/publish-pages.sh remove-preview "$PR"
+
+      - name: Say so on the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- jj-preview -->")) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -f body="<!-- jj-preview -->
+          Preview removed (pull request closed)." > /dev/null
+          fi

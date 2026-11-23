@@ -10,6 +10,15 @@ pass on that commit, `build-deploy.yml` builds it, pushes it to the
 `release` branch, waits for GitHub Pages to publish it, and fails loudly if
 Pages does not. An older commit never replaces a newer one.
 
+Then it waits for the live `version.json` to name the new build and opens
+the live site in a browser: the player boots, is cross-origin isolated,
+loads the sample video and seeks, with no page errors
+(`scripts/live-smoke-test.mjs`). A red "Check the live site" step means the
+site that is live now is broken or stale: roll back (below).
+
+Pull request previews live on the same branch under `previews/<number>/`;
+the deploy keeps them, and each is removed when its pull request closes.
+
 Open tabs find out within a few minutes of being brought back to the front
 (`version.json`) and offer a reload.
 

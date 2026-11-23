@@ -3,6 +3,7 @@ import { Modal } from '../../Modal.js';
 import { Logger } from '../../../shared/utils/Logger.js';
 import { ConfirmDialog } from '../../../shared/utils/ConfirmDialog.js';
 import { renderToolGrid } from '../core/ToolGrid.js';
+import { DB_NAME } from '../../../shared/services/IndexedDBService.js';
 
 /**
  * Create & share menu (the header's wrench button)
@@ -103,7 +104,7 @@ export class ToolsMenu {
                         try {
                             // Delete the entire IndexedDB database
                             await new Promise((resolve, reject) => {
-                                const request = indexedDB.deleteDatabase('JellyJumpDB');
+                                const request = indexedDB.deleteDatabase(DB_NAME);
                                 request.onsuccess = () => resolve();
                                 request.onerror = () => reject(request.error);
                                 request.onblocked = () => resolve(); // Still proceed if blocked

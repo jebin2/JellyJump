@@ -44,6 +44,9 @@ The checks that can stop a pull request:
 
 ## Pull requests
 
+- A pull request from a branch of this repository gets a **preview**: a
+  comment links to its build at `previews/<number>/player.html` on the
+  site, to try on a phone. It keeps its own playlist and settings.
 - Small and about one thing. A plan step (`docs/ARCHITECTURE_PLAN.md`) is
   usually one PR; say which in the description.
 - A bug fix comes with a test that fails without it.
