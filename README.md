@@ -58,8 +58,10 @@ in headless Chromium. The browser suites need Chromium: they use
 npx playwright-core install chromium
 ```
 
-Single suites run as `node scripts/<name>.mjs` (or the `test:*` scripts in
-`package.json`). The desktop app has its own check, `npm run test:desktop`.
+Single suites run as `node scripts/<name>.mjs`, or a few through the runner
+as `node scripts/run-tests.mjs smoke-test edit-panel-test`. A browser suite
+that fails is run once more and, if it then passes, reported as flaky
+(`CONTRIBUTING.md`). The desktop app has its own check, `npm run test:desktop`.
 
 CI runs `npm test` on every pull request; `main` is protected, and the site
 deploys only after the tests pass on `main`.
@@ -92,6 +94,8 @@ docs/             the architecture plan and decision records
   code is going, the plan to get there, and its progress.
 - [`docs/adr/`](docs/adr/): why the big decisions were made.
 - [`assets/js/STRUCTURE.md`](assets/js/STRUCTURE.md): what each folder owns.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): setup, the checks a pull request
+  must pass, commits, flaky tests.
 - [`.agent/rules/code-of-conduct.md`](.agent/rules/code-of-conduct.md): coding
   standards.
 

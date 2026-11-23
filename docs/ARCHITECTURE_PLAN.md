@@ -60,7 +60,8 @@ start (`78c1c90`); this table is where things stand now.
 | 2 | K3 coverage in every `npm test`, no new dependencies: Node's V8 coverage for the Node suites, Chromium's for the browser suites (checkpointed before each navigation), built chunks carried back to their sources through the source maps; printed per folder after the suites (`scripts/coverage-report.mjs`); fails when the total drops more than a point below `scripts/coverage-baseline.json`. Today 55.7% of the code in `assets/js` (outside `lib/`). Not counted: code run inside workers (the media worker, Whisper), and suites on other pages (watch party, YouTube embed) | done | #72 (CI also 55.7%) |
 | 2 | G4 desktop: a tool's result is written in chunks to `userData/copies/<id>__<name>` (`desktop/copies.js`) and read back by path; it survives a restart, the edit panel's Undo history is kept on desktop too (its desktop special case is gone), removing an item deletes its copy and the sweep covers the folder. Dropped files are the user's and are not copied; deleting reaches only the copies folder. `desktop-copies-test` (15); desktop smoke test: copy on disk, original not copied, plays after a restart, reads back by id, deleted with its item (17) | done | #73 |
 | 2 | Q2 moved to wave 4 (see Q2) | moved | this PR |
-| 3 | H, I, P3–P6, Q5, Q6, S4–S8, T3–T6, O7, O8, K4, K5 | to do | |
+| 3 | K4 PR template (`.github/pull_request_template.md`) with the device checklist, required for playback, audio, `PlaylistPlayback` and storage changes. K5 `run-tests.mjs` runs a failed browser suite once more; one that then passes is reported as flaky (summary line, CI warning, job summary); `JJ_NO_RETRY=1` turns it off; suites can be named on the command line. T4 `CONTRIBUTING.md`: setup, the checks a PR must pass, commits, the flake policy | done | this PR |
+| 3 | H, I, P3–P6, Q5, Q6, S4–S8, T3, T5, T6, O7, O8 | to do | |
 
 ---
 
