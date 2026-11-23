@@ -93,10 +93,10 @@ async function initEmbed() {
         tempDiv.innerHTML = playerHtml + screenshotHtml;
         document.body.appendChild(tempDiv);
 
-        // Import and initialize CorePlayer
-        const { CorePlayer } = await import('./core/Player.js');
+        // Import and build the player with its controls
+        const { createPlayer } = await import('./ui/player/createPlayer.js');
 
-        const player = window.player = new CorePlayer('player-container', {
+        const player = window.player = createPlayer('player-container', {
             autoplay: autoplay,
             muted: muted,
             mode: 'embed',

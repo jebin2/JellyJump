@@ -6,20 +6,5 @@
     "directElectronChecks": 0,
     "externalUrlFiles": 0
   },
-  "wrongWayImports": [
-    "core/Player.js -> ui/player/PlayerBindings.js",
-    "core/Player.js -> ui/player/PlayerControlBar.js",
-    "core/Player.js -> ui/player/PlayerControlsView.js",
-    "core/Player.js -> ui/player/PlayerKeyboard.js",
-    "core/Player.js -> ui/player/PlayerLoopControl.js",
-    "core/Player.js -> ui/player/PlayerOverlays.js",
-    "core/Player.js -> ui/player/PlayerPanels.js",
-    "core/Player.js -> ui/player/PlayerShell.js",
-    "core/Player.js -> ui/player/PlayerSubtitles.js",
-    "core/Player.js -> ui/player/PlayerThumbnails.js",
-    "core/Player.js -> ui/player/PlayerUIUpdates.js",
-    "core/Player.js -> ui/player/ScreenshotManager.js",
-    "core/audio/AudioEngine.js -> ui/player/AudioVisualizer.js",
-    "core/audio/AudioEngine.js -> ui/player/AudioVisualizer.js"
-  ]
+  "wrongWayImports": []
 }

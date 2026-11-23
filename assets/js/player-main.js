@@ -45,11 +45,11 @@ async function initializeApp() {
     document.body.appendChild(tempDiv);
 
     // Now that templates are loaded, import and initialize
-    const { CorePlayer } = await import('./core/Player.js');
+    const { createPlayer } = await import('./ui/player/createPlayer.js');
     const { Playlist } = await import('./ui/player/Playlist.js');
 
     // Initialize Player (attach to window for cleanup on unload)
-    const player = window.player = new CorePlayer('player-container', {
+    const player = window.player = createPlayer('player-container', {
         autoplay: false,
         muted: false,
         mode: 'player'
