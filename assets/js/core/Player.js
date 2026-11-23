@@ -19,7 +19,6 @@ import {
     PLAYER_CONTROL_PRESETS,
     CONTROL_BAR_MODE_DEFAULT
 } from './config.js';
-import { ScreenshotManager } from '../ui/player/ScreenshotManager.js';
 import { hasOverlays } from '../shared/media/OverlayCompositor.js';
 import { closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, closePlayerAudioContext, initPlayerAudio, restorePlayerAutoplayAudio, runPlayerAudioIterator, stopPlayerQueuedAudio, suspendPlayerAudioContext, syncPlayerAudioGain } from './audio/AudioEngine.js';
 import {
@@ -64,33 +63,6 @@ import {
 } from './playback/RenderLoop.js';
 import { cancelYouTubeAutoplayRetry, suspendPlayerYouTube, teardownPlayerYouTube, syncYouTubeAudio } from './youtube/YouTubePlayback.js';
 import { PlayerStream } from './streaming/PlayerStream.js';
-import {
-    mountPlayerShell,
-    initPlayerResizeObserver,
-    handlePlayerResize,
-    togglePlayerFullscreen
-} from '../ui/player/PlayerShell.js';
-import { createHelpOverlay } from '../ui/player/PlayerOverlays.js';
-import { createPlayerControls } from '../ui/player/PlayerControlsView.js';
-import { attachPlayerBindings } from '../ui/player/PlayerBindings.js';
-import {
-    handlePlayerDocumentClick,
-    togglePlayerFilterPanel,
-    togglePlayerSpeedPanel,
-    togglePlayerSubtitlePanel,
-    syncPlayerFilterSliders,
-    togglePlayerAudioPanel,
-    syncPlayerEqSliders
-} from '../ui/player/PlayerPanels.js';
-import {
-    updatePlayerFullscreenUI,
-    showPlayerBezel,
-} from '../ui/player/PlayerUIUpdates.js';
-import { PlayerKeyboard } from '../ui/player/PlayerKeyboard.js';
-import { PlayerSubtitles } from '../ui/player/PlayerSubtitles.js';
-import { PlayerLoopControl } from '../ui/player/PlayerLoopControl.js';
-import { PlayerThumbnails } from '../ui/player/PlayerThumbnails.js';
-import { PlayerControlBar } from '../ui/player/PlayerControlBar.js';
 
 import { Logger } from '../shared/utils/Logger.js';
 import { MediaTracks } from './playback/MediaTracks.js';
@@ -105,7 +77,15 @@ import { PlayerTiming } from './PlayerTiming.js';
 import { PlayerStateEvents } from './PlayerStateEvents.js';
 
 export class CorePlayer {
-    constructor(containerId, options = {}) {
+    /**
+     * @param {string} containerId
+     * @param {Object} [options] see core/config.js
+     * @param {Object|null} [view] what the player shows itself with
+     *   (ui/player/createPlayer.js); without one it has no controls.
+     */
+    constructor(containerId, options = {}, view = null) {
+        /** The screen side, handed in: the core imports nothing from ui/. */
+        this.view = view;
         /** Load, seek and dropped-frame timings for Diagnostics. */
         this.timing = new PlayerTiming();
         /** Listeners by event name (`on`, `off`, `trigger`). */
@@ -257,50 +237,24 @@ export class CorePlayer {
         }
 
         this.stream = new PlayerStream(this);
-        this.keyboard = new PlayerKeyboard(this);
-        this.subtitles = new PlayerSubtitles(this);
+        const parts = view?.parts(this) ?? {};
+        this.keyboard = parts.keyboard ?? null;
+        this.subtitles = parts.subtitles ?? null;
         // Playing backwards runs beside the forward pipeline, not through it.
         this.reverse = new ReversePlayback(this);
         // Which way Play goes. A setting, like speed: once backward, play,
         // pause, seeks and speed changes all keep going backward until it is
         // switched back, or another file is opened.
         this.direction = 'forward';
-        this.loop = new PlayerLoopControl(this);
-        this.thumbnails = new PlayerThumbnails(this);
-        this.controlBar = new PlayerControlBar(this);
-        this._init();
-    }
-
-    _init() {
-        mountPlayerShell(this);
-
-        if (this.config.controls.settings) {
-            this.screenshotManager = new ScreenshotManager(this);
-        }
-
-        this._createControls();
-
-        if (this.config.controls.keyboard) {
-            this._createHelpOverlay();
-        }
-
-        this._attachEvents();
-
-        if (this.config.controls.controlBar) {
-            this._applyControlBarMode();
-        }
-        if (this.config.controls.fullscreen) {
-            this._initResizeObserver();
-        }
+        this.loop = parts.loop ?? null;
+        this.thumbnails = parts.thumbnails ?? null;
+        this.controlBar = parts.controlBar ?? null;
+        this.view?.mount(this);
     }
 
     // ─── UI Shell ────────────────────────────────────────────────────────────────
-    _createHelpOverlay() { createHelpOverlay(this); }
-    _createControls() { createPlayerControls(this); }
-    _attachEvents() { attachPlayerBindings(this); }
-    _initResizeObserver() { initPlayerResizeObserver(this); }
-    _handleResize(entry) { handlePlayerResize(this, entry); }
-    toggleFullscreen() { togglePlayerFullscreen(this); }
+    _handleResize(entry) { this.view?.handleResize(this, entry); }
+    toggleFullscreen() { this.view?.toggleFullscreen(this); }
 
     _applyControlVisibility() {
         if (!this.ui.controls) return;
@@ -320,23 +274,23 @@ export class CorePlayer {
     _updatePlayPauseUI() { this.announce.playState(); }
     _updateProgress() { this.announce.progress(); }
     _updateTimeDisplay() { this.announce.progress(); }
-    _updateFullscreenUI() { updatePlayerFullscreenUI(this); }
+    _updateFullscreenUI() { this.view?.updateFullscreenUI(this); }
     _setLoading(isLoading) {
         this.isLoading = isLoading;
         this.announce.loading();
     }
-    _showBezel(icon, text) { showPlayerBezel(this, icon, text); }
+    _showBezel(icon, text) { this.view?.showBezel(this, icon, text); }
     _updateVolumeUI() { this.announce.volume(); }
 
     // ─── Panel helpers ───────────────────────────────────────────────────────────
-    _handleDocumentClick(e) { handlePlayerDocumentClick(this, e); }
+    _handleDocumentClick(e) { this.view?.handleDocumentClick(this, e); }
     _updateSpeedMenu() { this.announce.rate(); }
-    toggleFilterPanel() { togglePlayerFilterPanel(this); }
-    toggleSpeedPanel() { togglePlayerSpeedPanel(this); }
-    toggleSubtitlePanel() { togglePlayerSubtitlePanel(this); }
-    _syncFilterSliders() { syncPlayerFilterSliders(this); }
-    toggleAudioPanel() { togglePlayerAudioPanel(this); }
-    _syncEqSliders() { syncPlayerEqSliders(this); }
+    toggleFilterPanel() { this.view?.toggleFilterPanel(this); }
+    toggleSpeedPanel() { this.view?.toggleSpeedPanel(this); }
+    toggleSubtitlePanel() { this.view?.toggleSubtitlePanel(this); }
+    _syncFilterSliders() { this.view?.syncFilterSliders(this); }
+    toggleAudioPanel() { this.view?.toggleAudioPanel(this); }
+    _syncEqSliders() { this.view?.syncEqSliders(this); }
 
     // ─── Loop ────────────────────────────────────────────────────────────────────
     toggleLoopMode() { this.loop.toggleLoopMode(); }

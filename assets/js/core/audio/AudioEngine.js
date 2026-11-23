@@ -29,9 +29,11 @@ export async function initPlayerAudio(player) {
     player.gainNode.gain.value = player.config.muted ? 0 : player.config.volume;
 
     if (!player.audioVisualizer && player.canvas) {
-        import('../../ui/player/AudioVisualizer.js').then(({ AudioVisualizer }) => {
+        // The bars are drawn by the UI (ui/player/AudioVisualizer.js),
+        // handed in with the view; a player without one draws none.
+        player.view?.createAudioVisualizer(player.canvas).then((visualizer) => {
             if (!player.audioVisualizer && player.canvas && player.audioContext && player.gainNode) {
-                player.audioVisualizer = new AudioVisualizer(player.canvas);
+                player.audioVisualizer = visualizer;
                 player.audioVisualizer.connect(player.audioContext, player.gainNode);
             }
         });
@@ -44,10 +46,12 @@ export async function initPlayerAudio(player) {
 export async function startPlayerAudioVisualizer(player) {
     if (!player.isAudioMode) return;
 
-    if (!player.audioVisualizer && player.canvas) {
-        const { AudioVisualizer } = await import('../../ui/player/AudioVisualizer.js');
-        player.audioVisualizer = new AudioVisualizer(player.canvas);
-        player.audioVisualizer.connect(player.audioContext, player.gainNode);
+    if (!player.audioVisualizer && player.canvas && player.view) {
+        const visualizer = await player.view.createAudioVisualizer(player.canvas);
+        if (!player.audioVisualizer) {
+            player.audioVisualizer = visualizer;
+            player.audioVisualizer.connect(player.audioContext, player.gainNode);
+        }
     }
     if (player.audioVisualizer) {
         player.audioVisualizer.start();
