@@ -6,6 +6,7 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { CanvasRecorder } from './CanvasRecorder.js';
 import { runPlayerAudioIterator } from '../audio/AudioEngine.js';
 import { syncPlayerOverlayBaking } from '../playback/FramePresenter.js';
+import { getPlayerPlaybackTime } from '../playback/PlaybackState.js';
 
 export class PlayerStream {
     constructor(player) {
@@ -15,7 +16,7 @@ export class PlayerStream {
         this.isStreamMode = false;
         this.isWebcamMode = false;
         this.isLive = false;
-        this._liveStartTimestamp = null;
+        this.liveStartTimestamp = null;
         this.anchor = new PlaybackAnchor();
         this.video = new StreamVideoSource(player, this);
         this._liveAvSyncMonitor = null;
@@ -25,9 +26,9 @@ export class PlayerStream {
         // undefined until the loop first ran.
         this._liveBadgeTimer = null;
         this._isLiveLoopActive = false;
-        this._wasMutedForAutoplay = false;
+        this.wasMutedForAutoplay = false;
         this._isFetchingLiveFrame = false;
-        this._isMediaReady = false;
+        this.isMediaReady = false;
 
         // Recording lives in its own component now: it reads the canvas and
         // needs three events from here, so there is no reason for its eleven
@@ -70,7 +71,7 @@ export class PlayerStream {
      */
     _recordingMediaReady() {
         if (!this.isStreamMode && !this.isWebcamMode) return true;
-        return this._isMediaReady;
+        return this.isMediaReady;
     }
 
 
@@ -151,8 +152,7 @@ export class PlayerStream {
             const backoff = (refreshInterval || 6) * 2;
 
             const targetTs = Math.max(0, (currentLiveEdge ?? 0) - backoff);
-            player._liveStartTimestamp = targetTs;
-            this._liveStartTimestamp = targetTs;
+            this.liveStartTimestamp = targetTs;
 
             // Restart the loop at the edge
             this.startLiveVideoLoop(true);
@@ -166,7 +166,7 @@ export class PlayerStream {
         const player = this.player;
         if (!player.ui.liveBadge || !this.isLive) return;
 
-        const currentTime = player._getPlaybackTime();
+        const currentTime = getPlayerPlaybackTime(player);
 
         // We estimate the current live edge based on our anchor and elapsed wall time
         // isAnchored, not truthiness: a real anchor at wall 0 -- which is what
@@ -213,7 +213,7 @@ export class PlayerStream {
         this.isStreamMode = false;
         this.isLive = false;
         this._isLiveLoopActive = false;
-        this._liveStartTimestamp = null;
+        this.liveStartTimestamp = null;
         this.anchor.reset();
 
         if (this._liveAvSyncMonitor) {
@@ -288,7 +288,7 @@ export class PlayerStream {
             this._isLiveLoopActive = true;
             epoch = player.epoch.bump();
 
-            Logger.log(`[Live:Video] Loop starting — epoch=${epoch}, liveStartTs=${this._liveStartTimestamp?.toFixed(3)}, audioSink=${!!player.audioSink}, audioContext=${!!player.audioContext}, audioContextState=${player.audioContext?.state}`);
+            Logger.log(`[Live:Video] Loop starting — epoch=${epoch}, liveStartTs=${this.liveStartTimestamp?.toFixed(3)}, audioSink=${!!player.audioSink}, audioContext=${!!player.audioContext}, audioContextState=${player.audioContext?.state}`);
 
             if (player.frames.isOpen) {
                 Logger.log(`[Live:Video] Closing existing frame queue`);
@@ -300,7 +300,7 @@ export class PlayerStream {
             }
 
             player.setLoading(true);
-            const resumePosition = this._liveStartTimestamp;
+            const resumePosition = this.liveStartTimestamp;
 
             // ─── Instant Anchoring (Official Pattern) ───
             const anchorWall = player.audioContext ? player.audioContext.currentTime : 0;
@@ -331,7 +331,7 @@ export class PlayerStream {
 
             player.setLoading(false);
             this._isFetchingLiveFrame = false;
-            this._isMediaReady = true;
+            this.isMediaReady = true;
             if (player.isPlaying) this.resumeRecordingSmartPause();
 
             // ─── Main Video Rendering Loop (Official Pattern) ───
@@ -431,7 +431,7 @@ export class PlayerStream {
                     Logger.warn(`[Live:Video] Massive drift detected (${schedule.drift.toFixed(1)}s) — jumping to live edge`);
                     if (player.videoTrack) {
                         const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                        this._liveStartTimestamp = currentLiveEdge ?? 0;
+                        this.liveStartTimestamp = currentLiveEdge ?? 0;
                         setTimeout(() => this.startLiveVideoLoop(true), 0);
                         break;
                     }

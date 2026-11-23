@@ -28,7 +28,6 @@ import {
     loadPlayerMedia
 } from './playback/MediaLifecycle.js';
 import {
-    getPlayerPlaybackTime,
     togglePlayerPlay,
     seekPlayerTo,
     requestPlayerSeek,
@@ -189,18 +188,13 @@ export class CorePlayer {
     trigger(event, data = {}) { triggerPlayerEvent(this, event, data); }
 
     // ─── UI Updates ──────────────────────────────────────────────────────────────
-    _updatePlayPauseUI() { this.announce.playState(); }
-    _updateProgress() { this.announce.progress(); }
-    _updateTimeDisplay() { this.announce.progress(); }
     /** Show or hide the spinner; the playlist shows it while it fetches a file. @param {boolean} isLoading */
     setLoading(isLoading) {
         this.isLoading = isLoading;
         this.announce.loading();
     }
     _showBezel(icon, text) { this.view?.showBezel(this, icon, text); }
-    _updateVolumeUI() { this.announce.volume(); }
 
-    _updateSpeedMenu() { this.announce.rate(); }
 
     // ─── Loop ────────────────────────────────────────────────────────────────────
     setLoopStart() { this.loop.setLoopStart(); }
@@ -230,8 +224,6 @@ export class CorePlayer {
     // ─── Control Bar Mode ────────────────────────────────────────────────────────
     toggleControlBarMode() { this.controlBar.toggleMode(); }
     _applyControlBarMode() { this.controlBar.applyMode(); } // announces controlbarmodechange
-    _startAutoHideTimer() { this.controlBar.startAutoHideTimer(); }
-    _clearAutoHideTimer() { this.controlBar.clearAutoHideTimer(); }
 
     // ─── Stream helpers ──────────────────────────────────────────────────────────
     async loadWebcamStream(stream) { return this.stream.loadWebcamStream(stream); }
@@ -266,7 +258,7 @@ export class CorePlayer {
         await this.reverse?.stop({ reposition: false });
         if (this.direction !== 'forward') {
             this.direction = 'forward';
-            this._updatePlayPauseUI();
+            this.announce.playState();
         }
         // Always, not only when leaving YouTube: this runs before every load,
         // and a playing iframe left visible would sit on top of the next video.
@@ -280,7 +272,6 @@ export class CorePlayer {
     async _extractAndDrawFrame(timestamp) { return extractAndDrawPlayerFrame(this, timestamp); }
 
     // ─── Playback State ──────────────────────────────────────────────────────────
-    _getPlaybackTime() { return getPlayerPlaybackTime(this); }
     togglePlay() {
         if (this.reverse?.active) { this.pause(); return; }
         if (this.direction === 'backward' && this.engine !== 'youtube') { this.play(); return; }
@@ -300,7 +291,7 @@ export class CorePlayer {
             if (reason) return { reason };
             const wasPlaying = this.isPlaying;
             this.direction = 'backward';
-            this._updatePlayPauseUI();
+            this.announce.playState();
             if (wasPlaying) {
                 const result = await this._playBackward();
                 return result.started ? {} : { reason: result.reason };
@@ -309,7 +300,7 @@ export class CorePlayer {
         }
         const wasReversing = this.reverse.active;
         this.direction = 'forward';
-        this._updatePlayPauseUI();
+        this.announce.playState();
         if (wasReversing) {
             await this.reverse.stop();
             await this.play();
@@ -324,7 +315,7 @@ export class CorePlayer {
         if (this.engine === 'youtube') {
             this.youtube?.seek(time);
             this.currentTime = Math.max(0, time);
-            this._updateProgress();
+            this.announce.progress();
             return;
         }
         await seekPlayerTo(this, time);
@@ -424,7 +415,7 @@ export class CorePlayer {
 
         this._syncAudioGain();
 
-        this._updateVolumeUI();
+        this.announce.volume();
         if (!bezel) return;
 
         const volumePercent = Math.round(this.config.volume * 100);
@@ -440,7 +431,7 @@ export class CorePlayer {
 
         this._syncAudioGain();
 
-        this._updateVolumeUI();
+        this.announce.volume();
     }
 
     // ─── Navigation ──────────────────────────────────────────────────────────────
@@ -476,7 +467,7 @@ export class CorePlayer {
      * transport, the live stream, the webcam path and the YouTube embed, in
      * five files and eighteen places -- and the play/pause button has to
      * follow every one of them. Twelve of those writes remembered to call
-     * _updatePlayPauseUI() on the next line. The other five did not, and
+     * announce.playState() on the next line. The other five did not, and
      * relied on something nearby doing it: the webcam path plays immediately
      * afterwards, and one is a redundant second assignment of a value already
      * set. That leaves the three YouTube sites -- load, suspend and teardown
@@ -503,7 +494,7 @@ export class CorePlayer {
         this._wakeLock?.set(value);
         // The constructor sets this before `ui` is built, and the reset paths
         // can run while it is being rebuilt.
-        if (this.ui) this._updatePlayPauseUI();
+        if (this.ui) this.announce.playState();
     }
 
     // ─── Stream state ────────────────────────────────────────────────────────────
@@ -531,14 +522,8 @@ export class CorePlayer {
     get isWebcamMode() { return this.stream?.isWebcamMode; }
     set isWebcamMode(value) { this.stream.isWebcamMode = value; }
 
-    get _liveStartTimestamp() { return this.stream?._liveStartTimestamp; }
-    set _liveStartTimestamp(value) { this.stream._liveStartTimestamp = value; }
 
-    get _wasMutedForAutoplay() { return this.stream?._wasMutedForAutoplay; }
-    set _wasMutedForAutoplay(value) { this.stream._wasMutedForAutoplay = value; }
 
-    get _isMediaReady() { return this.stream?._isMediaReady; }
-    set _isMediaReady(value) { this.stream._isMediaReady = value; }
 
     get input() { return this.media.input; }
     get videoTrack() { return this.media.videoTrack; }

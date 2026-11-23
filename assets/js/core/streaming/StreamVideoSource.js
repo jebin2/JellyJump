@@ -15,7 +15,7 @@ import { syncPlayerOverlayBaking } from '../playback/FramePresenter.js';
  *
  * It holds the player, as every component here does, and the controller that
  * owns it -- for the three things that are genuinely the controller's: the
- * isStreamMode / isWebcamMode / _isMediaReady flags, which the player exposes
+ * isStreamMode / isWebcamMode / isMediaReady flags, which the player exposes
  * as its own, and telling the recorder a frame was presented.
  */
 export class StreamVideoSource {
@@ -29,7 +29,7 @@ export class StreamVideoSource {
     async loadWebcamStream(stream) {
         const player = this.player;
         player.setLoading(true);
-        this.stream._isMediaReady = false;
+        this.stream.isMediaReady = false;
 
         player.pause(false);
         await cleanupPlayerMediaBunny(player);
@@ -62,7 +62,7 @@ export class StreamVideoSource {
         }
 
         this.startStreamRenderLoop();
-        player._updatePlayPauseUI();
+        player.announce.playState();
     }
 
     stopWebcamStreamMode() {
@@ -76,7 +76,7 @@ export class StreamVideoSource {
         syncPlayerOverlayBaking(this.player);
         this.player.isPlaying = false;
         this.stopStreamRenderLoop();
-        this.player._updatePlayPauseUI();
+        this.player.announce.playState();
     }
 
     createStreamVideo() {
@@ -131,13 +131,13 @@ export class StreamVideoSource {
                 return;
             }
             player.isPlaying = true;
-            player._updatePlayPauseUI();
+            player.announce.playState();
             if (player.ui.playOverlay) player.ui.playOverlay.style.display = 'none';
             this.startStreamRenderLoop();
             if (player.controlBarMode === 'overlay') {
                 setTimeout(() => {
                     if (player.isPlaying && player.controlBarMode === 'overlay') {
-                        player._startAutoHideTimer();
+                        player.controlBar?.startAutoHideTimer();
                     }
                 }, 500);
             }
@@ -145,9 +145,9 @@ export class StreamVideoSource {
 
         this.streamVideo.onpause = () => {
             player.isPlaying = false;
-            player._clearAutoHideTimer();
+            player.controlBar?.clearAutoHideTimer();
             this.stopStreamRenderLoop();
-            player._updatePlayPauseUI();
+            player.announce.playState();
         };
 
         this.streamVideo.onloadedmetadata = () => {
@@ -183,13 +183,13 @@ export class StreamVideoSource {
         try {
             await this.streamVideo.play();
             player.isPlaying = true;
-            player._updatePlayPauseUI();
+            player.announce.playState();
             if (player.ui.playOverlay) player.ui.playOverlay.style.display = 'none';
 
             if (player.controlBarMode === 'overlay') {
                 setTimeout(() => {
                     if (player.isPlaying && player.controlBarMode === 'overlay') {
-                        player._startAutoHideTimer();
+                        player.controlBar?.startAutoHideTimer();
                     }
                 }, 500);
             }
@@ -206,10 +206,10 @@ export class StreamVideoSource {
                 player.config.muted = true;
                 this.streamVideo.muted = true;
                 this.streamVideo.setAttribute('muted', '');
-                player._updateVolumeUI();
+                player.announce.volume();
                 await this.streamVideo.play();
                 player.isPlaying = true;
-                player._updatePlayPauseUI();
+                player.announce.playState();
                 Logger.log('[Stream] Playing muted (touch/click to unmute)');
             } catch (mutedError) {
                 Logger.error('[Stream] Even muted play failed:', mutedError);
@@ -229,11 +229,11 @@ export class StreamVideoSource {
         const player = this.player;
         this.streamVideo.pause();
         player.isPlaying = false;
-        player._clearAutoHideTimer();
+        player.controlBar?.clearAutoHideTimer();
 
         if (showOverlay) player.setLoading(false);
 
-        player._updatePlayPauseUI();
+        player.announce.playState();
         if (player.ui.playOverlay) {
             const shouldShow = showOverlay && player.config.controls.playOverlay;
             player.ui.playOverlay.style.display = shouldShow ? 'flex' : 'none';
@@ -275,8 +275,8 @@ export class StreamVideoSource {
 
         player.presentFrame(this.streamVideo);
 
-        if (!this.stream._isMediaReady) {
-            this.stream._isMediaReady = true;
+        if (!this.stream.isMediaReady) {
+            this.stream.isMediaReady = true;
             if (player.isPlaying) this.stream.resumeRecordingSmartPause();
         }
     }

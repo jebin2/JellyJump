@@ -144,11 +144,9 @@ async function makePlayer({ restorePlayerAutoplayAudio, syncYouTubeAudio }) {
         currentTime: 0,
         config: { muted: false, volume: 1 },
         ui: { controls: makeElement('div'), playOverlay: makeElement('div') },
-        _wasMutedForAutoplay: false,
+        stream: { wasMutedForAutoplay: false },
+        announce: { volume() { }, progress() { }, playState() { }, loading() { } },
         setLoading() { },
-        _updateVolumeUI() { },
-        _updateProgress() { },
-        _updatePlayPauseUI() { },
         _completeMedia() { },
         trigger() { },
         // The real player funnels volume changes to whichever engine is
@@ -246,7 +244,7 @@ check('on a phone the first video mutes to get autoplay, then unmutes itself', a
 
     assert.equal(created[0].muted, false, 'the embed ended up unmuted');
     assert.equal(player.config.muted, false);
-    assert.equal(player._wasMutedForAutoplay, false, 'nothing is still owed');
+    assert.equal(player.stream.wasMutedForAutoplay, false, 'nothing is still owed');
 });
 
 check('on a phone the second video keeps the sound the first one earned', async () => {
@@ -284,7 +282,7 @@ check('an embed that ignores unMute is detected, not reported as success', async
 
     assert.equal(created[0].state, 'playing', 'it kept playing');
     assert.equal(player.config.muted, true, 'the UI agrees it is muted');
-    assert.equal(player._wasMutedForAutoplay, true, 'sound is still owed');
+    assert.equal(player.stream.wasMutedForAutoplay, true, 'sound is still owed');
 });
 
 check('an embed that pauses rather than unmutes is put back to playing', async () => {
@@ -300,7 +298,7 @@ check('an embed that pauses rather than unmutes is put back to playing', async (
     assert.equal(created[0].state, 'playing', 'playback was resumed');
     assert.equal(created[0].muted, true, 'muted and playing beats unmuted and stopped');
     assert.equal(player.config.muted, true);
-    assert.equal(player._wasMutedForAutoplay, true, 'sound is still owed');
+    assert.equal(player.stream.wasMutedForAutoplay, true, 'sound is still owed');
 });
 
 check('a refused unmute does not silence every later video', async () => {
@@ -324,7 +322,7 @@ check('a refused unmute does not silence every later video', async () => {
     // The mute came from this code, not from the user, so the next video tries
     // for sound again — otherwise one refusal is permanent.
     assert.ok(created[0].unmuteAttempts > attemptsAfterFirst, 'the next video tried again');
-    assert.equal(player._wasMutedForAutoplay, true, 'and it is still owed');
+    assert.equal(player.stream.wasMutedForAutoplay, true, 'and it is still owed');
 });
 
 check('a deliberate mute is left alone', async () => {
@@ -414,7 +412,7 @@ check('a fresh embed on desktop recovers a refused autoplay, sound and all', asy
     assert.equal(player.isPlaying, true, 'the watchdog got it playing');
     assert.equal(created[0].muted, false, 'and the sound came back');
     assert.equal(player.config.muted, false);
-    assert.equal(player._wasMutedForAutoplay, false, 'nothing still owed');
+    assert.equal(player.stream.wasMutedForAutoplay, false, 'nothing still owed');
 });
 
 check('a video that starts normally is never touched by the watchdog', async () => {
@@ -430,7 +428,7 @@ check('a video that starts normally is never touched by the watchdog', async () 
     assert.equal(player.isPlaying, true);
     assert.equal(created[0].muted, false, 'sound was never given up');
     assert.equal(player.config.muted, false);
-    assert.equal(player._wasMutedForAutoplay, false);
+    assert.equal(player.stream.wasMutedForAutoplay, false);
 });
 
 check('a slow video is left to buffer, not muted for being late', async () => {
@@ -453,7 +451,7 @@ check('a slow video is left to buffer, not muted for being late', async () => {
     assert.equal(created[0].muteCalls, 0, 'a slow start is not a refusal');
     assert.equal(created[0].muted, false);
     assert.equal(player.config.muted, false);
-    assert.equal(player._wasMutedForAutoplay, false);
+    assert.equal(player.stream.wasMutedForAutoplay, false);
 });
 
 check('a video loaded without autoplay is left alone', async () => {

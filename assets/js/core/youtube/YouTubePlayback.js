@@ -61,7 +61,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
     // player is muted right now: a mute this code applied to get autoplay past
     // the browser must not read back as "they asked for silence" on the next
     // video, or one refusal makes every later video permanently silent.
-    player._youtubeWantsSound = !player.config.muted || !!player._wasMutedForAutoplay;
+    player._youtubeWantsSound = !player.config.muted || !!player.stream?.wasMutedForAutoplay;
 
     // Reuse before creating. A video handed to the embed that is already there
     // inherits that frame's user activation, so once sound has been allowed
@@ -88,8 +88,8 @@ export async function loadPlayerYouTube(player, video, autoplay) {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (autoplay && isMobile && !player.config.muted) {
         player.config.muted = true;
-        player._wasMutedForAutoplay = true;
-        player._updateVolumeUI();
+        player.stream.wasMutedForAutoplay = true;
+        player.announce.volume();
     }
 
     player.youtube = new YouTubeEngine({
@@ -117,13 +117,13 @@ export async function loadPlayerYouTube(player, video, autoplay) {
         },
         onDuration: (duration) => {
             player.duration = duration;
-            player._updateProgress();
+            player.announce.progress();
         },
         onStateChange: (state) => {
             if (state === 'playing') {
                 cancelYouTubeAutoplayRetry(player);
                 player.isPlaying = true;
-                player._updatePlayPauseUI();
+                player.announce.playState();
                 startYouTubeTicker(player);
                 unmuteOncePlaying(player);
             } else if (state === 'buffering') {
@@ -134,11 +134,11 @@ export async function loadPlayerYouTube(player, video, autoplay) {
                 cancelYouTubeAutoplayRetry(player);
             } else if (state === 'paused') {
                 player.isPlaying = false;
-                player._updatePlayPauseUI();
+                player.announce.playState();
             } else if (state === 'ended') {
                 cancelYouTubeAutoplayRetry(player);
                 player.isPlaying = false;
-                player._updatePlayPauseUI();
+                player.announce.playState();
                 stopYouTubeTicker(player);
                 // Same completion as a local file: the playlist advances, and
                 // loop-one restarts, without either being special-cased here.
@@ -181,7 +181,7 @@ export function startYouTubeTicker(player) {
             player.currentTime = player.loopStart;
         }
 
-        player._updateProgress();
+        player.announce.progress();
         player.trigger('timeupdate', { currentTime: player.currentTime });
 
         player._youtubeTicker = requestAnimationFrame(tick);
@@ -283,9 +283,9 @@ function watchYouTubeAutoplay(player) {
         if (!player.config.muted) {
             Logger.log('[YouTube] Autoplay was refused; retrying muted');
             player.config.muted = true;
-            player._wasMutedForAutoplay = true;
+            player.stream.wasMutedForAutoplay = true;
             player._syncAudioGain();
-            player._updateVolumeUI();
+            player.announce.volume();
         } else {
             Logger.log('[YouTube] Autoplay did not start; asking again');
         }
@@ -319,7 +319,7 @@ export function cancelYouTubeAutoplayRetry(player) {
  * would look like the video simply stopping for no reason.
  */
 function unmuteOncePlaying(player) {
-    if (!player._wasMutedForAutoplay || !player._youtubeWantsSound) return;
+    if (!player.stream?.wasMutedForAutoplay || !player._youtubeWantsSound) return;
     // Once per video: a video that pauses and resumes must not fight this again.
     player._youtubeWantsSound = false;
 
@@ -345,9 +345,9 @@ function unmuteOncePlaying(player) {
         // flag is what tells the next video, and the next user interaction,
         // that sound is still owed.
         player.config.muted = true;
-        player._wasMutedForAutoplay = true;
+        player.stream.wasMutedForAutoplay = true;
         player._syncAudioGain();
-        player._updateVolumeUI();
+        player.announce.volume();
         if (!player.isPlaying) player.youtube.play();
     }, 500);
 }

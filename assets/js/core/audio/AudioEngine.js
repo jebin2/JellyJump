@@ -1,5 +1,6 @@
 import { AudioEqualizer } from './AudioEqualizer.js';
 import { Logger } from '../../shared/utils/Logger.js';
+import { getPlayerPlaybackTime } from '../playback/PlaybackState.js';
 
 
 export async function initPlayerAudio(player) {
@@ -96,7 +97,7 @@ export function closePlayerAudioBufferIteratorSoon(player) {
 }
 
 export function restorePlayerAutoplayAudio(player, sourceLabel) {
-    if (!player._wasMutedForAutoplay) return false;
+    if (!player.stream?.wasMutedForAutoplay) return false;
     // gainNode is this pipeline's output. Another engine has its own and never
     // builds one — requiring it here meant a video muted to get autoplay past
     // the browser could never be unmuted again.
@@ -107,8 +108,8 @@ export function restorePlayerAutoplayAudio(player, sourceLabel) {
     // Through the player's own funnel, so whichever engine is playing is the
     // one that hears about it.
     player._syncAudioGain();
-    player._wasMutedForAutoplay = false;
-    player._updateVolumeUI();
+    player.stream.wasMutedForAutoplay = false;
+    player.announce.volume();
     return true;
 }
 
@@ -231,16 +232,16 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
                     Logger.warn(`[${_audioLogTag}:Audio] Audio ${(-aheadMs).toFixed(0)}ms behind — triggering live resync`);
                     if (player.videoTrack) {
                         const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-                        player._liveStartTimestamp = currentLiveEdge ?? player._liveStartTimestamp;
-                        Logger.log(`[${_audioLogTag}:Audio] Jumping to live edge: ${player._liveStartTimestamp?.toFixed(3)}`);
+                        player.stream.liveStartTimestamp = currentLiveEdge ?? player.stream?.liveStartTimestamp;
+                        Logger.log(`[${_audioLogTag}:Audio] Jumping to live edge: ${player.stream?.liveStartTimestamp?.toFixed(3)}`);
                     }
                     player.stream?.startLiveVideoLoop(true);
                     break;
                 }
             }
 
-            if (!player.isLive && isAnchored && timestamp - player._getPlaybackTime() >= 3) {
-                const aheadMs = (timestamp - player._getPlaybackTime()) * 1000;
+            if (!player.isLive && isAnchored && timestamp - getPlayerPlaybackTime(player) >= 3) {
+                const aheadMs = (timestamp - getPlayerPlaybackTime(player)) * 1000;
                 const waitMs = Math.min(aheadMs - 2000, 1000); // Wait until we are only 2s ahead, max 1s wait
                 if (waitMs > 10) {
                     await new Promise(r => setTimeout(r, waitMs));
