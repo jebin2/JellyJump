@@ -33,8 +33,7 @@ function fakePlayer() {
             reset: () => { p.filterState = null; },
         },
         controlBar: { modes: [], applyMode() { this.modes.push(p.controlBarMode); }, saveMode() { p.saved.push(['controlBarMode']); } },
-        _updateFiltersButtonState() {},
-        _updateLoopUI() { p.loopDraws++; },
+        setLoop(mode, start, end) { p.loopMode = mode; p.loopStart = start; p.loopEnd = end; p.loopDraws++; },
     };
     return p;
 }

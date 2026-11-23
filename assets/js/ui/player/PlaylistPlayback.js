@@ -106,7 +106,7 @@ export const PlaylistPlayback = {
         const showLiveImmediately = video.isLive || video.url?.includes('.m3u8');
         if (showLiveImmediately) {
             this.player.isLive = true;
-            this.player._updateStreamUI?.();
+            this.player.announce?.streamState();
         }
 
         try {
@@ -115,7 +115,7 @@ export const PlaylistPlayback = {
         } catch (e) {
             if (showLiveImmediately) {
                 this.player.isLive = false;
-                this.player._updateStreamUI?.();
+                this.player.announce?.streamState();
             }
             throw e;
         }

@@ -47,9 +47,8 @@ const FACETS = {
         read: (p) => (p.videoFilters?.isActive() ? p.videoFilters.getState() : null),
         apply: (p, state) => {
             if (!p.videoFilters) return;
-            if (state) p.videoFilters.setState(state);
+            if (state) p.videoFilters.setState(state); // announces filterschange
             else p.videoFilters.reset();
-            p._updateFiltersButtonState?.();
         },
     },
     controlBarMode: {
@@ -63,10 +62,7 @@ const FACETS = {
     loop: {
         read: (p) => ({ mode: p.loopMode, start: p.loopStart, end: p.loopEnd }),
         apply: (p, loop) => {
-            p.loopMode = loop.mode;
-            p.loopStart = loop.start;
-            p.loopEnd = loop.end;
-            p._updateLoopUI?.();
+            p.setLoop(loop.mode, loop.start, loop.end);
         },
     },
 };

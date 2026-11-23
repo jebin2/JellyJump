@@ -1,6 +1,7 @@
 import { parseTime } from '../../shared/utils/mediaUtils.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { listenToPlayer } from './PlayerUIListeners.js';
+import { syncPlayerFilterSliders, syncPlayerEqSliders, updatePlayerAudioButtonState } from './PlayerPanels.js';
 
 export function attachPlayerBindings(player) {
     if (player.config.controls.playPause && player.ui.playBtn) {
@@ -137,9 +138,8 @@ export function attachPlayerBindings(player) {
                 if (value === 'off') {
                     player.subtitles.disable();
                 } else {
-                    player._switchSubtitleTrack(value);
+                    player.switchSubtitleTrack(value);
                 }
-                player._updateSubtitleMenu();
             }
         });
 
@@ -167,7 +167,7 @@ export function attachPlayerBindings(player) {
             if (item.classList.contains('disabled')) return;
 
             const trackId = parseInt(item.dataset.value);
-            player._switchAudioTrack(trackId);
+            player.switchAudioTrack(trackId);
             player.ui.audioMenu.classList.remove('visible');
         });
     }
@@ -216,22 +216,13 @@ export function attachPlayerBindings(player) {
     document.addEventListener('visibilitychange', player._handlers.visibilitychange);
 
     if (player.config.controls.loop) {
-        player._updateLoopUI();
-
         player.ui.loopBtn.addEventListener('click', () => player.toggleLoopPanel());
         player.ui.closeLoopPanelBtn.addEventListener('click', () => player.toggleLoopPanel());
 
         player.ui.loopModeRadios.forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                player.loopMode = e.target.value;
-                if (player.ui.loopAbSection) {
-                    player.ui.loopAbSection.style.display = player.loopMode === 'one' ? 'block' : 'none';
-                }
-                // Announces loopmodechange too (PlayerStateEvents): whether
-                // there is a next item depends on it, since in playlist-loop
-                // mode the last item has one.
-                player._updateLoopUI();
-            });
+            // loopmodechange also tells the playlist whether there is a next
+            // item: in playlist-loop mode the last item has one.
+            radio.addEventListener('change', (e) => player.setLoop(e.target.value));
         });
 
         player.ui.setABtn.addEventListener('click', () => player.setLoopStart());
@@ -240,18 +231,14 @@ export function attachPlayerBindings(player) {
 
         player.ui.loopStartInput.addEventListener('change', (e) => {
             const time = parseTime(e.target.value);
-            if (time !== null && player.loopMode === 'one') {
-                player.loopStart = time;
-                player._updateLoopUI();
-            }
+            if (time !== null && player.loopMode === 'one') player.setLoop('one', time);
+            player.loop.renderLoopUI(); // the field shows the time as the player has it
         });
 
         player.ui.loopEndInput.addEventListener('change', (e) => {
             const time = parseTime(e.target.value);
-            if (time !== null && player.loopMode === 'one') {
-                player.loopEnd = time;
-                player._updateLoopUI();
-            }
+            if (time !== null && player.loopMode === 'one') player.setLoop('one', player.loopStart, time);
+            player.loop.renderLoopUI(); // the field shows the time as the player has it
         });
     }
 
@@ -267,7 +254,6 @@ export function attachPlayerBindings(player) {
                 const value = parseInt(e.target.value);
                 player.videoFilters.setBrightness(value);
                 player.ui.brightnessValue.textContent = `${value}%`;
-                player._updateFiltersButtonState();
             });
         }
 
@@ -276,7 +262,6 @@ export function attachPlayerBindings(player) {
                 const value = parseInt(e.target.value);
                 player.videoFilters.setContrast(value);
                 player.ui.contrastValue.textContent = `${value}%`;
-                player._updateFiltersButtonState();
             });
         }
 
@@ -285,7 +270,6 @@ export function attachPlayerBindings(player) {
                 const value = parseInt(e.target.value);
                 player.videoFilters.setSaturation(value);
                 player.ui.saturationValue.textContent = `${value}%`;
-                player._updateFiltersButtonState();
             });
         }
 
@@ -294,7 +278,6 @@ export function attachPlayerBindings(player) {
                 const value = parseInt(e.target.value);
                 player.videoFilters.setBlur(value);
                 player.ui.blurValue.textContent = `${value}px`;
-                player._updateFiltersButtonState();
             });
         }
 
@@ -303,7 +286,6 @@ export function attachPlayerBindings(player) {
                 const value = parseInt(e.target.value);
                 player.videoFilters.setInvert(value);
                 player.ui.invertValue.textContent = `${value}%`;
-                player._updateFiltersButtonState();
             });
         }
 
@@ -318,8 +300,7 @@ export function attachPlayerBindings(player) {
         player.container.querySelectorAll('.filter-preset-btn[data-preset]').forEach(btn => {
             btn.addEventListener('click', () => {
                 player.videoFilters.applyPreset(btn.dataset.preset);
-                player._syncFilterSliders();
-                player._updateFiltersButtonState();
+                syncPlayerFilterSliders(player);
                 btn.blur();
             });
         });
@@ -331,7 +312,6 @@ export function attachPlayerBindings(player) {
                 player.videoFilters.applyEffect(btn.dataset.effect);
                 const active = player.videoFilters.effect;
                 fxButtons.forEach(b => b.classList.toggle('active', b.dataset.effect === active));
-                player._updateFiltersButtonState();
                 btn.blur();
             });
         });
@@ -427,9 +407,8 @@ export function attachPlayerBindings(player) {
         if (player.ui.resetFiltersBtn) {
             player.ui.resetFiltersBtn.addEventListener('click', () => {
                 player.videoFilters.reset();
-                player._syncFilterSliders();
+                syncPlayerFilterSliders(player);
                 fxButtons.forEach(b => b.classList.remove('active'));
-                player._updateFiltersButtonState();
             });
         }
     }
@@ -459,6 +438,7 @@ export function attachPlayerBindings(player) {
                     player.audioEqualizer.setBass(value);
                 }
                 player.ui.eqBassValue.textContent = value;
+                updatePlayerAudioButtonState(player);
             });
         }
 
@@ -469,6 +449,7 @@ export function attachPlayerBindings(player) {
                     player.audioEqualizer.setMid(value);
                 }
                 player.ui.eqMidValue.textContent = value;
+                updatePlayerAudioButtonState(player);
             });
         }
 
@@ -479,6 +460,7 @@ export function attachPlayerBindings(player) {
                     player.audioEqualizer.setTreble(value);
                 }
                 player.ui.eqTrebleValue.textContent = value;
+                updatePlayerAudioButtonState(player);
             });
         }
 
@@ -487,7 +469,8 @@ export function attachPlayerBindings(player) {
                 if (!player.audioEqualizer) return;
                 const preset = btn.dataset.preset;
                 player.audioEqualizer.applyPreset(preset);
-                player._syncEqSliders();
+                syncPlayerEqSliders(player);
+                updatePlayerAudioButtonState(player);
             });
         });
 
@@ -495,7 +478,8 @@ export function attachPlayerBindings(player) {
             player.ui.resetEqBtn.addEventListener('click', () => {
                 if (!player.audioEqualizer) return;
                 player.audioEqualizer.reset();
-                player._syncEqSliders();
+                syncPlayerEqSliders(player);
+                updatePlayerAudioButtonState(player);
             });
         }
     }

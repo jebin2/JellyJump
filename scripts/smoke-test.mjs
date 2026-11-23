@@ -376,6 +376,41 @@ async function run(page, origin) {
     check(/^0:01(\.0+)? \/ 0:02(\.0+)?$/.test(events.timeShown ?? ''), `the time display follows a seek (${events.timeShown})`);
     check(Math.abs(events.barShown - 100 / events.duration) < 3, `and the progress bar (${events.barShown?.toFixed(1)}%)`);
 
+    // The rest of the controls (H2, second part): changed through the
+    // player's state, drawn by the UI from the event.
+    const drawn = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        const label = (el) => el?.getAttribute('aria-label') ?? null;
+        const out = {};
+        p.videoFilters.setBrightness(150); await sleep(30);
+        out.filtersOn = label(p.ui.filtersBtn);
+        p.videoFilters.reset(); await sleep(30);
+        out.filtersOff = label(p.ui.filtersBtn);
+        p.setLoop('playlist'); await sleep(30);
+        out.loopPlaylist = label(p.ui.loopBtn);
+        p.setLoop('one', 0.5, 1.5); await sleep(30);
+        out.loopAb = label(p.ui.loopBtn);
+        out.markerA = parseFloat(p.ui.loopMarkerA?.style.left);
+        out.markerShown = p.ui.loopMarkerA?.style.display;
+        p.setLoop('off', null, null); await sleep(30);
+        out.loopOff = label(p.ui.loopBtn);
+        out.markerHidden = p.ui.loopMarkerA?.style.display;
+        p.subtitles.toggle(); await sleep(30);
+        out.ccOn = p.ui.ccBtn?.classList.contains('active');
+        p.subtitles.toggle(); await sleep(30);
+        out.ccOff = p.ui.ccBtn?.classList.contains('active');
+        out.duration = p.duration;
+        return out;
+    });
+    check(drawn.filtersOn === 'Video Filters (Active)' && drawn.filtersOff === 'Video Filters',
+        `the filters button follows filterschange (${drawn.filtersOn} / ${drawn.filtersOff})`);
+    check(drawn.loopPlaylist === 'Loop Mode: Playlist' && drawn.loopAb === 'Loop Mode: A-B' && drawn.loopOff === 'Loop Mode: Off',
+        `the loop button follows setLoop (${drawn.loopPlaylist} / ${drawn.loopAb} / ${drawn.loopOff})`);
+    check(drawn.markerShown === 'block' && Math.abs(drawn.markerA - 50 / drawn.duration) < 1 && drawn.markerHidden === 'none',
+        `and the A-B markers (${drawn.markerA?.toFixed(1)}%, ${drawn.markerShown} then ${drawn.markerHidden})`);
+    check(drawn.ccOn === true && drawn.ccOff === false, `the captions button follows trackschange (${drawn.ccOn} / ${drawn.ccOff})`);
+
     const overlays = await page.evaluate(async () => {
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         const p = window.player;

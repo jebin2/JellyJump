@@ -10,7 +10,8 @@
 import {
     updatePlayerPlayPauseUI, updatePlayerProgress, updatePlayerVolumeUI, showPlayerLoading,
 } from './PlayerUIUpdates.js';
-import { updatePlayerSpeedMenu } from './PlayerPanels.js';
+import { updatePlayerSpeedMenu, updatePlayerFiltersButtonState } from './PlayerPanels.js';
+import { Logger } from '../../shared/utils/Logger.js';
 
 /** @param {any} player */
 export function listenToPlayer(player) {
@@ -27,5 +28,21 @@ export function listenToPlayer(player) {
     player.on('ratechange', speed);
     player.on('loadingchange', loading);
 
-    playButton(); progress(); volume(); speed(); loading();
+    const filters = () => updatePlayerFiltersButtonState(player);
+    // The A-B markers sit at a share of the duration, so a range set while
+    // the video loads is placed once the duration arrives.
+    const loop = () => player.loop?.renderLoopUI();
+    const tracks = () => {
+        player.subtitles?.renderSubtitleMenu();
+        player.subtitles?.renderAudioTrackMenu()
+            .catch((/** @type {Error} */ e) => Logger.warn('[Tracks] Audio track menu:', e));
+    };
+    const stream = () => player.stream?.renderStreamUI();
+
+    player.on('filterschange', filters);
+    for (const event of ['loopmodechange', 'durationchange']) player.on(event, loop);
+    player.on('trackschange', tracks);
+    player.on('streamstatechange', stream);
+
+    playButton(); progress(); volume(); speed(); loading(); filters(); loop();
 }

@@ -80,7 +80,7 @@ export function togglePlayerSubtitlePanel(player) {
     const isVisible = player.ui.ccPanel.style.display !== 'none';
     player.ui.ccPanel.style.display = isVisible ? 'none' : 'block';
     if (!isVisible) {
-        player._updateSubtitleMenu();
+        player.subtitles.renderSubtitleMenu();
     }
 }
 

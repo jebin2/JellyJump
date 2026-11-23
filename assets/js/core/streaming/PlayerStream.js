@@ -97,7 +97,8 @@ export class PlayerStream {
 
     // ─── Stream UI ───────────────────────────────────────────────────────────────
 
-    updateStreamUI() {
+    /** Drawn by the UI on streamstatechange (PlayerUIListeners), not by the core. */
+    renderStreamUI() {
         const player = this.player;
 
         if (this.isLive) {
