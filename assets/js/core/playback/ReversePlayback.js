@@ -302,7 +302,7 @@ export class ReversePlayback {
         p.playbackTimeAtStart = t;
         p.trigger?.('timeupdate', { currentTime: t });
         p._updateProgress();
-        if (p.subtitles?.enabled) p._renderSubtitles(t);
+        if (p.subtitles?.enabled) p.subtitles.renderSubtitles(t);
 
         if (t <= this._start + EPSILON) {
             if (p.loopMode === 'one') {

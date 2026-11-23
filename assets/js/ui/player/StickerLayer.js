@@ -211,7 +211,7 @@ export class StickerLayer {
     _repaintIfPaused() {
         const player = this.player;
         if (player.isPlaying) return;
-        if (player.isStreamMode) { player._renderStreamFrame?.(); return; }
+        if (player.isStreamMode) { player.stream?.renderStreamFrame(); return; }
         if (player.videoTrack) player._extractAndDrawFrame?.(player.currentTime);
     }
 

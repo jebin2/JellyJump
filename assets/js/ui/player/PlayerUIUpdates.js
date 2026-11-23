@@ -144,3 +144,16 @@ export function updatePlayerVolumeUI(player) {
     Logger.log(`[VolumeUI] isMuted=${player.isMuted}, volume=${player.volume}, config.muted=${player.config.muted}, gainValue=${player.gainNode?.gain?.value}, audioSettingsBtn=${!!player.ui.audioSettingsBtn}, muteBtn=${!!player.ui.muteBtn}`);
     updatePlayerAudioButtonState(player);
 }
+
+/**
+ * Enable or grey out the player's previous and next buttons.
+ * @param {any} player @param {boolean} canGoPrev @param {boolean} canGoNext
+ */
+export function updatePlayerNavigationButtons(player, canGoPrev, canGoNext) {
+    for (const [btn, can] of [[player.ui.prevBtn, canGoPrev], [player.ui.nextBtn, canGoNext]]) {
+        if (!btn) continue;
+        btn.disabled = !can;
+        btn.style.opacity = can ? '1' : '0.4';
+        btn.style.cursor = can ? 'pointer' : 'not-allowed';
+    }
+}

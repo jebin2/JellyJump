@@ -12,14 +12,11 @@
  *   const player = createPlayer('player-container', { mode: 'player' });
  */
 import { CorePlayer } from '../../core/Player.js';
-import { mountPlayerShell, initPlayerResizeObserver, handlePlayerResize, togglePlayerFullscreen } from './PlayerShell.js';
+import { mountPlayerShell, initPlayerResizeObserver } from './PlayerShell.js';
 import { createHelpOverlay } from './PlayerOverlays.js';
 import { createPlayerControls } from './PlayerControlsView.js';
 import { attachPlayerBindings } from './PlayerBindings.js';
-import {
-    handlePlayerDocumentClick, togglePlayerFilterPanel, togglePlayerSpeedPanel, togglePlayerSubtitlePanel,
-    syncPlayerFilterSliders, togglePlayerAudioPanel, syncPlayerEqSliders,
-} from './PlayerPanels.js';
+import { handlePlayerDocumentClick } from './PlayerPanels.js';
 import { updatePlayerFullscreenUI, showPlayerBezel } from './PlayerUIUpdates.js';
 import { PlayerKeyboard } from './PlayerKeyboard.js';
 import { PlayerSubtitles } from './PlayerSubtitles.js';
@@ -27,6 +24,11 @@ import { PlayerLoopControl } from './PlayerLoopControl.js';
 import { PlayerThumbnails } from './PlayerThumbnails.js';
 import { PlayerControlBar } from './PlayerControlBar.js';
 import { ScreenshotManager } from './ScreenshotManager.js';
+import { handlePlayerVisibilityChange } from '../../core/playback/PlaybackState.js';
+
+const FULLSCREEN_EVENTS = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'];
+/** The document listeners each mounted player added, for `unmount`. @type {WeakMap<object, [string, EventListener][]>} */
+const documentListeners = new WeakMap();
 
 /** What the core is given to show itself with. */
 export const playerView = {
@@ -49,8 +51,38 @@ export const playerView = {
         createPlayerControls(player);
         if (controls.keyboard) createHelpOverlay(player);
         attachPlayerBindings(player);
+
+        /** @type {[string, EventListener][]} */
+        const listeners = [
+            ['visibilitychange', () => handlePlayerVisibilityChange(player)],
+            ['click', (e) => handlePlayerDocumentClick(player, e)],
+        ];
+        if (controls.fullscreen) {
+            const fullscreen = () => updatePlayerFullscreenUI(player);
+            for (const event of FULLSCREEN_EVENTS) listeners.push([event, fullscreen]);
+        }
+        if (controls.keyboard) listeners.push(['keydown', (e) => player.keyboard.handleKeyboard(e)]);
+        for (const [event, fn] of listeners) document.addEventListener(event, fn);
+        documentListeners.set(player, listeners);
+
         if (controls.controlBar) player.controlBar.applyMode();
         if (controls.fullscreen) initPlayerResizeObserver(player);
+    },
+
+    /**
+     * Take the player off the page: what `mount` added to the document,
+     * and the controls the player does not remove with its canvas.
+     * @param {any} player
+     */
+    unmount(player) {
+        const { ui } = player;
+        for (const [event, fn] of documentListeners.get(player) ?? []) document.removeEventListener(event, fn);
+        documentListeners.delete(player);
+        player.resizeObserver?.disconnect();
+        player.resizeObserver = null;
+        ui.controls?.remove();
+        ui.helpOverlay?.remove();
+        ui.loader?.remove();
     },
 
     /** The bars drawn for audio-only files, loaded when first needed. @param {HTMLCanvasElement} canvas */
@@ -59,17 +91,7 @@ export const playerView = {
         return new AudioVisualizer(canvas);
     },
 
-    handleResize: handlePlayerResize,
-    toggleFullscreen: togglePlayerFullscreen,
-    updateFullscreenUI: updatePlayerFullscreenUI,
     showBezel: showPlayerBezel,
-    handleDocumentClick: handlePlayerDocumentClick,
-    toggleFilterPanel: togglePlayerFilterPanel,
-    toggleSpeedPanel: togglePlayerSpeedPanel,
-    toggleSubtitlePanel: togglePlayerSubtitlePanel,
-    syncFilterSliders: syncPlayerFilterSliders,
-    toggleAudioPanel: togglePlayerAudioPanel,
-    syncEqSliders: syncPlayerEqSliders,
 };
 
 /**

@@ -78,7 +78,7 @@ export async function updatePlayerNextFrame(player) {
 
                 if (!player._isMediaReady) {
                     player._isMediaReady = true;
-                    if (player.isPlaying) player._resumeRecordingSmartPause();
+                    if (player.isPlaying) player.stream?.resumeRecordingSmartPause();
                 }
             } else {
                 player.frames.setPending(newNextFrame);
@@ -144,7 +144,7 @@ export function startPlayerRenderLoop(player) {
             }
 
             if (!player.isLive && !player.frames.pending) {
-                if (player.frames.isOpen) player._updateNextFrame();
+                if (player.frames.isOpen) updatePlayerNextFrame(player);
                 // A rebuild that gave up leaves the queue closed, and the pump
                 // will not run on one — so the picture would stay frozen under
                 // a player that is otherwise still going.
@@ -156,7 +156,7 @@ export function startPlayerRenderLoop(player) {
                     player.presentFrame(player.frames.pending.canvas, { clear: true });
 
                     player.frames.clearPending();
-                    player._updateNextFrame();
+                    updatePlayerNextFrame(player);
                 } else if (!player.isLive && player.frames.pending.timestamp > playbackTime + 1.0) {
                     // Insane drift: video is way ahead of audio (VOD only).
                     if (player._frameSyncLogCount % 60 === 0) {
@@ -170,7 +170,7 @@ export function startPlayerRenderLoop(player) {
             player._updateProgress();
 
             if (player.subtitles.enabled) {
-                player._renderSubtitles(playbackTime);
+                player.subtitles?.renderSubtitles(playbackTime);
             }
         }
 

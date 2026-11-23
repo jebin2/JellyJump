@@ -232,10 +232,10 @@ export function playerScrubStart(player, e) {
         player.audioContext.resume().catch(() => { });
     }
 
-    player._seek(e);
+    playerSeek(player, e);
 
-    player._scrubMoveHandler = (e) => player._onScrubMove(e);
-    player._scrubEndHandler = (e) => player._onScrubEnd(e);
+    player._scrubMoveHandler = (e) => playerScrubMove(player, e);
+    player._scrubEndHandler = (e) => playerScrubEnd(player, e);
 
     document.addEventListener('mousemove', player._scrubMoveHandler);
     document.addEventListener('mouseup', player._scrubEndHandler);

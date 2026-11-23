@@ -94,7 +94,7 @@ export class DecorationLayer {
         // same rule applies: bake it when there is something on top.
         player._syncOverlayBaking?.();
         if (player.isPlaying) return;
-        if (player.isStreamMode) { player._renderStreamFrame?.(); return; }
+        if (player.isStreamMode) { player.stream?.renderStreamFrame(); return; }
         if (player.videoTrack) player._extractAndDrawFrame?.(player.currentTime);
     }
 

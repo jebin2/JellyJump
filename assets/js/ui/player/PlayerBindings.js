@@ -1,7 +1,12 @@
 import { parseTime } from '../../shared/utils/mediaUtils.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { listenToPlayer } from './PlayerUIListeners.js';
-import { syncPlayerFilterSliders, syncPlayerEqSliders, updatePlayerAudioButtonState } from './PlayerPanels.js';
+import {
+    syncPlayerFilterSliders, syncPlayerEqSliders, updatePlayerAudioButtonState,
+    togglePlayerFilterPanel, togglePlayerSpeedPanel, togglePlayerSubtitlePanel, togglePlayerAudioPanel,
+} from './PlayerPanels.js';
+import { togglePlayerFullscreen } from './PlayerShell.js';
+import { playerScrubStart } from '../../core/playback/PlaybackState.js';
 
 export function attachPlayerBindings(player) {
     if (player.config.controls.playPause && player.ui.playBtn) {
@@ -31,7 +36,7 @@ export function attachPlayerBindings(player) {
 
     if (player.config.controls.progress && player.ui.progressContainer) {
         player.ui.progressContainer.addEventListener('mousedown', (e) => {
-            player._onScrubStart(e);
+            playerScrubStart(player, e);
         });
 
         if (player.config.controls.thumbnails) {
@@ -41,13 +46,13 @@ export function attachPlayerBindings(player) {
             // still get hover previews; touch never opens one, and any
             // lingering popup is closed when the finger lifts.
             player.ui.progressContainer.addEventListener('pointermove', (e) => {
-                if (e.pointerType === 'mouse') player._handleThumbnailHover(e);
+                if (e.pointerType === 'mouse') player.thumbnails?.handleHover(e);
             });
-            player.ui.progressContainer.addEventListener('pointerleave', () => player._handleThumbnailLeave());
+            player.ui.progressContainer.addEventListener('pointerleave', () => player.thumbnails?.handleLeave());
             player.ui.progressContainer.addEventListener('pointerup', (e) => {
-                if (e.pointerType !== 'mouse') player._handleThumbnailLeave();
+                if (e.pointerType !== 'mouse') player.thumbnails?.handleLeave();
             });
-            player.ui.progressContainer.addEventListener('pointercancel', () => player._handleThumbnailLeave());
+            player.ui.progressContainer.addEventListener('pointercancel', () => player.thumbnails?.handleLeave());
         }
     }
 
@@ -73,7 +78,7 @@ export function attachPlayerBindings(player) {
     }
 
     if (player.config.controls.fullscreen && player.ui.fullscreenBtn) {
-        player.ui.fullscreenBtn.addEventListener('click', () => player.toggleFullscreen());
+        player.ui.fullscreenBtn.addEventListener('click', () => togglePlayerFullscreen(player));
     }
 
     if (player.config.controls.fullscreen && player.ui.modeToggleBtn) {
@@ -81,7 +86,7 @@ export function attachPlayerBindings(player) {
     }
 
     if (player.config.controls.fullscreen) {
-        player.container.addEventListener('mousemove', (e) => player._handleMouseMove(e));
+        player.container.addEventListener('mousemove', (e) => player.controlBar?.handleMouseMove(e));
 
         const toggleExpand = (add) => {
             const btn = document.querySelector('.sidebar-collapse-btn');
@@ -129,8 +134,8 @@ export function attachPlayerBindings(player) {
     }
 
     if (player.config.controls.captions && player.ui.ccBtn && player.ui.ccPanel) {
-        player.ui.ccBtn.addEventListener('click', () => player.toggleSubtitlePanel());
-        player.ui.closeCcPanelBtn.addEventListener('click', () => player.toggleSubtitlePanel());
+        player.ui.ccBtn.addEventListener('click', () => togglePlayerSubtitlePanel(player));
+        player.ui.closeCcPanelBtn.addEventListener('click', () => togglePlayerSubtitlePanel(player));
 
         player.ui.subtitleOptions.addEventListener('change', (e) => {
             if (e.target.type === 'radio') {
@@ -173,8 +178,8 @@ export function attachPlayerBindings(player) {
     }
 
     if (player.config.controls.speed && player.ui.speedBtn && player.ui.speedPanel) {
-        player.ui.speedBtn.addEventListener('click', () => player.toggleSpeedPanel());
-        player.ui.closeSpeedPanelBtn.addEventListener('click', () => player.toggleSpeedPanel());
+        player.ui.speedBtn.addEventListener('click', () => togglePlayerSpeedPanel(player));
+        player.ui.closeSpeedPanelBtn.addEventListener('click', () => togglePlayerSpeedPanel(player));
 
         player.ui.speedSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
@@ -206,18 +211,9 @@ export function attachPlayerBindings(player) {
         });
     }
 
-    if (player.config.controls.fullscreen) {
-        document.addEventListener('fullscreenchange', player._handlers.fullscreen);
-        document.addEventListener('webkitfullscreenchange', player._handlers.fullscreen);
-        document.addEventListener('mozfullscreenchange', player._handlers.fullscreen);
-        document.addEventListener('MSFullscreenChange', player._handlers.fullscreen);
-    }
-
-    document.addEventListener('visibilitychange', player._handlers.visibilitychange);
-
     if (player.config.controls.loop) {
-        player.ui.loopBtn.addEventListener('click', () => player.toggleLoopPanel());
-        player.ui.closeLoopPanelBtn.addEventListener('click', () => player.toggleLoopPanel());
+        player.ui.loopBtn.addEventListener('click', () => player.loop.toggleLoopPanel());
+        player.ui.closeLoopPanelBtn.addEventListener('click', () => player.loop.toggleLoopPanel());
 
         player.ui.loopModeRadios.forEach(radio => {
             // loopmodechange also tells the playlist whether there is a next
@@ -243,10 +239,10 @@ export function attachPlayerBindings(player) {
     }
 
     if (player.config.controls.filters && player.ui.filtersBtn) {
-        player.ui.filtersBtn.addEventListener('click', () => player.toggleFilterPanel());
+        player.ui.filtersBtn.addEventListener('click', () => togglePlayerFilterPanel(player));
 
         if (player.ui.closeFilterPanelBtn) {
-            player.ui.closeFilterPanelBtn.addEventListener('click', () => player.toggleFilterPanel());
+            player.ui.closeFilterPanelBtn.addEventListener('click', () => togglePlayerFilterPanel(player));
         }
 
         if (player.ui.brightnessSlider) {
@@ -414,10 +410,10 @@ export function attachPlayerBindings(player) {
     }
 
     if (player.config.controls.equalizer && player.ui.audioSettingsBtn) {
-        player.ui.audioSettingsBtn.addEventListener('click', () => player.toggleAudioPanel());
+        player.ui.audioSettingsBtn.addEventListener('click', () => togglePlayerAudioPanel(player));
 
         if (player.ui.closeAudioPanelBtn) {
-            player.ui.closeAudioPanelBtn.addEventListener('click', () => player.toggleAudioPanel());
+            player.ui.closeAudioPanelBtn.addEventListener('click', () => togglePlayerAudioPanel(player));
         }
 
         if (player.ui.panelMuteBtn) {
@@ -482,12 +478,6 @@ export function attachPlayerBindings(player) {
                 updatePlayerAudioButtonState(player);
             });
         }
-    }
-
-    document.addEventListener('click', player._handlers.click);
-
-    if (player.config.controls.keyboard) {
-        document.addEventListener('keydown', player._handlers.keydown);
     }
 
     // The controls follow the player's state from here on (H2).

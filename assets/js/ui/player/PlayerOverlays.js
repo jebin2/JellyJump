@@ -23,8 +23,8 @@ export function createHelpOverlay(player) {
     player.ui.helpOverlay = player.container.querySelector('.jellyjump-help-overlay');
     player.ui.closeHelpBtn = player.container.querySelector('.jellyjump-close-help');
 
-    player.ui.closeHelpBtn.addEventListener('click', () => player._toggleHelp());
+    player.ui.closeHelpBtn.addEventListener('click', () => player.keyboard?.toggleHelp());
     player.ui.helpOverlay.addEventListener('click', (e) => {
-        if (e.target === player.ui.helpOverlay) player._toggleHelp();
+        if (e.target === player.ui.helpOverlay) player.keyboard?.toggleHelp();
     });
 }

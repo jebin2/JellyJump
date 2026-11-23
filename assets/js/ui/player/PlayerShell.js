@@ -1,4 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
+import { updatePlayerFullscreenUI } from './PlayerUIUpdates.js';
 
 export function mountPlayerShell(player) {
     player.container.classList.add('jellyjump-container');
@@ -46,7 +47,7 @@ export function togglePlayerFullscreen(player) {
     // CSS-fallback fullscreen active? This toggle is an exit request.
     if (player.container.classList.contains('fullscreen-fallback')) {
         exitFallbackFullscreen(player);
-        player._updateFullscreenUI();
+        updatePlayerFullscreenUI(player);
         return;
     }
 
@@ -57,7 +58,7 @@ export function togglePlayerFullscreen(player) {
             player.container.requestFullscreen().catch(err => {
                 Logger.warn(`Native fullscreen rejected (${err.message}), using CSS fallback`);
                 enterFallbackFullscreen(player);
-                player._updateFullscreenUI();
+                updatePlayerFullscreenUI(player);
             });
         } else if (player.container.webkitRequestFullscreen) {
             try {
@@ -86,7 +87,7 @@ export function togglePlayerFullscreen(player) {
         exitFallbackFullscreen(player);
     }
 
-    player._updateFullscreenUI();
+    updatePlayerFullscreenUI(player);
 }
 
 function enterFallbackFullscreen(player) {
