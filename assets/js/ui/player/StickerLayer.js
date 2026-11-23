@@ -108,7 +108,7 @@ export class StickerLayer {
                 : await AnimatedImage.load(file, frameWidth);
             sticker.aspect = sticker.media.width / sticker.media.height || 1;
             this._syncBoxes();
-            this._repaintIfPaused();
+            this.player.redraw?.();
             return sticker;
         } catch (error) {
             Logger.warn('[Stickers] Could not decode that file:', error);
@@ -169,8 +169,7 @@ export class StickerLayer {
         this.stickers.splice(i, 1);
         if (this.selectedId === id) this.selectedId = null;
         this._syncBoxes();
-        this.player._syncOverlayBaking?.();
-        this._repaintIfPaused();
+        this.player.redraw?.({ overlaysChanged: true });
     }
 
     clear() {
@@ -178,8 +177,7 @@ export class StickerLayer {
         this.stickers = [];
         this.selectedId = null;
         this._syncBoxes();
-        this.player._syncOverlayBaking?.();
-        this._repaintIfPaused();
+        this.player.redraw?.({ overlaysChanged: true });
     }
 
     /** Show the outlines and let them be dragged. */
@@ -199,22 +197,6 @@ export class StickerLayer {
         this._boxes.clear();
     }
 
-    /**
-     * Redraw the frame that is already on screen.
-     *
-     * While playing, the next frame carries the change along. Paused, nothing
-     * redraws -- and placing stickers is mostly something you do paused, so
-     * without this a sticker you just added or dragged stayed invisible until
-     * you hit play.
-     * @private
-     */
-    _repaintIfPaused() {
-        const player = this.player;
-        if (player.isPlaying) return;
-        if (player.isStreamMode) { player.stream?.renderStreamFrame(); return; }
-        if (player.videoTrack) player._extractAndDrawFrame?.(player.currentTime);
-    }
-
     /** @private */
     _add(props) {
         const sticker = {
@@ -228,8 +210,7 @@ export class StickerLayer {
         // rather than onto the element -- or the filter would grey this out
         // along with the picture. Before the repaint, so the frame that is
         // redrawn is drawn the new way.
-        this.player._syncOverlayBaking?.();
-        this._repaintIfPaused();
+        this.player.redraw?.({ overlaysChanged: true });
         return sticker;
     }
 
@@ -300,7 +281,7 @@ export class StickerLayer {
             || this.stickers[this.stickers.length - 1];
         if (!sticker) return;
         sticker.motion = (sticker.motion === name || !STICKER_MOTIONS[name]) ? null : name;
-        this._repaintIfPaused();
+        this.player.redraw?.();
     }
 
     // --- placement -------------------------------------------------------
@@ -433,7 +414,7 @@ export class StickerLayer {
                 sticker.y = Math.max(-0.25, Math.min(0.95, from.y + dy));
             }
             this._positionBoxes();
-            this._repaintIfPaused();
+            this.player.redraw?.();
         };
         const up = () => {
             this._overlay.removeEventListener('pointermove', move);

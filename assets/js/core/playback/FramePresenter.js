@@ -3,10 +3,11 @@
  * Putting frames on the player's canvas, and the overlays drawn over them
  * (moved out of core/Player.js, ARCHITECTURE_PLAN.md H4). The player keeps
  * one-line methods for each: `presentFrame`, `addRenderCallback`,
- * `removeRenderCallback`, `overlayTimeMs`, `_syncOverlayBaking`.
+ * `removeRenderCallback`, `overlayTimeMs`, `redraw`.
  */
 import { hasOverlays } from '../../shared/media/OverlayCompositor.js';
 import { Logger } from '../../shared/utils/Logger.js';
+import { extractAndDrawPlayerFrame } from './MediaLifecycle.js';
 
 /**
  * Put one frame on screen. The single way anything reaches the canvas:
@@ -98,4 +99,20 @@ export function syncPlayerOverlayBaking(player) {
     const needed = !!player.isStreamMode
         || hasOverlays({ stickers: player.stickers, decorations: player.decorations });
     player.videoFilters.setCanvasMode(needed);
+}
+
+/**
+ * Redraw what is on screen. While playing, the next frame carries any change
+ * along; paused, the frame showing is drawn again (stickers are mostly placed
+ * paused, and stayed invisible until Play without this).
+ * `overlaysChanged`: something above the picture (a sticker, a border) came
+ * or went, so first decide again whether the colour effects go into the
+ * pixels -- before the repaint, so it is drawn the new way.
+ * @param {any} player @param {{overlaysChanged?: boolean}} [options]
+ */
+export function redrawPlayer(player, { overlaysChanged = false } = {}) {
+    if (overlaysChanged) syncPlayerOverlayBaking(player);
+    if (player.isPlaying) return;
+    if (player.isStreamMode) { player.stream?.renderStreamFrame(); return; }
+    if (player.videoTrack) extractAndDrawPlayerFrame(player, player.currentTime);
 }

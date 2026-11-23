@@ -145,7 +145,7 @@ async function makePlayer({ restorePlayerAutoplayAudio, syncYouTubeAudio }) {
         config: { muted: false, volume: 1 },
         ui: { controls: makeElement('div'), playOverlay: makeElement('div') },
         _wasMutedForAutoplay: false,
-        _setLoading() { },
+        setLoading() { },
         _updateVolumeUI() { },
         _updateProgress() { },
         _updatePlayPauseUI() { },
@@ -155,7 +155,7 @@ async function makePlayer({ restorePlayerAutoplayAudio, syncYouTubeAudio }) {
         // playing; a no-op here would mean the unmute never reached the embed
         // and the test would be grading itself.
         _syncAudioGain() { syncYouTubeAudio(player); },
-        _restoreAutoplayAudio(label) { return restorePlayerAutoplayAudio(player, label); },
+        restoreAutoplayAudio(label) { return restorePlayerAutoplayAudio(player, label); },
     };
     return player;
 }

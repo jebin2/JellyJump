@@ -5,6 +5,7 @@ import { StreamVideoSource } from './StreamVideoSource.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { CanvasRecorder } from './CanvasRecorder.js';
 import { runPlayerAudioIterator } from '../audio/AudioEngine.js';
+import { syncPlayerOverlayBaking } from '../playback/FramePresenter.js';
 
 export class PlayerStream {
     constructor(player) {
@@ -44,7 +45,7 @@ export class PlayerStream {
         // stopWebcamStreamMode. Left on, canvas mode would keep suppressing
         // the CSS filters that playback draws with, and the filter panel
         // would look broken for the rest of the session.
-        this.player._syncOverlayBaking?.();
+        syncPlayerOverlayBaking(this.player);
 
         if (this.video.streamVideo && this.video.streamVideo.srcObject) {
             Logger.log('[Player] Clearing webcam stream in load()');
@@ -141,7 +142,7 @@ export class PlayerStream {
         player.epoch.bump();
 
         Logger.log('[Live] User requested jump to live edge');
-        player._setLoading(true);
+        player.setLoading(true);
 
         try {
             const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
@@ -157,7 +158,7 @@ export class PlayerStream {
             this.startLiveVideoLoop(true);
         } catch (e) {
             Logger.warn('[Live] Failed to jump to live edge:', e);
-            player._setLoading(false);
+            player.setLoading(false);
         }
     }
 
@@ -298,7 +299,7 @@ export class PlayerStream {
                 await player.audioBuffers.close().catch(() => { });
             }
 
-            player._setLoading(true);
+            player.setLoading(true);
             const resumePosition = this._liveStartTimestamp;
 
             // ─── Instant Anchoring (Official Pattern) ───
@@ -328,7 +329,7 @@ export class PlayerStream {
                 runPlayerAudioIterator(player, audioIterator, this.anchor.wall, this.anchor.content);
             };
 
-            player._setLoading(false);
+            player.setLoading(false);
             this._isFetchingLiveFrame = false;
             this._isMediaReady = true;
             if (player.isPlaying) this.resumeRecordingSmartPause();
@@ -359,7 +360,7 @@ export class PlayerStream {
 
                     if (attempt > RESYNC_DELAYS_MS.length) {
                         Logger.error(`[Live:Video] stalled ${attempt} times — giving up on this stream`);
-                        player._setLoading(false);
+                        player.setLoading(false);
                         if (player.onStreamError && player.currentVideoId) {
                             player.onStreamError(player.currentVideoId,
                                 'This live stream stopped sending video.');
@@ -444,7 +445,7 @@ export class PlayerStream {
                     if (frameCount % 120 === 0 || schedule.loud) {
                         if (frameCount % 120 === 0) Logger.log(`[Live:Video] Catching up — behind=${schedule.drift.toFixed(3)}s, frame=${frameCount}`);
                         if (schedule.showLoading) {
-                            player._setLoading(true);
+                            player.setLoading(true);
                             this._updateLiveBadgeState();
                         }
                     }
@@ -457,7 +458,7 @@ export class PlayerStream {
 
                 if (action === 'present') {
                     if (!audioStarted) startAudio();
-                    player._setLoading(false);
+                    player.setLoading(false);
 
                     if (isBackground) {
                         await new Promise(r => setTimeout(r, 100));
@@ -495,7 +496,7 @@ export class PlayerStream {
             if (!player.epoch.isStale(epoch)) {
                 this._isLiveLoopActive = false;
             }
-            if (!player.epoch.isStale(epoch)) player._setLoading(false);
+            if (!player.epoch.isStale(epoch)) player.setLoading(false);
             Logger.log(`[Live:Video] Loop exited — total=${frameCount ?? 0}, drawn=${drawnCount ?? 0}`);
         }
     }

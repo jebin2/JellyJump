@@ -30,11 +30,11 @@ export async function handlePlayerVisibilityChange(player) {
         Logger.log(`[Visibility] Tab hidden at playback time: ${player._getPlaybackTime().toFixed(2)}s`);
     } else if (player._wasHiddenWhilePlaying) {
         if (!player.isLive) {
-            player._setLoading(true);
+            player.setLoading(true);
             const currentTime = player._getPlaybackTime();
             Logger.log(`[Visibility] Tab visible, syncing VOD video to: ${currentTime.toFixed(2)}s`);
             await player._startVideoIterator();
-            player._setLoading(false);
+            player.setLoading(false);
         } else {
             // For LIVE streams, we don't restart the loop or jump to the edge.
             // Our catch-up logic in PlayerStream handles syncing automatically
@@ -47,7 +47,7 @@ export async function handlePlayerVisibilityChange(player) {
 }
 
 export function togglePlayerPlay(player) {
-    player._restoreAutoplayAudio('Play button pressed');
+    player.restoreAutoplayAudio('Play button pressed');
 
     if (!player.videoTrack && !player.audioTrack && !player.isStreamMode && !player.currentVideoId) {
         if (player.onPlayRequest) {
@@ -114,7 +114,7 @@ export function completePlayerMedia(player) {
 export async function seekPlayerTo(player, time) {
     Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${player.vodAnchor.wall?.toFixed(3)}, vodAnchorContent=${player.vodAnchor.content?.toFixed(3)}, playbackTime=${player._getPlaybackTime().toFixed(3)}`);
 
-    player._setLoading(true);
+    player.setLoading(true);
 
     const wasPlaying = player.isPlaying;
     if (wasPlaying) player.pause(false);
@@ -142,7 +142,7 @@ export async function seekPlayerTo(player, time) {
     try {
         await player._startVideoIterator();
     } finally {
-        player._setLoading(false);
+        player.setLoading(false);
     }
 
     // Seeking to the end of something that was playing ends it, exactly as

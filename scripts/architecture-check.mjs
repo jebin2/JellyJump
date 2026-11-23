@@ -91,8 +91,13 @@ const PLAYER_FILE = 'core/Player.js';
 const LOCAL_STORAGE_OWNERS = /^shared\/(settings\/|services\/(IndexedDB|DesktopStorage)Service\.js$)/;
 const isPlaylistPart = (r) => /^ui\/player\/Playlist[A-Za-z]*\.js$/.test(r);
 
-/** `player._x`, `this.player._x`, `….player._x`, and `p._x` where p is the player by convention. */
+/**
+ * `player._x`, `this.player._x`, `….player._x`, and `p._x` where p is the
+ * player by convention -- except in the playlist's parts, where p is the
+ * playlist. Vendored libraries (lib/) are not ours to count.
+ */
 const PLAYER_PRIVATE = /(?:\bplayer|\bp)\._[A-Za-z]\w*/g;
+const PLAYER_PRIVATE_NAMED = /\bplayer\._[A-Za-z]\w*/g;
 const PLAYLIST_PRIVATE = /\bplaylist\._[A-Za-z]\w*/g;
 
 const counts = { playerPrivateCalls: 0, playlistPrivateCalls: 0, localStorageFiles: 0, directElectronChecks: 0, externalUrlFiles: 0 };
@@ -100,7 +105,9 @@ for (const file of files) {
     const r = rel(file);
     const source = (await readFile(file, 'utf8'))
         .split('\n').filter((line) => !/^\s*(\/\/|\*)/.test(line)).join('\n');
-    if (r !== PLAYER_FILE) counts.playerPrivateCalls += (source.match(PLAYER_PRIVATE) ?? []).length;
+    if (r !== PLAYER_FILE && !r.startsWith('lib/')) {
+        counts.playerPrivateCalls += (source.match(isPlaylistPart(r) ? PLAYER_PRIVATE_NAMED : PLAYER_PRIVATE) ?? []).length;
+    }
     if (!isPlaylistPart(r)) counts.playlistPrivateCalls += (source.match(PLAYLIST_PRIVATE) ?? []).length;
     if (/\blocalStorage\b/.test(source) && !LOCAL_STORAGE_OWNERS.test(r)) counts.localStorageFiles++;
     if (r !== 'shared/platform/Platform.js' && /\belectronAPI\b/.test(source)) counts.directElectronChecks++;

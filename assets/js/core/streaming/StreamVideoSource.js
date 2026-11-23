@@ -1,5 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { cleanupPlayerMediaBunny } from '../playback/MediaLifecycle.js';
+import { syncPlayerOverlayBaking } from '../playback/FramePresenter.js';
 
 /**
  * A MediaStream shown through a <video> element: the camera, and the screen
@@ -27,7 +28,7 @@ export class StreamVideoSource {
 
     async loadWebcamStream(stream) {
         const player = this.player;
-        player._setLoading(true);
+        player.setLoading(true);
         this.stream._isMediaReady = false;
 
         player.pause(false);
@@ -44,9 +45,9 @@ export class StreamVideoSource {
         this.stream.isWebcamMode = true;
         player.isPlaying = true;
         this.showStreamVideo();
-        player._syncOverlayBaking?.();
+        syncPlayerOverlayBaking(player);
         this.setWebcamModeControls(true);
-        player._setLoading(false);
+        player.setLoading(false);
 
         try {
             await player.play();
@@ -72,7 +73,7 @@ export class StreamVideoSource {
         this.stream.isStreamMode = false;
         // After the flag, not before: the decision reads isStreamMode, and
         // asking while it still said "camera" left baking switched on.
-        this.player._syncOverlayBaking?.();
+        syncPlayerOverlayBaking(this.player);
         this.player.isPlaying = false;
         this.stopStreamRenderLoop();
         this.player._updatePlayPauseUI();
@@ -117,7 +118,7 @@ export class StreamVideoSource {
         const player = this.player;
 
         this.streamVideo.onplaying = () => {
-            if (this.stream.isStreamMode) player._setLoading(false);
+            if (this.stream.isStreamMode) player.setLoading(false);
         };
 
         this.streamVideo.onended = () => {
@@ -177,7 +178,7 @@ export class StreamVideoSource {
         if (!this.stream.isStreamMode || !this.streamVideo) return false;
 
         const player = this.player;
-        player._setLoading(true);
+        player.setLoading(true);
 
         try {
             await this.streamVideo.play();
@@ -213,12 +214,12 @@ export class StreamVideoSource {
             } catch (mutedError) {
                 Logger.error('[Stream] Even muted play failed:', mutedError);
                 if (mutedError.name !== 'AbortError') {
-                    player._setLoading(false);
+                    player.setLoading(false);
                 }
             }
         }
 
-        player._setLoading(false);
+        player.setLoading(false);
         return true;
     }
 
@@ -230,7 +231,7 @@ export class StreamVideoSource {
         player.isPlaying = false;
         player._clearAutoHideTimer();
 
-        if (showOverlay) player._setLoading(false);
+        if (showOverlay) player.setLoading(false);
 
         player._updatePlayPauseUI();
         if (player.ui.playOverlay) {

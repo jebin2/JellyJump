@@ -51,8 +51,12 @@ function makePlayer(canvasW = 1280, canvasH = 720) {
         // The real rule, copied from Player.overlayTimeMs.
         overlayTimeMs() { return this.isStreamMode ? 1e9 : this.currentTime * 1000; },
         syncCalls: 0, videoTrack: true,
-        _syncOverlayBaking() { this.syncCalls++; this.syncOrder = (this.repaints || 0); },
-        _extractAndDrawFrame() { this.repaints = (this.repaints || 0) + 1; },
+        // Player.redraw's order: the baking question first, then the repaint.
+        redraw({ overlaysChanged = false } = {}) {
+            if (overlaysChanged) { this.syncCalls++; this.syncOrder = (this.repaints || 0); }
+            if (this.isPlaying) return;
+            this.repaints = (this.repaints || 0) + 1;
+        },
     };
 }
 

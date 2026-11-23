@@ -23,9 +23,7 @@ export function handlePlayerDocumentClick(player, e) {
         !player.ui.loopBtn.contains(e.target) && !player.ui.loopPanel.contains(e.target)) {
         player.ui.loopPanel.style.display = 'none';
     }
-    if (!player._isLoading) {
-        player._restoreAutoplayAudio('User interaction');
-    }
+    player.restoreAutoplayAudio('User interaction');
 }
 
 export function updatePlayerSpeedMenu(player) {

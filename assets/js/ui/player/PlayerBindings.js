@@ -58,23 +58,12 @@ export function attachPlayerBindings(player) {
 
     if (player.config.controls.volume && player.ui.volumeSlider) {
         player.ui.volumeSlider.addEventListener('input', (e) => {
-            player.config.volume = parseFloat(e.target.value);
-            player.config.muted = false;
-
-            player.stream.syncVolumeState();
-            player._syncAudioGain();
-            player._updateVolumeUI();
+            player.setVolume(parseFloat(e.target.value), { bezel: false });
         });
     }
 
     if (player.config.controls.volume && player.ui.muteBtn) {
-        player.ui.muteBtn.addEventListener('click', () => {
-            player.config.muted = !player.config.muted;
-
-            player.stream.syncVolumeState();
-            player._syncAudioGain();
-            player._updateVolumeUI();
-        });
+        player.ui.muteBtn.addEventListener('click', () => player.toggleMute());
     }
 
     if (player.config.controls.fullscreen && player.ui.fullscreenBtn) {
@@ -97,24 +86,24 @@ export function attachPlayerBindings(player) {
             if (player.controlBarMode === 'overlay') {
                 player.ui.controls.classList.add('visible');
                 toggleExpand(true);
-                player._clearAutoHideTimer();
-                if (player.isPlaying) player._startAutoHideTimer();
+                player.controlBar.clearAutoHideTimer();
+                if (player.isPlaying) player.controlBar.startAutoHideTimer();
             }
         });
 
         player.container.addEventListener('mouseleave', () => {
             if (player.controlBarMode === 'overlay' && player.isPlaying) {
-                player._clearAutoHideTimer();
+                player.controlBar.clearAutoHideTimer();
                 player.ui.controls.classList.remove('visible');
                 toggleExpand(false);
                 player.container.classList.add('hide-cursor');
             }
         });
 
-        player.ui.controls.addEventListener('mouseenter', () => player._clearAutoHideTimer());
+        player.ui.controls.addEventListener('mouseenter', () => player.controlBar.clearAutoHideTimer());
         player.ui.controls.addEventListener('mouseleave', () => {
             if (player.isPlaying && player.controlBarMode === 'overlay') {
-                player._startAutoHideTimer();
+                player.controlBar.startAutoHideTimer();
             }
         });
 
@@ -123,13 +112,13 @@ export function attachPlayerBindings(player) {
             if (!btn || player.controlBarMode !== 'overlay') return;
             player.ui.controls.classList.add('visible');
             btn.classList.add('visible');
-            player._clearAutoHideTimer();
+            player.controlBar.clearAutoHideTimer();
         });
 
         document.addEventListener('mouseout', (e) => {
             const btn = e.target.closest('.sidebar-collapse-btn');
             if (!btn || player.controlBarMode !== 'overlay') return;
-            if (player.isPlaying) player._startAutoHideTimer();
+            if (player.isPlaying) player.controlBar.startAutoHideTimer();
         });
     }
 

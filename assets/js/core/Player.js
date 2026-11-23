@@ -16,7 +16,7 @@ import {
 } from './config.js';
 import {
     presentPlayerFrame, addPlayerRenderCallback, removePlayerRenderCallback,
-    playerOverlayTimeMs, syncPlayerOverlayBaking,
+    playerOverlayTimeMs, redrawPlayer,
 } from './playback/FramePresenter.js';
 import { closePlayerAudioContext, restorePlayerAutoplayAudio, syncPlayerAudioGain } from './audio/AudioEngine.js';
 import {
@@ -192,7 +192,8 @@ export class CorePlayer {
     _updatePlayPauseUI() { this.announce.playState(); }
     _updateProgress() { this.announce.progress(); }
     _updateTimeDisplay() { this.announce.progress(); }
-    _setLoading(isLoading) {
+    /** Show or hide the spinner; the playlist shows it while it fetches a file. @param {boolean} isLoading */
+    setLoading(isLoading) {
         this.isLoading = isLoading;
         this.announce.loading();
     }
@@ -247,7 +248,8 @@ export class CorePlayer {
         return syncPlayerAudioGain(this);
     }
     async _closeAudioContext() { return closePlayerAudioContext(this); }
-    _restoreAutoplayAudio(sourceLabel) { return restorePlayerAutoplayAudio(this, sourceLabel); }
+    /** Unmute what autoplay muted, now that the user has interacted. @param {string} sourceLabel for the log */
+    restoreAutoplayAudio(sourceLabel) { return restorePlayerAutoplayAudio(this, sourceLabel); }
 
 
     // ─── Media Lifecycle ─────────────────────────────────────────────────────────
@@ -330,7 +332,7 @@ export class CorePlayer {
     }
     _requestSeek(time) { requestPlayerSeek(this, time); }
     _completeMedia() { completePlayerMedia(this); }
-    seek(time) { this._seekTo(time); }
+    seek(time) { return this._seekTo(time); }
 
     // ─── Load ────────────────────────────────────────────────────────────────────
     async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
@@ -410,7 +412,11 @@ export class CorePlayer {
     get volume() { return this.config.volume; }
     get isMuted() { return this.config.muted; }
 
-    setVolume(value) {
+    /**
+     * @param {number} value 0–1
+     * @param {{bezel?: boolean}} [options] bezel: false while a slider is dragged
+     */
+    setVolume(value, { bezel = true } = {}) {
         this.config.volume = Math.max(0, Math.min(1, value));
         if (this.config.volume > 0) this.config.muted = false;
 
@@ -419,6 +425,7 @@ export class CorePlayer {
         this._syncAudioGain();
 
         this._updateVolumeUI();
+        if (!bezel) return;
 
         const volumePercent = Math.round(this.config.volume * 100);
         let icon = 'icon-volume-high';
@@ -446,8 +453,8 @@ export class CorePlayer {
 
     /** The clock animated overlays run on, in ms (FramePresenter). */
     overlayTimeMs() { return playerOverlayTimeMs(this); }
-    /** Bake the colour effects into the pixels when something sits above them. */
-    _syncOverlayBaking() { syncPlayerOverlayBaking(this); }
+    /** Redraw what is on screen (FramePresenter). @param {{overlaysChanged?: boolean}} [options] */
+    redraw(options) { redrawPlayer(this, options); }
 
     // ─── The current source ──────────────────────────────────────────────────────
     //

@@ -168,8 +168,8 @@ export const PlaylistPlayback = {
                 }
             } else {
                 // Local files or legacy behavior
-                if (this.player && typeof this.player._setLoading === 'function') {
-                    this.player._setLoading(true);
+                if (this.player && typeof this.player.setLoading === 'function') {
+                    this.player.setLoading(true);
                 } else if (this.player.ui && this.player.ui.loader) {
                     this.player.ui.loader.classList.add('visible');
                 }
@@ -192,8 +192,8 @@ export const PlaylistPlayback = {
             }
         } catch (e) {
             Logger.error('Error loading file from storage:', e);
-            if (this.player && typeof this.player._setLoading === 'function') {
-                this.player._setLoading(false);
+            if (this.player && typeof this.player.setLoading === 'function') {
+                this.player.setLoading(false);
             } else if (this.player.ui && this.player.ui.loader) {
                 this.player.ui.loader.classList.remove('visible');
             }
@@ -225,8 +225,8 @@ export const PlaylistPlayback = {
         if (index < 0 || index >= this.items.length) return;
 
         // Show loading immediately for instant feedback
-        if (this.player && typeof this.player._setLoading === 'function') {
-            this.player._setLoading(true);
+        if (this.player && typeof this.player.setLoading === 'function') {
+            this.player.setLoading(true);
         }
 
         // Reset UI (clear canvas, reset time/progress)
