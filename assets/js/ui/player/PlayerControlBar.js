@@ -46,6 +46,7 @@ export class PlayerControlBar {
 
     applyMode() {
         const p = this.player;
+        p.announce?.controlBarMode(); // every mode change comes through here
         p.container.classList.remove('mode-overlay', 'mode-fixed');
         p.container.classList.add(`mode-${p.controlBarMode}`);
 

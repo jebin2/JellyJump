@@ -107,6 +107,7 @@ export function completePlayerMedia(player) {
     player.playbackTimeAtStart = player.duration;
     player.currentTime = player.duration;
     player._updateProgress();
+    player.announce?.ended();
     if (player.onEnded) player.onEnded();
 }
 
