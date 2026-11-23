@@ -60,6 +60,11 @@ code ("Delete a removed item's stored file"), under about 72 characters; the
 plan step in brackets at the end when there is one ("… (plan G1)"). The body
 says why.
 
+## Releases
+
+`docs/runbooks/release.md`: `node scripts/release.mjs prepare <version>` in a
+pull request, then a `v<version>` tag builds and drafts the release.
+
 ## Flaky tests
 
 A browser suite that fails is run once more by `run-tests.mjs`. If it then

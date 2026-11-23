@@ -8,14 +8,23 @@ import { cspFor } from './assets/js/shared/config/csp.js';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // A build id for cache-busting (the commit, or the time when there is no
-// git), and the version (from the release tag in CI, else package.json).
+// git), and the version: VITE_APP_VERSION (the release job sets it from the
+// tag), else the newest release tag this commit is built on, else
+// package.json. The site is deployed from main, not from a tag, and used to
+// report whatever package.json said, which nobody bumped (BUG-11).
 // Read by shared/config/index.js.
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8'));
 const buildId = process.env.VITE_BUILD_ID || (() => {
     try { return execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim(); }
     catch { return String(Date.now()); }
 })();
-const appVersion = process.env.VITE_APP_VERSION || pkg.version;
+const versionFromTag = () => {
+    try {
+        return execSync('git describe --tags --match "v[0-9]*" --abbrev=0', { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] })
+            .toString().trim().replace(/^v/, '');
+    } catch { return ''; }
+};
+const appVersion = process.env.VITE_APP_VERSION || versionFromTag() || pkg.version;
 
 /**
  * Each page's Content-Security-Policy from shared/config/csp.js, written into

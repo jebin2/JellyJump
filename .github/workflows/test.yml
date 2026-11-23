@@ -11,6 +11,8 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # The desktop release runs this first (desktop-release.yml).
+  workflow_call:
 
 jobs:
   test:
