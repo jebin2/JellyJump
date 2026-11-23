@@ -29,9 +29,24 @@ const contentSecurityPolicy = {
     },
 };
 
+/**
+ * version.json next to the pages, so an open tab can tell a newer build went
+ * live (shared/utils/UpdateCheck.js, plan P6).
+ */
+const versionFile = {
+    name: 'jellyjump-version',
+    generateBundle() {
+        this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: JSON.stringify({ version: appVersion, build: buildId }) + '\n',
+        });
+    },
+};
+
 export default defineConfig({
     root: '.',
-    plugins: [contentSecurityPolicy],
+    plugins: [contentSecurityPolicy, versionFile],
 
     define: {
         'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),

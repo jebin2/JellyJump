@@ -11,6 +11,8 @@
  * and every request must carry the share token. Requests name an id from the
  * index, never a path, so nothing the scan did not walk can be addressed.
  *
+ *   GET /health                   { status, version } — no token; says
+ *                                 nothing about the library
  *   GET /                         page explaining the link, for a human who
  *                                 opens it in a browser
  *   GET /api/info                 { name, count } — cheap reachability check
@@ -36,6 +38,10 @@ let allowedOrigins = [
     'http://localhost:5199', 'http://127.0.0.1:5199',
 ];
 let serverName = 'JellyJump';
+/** The desktop app's version, for /health. */
+const VERSION = (() => {
+    try { return require('./package.json').version; } catch { return 'unknown'; }
+})();
 
 /** Constant-time compare, so a token cannot be guessed a character at a time. */
 function tokenMatches(provided) {
@@ -355,6 +361,13 @@ function handle(req, res) {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
         return sendJson(res, 405, { error: 'Method not allowed' });
     }
+    // Is the server up, and which version (ARCHITECTURE_PLAN.md P5). No token:
+    // it is for a person or a monitor checking the Tailscale address answers,
+    // so it says nothing about the library — not its name, not its size.
+    if (url.pathname === '/health') {
+        return sendJson(res, 200, { status: 'ok', version: VERSION });
+    }
+
     // A file, by its own key: that file and nothing else.
     const stream = /^\/api\/stream\/([a-f0-9]{16})$/.exec(url.pathname);
     const bySig = !!stream && sigMatches(stream[1], url.searchParams.get('sig'));
