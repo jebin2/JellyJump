@@ -20,6 +20,8 @@
  *    out an outside service's address (they belong in shared/config/services.js). A count may go
  *    down (lower it in the baseline when it does) but not up.
  *
+ * 3. core/Player.js stays under 600 lines (H4).
+ *
  *   node scripts/architecture-check.mjs            check
  *   node scripts/architecture-check.mjs --update   write today's state as the baseline
  */
@@ -117,6 +119,13 @@ if (UPDATE) {
 const baseline = JSON.parse(await readFile(BASELINE, 'utf8'));
 const failures = [];
 const notes = [];
+
+// H4: the player's file stays a composition root, not a home for behaviour.
+const PLAYER_MAX_LINES = 600;
+const playerLines = (await readFile(path.join(JS, PLAYER_FILE), 'utf8')).split('\n').length;
+if (playerLines > PLAYER_MAX_LINES) {
+    failures.push(`${PLAYER_FILE} is ${playerLines} lines; keep it under ${PLAYER_MAX_LINES} by putting behaviour in a module beside it (ARCHITECTURE_PLAN.md H4)`);
+}
 
 const known = new Set(baseline.wrongWayImports);
 for (const imp of wrongWay) {

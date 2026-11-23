@@ -1,4 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
+import { cleanupPlayerMediaBunny } from '../playback/MediaLifecycle.js';
 
 /**
  * A MediaStream shown through a <video> element: the camera, and the screen
@@ -30,7 +31,7 @@ export class StreamVideoSource {
         this.stream._isMediaReady = false;
 
         player.pause(false);
-        await player._cleanupMediaBunny();
+        await cleanupPlayerMediaBunny(player);
 
         this.createStreamVideo();
         this.setupStreamVideoEvents();

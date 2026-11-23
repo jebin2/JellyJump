@@ -3,6 +3,8 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
 import { StreamDetector } from '../../shared/utils/StreamDetector.js';
 import { loadPlayerYouTube, teardownPlayerYouTube } from '../youtube/YouTubePlayback.js';
+import { closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, closePlayerAudioContext, stopPlayerQueuedAudio, suspendPlayerAudioContext } from '../audio/AudioEngine.js';
+import { loadPlayerPlaybackState } from './PlaybackState.js';
 
 /**
  * Choose an audio track the browser can actually decode.
@@ -65,11 +67,11 @@ export async function resetPlayer(player) {
     player.pause();
 
     if (player.isLive || player.isStreamMode) {
-        player._cleanupHLS();
+        player.stream?.cleanupHLS();
     }
 
     if (player.isAudioMode) {
-        player._cleanupAudio();
+        cleanupPlayerAudioMode(player);
     }
 
     clearPlayerCanvas(player);
@@ -79,7 +81,7 @@ export async function resetPlayer(player) {
     player.audioContextStartTime = null;
     player.fallbackStartTime = undefined;
 
-    player._cleanupThumbnails();
+    player.thumbnails?.cleanup();
 
     // A queue that will not close cleanly is left behind either way; the
     // reset carries on, but a failure here is worth seeing while developing.
@@ -87,7 +89,7 @@ export async function resetPlayer(player) {
         await player.frames.close();
     } catch (e) { Logger.warn('[MediaLifecycle] Frame queue did not close cleanly:', e); }
     try {
-        await player._closeAudioBufferIterator();
+        await closePlayerAudioBufferIterator(player);
     } catch (e) { Logger.warn('[MediaLifecycle] Audio queue did not close cleanly:', e); }
 
     disposeMediaBunnyResources(player);
@@ -100,7 +102,7 @@ export async function resetPlayer(player) {
     player._updateProgress();
     if (player.ui?.loader) player.ui.loader.style.display = 'none';
 
-    player._stopQueuedAudio();
+    stopPlayerQueuedAudio(player);
 
     Logger.log('[Player] Reset complete - select a video to play');
 }
@@ -108,20 +110,20 @@ export async function resetPlayer(player) {
 export async function cleanupPlayerForLoad(player) {
     player._isMediaReady = false;
     player.pause(false);
-    player._cleanupThumbnails();
-    player._cleanupAudio();
-    player._cleanupHLS();
+    player.thumbnails?.cleanup();
+    cleanupPlayerAudioMode(player);
+    player.stream?.cleanupHLS();
     player.stream.resetForLoad();
-    player._setWebcamModeControls(false);
+    player.stream?.setWebcamModeControls(false);
     player.currentTime = 0;
 
     await player.frames.close();
     await player.audioBuffers.settle();
-    await player._closeAudioBufferIterator();
+    await closePlayerAudioBufferIterator(player);
     player.epoch.bump();
     player.playbackTimeAtStart = 0;
     player.audioContextStartTime = null;
-    player._stopQueuedAudio();
+    stopPlayerQueuedAudio(player);
     player.vodAnchor.clear();
     player._frameSyncLogCount = 0;
     player.stream?.anchor.reset();
@@ -129,7 +131,7 @@ export async function cleanupPlayerForLoad(player) {
     player.isLive = false;
     if (player.stream) {
         player.stream.isLive = false;
-        player._cleanupHLS();
+        player.stream?.cleanupHLS();
     }
     
     clearPlayerCanvas(player);
@@ -486,7 +488,7 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
         return;
     }
 
-    const savedState = player._loadPlaybackState();
+    const savedState = loadPlayerPlaybackState(player);
     let startTimestamp = 0;
 
     if (savedState && savedState.videoIdentifier === player.currentVideoId) {
@@ -523,7 +525,7 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
                 if (player.ui.muteBtn) player._updateVolumeUI();
 
                 try {
-                    await player._suspendAudioContext();
+                    await suspendPlayerAudioContext(player);
                     await player.play();
                     return;
                 } catch (retryErr) {
@@ -535,10 +537,10 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
             player.isPlaying = false;
             player._updatePlayPauseUI();
 
-            player._closeAudioBufferIteratorSoon();
-            await player._suspendAudioContext();
-            player._stopQueuedAudio();
-            await player._closeAudioContext();
+            closePlayerAudioBufferIteratorSoon(player);
+            await suspendPlayerAudioContext(player);
+            stopPlayerQueuedAudio(player);
+            await closePlayerAudioContext(player);
 
             try {
                 await player._startVideoIterator();
@@ -567,7 +569,7 @@ export async function cleanupPlayerMediaBunny(player) {
     } catch (e) { Logger.warn('[MediaLifecycle] Frame queue did not close cleanly:', e); }
 
     try {
-        await player._closeAudioBufferIterator();
+        await closePlayerAudioBufferIterator(player);
     } catch (e) { Logger.warn('[MediaLifecycle] Audio queue did not close cleanly:', e); }
 
     disposeMediaBunnyResources(player);
@@ -656,12 +658,12 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         Logger.log(`Loading media: ${url}`);
         player.currentVideoId = videoId || url;
 
-        await player._setupMediaTracks(url, isHls);
+        await setupPlayerMediaTracks(player, url, isHls);
 
-        if (isHls) await player._handleHLSState();
-        if (savedSubtitles?.length > 0) player._restoreSavedSubtitles(savedSubtitles);
+        if (isHls) await handlePlayerHlsState(player);
+        if (savedSubtitles?.length > 0) player.subtitles?.restoreSavedSubtitles(savedSubtitles);
 
-        await player._handleInitialFrame(autoplay);
+        await handlePlayerInitialFrame(player, autoplay);
         player.announce.tracks();
 
         if (!player.isLive) player._setLoading(false);

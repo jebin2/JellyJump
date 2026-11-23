@@ -4,6 +4,7 @@ import { scheduleLiveFrame } from './LiveFrameSchedule.js';
 import { StreamVideoSource } from './StreamVideoSource.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { CanvasRecorder } from './CanvasRecorder.js';
+import { runPlayerAudioIterator } from '../audio/AudioEngine.js';
 
 export class PlayerStream {
     constructor(player) {
@@ -324,7 +325,7 @@ export class PlayerStream {
                     || !player.audioContext) return;
                 audioStarted = true;
                 Logger.log(`[Live:Audio] Starting audio sync loop`);
-                player._runAudioIterator(audioIterator, this.anchor.wall, this.anchor.content);
+                runPlayerAudioIterator(player, audioIterator, this.anchor.wall, this.anchor.content);
             };
 
             player._setLoading(false);
@@ -372,7 +373,7 @@ export class PlayerStream {
                     // Scheduled, not awaited: the restart must not run inside
                     // the loop it replaces.
                     setTimeout(() => {
-                        if (!player.epoch.isStale(epoch)) player._startLiveVideoLoop(true);
+                        if (!player.epoch.isStale(epoch)) player.stream?.startLiveVideoLoop(true);
                     }, wait);
                     break;
                 }

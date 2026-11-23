@@ -8,60 +8,39 @@ import '../shared/media/MediaBunny.js'; // registers the codec plugins
 import { Settings } from '../shared/settings/Settings.js';
 import { PlayerOverrides } from './PlayerOverrides.js';
 import { ScreenWakeLock } from './playback/ScreenWakeLock.js';
-import {
-    onPlayerEvent,
-    offPlayerEvent,
-    triggerPlayerEvent
-} from './PlayerEvents.js';
+import { onPlayerEvent, offPlayerEvent, triggerPlayerEvent } from './PlayerEvents.js';
 import {
     PLAYER_CONFIG,
     PLAYER_CONTROL_DEFAULTS,
-    PLAYER_CONTROL_PRESETS,
     CONTROL_BAR_MODE_DEFAULT
 } from './config.js';
-import { hasOverlays } from '../shared/media/OverlayCompositor.js';
-import { closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, closePlayerAudioContext, initPlayerAudio, restorePlayerAutoplayAudio, runPlayerAudioIterator, stopPlayerQueuedAudio, suspendPlayerAudioContext, syncPlayerAudioGain } from './audio/AudioEngine.js';
 import {
-    clearPlayerCanvas,
-    disposeMediaBunnyResources,
+    presentPlayerFrame, addPlayerRenderCallback, removePlayerRenderCallback,
+    playerOverlayTimeMs, syncPlayerOverlayBaking,
+} from './playback/FramePresenter.js';
+import { closePlayerAudioContext, restorePlayerAutoplayAudio, syncPlayerAudioGain } from './audio/AudioEngine.js';
+import {
     resetPlayer,
     cleanupPlayerForLoad,
-    setupPlayerMediaTracks,
-    handlePlayerHlsState,
-    cleanupPlayerAudioMode,
     resetPlayerUI,
-    cleanupPlayerMediaBunny,
     startPlayerVideoIterator,
     extractAndDrawPlayerFrame,
-    handlePlayerInitialFrame,
-    loadPlayerMedia,
+    loadPlayerMedia
 } from './playback/MediaLifecycle.js';
 import {
     getPlayerPlaybackTime,
-    handlePlayerVisibilityChange,
     togglePlayerPlay,
-    cyclePlayerSpeed,
-    stepPlayerFrame,
     seekPlayerTo,
     requestPlayerSeek,
-    completePlayerMedia,
-    playerSeek,
-    playerScrubStart,
-    playerScrubMove,
-    playerScrubEnd,
-    savePlayerPlaybackState,
-    loadPlayerPlaybackState
+    completePlayerMedia
 } from './playback/PlaybackState.js';
+import { playPlayer, pausePlayer, setPlayerPlaybackRate } from './playback/PlaybackTransport.js';
 import {
-    playPlayer,
-    pausePlayer,
-    setPlayerPlaybackRate
-} from './playback/PlaybackTransport.js';
-import {
-    startPlayerRenderLoop,
-    updatePlayerNextFrame
-} from './playback/RenderLoop.js';
-import { cancelYouTubeAutoplayRetry, suspendPlayerYouTube, teardownPlayerYouTube, syncYouTubeAudio } from './youtube/YouTubePlayback.js';
+    cancelYouTubeAutoplayRetry,
+    suspendPlayerYouTube,
+    teardownPlayerYouTube,
+    syncYouTubeAudio
+} from './youtube/YouTubePlayback.js';
 import { PlayerStream } from './streaming/PlayerStream.js';
 
 import { Logger } from '../shared/utils/Logger.js';
@@ -127,8 +106,6 @@ export class CorePlayer {
             ...this.config.controls
         };
 
-        this.PRESETS = PLAYER_CONTROL_PRESETS;
-
         // The demuxed source and what is read from it. Owned by the
         // component; exposed below as read-only views so the nine files that
         // read these keep working untouched.
@@ -168,42 +145,8 @@ export class CorePlayer {
         // Render Callbacks
         this.afterFrameRenderCallbacks = [];
 
-        // UI Elements
-        this.ui = {
-            controls: null,
-            playBtn: null,
-            prevBtn: null,
-            nextBtn: null,
-            progressBar: null,
-            progressContainer: null,
-            timeDisplay: null,
-            volumeSlider: null,
-            muteBtn: null,
-            fullscreenBtn: null,
-            loader: null,
-            ccBtn: null,
-            ccPanel: null,
-            ccInput: null,
-            closeCcPanelBtn: null,
-            subtitleOptions: null,
-            audioBtn: null,
-            audioMenu: null,
-            speedBtn: null,
-            speedPanel: null,
-            speedSlider: null,
-            speedValue: null,
-            resetSpeedBtn: null,
-            closeSpeedPanelBtn: null,
-            loopBtn: null,
-            loopMarkerA: null,
-            loopMarkerB: null,
-            loopRegion: null,
-            loopPanel: null,
-            loopStartInput: null,
-            loopEndInput: null,
-            playOverlay: null,
-            bezelOverlay: null
-        };
+        // The controls' elements, filled in by the view (ui/player/createPlayer.js).
+        this.ui = {};
 
         this.isLoading = false;
         this.bezelTimer = null;
@@ -224,18 +167,6 @@ export class CorePlayer {
         this.isAudioMode = false;
         this.audioElement = null;
 
-        // Global Event Handlers
-        this._handlers = {
-            click: (e) => this._handleDocumentClick(e),
-            visibilitychange: () => this._handleVisibilityChange()
-        };
-        if (this.config.controls.fullscreen) {
-            this._handlers.fullscreen = this._updateFullscreenUI.bind(this);
-        }
-        if (this.config.controls.keyboard) {
-            this._handlers.keydown = (e) => this._handleKeyboard(e);
-        }
-
         this.stream = new PlayerStream(this);
         const parts = view?.parts(this) ?? {};
         this.keyboard = parts.keyboard ?? null;
@@ -252,19 +183,6 @@ export class CorePlayer {
         this.view?.mount(this);
     }
 
-    // ─── UI Shell ────────────────────────────────────────────────────────────────
-    _handleResize(entry) { this.view?.handleResize(this, entry); }
-    toggleFullscreen() { this.view?.toggleFullscreen(this); }
-
-    _applyControlVisibility() {
-        if (!this.ui.controls) return;
-        const c = this.config.controls;
-        this.ui.controls.querySelectorAll('[data-control]').forEach(el => {
-            const controlName = el.dataset.control;
-            if (c[controlName]) el.classList.remove('control--hidden');
-        });
-    }
-
     // ─── Event emitter ───────────────────────────────────────────────────────────
     on(event, callback) { onPlayerEvent(this, event, callback); }
     off(event, callback) { offPlayerEvent(this, event, callback); }
@@ -274,7 +192,6 @@ export class CorePlayer {
     _updatePlayPauseUI() { this.announce.playState(); }
     _updateProgress() { this.announce.progress(); }
     _updateTimeDisplay() { this.announce.progress(); }
-    _updateFullscreenUI() { this.view?.updateFullscreenUI(this); }
     _setLoading(isLoading) {
         this.isLoading = isLoading;
         this.announce.loading();
@@ -282,19 +199,9 @@ export class CorePlayer {
     _showBezel(icon, text) { this.view?.showBezel(this, icon, text); }
     _updateVolumeUI() { this.announce.volume(); }
 
-    // ─── Panel helpers ───────────────────────────────────────────────────────────
-    _handleDocumentClick(e) { this.view?.handleDocumentClick(this, e); }
     _updateSpeedMenu() { this.announce.rate(); }
-    toggleFilterPanel() { this.view?.toggleFilterPanel(this); }
-    toggleSpeedPanel() { this.view?.toggleSpeedPanel(this); }
-    toggleSubtitlePanel() { this.view?.toggleSubtitlePanel(this); }
-    _syncFilterSliders() { this.view?.syncFilterSliders(this); }
-    toggleAudioPanel() { this.view?.toggleAudioPanel(this); }
-    _syncEqSliders() { this.view?.syncEqSliders(this); }
 
     // ─── Loop ────────────────────────────────────────────────────────────────────
-    toggleLoopMode() { this.loop.toggleLoopMode(); }
-    toggleLoopPanel() { this.loop.toggleLoopPanel(); }
     setLoopStart() { this.loop.setLoopStart(); }
     setLoopEnd() { this.loop.setLoopEnd(); }
     clearLoopMarkers() { this.loop.clearLoopMarkers(); }
@@ -311,53 +218,27 @@ export class CorePlayer {
         this.announce.loop();
     }
 
-    // ─── Thumbnail helpers ───────────────────────────────────────────────────────
-    _createThumbnailOverlay() { this.thumbnails.createOverlay(); }
-    _handleThumbnailHover(e) { this.thumbnails.handleHover(e); }
-    _updateThumbnailImage(time) { this.thumbnails.updateImage(time); }
-    _handleThumbnailLeave() { this.thumbnails.handleLeave(); }
-    async _startThumbnailGeneration() { return this.thumbnails.startGeneration(); }
-    _cleanupThumbnails() { this.thumbnails.cleanup(); }
 
     // ─── Subtitle / audio track helpers ─────────────────────────────────────────
     switchSubtitleTrack(trackId) { this.subtitles.switchSubtitleTrack(trackId); }
     async switchAudioTrack(trackId) { return this.subtitles.switchAudioTrack(trackId); }
-    _restoreSavedSubtitles(savedSubtitles) { this.subtitles.restoreSavedSubtitles(savedSubtitles); }
     async loadSubtitle(url, name) { return this.subtitles.loadSubtitle(url, name); }
     async generateSubtitles(opts) { return this.subtitles.generateSubtitles(opts); }
-    _renderSubtitles(timestamp) { this.subtitles.renderSubtitles(timestamp); }
 
-    // ─── Keyboard ────────────────────────────────────────────────────────────────
-    _handleKeyboard(e) { this.keyboard.handleKeyboard(e); }
-    _toggleHelp() { this.keyboard.toggleHelp(); }
 
     // ─── Control Bar Mode ────────────────────────────────────────────────────────
-    _loadControlBarMode() { this.controlBar.loadMode(); }
-    _saveControlBarMode() { this.controlBar.saveMode(); }
     toggleControlBarMode() { this.controlBar.toggleMode(); }
     _applyControlBarMode() { this.controlBar.applyMode(); } // announces controlbarmodechange
-    _handleMouseMove(e) { this.controlBar.handleMouseMove(e); }
     _startAutoHideTimer() { this.controlBar.startAutoHideTimer(); }
     _clearAutoHideTimer() { this.controlBar.clearAutoHideTimer(); }
 
     // ─── Stream helpers ──────────────────────────────────────────────────────────
-    _setupStreamVideoEvents() { this.stream.setupStreamVideoEvents(); }
     async loadWebcamStream(stream) { return this.stream.loadWebcamStream(stream); }
     async startCanvasRecording(options = {}) { return this.stream.startCanvasRecording(options); }
-    _resumeRecordingSmartPause() { this.stream.resumeRecordingSmartPause(); }
     async stopCanvasRecording() { return this.stream.stopCanvasRecording(); }
     stopWebcamStreamMode() { this.stream.stopWebcamStreamMode(); }
-    _stopStreamRenderLoop() { this.stream.stopStreamRenderLoop(); }
-    _renderStreamFrame() { this.stream.renderStreamFrame(); }
-    _setStreamModeControls(isStreamMode) { this.stream.setStreamModeControls(isStreamMode); }
-    _setWebcamModeControls(isWebcamMode) { this.stream.setWebcamModeControls(isWebcamMode); }
-    async _cleanupMediaBunny() { return cleanupPlayerMediaBunny(this); }
-    _cleanupHLS() { this.stream.cleanupHLS(); }
-    async _startLiveVideoLoop(force = false) { return this.stream.startLiveVideoLoop(force); }
 
     // ─── Audio ───────────────────────────────────────────────────────────────────
-    _initAudio() { initPlayerAudio(this); }
-    _cleanupAudio() { cleanupPlayerAudioMode(this); }
     _syncAudioGain() {
         // Every volume and mute change funnels through here, so this is the one
         // place the embed needs telling — branching in setVolume and toggleMute
@@ -366,22 +247,10 @@ export class CorePlayer {
         return syncPlayerAudioGain(this);
     }
     async _closeAudioContext() { return closePlayerAudioContext(this); }
-    async _suspendAudioContext() { return suspendPlayerAudioContext(this); }
-    _stopQueuedAudio() { stopPlayerQueuedAudio(this); }
-    async _closeAudioBufferIterator() { return closePlayerAudioBufferIterator(this); }
-    _closeAudioBufferIteratorSoon() { closePlayerAudioBufferIteratorSoon(this); }
     _restoreAutoplayAudio(sourceLabel) { return restorePlayerAutoplayAudio(this, sourceLabel); }
-    async _runAudioIterator(iterator, anchorWall, anchorContent, prefetchedSample) {
-        return runPlayerAudioIterator(this, iterator, anchorWall, anchorContent, prefetchedSample);
-    }
 
-    // ─── Render loop ─────────────────────────────────────────────────────────────
-    _startRenderLoop() { startPlayerRenderLoop(this); }
-    async _updateNextFrame() { return updatePlayerNextFrame(this); }
 
     // ─── Media Lifecycle ─────────────────────────────────────────────────────────
-    _clearCanvas() { clearPlayerCanvas(this); }
-    _disposeMediaBunnyResources() { disposeMediaBunnyResources(this); }
     async reset() {
         // A reset is the end of playback, not a step between two videos, so
         // the kept-alive embed goes with it.
@@ -404,16 +273,12 @@ export class CorePlayer {
         suspendPlayerYouTube(this);
         return cleanupPlayerForLoad(this);
     }
-    async _setupMediaTracks(url, isHls) { return setupPlayerMediaTracks(this, url, isHls); }
-    async _handleHLSState() { return handlePlayerHlsState(this); }
     resetUI() { resetPlayerUI(this); }
     async _startVideoIterator() { return startPlayerVideoIterator(this); }
     async _extractAndDrawFrame(timestamp) { return extractAndDrawPlayerFrame(this, timestamp); }
-    async _handleInitialFrame(autoplay = false) { return handlePlayerInitialFrame(this, autoplay); }
 
     // ─── Playback State ──────────────────────────────────────────────────────────
     _getPlaybackTime() { return getPlayerPlaybackTime(this); }
-    async _handleVisibilityChange() { return handlePlayerVisibilityChange(this); }
     togglePlay() {
         if (this.reverse?.active) { this.pause(); return; }
         if (this.direction === 'backward' && this.engine !== 'youtube') { this.play(); return; }
@@ -449,8 +314,6 @@ export class CorePlayer {
         }
         return {};
     }
-    _cycleSpeed(direction) { cyclePlayerSpeed(this, direction); }
-    _stepFrame(direction) { stepPlayerFrame(this, direction); }
     async _seekTo(time) {
         this.timing.seekStarted();
         // Playing backwards carries on from wherever the seek lands.
@@ -467,13 +330,7 @@ export class CorePlayer {
     }
     _requestSeek(time) { requestPlayerSeek(this, time); }
     _completeMedia() { completePlayerMedia(this); }
-    _seek(e) { playerSeek(this, e); }
-    _onScrubStart(e) { playerScrubStart(this, e); }
-    _onScrubMove(e) { playerScrubMove(this, e); }
-    _onScrubEnd(e) { playerScrubEnd(this, e); }
     seek(time) { this._seekTo(time); }
-    _savePlaybackState() { savePlayerPlaybackState(this); }
-    _loadPlaybackState() { return loadPlayerPlaybackState(this); }
 
     // ─── Load ────────────────────────────────────────────────────────────────────
     async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
@@ -587,87 +444,10 @@ export class CorePlayer {
         this.onNext = onNext;
     }
 
-    updateNavigationButtons(canGoPrev, canGoNext) {
-        if (this.ui.prevBtn) {
-            this.ui.prevBtn.disabled = !canGoPrev;
-            this.ui.prevBtn.style.opacity = canGoPrev ? '1' : '0.4';
-            this.ui.prevBtn.style.cursor = canGoPrev ? 'pointer' : 'not-allowed';
-        }
-        if (this.ui.nextBtn) {
-            this.ui.nextBtn.disabled = !canGoNext;
-            this.ui.nextBtn.style.opacity = canGoNext ? '1' : '0.4';
-            this.ui.nextBtn.style.cursor = canGoNext ? 'pointer' : 'not-allowed';
-        }
-    }
-
-    // ─── Controls Config ─────────────────────────────────────────────────────────
-    setControlsConfig(config) {
-        this.config.controls = { ...this.config.controls, ...config };
-        this._applyControlVisibility();
-    }
-
-    toggleControl(name, visible) {
-        if (this.config.controls.hasOwnProperty(name)) {
-            this.config.controls[name] = visible;
-            this._applyControlVisibility();
-        } else {
-            Logger.warn(`Control '${name}' not found in configuration.`);
-        }
-    }
-
-    getControlsConfig() { return { ...this.config.controls }; }
-
-    setControlsPreset(presetName) {
-        if (this.PRESETS[presetName]) {
-            this.setControlsConfig(this.PRESETS[presetName]);
-        } else {
-            Logger.warn(`Preset '${presetName}' not found.`);
-        }
-    }
-
-    /**
-     * The clock that animated overlays run on.
-     *
-     * A file has a timeline, so its decorations must follow that rather than
-     * the wall clock: otherwise seeking backwards does not take them back with
-     * you, playing the same file twice gives different results, and a
-     * screenshot -- which re-composites the frame and reads the clock again --
-     * saves a different moment of the animation than the one on screen.
-     *
-     * A camera or a live stream has no timeline to be consistent with, so
-     * there the wall clock is the only sensible answer. Paused, a file's
-     * decorations hold still along with the picture, which is what makes the
-     * screenshot match.
-     *
-     * @returns {number} milliseconds
-     */
-    overlayTimeMs() {
-        if (this.isStreamMode) return performance.now();
-        return (this.currentTime || 0) * 1000;
-    }
-
-    /**
-     * Decide whether the colour effects go into the pixels or onto the element.
-     *
-     * A filter treats the footage; a sticker is a thing put on top of it. So a
-     * flower stays pink over a black-and-white clip rather than going grey
-     * with it -- which is what every camera app does, and what this app's own
-     * camera and export have always done. Playback was the odd one out: its
-     * colour is a CSS filter over the whole canvas, stickers included.
-     *
-     * Baking is the only way to get that order right, and it costs a filter
-     * per frame on the main thread. So it is switched on exactly when
-     * something has to sit above the colour -- which means a plain filtered
-     * video, however large, never pays for it. The camera always bakes
-     * regardless: its recorder reads canvas pixels and a CSS filter is
-     * invisible to it.
-     */
-    _syncOverlayBaking() {
-        if (!this.videoFilters) return;
-        const needed = !!this.isStreamMode
-            || hasOverlays({ stickers: this.stickers, decorations: this.decorations });
-        this.videoFilters.setCanvasMode(needed);
-    }
+    /** The clock animated overlays run on, in ms (FramePresenter). */
+    overlayTimeMs() { return playerOverlayTimeMs(this); }
+    /** Bake the colour effects into the pixels when something sits above them. */
+    _syncOverlayBaking() { syncPlayerOverlayBaking(this); }
 
     // ─── The current source ──────────────────────────────────────────────────────
     //
@@ -759,53 +539,10 @@ export class CorePlayer {
     get audioTrack() { return this.media.audioTrack; }
     get audioSink() { return this.media.audioSink; }
 
-    // ─── Frame presentation ──────────────────────────────────────────────────────
-
-    /**
-     * Put one frame on screen. The single way anything reaches the canvas:
-     * decoded file frames, live frames and the camera all come through here.
-     *
-     * It exists because the three steps -- draw the frame, apply the effects,
-     * run whatever draws over it -- were hand-copied at nine call sites, and a
-     * copy that forgets the third step is invisible until someone tries to
-     * draw over that path. The camera was one such copy, and three sites in
-     * the live loop still were.
-     *
-     * @param {CanvasImageSource} source
-     * @param {{clear?: boolean}} [options] - clear first, for sources that may
-     *   not cover the canvas (a resolution change mid-stream leaves a border
-     *   of the previous frame otherwise).
-     */
-    presentFrame(source, { clear = false } = {}) {
-        if (!source || !this.ctx || !this.canvas) return;
-        this.timing.framePresented();
-
-        if (clear) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        if (this.videoFilters) {
-            this.videoFilters.drawFrame(this.ctx, source, this.canvas.width, this.canvas.height);
-        } else {
-            this.ctx.drawImage(source, 0, 0, this.canvas.width, this.canvas.height);
-        }
-
-        for (const cb of this.afterFrameRenderCallbacks) {
-            try { cb(this.canvas, this.ctx); } catch (e) { Logger.warn('After-frame callback error:', e); }
-        }
-    }
-
-    // ─── Render Callbacks ────────────────────────────────────────────────────────
-    addRenderCallback(callback) {
-        if (typeof callback === 'function') {
-            this.afterFrameRenderCallbacks.push(callback);
-        }
-    }
-
-    removeRenderCallback(callback) {
-        const index = this.afterFrameRenderCallbacks.indexOf(callback);
-        if (index !== -1) {
-            this.afterFrameRenderCallbacks.splice(index, 1);
-        }
-    }
+    // ─── Frames (core/playback/FramePresenter.js) ─────────────────────────────────
+    presentFrame(source, options) { presentPlayerFrame(this, source, options); }
+    addRenderCallback(callback) { addPlayerRenderCallback(this, callback); }
+    removeRenderCallback(callback) { removePlayerRenderCallback(this, callback); }
 
     // ─── Destroy ─────────────────────────────────────────────────────────────────
     async destroy() {
@@ -818,22 +555,8 @@ export class CorePlayer {
 
         await this._closeAudioContext();
 
-        if (this.config.controls.fullscreen) {
-            document.removeEventListener('fullscreenchange', this._handlers.fullscreen);
-            document.removeEventListener('webkitfullscreenchange', this._handlers.fullscreen);
-            document.removeEventListener('mozfullscreenchange', this._handlers.fullscreen);
-            document.removeEventListener('MSFullscreenChange', this._handlers.fullscreen);
-        }
-        document.removeEventListener('visibilitychange', this._handlers.visibilitychange);
-        document.removeEventListener('click', this._handlers.click);
-        if (this.config.controls.keyboard) {
-            document.removeEventListener('keydown', this._handlers.keydown);
-        }
-
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
-        }
+        // Listeners, observers and the overlays the view added.
+        this.view?.unmount(this);
 
         // The component owns the generator, which holds decoded frames.
         this.thumbnails?.destroy();
@@ -858,9 +581,6 @@ export class CorePlayer {
             this.canvas.remove();
             this.canvas = null;
         }
-        if (this.ui.controls) this.ui.controls.remove();
-        if (this.ui.helpOverlay) this.ui.helpOverlay.remove();
-        if (this.ui.loader) this.ui.loader.remove();
 
         this.container.classList.remove('jellyjump-container');
         this.container = null;

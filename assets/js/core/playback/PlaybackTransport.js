@@ -1,6 +1,8 @@
 import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from '../../shared/utils/Logger.js';
-import { startPlayerAudioVisualizer } from '../audio/AudioEngine.js';
+import { startPlayerAudioVisualizer, initPlayerAudio, suspendPlayerAudioContext, stopPlayerQueuedAudio, closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, runPlayerAudioIterator } from '../audio/AudioEngine.js';
+import { startPlayerRenderLoop } from './RenderLoop.js';
+import { savePlayerPlaybackState } from './PlaybackState.js';
 
 export async function playPlayer(player) {
     player.stream.onPlay();
@@ -16,7 +18,7 @@ export async function playPlayer(player) {
     Logger.log(`[Play] Starting playback - isAudioMode: ${player.isAudioMode}, playbackTimeAtStart: ${player.playbackTimeAtStart}`);
 
     try {
-        player._initAudio();
+        initPlayerAudio(player);
 
         if (player.audioContext && player.audioContext.state === 'suspended') {
             const resumePromise = player.audioContext.resume();
@@ -81,7 +83,7 @@ export async function playPlayer(player) {
             Logger.log(`[Play:Live] Using existing live start timestamp: ${player._liveStartTimestamp.toFixed(3)}`);
         }
         
-        await player._startLiveVideoLoop(forceRestart);
+        await player.stream?.startLiveVideoLoop(forceRestart);
         player.announce.streamState();
         return; // IMPORTANT: Prevent VOD logic below from clobbering the live loop
     }
@@ -141,7 +143,7 @@ export async function playPlayer(player) {
     if (player.audioSink) {
         if (!player.isLive) {
             const startTime = player.playbackTimeAtStart;
-            await player._closeAudioBufferIterator();
+            await closePlayerAudioBufferIterator(player);
             Logger.log(`[Play] Starting audio iterator at time: ${startTime.toFixed(2)}s`);
             const audioIterator = player.audioBuffers.open(player.audioSink, startTime);
 
@@ -153,13 +155,13 @@ export async function playPlayer(player) {
             player.vodAnchor.set(vodAnchorWall, vodAnchorContent);
             Logger.log(`[Play] VOD anchor prefetched — wall=${vodAnchorWall.toFixed(3)}, content=${vodAnchorContent.toFixed(3)}, buffer=${vodPrefetchedBuffer ? 'ok' : 'null'}`);
 
-            player._runAudioIterator(audioIterator, vodAnchorWall, vodAnchorContent, vodPrefetchedBuffer);
+            runPlayerAudioIterator(player, audioIterator, vodAnchorWall, vodAnchorContent, vodPrefetchedBuffer);
         }
 
         await startPlayerAudioVisualizer(player);
     }
 
-    player._startRenderLoop();
+    startPlayerRenderLoop(player);
 
     if (player.controlBarMode === 'overlay') {
         setTimeout(() => {
@@ -196,18 +198,18 @@ export function pausePlayer(player, showOverlay = true) {
 
     player._updatePlayPauseUI();
 
-    player._closeAudioBufferIteratorSoon();
+    closePlayerAudioBufferIteratorSoon(player);
 
     if (player.animationFrameId) {
         cancelAnimationFrame(player.animationFrameId);
         player.animationFrameId = null;
     }
 
-    player._suspendAudioContext();
+    suspendPlayerAudioContext(player);
 
-    player._stopQueuedAudio();
+    stopPlayerQueuedAudio(player);
 
-    player._savePlaybackState();
+    savePlayerPlaybackState(player);
 
     if (player.ui.playOverlay && !player.isLoading) {
         const shouldShow = showOverlay && player.config.controls.playOverlay;

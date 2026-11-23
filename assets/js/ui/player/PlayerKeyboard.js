@@ -1,4 +1,6 @@
 import { Toast } from '../../shared/utils/Toast.js';
+import { cyclePlayerSpeed, stepPlayerFrame } from '../../core/playback/PlaybackState.js';
+import { togglePlayerFullscreen } from './PlayerShell.js';
 
 /**
  * Keys that do nothing while a video is being edited (the edit panel open),
@@ -104,7 +106,7 @@ export class PlayerKeyboard {
             // Display Controls
             case 'f':
                 e.preventDefault();
-                p.toggleFullscreen();
+                togglePlayerFullscreen(p);
                 break;
             case 'c':
                 e.preventDefault();
@@ -144,19 +146,19 @@ export class PlayerKeyboard {
                 }
                 break;
             case '<':
-                if (e.shiftKey) { e.preventDefault(); p._cycleSpeed(-1); }
+                if (e.shiftKey) { e.preventDefault(); cyclePlayerSpeed(p, -1); }
                 break;
             case '>':
-                if (e.shiftKey) { e.preventDefault(); p._cycleSpeed(1); }
+                if (e.shiftKey) { e.preventDefault(); cyclePlayerSpeed(p, 1); }
                 break;
 
             // Editor Mode Controls
             // Frame by frame, in the editor and while editing (to place a cut).
             case ',':
-                if (p.config.mode === 'editor' || editing) { e.preventDefault(); p._stepFrame(-1); }
+                if (p.config.mode === 'editor' || editing) { e.preventDefault(); stepPlayerFrame(p, -1); }
                 break;
             case '.':
-                if (p.config.mode === 'editor' || editing) { e.preventDefault(); p._stepFrame(1); }
+                if (p.config.mode === 'editor' || editing) { e.preventDefault(); stepPlayerFrame(p, 1); }
                 break;
             case 'i':
                 e.preventDefault();

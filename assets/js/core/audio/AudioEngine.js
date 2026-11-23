@@ -234,7 +234,7 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
                         player._liveStartTimestamp = currentLiveEdge ?? player._liveStartTimestamp;
                         Logger.log(`[${_audioLogTag}:Audio] Jumping to live edge: ${player._liveStartTimestamp?.toFixed(3)}`);
                     }
-                    player._startLiveVideoLoop(true);
+                    player.stream?.startLiveVideoLoop(true);
                     break;
                 }
             }

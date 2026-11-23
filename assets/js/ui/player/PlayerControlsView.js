@@ -48,8 +48,17 @@ export function createPlayerControls(player) {
     if (player.config.controls.filters) initFiltersPanel(player);
     if (player.config.controls.equalizer) initEqualizerPanel(player);
 
-    player._createThumbnailOverlay();
-    player._applyControlVisibility();
+    player.thumbnails?.createOverlay();
+    showConfiguredControls(player);
+}
+
+/** Show the controls the configuration turns on (all start hidden). */
+function showConfiguredControls(player) {
+    if (!player.ui.controls) return;
+    const c = player.config.controls;
+    player.ui.controls.querySelectorAll('[data-control]').forEach(el => {
+        if (c[el.dataset.control]) el.classList.remove('control--hidden');
+    });
 }
 
 function initCaptionsPanel(player) {

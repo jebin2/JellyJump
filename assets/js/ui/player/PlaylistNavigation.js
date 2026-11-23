@@ -1,3 +1,4 @@
+import { updatePlayerNavigationButtons } from './PlayerUIUpdates.js';
 
 /**
  * Playlist Navigation Helper
@@ -144,11 +145,8 @@ export class PlaylistNavigation {
      * Update player's native navigation button states
      */
     updatePlayerNavigationState() {
-        if (this.playlist.player && typeof this.playlist.player.updateNavigationButtons === 'function') {
-            this.playlist.player.updateNavigationButtons(
-                this._canGoPrevious(),
-                this._canGoNext()
-            );
+        if (this.playlist.player?.ui) {
+            updatePlayerNavigationButtons(this.playlist.player, this._canGoPrevious(), this._canGoNext());
         }
     }
 
