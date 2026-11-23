@@ -74,7 +74,17 @@ const { port } = await server.start({ token: TOKEN, origins: ['https://jellyjump
 const base = `http://127.0.0.1:${port}`;
 const auth = { Authorization: `Bearer ${TOKEN}` };
 
-console.log('auth');
+console.log('health (no token)');
+{
+    const res = await fetch(`${base}/health`);
+    const body = await res.json();
+    const { version } = require('../desktop/package.json');
+    check(res.status === 200 && body.status === 'ok' && body.version === version, `up, with the desktop app's version (${JSON.stringify(body)})`);
+    check(Object.keys(body).sort().join() === 'status,version', 'and nothing about the library: no name, no count');
+    check((await fetch(`${base}/health`, { method: 'POST' })).status === 405, 'GET only');
+}
+
+console.log('\nauth');
 check((await fetch(`${base}/api/library`)).status === 401, 'no token is rejected');
 check((await fetch(`${base}/api/library`, { headers: { Authorization: 'Bearer wrong' } })).status === 401,
     'a wrong token is rejected');

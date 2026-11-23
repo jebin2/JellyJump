@@ -7,6 +7,8 @@ import { registerServiceWorkerWithCOI } from './shared/utils/coi.js';
 import { Logger } from './shared/utils/Logger.js';
 import { installErrorReporter } from './shared/errors/ErrorReporter.js';
 import { hasSavedPlaylist } from './shared/services/IndexedDBService.js';
+import { startUpdateCheck } from './shared/utils/UpdateCheck.js';
+import { Toast } from './shared/utils/Toast.js';
 
 // Errors nothing else caught are recorded and shown once (shared/errors).
 installErrorReporter();
@@ -74,6 +76,15 @@ async function initializeApp() {
         ], true); // true = autoplay on page load
     }
     hideLoader();
+
+    // A newer build went live while this tab was open: offer, never force.
+    startUpdateCheck({
+        onNewBuild: (info) => {
+            Toast.show(`JellyJump ${info.version} is available`, 30000, false, {
+                action: { label: 'Reload', onClick: () => window.location.reload() },
+            });
+        },
+    });
 }
 
 // Initialize when DOM is ready

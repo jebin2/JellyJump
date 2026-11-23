@@ -62,7 +62,8 @@ start (`78c1c90`); this table is where things stand now.
 | 2 | Q2 moved to wave 4 (see Q2) | moved | this PR |
 | 3 | K4 PR template (`.github/pull_request_template.md`) with the device checklist, required for playback, audio, `PlaylistPlayback` and storage changes. K5 `run-tests.mjs` runs a failed browser suite once more; one that then passes is reported as flaky (summary line, CI warning, job summary); `JJ_NO_RETRY=1` turns it off; suites can be named on the command line. T4 `CONTRIBUTING.md`: setup, the checks a PR must pass, commits, the flake policy | done | this PR |
 | 3 | O7 encryption design written into ADR 0011 (algorithms, keys, counter block, header layout, review checklist, findings F1–F7); the header in its own module (`JJC4Header.js`); `crypto-vectors-test` (26) pins key derivation, ciphertext, HMAC, counter block and header bytes against `node:crypto`. Fixed: payloads over 4 GiB refused instead of a wrapped size (F4), a decrypted file keeps only a media type (F5), file name and hint out of the log (F6), stale comments (F7). Open: header not under the HMAC (F1), 100k PBKDF2 rounds (F2) — both need format version 6; no minimum password (F3). O8 `SECURITY.md` (reporting, threat model, data kept and where); secret scanning, push protection and private vulnerability reporting turned on | done | this PR |
-| 3 | H, I, P3–P6, Q5, Q6, S4–S8, T3, T5, T6 | to do | |
+| 3 | P5 desktop library server `GET /health` → `{status, version}`, no token, nothing about the library; library-server-test (+3). P6 the build writes `version.json` (`{version, build}`); the player page reads it when the tab comes back to the front (at most every 5 minutes, not in the first 5 after loading, not on desktop or a dev build) and offers "Reload" once per new build, never reloading by itself (`shared/utils/UpdateCheck.js`); `update-check-test` (13) | done | this PR |
+| 3 | H, I, P3, P4, Q5, Q6, S4–S8, T3, T5, T6 | to do | |
 
 ---
 
