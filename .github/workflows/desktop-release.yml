@@ -10,8 +10,15 @@ permissions:
   contents: write
 
 jobs:
+  # Every suite, as on a pull request, before anything is built. A tag can
+  # point at any commit, not only one whose pull request passed (plan S4).
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
+
   build:
     name: Build ${{ matrix.os }}
+    needs: test
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -24,9 +31,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: desktop/package-lock.json
+
+      # The tag is the source of truth for the version (BUG-11): stamped into
+      # both package.json files and given to the web build, so the app, its
+      # Diagnostics and the installer all say the release's number.
+      - name: Stamp Version From Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "VITE_APP_VERSION=$version" >> "$GITHUB_ENV"
+          npm version --no-git-tag-version --allow-same-version "$version"
+          (cd desktop && npm version --no-git-tag-version --allow-same-version "$version")
+        shell: bash
 
       - name: Install Web Dependencies
         run: npm ci
@@ -37,16 +56,6 @@ jobs:
         run: |
           mkdir -p desktop/build
           cp -r dist/* desktop/build/
-        shell: bash
-
-      # The tag is the source of truth for the version. Without this the
-      # version in package.json is whatever was committed, so every release
-      # reported the same number — nothing in an installed build said which
-      # one it was, and apt saw no upgrade to perform.
-      - name: Stamp Version From Tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        working-directory: ./desktop
-        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
         shell: bash
 
       - name: Install Desktop Dependencies
@@ -120,26 +129,43 @@ jobs:
   release:
     name: Create Release
     needs: build
+    # A manual run builds the installers to try; only a tag publishes them.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
       - name: Download All Artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts
 
-      - name: Display Structure
-        run: ls -R artifacts
+      # One file listing every installer's SHA-256, so a download can be
+      # checked: sha256sum -c SHA256SUMS.txt --ignore-missing
+      - name: Checksums
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.exe' -o -name '*.dmg' -o -name '*.zip' \) -exec cp {} release/ \;
+          (cd release && sha256sum * > SHA256SUMS.txt)
+          ls -l release
+          cat release/SHA256SUMS.txt
+
+      # The release page says what changed: the version's CHANGELOG.md
+      # section, or the commit subjects since the last tag if it has none.
+      - name: Release Notes
+        run: |
+          node scripts/release.mjs notes "$GITHUB_REF_NAME" > notes.md
+          printf '\n---\nVerify a download: `sha256sum -c SHA256SUMS.txt --ignore-missing`\n' >> notes.md
+          cat notes.md
 
       - name: Create Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           draft: true
-          files: |
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
-            artifacts/**/*.exe
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-          generate_release_notes: true
+          body_path: notes.md
+          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

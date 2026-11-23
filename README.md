@@ -93,6 +93,9 @@ docs/             the architecture plan and decision records
 - [`docs/ARCHITECTURE_PLAN.md`](docs/ARCHITECTURE_PLAN.md): where the
   code is going, the plan to get there, and its progress.
 - [`docs/adr/`](docs/adr/): why the big decisions were made.
+- [`docs/runbooks/`](docs/runbooks/): releasing, rolling back and hotfixes;
+  handling a bug report.
+- [`CHANGELOG.md`](CHANGELOG.md): what changed in each release.
 - [`assets/js/STRUCTURE.md`](assets/js/STRUCTURE.md): what each folder owns.
 - [`SECURITY.md`](SECURITY.md): reporting a vulnerability, the threat
   model, what data is kept and where.
