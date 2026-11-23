@@ -1,2 +1,0 @@
-import{u as e}from"./ErrorReporter-Dmez68m5.js";var t=`Operation cancelled.`;function n(t){let n=new AbortController,r=document.createElement(`button`);return r.type=`button`,r.textContent=`Cancel`,r.className=`jellyjump-btn-secondary text-sm job-cancel-btn`,r.addEventListener(`click`,()=>{r.disabled=!0,r.textContent=`Cancelling…`,n.abort()}),t?.appendChild(r),{signal:n.signal,isCancelled:t=>n.signal.aborted&&e(t),end:()=>r.remove()}}export{n,t};
-//# sourceMappingURL=CancellableJob-BEGwLFtn.js.map
