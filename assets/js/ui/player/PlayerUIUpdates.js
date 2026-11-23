@@ -1,6 +1,7 @@
 import { formatTime } from '../../shared/utils/mediaUtils.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { html } from '../../shared/utils/html.js';
+import { updatePlayerAudioButtonState } from './PlayerPanels.js';
 
 export function updatePlayerPlayPauseUI(player) {
     if (!player.ui.playBtn) return;
@@ -141,5 +142,5 @@ export function updatePlayerVolumeUI(player) {
     }
 
     Logger.log(`[VolumeUI] isMuted=${player.isMuted}, volume=${player.volume}, config.muted=${player.config.muted}, gainValue=${player.gainNode?.gain?.value}, audioSettingsBtn=${!!player.ui.audioSettingsBtn}, muteBtn=${!!player.ui.muteBtn}`);
-    player._updateAudioButtonState();
+    updatePlayerAudioButtonState(player);
 }

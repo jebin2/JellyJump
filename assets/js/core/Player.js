@@ -79,10 +79,8 @@ import {
     togglePlayerSpeedPanel,
     togglePlayerSubtitlePanel,
     syncPlayerFilterSliders,
-    updatePlayerFiltersButtonState,
     togglePlayerAudioPanel,
-    syncPlayerEqSliders,
-    updatePlayerAudioButtonState
+    syncPlayerEqSliders
 } from '../ui/player/PlayerPanels.js';
 import {
     updatePlayerFullscreenUI,
@@ -337,10 +335,8 @@ export class CorePlayer {
     toggleSpeedPanel() { togglePlayerSpeedPanel(this); }
     toggleSubtitlePanel() { togglePlayerSubtitlePanel(this); }
     _syncFilterSliders() { syncPlayerFilterSliders(this); }
-    _updateFiltersButtonState() { updatePlayerFiltersButtonState(this); this.announce.filters(); }
     toggleAudioPanel() { togglePlayerAudioPanel(this); }
     _syncEqSliders() { syncPlayerEqSliders(this); }
-    _updateAudioButtonState() { updatePlayerAudioButtonState(this); }
 
     // ─── Loop ────────────────────────────────────────────────────────────────────
     toggleLoopMode() { this.loop.toggleLoopMode(); }
@@ -349,7 +345,17 @@ export class CorePlayer {
     setLoopEnd() { this.loop.setLoopEnd(); }
     clearLoopMarkers() { this.loop.clearLoopMarkers(); }
     resetLoop() { this.loop.resetLoop(); }
-    _updateLoopUI() { this.loop.updateLoopUI(); } // announces loopmodechange
+    /**
+     * Loop `mode` ('off', 'one', 'playlist'); in 'one', `start` and `end`
+     * (seconds, or null) make it an A-B loop. Leaving one out keeps it.
+     * @param {string} [mode] @param {number|null} [start] @param {number|null} [end]
+     */
+    setLoop(mode = this.loopMode, start = this.loopStart, end = this.loopEnd) {
+        this.loopMode = mode;
+        this.loopStart = start;
+        this.loopEnd = end;
+        this.announce.loop();
+    }
 
     // ─── Thumbnail helpers ───────────────────────────────────────────────────────
     _createThumbnailOverlay() { this.thumbnails.createOverlay(); }
@@ -360,14 +366,8 @@ export class CorePlayer {
     _cleanupThumbnails() { this.thumbnails.cleanup(); }
 
     // ─── Subtitle / audio track helpers ─────────────────────────────────────────
-    _updateSubtitleMenu() { this.subtitles.updateSubtitleMenu(); this.announce.tracks(); }
-    _switchSubtitleTrack(trackId) { this.subtitles.switchSubtitleTrack(trackId); }
-    async _switchAudioTrack(trackId) { return this.subtitles.switchAudioTrack(trackId); }
-    async _updateAudioTracks() {
-        const result = await this.subtitles.updateAudioTracks();
-        this.announce.tracks();
-        return result;
-    }
+    switchSubtitleTrack(trackId) { this.subtitles.switchSubtitleTrack(trackId); }
+    async switchAudioTrack(trackId) { return this.subtitles.switchAudioTrack(trackId); }
     _restoreSavedSubtitles(savedSubtitles) { this.subtitles.restoreSavedSubtitles(savedSubtitles); }
     async loadSubtitle(url, name) { return this.subtitles.loadSubtitle(url, name); }
     async generateSubtitles(opts) { return this.subtitles.generateSubtitles(opts); }
@@ -395,7 +395,6 @@ export class CorePlayer {
     stopWebcamStreamMode() { this.stream.stopWebcamStreamMode(); }
     _stopStreamRenderLoop() { this.stream.stopStreamRenderLoop(); }
     _renderStreamFrame() { this.stream.renderStreamFrame(); }
-    _updateStreamUI() { this.stream.updateStreamUI(); this.announce.streamState(); }
     _setStreamModeControls(isStreamMode) { this.stream.setStreamModeControls(isStreamMode); }
     _setWebcamModeControls(isWebcamMode) { this.stream.setWebcamModeControls(isWebcamMode); }
     async _cleanupMediaBunny() { return cleanupPlayerMediaBunny(this); }

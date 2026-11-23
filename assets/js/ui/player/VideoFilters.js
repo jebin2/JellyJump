@@ -249,6 +249,9 @@ export class VideoFilters {
     }
 
     _apply() {
+        // Every change of the filters comes through here: announce it
+        // (filterschange), which is what the filters button listens to.
+        this.player?.announce?.filters();
         if (!this.canvas) return;
         const eff = this.effect ? this.effects[this.effect] : null;
 

@@ -13,7 +13,7 @@ export class PlayerLoopControl {
             p.loopEnd = null;
         }
         if (p.loopMode !== 'one') p.loopMode = 'one';
-        this.updateLoopUI();
+        p.announce?.loop();
         Logger.log('Loop Start set:', p.loopStart);
     }
 
@@ -29,7 +29,7 @@ export class PlayerLoopControl {
         }
         p.loopEnd = p.currentTime;
         if (p.loopMode !== 'one') p.loopMode = 'one';
-        this.updateLoopUI();
+        p.announce?.loop();
         Logger.log('Loop End set:', p.loopEnd);
     }
 
@@ -37,7 +37,7 @@ export class PlayerLoopControl {
         const p = this.player;
         p.loopStart = null;
         p.loopEnd = null;
-        this.updateLoopUI();
+        p.announce?.loop();
     }
 
     resetLoop() {
@@ -45,7 +45,7 @@ export class PlayerLoopControl {
         p.loopStart = null;
         p.loopEnd = null;
         p.loopMode = 'off';
-        this.updateLoopUI();
+        p.announce?.loop();
     }
 
     toggleLoopMode() {
@@ -54,21 +54,23 @@ export class PlayerLoopControl {
             p.loopStart = null;
             p.loopEnd = null;
         }
-        this.updateLoopUI();
+        p.announce?.loop();
     }
 
     toggleLoopPanel() {
         const p = this.player;
         const isVisible = p.ui.loopPanel.style.display !== 'none';
         p.ui.loopPanel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) this.updateLoopUI();
+        if (!isVisible) this.renderLoopUI();
     }
 
-    updateLoopUI() {
+    /**
+     * Draw the loop button, panel and the A-B markers on the progress bar.
+     * Called by the UI on loopmodechange and durationchange (the markers are
+     * placed as a share of the duration), not by the core.
+     */
+    renderLoopUI() {
         const p = this.player;
-        // Every loop change comes through here: announce it (loopmodechange),
-        // whether or not there is a loop button to draw.
-        p.announce?.loop();
         const btn = p.ui.loopBtn;
         if (!btn) return;
 

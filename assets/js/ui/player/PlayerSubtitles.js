@@ -35,11 +35,13 @@ export class PlayerSubtitles {
     /** Turn captions off without forgetting the tracks that were loaded. */
     disable() {
         this.enabled = false;
+        this.player.announce?.tracks();
     }
 
     /** What the C key does. */
     toggle() {
         this.enabled = !this.enabled;
+        this.player.announce?.tracks();
     }
 
     async loadSubtitle(url, name) {
@@ -79,7 +81,7 @@ export class PlayerSubtitles {
 
             this.activeTrackId = trackId;
             this.enabled = true;
-            this.updateSubtitleMenu();
+            p.announce?.tracks();
             Logger.log(`Subtitles loaded successfully as "${trackName}"`);
 
             if (p.onSubtitleChange) p.onSubtitleChange(this.tracks);
@@ -150,7 +152,11 @@ export class PlayerSubtitles {
         }
     }
 
-    updateSubtitleMenu() {
+    /**
+     * Draw the captions menu. The UI calls this on trackschange
+     * (PlayerUIListeners) and when the panel opens.
+     */
+    renderSubtitleMenu() {
         const p = this.player;
         if (!p.ui.subtitleOptions || !p.ui.ccBtn) return;
 
@@ -187,7 +193,7 @@ export class PlayerSubtitles {
         this.manager.cues = [...track.cues];
         this.activeTrackId = trackId;
         this.enabled = true;
-        this.updateSubtitleMenu();
+        this.player.announce?.tracks();
         Logger.log(`Switched to subtitle track: ${track.name}`);
     }
 
@@ -209,17 +215,24 @@ export class PlayerSubtitles {
                 p.play();
             }
 
-            this.updateAudioTracks();
+            p.announce?.tracks();
             Logger.log(`Switched to audio track: ${track.id}`);
         }
     }
 
-    async updateAudioTracks() {
+    /**
+     * Draw the audio track menu, on trackschange (PlayerUIListeners). It
+     * waits on the file, so a newer call can start before this one ends:
+     * only the newest draws.
+     */
+    async renderAudioTrackMenu() {
         const p = this.player;
         if (!p.ui.audioMenu || !p.ui.audioContainer) return;
+        const draw = this._audioMenuDraw = (this._audioMenuDraw ?? 0) + 1;
+        const current = () => draw === this._audioMenuDraw;
 
-        p.ui.audioMenu.textContent = '';
         const allTracks = p.input ? await p.input.getAudioTracks() : [];
+        if (!current()) return;
         // Only audio that can play with the picture on screen. In a file every
         // track pairs with every other, so this changes nothing; in an HLS
         // stream whose variants each carry their own audio, the other
@@ -228,6 +241,7 @@ export class PlayerSubtitles {
         const tracks = paired.length ? paired : allTracks;
 
         if (tracks.length <= 1) {
+            p.ui.audioMenu.textContent = '';
             p.ui.audioContainer.style.display = 'none';
             return;
         }
@@ -253,6 +267,8 @@ export class PlayerSubtitles {
         // Name, language, purpose and channel layout, so two English tracks
         // no longer both read "eng".
         const labels = await labelAudioTracks(tracks);
+        if (!current()) return;
+        p.ui.audioMenu.textContent = '';
 
         tracks.forEach((track, index) => {
             const item = template.content.cloneNode(true).querySelector('.jellyjump-menu-item');

@@ -22,10 +22,7 @@ export function borrowMainPlayer(surface, playlist) {
     // player's own comes back when it closes.
     const release = player.override?.({ loop: { mode: player.loopMode, start: player.loopStart, end: player.loopEnd } });
     player.pause?.();
-    surface.onCleanup(() => {
-        clearTimeout(player._previewRangeTimer);
-        release?.();
-    });
+    surface.onCleanup(() => release?.());
     return player;
 }
 
@@ -36,20 +33,9 @@ export function borrowMainPlayer(surface, playlist) {
  * @param {number} end - seconds
  */
 export function setPreviewRange(player, start, end) {
-    if (!player) return;
-    player.loopMode = 'one';
-    player.loopStart = start;
-    player.loopEnd = end;
-    draw(player);
-}
-
-/** The markers are placed against the duration, which a video still loading does not have yet. */
-function draw(player, tries = 0) {
-    clearTimeout(player._previewRangeTimer);
-    player._updateLoopUI?.();
-    if (!(player.duration > 0) && tries < 50) {
-        player._previewRangeTimer = setTimeout(() => draw(player, tries + 1), 100);
-    }
+    // The markers are drawn again when the duration arrives
+    // (PlayerUIListeners), so a video still loading needs nothing more.
+    player?.setLoop?.('one', start, end);
 }
 
 /**

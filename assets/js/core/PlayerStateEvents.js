@@ -4,11 +4,10 @@
  *
  * The core used to tell the UI about every change by calling it:
  * `_updatePlayPauseUI()`, `_updateVolumeUI()` and a dozen more, from 75
- * places. Those calls are where the state is known to have settled, so the
- * events fire from the same places: each `_update*` wrapper on the player
- * calls one method here, which compares the state with what was last
- * announced and fires only on a change. During the move (H2) the wrappers
- * still call the UI too; afterwards the UI only listens.
+ * places. Those calls were where the state is known to have settled, so the
+ * events fire from the same places: the core calls one method here, which
+ * compares the state with what was last announced and fires only on a
+ * change. The UI listens (ui/player/PlayerUIListeners.js, H2).
  *
  *   player.on('play', () => …)
  *   player.on('volumechange', ({volume, muted}) => …)
@@ -97,10 +96,14 @@ export class PlayerStateEvents {
         this._changed('controlBarMode', mode, 'controlbarmodechange', { mode });
     }
 
+    /**
+     * Announced every time a stream is loaded or started, changed or not:
+     * the UI hides the controls a stream has no use for each time, as the
+     * core did when it drew them (a file played in between shows them).
+     */
     streamState() {
         const p = this.player;
-        const s = { isStreamMode: !!p.isStreamMode, isWebcamMode: !!p.isWebcamMode, isLive: !!p.isLive };
-        this._changed('stream', `${s.isStreamMode}|${s.isWebcamMode}|${s.isLive}`, 'streamstatechange', s);
+        p.trigger('streamstatechange', { isStreamMode: !!p.isStreamMode, isWebcamMode: !!p.isWebcamMode, isLive: !!p.isLive });
     }
 
     /** Track lists are rebuilt as a whole; every rebuild is announced. */

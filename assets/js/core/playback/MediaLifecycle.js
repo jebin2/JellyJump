@@ -298,7 +298,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         throw await explainSourceFailure(url, e);
     }
 
-    player._updateAudioTracks();
+    player.announce.tracks();
 }
 
 export async function handlePlayerHlsState(player) {
@@ -343,7 +343,7 @@ export async function handlePlayerHlsState(player) {
     }
 
     player._updateTimeDisplay();
-    player._updateStreamUI();
+    player.announce.streamState();
 }
 
 export function cleanupPlayerAudioMode(player) {
@@ -662,7 +662,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         if (savedSubtitles?.length > 0) player._restoreSavedSubtitles(savedSubtitles);
 
         await player._handleInitialFrame(autoplay);
-        player._updateSubtitleMenu();
+        player.announce.tracks();
 
         if (!player.isLive) player._setLoading(false);
         // Now that it is known whether this is live and has a picture, the

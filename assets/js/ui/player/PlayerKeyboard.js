@@ -108,8 +108,7 @@ export class PlayerKeyboard {
                 break;
             case 'c':
                 e.preventDefault();
-                p.subtitles.toggle();
-                p._updateSubtitleMenu();
+                p.subtitles.toggle(); // announces trackschange
                 break;
             case 'escape':
                 if (document.fullscreenElement) {

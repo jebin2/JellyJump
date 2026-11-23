@@ -82,7 +82,7 @@ export async function playPlayer(player) {
         }
         
         await player._startLiveVideoLoop(forceRestart);
-        player._updateStreamUI();
+        player.announce.streamState();
         return; // IMPORTANT: Prevent VOD logic below from clobbering the live loop
     }
 
