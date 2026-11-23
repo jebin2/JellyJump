@@ -35,6 +35,10 @@ What we defend against:
 | A vulnerable dependency | `npm audit` (high and above, shipped code) in CI for the site and the desktop app; Dependabot for npm and GitHub Actions; actions pinned to commit SHAs; the vendored libraries' hashes are checked (`npm run verify:libs`) |
 | Someone without the password opening an encrypted carrier | AES-256-CTR with HMAC-SHA-256 and PBKDF2; design and review in `docs/adr/0011-encryption-format.md` |
 
+Pull request previews run on the site's own domain (`previews/<number>/`).
+They are built only for branches of this repository, never for forks or
+Dependabot, and keep their storage apart from the live site's.
+
 Not in scope: an attacker who controls the user's device or browser, or
 their unlocked desktop session; a malicious browser extension; what a
 platform does with a carrier the user uploads to it.

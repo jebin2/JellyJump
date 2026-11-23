@@ -19,7 +19,12 @@
  * for the life of the page.
  *
  * The old keys are read once, on first use, and moved to the new names.
+ *
+ * A pull request's preview, served from the live site's domain, keeps its
+ * values under its own prefix (`jj-pr-81:`), never moves the old keys, and
+ * resets only its own (config.storageNamespace).
  */
+import { config } from '../config/index.js';
 
 /**
  * Every preference, with the key it was kept under before (moved once).
@@ -46,7 +51,8 @@ const KEYS = {
 /** One key per video before `progress` (BUG-5), moved into it once. */
 const OLD_PROGRESS_PREFIX = 'jellyjump-state-';
 
-const PREFIX = 'jj:';
+const NAMESPACE = config.storageNamespace;
+const PREFIX = NAMESPACE ? `jj-${NAMESPACE}:` : 'jj:';
 /** How many videos' progress is kept (Progress.js). */
 export const PROGRESS_CAP = 200;
 
@@ -80,7 +86,8 @@ function migrate() {
     if (migrated) return;
     migrated = true;
     const s = store();
-    if (!s) return;
+    // The old keys are the live site's; a preview leaves them for it.
+    if (!s || NAMESPACE) return;
     for (const [name, { old, legacy }] of Object.entries(KEYS)) {
         if (!old) continue;
         try {
@@ -213,11 +220,22 @@ export const Settings = {
 
     /**
      * Forget everything this site keeps in `localStorage`: preferences and
-     * the storage layer's own markers. For "reset the app" only.
+     * the storage layer's own markers. For "reset the app" only. A preview
+     * forgets only its own keys, not the live site's.
      */
     clearAll() {
         memory.clear();
-        try { store()?.clear(); } catch { /* blocked */ }
+        try {
+            const s = store();
+            if (!s) return;
+            if (!NAMESPACE) { s.clear(); return; }
+            const ours = [];
+            for (let i = 0; i < s.length; i++) {
+                const key = s.key(i);
+                if (key?.startsWith(PREFIX) || key?.startsWith(`JellyJumpDB-${NAMESPACE}`)) ours.push(key);
+            }
+            for (const key of ours) s.removeItem(key);
+        } catch { /* blocked */ }
     },
 
     /** The names there are, for tests and diagnostics. */

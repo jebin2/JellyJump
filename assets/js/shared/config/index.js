@@ -9,12 +9,13 @@
  * configuration at all.
  *
  * Outside a Vite build (the Node test suites) `import.meta.env` does not
- * exist, so every value has a default.
+ * exist: values come from the process environment, as a build would take
+ * them, and every value has a default.
  */
 
 /** @type {Record<string, string | undefined>} */
 // @ts-ignore -- Vite adds import.meta.env; written out exactly so Vite can replace it
-const env = import.meta.env ?? {};
+const env = import.meta.env ?? globalThis.process?.env ?? {};
 
 /** @param {string | undefined} value @param {boolean} fallback */
 const flag = (value, fallback) => (value === undefined || value === '' ? fallback : value === 'true');
@@ -29,6 +30,13 @@ export const config = Object.freeze({
     /** Version of this build (from the release tag in CI), and a build id for cache-busting. */
     version: env.VITE_APP_VERSION || '0.0.0-dev',
     buildId: env.VITE_BUILD_ID || 'dev',
+    /**
+     * Set for a pull request's preview (VITE_STORAGE_NAMESPACE, e.g.
+     * `pr-81`). Previews are served from the live site's own domain, so
+     * without this they would open, migrate and reset the user's real
+     * playlist and settings. Empty for the real site.
+     */
+    storageNamespace: env.VITE_STORAGE_NAMESPACE || '',
     /**
      * The video put in an empty playlist on a first visit, relative to the
      * page; empty for none.

@@ -1,5 +1,6 @@
 import { Logger } from "../utils/Logger.js";
 import { desktopBridge } from '../platform/Platform.js';
+import { PLAYLIST_MARKER } from './IndexedDBService.js';
 
 /**
  * DesktopStorageService
@@ -46,9 +47,9 @@ export class DesktopStorageService {
         }
         // Mirror presence flag so player-main.js requires no changes
         if (this._cache.playlist && this._cache.playlist.length > 0) {
-            localStorage.setItem('JellyJumpDB-playlist', 'true');
+            localStorage.setItem(PLAYLIST_MARKER, 'true');
         } else {
-            localStorage.removeItem('JellyJumpDB-playlist');
+            localStorage.removeItem(PLAYLIST_MARKER);
         }
     }
 

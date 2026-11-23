@@ -159,5 +159,39 @@ console.log('\nwhere each video was left (BUG-5)');
     check(after[`v${MAX_VIDEOS + 19}`] && !after.a, 'the oldest go first');
 }
 
+console.log('\na pull request\'s preview (VITE_STORAGE_NAMESPACE), on the live site\'s domain');
+{
+    // config is read once per process, so the preview runs in its own.
+    const { execFileSync } = await import('node:child_process');
+    const script = `
+        const data = new Map(Object.entries({
+            'jj:speed': '2', 'JellyJumpDB-playlist': 'true', 'jellyjump-speed': '1.5', 'other-site-key': 'x',
+        }));
+        globalThis.localStorage = {
+            getItem: (k) => data.has(k) ? data.get(k) : null, setItem: (k, v) => data.set(k, String(v)),
+            removeItem: (k) => data.delete(k), clear: () => data.clear(),
+            key: (i) => [...data.keys()][i] ?? null, get length() { return data.size; },
+        };
+        const { Settings } = await import('./assets/js/shared/settings/Settings.js');
+        const { DB_NAME, PLAYLIST_MARKER, hasSavedPlaylist } = await import('./assets/js/shared/services/IndexedDBService.js');
+        const out = { readsLive: Settings.get('speed', 1), db: DB_NAME, marker: PLAYLIST_MARKER, saved: hasSavedPlaylist() };
+        Settings.set('speed', 0.5);
+        data.set(PLAYLIST_MARKER, 'true');
+        out.afterSet = Object.fromEntries(data);
+        Settings.clearAll();
+        out.afterReset = Object.fromEntries(data);
+        console.log(JSON.stringify(out));
+    `;
+    const out = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+        cwd: new URL('..', import.meta.url), encoding: 'utf8', env: { ...process.env, VITE_STORAGE_NAMESPACE: 'pr-7' },
+    }).trim().split('\n').pop());
+    check(out.readsLive === 1 && out.saved === false, 'does not read the live site\'s settings or its saved-playlist marker');
+    check(out.db === 'JellyJumpDB-pr-7' && out.marker === 'JellyJumpDB-pr-7-playlist', `has its own database (${out.db})`);
+    check(out.afterSet['jj-pr-7:speed'] === '0.5' && out.afterSet['jj:speed'] === '2', 'saves under its own prefix; the live value stays');
+    check(out.afterSet['jellyjump-speed'] === '1.5', 'leaves the live site\'s old keys for it to move');
+    const left = Object.keys(out.afterReset).sort().join();
+    check(left === 'JellyJumpDB-playlist,jellyjump-speed,jj:speed,other-site-key', `reset clears only its own keys (left: ${left})`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

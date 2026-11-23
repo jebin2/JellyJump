@@ -72,72 +72,32 @@ jobs:
       - name: Build with Vite
         run: npm run build
 
-      - name: Note the current Pages build
-        if: env.DEPLOY == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          before=$(gh api "repos/${{ github.repository }}/pages/builds/latest" --jq '.created_at' 2>/dev/null || echo none)
-          echo "PAGES_BUILD_BEFORE=$before" >> "$GITHUB_ENV"
-          echo "Pages build current before this deploy: $before"
-
       - name: Deploy to release branch
         # A pull request against main triggers this workflow too, and without
-        # this guard the step force-pushed the PR's build to `release` -- which
-        # is the branch Pages serves, so proposing a change published it to the
+        # this guard the step pushed the PR's build to `release` -- which is
+        # the branch Pages serves, so proposing a change published it to the
         # live site. DEPLOY is true only after Test passed on main (or a manual
         # run on main), and only for the newest commit there.
+        #
+        # The site, plus the files the desktop build script fetches from this
+        # branch. Pull request previews under previews/ are kept: the script
+        # commits on top of the branch and never force-pushes.
         if: env.DEPLOY == 'true'
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-
-          # Move build directory contents and other files to temp location
-          TEMP_DIR=/tmp/release-artifacts
-          mkdir -p "$TEMP_DIR"
-
-          # Move contents of dist to root of temp dir (Flattens the structure)
-          cp -r dist/* "$TEMP_DIR/" 2>/dev/null || true
-
-          # Copy other necessary files
-          cp -r desktop "$TEMP_DIR/" 2>/dev/null || true
-          cp build-desktop.sh "$TEMP_DIR/" 2>/dev/null || true
-          cp package-lock.json "$TEMP_DIR/" 2>/dev/null || true
-          cp package.json "$TEMP_DIR/" 2>/dev/null || true
-          
-          # Create or checkout release branch
-          git fetch origin
-          git checkout release 2>/dev/null || git checkout --orphan release
-          
-          # Clear everything in release branch
-          git rm -rf . 2>/dev/null || true
-          rm -rf * 2>/dev/null || true
-          
-          # Move selected files/folders back
-          mv "$TEMP_DIR"/* . 2>/dev/null || true
-          
-          # Force add all files
-          git add -A
-          
-          # Commit if there are changes
-          if ! git diff --staged --quiet 2>/dev/null; then
-            git commit -m "Build: Update release artifacts from main [skip ci]"
-            echo "PAGES_EXPECT_BUILD=yes" >> "$GITHUB_ENV"
-          else
-            echo "Nothing changed; Pages will not rebuild."
-            echo "PAGES_EXPECT_BUILD=no" >> "$GITHUB_ENV"
-          fi
-          
-          # Push to release branch
-          git push -f origin release
+          site=$(mktemp -d)
+          cp -r dist/. "$site"/
+          cp -r desktop build-desktop.sh package-lock.json package.json "$site"/
+          bash scripts/ci/publish-pages.sh site "$site"
 
       # Pushing to `release` is not the deploy. GitHub Pages then builds that
       # branch itself, as a separate job with its own outcome -- and that
       # build can fail while this workflow still reports success. It has: a
       # green run published nothing, and the symptom was indistinguishable
       # from slow CDN propagation. Without this step there is no signal at all.
+      # Previews push to the same branch, so a build of a later commit that
+      # contains this one counts too.
       - name: Verify GitHub Pages published
-        if: env.DEPLOY == 'true' && env.PAGES_EXPECT_BUILD == 'yes'
+        if: env.DEPLOY == 'true' && env.PUBLISHED_SHA != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -150,13 +110,12 @@ jobs:
               continue
             fi
             status=$(jq -r '.status' <<< "$json")
-            created=$(jq -r '.created_at' <<< "$json")
-
-            # A build that predates this deploy says nothing about it.
-            if [ "$created" = "$PAGES_BUILD_BEFORE" ]; then
-              echo "Waiting for a new Pages build to start (newest is still $created)."
+            commit=$(jq -r '.commit' <<< "$json")
+            git fetch --quiet origin release
+            if [ "$commit" != "$PUBLISHED_SHA" ] && ! git merge-base --is-ancestor "$PUBLISHED_SHA" "$commit" 2>/dev/null; then
+              echo "Waiting for a Pages build that includes $PUBLISHED_SHA (newest is $commit, $status)."
             elif [ "$status" = "built" ]; then
-              echo "Pages published commit $(jq -r '.commit' <<< "$json")."
+              echo "Pages published $commit."
               exit 0
             elif [ "$status" = "errored" ]; then
               echo "::error::GitHub Pages build failed: $(jq -r '.error.message // "no message given"' <<< "$json")"
@@ -168,3 +127,16 @@ jobs:
           done
           echo "::error::Timed out after 10 minutes waiting for the GitHub Pages build."
           exit 1
+
+      # Published is not the same as working (plan S7): wait until the live
+      # site serves this build, then open it, load the sample, seek, and
+      # fail loudly on any error. Blocks the visit counter.
+      - name: Check the live site
+        if: env.DEPLOY == 'true' && env.PUBLISHED_SHA != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx playwright-core install --with-deps chromium
+          export CHROMIUM_PATH=$(node --input-type=module -e "import { chromium } from 'playwright-core'; console.log(chromium.executablePath())")
+          url=$(gh api "repos/${{ github.repository }}/pages" --jq '.html_url')
+          node scripts/live-smoke-test.mjs "$url" "$BUILD_SHA"

@@ -1,4 +1,10 @@
 import { Logger } from "../utils/Logger.js";
+import { config } from '../config/index.js';
+
+/** The database; a preview build's own, apart from the live site's (config.storageNamespace). */
+export const DB_NAME = config.storageNamespace ? `JellyJumpDB-${config.storageNamespace}` : 'JellyJumpDB';
+/** The localStorage marker that a playlist was saved. */
+export const PLAYLIST_MARKER = `${DB_NAME}-playlist`;
 /**
  * IndexedDB Service
  * Handles persistence of playlist, files, and player state using IndexedDB.
@@ -26,7 +32,7 @@ import { Logger } from "../utils/Logger.js";
  */
 export function hasSavedPlaylist() {
     try {
-        return !!localStorage.getItem('JellyJumpDB-playlist');
+        return !!localStorage.getItem(PLAYLIST_MARKER);
     } catch {
         return false;
     }
@@ -34,7 +40,7 @@ export function hasSavedPlaylist() {
 
 export class IndexedDBService {
     constructor() {
-        this.DB_NAME = 'JellyJumpDB';
+        this.DB_NAME = DB_NAME;
         this.DB_VERSION = 1;
         this.STORES = {
             PLAYLIST: 'playlist',
