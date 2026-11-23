@@ -1,3 +1,4 @@
+import { updatePlayerVolumeUI } from './PlayerUIUpdates.js';
 export function handlePlayerDocumentClick(player, e) {
     if (player.ui.ccPanel && player.ui.ccBtn &&
         !player.ui.ccBtn.contains(e.target) && !player.ui.ccPanel.contains(e.target)) {
@@ -127,7 +128,7 @@ export function togglePlayerAudioPanel(player) {
     player.ui.audioPanel.style.display = isVisible ? 'none' : 'block';
     if (!isVisible) {
         syncPlayerEqSliders(player);
-        player._updateVolumeUI();
+        updatePlayerVolumeUI(player);
     }
 }
 

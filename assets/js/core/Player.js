@@ -75,7 +75,6 @@ import { createPlayerControls } from '../ui/player/PlayerControlsView.js';
 import { attachPlayerBindings } from '../ui/player/PlayerBindings.js';
 import {
     handlePlayerDocumentClick,
-    updatePlayerSpeedMenu,
     togglePlayerFilterPanel,
     togglePlayerSpeedPanel,
     togglePlayerSubtitlePanel,
@@ -86,13 +85,8 @@ import {
     updatePlayerAudioButtonState
 } from '../ui/player/PlayerPanels.js';
 import {
-    updatePlayerPlayPauseUI,
-    updatePlayerProgress,
-    updatePlayerTimeDisplay,
     updatePlayerFullscreenUI,
-    setPlayerLoading,
     showPlayerBezel,
-    updatePlayerVolumeUI
 } from '../ui/player/PlayerUIUpdates.js';
 import { PlayerKeyboard } from '../ui/player/PlayerKeyboard.js';
 import { PlayerSubtitles } from '../ui/player/PlayerSubtitles.js';
@@ -325,21 +319,20 @@ export class CorePlayer {
     trigger(event, data = {}) { triggerPlayerEvent(this, event, data); }
 
     // ─── UI Updates ──────────────────────────────────────────────────────────────
-    _updatePlayPauseUI() { updatePlayerPlayPauseUI(this); this.announce.playState(); }
-    _updateProgress() { updatePlayerProgress(this); this.announce.progress(); }
-    _updateTimeDisplay() { updatePlayerTimeDisplay(this); this.announce.progress(); }
+    _updatePlayPauseUI() { this.announce.playState(); }
+    _updateProgress() { this.announce.progress(); }
+    _updateTimeDisplay() { this.announce.progress(); }
     _updateFullscreenUI() { updatePlayerFullscreenUI(this); }
     _setLoading(isLoading) {
         this.isLoading = isLoading;
-        setPlayerLoading(this, isLoading);
         this.announce.loading();
     }
     _showBezel(icon, text) { showPlayerBezel(this, icon, text); }
-    _updateVolumeUI() { updatePlayerVolumeUI(this); this.announce.volume(); }
+    _updateVolumeUI() { this.announce.volume(); }
 
     // ─── Panel helpers ───────────────────────────────────────────────────────────
     _handleDocumentClick(e) { handlePlayerDocumentClick(this, e); }
-    _updateSpeedMenu() { updatePlayerSpeedMenu(this); this.announce.rate(); }
+    _updateSpeedMenu() { this.announce.rate(); }
     toggleFilterPanel() { togglePlayerFilterPanel(this); }
     toggleSpeedPanel() { togglePlayerSpeedPanel(this); }
     toggleSubtitlePanel() { togglePlayerSubtitlePanel(this); }

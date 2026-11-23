@@ -13,7 +13,7 @@
  *   player.on('play', () => …)
  *   player.on('volumechange', ({volume, muted}) => …)
  *
- * Events: play, pause, timeupdate, durationchange, loadingchange,
+ * Events: play, pause, directionchange, timeupdate, durationchange, loadingchange,
  * volumechange, ratechange, loopmodechange, ended, trackschange,
  * streamstatechange, controlbarmodechange, filterschange (and reversefailed,
  * fired where it happens).
@@ -45,8 +45,13 @@ export class PlayerStateEvents {
     }
 
     playState() {
-        const playing = !!this.player.isPlaying;
+        const p = this.player;
+        const playing = !!p.isPlaying;
         this._changed('playing', playing, playing ? 'play' : 'pause');
+        // Which way Play goes, whether playing backwards is running, and
+        // whether it can run here: the play button shows all three.
+        const direction = { direction: p.direction, reversing: !!p.reverse?.active, reverseUnavailable: p.reverse?.unavailableReason ?? null };
+        this._changed('direction', `${direction.direction}|${direction.reversing}|${direction.reverseUnavailable}`, 'directionchange', direction);
     }
 
     progress() {

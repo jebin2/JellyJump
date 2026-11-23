@@ -50,7 +50,6 @@ export function createPlayerControls(player) {
 
     player._createThumbnailOverlay();
     player._applyControlVisibility();
-    if (player.config.controls.speed) player._updateSpeedMenu();
 }
 
 function initCaptionsPanel(player) {
