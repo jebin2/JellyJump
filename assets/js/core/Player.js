@@ -109,9 +109,12 @@ import { WatchParty } from './streaming/WatchParty.js';
 import { VideoFrameQueue } from './playback/VideoFrameQueue.js';
 import { AudioBufferQueue } from './audio/AudioBufferQueue.js';
 import { ReversePlayback } from './playback/ReversePlayback.js';
+import { PlayerTiming } from './PlayerTiming.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
+        /** Load, seek and dropped-frame timings for Diagnostics. */
+        this.timing = new PlayerTiming();
         this.container = document.getElementById(containerId);
         if (!this.container) {
             Logger.error(`Container with ID "${containerId}" not found.`);
@@ -490,6 +493,7 @@ export class CorePlayer {
     _cycleSpeed(direction) { cyclePlayerSpeed(this, direction); }
     _stepFrame(direction) { stepPlayerFrame(this, direction); }
     async _seekTo(time) {
+        this.timing.seekStarted();
         // Playing backwards carries on from wherever the seek lands.
         const wasReversing = !!this.reverse?.active;
         if (wasReversing) await this.reverse.stop({ reposition: false });
@@ -514,6 +518,7 @@ export class CorePlayer {
 
     // ─── Load ────────────────────────────────────────────────────────────────────
     async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
+        this.timing.loadStarted();
         return loadPlayerMedia(this, url, autoplay, videoId, savedSubtitles);
     }
 
@@ -814,6 +819,7 @@ export class CorePlayer {
      */
     presentFrame(source, { clear = false } = {}) {
         if (!source || !this.ctx || !this.canvas) return;
+        this.timing.framePresented();
 
         if (clear) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 

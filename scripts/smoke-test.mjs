@@ -297,6 +297,35 @@ async function run(page, origin) {
     check(button.every(ok => ok === true),
         `play, pause, seek, resume and reaching the end all agree (${button.filter(Boolean).length}/${button.length})`);
 
+    // Diagnostics (plan P3, P4): the numbers the loads and seeks above
+    // produced, shown and copied without naming the file.
+    const diag = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const modal = await window.jellyjump.openDiagnostics();
+        const pre = modal.body.querySelector('.diagnostics-report');
+        for (let i = 0; i < 50 && pre.textContent === 'Collecting…'; i++) await sleep(100);
+        const copy = modal.footer.querySelector('.diagnostics-copy');
+        copy.click();
+        await sleep(300);
+        const copied = await navigator.clipboard.readText().catch(e => `read failed: ${e.message}`);
+        const status = modal.footer.querySelector('.diagnostics-status').textContent;
+        modal.close();
+        return { text: pre.textContent, copied, status, measures: performance.getEntriesByType('measure').map(m => m.name) };
+    });
+    const metric = (name) => Number(new RegExp(`${name}: (\\d+) ms`).exec(diag.text)?.[1]);
+
+    console.log('\nDiagnostics');
+    check(/^JellyJump \S+ \(build \S+\)/.test(diag.text), `opens with the version and build (${diag.text.split('\n')[0]})`);
+    check(/H\.264: yes \/ (yes|no)/.test(diag.text), 'lists the codecs this browser decodes');
+    check(/Storage: .* of /.test(diag.text), 'shows storage use');
+    check(metric('firstFrame') > 0 && metric('firstFrame') < 10000, `time to first frame measured (${metric('firstFrame')} ms)`);
+    check(metric('seek') > 0 && metric('seek') < 5000, `seek latency measured (${metric('seek')} ms)`);
+    check(metric('pageReady') > 0, `page ready measured (${metric('pageReady')} ms)`);
+    check(/framesShown: \d+/.test(diag.text) && /storageUsed: /.test(diag.text), 'frames shown and storage used are in the metrics');
+    check(diag.measures.includes('jj:firstFrame') && diag.measures.includes('jj:seek'), 'and in the browser\'s performance timeline');
+    check(!diag.text.includes('smoke') && !diag.text.includes(origin) && !diag.text.includes('blob:'), 'no file name or address in it');
+    check(diag.copied === diag.text && /Copied/.test(diag.status), `Copy puts exactly that on the clipboard (${diag.status})`);
+
     const overlays = await page.evaluate(async () => {
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         const p = window.player;
@@ -797,7 +826,7 @@ const browser = await chromium.launch({
 });
 let page = null;
 try {
-    const context = await browser.newContext({ permissions: ['camera'], viewport: { width: 1280, height: 800 } });
+    const context = await browser.newContext({ permissions: ['camera', 'clipboard-read', 'clipboard-write'], viewport: { width: 1280, height: 800 } });
     page = await context.newPage();
     await startCoverage(page);
     await run(page, origin);

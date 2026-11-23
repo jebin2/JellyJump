@@ -2,6 +2,7 @@
 import { Logger } from '../utils/Logger.js';
 import { isCancellation } from '../utils/Cancellation.js';
 import { AppError } from '../errors/AppError.js';
+import { Metrics } from '../diagnostics/Metrics.js';
 
 /**
  * JobQueue - processing jobs that run behind the app, one at a time.
@@ -37,6 +38,8 @@ import { AppError } from '../errors/AppError.js';
  * @property {string} [error]
  * @property {string} [errorCode] - the AppError code of the failure (shared/errors/codes.js)
  * @property {JobResult[]} results
+ * @property {number} [startedAt] - performance.now() when it started running
+ * @property {number} [finishedAt] - and when it stopped, however it ended
  * @property {() => void} cancel
  *
  * @typedef {Object} JobSpec
@@ -76,6 +79,7 @@ async function pump() {
 
     running = true;
     job.status = 'running';
+    job.startedAt = performance.now();
     emit();
 
     // Progress arrives far more often than it can be seen; a whole percent
@@ -104,6 +108,8 @@ async function pump() {
         try { await spec.done?.(result); } finally { window.removeEventListener(PROCESSED_ITEM_EVENT, collect); }
         job.status = 'done';
         job.progress = 1;
+        // How long each tool takes, for Diagnostics (plan P3).
+        Metrics.record(`job:${spec.name}`, performance.now() - (job.startedAt ?? 0));
         resolve({ ok: true, result });
     } catch (failure) {
         const error = /** @type {Error} */ (failure);
@@ -119,6 +125,7 @@ async function pump() {
         }
     } finally {
         Logger.setTrace('job', null);
+        job.finishedAt = performance.now();
         pending.delete(job.id);
         running = false;
         emit();

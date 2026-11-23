@@ -76,6 +76,14 @@ async function initializeApp() {
         ], true); // true = autoplay on page load
     }
     hideLoader();
+    // The metrics module comes with the player's code anyway; not loaded
+    // before first paint for this one number.
+    const readyAt = performance.now();
+    import('./shared/diagnostics/Metrics.js').then(({ Metrics }) => Metrics.record('pageReady', readyAt));
+    // Diagnostics without a playlist item to open Info on (tests, a console).
+    window.jellyjump = {
+        openDiagnostics: async () => (await import('./ui/menus/features/DiagnosticsView.js')).DiagnosticsView.open(),
+    };
 
     // A newer build went live while this tab was open: offer, never force.
     startUpdateCheck({
