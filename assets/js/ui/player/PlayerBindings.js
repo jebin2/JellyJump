@@ -226,12 +226,10 @@ export function attachPlayerBindings(player) {
                 if (player.ui.loopAbSection) {
                     player.ui.loopAbSection.style.display = player.loopMode === 'one' ? 'block' : 'none';
                 }
+                // Announces loopmodechange too (PlayerStateEvents): whether
+                // there is a next item depends on it, since in playlist-loop
+                // mode the last item has one.
                 player._updateLoopUI();
-                // Whether there is a next item depends on this: in playlist-loop
-                // mode the last item has one. Announced rather than assumed, so
-                // the prev/next buttons are not left stale until something else
-                // happens to refresh them.
-                player.trigger('loopmodechange', { loopMode: player.loopMode });
             });
         });
 
@@ -507,9 +505,6 @@ export function attachPlayerBindings(player) {
         document.addEventListener('keydown', player._handlers.keydown);
     }
 
-    player._events = {};
-
-    // After the event list exists; registered any earlier, it would be wiped.
     // Play pressed while backward is set, and backwards could not start.
     player.on('reversefailed', ({ reason }) => Toast.show(reason, 3500));
 }

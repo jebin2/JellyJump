@@ -110,11 +110,16 @@ import { VideoFrameQueue } from './playback/VideoFrameQueue.js';
 import { AudioBufferQueue } from './audio/AudioBufferQueue.js';
 import { ReversePlayback } from './playback/ReversePlayback.js';
 import { PlayerTiming } from './PlayerTiming.js';
+import { PlayerStateEvents } from './PlayerStateEvents.js';
 
 export class CorePlayer {
     constructor(containerId, options = {}) {
         /** Load, seek and dropped-frame timings for Diagnostics. */
         this.timing = new PlayerTiming();
+        /** Listeners by event name (`on`, `off`, `trigger`). */
+        this._events = {};
+        /** Fires the §4.1 events when the state they describe changes. */
+        this.announce = new PlayerStateEvents(this);
         this.container = document.getElementById(containerId);
         if (!this.container) {
             Logger.error(`Container with ID "${containerId}" not found.`);
@@ -320,22 +325,26 @@ export class CorePlayer {
     trigger(event, data = {}) { triggerPlayerEvent(this, event, data); }
 
     // ─── UI Updates ──────────────────────────────────────────────────────────────
-    _updatePlayPauseUI() { updatePlayerPlayPauseUI(this); }
-    _updateProgress() { updatePlayerProgress(this); }
-    _updateTimeDisplay() { updatePlayerTimeDisplay(this); }
+    _updatePlayPauseUI() { updatePlayerPlayPauseUI(this); this.announce.playState(); }
+    _updateProgress() { updatePlayerProgress(this); this.announce.progress(); }
+    _updateTimeDisplay() { updatePlayerTimeDisplay(this); this.announce.progress(); }
     _updateFullscreenUI() { updatePlayerFullscreenUI(this); }
-    _setLoading(isLoading) { setPlayerLoading(this, isLoading); }
+    _setLoading(isLoading) {
+        this.isLoading = isLoading;
+        setPlayerLoading(this, isLoading);
+        this.announce.loading();
+    }
     _showBezel(icon, text) { showPlayerBezel(this, icon, text); }
-    _updateVolumeUI() { updatePlayerVolumeUI(this); }
+    _updateVolumeUI() { updatePlayerVolumeUI(this); this.announce.volume(); }
 
     // ─── Panel helpers ───────────────────────────────────────────────────────────
     _handleDocumentClick(e) { handlePlayerDocumentClick(this, e); }
-    _updateSpeedMenu() { updatePlayerSpeedMenu(this); }
+    _updateSpeedMenu() { updatePlayerSpeedMenu(this); this.announce.rate(); }
     toggleFilterPanel() { togglePlayerFilterPanel(this); }
     toggleSpeedPanel() { togglePlayerSpeedPanel(this); }
     toggleSubtitlePanel() { togglePlayerSubtitlePanel(this); }
     _syncFilterSliders() { syncPlayerFilterSliders(this); }
-    _updateFiltersButtonState() { updatePlayerFiltersButtonState(this); }
+    _updateFiltersButtonState() { updatePlayerFiltersButtonState(this); this.announce.filters(); }
     toggleAudioPanel() { togglePlayerAudioPanel(this); }
     _syncEqSliders() { syncPlayerEqSliders(this); }
     _updateAudioButtonState() { updatePlayerAudioButtonState(this); }
@@ -347,7 +356,7 @@ export class CorePlayer {
     setLoopEnd() { this.loop.setLoopEnd(); }
     clearLoopMarkers() { this.loop.clearLoopMarkers(); }
     resetLoop() { this.loop.resetLoop(); }
-    _updateLoopUI() { this.loop.updateLoopUI(); }
+    _updateLoopUI() { this.loop.updateLoopUI(); } // announces loopmodechange
 
     // ─── Thumbnail helpers ───────────────────────────────────────────────────────
     _createThumbnailOverlay() { this.thumbnails.createOverlay(); }
@@ -358,10 +367,14 @@ export class CorePlayer {
     _cleanupThumbnails() { this.thumbnails.cleanup(); }
 
     // ─── Subtitle / audio track helpers ─────────────────────────────────────────
-    _updateSubtitleMenu() { this.subtitles.updateSubtitleMenu(); }
+    _updateSubtitleMenu() { this.subtitles.updateSubtitleMenu(); this.announce.tracks(); }
     _switchSubtitleTrack(trackId) { this.subtitles.switchSubtitleTrack(trackId); }
     async _switchAudioTrack(trackId) { return this.subtitles.switchAudioTrack(trackId); }
-    async _updateAudioTracks() { return this.subtitles.updateAudioTracks(); }
+    async _updateAudioTracks() {
+        const result = await this.subtitles.updateAudioTracks();
+        this.announce.tracks();
+        return result;
+    }
     _restoreSavedSubtitles(savedSubtitles) { this.subtitles.restoreSavedSubtitles(savedSubtitles); }
     async loadSubtitle(url, name) { return this.subtitles.loadSubtitle(url, name); }
     async generateSubtitles(opts) { return this.subtitles.generateSubtitles(opts); }
@@ -375,7 +388,7 @@ export class CorePlayer {
     _loadControlBarMode() { this.controlBar.loadMode(); }
     _saveControlBarMode() { this.controlBar.saveMode(); }
     toggleControlBarMode() { this.controlBar.toggleMode(); }
-    _applyControlBarMode() { this.controlBar.applyMode(); }
+    _applyControlBarMode() { this.controlBar.applyMode(); } // announces controlbarmodechange
     _handleMouseMove(e) { this.controlBar.handleMouseMove(e); }
     _startAutoHideTimer() { this.controlBar.startAutoHideTimer(); }
     _clearAutoHideTimer() { this.controlBar.clearAutoHideTimer(); }
@@ -389,7 +402,7 @@ export class CorePlayer {
     stopWebcamStreamMode() { this.stream.stopWebcamStreamMode(); }
     _stopStreamRenderLoop() { this.stream.stopStreamRenderLoop(); }
     _renderStreamFrame() { this.stream.renderStreamFrame(); }
-    _updateStreamUI() { this.stream.updateStreamUI(); }
+    _updateStreamUI() { this.stream.updateStreamUI(); this.announce.streamState(); }
     _setStreamModeControls(isStreamMode) { this.stream.setStreamModeControls(isStreamMode); }
     _setWebcamModeControls(isWebcamMode) { this.stream.setWebcamModeControls(isWebcamMode); }
     async _cleanupMediaBunny() { return cleanupPlayerMediaBunny(this); }

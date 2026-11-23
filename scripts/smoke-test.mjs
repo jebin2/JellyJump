@@ -326,6 +326,47 @@ async function run(page, origin) {
     check(!diag.text.includes('smoke') && !diag.text.includes(origin) && !diag.text.includes('blob:'), 'no file name or address in it');
     check(diag.copied === diag.text && /Copied/.test(diag.status), `Copy puts exactly that on the clipboard (${diag.status})`);
 
+    // The player's events (plan H1): what the UI will listen to instead of
+    // being called. Each fires on a change, once.
+    const events = await page.evaluate(async () => {
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const p = window.player;
+        const seen = [];
+        const names = ['play', 'pause', 'timeupdate', 'durationchange', 'loadingchange', 'volumechange',
+            'ratechange', 'loopmodechange', 'controlbarmodechange'];
+        const listeners = names.map(n => [n, (d) => seen.push([n, d])]);
+        for (const [n, f] of listeners) p.on(n, f);
+        await p.play().catch(() => {}); await sleep(400);
+        p.pause(); await sleep(200);
+        await p._seekTo(0.5).catch(() => {}); await sleep(400);
+        const volumeBefore = p.volume;
+        p.setVolume(0.3); await sleep(50);
+        p.setVolume(volumeBefore); await sleep(50);
+        await p.setPlaybackRate(1.5, { persist: false }); await sleep(50);
+        await p.setPlaybackRate(1, { persist: false }); await sleep(50);
+        p.setLoopStart(); await p._seekTo(1.2).catch(() => {}); await sleep(300);
+        p.setLoopEnd(); p.clearLoopMarkers(); await sleep(50);
+        p.toggleControlBarMode(); p.toggleControlBarMode(); await sleep(50);
+        for (const [n, f] of listeners) p.off(n, f);
+        const count = (n) => seen.filter(([e]) => e === n).length;
+        return {
+            order: seen.filter(([e]) => e === 'play' || e === 'pause').map(([e]) => e).join(','),
+            counts: Object.fromEntries(names.map(n => [n, count(n)])),
+            volume: seen.filter(([e]) => e === 'volumechange').map(([, d]) => d.volume),
+            rates: seen.filter(([e]) => e === 'ratechange').map(([, d]) => d.playbackRate),
+            loading: seen.filter(([e]) => e === 'loadingchange').map(([, d]) => d.loading).join(','),
+        };
+    });
+
+    console.log('\nthe player\'s events');
+    check(events.order === 'play,pause', `play then pause, once each (${events.order})`);
+    check(events.counts.timeupdate > 0, `timeupdate while playing and seeking (${events.counts.timeupdate})`);
+    check(events.loading.includes('true,false'), `loadingchange around the seek (${events.loading})`);
+    check(events.volume.join() === `0.3,${await page.evaluate(() => window.player.volume)}`, `volumechange for each volume set (${events.volume})`);
+    check(events.rates.join() === '1.5,1', `ratechange for each speed (${events.rates})`);
+    check(events.counts.loopmodechange === 3, `loopmodechange for setting A, setting B and clearing them (${events.counts.loopmodechange})`);
+    check(events.counts.controlbarmodechange === 2, `controlbarmodechange for each mode (${events.counts.controlbarmodechange})`);
+
     const overlays = await page.evaluate(async () => {
         const sleep = ms => new Promise(r => setTimeout(r, ms));
         const p = window.player;

@@ -66,6 +66,9 @@ export class PlayerLoopControl {
 
     updateLoopUI() {
         const p = this.player;
+        // Every loop change comes through here: announce it (loopmodechange),
+        // whether or not there is a loop button to draw.
+        p.announce?.loop();
         const btn = p.ui.loopBtn;
         if (!btn) return;
 
