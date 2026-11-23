@@ -48,6 +48,10 @@ export class InfoMenu {
         const contentEl = modalContent.querySelector('.info-modal-content');
         const copyBtns = modalContent.querySelectorAll('.copy-btn');
         const copyAllBtn = modalContent.querySelector('.copy-all-btn');
+        modalContent.querySelector('.diagnostics-btn')?.addEventListener('click', async () => {
+            const { DiagnosticsView } = await import('./DiagnosticsView.js');
+            DiagnosticsView.open();
+        });
 
         modal.open();
 

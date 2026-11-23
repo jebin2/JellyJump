@@ -74,6 +74,7 @@ export async function updatePlayerNextFrame(player) {
                 // visible scrub through everything in between. Only the last
                 // one is worth showing, and only if nothing current turns up.
                 lateFrame = newNextFrame;
+                player.timing?.lateFrame();
 
                 if (!player._isMediaReady) {
                     player._isMediaReady = true;

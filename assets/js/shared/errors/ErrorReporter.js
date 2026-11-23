@@ -3,6 +3,7 @@ import { AppError } from './AppError.js';
 import { Logger } from '../utils/Logger.js';
 import { Toast } from '../utils/Toast.js';
 import { config } from '../config/index.js';
+import { redact } from '../diagnostics/redact.js';
 
 /**
  * The last line of defence: errors nothing else caught.
@@ -27,13 +28,12 @@ let installed = false;
 
 /**
  * A bug report the user can paste: what happened, on what, and the log
- * leading up to it. Addresses are replaced, since they can name the user's
- * files and servers.
+ * leading up to it. Addresses, paths and file names are replaced, since
+ * they can name the user's files and servers.
  * @param {AppError} error
  * @returns {string}
  */
 export function buildReport(error) {
-    const redact = (text) => String(text).replace(/\b(?:blob:)?(?:https?|file):\/\/[^\s'")]+/g, '<url>');
     const lines = [
         `JellyJump ${config.version} (build ${config.buildId})`,
         `Time: ${new Date().toISOString()}`,
