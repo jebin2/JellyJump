@@ -1,0 +1,12 @@
+import{jt as e}from"./Progress-_ePSYrIx.js";var t=e({jsonToVTT:()=>r,parseTranscriptJSON:()=>a});function n(e){let t=Math.floor(e/3600),n=Math.floor(e%3600/60),r=(e%60).toFixed(3);return`${t.toString().padStart(2,`0`)}:${n.toString().padStart(2,`0`)}:${r.padStart(6,`0`)}`}function r(e,t={}){let{wordsPerCue:r=8,maxCueDuration:i=5}=t;if(!Array.isArray(e)||e.length===0)return`WEBVTT
+
+`;let a=`WEBVTT
+
+`,o=0;for(;o<e.length;){let t=[],s=e[o],c=s;for(;o<e.length&&t.length<r&&e[o].end-s.start<=i;)t.push(e[o]),c=e[o],o++;if(t.length===0&&o<e.length&&(t.push(e[o]),c=e[o],o++),t.length>0){let e=n(t[0].start),r=n(c.end),i=t.map(e=>e.word).join(` `);a+=`${e} --> ${r}\n`,a+=`${i}\n\n`}}return a}function i(e,t={}){let{measure:r=null,maxWidth:i=0,maxWords:a=16,wordsPerCue:o=4,maxCueDuration:s=6,maxGap:c=1.5}=t,l=typeof r==`function`&&i>0,u=[];for(let t of Array.isArray(e)?e:[]){let e=(t?.text||``).trim();if(!e)continue;let n=Number(t?.timestamp?.[0]),r=Number(t?.timestamp?.[1]);Number.isFinite(n)||(n=u.length?u[u.length-1].end:0),Number.isFinite(r)||(r=n+.3),r<n&&(r=n+.1),u.push({text:e,start:n,end:r})}if(u.length===0)return`WEBVTT
+
+`;let d=`WEBVTT
+
+`,f=[],p=()=>{if(f.length===0)return;let e=f[0].start,t=Math.max(f[f.length-1].end,e+.1),r=f.map(e=>e.text).join(` `);d+=`${n(e)} --> ${n(t)}\n${r}\n\n`,f=[]};for(let e of u){if(f.length>0){let t=e.start-f[f.length-1].end,n=e.end-f[0].start>s||t>c;if(!n){if(l){let t=f.map(e=>e.text).join(` `)+` `+e.text;n=f.length>=a||r(t)>i}else n=f.length>=o}n&&p()}f.push(e)}return p(),d}function a(e){let t=JSON.parse(e);if(Array.isArray(t))return t;if(t.words)return t.words;if(t.segments)return t.segments.flatMap(e=>e.words||[]);throw Error(`Invalid transcript format: expected array or object with words/segments property`)}function o(e){let t=Math.max(0,Math.round(e)),n=Math.floor(t/36e5),r=Math.floor(t/6e4)%60,i=Math.floor(t/1e3)%60,a=(e,t)=>String(e).padStart(t,`0`);return`${a(n,2)}:${a(r,2)}:${a(i,2)}.${a(t%1e3,3)}`}function s(e,{start:t=0,end:n=1/0}={}){let r=[`WEBVTT`,``],i=0;for(let a of[...e].sort((e,t)=>e.start-t.start)){let e=Math.max(a.start,t),s=Math.min(a.end,n),c=(a.text||``).trim().split(/\r?\n/).filter(e=>e.trim()).join(`
+`);s>e&&c&&(r.push(`${o((e-t)*1e3)} --> ${o((s-t)*1e3)} align:center`,c,``),i++)}return i?r.join(`
+`):null}export{s as n,i as r,t};
+//# sourceMappingURL=SubtitleConverter-CQyO6-ED.js.map
