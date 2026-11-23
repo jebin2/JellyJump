@@ -1,5 +1,5 @@
 import { Toast } from '../../shared/utils/Toast.js';
-import { cyclePlayerSpeed, stepPlayerFrame } from '../../core/playback/PlaybackState.js';
+import { cyclePlayerSpeed, stepPlayerFrame, requestPlayerSeek } from '../../core/playback/PlaybackState.js';
 import { togglePlayerFullscreen } from './PlayerShell.js';
 
 /**
@@ -38,11 +38,11 @@ export class PlayerKeyboard {
             case 'k':
                 e.preventDefault();
                 // Restore audio if muted for autoplay (user is now interacting)
-                p._restoreAutoplayAudio('Keyboard play');
+                p.restoreAutoplayAudio('Keyboard play');
                 p.togglePlay();
                 break;
-            // The four relative-seek keys go through _requestSeek rather than
-            // _seekTo: these are the ones people hold down, and the OS repeats
+            // The four relative-seek keys go through requestPlayerSeek rather
+            // than seek: these are the ones people hold down, and the OS repeats
             // them far faster than a seek can complete.
             case 'j':
                 e.preventDefault();
@@ -52,7 +52,7 @@ export class PlayerKeyboard {
                         if (result?.reason) Toast.show(result.reason, 3500);
                     });
                 }
-                else p._requestSeek(p.currentTime - 10);
+                else requestPlayerSeek(p, p.currentTime - 10);
                 break;
             case 'l':
                 if (e.shiftKey) {
@@ -60,24 +60,24 @@ export class PlayerKeyboard {
                     p.clearLoopMarkers();
                 } else {
                     e.preventDefault();
-                    p._requestSeek(p.currentTime + 10);
+                    requestPlayerSeek(p, p.currentTime + 10);
                 }
                 break;
             case 'arrowleft':
                 e.preventDefault();
-                p._requestSeek(p.currentTime - 5);
+                requestPlayerSeek(p, p.currentTime - 5);
                 break;
             case 'arrowright':
                 e.preventDefault();
-                p._requestSeek(p.currentTime + 5);
+                requestPlayerSeek(p, p.currentTime + 5);
                 break;
             case 'home':
                 e.preventDefault();
-                p._seekTo(0);
+                p.seek(0);
                 break;
             case 'end':
                 e.preventDefault();
-                p._seekTo(p.duration);
+                p.seek(p.duration);
                 break;
 
             // Number Keys - Seek to percentage
@@ -85,7 +85,7 @@ export class PlayerKeyboard {
             case '5': case '6': case '7': case '8': case '9': {
                 e.preventDefault();
                 const percent = parseInt(key) / 10;
-                p._seekTo(p.duration * percent);
+                p.seek(p.duration * percent);
                 break;
             }
 

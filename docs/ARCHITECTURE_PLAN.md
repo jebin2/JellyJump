@@ -71,7 +71,8 @@ start (`78c1c90`); this table is where things stand now.
 | 3 | H2 (rest) the filters button, loop button, panel and A-B markers, captions and audio-track menus and the live badge are drawn from `filterschange`, `loopmodechange` (and `durationchange`, for the markers), `trackschange` and `streamstatechange`. The changes announce themselves: `VideoFilters` on every change, the subtitle state on load, switch, toggle and off, and the new public `setLoop(mode, start, end)` (§4.1), which the loop panel, the overrides and the edit panel's preview range use (the preview's retry timer for a duration still loading is gone). Public `switchSubtitleTrack` and `switchAudioTrack` (§4.1). `streamstatechange` fires every time a stream loads, as the stream controls were redrawn. The `_updateFiltersButtonState`, `_updateAudioButtonState`, `_updateLoopUI`, `_updateSubtitleMenu`, `_updateAudioTracks` and `_updateStreamUI` wrappers are gone; the `_update*` wrappers left only announce, except `_updateFullscreenUI` (H3). The audio menu draws only its newest request; the audio button now also follows equalizer changes. smoke-test (+4). `player._*` 352 → 318 | done | #83 |
 | 3 | H3 `ui/player/createPlayer.js`: `createPlayer(id, options)` builds the core with a view (`playerView`): the parts that own a piece of the screen (keyboard, captions, loop, thumbnails, control bar), `mount` (shell, screenshot button, controls, help overlay, bindings, control bar mode, resize observer), the audio-only visualizer, and the bezel, fullscreen and panel calls the core makes. Both pages use it. `core/Player.js` takes the view as its third argument and imports nothing from `ui/`; `AudioEngine` asks the view for the visualizer. The `_init`, `_createControls`, `_attachEvents`, `_createHelpOverlay` and `_initResizeObserver` wrappers are gone. Wrong-way imports 14 → 0 (the core → ui allow-list is empty) | done | #84 |
 | 3 | H4 `core/Player.js` 868 → 588 lines; the architecture check fails it above 600. 60 one-line pass-throughs are gone: their callers call the part (`player.thumbnails`, `.subtitles`, `.stream`, `.keyboard`, `.controlBar`, `.loop`) or the module function (`AudioEngine`, `MediaLifecycle`, `PlaybackState`, `RenderLoop`) directly. UI left the core: the document listeners (click, keydown, fullscreen, visibility) are added and removed by the view (`mount`, new `unmount`), the panel and fullscreen toggles are called by the controls themselves, showing the configured controls is in `PlayerControlsView`, the previous/next buttons in `PlayerUIUpdates`. Frame presentation and the overlay clock and baking moved to `core/playback/FramePresenter.js` (the player keeps one-line methods; tests fake them). Removed unused `setControlsConfig`, `toggleControl`, `setControlsPreset`, `getControlsConfig` and their presets. `player._*` 318 → 248 | done | this PR |
-| 3 | I, Q5, Q6, T3, T6 | to do | |
+| 3 | I1 (`ui/`) no `player._*` left in `ui/`. New public `setLoading(on)`, `restoreAutoplayAudio(label)` (renamed from the private ones, everywhere) and `redraw({ overlaysChanged })` (§4.1), which the sticker and decoration layers call instead of reaching for the frame decode and the baking switch; `setVolume(v, { bezel: false })` and `toggleMute()` back the volume slider and mute button, which had copied their bodies; the keyboard seeks with `seek` and `requestPlayerSeek`; the auto-hide timers are the control bar's. A dead `player._isLoading` test (never set, so always passed) before restoring autoplay audio on a click is gone. The check no longer counts the vendored `lib/` or the playlist's `p._` (p is the playlist there). `player._*` 248 → 179 | done | this PR |
+| 3 | I1 (rest), I2, Q5, Q6, T3, T6 | to do | |
 
 ---
 
@@ -685,13 +686,13 @@ tag vX.Y.Z ──► version stamped into web + desktop ──► tests ──�
 
 | Area | Members |
 |---|---|
-| Lifecycle | `load(url, options)`, `reset()`, `destroy()` |
+| Lifecycle | `load(url, options)`, `reset()`, `destroy()`, `setLoading(on)` (the playlist shows the spinner while it fetches a file) |
 | Transport | `play()`, `pause()`, `togglePlay()`, `seek(t)`, `stepFrame(dir)`, `setPlaybackRate(r)`, `toggleDirection()` |
 | State (read-only) | `currentTime`, `duration`, `playbackRate`, `isPlaying`, `isLoading`, `isLive`, `isStreamMode`, `isWebcamMode`, `canvas`, `engine`, `capabilities` (`canReverse`, `canChangeRate`, `canDecodeFrames`) |
-| Audio | `volume`, `setVolume(v)`, `isMuted`, `toggleMute()`, `restoreAutoplayAudio()`, `tapAudio()` |
+| Audio | `volume`, `setVolume(v, { bezel })`, `isMuted`, `toggleMute()`, `restoreAutoplayAudio()`, `tapAudio()` |
 | Loop | `loopMode`, `loopStart`, `loopEnd`, `setLoop(mode, start, end)` |
 | Overrides | `override(values) → release` (§3.4) |
-| Frames | `addRenderCallback(cb)`, `removeRenderCallback(cb)`, `redraw()` |
+| Frames | `addRenderCallback(cb)`, `removeRenderCallback(cb)`, `redraw({ overlaysChanged })` (repaint when paused; `overlaysChanged` first re-decides baking the colour effects) |
 | Streams | `loadWebcamStream()`, `startCanvasRecording()`, `stopCanvasRecording()`, `stopWebcamStreamMode()` |
 | Tracks | `loadSubtitle()`, `generateSubtitles()`, `switchAudioTrack()`, `switchSubtitleTrack()` |
 | Wiring | `on(event, fn)`, `off(event, fn)`, `setNavigationCallbacks()`, `setPlayCallback()` |

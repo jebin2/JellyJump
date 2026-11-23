@@ -210,7 +210,7 @@ export class PlayerSubtitles {
 
             if (p.isPlaying) {
                 p.pause();
-                const startTime = p._getPlaybackTime();
+                const startTime = p.currentTime;
                 Logger.log(`[Audio] Switching track while playing - restarting iterator at ${startTime.toFixed(2)}s`);
                 p.play();
             }

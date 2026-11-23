@@ -267,7 +267,7 @@ export class EditPanel {
         if (index !== -1 && this.playlist.activeIndex !== index) {
             this.playlist.selectItem(index, false);
         }
-        this.playlist.player?._restoreAutoplayAudio?.('Edit panel opened');
+        this.playlist.player?.restoreAutoplayAudio?.('Edit panel opened');
         if (focus) this.backBtn.focus({ preventScroll: true });
     }
 

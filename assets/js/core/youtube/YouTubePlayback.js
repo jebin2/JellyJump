@@ -72,7 +72,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
         // Armed before asking, so the playing event can cancel it.
         if (autoplay) watchYouTubeAutoplay(player);
         player.youtube.load({ videoId: video.id, start: video.start, autoplay });
-        player._setLoading(false);
+        player.setLoading(false);
         syncYouTubeAudio(player);
         if (player.playbackRate !== 1) player.youtube.setRate(player.playbackRate);
         Logger.log(`[YouTube] Reused embed for ${video.id}`);
@@ -99,7 +99,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
         autoplay,
         muted: player.config.muted,
         onReady: () => {
-            player._setLoading(false);
+            player.setLoading(false);
             // The embed starts at its own defaults, so the player's current
             // volume, mute and speed are pushed once it can accept them.
             syncYouTubeAudio(player);
@@ -147,7 +147,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
         },
         onError: (message) => {
             Logger.error('[YouTube]', message);
-            player._setLoading(false);
+            player.setLoading(false);
             if (player.onStreamError && player.currentVideoId) {
                 player.onStreamError(player.currentVideoId, message);
             }
@@ -323,7 +323,7 @@ function unmuteOncePlaying(player) {
     // Once per video: a video that pauses and resumes must not fight this again.
     player._youtubeWantsSound = false;
 
-    player._restoreAutoplayAudio('YouTube started playing');
+    player.restoreAutoplayAudio('YouTube started playing');
 
     setTimeout(() => {
         if (player.engine !== 'youtube' || !player.youtube) return;

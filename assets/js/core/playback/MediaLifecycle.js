@@ -639,7 +639,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         // picture and the sound.
         if (youtube) {
             player.currentVideoId = videoId || url;
-            player._setLoading(true);
+            player.setLoading(true);
             await loadPlayerYouTube(player, youtube, autoplay);
             // The direction button hides for YouTube.
             player._updatePlayPauseUI();
@@ -654,7 +654,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
             player.audioContext.resume().catch(() => { });
         }
 
-        player._setLoading(true);
+        player.setLoading(true);
         Logger.log(`Loading media: ${url}`);
         player.currentVideoId = videoId || url;
 
@@ -666,7 +666,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         await handlePlayerInitialFrame(player, autoplay);
         player.announce.tracks();
 
-        if (!player.isLive) player._setLoading(false);
+        if (!player.isLive) player.setLoading(false);
         // Now that it is known whether this is live and has a picture, the
         // direction button shows or hides to match.
         player._updatePlayPauseUI();
@@ -674,7 +674,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
 
     } catch (error) {
         Logger.error('Error loading media:', error);
-        player._setLoading(false);
+        player.setLoading(false);
         if (player.onStreamError && player.currentVideoId) {
             player.onStreamError(player.currentVideoId, error.message || 'Failed to load media');
         }
