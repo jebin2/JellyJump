@@ -76,8 +76,8 @@ export function updatePlayerFullscreenUI(player) {
     }
 }
 
-export function setPlayerLoading(player, isLoading) {
-    player.isLoading = isLoading;
+/** The spinner, for the player's isLoading (the core sets it; this only shows it). */
+export function showPlayerLoading(player, isLoading) {
     if (!player.ui.loader) return;
 
     if (isLoading) {

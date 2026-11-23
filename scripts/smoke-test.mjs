@@ -343,7 +343,11 @@ async function run(page, origin) {
         p.setVolume(0.3); await sleep(50);
         p.setVolume(volumeBefore); await sleep(50);
         await p.setPlaybackRate(1.5, { persist: false }); await sleep(50);
+        const speedShown = p.ui.speedBtn?.textContent;
         await p.setPlaybackRate(1, { persist: false }); await sleep(50);
+        await p._seekTo(1.0).catch(() => {}); await sleep(400);
+        const timeShown = p.ui.timeDisplay?.textContent;
+        const barShown = parseFloat(p.ui.progressBar?.style.width);
         p.setLoopStart(); await p._seekTo(1.2).catch(() => {}); await sleep(300);
         p.setLoopEnd(); p.clearLoopMarkers(); await sleep(50);
         p.toggleControlBarMode(); p.toggleControlBarMode(); await sleep(50);
@@ -355,6 +359,7 @@ async function run(page, origin) {
             volume: seen.filter(([e]) => e === 'volumechange').map(([, d]) => d.volume),
             rates: seen.filter(([e]) => e === 'ratechange').map(([, d]) => d.playbackRate),
             loading: seen.filter(([e]) => e === 'loadingchange').map(([, d]) => d.loading).join(','),
+            speedShown, timeShown, barShown, duration: p.duration,
         };
     });
 
@@ -366,6 +371,10 @@ async function run(page, origin) {
     check(events.rates.join() === '1.5,1', `ratechange for each speed (${events.rates})`);
     check(events.counts.loopmodechange === 3, `loopmodechange for setting A, setting B and clearing them (${events.counts.loopmodechange})`);
     check(events.counts.controlbarmodechange === 2, `controlbarmodechange for each mode (${events.counts.controlbarmodechange})`);
+    // The controls are drawn from these events now (H2), not called by the core.
+    check(events.speedShown === '1.5x', `the speed button follows ratechange (${events.speedShown})`);
+    check(/^0:01(\.0+)? \/ 0:02(\.0+)?$/.test(events.timeShown ?? ''), `the time display follows a seek (${events.timeShown})`);
+    check(Math.abs(events.barShown - 100 / events.duration) < 3, `and the progress bar (${events.barShown?.toFixed(1)}%)`);
 
     const overlays = await page.evaluate(async () => {
         const sleep = ms => new Promise(r => setTimeout(r, ms));

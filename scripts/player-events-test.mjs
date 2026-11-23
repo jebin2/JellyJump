@@ -46,6 +46,19 @@ console.log('\nplay and pause');
     check(names(p) === 'pause,play,pause', 'each change once');
 }
 
+console.log('\ndirection');
+{
+    const p = fakePlayer();
+    p.direction = 'forward'; p.reverse = { active: false, unavailableReason: null };
+    p.on('directionchange', (d) => p.seen.push(['directionchange', d]));
+    p.announce.playState(); p.seen = [];
+    p.direction = 'backward'; p.announce.playState();
+    p.reverse.active = true; p.announce.playState(); p.announce.playState();
+    p.reverse.unavailableReason = 'live'; p.announce.playState();
+    check(names(p) === 'directionchange,directionchange,directionchange', 'directionchange for the direction, reversing starting, and it becoming unavailable');
+    check(p.seen[1][1].reversing === true && p.seen[2][1].reverseUnavailable === 'live', 'with what changed');
+}
+
 console.log('\ntime and duration');
 {
     const p = fakePlayer();

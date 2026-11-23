@@ -1,5 +1,6 @@
 import { parseTime } from '../../shared/utils/mediaUtils.js';
 import { Toast } from '../../shared/utils/Toast.js';
+import { listenToPlayer } from './PlayerUIListeners.js';
 
 export function attachPlayerBindings(player) {
     if (player.config.controls.playPause && player.ui.playBtn) {
@@ -504,6 +505,9 @@ export function attachPlayerBindings(player) {
     if (player.config.controls.keyboard) {
         document.addEventListener('keydown', player._handlers.keydown);
     }
+
+    // The controls follow the player's state from here on (H2).
+    listenToPlayer(player);
 
     // Play pressed while backward is set, and backwards could not start.
     player.on('reversefailed', ({ reason }) => Toast.show(reason, 3500));
