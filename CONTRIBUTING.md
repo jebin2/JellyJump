@@ -83,5 +83,5 @@ off, to reproduce a flake.
 
 ## Security
 
-Report a vulnerability privately (the repository's Security tab → Report a
-vulnerability), not in a public issue.
+Report a vulnerability as described in [`SECURITY.md`](SECURITY.md), not in a
+public issue. It also lists the threat model and the data the app keeps.

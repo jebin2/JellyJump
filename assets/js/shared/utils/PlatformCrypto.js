@@ -27,14 +27,17 @@
  *   ~9.5 KB/sec of usable visual-strip capacity at 30 fps after 25% parity.
  *   Short-form platforms (≈140 s limit) → ≈1.3 MB max payload.
  *   Long-form platforms (≈10 min limit) → ≈5.7 MB max.
- *   Hard cap: 65 535 shards (uint16 header index) → ≈20 MB payload.
+ *   Hard cap: the header's 32-bit payload size, 4 GiB. Shard indices are
+ *   32-bit too, below the header range, so they never bind first.
  *
- * Crypto: AES-256-CTR + HMAC-SHA256 + PBKDF2 (100k iter).
- * Detection: "JJC4" magic in the audio header.
+ * Crypto: AES-256-CTR + HMAC-SHA256 + PBKDF2 (100k iter), CryptoHelper.
+ * Header layout: JJC4Header.js. Design and review: docs/adr/0011.
+ * Detection: the "JJC4" magic in the header frames of the video strip.
  */
 
 import { Logger } from './Logger.js';
 import { CryptoHelper } from './CryptoHelper.js';
+import { MAGIC, VERSION, FIXED_SIZE, MAX_PAYLOAD, encodeHeader, parseHeader, safeMediaType } from './JJC4Header.js';
 import { config } from '../config/index.js';
 import {
     AUDIO_SAMPLE_RATE,
@@ -48,8 +51,6 @@ import {
     stripDurationSec,
 } from './VisualStripCodec.js';
 
-const MAGIC = 'JJC4';
-const VERSION = 5;                 // the header lives in the video strip
 
 // Shard indices at or above this carry header bytes rather than payload. The
 // index travels inside the frame's own CRC, so a header frame verifies itself
@@ -131,15 +132,15 @@ export class PlatformCrypto {
         step(4, `HMAC-SHA256 integrity tag in ${ms(t, performance.now())}`);
         progress(0.35);
 
-        // ── Step 2: Build audio header bytes ──────────────────────────────
-        // Layout: magic(4) + version(2) + payloadSize(4) + metadataSize(2)
-        //       + salt(16) + iv(16) + hmac(32) + metadata JSON
+        // ── Step 2: Build the header (layout in JJC4Header.js) ─────────────
         const metadata = { rs: [RS_DATA_SHARDS, RS_PARITY_SHARDS] }; // v4 RS params
         if (filename) metadata.name = filename;
         if (mimeType)  metadata.type = mimeType;
         if (hint)      metadata.hint = hint;
-        const metaBytes   = new TextEncoder().encode(JSON.stringify(metadata));
         const payloadSize = ciphertext.length;
+        if (payloadSize > MAX_PAYLOAD) {
+            throw new Error(`File too large to encrypt: ${(payloadSize / 1073741824).toFixed(1)} GB; the format holds at most 4 GB.`);
+        }
 
         // v4 shard plan — encoder and decoder derive the identical plan from
         // (payloadSize, rs) alone, so nothing else needs to travel in-band.
@@ -155,19 +156,7 @@ export class PlatformCrypto {
             throw new Error(`File too large to encrypt in memory: ${(payloadSize / 1048576).toFixed(1)} MB. A save location is required to stream the carrier to disk.`);
         }
 
-        const headerFixed = new Uint8Array(4 + 2 + 4 + 2 + 16 + 16 + 32); // 76 bytes
-        const hdv = new DataView(headerFixed.buffer);
-        headerFixed.set(new TextEncoder().encode(MAGIC), 0);         // magic
-        hdv.setUint16(4, VERSION, false);                            // version = 4
-        hdv.setUint32(6, payloadSize, false);                        // payloadSize
-        hdv.setUint16(10, metaBytes.length, false);                  // metadataSize
-        headerFixed.set(salt, 12);                                   // salt
-        headerFixed.set(iv,   28);                                   // iv
-        headerFixed.set(hmac, 44);                                   // hmac
-
-        const headerBytes = new Uint8Array(headerFixed.length + metaBytes.length);
-        headerBytes.set(headerFixed, 0);
-        headerBytes.set(metaBytes, headerFixed.length);
+        const headerBytes = encodeHeader({ payloadSize, salt, iv, hmac, metadata });
 
         // The header rides in the video strip, split across as many frames as
         // it needs -- one, unless the filename and hint are long.
@@ -180,7 +169,7 @@ export class PlatformCrypto {
             chunk.set(headerBytes.subarray(off, Math.min(off + DATA_BYTES_PER_FRAME, headerBytes.length)));
             headerChunks.push(chunk);
         }
-        Logger.log(`[PlatformCrypto] Header — ${headerBytes.length} B (fixed=76 meta=${metaBytes.length}) in ${headerChunks.length} frame(s)`);
+        Logger.log(`[PlatformCrypto] Header — ${headerBytes.length} B (fixed=${FIXED_SIZE} meta=${headerBytes.length - FIXED_SIZE}) in ${headerChunks.length} frame(s)`);
 
         // ── Step 3: Lay out the carrier's frames ───────────────────────────
         // Header copies are interleaved through the payload rather than massed
@@ -269,23 +258,10 @@ export class PlatformCrypto {
         }
         progress(0.15);
 
-        const hdv          = new DataView(headerBytes.buffer, headerBytes.byteOffset);
-        const version      = hdv.getUint16(4,  false);
-        const payloadSize  = hdv.getUint32(6,  false);
-        const metadataSize = hdv.getUint16(10, false);
-        const salt         = headerBytes.slice(12, 28);
-        const iv           = headerBytes.slice(28, 44);
-        const storedHmac   = headerBytes.slice(44, 76);
-        let metadata = {};
-        if (metadataSize > 0) {
-            try {
-                metadata = JSON.parse(
-                    new TextDecoder().decode(headerBytes.slice(76, 76 + metadataSize))
-                );
-            } catch { /* ignore parse errors */ }
-        }
+        const { version, payloadSize, salt, iv, hmac: storedHmac, metadata } = parseHeader(headerBytes);
 
-        Logger.log(`[PlatformCrypto] Header parsed — version=${version} payloadSize=${payloadSize} B, salt=${salt.length}B iv=${iv.length}B hmac=${storedHmac.length}B meta=${JSON.stringify(metadata)}`);
+        // No file name or hint in the log: the ring is what a bug report copies.
+        Logger.log(`[PlatformCrypto] Header parsed — version=${version} payloadSize=${payloadSize} B, meta=${Object.keys(metadata).join(',')}`);
         progress(0.20);
 
         // Reed–Solomon shards — derive the identical plan the encoder used
@@ -381,7 +357,7 @@ export class PlatformCrypto {
         const plaintext = new Uint8Array(ciphertext);
         await CryptoHelper._xorRegion(plaintext, 0, plaintext.length, aesKey, iv, 0);
 
-        const outputType = metadata.type || 'application/octet-stream';
+        const outputType = safeMediaType(metadata.type);
         Logger.log(`[PlatformCrypto] DECRYPT done — ${plaintext.length} B (type=${outputType})`);
         progress(1);
         return { blob: new Blob([plaintext], { type: outputType }), metadata };
@@ -537,18 +513,7 @@ export class PlatformCrypto {
             const headerBytes = await PlatformCrypto._readVideoHeader(MediaBunny, videoTracks[0]);
             if (!headerBytes) return null;
 
-            const metadataSize = new DataView(
-                headerBytes.buffer, headerBytes.byteOffset
-            ).getUint16(10, false);
-
-            if (metadataSize > 0 && headerBytes.length >= 76 + metadataSize) {
-                try {
-                    return JSON.parse(
-                        new TextDecoder().decode(headerBytes.slice(76, 76 + metadataSize))
-                    );
-                } catch { return {}; }
-            }
-            return {};
+            return parseHeader(headerBytes).metadata;
         } catch (e) {
             Logger.log(`[PlatformCrypto] readMetadata: ${e.message}`);
             return null;

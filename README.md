@@ -94,6 +94,8 @@ docs/             the architecture plan and decision records
   code is going, the plan to get there, and its progress.
 - [`docs/adr/`](docs/adr/): why the big decisions were made.
 - [`assets/js/STRUCTURE.md`](assets/js/STRUCTURE.md): what each folder owns.
+- [`SECURITY.md`](SECURITY.md): reporting a vulnerability, the threat
+  model, what data is kept and where.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): setup, the checks a pull request
   must pass, commits, flaky tests.
 - [`.agent/rules/code-of-conduct.md`](.agent/rules/code-of-conduct.md): coding
