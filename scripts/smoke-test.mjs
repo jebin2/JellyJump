@@ -28,7 +28,7 @@ const FIXTURE_PREFIX = '/__fixtures__/';
 const FIXTURE_URL = `${FIXTURE_PREFIX}smoke.webm`;
 // The only fixture with an audio track. Without one the VOD anchor is never
 // set -- it is written only by the audio pump -- so the anchor branch of
-// _getPlaybackTime, which is the primary playback clock, is unreachable. Half
+// getPlayerPlaybackTime, which is the primary playback clock, is unreachable. Half
 // the clock logic went untested until this existed.
 const AV_FIXTURE_URL = `${FIXTURE_PREFIX}smoke-av.webm`;
 const HLS_URL = `${FIXTURE_PREFIX}hls/stream.m3u8`;
@@ -497,7 +497,7 @@ async function run(page, origin) {
 
     // Replaying a finished video, on a file that has audio.
     //
-    // What this does cover: the anchor branch of _getPlaybackTime, which is the
+    // What this does cover: the anchor branch of getPlayerPlaybackTime, which is the
     // primary playback clock and which no test reached before, because the
     // anchor is written only by the audio pump and every other fixture is
     // silent.

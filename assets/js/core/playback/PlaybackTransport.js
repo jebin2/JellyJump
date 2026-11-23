@@ -3,6 +3,7 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { startPlayerAudioVisualizer, initPlayerAudio, suspendPlayerAudioContext, stopPlayerQueuedAudio, closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, runPlayerAudioIterator } from '../audio/AudioEngine.js';
 import { startPlayerRenderLoop } from './RenderLoop.js';
 import { savePlayerPlaybackState } from './PlaybackState.js';
+import { getPlayerPlaybackTime } from './PlaybackState.js';
 
 export async function playPlayer(player) {
     player.stream.onPlay();
@@ -10,7 +11,7 @@ export async function playPlayer(player) {
     const streamHandled = await player.stream.playStream();
     if (streamHandled) return;
 
-    player._updateVolumeUI();
+    player.announce.volume();
 
     if (player.isPlaying) return;
     if (!player.videoTrack && !player.audioTrack) return;
@@ -30,57 +31,57 @@ export async function playPlayer(player) {
     } catch (e) {
         Logger.warn('[Play] AudioContext blocked/failed:', e);
         Logger.log('[Play] Auto-muting due to audio block...');
-        player._wasMutedForAutoplay = true;
+        player.stream.wasMutedForAutoplay = true;
         if (!player.config.muted) {
             player.config.muted = true;
             player._syncAudioGain();
-            if (player.ui.muteBtn) player._updateVolumeUI();
+            if (player.ui.muteBtn) player.announce.volume();
         }
     }
 
     player.isPlaying = true;
-    player._updatePlayPauseUI();
+    player.announce.playState();
 
     if (player.isLive) {
         let forceRestart = false;
         Logger.log(`[Play:Live] isLive=${player.isLive}, videoTrack=${!!player.videoTrack}, audioContext=${!!player.audioContext}, audioCtxTime=${player.audioContext?.currentTime?.toFixed(3)}`);
         
-        const lastPosition = player._getPlaybackTime();
+        const lastPosition = getPlayerPlaybackTime(player);
         const isLastPosUnix = lastPosition > 1000000000;
-        const isStartTsUnix = (player._liveStartTimestamp || 0) > 1000000000;
+        const isStartTsUnix = (player.stream?.liveStartTimestamp || 0) > 1000000000;
 
-        if (lastPosition > 0 && isLastPosUnix === isStartTsUnix && Math.abs(lastPosition - (player._liveStartTimestamp || 0)) > 1.0) {
-            player._liveStartTimestamp = lastPosition;
-            Logger.log(`[Play:Live] Resuming from last position: ${player._liveStartTimestamp.toFixed(3)}`);
+        if (lastPosition > 0 && isLastPosUnix === isStartTsUnix && Math.abs(lastPosition - (player.stream?.liveStartTimestamp || 0)) > 1.0) {
+            player.stream.liveStartTimestamp = lastPosition;
+            Logger.log(`[Play:Live] Resuming from last position: ${player.stream?.liveStartTimestamp.toFixed(3)}`);
         }
 
-        if (player.isLive && player._liveStartTimestamp) {
+        if (player.isLive && player.stream?.liveStartTimestamp) {
             const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
-            const drift = (currentLiveEdge ?? 0) - player._liveStartTimestamp;
+            const drift = (currentLiveEdge ?? 0) - player.stream?.liveStartTimestamp;
             // If drift is too large (lagging or leading), reset to edge
             if (Math.abs(drift) > 60) {
                 Logger.log(`[Play:Live] Resume position drift is too high (${drift.toFixed(1)}s) — resetting to edge`);
-                player._liveStartTimestamp = null;
+                player.stream.liveStartTimestamp = null;
                 forceRestart = true;
             }
         }
 
-        if (!player._liveStartTimestamp || forceRestart) {
+        if (!player.stream?.liveStartTimestamp || forceRestart) {
             if (player.videoTrack) {
                 try {
                     const currentLiveEdge = await player.videoTrack.getDurationFromMetadata({ skipLiveWait: true });
                     const refreshInterval = await player.videoTrack.getLiveRefreshInterval();
                     const backoff = (refreshInterval || 6) * 3;
-                    player._liveStartTimestamp = Math.max(0, (currentLiveEdge ?? 0) - backoff);
-                    Logger.log(`[Play:Live] Calculated new live start: ${player._liveStartTimestamp.toFixed(3)}`);
+                    player.stream.liveStartTimestamp = Math.max(0, (currentLiveEdge ?? 0) - backoff);
+                    Logger.log(`[Play:Live] Calculated new live start: ${player.stream?.liveStartTimestamp.toFixed(3)}`);
                 } catch (e) {
-                    player._liveStartTimestamp = Date.now() / 1000 - 15;
+                    player.stream.liveStartTimestamp = Date.now() / 1000 - 15;
                 }
             } else {
-                player._liveStartTimestamp = Date.now() / 1000 - 15;
+                player.stream.liveStartTimestamp = Date.now() / 1000 - 15;
             }
         } else {
-            Logger.log(`[Play:Live] Using existing live start timestamp: ${player._liveStartTimestamp.toFixed(3)}`);
+            Logger.log(`[Play:Live] Using existing live start timestamp: ${player.stream?.liveStartTimestamp.toFixed(3)}`);
         }
         
         await player.stream?.startLiveVideoLoop(forceRestart);
@@ -120,14 +121,14 @@ export async function playPlayer(player) {
     // froze the picture the same way, for the same reason.
     player.fallbackStartTime = performance.now();
 
-    const currentPosition = player._getPlaybackTime();
+    const currentPosition = getPlayerPlaybackTime(player);
     if (player.duration > 1.0 && currentPosition >= player.duration - 0.5) {
         Logger.log(`[Play] Resetting to start (position=${currentPosition.toFixed(2)}, duration=${player.duration.toFixed(2)})`);
         player.playbackTimeAtStart = 0;
         // Both clocks move with the position, or the next reader disagrees.
         //
         // The anchor is the one that matters here and was the harder half to
-        // see. _getPlaybackTime prefers it whenever the AudioContext is
+        // see. getPlayerPlaybackTime prefers it whenever the AudioContext is
         // running, and play() resumes the context a few lines above -- so an
         // anchor left over from the finished playthrough (content near the
         // duration) reported a position past the end, the iterator was opened
@@ -166,7 +167,7 @@ export async function playPlayer(player) {
     if (player.controlBarMode === 'overlay') {
         setTimeout(() => {
             if (player.isPlaying && player.controlBarMode === 'overlay') {
-                player._startAutoHideTimer();
+                player.controlBar?.startAutoHideTimer();
             }
         }, 500);
     }
@@ -184,19 +185,19 @@ export function pausePlayer(player, showOverlay = true) {
     const streamHandled = player.stream.pauseStream(showOverlay);
     if (streamHandled) return;
 
-    const calculatedTime = player._getPlaybackTime();
+    const calculatedTime = getPlayerPlaybackTime(player);
 
     if (calculatedTime < 0.1 && player.currentTime > 1.0) {
-        Logger.warn(`[Pause] Correction: _getPlaybackTime returned ${calculatedTime} but currentTime is ${player.currentTime}. Keeping ${player.currentTime}.`);
+        Logger.warn(`[Pause] Correction: the playback clock returned ${calculatedTime} but currentTime is ${player.currentTime}. Keeping ${player.currentTime}.`);
         player.playbackTimeAtStart = player.currentTime;
     } else {
         player.playbackTimeAtStart = calculatedTime;
     }
     player.isPlaying = false;
     player._pausedAtWall = performance.now();
-    player._clearAutoHideTimer();
+    player.controlBar?.clearAutoHideTimer();
 
-    player._updatePlayPauseUI();
+    player.announce.playState();
 
     closePlayerAudioBufferIteratorSoon(player);
 
@@ -227,12 +228,12 @@ export async function setPlayerPlaybackRate(player, rate, { persist = true } = {
         if (player.playbackRate !== 1) {
             player.playbackRate = 1;
         }
-        player._updateSpeedMenu();
+        player.announce.rate();
         return;
     }
 
     const wasPlaying = player.isPlaying;
-    const currentPosition = player._getPlaybackTime();
+    const currentPosition = getPlayerPlaybackTime(player);
 
     if (wasPlaying) {
         player.pause();
@@ -241,7 +242,7 @@ export async function setPlayerPlaybackRate(player, rate, { persist = true } = {
 
     player.playbackRate = rate;
     if (persist) Settings.set('speed', rate);
-    player._updateSpeedMenu();
+    player.announce.rate();
 
     if (wasPlaying) {
         await player._seekTo(currentPosition);

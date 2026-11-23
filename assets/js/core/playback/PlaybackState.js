@@ -27,11 +27,11 @@ export async function handlePlayerVisibilityChange(player) {
 
     if (document.hidden) {
         player._wasHiddenWhilePlaying = true;
-        Logger.log(`[Visibility] Tab hidden at playback time: ${player._getPlaybackTime().toFixed(2)}s`);
+        Logger.log(`[Visibility] Tab hidden at playback time: ${getPlayerPlaybackTime(player).toFixed(2)}s`);
     } else if (player._wasHiddenWhilePlaying) {
         if (!player.isLive) {
             player.setLoading(true);
-            const currentTime = player._getPlaybackTime();
+            const currentTime = getPlayerPlaybackTime(player);
             Logger.log(`[Visibility] Tab visible, syncing VOD video to: ${currentTime.toFixed(2)}s`);
             await player._startVideoIterator();
             player.setLoading(false);
@@ -106,13 +106,13 @@ export function completePlayerMedia(player) {
     player.pause();
     player.playbackTimeAtStart = player.duration;
     player.currentTime = player.duration;
-    player._updateProgress();
+    player.announce.progress();
     player.announce?.ended();
     if (player.onEnded) player.onEnded();
 }
 
 export async function seekPlayerTo(player, time) {
-    Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${player.vodAnchor.wall?.toFixed(3)}, vodAnchorContent=${player.vodAnchor.content?.toFixed(3)}, playbackTime=${player._getPlaybackTime().toFixed(3)}`);
+    Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${player.vodAnchor.wall?.toFixed(3)}, vodAnchorContent=${player.vodAnchor.content?.toFixed(3)}, playbackTime=${getPlayerPlaybackTime(player).toFixed(3)}`);
 
     player.setLoading(true);
 
@@ -135,7 +135,7 @@ export async function seekPlayerTo(player, time) {
 
     player.playbackTimeAtStart = Math.max(0, Math.min(player.duration, time));
     player.currentTime = player.playbackTimeAtStart;
-    player._updateProgress();
+    player.announce.progress();
 
     player.vodAnchor.clear();
 
@@ -189,7 +189,7 @@ export function requestPlayerSeek(player, time) {
     // key would crawl instead of scanning.
     player._pendingSeekTime = target;
     player.currentTime = target;
-    player._updateProgress();
+    player.announce.progress();
 
     if (player._seekLoopActive) return;
     player._seekLoopActive = true;

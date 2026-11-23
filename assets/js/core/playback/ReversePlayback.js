@@ -202,7 +202,7 @@ export class ReversePlayback {
         this._origin = { position: from, wall: performance.now(), rate: p.playbackRate || 1 };
         this.position = from;
         this.active = true;
-        p._updatePlayPauseUI();
+        p.announce.playState();
         p.trigger?.('reversechange', { active: true });
         Logger.log(`[Reverse] Playing backwards from ${from.toFixed(3)}s at ${this._origin.rate}x`);
 
@@ -265,7 +265,7 @@ export class ReversePlayback {
         this._audio = null;
         for (const reader of this._readers ?? []) reader.close();
         this._readers = null;
-        p._updatePlayPauseUI();
+        p.announce.playState();
         p.trigger?.('reversechange', { active: false });
         Logger.log(`[Reverse] Stopped at ${this.position.toFixed(3)}s`);
 
@@ -301,7 +301,7 @@ export class ReversePlayback {
         p.currentTime = t;
         p.playbackTimeAtStart = t;
         p.trigger?.('timeupdate', { currentTime: t });
-        p._updateProgress();
+        p.announce.progress();
         if (p.subtitles?.enabled) p.subtitles.renderSubtitles(t);
 
         if (t <= this._start + EPSILON) {

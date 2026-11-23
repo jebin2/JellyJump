@@ -5,6 +5,7 @@ import { StreamDetector } from '../../shared/utils/StreamDetector.js';
 import { loadPlayerYouTube, teardownPlayerYouTube } from '../youtube/YouTubePlayback.js';
 import { closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, closePlayerAudioContext, stopPlayerQueuedAudio, suspendPlayerAudioContext } from '../audio/AudioEngine.js';
 import { loadPlayerPlaybackState } from './PlaybackState.js';
+import { getPlayerPlaybackTime } from './PlaybackState.js';
 
 /**
  * Choose an audio track the browser can actually decode.
@@ -98,8 +99,8 @@ export async function resetPlayer(player) {
     player.media.audioTrack = null;
     player.currentVideoId = null;
 
-    player._updateTimeDisplay();
-    player._updateProgress();
+    player.announce.progress();
+    player.announce.progress();
     if (player.ui?.loader) player.ui.loader.style.display = 'none';
 
     stopPlayerQueuedAudio(player);
@@ -108,7 +109,7 @@ export async function resetPlayer(player) {
 }
 
 export async function cleanupPlayerForLoad(player) {
-    player._isMediaReady = false;
+    player.stream.isMediaReady = false;
     player.pause(false);
     player.thumbnails?.cleanup();
     cleanupPlayerAudioMode(player);
@@ -135,7 +136,7 @@ export async function cleanupPlayerForLoad(player) {
     }
     
     clearPlayerCanvas(player);
-    player._updateTimeDisplay();
+    player.announce.progress();
     disposeMediaBunnyResources(player);
 
     player.subtitles.reset();
@@ -211,7 +212,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         } catch (e) {
             throw await explainSourceFailure(url, e);
         }
-        player._updateTimeDisplay();
+        player.announce.progress();
     }
 
     try {
@@ -306,17 +307,12 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
 export async function handlePlayerHlsState(player) {
     Logger.log('[MediaLifecycle] Handling HLS state...');
     player.isLive = player.videoTrack ? await player.videoTrack.isLive() : false;
-    
-    // Sync with stream controller
-    if (player.streamController) {
-        player.streamController.isLive = player.isLive;
-    }
 
     Logger.log(`[Live:Load] isLive=${player.isLive}, videoTrack=${!!player.videoTrack}, audioTrack=${!!player.audioTrack}, audioSink=${!!player.audioSink}`);
 
     if (player.isLive) {
         player.playbackRate = 1;
-        player._updateSpeedMenu();
+        player.announce.rate();
 
         Logger.log('[MediaLifecycle] Fetching live duration and refresh interval...');
         const [currentDur, refreshInterval] = await Promise.all([
@@ -328,23 +324,17 @@ export async function handlePlayerHlsState(player) {
         const backoff = (refreshInterval || 6) * 3;
         const startTs = Math.max(0, (currentDur ?? 0) - backoff);
         
-        player._liveStartTimestamp = startTs;
-        if (player.streamController) {
-            player.streamController._liveStartTimestamp = startTs;
-        }
+        player.stream.liveStartTimestamp = startTs;
         
         Logger.log(`[Live:Load] liveEdge=${(currentDur ?? 0).toFixed(3)}, refreshInterval=${refreshInterval ?? 6}s, starting at=${startTs.toFixed(3)} (backoff: ${backoff}s)`);
         player.duration = 0;
     } else {
-        player._liveStartTimestamp = null;
-        if (player.streamController) {
-            player.streamController._liveStartTimestamp = null;
-        }
+        player.stream.liveStartTimestamp = null;
         player.duration = await player.input.getDurationFromMetadata() ?? 0;
         Logger.log(`[Live:Load] VOD duration=${player.duration.toFixed(3)}s`);
     }
 
-    player._updateTimeDisplay();
+    player.announce.progress();
     player.announce.streamState();
 }
 
@@ -361,8 +351,8 @@ export function resetPlayerUI(player) {
     clearPlayerCanvas(player);
     player.currentTime = 0;
     player.duration = 0;
-    player._updateTimeDisplay();
-    player._updateProgress();
+    player.announce.progress();
+    player.announce.progress();
 }
 
 // Long enough that a slow decoder spin-up, a large GOP or a sluggish network
@@ -413,11 +403,11 @@ export async function startPlayerVideoIterator(player) {
     try {
         await player.frames.close();
 
-        const startTime = player._getPlaybackTime();
+        const startTime = getPlayerPlaybackTime(player);
         Logger.log(`[VideoIterator] Initializing canvases at time: ${startTime.toFixed(3)}s (epoch=${epoch})`);
         const iterator = player.frames.open(player.videoSink, startTime);
         if (!iterator) {
-            Logger.warn('[VideoIterator] videoSink returned null iterator for time:', player._getPlaybackTime());
+            Logger.warn('[VideoIterator] videoSink returned null iterator for time:', getPlayerPlaybackTime(player));
             return;
         }
 
@@ -505,7 +495,7 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
 
     player.playbackTimeAtStart = startTimestamp;
     player.currentTime = startTimestamp;
-    player._updateProgress();
+    player.announce.progress();
 
     Logger.log(`[InitialFrame] Restored state - isAudioMode: ${player.isAudioMode}, playbackTimeAtStart: ${player.playbackTimeAtStart}, currentTime: ${player.currentTime}`);
 
@@ -522,7 +512,7 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
             if (!player.config.muted) {
                 Logger.log('Attempting fallback to muted autoplay...');
                 player.config.muted = true;
-                if (player.ui.muteBtn) player._updateVolumeUI();
+                if (player.ui.muteBtn) player.announce.volume();
 
                 try {
                     await suspendPlayerAudioContext(player);
@@ -535,7 +525,7 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
 
             Logger.warn('Falling back to paused state.');
             player.isPlaying = false;
-            player._updatePlayPauseUI();
+            player.announce.playState();
 
             closePlayerAudioBufferIteratorSoon(player);
             await suspendPlayerAudioContext(player);
@@ -558,7 +548,7 @@ export async function handlePlayerInitialFrame(player, autoplay = false) {
             Logger.warn('Initial video iterator failed:', e);
         }
     }
-    player._updateVolumeUI();
+    player.announce.volume();
 }
 
 export async function cleanupPlayerMediaBunny(player) {
@@ -619,8 +609,8 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
             // audio instead of leaving the video silent until a manual
             // unmute. Skipped when the user muted deliberately (guard
             // above): auto-restore must not override their choice.
-            player._wasMutedForAutoplay = true;
-            player._updateVolumeUI();
+            player.stream.wasMutedForAutoplay = true;
+            player.announce.volume();
         }
 
         const youtube = parseYouTubeUrl(url);
@@ -642,7 +632,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
             player.setLoading(true);
             await loadPlayerYouTube(player, youtube, autoplay);
             // The direction button hides for YouTube.
-            player._updatePlayPauseUI();
+            player.announce.playState();
             Logger.log('Media loaded successfully (youtube)');
             return;
         }
@@ -669,7 +659,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         if (!player.isLive) player.setLoading(false);
         // Now that it is known whether this is live and has a picture, the
         // direction button shows or hides to match.
-        player._updatePlayPauseUI();
+        player.announce.playState();
         Logger.log('Media loaded successfully');
 
     } catch (error) {

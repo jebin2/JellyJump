@@ -1,4 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
+import { getPlayerPlaybackTime } from './PlaybackState.js';
 
 // How long to leave a closed queue alone before trying to open it again, and
 // how many times to bother. Spaced out because the usual reason a rebuild gave
@@ -66,7 +67,7 @@ export async function updatePlayerNextFrame(player) {
                 continue; 
             }
 
-            const playbackTime = player._getPlaybackTime();
+            const playbackTime = getPlayerPlaybackTime(player);
             if (newNextFrame.timestamp <= playbackTime) {
                 // Late frame: skip it. Held rather than drawn — painting every
                 // frame on the way past is what a fast-forward looks like, and
@@ -76,8 +77,8 @@ export async function updatePlayerNextFrame(player) {
                 lateFrame = newNextFrame;
                 player.timing?.lateFrame();
 
-                if (!player._isMediaReady) {
-                    player._isMediaReady = true;
+                if (!player.stream?.isMediaReady) {
+                    player.stream.isMediaReady = true;
                     if (player.isPlaying) player.stream?.resumeRecordingSmartPause();
                 }
             } else {
@@ -114,7 +115,7 @@ export function startPlayerRenderLoop(player) {
 
     const loop = () => {
         if (player.isPlaying) {
-            const playbackTime = player._getPlaybackTime();
+            const playbackTime = getPlayerPlaybackTime(player);
             player.currentTime = playbackTime;
 
             if (player._frameSyncLogCount === undefined) player._frameSyncLogCount = 0;
@@ -167,7 +168,7 @@ export function startPlayerRenderLoop(player) {
                 }
             }
 
-            player._updateProgress();
+            player.announce.progress();
 
             if (player.subtitles.enabled) {
                 player.subtitles?.renderSubtitles(playbackTime);
