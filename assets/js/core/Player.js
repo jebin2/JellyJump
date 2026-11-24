@@ -28,6 +28,7 @@ import {
     togglePlayerPlay,
     seekPlayerTo,
     requestPlayerSeek,
+    stepPlayerFrame,
 } from './playback/PlaybackState.js';
 import { playPlayer, pausePlayer, setPlayerPlaybackRate } from './playback/PlaybackTransport.js';
 import {
@@ -300,6 +301,8 @@ export class CorePlayer {
      * @param {number} time
      */
     requestSeek(time) { requestPlayerSeek(this, time); }
+    /** One frame forward (1) or back (-1), paused. @param {1|-1} direction */
+    stepFrame(direction) { stepPlayerFrame(this, direction); }
 
     // ─── Load ────────────────────────────────────────────────────────────────────
     async load(url, autoplay = false, videoId = null, savedSubtitles = null) {

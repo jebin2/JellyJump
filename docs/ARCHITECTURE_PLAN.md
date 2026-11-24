@@ -74,8 +74,9 @@ start (`78c1c90`); this table is where things stand now.
 | 3 | I1 (`ui/`) no `player._*` left in `ui/`. New public `setLoading(on)`, `restoreAutoplayAudio(label)` (renamed from the private ones, everywhere) and `redraw({ overlaysChanged })` (§4.1), which the sticker and decoration layers call instead of reaching for the frame decode and the baking switch; `setVolume(v, { bezel: false })` and `toggleMute()` back the volume slider and mute button, which had copied their bodies; the keyboard seeks with `seek` and `requestPlayerSeek`; the auto-hide timers are the control bar's. A dead `player._isLoading` test (never set, so always passed) before restoring autoplay audio on a click is gone. The check no longer counts the vendored `lib/` or the playlist's `p._` (p is the playlist there). `player._*` 248 → 179 | done | #86 |
 | 3 | I1 (`core/streaming`, and the wrappers everywhere in `core/`) no `player._*` left in `core/streaming`. The core announces with `player.announce.*` directly (`_updatePlayPauseUI`, `_updateProgress`, `_updateTimeDisplay`, `_updateVolumeUI`, `_updateSpeedMenu` gone), reads the clock with `getPlayerPlaybackTime`, and calls the control bar's auto-hide timers (if there is a control bar). The live start time, the owed autoplay sound and the media-ready flag are the stream's (`stream.liveStartTimestamp`, `wasMutedForAutoplay`, `isMediaReady`), no longer forwarded by private player accessors. A `player.streamController` that nothing ever set is gone. `player._*` 179 → 83 | done | #87 |
 | 3 | I1 (`core/youtube`, `PlayerEvents`, the volume) none left in either. The YouTube mode's ticker, autoplay retry and owed sound, and the listener lists, are kept by their modules per player (a `WeakMap`), not as player fields; `clearPlayerEvents` empties the list on destroy. The engine switch for volume moved from `Player._syncAudioGain` to `AudioEngine.syncPlayerVolume`; YouTube's own retry tells the embed directly. The end of a video calls `completePlayerMedia`, without `Player._completeMedia`. `player._*` 83 → 55 | done | #88 |
-| 3 | I1 (`core/playback`, `core/audio`) done: B2's `player._*` count is 0. `seek(t)` is the seek itself (no `_seekTo`), and the new public `requestSeek(t)` (§4.1) is the coalesced one the keyboard and scrubbing use. The seek queue and the closed-queue reopen are small player parts (`seekQueue`, `frameReopen`) the suites read; the hidden-tab flag, the scrub listeners, the pause time and the frame-sync log count are kept by the module that uses them. The playback modules call `startPlayerVideoIterator`, `extractAndDrawPlayerFrame` and `cleanupPlayerForLoad` (which took in the reverse and YouTube steps of `_cleanupForLoad`) directly. A `_liveNextAudioTime` nothing read is gone. `player._*` 55 → 0 | done | this PR |
-| 3 | I2, Q5, Q6, T3, T6 | to do | |
+| 3 | I1 (`core/playback`, `core/audio`) done: B2's `player._*` count is 0. `seek(t)` is the seek itself (no `_seekTo`), and the new public `requestSeek(t)` (§4.1) is the coalesced one the keyboard and scrubbing use. The seek queue and the closed-queue reopen are small player parts (`seekQueue`, `frameReopen`) the suites read; the hidden-tab flag, the scrub listeners, the pause time and the frame-sync log count are kept by the module that uses them. The playback modules call `startPlayerVideoIterator`, `extractAndDrawPlayerFrame` and `cleanupPlayerForLoad` (which took in the reverse and YouTube steps of `_cleanupForLoad`) directly. A `_liveNextAudioTime` nothing read is gone. `player._*` 55 → 0 | done | #89 |
+| 3 | I2 `player-api-test`: reads `CorePlayer`'s methods and accessors from the source and the member names from §4.1's table, and fails on a public one §4.1 does not list, or a §4.1 entry the player does not have (one marked "(planned" excepted, and constructor fields count). It found 15 members in use but never listed (the A-B marker calls, `trigger`, `resetUI`, `presentFrame`, `overlayTimeMs`, the source getters, the control bar toggle), now in §4.1; `capabilities` described with its real keys; `stepFrame(dir)` added (the keyboard uses it); `tapAudio()` marked planned | done | this PR |
+| 3 | Q5, Q6, T3, T6 | to do | |
 
 ---
 
@@ -689,16 +690,18 @@ tag vX.Y.Z ──► version stamped into web + desktop ──► tests ──�
 
 | Area | Members |
 |---|---|
-| Lifecycle | `load(url, options)`, `reset()`, `destroy()`, `setLoading(on)` (the playlist shows the spinner while it fetches a file) |
+| Lifecycle | `load(url, options)`, `reset()`, `destroy()`, `setLoading(on)` (the playlist shows the spinner while it fetches a file), `resetUI()` (blank picture and bar before the next item) |
 | Transport | `play()`, `pause()`, `togglePlay()`, `seek(t)` (resolves once shown), `requestSeek(t)` (a burst of seeks: the position moves at once, the decode goes to the latest), `stepFrame(dir)`, `setPlaybackRate(r)`, `toggleDirection()` |
-| State (read-only) | `currentTime`, `duration`, `playbackRate`, `isPlaying`, `isLoading`, `isLive`, `isStreamMode`, `isWebcamMode`, `canvas`, `engine`, `capabilities` (`canReverse`, `canChangeRate`, `canDecodeFrames`) |
-| Audio | `volume`, `setVolume(v, { bezel })`, `isMuted`, `toggleMute()`, `restoreAutoplayAudio()`, `tapAudio()` |
-| Loop | `loopMode`, `loopStart`, `loopEnd`, `setLoop(mode, start, end)` |
+| State (read-only) | `currentTime`, `duration`, `playbackRate`, `isPlaying`, `isLoading`, `isLive`, `isStreamMode`, `isWebcamMode`, `canvas`, `engine`, `capabilities` (`canvasFrames`, `audioGraph`: false while YouTube plays) |
+| Source (read-only) | `input`, `videoTrack`, `videoSink`, `audioTrack`, `audioSink` (the loaded file, from `player.media`), `streamVideo` (the live or camera element) |
+| Audio | `volume`, `setVolume(v, { bezel })`, `isMuted`, `toggleMute()`, `restoreAutoplayAudio()`, `tapAudio()` (planned: the recorder's audio tap, now in RecordMenu) |
+| Loop | `loopMode`, `loopStart`, `loopEnd`, `setLoop(mode, start, end)`, `setLoopStart()`, `setLoopEnd()`, `clearLoopMarkers()`, `resetLoop()` (the A-B keys and buttons, at the current position) |
 | Overrides | `override(values) → release` (§3.4) |
-| Frames | `addRenderCallback(cb)`, `removeRenderCallback(cb)`, `redraw({ overlaysChanged })` (repaint when paused; `overlaysChanged` first re-decides baking the colour effects) |
+| Frames | `addRenderCallback(cb)`, `removeRenderCallback(cb)`, `presentFrame(source, options)` (the one way a frame reaches the canvas), `overlayTimeMs()` (the clock animated overlays run on), `redraw({ overlaysChanged })` (repaint when paused; `overlaysChanged` first re-decides baking the colour effects) |
 | Streams | `loadWebcamStream()`, `startCanvasRecording()`, `stopCanvasRecording()`, `stopWebcamStreamMode()` |
 | Tracks | `loadSubtitle()`, `generateSubtitles()`, `switchAudioTrack()`, `switchSubtitleTrack()` |
-| Wiring | `on(event, fn)`, `off(event, fn)`, `setNavigationCallbacks()`, `setPlayCallback()` |
+| Wiring | `on(event, fn)`, `off(event, fn)`, `trigger(event, data)` (fires one; the core's parts use it), `setNavigationCallbacks()`, `setPlayCallback()` |
+| Control bar | `controlBarMode`, `toggleControlBarMode()` |
 | Layers | `videoFilters`, `stickers`, `decorations`, `subtitles` |
 
 Events: `play`, `pause`, `directionchange`, `timeupdate`, `durationchange`, `loadingchange`,
