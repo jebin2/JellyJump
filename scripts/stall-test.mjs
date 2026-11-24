@@ -215,6 +215,18 @@ try {
     check('nearly every frame after the seek was shown', seekRun.shownAfterSeek >= afterSeek * 0.8,
         `${seekRun.shownAfterSeek} of ${afterSeek}`);
     check('the clock never ran far past the picture after the seek', seekRun.worstLead < 1.0, `${seekRun.worstLead.toFixed(2)} s`);
+    // Seek-bar thumbnails are not made for a file streamed from the network:
+    // they read frames from all over it and starved its playback.
+    sent = 0;
+    const thumbs = await page.evaluate(async () => {
+        const t = window.player.thumbnails;
+        t.generationStarted = false;
+        await t.startGeneration();
+        return { generating: !!t.generator?.isGenerating, made: t.generator?.thumbnails?.length ?? 0 };
+    });
+    await new Promise((r) => setTimeout(r, 500));
+    check('no seek-bar thumbnails are made for a file streamed from the network',
+        !thumbs.generating && thumbs.made === 0 && sent === 0, `${JSON.stringify(thumbs)}, ${sent} bytes read`);
     check('no uncaught errors', errors.length === 0, errors.join(' | '));
 } catch (error) {
     failed++;

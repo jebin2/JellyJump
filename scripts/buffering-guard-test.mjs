@@ -1,12 +1,12 @@
 /**
  * BufferingGuard's decisions, without a browser: when it holds the clock,
- * when it lets go, and when background reads may run.
+ * and when it lets go.
  *
  *   node scripts/buffering-guard-test.mjs
  */
 import {
     checkPlayerBuffering, isPlayerStalled, clearPlayerStall, noteAudioStarted, noteAudioScheduled,
-    noteFramePresented, whenPlayerIdle, audioLeadLimit, RESUME_AT, IDLE_FOR_MS,
+    noteFramePresented, audioLeadLimit, RESUME_AT,
 } from '../assets/js/core/playback/BufferingGuard.js';
 
 let passed = 0;
@@ -134,23 +134,6 @@ console.log('\nstarved video\n');
     check('no frame for over half a second while the decoder works: waits', isPlayerStalled(p));
     clearPlayerStall(p);
     check('pause, seek or load clears it', !isPlayerStalled(p) && !p.isLoading);
-}
-
-console.log('\nbackground reads wait for a real pause\n');
-{
-    const p = fakePlayer();
-    let resolved = false;
-    const waiting = whenPlayerIdle(p).then(() => { resolved = true; });
-    // A seek: paused for a moment, then playing on.
-    p.isPlaying = false;
-    await sleep(300);
-    p.isPlaying = true;
-    await sleep(IDLE_FOR_MS);
-    check("a seek's moment of pause does not count", !resolved);
-    p.isPlaying = false;
-    await sleep(IDLE_FOR_MS + 400);
-    check('a pause that lasts does', resolved);
-    await waiting;
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

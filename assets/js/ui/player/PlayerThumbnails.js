@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { whenPlayerHasHeadroom, whenPlayerIdle } from '../../core/playback/BufferingGuard.js';
+import { whenPlayerHasHeadroom } from '../../core/playback/BufferingGuard.js';
 import { formatTime } from '../../shared/utils/mediaUtils.js';
 import { ThumbnailGenerator } from './ThumbnailGenerator.js';
 
@@ -113,18 +113,24 @@ export class PlayerThumbnails {
             return;
         }
 
+        // Nor for a file played straight from the network: making them reads
+        // 100 frames from all over it, and over a home link that starved the
+        // playback of the same file (or, held back until a pause, still read
+        // a large part of a film nobody may scrub through). A remote file
+        // that is in the cache plays from a blob: copy and gets them as a
+        // local file does. The overlay keeps its loading indicator.
+        if (/^https?:/i.test(url)) {
+            Logger.log('[Thumbnails] Not made for a file streamed from the network');
+            return;
+        }
+
         Logger.log('[Thumbnails] Starting generation with URL:', url);
         try {
             await this.generator.generate(url, p.duration, {
                 width: 160, count: 100,
-                // Playback first. A local file: each thumbnail waits until the
-                // player has audio to spare. A remote one is made only while
-                // the player is paused: 100 frames read from all over a long
-                // file over a home link starved playback after a seek, even
-                // read one at a time.
-                waitTurn: /^https?:/i.test(url)
-                    ? () => whenPlayerIdle(p, () => !this.generator?.isGenerating)
-                    : () => whenPlayerHasHeadroom(p, () => !this.generator?.isGenerating),
+                // Playback first: each thumbnail waits until the player has
+                // audio to spare, or is paused.
+                waitTurn: () => whenPlayerHasHeadroom(p, () => !this.generator?.isGenerating),
             });
             Logger.log('[Thumbnails] Generation complete');
         } catch (e) {

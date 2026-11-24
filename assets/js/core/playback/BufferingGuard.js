@@ -256,28 +256,3 @@ export async function whenPlayerHasHeadroom(player, isCancelled = () => false) {
         await new Promise((resolve) => setTimeout(resolve, 250));
     }
 }
-
-/** How long (ms) the player must have stayed paused to count as idle. */
-export const IDLE_FOR_MS = 1000;
-
-/**
- * Resolves once the player has stayed not playing (paused, ended, nothing
- * loaded) for IDLE_FOR_MS. For background reads of a remote source, which on
- * a slow link starve playback whatever they wait for between requests.
- * A seek pauses for a moment and plays on; a check that took that moment
- * for idle let the thumbnails start reading in the middle of playback (seen
- * on the device: playback fell from ~2.8 MB/s to ~0.4 MB/s). Polled;
- * `isCancelled` ends it.
- * @param {any} player
- * @param {() => boolean} [isCancelled]
- * @returns {Promise<void>}
- */
-export async function whenPlayerIdle(player, isCancelled = () => false) {
-    let idleSince = null;
-    while (!isCancelled()) {
-        if (player.isPlaying || player.isLoading) idleSince = null;
-        else if (idleSince === null) idleSince = performance.now();
-        else if (performance.now() - idleSince >= IDLE_FOR_MS) return;
-        await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-}
