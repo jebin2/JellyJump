@@ -17,7 +17,7 @@ import { Logger } from './Logger.js';
 /**
  * Creates a configured process footer from the common template
  * @param {FooterConfig} config - Configuration object
- * @returns {DocumentFragment} Cloned and configured footer fragment
+ * @returns {DocumentFragment|null} Cloned and configured footer fragment; null without the template
  */
 export function createProcessFooter(config) {
     const template = /** @type {HTMLTemplateElement|null} */ (document.getElementById('common-process-footer-template'));

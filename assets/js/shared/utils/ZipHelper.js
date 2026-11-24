@@ -88,6 +88,10 @@ export class ZipHelper {
     /** @type {Uint32Array|null} CRC-32 lookup table, built on first use */
     static _table = null;
 
+    /**
+     * @param {Uint8Array} data
+     * @returns {number}
+     */
     static _crc32(data) {
         if (!ZipHelper._table) {
             const t = new Uint32Array(256);
@@ -99,7 +103,7 @@ export class ZipHelper {
             ZipHelper._table = t;
         }
         let crc = 0xffffffff;
-        for (let i = 0; i < data.length; i++) crc = ZipHelper._table[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+        for (let i = 0; i < data.length; i++) crc = /** @type {Uint32Array} */ (ZipHelper._table)[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
         return (crc ^ 0xffffffff) >>> 0;
     }
 }

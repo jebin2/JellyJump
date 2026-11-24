@@ -23,7 +23,7 @@ const FONT = `${SPRITE_PX}px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI 
 
 export class EmojiSprites {
     constructor() {
-        /** @type {Map<string, {source: CanvasImageSource, bitmap: ImageBitmap|null}>} */
+        /** @type {Map<string, {source: HTMLCanvasElement, bitmap: ImageBitmap|null}>} */
         this._cache = new Map();
     }
 
@@ -45,11 +45,13 @@ export class EmojiSprites {
         const canvas = document.createElement('canvas');
         canvas.width = SPRITE_PX;
         canvas.height = SPRITE_PX;
-        const ctx = canvas.getContext('2d');
+        // A new canvas always has a 2D context to give.
+        const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
         ctx.font = FONT;
         ctx.textBaseline = 'top';
         ctx.fillText(char, 0, 0);
 
+        /** @type {{source: HTMLCanvasElement, bitmap: ImageBitmap|null}} */
         const entry = { source: canvas, bitmap: null };
         this._cache.set(char, entry);
         this._evictIfNeeded();
@@ -67,7 +69,7 @@ export class EmojiSprites {
     /** @private */
     _evictIfNeeded() {
         while (this._cache.size > MAX_SPRITES) {
-            const oldest = this._cache.keys().next().value;
+            const oldest = /** @type {string} */ (this._cache.keys().next().value);   // size > 0
             this._cache.get(oldest)?.bitmap?.close();
             this._cache.delete(oldest);
         }

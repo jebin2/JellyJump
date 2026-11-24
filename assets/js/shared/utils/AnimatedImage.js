@@ -56,7 +56,7 @@ const DEFAULT_FRAME_MS = 100;
  * @returns {{scale: number, keepEvery: number, frames: number, bytes: number}}
  */
 export function decodePlan({ frameCount, width, height, frameWidth }) {
-    const bytesAt = (scale, frames) =>
+    const bytesAt = (/** @type {number} */ scale, /** @type {number} */ frames) =>
         Math.max(1, Math.round(width * scale)) * Math.max(1, Math.round(height * scale)) * 4 * frames;
 
     // Start from the width cap, which is about looking right rather than fitting.

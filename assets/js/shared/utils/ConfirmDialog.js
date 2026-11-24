@@ -101,6 +101,7 @@ export class ConfirmDialog {
             document.body.appendChild(overlay);
 
             // Cleanup function
+            /** @type {((e: KeyboardEvent) => void)|null} */
             let keydownHandler = null;
             const cleanup = () => {
                 if (keydownHandler) {
@@ -114,7 +115,7 @@ export class ConfirmDialog {
                 confirmBtn.focus();
 
                 // Handle escape key
-                keydownHandler = (e) => {
+                keydownHandler = (/** @type {KeyboardEvent} */ e) => {
                     if (e.key === 'Escape') {
                         cleanup();
                         this._close(overlay);
@@ -229,7 +230,7 @@ export class ConfirmDialog {
             okBtn.focus();
 
             // Handle escape key
-            const handleKeydown = (e) => {
+            const handleKeydown = (/** @type {KeyboardEvent} */ e) => {
                 if (e.key === 'Escape') {
                     this._close(overlay);
                     document.removeEventListener('keydown', handleKeydown);

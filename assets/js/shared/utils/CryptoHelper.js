@@ -99,12 +99,12 @@ export class CryptoHelper {
      * Web Crypto requires all bytes at once; accept BufferSource or Blob to avoid
      * an extra copy when the caller already holds a typed array.
      * @param {CryptoKey} hmacKey
-     * @param {BufferSource|Blob} data
+     * @param {BufferSource|Blob|Uint8Array} data
      * @returns {Promise<Uint8Array>} 32-byte HMAC
      */
     static async _computeHmac(hmacKey, data) {
         const buf = data instanceof Blob ? await data.arrayBuffer() : data;
-        const sig = await crypto.subtle.sign('HMAC', hmacKey, buf);
+        const sig = await crypto.subtle.sign('HMAC', hmacKey, /** @type {BufferSource} */ (buf));
         return new Uint8Array(sig);
     }
 

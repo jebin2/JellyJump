@@ -31,11 +31,21 @@ const LOG = new Uint8Array(256);
     for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
 })();
 
+/**
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
 function gmul(a, b) {
     if (a === 0 || b === 0) return 0;
     return EXP[LOG[a] + LOG[b]];
 }
 
+/**
+ * @param {number} a
+ * @param {number} b
+ * @returns {number}
+ */
 function gdiv(a, b) {
     // b must be non-zero
     if (a === 0) return 0;
@@ -63,6 +73,10 @@ export const MAX_SHARDS = 255;
  * (parity shards). Cauchy element = 1 / (x_i XOR y_j) with the x's and y's
  * drawn from disjoint value ranges, guaranteeing every square submatrix is
  * invertible.
+ * @param {number} r
+ * @param {number} k
+ * @param {number} m
+ * @returns {Uint8Array}
  */
 function encodingRow(r, k, m) {
     const row = new Uint8Array(k);
@@ -83,6 +97,9 @@ function encodingRow(r, k, m) {
  * Invert a k×k matrix (array of k Uint8Array rows) in GF(256) via
  * Gauss–Jordan elimination. Returns the inverse as k Uint8Array rows.
  * Throws if singular (should never happen for a Cauchy-derived matrix).
+ * @param {Uint8Array[]} rows
+ * @param {number} k
+ * @returns {Uint8Array[]}
  */
 function invertMatrix(rows, k) {
     // Work on an augmented [A | I] then reduce A to I.
@@ -176,7 +193,8 @@ export function decode(shards, k, m) {
     for (let r = 0; r < k; r++) {
         if (!shards[r]) { allData = false; break; }
     }
-    if (allData) return shards.slice(0, k).map((s) => s);
+    // Every one of the first k is present (just checked).
+    if (allData) return /** @type {Uint8Array[]} */ (shards.slice(0, k));
 
     // Pick the first k present shards.
     const present = [];
@@ -190,18 +208,22 @@ export function decode(shards, k, m) {
     const decodeMatrix = present.map((r) => encodingRow(r, k, m));
     const inv = invertMatrix(decodeMatrix, k);
 
-    const L = shards[present[0]].length;
+    /** @param {number} r a present shard's index @returns {Uint8Array} */
+    const shard = (r) => /** @type {Uint8Array} */ (shards[r]);
+    const L = shard(present[0]).length;
+    /** @type {Uint8Array[]} */
     const out = [];
     for (let i = 0; i < k; i++) {
         // Data shard i is present → copy it, skip the matrix multiply.
-        if (shards[i]) { out.push(shards[i]); continue; }
+        const own = shards[i];
+        if (own) { out.push(own); continue; }
 
         const dst = new Uint8Array(L);
         const invRow = inv[i];
         for (let j = 0; j < k; j++) {
             const c = invRow[j];
             if (c === 0) continue;
-            const src = shards[present[j]];
+            const src = shard(present[j]);
             const mulRow = c * 256;
             for (let b = 0; b < L; b++) {
                 dst[b] ^= MUL[mulRow + src[b]];

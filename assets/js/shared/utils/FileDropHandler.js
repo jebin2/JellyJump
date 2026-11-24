@@ -12,7 +12,10 @@ export class FileDropHandler {
     constructor(container, onFilesDropped) {
         this.container = container;
         this.onFilesDropped = onFilesDropped;
+        /** @type {Map<string, EventListener>} */
         this.boundHandlers = new Map();
+        /** @type {HTMLElement|null} where the listeners are, once attached */
+        this.section = null;
 
         this._attachEvents();
     }
@@ -22,10 +25,10 @@ export class FileDropHandler {
      * @private
      */
     _attachEvents() {
-        const section = this.container.closest('.playlist-section') || this.container;
+        const section = /** @type {HTMLElement} */ (this.container.closest('.playlist-section') || this.container);
 
         // Prevent default drag behaviors
-        const preventDefaults = (e) => {
+        const preventDefaults = (/** @type {Event} */ e) => {
             e.preventDefault();
             e.stopPropagation();
         };
@@ -51,8 +54,9 @@ export class FileDropHandler {
         });
 
         // Handle dropped files
-        const handleDrop = async (e) => {
-            const dt = e.dataTransfer;
+        const handleDrop = async (/** @type {Event} */ e) => {
+            // A drop event always carries its data.
+            const dt = /** @type {DataTransfer} */ (/** @type {DragEvent} */ (e).dataTransfer);
             const items = dt.items;
 
             if (items) {
@@ -61,7 +65,7 @@ export class FileDropHandler {
                 const queue = [];
 
                 for (let i = 0; i < items.length; i++) {
-                    const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+                    const entry = typeof items[i].webkitGetAsEntry === 'function' ? items[i].webkitGetAsEntry() : null;
                     if (entry) {
                         queue.push(FileDropHandler.scanEntry(entry));
                     } else if (items[i].kind === 'file') {
@@ -95,7 +99,7 @@ export class FileDropHandler {
     static scanEntry(entry) {
         return new Promise((resolve) => {
             if (entry.isFile) {
-                entry.file(file => {
+                entry.file((/** @type {File} */ file) => {
                     // Patch webkitRelativePath if missing
                     if (!file.webkitRelativePath && entry.fullPath) {
                         Object.defineProperty(file, 'webkitRelativePath', {
@@ -106,8 +110,8 @@ export class FileDropHandler {
                 });
             } else if (entry.isDirectory) {
                 const dirReader = entry.createReader();
-                dirReader.readEntries(async (entries) => {
-                    const promises = entries.map(e => FileDropHandler.scanEntry(e));
+                dirReader.readEntries(async (/** @type {any[]} */ entries) => {
+                    const promises = entries.map((/** @type {any} */ e) => FileDropHandler.scanEntry(e));
                     const results = await Promise.all(promises);
                     resolve(results.flat());
                 });
@@ -121,33 +125,34 @@ export class FileDropHandler {
      * Clean up event listeners
      */
     destroy() {
-        if (!this.section) return;
+        const section = this.section;
+        if (!section) return;
 
         // Remove all bound handlers
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             const preventHandler = this.boundHandlers.get(`prevent-${eventName}`);
             if (preventHandler) {
-                this.section.removeEventListener(eventName, preventHandler, false);
+                section.removeEventListener(eventName, preventHandler, false);
             }
         });
 
         ['dragenter', 'dragover'].forEach(eventName => {
             const highlightHandler = this.boundHandlers.get(`highlight-${eventName}`);
             if (highlightHandler) {
-                this.section.removeEventListener(eventName, highlightHandler, false);
+                section.removeEventListener(eventName, highlightHandler, false);
             }
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
             const unhighlightHandler = this.boundHandlers.get(`unhighlight-${eventName}`);
             if (unhighlightHandler) {
-                this.section.removeEventListener(eventName, unhighlightHandler, false);
+                section.removeEventListener(eventName, unhighlightHandler, false);
             }
         });
 
         const dropHandler = this.boundHandlers.get('drop');
         if (dropHandler) {
-            this.section.removeEventListener('drop', dropHandler, false);
+            section.removeEventListener('drop', dropHandler, false);
         }
 
         this.boundHandlers.clear();
