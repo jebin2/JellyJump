@@ -53,8 +53,10 @@ The checks that can stop a pull request:
 - Fill in the template. Its **device check** is required for changes to
   playback, audio, `PlaylistPlayback` or storage: those break on phones in
   ways no headless browser shows.
-- A change to how the code is laid out updates `assets/js/STRUCTURE.md` or
-  the relevant decision record in `docs/adr/` in the same PR.
+- A change to how the code is laid out updates `assets/js/STRUCTURE.md`,
+  [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (layers, APIs, the open,
+  edit and export flows) or the relevant decision record in `docs/adr/` in
+  the same PR.
 
 ## Commits
 
