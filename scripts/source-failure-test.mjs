@@ -189,15 +189,15 @@ async function run(page, origin) {
             return: async () => { returned = true; return { done: true }; },
         });
 
-        p._requestSeek(1.0);
+        p.requestSeek(1.0);
         await sleep(50);
-        const tookIt = !!p._seekLoopActive;
+        const tookIt = !!p.seekQueue.active;
 
         let releasedMs = null;
         const t0 = performance.now();
         for (let i = 0; i < 100 && releasedMs === null; i++) {
             await sleep(100);
-            if (!p._seekLoopActive) releasedMs = Math.round(performance.now() - t0);
+            if (!p.seekQueue.active) releasedMs = Math.round(performance.now() - t0);
         }
         const spinnerAfter = !!document.querySelector('.jellyjump-loading:not([hidden])');
         // The wedged pump never reaches its own endFetch, so giving up has to
@@ -210,11 +210,11 @@ async function run(page, origin) {
         // Put the real decoder back; the player must take seeks again.
         p.videoSink.canvases = realCanvases;
         delete p.firstFrameTimeoutMs;
-        p._requestSeek(0.5);
-        for (let i = 0; i < 80 && p._seekLoopActive; i++) await sleep(100);
+        p.requestSeek(0.5);
+        for (let i = 0; i < 80 && p.seekQueue.active; i++) await sleep(100);
         return {
             tookIt, releasedMs, spinnerAfter,
-            seeksAgain: !p._seekLoopActive,
+            seeksAgain: !p.seekQueue.active,
             landed: Number(p.currentTime.toFixed(2)),
             latchCleared, pendingCleared, returned,
         };
@@ -247,8 +247,8 @@ async function run(page, origin) {
             : realCanvases(...args));
 
         await p.play();
-        p._requestSeek(0.3);            // stay well inside the clip
-        for (let i = 0; i < 60 && p._seekLoopActive; i++) await sleep(100);
+        p.requestSeek(0.3);            // stay well inside the clip
+        for (let i = 0; i < 60 && p.seekQueue.active; i++) await sleep(100);
         const deadAfterGiveUp = !p.frames.isOpen;
 
         // The source comes good, as a slow one eventually does.
@@ -262,7 +262,7 @@ async function run(page, origin) {
         delete p.firstFrameTimeoutMs;
         delete p.reopenDelayMs;
         return { deadAfterGiveUp, reopened, playing: p.isPlaying,
-                 attempts: p._reopenAttempts ?? 0, timer: !!p._reopenTimer, live: p.isLive };
+                 attempts: p.frameReopen.attempts, timer: !!p.frameReopen.timer, live: p.isLive };
     });
 
     // Reading a remote file's metadata used to drag the whole file over to make

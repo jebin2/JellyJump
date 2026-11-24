@@ -194,7 +194,6 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
         }
 
         nextAudioTime = targetTime + buffer.duration / player.playbackRate;
-        player._liveNextAudioTime = nextAudioTime;
 
         player.queuedAudioNodes.add(audioSource);
         audioSource.onended = () => player.queuedAudioNodes.delete(audioSource);

@@ -273,7 +273,7 @@ export class ReversePlayback {
             // The forward pipeline is rebuilt at the new position, so the next
             // play, step or seek starts from here rather than from where
             // forward playback last was.
-            await p._seekTo(this.position);
+            await p.seek(this.position);
         }
     }
 

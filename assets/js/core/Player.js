@@ -21,10 +21,7 @@ import {
 import { closePlayerAudioContext, restorePlayerAutoplayAudio, syncPlayerVolume } from './audio/AudioEngine.js';
 import {
     resetPlayer,
-    cleanupPlayerForLoad,
     resetPlayerUI,
-    startPlayerVideoIterator,
-    extractAndDrawPlayerFrame,
     loadPlayerMedia
 } from './playback/MediaLifecycle.js';
 import {
@@ -35,7 +32,6 @@ import {
 import { playPlayer, pausePlayer, setPlayerPlaybackRate } from './playback/PlaybackTransport.js';
 import {
     cancelYouTubeAutoplayRetry,
-    suspendPlayerYouTube,
     teardownPlayerYouTube,
 } from './youtube/YouTubePlayback.js';
 import { PlayerStream } from './streaming/PlayerStream.js';
@@ -132,6 +128,11 @@ export class CorePlayer {
         this.watchParty = new WatchParty(this);
         this.playbackTimeAtStart = 0;
         this.audioContextStartTime = null;
+
+        /** Seeks coalesced by requestSeek: the latest target, and whether one is decoding. */
+        this.seekQueue = { pending: null, active: false };
+        /** Reopening a frame queue that closed while playing (RenderLoop). */
+        this.frameReopen = { attempts: 0, timer: null };
 
         // Scrubbing state
         this.isScrubbing = false;
@@ -240,25 +241,7 @@ export class CorePlayer {
         teardownPlayerYouTube(this);
         return resetPlayer(this);
     }
-    async _cleanupForLoad() {
-        // Nothing to hand back to: the media is being replaced. A new file
-        // always starts forward, so it never surprises anyone by running
-        // backwards.
-        await this.reverse?.stop({ reposition: false });
-        if (this.direction !== 'forward') {
-            this.direction = 'forward';
-            this.announce.playState();
-        }
-        // Always, not only when leaving YouTube: this runs before every load,
-        // and a playing iframe left visible would sit on top of the next video.
-        // Suspended rather than destroyed — load() destroys it once it knows
-        // the next video is not another YouTube link.
-        suspendPlayerYouTube(this);
-        return cleanupPlayerForLoad(this);
-    }
     resetUI() { resetPlayerUI(this); }
-    async _startVideoIterator() { return startPlayerVideoIterator(this); }
-    async _extractAndDrawFrame(timestamp) { return extractAndDrawPlayerFrame(this, timestamp); }
 
     // ─── Playback State ──────────────────────────────────────────────────────────
     togglePlay() {
@@ -296,7 +279,8 @@ export class CorePlayer {
         }
         return {};
     }
-    async _seekTo(time) {
+    /** Go to `time` (seconds); resolves once the frame there is shown. @param {number} time */
+    async seek(time) {
         this.timing.seekStarted();
         // Playing backwards carries on from wherever the seek lands.
         const wasReversing = !!this.reverse?.active;
@@ -310,8 +294,12 @@ export class CorePlayer {
         await seekPlayerTo(this, time);
         if (wasReversing) await this._playBackward();
     }
-    _requestSeek(time) { requestPlayerSeek(this, time); }
-    seek(time) { return this._seekTo(time); }
+    /**
+     * Seek, for a burst of seeks (a held key, a dragged bar): the position
+     * moves at once, and the decode goes only to the latest target.
+     * @param {number} time
+     */
+    requestSeek(time) { requestPlayerSeek(this, time); }
 
     // ─── Load ────────────────────────────────────────────────────────────────────
     async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
