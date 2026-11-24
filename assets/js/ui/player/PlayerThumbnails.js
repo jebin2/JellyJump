@@ -1,4 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
+import { whenPlayerHasHeadroom } from '../../core/playback/BufferingGuard.js';
 import { formatTime } from '../../shared/utils/mediaUtils.js';
 import { ThumbnailGenerator } from './ThumbnailGenerator.js';
 
@@ -114,7 +115,12 @@ export class PlayerThumbnails {
 
         Logger.log('[Thumbnails] Starting generation with URL:', url);
         try {
-            await this.generator.generate(url, p.duration, { width: 160, count: 100 });
+            await this.generator.generate(url, p.duration, {
+                width: 160, count: 100,
+                // Playback first: each thumbnail waits until the player has
+                // audio to spare, or is paused.
+                waitTurn: () => whenPlayerHasHeadroom(p, () => !this.generator?.isGenerating),
+            });
             Logger.log('[Thumbnails] Generation complete');
         } catch (e) {
             Logger.warn('[Thumbnails] Generation failed:', e);

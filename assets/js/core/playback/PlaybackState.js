@@ -1,4 +1,5 @@
 import { saveProgress, loadProgress } from '../../shared/settings/Progress.js';
+import { isPlayerStalled } from './BufferingGuard.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { startPlayerVideoIterator } from './VideoIterator.js';
 
@@ -14,7 +15,10 @@ export function getPlayerPlaybackTime(player) {
 
     const anchor = player.isLive ? player.stream?.anchor : player.vodAnchor;
 
-    if (anchor?.isAnchored && player.audioContext && player.audioContext.state === 'running') {
+    // Held while waiting for data (BufferingGuard): the context is suspended
+    // then, so its time, and with it the position, stand still.
+    if (anchor?.isAnchored && player.audioContext
+        && (player.audioContext.state === 'running' || isPlayerStalled(player))) {
         return anchor.positionAt(player.audioContext.currentTime, player.playbackRate);
     }
 

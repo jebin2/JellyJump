@@ -54,7 +54,8 @@ CorePlayer                  public API (below), events, overrides
                             iterator, render loop, clock (PlaybackState,
                             PlaybackAnchor, PlaybackEpoch), transport, reverse,
                             the frame queue, putting frames on the canvas
-                            (FramePresenter)
+                            (FramePresenter), holding the clock while a slow
+                            source catches up (BufferingGuard)
   core/audio/               the Web Audio graph, scheduling, equalizer; the
                             audio clock drives playback (ADR 0003)
   core/streaming/           camera, live and HLS, recording, broadcast,
@@ -216,5 +217,6 @@ with their own `MediaProcessor` call.
 | `player-events-test`, `smoke-test` | the events, and the real player end to end |
 | `override-test` | overrides stack and restore exactly |
 | `edit-panel-test`, `processing-test` | the edit and export flows |
+| `stall-test` | a source slower than the video: the player waits for data and skips nothing, before and after a seek |
 | `offline-test` | after one visit, the player opens and plays a local file with the network off |
 | `bench-test` | first frame, seek, dropped frames, memory, playlist render, against budgets |

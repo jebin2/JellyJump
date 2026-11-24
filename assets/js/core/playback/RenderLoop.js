@@ -1,6 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { getPlayerPlaybackTime, completePlayerMedia } from './PlaybackState.js';
 import { startPlayerVideoIterator } from './VideoIterator.js';
+import { checkPlayerBuffering, noteFramePresented } from './BufferingGuard.js';
 
 /** Frames drawn since the media loaded, per player, for a sync log every 60. @type {WeakMap<object, number>} */
 const frameSyncLogCount = new WeakMap();
@@ -100,6 +101,7 @@ export async function updatePlayerNextFrame(player) {
         if (lateFrame && !player.frames.pending && !player.epoch.isStale(epoch)
             && player.ctx && player.canvas) {
             player.presentFrame(lateFrame.canvas, { clear: true });
+            noteFramePresented(player);
         }
     } catch (e) {
         if (!player.epoch.isStale(epoch)) {
@@ -118,11 +120,14 @@ export async function updatePlayerNextFrame(player) {
 
 export function startPlayerRenderLoop(player) {
     if (player.animationFrameId) return;
+    // Counted from here: the frame shown before a seek is not a gap.
+    noteFramePresented(player);
 
     const loop = () => {
         if (player.isPlaying) {
             const playbackTime = getPlayerPlaybackTime(player);
             player.currentTime = playbackTime;
+            checkPlayerBuffering(player);
 
             const frameSyncCount = (frameSyncLogCount.get(player) ?? 0) + 1;
             frameSyncLogCount.set(player, frameSyncCount);
@@ -161,6 +166,7 @@ export function startPlayerRenderLoop(player) {
             if (player.frames.pending) {
                 if (player.frames.pending.timestamp <= playbackTime) {
                     player.presentFrame(player.frames.pending.canvas, { clear: true });
+                    noteFramePresented(player);
 
                     player.frames.clearPending();
                     updatePlayerNextFrame(player);

@@ -19,7 +19,9 @@ export class ThumbnailGenerator {
      * Start generating thumbnails (Mediabunny version)
      * @param {string|File|Blob} resource - Video URL or File/Blob
      * @param {number} duration - Video duration in seconds (optional fallback)
-     * @param {Object} options - { interval: number, width: number }
+     * @param {Object} options - { interval: number, width: number, count: number,
+     *   waitTurn?: () => Promise<void> } -- waitTurn is awaited before each
+     *   thumbnail, so playback reading the same source goes first
      */
     async generate(resource, duration, options = {}) {
         if (this.isGenerating) {
@@ -115,7 +117,19 @@ export class ThumbnailGenerator {
             const runPass = async (sink) => {
                 let processedCount = 0;
 
-                for await (const result of sink.canvasesAtTimestamps(timestamps)) {
+                // Handed out one at a time, each after its turn: a pass over a
+                // long remote file reads a frame from all over it, and on a
+                // slow link that starved the playback it was meant to help.
+                const waitTurn = options.waitTurn;
+                const paced = waitTurn
+                    ? (async function* () {
+                        for (const t of timestamps) {
+                            await waitTurn();
+                            yield t;
+                        }
+                    })()
+                    : timestamps;
+                for await (const result of sink.canvasesAtTimestamps(paced)) {
                     if (!this.isGenerating) break;
 
                     // Skip null results

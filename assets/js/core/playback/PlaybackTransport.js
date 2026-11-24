@@ -5,6 +5,7 @@ import { startPlayerRenderLoop } from './RenderLoop.js';
 import { savePlayerPlaybackState } from './PlaybackState.js';
 import { getPlayerPlaybackTime } from './PlaybackState.js';
 import { startPlayerVideoIterator } from './VideoIterator.js';
+import { clearPlayerStall } from './BufferingGuard.js';
 
 /** When each player last paused (performance.now()), to spot a long pause. @type {WeakMap<object, number>} */
 const pausedAtWall = new WeakMap();
@@ -19,6 +20,7 @@ export async function playPlayer(player) {
 
     if (player.isPlaying) return;
     if (!player.videoTrack && !player.audioTrack) return;
+    clearPlayerStall(player);   // the context is resumed below
 
     Logger.log(`[Play] Starting playback - isAudioMode: ${player.isAudioMode}, playbackTimeAtStart: ${player.playbackTimeAtStart}`);
 
@@ -198,6 +200,7 @@ export function pausePlayer(player, showOverlay = true) {
     } else {
         player.playbackTimeAtStart = calculatedTime;
     }
+    clearPlayerStall(player);   // read the held position first; the context is suspended below
     player.isPlaying = false;
     pausedAtWall.set(player, performance.now());
     player.controlBar?.clearAutoHideTimer();

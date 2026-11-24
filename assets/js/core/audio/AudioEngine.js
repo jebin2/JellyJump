@@ -2,6 +2,7 @@ import { AudioEqualizer } from './AudioEqualizer.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { getPlayerPlaybackTime } from '../playback/PlaybackState.js';
 import { syncYouTubeAudio } from '../youtube/YouTubePlayback.js';
+import { noteAudioStarted, noteAudioScheduled, noteAudioFinished } from '../playback/BufferingGuard.js';
 
 
 export async function initPlayerAudio(player) {
@@ -194,16 +195,19 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
         }
 
         nextAudioTime = targetTime + buffer.duration / player.playbackRate;
+        noteAudioScheduled(player, nextAudioTime);
 
         player.queuedAudioNodes.add(audioSource);
         audioSource.onended = () => player.queuedAudioNodes.delete(audioSource);
     };
 
+    noteAudioStarted(player);
     if (prefetchedBuffer) scheduleOne(prefetchedBuffer);
+    let exhausted = true;
 
     try {
         for await (const bufferObj of myIterator) {
-            if (!player.isPlaying) break;
+            if (!player.isPlaying) { exhausted = false; break; }
 
             sampleCount++;
             const { timestamp } = bufferObj;
@@ -246,6 +250,7 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
                         Logger.log(`[${_audioLogTag}:Audio] Jumping to live edge: ${player.stream?.liveStartTimestamp?.toFixed(3)}`);
                     }
                     player.stream?.startLiveVideoLoop(true);
+                    exhausted = false;
                     break;
                 }
             }
@@ -259,6 +264,8 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
             }
         }
         Logger.log(`[${_audioLogTag}:Audio] Iterator completed after ${sampleCount} buffers`);
+        // The end of the file, not a stop: nothing more is coming to wait for.
+        if (exhausted && player.audioBuffers.holds(myIterator)) noteAudioFinished(player);
     } catch (error) {
         if (error.name !== 'InputDisposedError' && !error.message?.includes('Input has been disposed')) {
             Logger.error(`[${_audioLogTag}:Audio] Iterator error after ${sampleCount} buffers:`, error);
