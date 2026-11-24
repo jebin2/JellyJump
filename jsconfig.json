@@ -18,6 +18,6 @@
     "types": [],
     "maxNodeModuleJsDepth": 0
   },
-  "include": ["assets/js/**/*.js"],
+  "include": ["assets/js/**/*.js", "assets/js/**/*.d.ts"],
   "exclude": ["assets/js/lib/**", "node_modules", "dist"]
 }

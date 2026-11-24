@@ -207,7 +207,7 @@ with their own `MediaProcessor` call.
 | Test | Holds |
 |---|---|
 | `architecture-check` | the layer rules, the private-call counts, the `Player.js` size |
-| `player-api-test` | the player's public members match §4.1 |
+| `player-api-test`, `playlist-api-test` | the player's and the playlist's public members match §4.1 and §4.2, each documented, in type-checked files |
 | `player-events-test`, `smoke-test` | the events, and the real player end to end |
 | `override-test` | overrides stack and restore exactly |
 | `edit-panel-test`, `processing-test` | the edit and export flows |

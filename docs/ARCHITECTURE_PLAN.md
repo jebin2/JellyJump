@@ -78,8 +78,9 @@ start (`78c1c90`); this table is where things stand now.
 | 3 | I2 `player-api-test`: reads `CorePlayer`'s methods and accessors from the source and the member names from §4.1's table, and fails on a public one §4.1 does not list, or a §4.1 entry the player does not have (one marked "(planned" excepted, and constructor fields count). It found 15 members in use but never listed (the A-B marker calls, `trigger`, `resetUI`, `presentFrame`, `overlayTimeMs`, the source getters, the control bar toggle), now in §4.1; `capabilities` described with its real keys; `stepFrame(dir)` added (the keyboard uses it); `tapAudio()` marked planned | done | #90 |
 | 3 | Q5 `bench-test` (browser suite, in `npm test`): time to first frame, seek latency (median and worst of 10), dropped frames over a 6 s A/V play-through, JS heap growth over 20 loads (after GC), and a 2,000-item playlist render and re-render. Printed every run and added to the GitHub job summary; each has a budget (in the script, with the local baseline beside it), and one over budget fails. Local baseline: first frame 14 ms, seek 12 ms (worst 15), 0 dropped of 89, heap −0.05 MB, playlist 28–65 ms first draw and 18–27 ms again (it draws the first 50 rows, ~900 elements). Nothing over budget, so Q6 has no finding yet from these; decoder and GPU memory are outside what a page can measure | done | #91 |
 | 3 | T3 `docs/ARCHITECTURE.md`: the layers and their checked rules, the player (core, view, public API, events, overrides), the playlist's parts, tools and jobs, and the flows for opening a file, applying an edit and exporting, as the code does them today; the tests that hold each in place. Linked from the README, CONTRIBUTING (updated in the PR that changes the structure) and STRUCTURE.md | done | #92 |
-| 3 | T6 (`CorePlayer`, jobs) `core/Player.js` is under `// @ts-check` (one undeclared field, `_overrides`, declared) and every public method and accessor has a JSDoc comment; `player-api-test` now fails on a public member without one, or on the file losing `@ts-check`. Section dividers above members became their docs, so Player.js stays at 589 lines. The jobs API (§4.3: `runMenuJob`, `insertProcessedItem`) was already documented, and `MenuJob.js` / `JobQueue.js` already checked | done | this PR |
-| 3 | T6 (`Playlist`): §4.2 does not match the code yet (`ingest.*`, `getSource`, `activeItem`, `showToast` and the events are not built under those names; adding is `handleFiles`, `handleUrlUpload`, …), so first reconcile §4.2, then JSDoc and `@ts-check` the playlist files (23 errors today, mostly the parts' methods unknown to the class); Q6 (nothing over budget yet) | to do | |
+| 3 | T6 (`CorePlayer`, jobs) `core/Player.js` is under `// @ts-check` (one undeclared field, `_overrides`, declared) and every public method and accessor has a JSDoc comment; `player-api-test` now fails on a public member without one, or on the file losing `@ts-check`. Section dividers above members became their docs, so Player.js stays at 589 lines. The jobs API (§4.3: `runMenuJob`, `insertProcessedItem`) was already documented, and `MenuJob.js` / `JobQueue.js` already checked | done | #93 |
+| 3 | T6 (`Playlist`) §4.2 rewritten to the playlist as it is (the handlers, discovered media, view state, the real window events), with `ingest.*`, `getSource`, `activeItem`, `showToast` and the `itemadded`/`itemremoved` events marked planned. `Playlist.js` and its five parts are under `@ts-check`: a types-only `PlaylistParts.d.ts` tells the checker the parts' methods are the playlist's, and the hooks `nameProcessedItem` (playlist) and `onStreamError` (player) are declared. Every public member has a JSDoc comment; `playlist-api-test` holds §4.2 to the code the way `player-api-test` holds §4.1 (both now use `scripts/lib/api-listing.mjs`). Bug found by the checker: the Clear-playlist and Delete-folder confirmations passed `confirmType: 'danger'`, which the dialog does not read, so their buttons were never shown as dangerous; now `confirmStyle` | done | this PR |
+| 3 | Q6 (nothing over budget yet) | to do | |
 
 ---
 
@@ -713,15 +714,25 @@ Events: `play`, `pause`, `directionchange`, `timeupdate`, `durationchange`, `loa
 
 ### 4.2 `Playlist`
 
+The class is `ui/player/Playlist.js` plus its parts (`PlaylistIngest`,
+`PlaylistPlayback`, `PlaylistMetadata`, `PlaylistStore`,
+`PlaylistDiscovery`), whose methods are the playlist's own.
+`scripts/playlist-api-test.mjs` holds this table to the code.
+
 | Area | Members |
 |---|---|
-| Items | `items` (read-only), `activeIndex`, `activeItem`, `addItems(items, autoplay)`, `insertProcessedItem(source, blob, name, options)`, `removeItem(i)`, `removeFolder(path)`, `clear()` |
+| Items | `items`, `activeIndex`, `addItems(items, autoplay)`, `addItem(item)`, `insertProcessedItem(source, blob, name, options)`, `removeItem(i)`, `removeFolder(path)`, `clear(askConfirm)`, `activeItem` (planned) |
+| View state | `searchQuery`, `isLoading`, `expandedFolders` |
 | Playing | `selectItem(i, autoplay)`, `playNext()`, `playPrevious()` |
-| Adding | `ingest.files(list)`, `ingest.url(text)`, `ingest.youtube(url)`, `ingest.m3u(url)`, `ingest.linkList(file)` |
-| Data | `ensureMetadata(item)`, `getSource(item)` (wraps `MediaMetadata.getSourceBlob`), `save()` |
-| UI | `render()`, `scrollToPlaying()`, `showToast(text)` |
-| Hooks | `nameProcessedItem` (used by the edit panel) |
-| Events | `itemselected`, `itemadded`, `itemremoved`, `processeditem` |
+| Adding | `handleFiles(files)`, `handleElectronFiles(files)`, `handleUrlUpload(url, onFirstItems)`, `addLinkListItems(file)`, `ingest` (planned: `ingest.files`, `.url`, `.youtube`, `.m3u`, `.linkList` in place of the handlers) |
+| Discovered media | `addDiscoveredItems(files)`, `keepDiscoveredItem(id)`, `discoveredFolderName`, `cancelMediaScan()` |
+| Data | `ensureMetadata(item)`, `processMetadata(items)`, `markItemBroken(id, error)`, `save()`, `getSource(item)` (planned: wraps `MediaMetadata.getSourceBlob`) |
+| UI | `render()`, `scrollToPlaying()`, `setRecordingState(on)`, `destroy()`, `showToast(text)` (planned) |
+| Wiring | `player`, `container`, `nameProcessedItem` (a hook the edit panel sets) |
+
+Events, on `window`: `jellyjump:item-selected` (`ITEM_SELECTED_EVENT`,
+`{ index, item }`), `jellyjump:processed-item` (`PROCESSED_ITEM_EVENT`,
+`{ item, url }`); `itemadded` and `itemremoved` are planned.
 
 ### 4.3 Jobs
 

@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from "../../shared/utils/Logger.js";
 import { Toast } from "../../shared/utils/Toast.js";
 import { StorageService } from "../../shared/services/StorageService.js";
@@ -27,11 +28,17 @@ import { PlaylistPlayback } from './PlaylistPlayback.js';
 export class Playlist {
     /**
      * @param {HTMLElement} container - The container element for the playlist
-     * @param {CorePlayer} player - The player instance
+     * @param {import('../../core/Player.js').CorePlayer} player - The player instance
      */
     constructor(container, player) {
         this.container = container;
         this.player = player;
+        /**
+         * Names a tool's result before it is added (the edit panel sets it, to
+         * name its working copy); null keeps the tool's name.
+         * @type {((source: Object|null, filename: string) => {title: string, path: string}|null)|null}
+         */
+        this.nameProcessedItem = null;
         
         // Modularized helpers
         this.state = new PlaylistState();
@@ -73,11 +80,11 @@ export class Playlist {
         // filling, which is indistinguishable from there being nothing to fill
         // it with.
         (async () => {
-            for (const [what, stage] of [
+            for (const [what, stage] of /** @type {[string, () => unknown][]} */ ([
                 ['load the saved playlist', () => this._loadSavedPlaylist()],
                 ['restore shared libraries', () => this.remoteLibraries.restore()],
                 ['scan for media', () => this._startMediaScan()],
-            ]) {
+            ])) {
                 try {
                     await stage();
                 } catch (error) {
@@ -98,25 +105,30 @@ export class Playlist {
         }
     }
 
-    // Compatibility getters for Renderer and external callers
+    // The state lives in PlaylistState; these read and write it.
+    /** The items, in order. Change them through the methods, not by assigning. @type {Object[]} */
     get items() { return this.state.items; }
-    get activeIndex() { return this.state.activeIndex; }
-    get expandedFolders() { return this.state.expandedFolders; }
-    get searchQuery() { return this.state.searchQuery; }
-    get isLoading() { return this.state.isLoading; }
-
-    // Compatibility setters
     set items(val) { this.state.setItems(val); }
+    /** The index of the item playing, or -1. @type {number} */
+    get activeIndex() { return this.state.activeIndex; }
     set activeIndex(val) { this.state.setActiveIndex(val); }
+    /** The folder paths open in the list. @type {Set<string>} */
+    get expandedFolders() { return this.state.expandedFolders; }
+    /** The search box's text; the list shows matches while it is set. @type {string} */
+    get searchQuery() { return this.state.searchQuery; }
     set searchQuery(val) { this.state.setSearchQuery(val); }
+    /** True while the saved playlist is being restored (the list is hidden). @type {boolean} */
+    get isLoading() { return this.state.isLoading; }
     set isLoading(val) { this.state.setIsLoading(val); }
 
-    // Navigation convenience wrappers
     // While a video is being edited the player is its preview: it stays on
     // that video, whatever asks for the next one (the end of the video, a
     // key, a button), or the edit panel would be taken along to another.
+    /** Play the next item (back to the first when the playlist loops), unless editing. */
     playNext() { if (!this.ui?.editPanel?.isOpen) this.navigation.playNext(); }
+    /** Play the previous item (to the last when the playlist loops), unless editing. */
     playPrevious() { if (!this.ui?.editPanel?.isOpen) this.navigation.playPrevious(); }
+    /** Scroll the list to the item playing, opening its folders. */
     scrollToPlaying() { return this.navigation.scrollToPlaying(); }
     _updatePlayerNavigationState() { this.navigation.updatePlayerNavigationState(); }
 
@@ -219,7 +231,7 @@ export class Playlist {
                 title: 'Clear Playlist',
                 message: 'Are you sure you want to clear the playlist? This will reset the application state.',
                 confirmText: 'Clear All',
-                confirmType: 'danger'
+                confirmStyle: 'danger'
             });
         }
         
@@ -289,17 +301,18 @@ export class Playlist {
         Logger.log('[Playlist] destroyed');
     }
 
+    /** Redraw the list from the items (keeping the scroll position and open folders). */
     render() {
         this.renderer.render();
     }
 
     _toggleFolder(path) {
         // Find wrapper
-        const wrappers = this.container.querySelectorAll('.playlist-folder');
+        const wrappers = /** @type {NodeListOf<HTMLElement>} */ (this.container.querySelectorAll('.playlist-folder'));
         for (const wrapper of wrappers) {
             if (wrapper.dataset.path === path) {
                 // Click the header to trigger toggleDrawer
-                const header = wrapper.querySelector('.playlist-folder-header');
+                const header = /** @type {HTMLElement|null} */ (wrapper.querySelector('.playlist-folder-header'));
                 if (header) header.click();
                 return;
             }
@@ -322,7 +335,7 @@ export class Playlist {
             title: 'Delete Folder',
             message: `Delete folder "${folderData.name}" and all contents?`,
             confirmText: 'Delete',
-            confirmType: 'danger'
+            confirmStyle: 'danger'
         });
 
         if (confirmed) {
@@ -379,7 +392,7 @@ export class Playlist {
             }
 
             // Trigger download
-            const downloadLink = document.getElementById('mb-download-link');
+            const downloadLink = /** @type {HTMLAnchorElement|null} */ (document.getElementById('mb-download-link'));
             if (downloadLink) {
                 downloadLink.href = item.blob_url;
                 downloadLink.download = filename;

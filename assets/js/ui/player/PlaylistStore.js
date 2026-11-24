@@ -1,3 +1,4 @@
+// @ts-check
 import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { Toast } from '../../shared/utils/Toast.js';

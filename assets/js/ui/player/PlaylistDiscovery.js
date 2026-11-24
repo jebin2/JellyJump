@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from '../../shared/utils/Logger.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { DiscoveredMedia } from '../../shared/services/DiscoveredMedia.js';
