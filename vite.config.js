@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
-import { resolve, basename } from 'path';
+import { resolve, basename, join, relative } from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { cspFor } from './assets/js/shared/config/csp.js';
 
@@ -53,9 +53,70 @@ const versionFile = {
     },
 };
 
+/** A build file named by its content (assets/name-HASH.ext): never changes. */
+const HASHED_FILE = /(^|\/)assets\/[^/]+-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/i;
+/** Public files the offline player needs; the rest (media, SEO) are not stored. */
+const OFFLINE_PUBLIC = /^(manifest\.json|favicon\.ico|icon-\d+\.png|poster\.webp|assets\/(icons|templates)\/.+|assets\/js\/lib\/.+)$/;
+/** Pages stored for offline use: the player, and the landing page. */
+const OFFLINE_PAGES = { 'player.html': 'player', 'index.html': 'main' };
+/** On-demand decoders a file may need before it plays (plan Q4). */
+const OFFLINE_DECODERS = /^mediabunny-(dts|truehd)$/;
+
+const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)]);
+
+/**
+ * The service worker's precache list and the build's hashed files, written
+ * into dist/sw.js (public/sw.js carries a placeholder; plan Q4). Precached:
+ * the pages, the code each loads at start and the chunks it imports
+ * directly (the player, the playlist, MediaBunny), the on-demand decoders,
+ * and the public files the player reads. Everything else is stored by the
+ * worker the first time it is used.
+ */
+const serviceWorkerManifest = {
+    name: 'jellyjump-sw',
+    apply: 'build',
+    writeBundle(options, bundle) {
+        const outDir = options.dir;
+        const chunks = Object.values(bundle).filter((item) => item.type === 'chunk');
+        const byFile = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
+        const precache = new Set(Object.keys(OFFLINE_PAGES));
+        const addStatic = (chunk) => {
+            if (!chunk || precache.has(chunk.fileName)) return;
+            precache.add(chunk.fileName);
+            for (const css of chunk.viteMetadata?.importedCss ?? []) precache.add(css);
+            for (const asset of chunk.viteMetadata?.importedAssets ?? []) precache.add(asset);
+            for (const file of chunk.imports) addStatic(byFile.get(file));
+        };
+        for (const name of Object.values(OFFLINE_PAGES)) {
+            const entry = chunks.find((chunk) => chunk.isEntry && chunk.name === name);
+            if (!entry) throw new Error(`jellyjump-sw: no entry chunk named ${name}`);
+            addStatic(entry);
+            for (const file of entry.dynamicImports) addStatic(byFile.get(file));
+        }
+        for (const chunk of chunks) if (OFFLINE_DECODERS.test(chunk.name)) addStatic(chunk);
+
+        const written = walk(outDir).map((file) => relative(outDir, file).split('\\').join('/'));
+        for (const file of written) if (OFFLINE_PUBLIC.test(file)) precache.add(file);
+        const missing = [...precache].filter((file) => !written.includes(file));
+        if (missing.length) throw new Error(`jellyjump-sw: precache names files the build did not write: ${missing.join(', ')}`);
+
+        const manifest = {
+            id: buildId,
+            precache: [...precache].sort(),
+            files: written.filter((file) => HASHED_FILE.test(file) && !file.endsWith('.map')).sort(),
+        };
+        const swPath = join(outDir, 'sw.js');
+        const source = readFileSync(swPath, 'utf8');
+        const placeholder = '/*JJ_SW_BUILD*/null';
+        if (!source.includes(placeholder)) throw new Error('jellyjump-sw: sw.js has no /*JJ_SW_BUILD*/ placeholder');
+        writeFileSync(swPath, source.replace(placeholder, JSON.stringify(manifest)));
+    },
+};
+
 export default defineConfig({
     root: '.',
-    plugins: [contentSecurityPolicy, versionFile],
+    plugins: [contentSecurityPolicy, versionFile, serviceWorkerManifest],
 
     define: {
         'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),
