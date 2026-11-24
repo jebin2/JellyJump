@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * EmojiSprites - each emoji glyph rasterised once, for drawing many of them.
  *

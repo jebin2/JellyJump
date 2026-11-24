@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from "../utils/Logger.js";
 import { isDesktop, desktopBridge } from './Platform.js';
 /**

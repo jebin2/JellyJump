@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from "../utils/Logger.js";
 import { MediaBunny } from "../media/MediaBunny.js";
 

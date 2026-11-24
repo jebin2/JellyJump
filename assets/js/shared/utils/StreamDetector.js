@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Stream Detection Utility
  * Identifies stream types from URLs for IPTV/HLS support

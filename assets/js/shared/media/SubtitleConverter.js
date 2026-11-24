@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Subtitle Converter Utility
  * Converts word-level JSON transcripts to WebVTT format.

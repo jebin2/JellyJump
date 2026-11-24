@@ -1,3 +1,4 @@
+// @ts-check
 // Registers the PWA service worker and, on hosts that cannot send COOP/COEP
 // headers themselves (e.g. GitHub Pages), reloads once so the SW-injected
 // headers take effect and the page becomes cross-origin isolated — which

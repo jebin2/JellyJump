@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from "./Logger.js";
 import { html } from './html.js';
 /**
@@ -10,9 +11,9 @@ export class ConfirmDialog {
 
     /**
      * Show a confirmation modal
-     * @param {Object} options - Modal options
-     * @param {string} options.title - Modal title
-     * @param {string} options.message - Modal message
+     * @param {Object} [options] - Modal options
+     * @param {string} [options.title] - Modal title
+     * @param {string} [options.message] - Modal message
      * @param {string} [options.confirmText='OK'] - Confirm button text
      * @param {string} [options.cancelText='Cancel'] - Cancel button text
      * @param {string} [options.confirmStyle='primary'] - Confirm button style: 'primary', 'danger', 'secondary'
@@ -153,9 +154,9 @@ export class ConfirmDialog {
 
     /**
      * Show an alert modal (single button)
-     * @param {Object} options - Modal options
-     * @param {string} options.title - Modal title
-     * @param {string} options.message - Modal message
+     * @param {Object} [options] - Modal options
+     * @param {string} [options.title] - Modal title
+     * @param {string} [options.message] - Modal message
      * @param {string} [options.buttonText='OK'] - Button text
      * @param {string} [options.buttonStyle='primary'] - Button style
      * @param {string} [options.icon='ℹ️'] - Icon to show in title

@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from '../utils/Logger.js';
 
 const VIDEO_EXTENSIONS = new Set([
@@ -27,13 +28,17 @@ export class BrowserMediaScanner {
     }
 
     static isSupported() {
-        return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
+        return typeof window !== 'undefined' && typeof /** @type {any} */ (window).showDirectoryPicker === 'function';
     }
 
     get isScanning() {
         return this._scanning;
     }
 
+    /**
+     * @param {{ onBatch?: Function, onDone?: Function, onError?: Function,
+     *   directoryHandle?: any }} [handlers] - with no handle, the user picks a folder
+     */
     async scan({ onBatch, onDone, onError, directoryHandle } = {}) {
         if (this._scanning) return;
         this._scanning = true;
@@ -51,7 +56,7 @@ export class BrowserMediaScanner {
         };
 
         try {
-            const root = directoryHandle ?? await window.showDirectoryPicker({ id: 'jellyjump-media' });
+            const root = directoryHandle ?? await /** @type {any} */ (window).showDirectoryPicker({ id: 'jellyjump-media' });
 
             for await (const record of this._walk(root, root.name)) {
                 scanned++;

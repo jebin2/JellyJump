@@ -1,3 +1,4 @@
+// @ts-check
 import { fetchWithPolicy } from '../net/fetchWithPolicy.js';
 import { Logger } from '../utils/Logger.js';
 import { Settings } from '../settings/Settings.js';
@@ -259,6 +260,7 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    /** @type {any} */
     let header = null;
     let total = 0;
     let batch = [];

@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * FooterHelper - Creates configurable footer for processing modals
  * Reduces duplicate footer templates by providing a single common template
@@ -19,16 +20,17 @@ import { Logger } from './Logger.js';
  * @returns {DocumentFragment} Cloned and configured footer fragment
  */
 export function createProcessFooter(config) {
-    const template = document.getElementById('common-process-footer-template');
+    const template = /** @type {HTMLTemplateElement|null} */ (document.getElementById('common-process-footer-template'));
 
     if (!template) {
         Logger.error('FooterHelper: common-process-footer-template not found');
         return null;
     }
 
-    const footer = template.content.cloneNode(true);
+    const footer = /** @type {DocumentFragment} */ (template.content.cloneNode(true));
 
     // Configure the primary action button
+    /** @type {HTMLElement|null} */
     const actionBtn = footer.querySelector('.primary-action-btn');
     const iconUse = footer.querySelector('.action-icon-use');
 

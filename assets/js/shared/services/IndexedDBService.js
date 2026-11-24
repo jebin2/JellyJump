@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from "../utils/Logger.js";
 import { config } from '../config/index.js';
 
@@ -60,17 +61,17 @@ export class IndexedDBService {
             const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
 
             request.onerror = (event) => {
-                Logger.error('IndexedDB error:', event.target.error);
-                reject(event.target.error);
+                Logger.error('IndexedDB error:', /** @type {IDBOpenDBRequest} */ (event.target).error);
+                reject(/** @type {IDBOpenDBRequest} */ (event.target).error);
             };
 
             request.onsuccess = (event) => {
-                this.db = event.target.result;
+                this.db = /** @type {IDBOpenDBRequest} */ (event.target).result;
                 resolve(this.db);
             };
 
             request.onupgradeneeded = (event) => {
-                const db = event.target.result;
+                const db = /** @type {IDBOpenDBRequest} */ (event.target).result;
 
                 // Playlist store (key: id)
                 if (!db.objectStoreNames.contains(this.STORES.PLAYLIST)) {
@@ -115,7 +116,7 @@ export class IndexedDBService {
     /**
      * Execute a transaction with automatic retry on InvalidStateError
      * @param {string[]} stores - Store names for transaction
-     * @param {string} mode - 'readonly' or 'readwrite'
+     * @param {IDBTransactionMode} mode - 'readonly' or 'readwrite'
      * @param {Function} executor - Function receiving (transaction) to execute operations
      * @returns {Promise} Result from executor
      * @private
@@ -181,7 +182,7 @@ export class IndexedDBService {
 
                     resolve();
                 };
-                transaction.onerror = (event) => reject(event.target.error);
+                transaction.onerror = (event) => reject(/** @type {IDBOpenDBRequest} */ (event.target).error);
                 // A full disk aborts the transaction when it commits, which
                 // fires abort, not error.
                 transaction.onabort = () => reject(transaction.error);

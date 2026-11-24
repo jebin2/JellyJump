@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * AudioDataCodec
  * Encodes bytes as a multi-tone On-Off Keying (OOK) audio signal and decodes them back.

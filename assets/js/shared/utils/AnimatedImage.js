@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * AnimatedImage - an image that can be drawn onto a canvas, animated ones
  * included.
@@ -90,6 +91,8 @@ export class AnimatedImage {
         this.totalMs = durations.reduce((a, b) => a + b, 0);
         this.width = frames[0]?.width || 0;
         this.height = frames[0]?.height || 0;
+        /** True when the source cannot carry transparency (set by its reader). */
+        this.opaque = false;
     }
 
     get animated() { return this.frames.length > 1; }

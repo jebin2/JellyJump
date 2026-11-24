@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * VisualStripCodec
  * Encodes bytes as black/white 16×16-pixel blocks across the entire video frame,

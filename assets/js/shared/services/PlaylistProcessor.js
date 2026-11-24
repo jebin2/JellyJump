@@ -1,3 +1,4 @@
+// @ts-check
 import { AppError } from '../errors/AppError.js';
 import { Logger } from "../utils/Logger.js";
 import { MediaMetadata } from '../utils/MediaMetadata.js';
@@ -59,8 +60,9 @@ export class PlaylistProcessor {
                 addedAt: new Date().toISOString()
             };
 
-            if (file.path) {
-                item.localPath = file.path;
+            const desktopPath = /** @type {File & { path?: string }} */ (file).path;   // Electron's
+            if (desktopPath) {
+                item.localPath = desktopPath;
             }
 
             const mediaBasename = getBasename(file.name);
