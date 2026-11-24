@@ -1,5 +1,6 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { YouTubeEngine } from './YouTubeEngine.js';
+import { completePlayerMedia } from '../playback/PlaybackState.js';
 
 /**
  * The player driving a YouTube video instead of its own decode pipeline.
@@ -13,6 +14,22 @@ import { YouTubeEngine } from './YouTubeEngine.js';
  * render loop and a seek to the end use, so auto-advance and every loop mode
  * behave identically to a local file with no logic duplicated for them.
  */
+
+/**
+ * What this mode keeps per player, here rather than on the player: the
+ * position ticker, the autoplay retry, and whether the user wants sound.
+ * @type {WeakMap<object, {ticker: number|null, autoplayRetry: ReturnType<typeof setTimeout>|null, wantsSound: boolean}>}
+ */
+const youtubeState = new WeakMap();
+/** @param {object} player */
+function stateOf(player) {
+    let state = youtubeState.get(player);
+    if (!state) youtubeState.set(player, state = { ticker: null, autoplayRetry: null, wantsSound: false });
+    return state;
+}
+
+/** Whether sound is still to be given back once the video plays. @param {object} player */
+export function youtubeWantsSound(player) { return stateOf(player).wantsSound; }
 
 /**
  * Switch the player between its own pipeline and YouTube's, in one place.
@@ -61,7 +78,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
     // player is muted right now: a mute this code applied to get autoplay past
     // the browser must not read back as "they asked for silence" on the next
     // video, or one refusal makes every later video permanently silent.
-    player._youtubeWantsSound = !player.config.muted || !!player.stream?.wasMutedForAutoplay;
+    stateOf(player).wantsSound = !player.config.muted || !!player.stream?.wasMutedForAutoplay;
 
     // Reuse before creating. A video handed to the embed that is already there
     // inherits that frame's user activation, so once sound has been allowed
@@ -142,7 +159,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
                 stopYouTubeTicker(player);
                 // Same completion as a local file: the playlist advances, and
                 // loop-one restarts, without either being special-cased here.
-                player._completeMedia();
+                completePlayerMedia(player);
             }
         },
         onError: (message) => {
@@ -164,7 +181,7 @@ export async function loadPlayerYouTube(player, video, autoplay) {
  * It runs only while playing, so a paused tab costs nothing.
  */
 export function startYouTubeTicker(player) {
-    if (player._youtubeTicker) return;
+    if (stateOf(player).ticker) return;
 
     const tick = () => {
         if (player.engine !== 'youtube' || !player.youtube) return stopYouTubeTicker(player);
@@ -184,16 +201,16 @@ export function startYouTubeTicker(player) {
         player.announce.progress();
         player.trigger('timeupdate', { currentTime: player.currentTime });
 
-        player._youtubeTicker = requestAnimationFrame(tick);
+        stateOf(player).ticker = requestAnimationFrame(tick);
     };
 
-    player._youtubeTicker = requestAnimationFrame(tick);
+    stateOf(player).ticker = requestAnimationFrame(tick);
 }
 
 export function stopYouTubeTicker(player) {
-    if (!player._youtubeTicker) return;
-    cancelAnimationFrame(player._youtubeTicker);
-    player._youtubeTicker = null;
+    if (!stateOf(player).ticker) return;
+    cancelAnimationFrame(stateOf(player).ticker);
+    stateOf(player).ticker = null;
 }
 
 /**
@@ -271,8 +288,8 @@ const AUTOPLAY_RETRY_MS = 1500;
 function watchYouTubeAutoplay(player) {
     cancelYouTubeAutoplayRetry(player);
 
-    player._youtubeAutoplayRetry = setTimeout(() => {
-        player._youtubeAutoplayRetry = null;
+    stateOf(player).autoplayRetry = setTimeout(() => {
+        stateOf(player).autoplayRetry = null;
         if (player.engine !== 'youtube' || !player.youtube) return;
         if (player.isPlaying) return; // it started; nothing to recover
 
@@ -284,7 +301,7 @@ function watchYouTubeAutoplay(player) {
             Logger.log('[YouTube] Autoplay was refused; retrying muted');
             player.config.muted = true;
             player.stream.wasMutedForAutoplay = true;
-            player._syncAudioGain();
+            syncYouTubeAudio(player);
             player.announce.volume();
         } else {
             Logger.log('[YouTube] Autoplay did not start; asking again');
@@ -301,9 +318,9 @@ function watchYouTubeAutoplay(player) {
  * deliberately stopped.
  */
 export function cancelYouTubeAutoplayRetry(player) {
-    if (!player._youtubeAutoplayRetry) return;
-    clearTimeout(player._youtubeAutoplayRetry);
-    player._youtubeAutoplayRetry = null;
+    if (!stateOf(player).autoplayRetry) return;
+    clearTimeout(stateOf(player).autoplayRetry);
+    stateOf(player).autoplayRetry = null;
 }
 
 /**
@@ -319,9 +336,9 @@ export function cancelYouTubeAutoplayRetry(player) {
  * would look like the video simply stopping for no reason.
  */
 function unmuteOncePlaying(player) {
-    if (!player.stream?.wasMutedForAutoplay || !player._youtubeWantsSound) return;
+    if (!player.stream?.wasMutedForAutoplay || !stateOf(player).wantsSound) return;
     // Once per video: a video that pauses and resumes must not fight this again.
-    player._youtubeWantsSound = false;
+    stateOf(player).wantsSound = false;
 
     player.restoreAutoplayAudio('YouTube started playing');
 
@@ -346,7 +363,7 @@ function unmuteOncePlaying(player) {
         // that sound is still owed.
         player.config.muted = true;
         player.stream.wasMutedForAutoplay = true;
-        player._syncAudioGain();
+        syncYouTubeAudio(player);
         player.announce.volume();
         if (!player.isPlaying) player.youtube.play();
     }, 500);

@@ -1,5 +1,5 @@
 import { Logger } from '../../shared/utils/Logger.js';
-import { getPlayerPlaybackTime } from './PlaybackState.js';
+import { getPlayerPlaybackTime, completePlayerMedia } from './PlaybackState.js';
 
 // How long to leave a closed queue alone before trying to open it again, and
 // how many times to bother. Spaced out because the usual reason a rebuild gave
@@ -132,7 +132,7 @@ export function startPlayerRenderLoop(player) {
                 // Same completion a seek to the end goes through, so both ways
                 // of arriving there behave identically. It stops the loop
                 // either way: pause() for a real end, _seekTo for loop-one.
-                player._completeMedia();
+                completePlayerMedia(player);
                 return;
             }
 

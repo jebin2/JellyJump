@@ -8,7 +8,7 @@ import '../shared/media/MediaBunny.js'; // registers the codec plugins
 import { Settings } from '../shared/settings/Settings.js';
 import { PlayerOverrides } from './PlayerOverrides.js';
 import { ScreenWakeLock } from './playback/ScreenWakeLock.js';
-import { onPlayerEvent, offPlayerEvent, triggerPlayerEvent } from './PlayerEvents.js';
+import { onPlayerEvent, offPlayerEvent, triggerPlayerEvent, clearPlayerEvents } from './PlayerEvents.js';
 import {
     PLAYER_CONFIG,
     PLAYER_CONTROL_DEFAULTS,
@@ -18,7 +18,7 @@ import {
     presentPlayerFrame, addPlayerRenderCallback, removePlayerRenderCallback,
     playerOverlayTimeMs, redrawPlayer,
 } from './playback/FramePresenter.js';
-import { closePlayerAudioContext, restorePlayerAutoplayAudio, syncPlayerAudioGain } from './audio/AudioEngine.js';
+import { closePlayerAudioContext, restorePlayerAutoplayAudio, syncPlayerVolume } from './audio/AudioEngine.js';
 import {
     resetPlayer,
     cleanupPlayerForLoad,
@@ -31,14 +31,12 @@ import {
     togglePlayerPlay,
     seekPlayerTo,
     requestPlayerSeek,
-    completePlayerMedia
 } from './playback/PlaybackState.js';
 import { playPlayer, pausePlayer, setPlayerPlaybackRate } from './playback/PlaybackTransport.js';
 import {
     cancelYouTubeAutoplayRetry,
     suspendPlayerYouTube,
     teardownPlayerYouTube,
-    syncYouTubeAudio
 } from './youtube/YouTubePlayback.js';
 import { PlayerStream } from './streaming/PlayerStream.js';
 
@@ -66,8 +64,6 @@ export class CorePlayer {
         this.view = view;
         /** Load, seek and dropped-frame timings for Diagnostics. */
         this.timing = new PlayerTiming();
-        /** Listeners by event name (`on`, `off`, `trigger`). */
-        this._events = {};
         /** Fires the §4.1 events when the state they describe changes. */
         this.announce = new PlayerStateEvents(this);
         this.container = document.getElementById(containerId);
@@ -232,13 +228,6 @@ export class CorePlayer {
     stopWebcamStreamMode() { this.stream.stopWebcamStreamMode(); }
 
     // ─── Audio ───────────────────────────────────────────────────────────────────
-    _syncAudioGain() {
-        // Every volume and mute change funnels through here, so this is the one
-        // place the embed needs telling — branching in setVolume and toggleMute
-        // separately would be the same fix written twice.
-        if (this.engine === 'youtube') return syncYouTubeAudio(this);
-        return syncPlayerAudioGain(this);
-    }
     async _closeAudioContext() { return closePlayerAudioContext(this); }
     /** Unmute what autoplay muted, now that the user has interacted. @param {string} sourceLabel for the log */
     restoreAutoplayAudio(sourceLabel) { return restorePlayerAutoplayAudio(this, sourceLabel); }
@@ -322,7 +311,6 @@ export class CorePlayer {
         if (wasReversing) await this._playBackward();
     }
     _requestSeek(time) { requestPlayerSeek(this, time); }
-    _completeMedia() { completePlayerMedia(this); }
     seek(time) { return this._seekTo(time); }
 
     // ─── Load ────────────────────────────────────────────────────────────────────
@@ -413,7 +401,7 @@ export class CorePlayer {
 
         this.stream.syncVolumeState();
 
-        this._syncAudioGain();
+        syncPlayerVolume(this);
 
         this.announce.volume();
         if (!bezel) return;
@@ -429,7 +417,7 @@ export class CorePlayer {
 
         this.stream.syncVolumeState();
 
-        this._syncAudioGain();
+        syncPlayerVolume(this);
 
         this.announce.volume();
     }
@@ -543,7 +531,7 @@ export class CorePlayer {
         this._wakeLock?.destroy();
         this._wakeLock = null;
 
-        this._events = {};
+        clearPlayerEvents(this);
 
         await this._closeAudioContext();
 

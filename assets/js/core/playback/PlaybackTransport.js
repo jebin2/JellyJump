@@ -1,6 +1,6 @@
 import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from '../../shared/utils/Logger.js';
-import { startPlayerAudioVisualizer, initPlayerAudio, suspendPlayerAudioContext, stopPlayerQueuedAudio, closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, runPlayerAudioIterator } from '../audio/AudioEngine.js';
+import { startPlayerAudioVisualizer, initPlayerAudio, suspendPlayerAudioContext, stopPlayerQueuedAudio, closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, runPlayerAudioIterator, syncPlayerVolume } from '../audio/AudioEngine.js';
 import { startPlayerRenderLoop } from './RenderLoop.js';
 import { savePlayerPlaybackState } from './PlaybackState.js';
 import { getPlayerPlaybackTime } from './PlaybackState.js';
@@ -34,7 +34,7 @@ export async function playPlayer(player) {
         player.stream.wasMutedForAutoplay = true;
         if (!player.config.muted) {
             player.config.muted = true;
-            player._syncAudioGain();
+            syncPlayerVolume(player);
             if (player.ui.muteBtn) player.announce.volume();
         }
     }

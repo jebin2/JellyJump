@@ -16,7 +16,7 @@ const check = (ok, label) => {
 
 function fakePlayer() {
     const p = {
-        _events: {}, isPlaying: false, isLoading: false, currentTime: 0, duration: NaN,
+        isPlaying: false, isLoading: false, currentTime: 0, duration: NaN,
         config: { volume: 1, muted: false }, get volume() { return p.config.volume; }, get isMuted() { return p.config.muted; },
         playbackRate: 1, loopMode: 'off', loopStart: null, loopEnd: null, controlBarMode: 'overlay',
         isStreamMode: false, isWebcamMode: false, isLive: false,
