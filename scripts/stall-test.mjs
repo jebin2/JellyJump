@@ -123,7 +123,14 @@ try {
     const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(`${origin}/player.html`);
+    // STALL_DEBUG=1 prints the player's own log (buffering, frame sync, audio).
+    if (process.env.STALL_DEBUG) {
+        page.on('console', (message) => {
+            const text = message.text();
+            if (/Buffering|FrameSync|Audio\]|Seek|Video way/.test(text)) console.log(`    [page] ${text.slice(0, 200)}`);
+        });
+    }
+    await page.goto(`${origin}/player.html${process.env.STALL_DEBUG ? '?debug=1' : ''}`);
     await page.waitForFunction(() => !!window.player, null, { timeout: 60000 });
 
     /** Play the file through from a fresh load; optionally seek once, after `seekAt` s of play. */
@@ -148,6 +155,8 @@ try {
             return present(...args);
         };
         let spinnerSeen = false;
+        let waits = 0;
+        let wasLoading = false;
         let worstLead = 0;
         let ended = false;
         const onEnded = () => { ended = true; };
@@ -164,19 +173,21 @@ try {
                 continue;
             }
             if (p.isLoading) spinnerSeen = true;
+            if (p.isPlaying && p.isLoading && !wasLoading) waits++;
+            wasLoading = p.isLoading;
             if (p.isPlaying) worstLead = Math.max(worstLead, p.currentTime - lastShownTs);
             if (!p.isPlaying && p.currentTime >= p.duration - 0.2) break;
         }
         p.presentFrame = present;
         p.off?.('ended', onEnded);
-        return { loadSec, shown, shownAfterSeek, spinnerSeen, worstLead, ended, at: p.currentTime,
+        return { loadSec, shown, shownAfterSeek, spinnerSeen, waits, worstLead, ended, at: p.currentTime,
             duration: p.duration, wallSec: (performance.now() - t0) / 1000 };
     }, { url, seekAt, seekTo });
 
     const report = (run) => {
         console.log(`  load took ${run.loadSec.toFixed(1)} s; ${run.shown} frames shown, clock ${run.at.toFixed(2)} `
             + `of ${run.duration.toFixed(2)} s, ${run.wallSec.toFixed(1)} s of wall time, `
-            + `worst lead of the clock over the picture ${run.worstLead.toFixed(2)} s\n`);
+            + `worst lead of the clock over the picture ${run.worstLead.toFixed(2)} s, ${run.waits} waits for data\n`);
     };
 
     console.log(`\nplaying a 12 s file served at a quarter of its bitrate (after the first ${FAST_BYTES / 1024} KB)\n`);
@@ -187,6 +198,10 @@ try {
     check('the spinner showed while it waited', run.spinnerSeen);
     check('nearly every frame was shown, none skipped for being late', run.shown >= FRAMES * 0.8, `${run.shown} of ${FRAMES}`);
     check('the clock never ran far past the picture', run.worstLead < 1.0, `${run.worstLead.toFixed(2)} s`);
+    // A link at a quarter of the bitrate needs ~3x the video's length of
+    // waiting; growing the cushion each time keeps that to a few waits rather
+    // than one every second or two.
+    check('a few long waits rather than many short ones', run.waits <= 6, `${run.waits} waits`);
 
     // The case reported: a seek into a part not downloaded yet, then play on.
     sent = 0;

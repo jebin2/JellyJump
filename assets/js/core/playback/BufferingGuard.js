@@ -15,11 +15,16 @@
  * whether the data is running out:
  * - the audio scheduled ahead of the clock is under STALL_AT, or
  * - no frame has been shown for VIDEO_GAP while the decoder is still
- *   working on the next one (none is waiting),
+ *   working on the next one (none is waiting), or
+ * - the frames the decoder hands over are already VIDEO_LAG behind the clock
+ *   (they would be skipped as late, one after another),
  * and if so suspends the AudioContext. That stops the clock and the audio
  * already scheduled together, at the same instant, so what arrives while
  * waiting is on time, not late. The spinner shows. Playback goes on once
- * RESUME_AT of audio is scheduled ahead and the next frame is decoded.
+ * enough audio is scheduled ahead and the next frame is decoded: RESUME_AT
+ * the first time, twice as much each time it has to wait again soon after
+ * (up to MAX_RESUME_AT) -- on a link slower than the video, a few longer
+ * waits rather than one every couple of seconds.
  *
  * Play, pause, seek and load clear it: play resumes the context itself.
  */
@@ -27,14 +32,22 @@ import { Logger } from '../../shared/utils/Logger.js';
 
 /** Stall when less audio than this (seconds) is scheduled ahead. */
 export const STALL_AT = 0.1;
-/** Go on when this much (seconds) is. */
+/** Go on when this much (seconds) is... */
 export const RESUME_AT = 1.0;
+/** ...doubled for each wait that comes within REPEAT_WINDOW of the last, up to this. */
+export const MAX_RESUME_AT = 4.0;
+/** A wait this soon (ms) after the last one ended counts as a repeat. */
+const REPEAT_WINDOW_MS = 10000;
+/** How far ahead the audio pump reads normally (seconds); AudioEngine. */
+const NORMAL_LEAD = 3.0;
 /** Stall when no frame has been shown for this long (seconds of clock) and the next is still being decoded. */
 export const VIDEO_GAP = 0.5;
+/** Stall when the frames decoded are this far (seconds) behind the clock. */
+export const VIDEO_LAG = 0.3;
 /** Not judged in the first moments after the audio starts: it is still filling. */
 const AUDIO_GRACE = 0.5;
 /** Background work (seek-bar thumbnails) waits for this much audio ahead. */
-export const HEADROOM = 1.5;   // the audio pump keeps 2–3 s ahead while it can
+export const HEADROOM = 2.5;   // the audio pump keeps 2–3 s ahead when the source keeps up
 
 /**
  * Per player: where the scheduled audio ends (AudioContext time), when the
@@ -45,8 +58,35 @@ export const HEADROOM = 1.5;   // the audio pump keeps 2–3 s ahead while it ca
 const audioAhead = new WeakMap();
 /** AudioContext time of the last frame shown, per player. @type {WeakMap<object, number>} */
 const lastFrameAt = new WeakMap();
+/** How far (seconds) behind the clock the last frame decoded was; 0 when on time. @type {WeakMap<object, number>} */
+const videoLag = new WeakMap();
 /** Players waiting for data. @type {WeakSet<object>} */
 const stalled = new WeakSet();
+/**
+ * Players whose AudioContext is being resumed. They stay `stalled` until it
+ * is running: in between, the context is still suspended, and a clock that
+ * no longer counted it as held fell back to its wall-clock reckoning from
+ * the last play -- after a long wait, seconds ahead, which ran the file to
+ * its end in an instant.
+ * @type {WeakSet<object>}
+ */
+const resuming = new WeakSet();
+/**
+ * Per player: the audio wanted ahead before playing on, when the current wait
+ * began, and when the last one ended (performance.now()).
+ * @type {WeakMap<object, {goal: number, since: number, endedAt: number}>}
+ */
+const waits = new WeakMap();
+
+/**
+ * How far ahead of the clock the audio pump may read (seconds): further
+ * while waiting for a bigger cushion than it would normally keep.
+ * @param {any} player
+ */
+export function audioLeadLimit(player) {
+    const goal = waits.get(player)?.goal ?? RESUME_AT;
+    return Math.max(NORMAL_LEAD, goal + 0.5);
+}
 
 /**
  * A new audio iterator started (AudioEngine).
@@ -85,6 +125,25 @@ export function noteFramePresented(player) {
 }
 
 /**
+ * Playback (re)started: nothing is behind yet. RenderLoop.
+ * @param {any} player
+ */
+export function notePlaybackStarted(player) {
+    noteFramePresented(player);
+    videoLag.set(player, 0);
+}
+
+/**
+ * A frame came from the decoder `lag` seconds behind the clock (0: on time,
+ * it waits for its moment). RenderLoop.
+ * @param {any} player
+ * @param {number} lag
+ */
+export function noteFrameLag(player, lag) {
+    videoLag.set(player, lag);
+}
+
+/**
  * Whether the player is waiting for data (the clock is held).
  * @param {any} player
  */
@@ -98,6 +157,7 @@ export function isPlayerStalled(player) {
  * @param {any} player
  */
 export function clearPlayerStall(player) {
+    resuming.delete(player);
     if (!stalled.delete(player)) return;
     player.setLoading?.(false);
 }
@@ -126,6 +186,7 @@ function audioStillFilling(player) {
  * @param {any} player
  */
 function videoStarved(player) {
+    if ((videoLag.get(player) ?? 0) > VIDEO_LAG) return true;
     const frames = player.frames;
     if (!player.videoTrack || !frames?.isOpen || frames.pending || !frames.isFetching) return false;
     const shown = lastFrameAt.get(player);
@@ -148,20 +209,35 @@ export function checkPlayerBuffering(player) {
         const audioLow = ahead < STALL_AT && !audioStillFilling(player);
         if (!audioLow && !videoStarved(player)) return;
         stalled.add(player);
+        const now = performance.now();
+        const last = waits.get(player);
+        const repeat = !!last && now - last.endedAt < REPEAT_WINDOW_MS;
+        const goal = repeat ? Math.min(last.goal * 2, MAX_RESUME_AT) : RESUME_AT;
+        waits.set(player, { goal, since: now, endedAt: last?.endedAt ?? -Infinity });
         Logger.log(`[Buffering] Waiting for data at ${player.currentTime?.toFixed(3)}s `
             + `(audio ahead ${Number.isFinite(ahead) ? `${(ahead * 1000).toFixed(0)}ms` : 'n/a'}, `
-            + `video ${videoStarved(player) ? 'starved' : 'ok'})`);
+            + `video ${videoStarved(player) ? 'starved' : 'ok'}; playing on with ${goal.toFixed(1)}s ahead)`);
         player.setLoading(true);
         ctx.suspend().catch(() => { /* closed: the next load makes a new one */ });
         return;
     }
 
+    const wait = waits.get(player);
+    const goal = wait?.goal ?? RESUME_AT;
     const frameReady = !player.videoTrack || !player.frames?.isOpen || !!player.frames.pending;
-    if (ahead >= RESUME_AT && frameReady) {
-        stalled.delete(player);
-        Logger.log(`[Buffering] Data caught up — playing on from ${player.currentTime?.toFixed(3)}s`);
-        player.setLoading(false);
-        ctx.resume().catch(() => { /* play() resumes it if this did not */ });
+    // At the end of the file there is no more to wait for.
+    if ((ahead >= goal || ahead === Infinity) && frameReady && !resuming.has(player)) {
+        resuming.add(player);
+        const finish = () => {
+            // Paused, seeked or reloaded meanwhile: they own the context now.
+            if (!resuming.delete(player) || !stalled.delete(player)) return;
+            const now = performance.now();
+            if (wait) wait.endedAt = now;
+            Logger.log(`[Buffering] Data caught up — playing on from ${player.currentTime?.toFixed(3)}s `
+                + `after ${wait ? ((now - wait.since) / 1000).toFixed(1) : '?'}s`);
+            player.setLoading(false);
+        };
+        ctx.resume().then(finish, finish);   // a failed resume: play() resumes it
     }
 }
 

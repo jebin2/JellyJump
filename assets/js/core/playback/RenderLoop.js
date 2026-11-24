@@ -1,7 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { getPlayerPlaybackTime, completePlayerMedia } from './PlaybackState.js';
 import { startPlayerVideoIterator } from './VideoIterator.js';
-import { checkPlayerBuffering, noteFramePresented } from './BufferingGuard.js';
+import { checkPlayerBuffering, noteFramePresented, noteFrameLag, notePlaybackStarted } from './BufferingGuard.js';
 
 /** Frames drawn since the media loaded, per player, for a sync log every 60. @type {WeakMap<object, number>} */
 const frameSyncLogCount = new WeakMap();
@@ -76,6 +76,7 @@ export async function updatePlayerNextFrame(player) {
 
             const playbackTime = getPlayerPlaybackTime(player);
             if (newNextFrame.timestamp <= playbackTime) {
+                noteFrameLag(player, playbackTime - newNextFrame.timestamp);
                 // Late frame: skip it. Held rather than drawn — painting every
                 // frame on the way past is what a fast-forward looks like, and
                 // when the iterator is far behind (after a seek) that is a
@@ -89,6 +90,7 @@ export async function updatePlayerNextFrame(player) {
                     if (player.isPlaying) player.stream?.resumeRecordingSmartPause();
                 }
             } else {
+                noteFrameLag(player, 0);
                 player.frames.setPending(newNextFrame);
                 break;
             }
@@ -121,7 +123,7 @@ export async function updatePlayerNextFrame(player) {
 export function startPlayerRenderLoop(player) {
     if (player.animationFrameId) return;
     // Counted from here: the frame shown before a seek is not a gap.
-    noteFramePresented(player);
+    notePlaybackStarted(player);
 
     const loop = () => {
         if (player.isPlaying) {

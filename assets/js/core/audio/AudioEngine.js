@@ -2,7 +2,7 @@ import { AudioEqualizer } from './AudioEqualizer.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { getPlayerPlaybackTime } from '../playback/PlaybackState.js';
 import { syncYouTubeAudio } from '../youtube/YouTubePlayback.js';
-import { noteAudioStarted, noteAudioScheduled, noteAudioFinished } from '../playback/BufferingGuard.js';
+import { noteAudioStarted, noteAudioScheduled, noteAudioFinished, audioLeadLimit } from '../playback/BufferingGuard.js';
 
 
 export async function initPlayerAudio(player) {
@@ -255,9 +255,12 @@ export async function runPlayerAudioIterator(player, iterator, anchorWall, ancho
                 }
             }
 
-            if (!player.isLive && isAnchored && timestamp - getPlayerPlaybackTime(player) >= 3) {
+            // Kept a few seconds ahead of the clock, more while it waits for
+            // data and wants a bigger cushion before playing on (BufferingGuard).
+            const lead = audioLeadLimit(player);
+            if (!player.isLive && isAnchored && timestamp - getPlayerPlaybackTime(player) >= lead) {
                 const aheadMs = (timestamp - getPlayerPlaybackTime(player)) * 1000;
-                const waitMs = Math.min(aheadMs - 2000, 1000); // Wait until we are only 2s ahead, max 1s wait
+                const waitMs = Math.min(aheadMs - (lead - 1) * 1000, 1000); // until a second under the limit, max 1s wait
                 if (waitMs > 10) {
                     await new Promise(r => setTimeout(r, waitMs));
                 }
