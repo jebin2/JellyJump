@@ -93,7 +93,9 @@ export async function decodeVideoSticker(blob, frameWidth) {
             alpha: true,
         });
 
+        /** @type {ImageBitmap[]} */
         const frames = [];
+        /** @type {number[]} */
         const times = [];
         const firstTimestamp = stamps[0];
         // Only the frames being kept are asked for, so the ones dropped are

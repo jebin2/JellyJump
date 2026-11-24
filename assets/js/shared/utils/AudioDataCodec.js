@@ -37,6 +37,10 @@ const PREAMBLE_REPS = 4;      // repeat each pattern 4×
 
 // ─── CRC-32 (IEEE 802.3) ─────────────────────────────────────────────────────
 
+/**
+ * @param {Uint8Array} data
+ * @returns {number}
+ */
 function _crc32(data) {
     let crc = 0xFFFFFFFF;
     for (const b of data) {
@@ -106,6 +110,9 @@ export function encodeAudio(bytes) {
 
 /**
  * Goertzel filter: energy of a single frequency within a sample window.
+ * @param {Float32Array} samples
+ * @param {number} freq
+ * @returns {number}
  */
 function goertzel(samples, freq) {
     const omega = 2 * Math.PI * freq / AUDIO_SAMPLE_RATE;
@@ -123,6 +130,8 @@ function goertzel(samples, freq) {
  * Decode one symbol window using max-gap split on sorted energies.
  * Reliable when exactly 8 tones are active (preamble + coarse scan use only).
  * Do NOT use for data symbols — use _decodeCalibrated instead.
+ * @param {Float32Array} samples
+ * @returns {number}
  */
 function decodeSymbol(samples) {
     const energies = TONES.map(f => goertzel(samples, f));
@@ -144,6 +153,9 @@ function decodeSymbol(samples) {
  * Decode using per-tone calibrated thresholds derived from the preamble.
  * Each tone is independently compared to its own threshold (E_on[i] / 2),
  * correctly handling any number of active tones including 0 (silence) and 16.
+ * @param {Float32Array} samples
+ * @param {number[]} thresholds
+ * @returns {number}
  */
 function _decodeCalibrated(samples, thresholds) {
     let sym = 0;
@@ -161,6 +173,8 @@ function _decodeCalibrated(samples, thresholds) {
  * After preamble, each tone's ON-energy is measured from the last confirmed
  * EVEN/ODD preamble symbol and used as a per-tone threshold for all data symbols.
  * This correctly handles 0x0000 (silence) and 0xFFFF (all tones) data symbols.
+ * @param {Float32Array} allSamples
+ * @param {number} startOffset
  */
 function tryDecode(allSamples, startOffset) {
     let pos = startOffset;
@@ -202,7 +216,8 @@ function tryDecode(allSamples, startOffset) {
     //   PREAMBLE_ODD  (0x5555) → bit i set when i is EVEN (0,2,4,...,14) → EVEN tones ON
     const thresholds = new Array(16);
     for (let i = 0; i < 16; i++) {
-        const E_on = (i % 2 === 0) ? lastOddEnergies[i] : lastEvenEnergies[i];
+        // Both preambles were seen (the counts above), so both are set.
+        const E_on = (i % 2 === 0) ? /** @type {number[]} */ (lastOddEnergies)[i] : /** @type {number[]} */ (lastEvenEnergies)[i];
         thresholds[i] = E_on / 2;
     }
 
@@ -293,6 +308,8 @@ export function decodeAudio(allSamples) {
 
 /**
  * Duration in seconds for an audio signal encoding the given number of bytes.
+ * @param {number} byteCount
+ * @returns {number}
  */
 export function audioDurationSec(byteCount) {
     const preambleSymbols = PREAMBLE_REPS * 2;

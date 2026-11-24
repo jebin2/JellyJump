@@ -61,8 +61,19 @@ export const BANNER_ROW_END   = 30;  // y: 480px  → 240px tall
 const HEADER_BITS = 80;
 const SYNC_BYTE   = 0b10101010;
 
+/**
+ * How a payload is split into shards and RS generations. `start` is the
+ * global shard index of a generation's first shard.
+ * @typedef {{ totalDataShards: number, totalShards: number,
+ *             generations: {k: number, m: number, start: number}[] }} ShardPlan
+ */
+
 // ─── CRC-32 (IEEE 802.3) ─────────────────────────────────────────────────────
 
+/**
+ * @param {Uint8Array} data
+ * @returns {number}
+ */
 function crc32(data) {
     let crc = 0xFFFFFFFF;
     for (const byte of data) {
@@ -99,7 +110,12 @@ export const DATA_BYTES_PER_FRAME = _DATA_BLOCKS.length >> 3; // 395
 // The 32-bit shard index lets a single carrier address up to 4 294 967 295
 // shards, so payload size is bounded by carrier duration/RAM, not the header.
 
-/** CRC-32 over (shard_index big-endian ‖ data). */
+/**
+ * CRC-32 over (shard_index big-endian ‖ data).
+ * @param {number} shardIndex
+ * @param {Uint8Array} data
+ * @returns {number}
+ */
 function _headerCrc(shardIndex, data) {
     const crcInput = new Uint8Array(4 + data.length);
     crcInput[0] = (shardIndex >>> 24) & 0xFF;
@@ -110,7 +126,12 @@ function _headerCrc(shardIndex, data) {
     return crc32(crcInput);
 }
 
-/** Pack the 80 header bits (MSB first) into a Uint8Array of 0/1. */
+/**
+ * Pack the 80 header bits (MSB first) into a Uint8Array of 0/1.
+ * @param {number} shardIndex
+ * @param {number} checksum
+ * @returns {Uint8Array}
+ */
 function _headerBits(shardIndex, checksum) {
     const bits = new Uint8Array(HEADER_BITS);
     let p = 0;
@@ -129,8 +150,10 @@ function _headerBits(shardIndex, checksum) {
  * k, m), so encoder and decoder derive the identical plan from the audio
  * header alone.
  *
- * @returns {{ totalDataShards: number, totalShards: number,
- *             generations: {k: number, m: number, start: number}[] }}
+ * @param {number} payloadBytes
+ * @param {number} [k]
+ * @param {number} [m]
+ * @returns {ShardPlan}
  *          `start` is the global shard index of the generation's first shard.
  */
 export function planShards(payloadBytes, k = RS_DATA_SHARDS, m = RS_PARITY_SHARDS) {
@@ -154,6 +177,9 @@ export function planShards(payloadBytes, k = RS_DATA_SHARDS, m = RS_PARITY_SHARD
  * the payload (except a padded final shard); parity shards are RS-encoded per
  * generation. Returns an array of `plan.totalShards` Uint8Arrays, indexed by
  * global shard index, each DATA_BYTES_PER_FRAME long.
+ * @param {Uint8Array} payload
+ * @param {ShardPlan} plan
+ * @returns {Uint8Array[]}
  */
 export function buildShards(payload, plan) {
     const shards = new Array(plan.totalShards);
@@ -183,11 +209,13 @@ export function buildShards(payload, plan) {
  * belong to different generations — a burst of corrupted frames then costs
  * each generation ~burst/G shards instead of landing entirely in one.
  * Decode is order-independent (each frame header carries its global index).
+ * @param {ShardPlan} plan
+ * @returns {number[]}
  */
 export function interleavedShardOrder(plan) {
     const order = new Array(plan.totalShards);
     let pos = 0;
-    const maxLen = plan.generations.reduce((mx, g) => Math.max(mx, g.k + g.m), 0);
+    const maxLen = plan.generations.reduce((/** @type {number} */ mx, g) => Math.max(mx, g.k + g.m), 0);
     for (let s = 0; s < maxLen; s++) {
         for (const g of plan.generations) {
             if (s < g.k + g.m) order[pos++] = g.start + s;
@@ -200,6 +228,10 @@ export function interleavedShardOrder(plan) {
  * Reassemble the payload from decoded frames (v4). `shardSlots` is an array of
  * length plan.totalShards holding each CRC-valid frame's data (or null).
  * Throws when any generation has fewer than k shards present.
+ * @param {(Uint8Array|null)[]} shardSlots
+ * @param {ShardPlan} plan
+ * @param {number} originalSize
+ * @returns {Uint8Array}
  */
 export function assembleShardsRS(shardSlots, plan, originalSize) {
     const out = new Uint8Array(originalSize);
@@ -224,10 +256,18 @@ export function assembleShardsRS(shardSlots, plan, originalSize) {
     return out;
 }
 
+/**
+ * @param {number} byteCount
+ * @returns {number}
+ */
 export function framesNeeded(byteCount) {
     return planShards(byteCount).totalShards;
 }
 
+/**
+ * @param {number} byteCount
+ * @returns {number}
+ */
 export function stripDurationSec(byteCount) {
     return framesNeeded(byteCount) / FPS;
 }
@@ -242,6 +282,12 @@ export const I420_Y_SIZE  = VIDEO_W * VIDEO_H;                // 921 600 B
 export const I420_UV_SIZE = (VIDEO_W >> 1) * (VIDEO_H >> 1); // 230 400 B
 export const I420_SIZE    = I420_Y_SIZE + I420_UV_SIZE * 2;  // 1 382 400 B
 
+/**
+ * @param {Uint8Array} i420
+ * @param {number} col
+ * @param {number} row
+ * @param {number} bit
+ */
 function _writeBlockI420Y(i420, col, row, bit) {
     // bit=0 → Y stays at whatever the placeholder has (<128 → decoded as 0). No write.
     // bit=1 → write Y=255 to every pixel in the 16×16 block.
@@ -359,6 +405,13 @@ export function makeFrameWriter(placeholderI420) {
 const _BLOCK_PIXELS = BLOCK_PX * BLOCK_PX;
 const _WHITE_SUM = 128 * _BLOCK_PIXELS;
 
+/**
+ * @param {Uint8Array|Uint8ClampedArray} luma
+ * @param {number} stride
+ * @param {number} col
+ * @param {number} row
+ * @returns {number}
+ */
 function _readBitLuma(luma, stride, col, row) {
     const x0 = col * BLOCK_PX;
     const y0 = row * BLOCK_PX;
@@ -393,6 +446,7 @@ function _lumaFromImageData(imageData) {
 /**
  * Decode a frame's data from its ImageData.
  * Returns { shardIndex, data, valid } or null if the sync byte doesn't match.
+ * @param {ImageData} imageData
  */
 export function decodeFrame(imageData) {
     return decodeFrameFromLuma(_lumaFromImageData(imageData), imageData.width);

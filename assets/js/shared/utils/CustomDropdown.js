@@ -18,7 +18,7 @@ export class CustomDropdown {
         const menuItems = menu.querySelectorAll('.jellyjump-menu-item');
         let currentValue = initialValue;
 
-        const updateActiveState = (value) => {
+        const updateActiveState = (/** @type {string|undefined} */ value) => {
             menuItems.forEach(item => {
                 const isActive = item.dataset.value === value;
                 item.classList.toggle('active', isActive);
@@ -158,11 +158,11 @@ export class CustomDropdown {
 
         return {
             getValue: () => currentValue,
-            setValue: (value) => {
+            setValue: (/** @type {string} */ value) => {
                 currentValue = value;
                 updateActiveState(value);
             },
-            setDisabled: (disabled) => {
+            setDisabled: (/** @type {boolean} */ disabled) => {
                 button.disabled = disabled;
                 button.classList.toggle('disabled', disabled);
             },

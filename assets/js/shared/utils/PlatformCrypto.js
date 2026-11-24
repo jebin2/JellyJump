@@ -73,6 +73,11 @@ const HEADER_SCAN_FRAMES = 150;
 // practical ceiling — up to 2^32-1 shards. Size is bounded by memory instead.
 const MAX_TOTAL_SHARDS = 0xFFFFFFFF;
 
+/**
+ * One frame of the carrier: a header copy, a payload shard, or a blank tail frame.
+ * @typedef {{header?: number, shard?: number}} CarrierSlot
+ */
+
 export class PlatformCrypto {
     static MAGIC = MAGIC;
 
@@ -98,19 +103,20 @@ export class PlatformCrypto {
      * @param {Function} [options.onProgress]  (0..1)
      * @param {AbortSignal} [options.signal]
      * @param {any} [options.fileHandle] - a FileSystemFileHandle; required above the in-memory limit
-     * @returns {Promise<Blob>}
+     * @returns {Promise<Blob|null>} the carrier; null when it was streamed to `fileHandle`
      */
     static async encrypt(blob, password, options = {}) {
         const { filename, mimeType, hint, onProgress, signal } = options;
         // `info` carries the rate and the estimate; callers that only want the
         // fraction can keep ignoring it.
+        /** @type {(v: number, info?: Object) => void} */
         const progress = (v, info) => onProgress && onProgress(v, info);
 
         const t0 = performance.now();
-        const ms = (a, b) => `${(b - a).toFixed(1)}ms`;
+        const ms = (/** @type {number} */ a, /** @type {number} */ b) => `${(b - a).toFixed(1)}ms`;
 
         Logger.log(`[PlatformCrypto] ──── ENCRYPT START — ${(blob.size / 1048576).toFixed(2)} MB ────`);
-        const step = (n, msg) => Logger.log(`[PlatformCrypto] [t=${ms(t0, performance.now())}] STEP ${n}/6 — ${msg}`);
+        const step = (/** @type {number} */ n, /** @type {string} */ msg) => Logger.log(`[PlatformCrypto] [t=${ms(t0, performance.now())}] STEP ${n}/6 — ${msg}`);
         progress(0);
 
         // ── Step 1: Derive keys + encrypt payload ─────────────────────────
@@ -135,6 +141,7 @@ export class PlatformCrypto {
         progress(0.35);
 
         // ── Step 2: Build the header (layout in JJC4Header.js) ─────────────
+        /** @type {import('./JJC4Header.js').Metadata} */
         const metadata = { rs: [RS_DATA_SHARDS, RS_PARITY_SHARDS] }; // v4 RS params
         if (filename) metadata.name = filename;
         if (mimeType)  metadata.type = mimeType;
@@ -165,6 +172,7 @@ export class PlatformCrypto {
         // Padded to a full frame's worth: the frame CRC covers all
         // DATA_BYTES_PER_FRAME bytes, and the decoder reads back a full-length
         // zero-padded array, so a short chunk here would fail its own CRC.
+        /** @type {Uint8Array[]} */
         const headerChunks = [];
         for (let off = 0; off < headerBytes.length; off += DATA_BYTES_PER_FRAME) {
             const chunk = new Uint8Array(DATA_BYTES_PER_FRAME);
@@ -177,6 +185,7 @@ export class PlatformCrypto {
         // Header copies are interleaved through the payload rather than massed
         // at the front, so a burst of damage cannot take every copy with it.
         const shardOrder = interleavedShardOrder(plan);
+        /** @type {CarrierSlot[]} */
         const schedule = [];
         let nextShard = 0;
         while (nextShard < shardOrder.length) {
@@ -212,7 +221,7 @@ export class PlatformCrypto {
             signal,
             t0,
             fileHandle: options.fileHandle,   // present → stream carrier to disk
-            onProgress: (v, info) => progress(0.40 + v * 0.55, info),
+            onProgress: (/** @type {number} */ v, /** @type {Object|undefined} */ info) => progress(0.40 + v * 0.55, info),
         });
 
         progress(1);
@@ -234,6 +243,7 @@ export class PlatformCrypto {
      * @returns {Promise<{blob: Blob, metadata: Object}>}
      */
     static async decrypt(blob, password, onProgress, signal) {
+        /** @type {(v: number, info?: Object) => void} */
         const progress = (v, info) => onProgress && onProgress(v, info);
         const scanStart = performance.now();
         Logger.log(`[PlatformCrypto] DECRYPT start — ${blob.size} bytes`);
@@ -376,7 +386,7 @@ export class PlatformCrypto {
      * then this is a v4 file whose header lives in the audio tones instead.
      * @returns {Promise<Uint8Array|null>}
      */
-    static async _readVideoHeader(MediaBunny, videoTrack) {
+    static async _readVideoHeader(/** @type {any} */ MediaBunny, /** @type {any} */ videoTrack) {
         const decodeSample = PlatformCrypto._makeFrameDecoder();
         const chunks = new Map();
         let expected = null;
@@ -427,11 +437,16 @@ export class PlatformCrypto {
      * through a canvas, which scales it back on the way. Returned as a factory
      * so the canvas and the buffer are made once per scan rather than per
      * frame.
-     * @returns {(sample: Object) => Promise<{shardIndex: number, data: Uint8Array, valid: boolean}|null>}
+     * @returns {(sample: any) => Promise<{shardIndex: number, data: Uint8Array, valid: boolean}|null>}
      */
     static _makeFrameDecoder() {
-        let canvas = null, ctx = null, buf = null;
-        return async (sample) => {
+        /** @type {HTMLCanvasElement|OffscreenCanvas|null} */
+        let canvas = null;
+        /** @type {any} a 2D context of either kind of canvas */
+        let ctx = null;
+        /** @type {Uint8Array|null} */
+        let buf = null;
+        return async (/** @type {any} */ sample) => {
             if (sample.displayWidth === VIDEO_W && sample.displayHeight === VIDEO_H) {
                 const size = sample.allocationSize();
                 if (!buf || buf.length < size) buf = new Uint8Array(size);
@@ -520,13 +535,15 @@ export class PlatformCrypto {
 
             return parseHeader(headerBytes).metadata;
         } catch (e) {
-            Logger.log(`[PlatformCrypto] readMetadata: ${e.message}`);
+            Logger.log(`[PlatformCrypto] readMetadata: ${/** @type {Error} */ (e).message}`);
             return null;
         }
     }
 
     /**
      * Estimated video duration (seconds) for a given plaintext file size.
+     * @param {number} fileSize
+     * @returns {number}
      */
     static estimatedDuration(fileSize) {
         // Payload frames, plus one header copy per HEADER_EVERY of them, plus
@@ -538,13 +555,19 @@ export class PlatformCrypto {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    /**
+     * @param {{ciphertext: Uint8Array, plan: import('./VisualStripCodec.js').ShardPlan,
+     *   headerChunks: Uint8Array[], schedule: CarrierSlot[], hint?: string, signal?: AbortSignal,
+     *   t0: number, fileHandle?: any, onProgress: (v: number, info?: Object) => void}} job
+     * @returns {Promise<Blob|null>} null when streamed to `fileHandle`
+     */
     static async _generateCarrierMp4({
         ciphertext, plan, headerChunks, schedule, hint, signal, t0,
         fileHandle, onProgress,
     }) {
         const totalFrames   = schedule.length;
         const totalAudioSec = totalFrames / FPS;
-        const ms  = (a, b) => `${(b - a).toFixed(1)}ms`;
+        const ms  = (/** @type {number} */ a, /** @type {number} */ b) => `${(b - a).toFixed(1)}ms`;
         const rel = () => `t=${ms(t0, performance.now())}`;
         let t;
 
@@ -556,6 +579,7 @@ export class PlatformCrypto {
         // Target: in-RAM BufferTarget (returns a Blob), or — for payloads too
         // big to hold as one ArrayBuffer — a StreamTarget that writes the
         // carrier straight to the caller's disk file as it's produced.
+        /** @type {any} a FileSystemWritableFileStream */
         let fileWritable = null;
         let bytesWritten = 0;   // running total streamed to disk (progress log)
         let target;
@@ -639,7 +663,7 @@ export class PlatformCrypto {
         // the 25% parity is newly allocated. One shard per frame, no repeats.
         const t2 = performance.now();
         const shards = buildShards(ciphertext, plan);
-        const shardOrder = schedule.filter((slot) => slot.shard !== undefined);
+        const shardOrder = schedule.filter((/** @type {CarrierSlot} */ slot) => slot.shard !== undefined);
         Logger.log(`[PlatformCrypto] [${rel()}] RS encode (${plan.totalShards} shards, ${plan.generations.length} generations): ${ms(t2, performance.now())}`);
 
         // Pre-render placeholder once: canvas → RGBA → I420.
@@ -648,7 +672,7 @@ export class PlatformCrypto {
         // from 3.7 MB (RGBA) to 1.4 MB (I420).
         t = performance.now();
         const tmpCanvas = PlatformCrypto._createCanvas(VIDEO_W, VIDEO_H);
-        const tmpCtx = tmpCanvas.getContext('2d');
+        const tmpCtx = /** @type {any} a new canvas's 2D context */ (tmpCanvas.getContext('2d'));
         PlatformCrypto._drawPlaceholder(tmpCtx, hint);
         const placeholderRgba = tmpCtx.getImageData(0, 0, VIDEO_W, VIDEO_H).data;
         const placeholderI420 = PlatformCrypto._rgbaToI420(placeholderRgba, VIDEO_W, VIDEO_H);
@@ -670,7 +694,7 @@ export class PlatformCrypto {
         let tMemcpy = 0, tPixelWrite = 0, tSampleCreate = 0, tVideoSourceAdd = 0;
         const loopStart = performance.now();
         let windowStart = loopStart;
-        const fmtDur = (sec) => sec >= 3600
+        const fmtDur = (/** @type {number} */ sec) => sec >= 3600
             ? `${(sec / 3600).toFixed(1)}h`
             : sec >= 60 ? `${(sec / 60).toFixed(1)}m` : `${sec.toFixed(0)}s`;
 
@@ -696,7 +720,8 @@ export class PlatformCrypto {
                 if (slot.header !== undefined) {
                     writeFrame(i420Frame, HEADER_INDEX_BASE + slot.header, headerChunks[slot.header]);
                 } else {
-                    writeFrame(i420Frame, slot.shard, shards[slot.shard]);
+                    const shard = /** @type {number} */ (slot.shard);   // not a header, so a shard
+                    writeFrame(i420Frame, shard, shards[shard]);
                     shardsWritten++;
                 }
                 tPixelWrite += performance.now() - ts;
@@ -770,7 +795,12 @@ export class PlatformCrypto {
         return mp4Blob;
     }
 
-    /** Create a 2D-capable canvas that also works inside workers. */
+    /**
+     * Create a 2D-capable canvas that also works inside workers.
+     * @param {number} width
+     * @param {number} height
+     * @returns {HTMLCanvasElement|OffscreenCanvas}
+     */
     static _createCanvas(width, height) {
         if (typeof OffscreenCanvas !== 'undefined') {
             return new OffscreenCanvas(width, height);
@@ -781,6 +811,10 @@ export class PlatformCrypto {
         return canvas;
     }
 
+    /**
+     * @param {any} audioSource - a MediaBunny AudioSampleSource
+     * @param {Float32Array} float32Array
+     */
     static async _feedAudio(audioSource, float32Array) {
         const MB = await _getMediaBunny();
         const CHUNK = AUDIO_SAMPLE_RATE; // 1-second slices
@@ -803,6 +837,10 @@ export class PlatformCrypto {
         }
     }
 
+    /**
+     * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} ctx
+     * @param {string} [hint]
+     */
     static _drawPlaceholder(ctx, hint) {
         // Black frame; data blocks are drawn on top by encodeFrame
         ctx.fillStyle = '#0a0a0a';
@@ -875,6 +913,10 @@ export class PlatformCrypto {
      * Convert RGBA ImageData pixels to a packed I420 (YUV 4:2:0) Uint8Array.
      * Done once per encrypt call for the placeholder frame.
      * BT.601 full-range coefficients, integer arithmetic.
+     * @param {Uint8ClampedArray} rgba
+     * @param {number} width
+     * @param {number} height
+     * @returns {Uint8Array}
      */
     static _rgbaToI420(rgba, width, height) {
         const ySize  = width * height;
@@ -899,7 +941,9 @@ export class PlatformCrypto {
 }
 
 // Module-level mediabunny cache so _feedAudio can use AudioSample.fromAudioBuffer
+/** @type {any} */
 let _MB;
+/** @returns {Promise<any>} */
 async function _getMediaBunny() {
     if (!_MB) _MB = (await import('../media/MediaBunny.js')).MediaBunny;
     return _MB;
