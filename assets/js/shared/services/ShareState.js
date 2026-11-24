@@ -33,6 +33,9 @@ function applyToButton() {
     }
 }
 
+/**
+ * @param {boolean} next
+ */
 function set(next) {
     const changed = enabled !== next;
     enabled = next;
@@ -69,10 +72,14 @@ export const ShareState = {
     },
 
     /** Called by the share menu, which already knows the new state. */
-    update(state) {
+    update(/** @type {{enabled?: boolean}|null|undefined} */ state) {
         set(!!state?.enabled);
     },
 
+    /**
+     * @param {(enabled: boolean) => void} listener
+     * @returns {() => void} stops listening
+     */
     subscribe(listener) {
         listeners.add(listener);
         return () => listeners.delete(listener);

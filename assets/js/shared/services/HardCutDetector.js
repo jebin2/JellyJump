@@ -17,7 +17,8 @@ const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink, EncodedPacketSink
 export class HardCutDetector {
     constructor() {
         this.isDetecting = false;
-        this.progressCallback = null; // (progress: number) => void
+        /** @type {((progress: number) => void)|null} */
+        this.progressCallback = null;
         this.lastStats = null; // Store statistics from last detection
         this._input = null; // Track for cleanup
     }
@@ -50,6 +51,7 @@ export class HardCutDetector {
         const processingWidth = options.width ?? 64;
 
         // Sensitivity maps to stddev multiplier: Low sensitivity = higher multiplier = fewer cuts
+        /** @type {Record<number, number>} */
         const sensitivityMultipliers = { 1: 1.5, 2: 2.0, 3: 2.5 };
         const multiplier = sensitivityMultipliers[sensitivity] ?? 2.0;
 
@@ -130,6 +132,11 @@ export class HardCutDetector {
      * Two-pass adaptive detection:
      * Pass 1: Collect content score statistics (coarse sampling)
      * Pass 2: Detect cuts using adaptive threshold = mean + (multiplier * stddev)
+     * @param {any} videoTrack - a MediaBunny video track
+     * @param {number[]} timestamps
+     * @param {number} processingWidth
+     * @param {number} minSceneLen
+     * @param {number} multiplier
      */
     async _detectTwoPass(videoTrack, timestamps, processingWidth, minSceneLen, multiplier) {
         const cuts = [];
@@ -252,6 +259,11 @@ export class HardCutDetector {
 
     /**
      * Single-pass detection with fixed threshold (original behavior)
+     * @param {any} videoTrack
+     * @param {number[]} timestamps
+     * @param {number} processingWidth
+     * @param {number} minSceneLen
+     * @param {number} threshold
      */
     async _detectSinglePass(videoTrack, timestamps, processingWidth, minSceneLen, threshold) {
         const cuts = [];
@@ -315,6 +327,8 @@ export class HardCutDetector {
      * Compute HSV histogram for color-based comparison.
      * Uses 12 hue bins, 5 saturation bins, 5 value bins = 300 bins total.
      * This is much more robust to lighting changes than raw RGB comparison.
+     * @param {ImageData} imageData
+     * @returns {Float32Array}
      */
     _computeHSVHistogram(imageData) {
         const data = imageData.data;
@@ -375,6 +389,9 @@ export class HardCutDetector {
     /**
      * Compare two histograms using chi-squared distance.
      * Returns a value between 0 (identical) and 1 (completely different).
+     * @param {Float32Array} hist1
+     * @param {Float32Array} hist2
+     * @returns {number}
      */
     _compareHistograms(hist1, hist2) {
         let distance = 0;
@@ -396,6 +413,10 @@ export class HardCutDetector {
     /**
      * Compute average edge magnitude using Sobel-like gradient.
      * Higher values indicate more edges/detail in the frame.
+     * @param {ImageData} imageData
+     * @param {number} width
+     * @param {number} height
+     * @returns {number}
      */
     _computeEdgeMagnitude(imageData, width, height) {
         const data = imageData.data;

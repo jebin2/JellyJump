@@ -167,8 +167,7 @@ export class PlaylistRemoteLibraries {
                     return previous;
                 }
                 added++;
-                item.id = generateId();
-                return item;
+                return { ...item, id: generateId() };
             });
             const removed = existing.length - (fresh.length - added);
 

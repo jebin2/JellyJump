@@ -1,4 +1,5 @@
 // @ts-check
+/** @typedef {import('../types.js').NewPlaylistItem} NewPlaylistItem */
 import { fetchWithPolicy } from '../net/fetchWithPolicy.js';
 import { Logger } from '../utils/Logger.js';
 import { Settings } from '../settings/Settings.js';
@@ -20,7 +21,11 @@ import { buildYouTubeItem } from '../utils/YouTubeUrl.js';
  * saved copy would come back as broken entries whenever that machine is off.
  */
 
-/** Cheap, specific signal: our links always carry a token. */
+/**
+ * Cheap, specific signal: our links always carry a token.
+ * @param {string} rawUrl
+ * @returns {boolean}
+ */
 export function looksLikeShareLink(rawUrl) {
     try {
         const url = new URL(rawUrl);
@@ -76,6 +81,9 @@ export function reachHint(url) {
     return '';
 }
 
+/**
+ * @param {string} rawUrl
+ */
 export async function probe(rawUrl) {
     let url;
     try {
@@ -105,7 +113,8 @@ export async function probe(rawUrl) {
 
 /**
  * Fetch the listing and shape it into playlist items.
- * @returns {Promise<Array>}
+ * @param {string} rawUrl
+ * @returns {Promise<NewPlaylistItem[]>}
  */
 export async function fetchItems(rawUrl) {
     const url = new URL(rawUrl);
@@ -119,7 +128,7 @@ export async function fetchItems(rawUrl) {
     const items = Array.isArray(data.items) ? data.items : [];
     const lists = Array.isArray(data.linkLists) ? data.linkLists : [];
 
-    const shaped = items.map((item) => shapeItem(item, url, token, serverName, rawUrl));
+    const shaped = items.map((/** @type {any} */ item) => shapeItem(item, url, token, serverName, rawUrl));
     for (const list of lists) shaped.push(...shapeLinkList(list, serverName, rawUrl));
 
     Logger.log(`[RemoteLibrary] ${shaped.length} item(s) from ${serverName}`);
@@ -135,6 +144,10 @@ export async function fetchItems(rawUrl) {
  * that cannot import it. These play through YouTube like any other YouTube
  * item — there is no file on the other machine to stream, and nothing is
  * fetched from it for them.
+ * @param {any} list - a link list from the listing
+ * @param {string} serverName
+ * @param {string} rawUrl
+ * @returns {NewPlaylistItem[]}
  */
 function shapeLinkList(list, serverName, rawUrl) {
     const folder = linkListFolderName(list.name || 'Links');
@@ -182,6 +195,12 @@ function streamUrl(url, entry, token) {
 /**
  * One listing entry as a playlist item. Shared by both fetch paths so a
  * streamed library and a whole-response one are indistinguishable afterwards.
+ * @param {any} item - one entry of the listing
+ * @param {URL} url
+ * @param {string|null} token
+ * @param {string} serverName
+ * @param {string} rawUrl
+ * @returns {NewPlaylistItem}
  */
 function shapeItem(item, url, token, serverName, rawUrl) {
     return {
@@ -206,7 +225,7 @@ function shapeItem(item, url, token, serverName, rawUrl) {
         remoteServer: serverName,
         ...(Array.isArray(item.subtitles) && item.subtitles.length > 0
             ? {
-                subtitleUrls: item.subtitles.map((subtitle) => streamUrl(url, subtitle, token)),
+                subtitleUrls: item.subtitles.map((/** @type {any} */ subtitle) => streamUrl(url, subtitle, token)),
             }
             : {}),
     };
@@ -228,7 +247,7 @@ function shapeItem(item, url, token, serverName, rawUrl) {
  * to care which path ran.
  *
  * @param {string} rawUrl
- * @param {(items: Array) => void} onBatch - called with each batch, in order
+ * @param {(items: NewPlaylistItem[]) => void} onBatch - called with each batch, in order
  * @returns {Promise<{total: number, expected: number|null, complete: boolean}>}
  *   how many arrived, how many the host said it had, and whether the stream
  *   ended where it should have. A caller that added items as they arrived needs
@@ -263,6 +282,7 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
     /** @type {any} */
     let header = null;
     let total = 0;
+    /** @type {NewPlaylistItem[]} */
     let batch = [];
 
     const flush = () => {
@@ -277,7 +297,7 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
     // fallback would then add them a second time.
     let bogus = false;
 
-    const consume = (line) => {
+    const consume = (/** @type {string} */ line) => {
         if (bogus || !line) return;
         let parsed;
         try {
@@ -344,7 +364,7 @@ export async function fetchItemsStreaming(rawUrl, onBatch) {
         // fraction of someone's files as if it were all of them is worse than
         // saying so.
         flush();
-        Logger.warn(`[RemoteLibrary] Listing stopped after ${total} item(s):`, error?.message || error);
+        Logger.warn(`[RemoteLibrary] Listing stopped after ${total} item(s):`, /** @type {Error|undefined} */ (error)?.message || error);
     }
 
     // A response short enough to end inside the first chunk reaches here rather
@@ -398,6 +418,9 @@ export function savedLinks() {
     }
 }
 
+/**
+ * @param {string} rawUrl
+ */
 export function rememberLink(rawUrl) {
     const links = savedLinks();
     if (links.includes(rawUrl)) return;
@@ -409,6 +432,9 @@ export function rememberLink(rawUrl) {
     }
 }
 
+/**
+ * @param {string} rawUrl
+ */
 export function forgetLink(rawUrl) {
     try {
         Settings.set('remoteLibraries', savedLinks().filter(l => l !== rawUrl));

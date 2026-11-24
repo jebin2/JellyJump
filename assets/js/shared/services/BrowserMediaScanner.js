@@ -21,6 +21,11 @@ const BATCH_SIZE = 200;
  * Records carry a `file` handle instead of a `path`: there is no filesystem
  * path to hand out, and the File is what the player can actually open.
  */
+/**
+ * A video file the scan found.
+ * @typedef {{path: string, name: string, size: number, mtime: number, ext: string, file: File}} ScanRecord
+ */
+
 export class BrowserMediaScanner {
     constructor() {
         this._cancelled = false;
@@ -47,6 +52,7 @@ export class BrowserMediaScanner {
         const started = performance.now();
         let found = 0;
         let scanned = 0;
+        /** @type {ScanRecord[]} */
         let batch = [];
 
         const flush = () => {
@@ -68,7 +74,7 @@ export class BrowserMediaScanner {
             flush();
         } catch (error) {
             // An aborted picker is the user declining, not a failure.
-            if (error?.name !== 'AbortError') {
+            if (/** @type {Error|undefined} */ (error)?.name !== 'AbortError') {
                 Logger.error('[Scanner]', error);
                 onError?.(error);
             }
@@ -86,6 +92,9 @@ export class BrowserMediaScanner {
     /**
      * Depth-first walk of a directory handle, yielding a record per video file
      * and null for everything else (so the caller can still count what it saw).
+     * @param {any} directoryHandle - a FileSystemDirectoryHandle
+     * @param {string} prefix
+     * @returns {AsyncGenerator<ScanRecord|null>}
      */
     async *_walk(directoryHandle, prefix) {
         for await (const [name, handle] of directoryHandle.entries()) {

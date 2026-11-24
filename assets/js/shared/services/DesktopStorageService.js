@@ -17,6 +17,9 @@ import { PLAYLIST_MARKER } from './IndexedDBService.js';
  * The JellyJumpDB-playlist localStorage flag is mirrored so that player-main.js
  * (which checks that flag for the demo-video logic) requires no changes.
  */
+/** @typedef {import('../types.js').PlaylistItem} PlaylistItem */
+/** @typedef {{playlist: PlaylistItem[], playbackState: Object|null}} DesktopConfig */
+
 /** Bytes per message when writing a copy to disk. */
 const COPY_CHUNK = 8 * 1024 * 1024;
 
@@ -26,7 +29,8 @@ export class DesktopStorageService {
         this._storing = new Map();
         /** @type {Set<string>} items with a file in memory that get no copy (a dropped file) */
         this._notCopies = new Set();
-        this._cache = null; // { playlist: [], playbackState: null }
+        /** @type {DesktopConfig|null} what jellyjump.json holds; null until read */
+        this._cache = null;
         this._initPromise = this._load();
     }
 
@@ -47,7 +51,7 @@ export class DesktopStorageService {
             Logger.error('[DesktopStorage] Failed to write config:', e);
         }
         // Mirror presence flag so player-main.js requires no changes
-        if (this._cache.playlist && this._cache.playlist.length > 0) {
+        if (this._data.playlist && this._data.playlist.length > 0) {
             localStorage.setItem(PLAYLIST_MARKER, 'true');
         } else {
             localStorage.removeItem(PLAYLIST_MARKER);
@@ -58,8 +62,16 @@ export class DesktopStorageService {
         if (!this._cache) await this._initPromise;
     }
 
+    /** The config, once ready() has resolved (it is read, or started fresh). */
+    get _data() {
+        return /** @type {DesktopConfig} */ (this._cache);
+    }
+
     // ─── Playlist ────────────────────────────────────────────────────────────
 
+    /**
+     * @param {PlaylistItem[]} items
+     */
     async savePlaylist(items) {
         await this.ready();
 
@@ -67,10 +79,10 @@ export class DesktopStorageService {
         // copies folder, so it plays after its memory is let go and after a
         // restart (G4; BUG-6 was the worst of not having one).
         await Promise.all(items
-            .filter(item => item.isLocal && item.file && !item.localPath && !item.isWebcam && !this._notCopies.has(item.id))
+            .filter((item) => item.isLocal && item.file && !item.localPath && !item.isWebcam && !this._notCopies.has(item.id))
             .map(item => this._storeCopy(item)));
 
-        this._cache.playlist = items.map(item => ({
+        this._data.playlist = items.map(item => ({
             id: item.id,
             title: item.title,
             duration: item.duration,
@@ -98,10 +110,13 @@ export class DesktopStorageService {
         await this._persist();
     }
 
+    /**
+     * @returns {Promise<PlaylistItem[]>}
+     */
     async loadPlaylist() {
         await this.ready();
 
-        return (this._cache.playlist || []).map(item => {
+        return (this._data.playlist || []).map((item) => {
             const restored = { ...item };
             if (restored.isLocal) {
                 restored.file = null;
@@ -117,18 +132,19 @@ export class DesktopStorageService {
     /**
      * On desktop, local files are always read from disk via localPath.
      * We look up the cached playlist to find the path for the given id.
+     * @param {string} id
      */
     async loadFile(id) {
         await this.ready();
 
-        const item = (this._cache.playlist || []).find(i => i.id === id);
+        const item = (this._data.playlist || []).find(i => i.id === id);
         // Not in the playlist: an earlier copy the edit panel keeps for Undo.
         const path = item?.localPath ?? await this._copyPath(id);
         if (!path) return null;
         try {
             const result = await desktopBridge().readFile(path);
             if (result.success) {
-                return new File([result.buffer], item?.title || path.split(/[\\/]/).pop().replace(/^[^_]+__/, '') || 'file', {
+                return new File([result.buffer], item?.title || (path.split(/[\\/]/).pop() ?? '').replace(/^[^_]+__/, '') || 'file', {
                     type: item?.mimeType || '',
                 });
             }
@@ -143,6 +159,11 @@ export class DesktopStorageService {
      * No-op on desktop: a remote video is not kept (it is fetched again when
      * played). A tool's result is kept, by savePlaylist. Returns false so
      * callers know nothing was cached.
+     * @param {string} _id
+     * @param {Blob} _blob
+     * @param {string} [_name]
+     * @param {string} [_type]
+     * @returns {Promise<boolean>}
      */
     async saveFile(_id, _blob, _name, _type) {
         return false;
@@ -178,7 +199,7 @@ export class DesktopStorageService {
      * the user dropped gets none: it is theirs, and copying it would double
      * it on disk; it stays in memory, as before. Concurrent saves share the
      * one write.
-     * @param {Object} item
+     * @param {PlaylistItem} item
      * @returns {Promise<string|null>}
      */
     _storeCopy(item) {
@@ -190,7 +211,8 @@ export class DesktopStorageService {
                         this._notCopies.add(item.id);
                         return null;
                     }
-                    return this._writeCopy(item.id, item.file, item.file.name || item.title);
+                    const file = /** @type {File} */ (item.file);   // only items with one are stored
+                    return this._writeCopy(item.id, file, file.name || item.title);
                 })
                 .then((path) => {
                     if (path) item.localPath = path;
@@ -203,14 +225,20 @@ export class DesktopStorageService {
                 .finally(() => this._storing.delete(item.id));
             this._storing.set(item.id, writing);
         }
-        return this._storing.get(item.id);
+        return /** @type {Promise<string|null>} */ (this._storing.get(item.id));
     }
 
-    /** In chunks: a long video is too big for one message to the main process. */
+    /**
+     * In chunks: a long video is too big for one message to the main process.
+     * @param {string} id
+     * @param {Blob} blob
+     * @param {string} name
+     * @returns {Promise<string|null>} the copy's path
+     */
     async _writeCopy(id, blob, name) {
         const bridge = desktopBridge();
         if (!bridge?.copyBegin) return null;
-        const step = (result) => {
+        const step = (/** @type {{success?: boolean, error?: string, value?: any}} */ result) => {
             if (!result?.success) throw new Error(result?.error || 'copy failed');
             return result.value;
         };
@@ -228,15 +256,18 @@ export class DesktopStorageService {
 
     // ─── Playback state ───────────────────────────────────────────────────────
 
+    /**
+     * @param {Object} state
+     */
     async savePlaybackState(state) {
         await this.ready();
-        this._cache.playbackState = { key: 'playback', ...state };
+        this._data.playbackState = { key: 'playback', ...state };
         await this._persist();
     }
 
     async loadPlaybackState() {
         await this.ready();
-        return this._cache.playbackState || null;
+        return this._data.playbackState || null;
     }
 
     // ─── Clear ────────────────────────────────────────────────────────────────

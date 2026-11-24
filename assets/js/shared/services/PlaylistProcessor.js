@@ -6,6 +6,9 @@ import { M3UParser } from '../utils/M3UParser.js';
 import { StreamDetector } from '../utils/StreamDetector.js';
 import { generateId } from '../utils/mediaUtils.js';
 
+/** @typedef {import('../types.js').PlaylistItem} PlaylistItem */
+/** @typedef {import('../types.js').NewPlaylistItem} NewPlaylistItem */
+
 /**
  * Playlist Processor Service
  * Handles asynchronous media operations: metadata extraction, file imports, and M3U syncing.
@@ -14,7 +17,7 @@ export class PlaylistProcessor {
     /**
      * Process dropped files into playlist items
      * @param {FileList|File[]} files 
-     * @returns {Object[]} Array of prepared playlist items
+     * @returns {PlaylistItem[]} Array of prepared playlist items
      */
     static processFiles(files) {
         const fileArray = Array.from(files);
@@ -32,7 +35,7 @@ export class PlaylistProcessor {
             return [];
         }
 
-        const getBasename = (name) => name.substring(0, name.lastIndexOf('.'));
+        const getBasename = (/** @type {string} */ name) => name.substring(0, name.lastIndexOf('.'));
 
         return mediaFiles.map(file => {
             let path = file.webkitRelativePath || file.name;
@@ -43,6 +46,7 @@ export class PlaylistProcessor {
             const isAudio = file.type.startsWith('audio/');
             const id = generateId();
 
+            /** @type {PlaylistItem} */
             const item = {
                 id: id,
                 title: file.name,
@@ -80,7 +84,7 @@ export class PlaylistProcessor {
 
     /**
      * Extract metadata for a batch of items
-     * @param {Object[]} items 
+     * @param {PlaylistItem[]} items 
      * @param {Function} onItemUpdated - Callback for each item
      * @param {Function} onBatchComplete - Callback when batch is done
      */
@@ -94,7 +98,7 @@ export class PlaylistProcessor {
 
     /**
      * Ensure metadata exists for a single item
-     * @param {Object} item 
+     * @param {PlaylistItem} item 
      * @param {Function} onUpdated 
      */
     static async ensureMetadata(item, onUpdated) {
@@ -148,7 +152,7 @@ export class PlaylistProcessor {
     /**
      * Parse and transform an M3U playlist from URL
      * @param {string} url - URL to the M3U playlist
-     * @returns {Promise<Object[]>} Array of prepared items
+     * @returns {Promise<PlaylistItem[]>} Array of prepared items
      */
     static async importM3U(url) {
         this._assertNotMixedContent(url);
@@ -252,7 +256,7 @@ export class PlaylistProcessor {
             return response.ok;
         } catch (err) {
             clearTimeout(timeoutId);
-            if (err.name === 'AbortError') return false;
+            if (/** @type {Error} */ (err).name === 'AbortError') return false;
 
             // CORS error - try no-cors mode as fallback
             try {
@@ -275,16 +279,16 @@ export class PlaylistProcessor {
 
     /**
      * Validate a list of streams
-     * @param {Object[]} items 
+     * @param {PlaylistItem[]} items 
      * @param {Function} onProgress 
-     * @returns {Promise<Object>} Results summary
+     * @returns {Promise<{total: number, broken: number, valid: number}>} Results summary
      */
     static async validateStreams(items, onProgress) {
         const results = { total: items.length, broken: 0, valid: 0 };
         
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
-            const isValid = await this.checkStreamAccessibility(item.url);
+            const isValid = await this.checkStreamAccessibility(item.url ?? '');
             
             if (!isValid) {
                 item.isBroken = true;
@@ -306,7 +310,8 @@ export class PlaylistProcessor {
     /**
      * Process a single URL into a playlist item
      * @param {string} url 
-     * @returns {Promise<Object>} Prepared item
+     * @returns {Promise<NewPlaylistItem|{type: 'm3u', url: string}>} Prepared item, or an M3U
+     *   playlist to import
      */
     static async processUrl(url) {
         const urlLower = url.toLowerCase();
@@ -319,7 +324,7 @@ export class PlaylistProcessor {
             (urlLower.includes('.m3u') && !urlLower.includes('.m3u8'));
 
         if (isM3UPlaylist) {
-            return { type: 'm3u', url };
+            return { type: /** @type {const} */ ('m3u'), url };
         }
 
         // 2. Detect HLS/Stream
@@ -335,7 +340,7 @@ export class PlaylistProcessor {
                     !content.includes('#EXT-X-STREAM-INF') &&
                     !content.includes('#EXT-X-MEDIA-SEQUENCE');
 
-                if (isIPTVPlaylist) return { type: 'm3u', url };
+                if (isIPTVPlaylist) return { type: /** @type {const} */ ('m3u'), url };
             } catch (e) {
                 Logger.warn('[Processor] Could not inspect .m3u8, treating as stream');
             }
@@ -422,7 +427,7 @@ export class PlaylistProcessor {
                 id: generateId()
             };
         } catch (e) {
-            if (e.name === 'TypeError') {
+            if (/** @type {Error} */ (e).name === 'TypeError') {
                 if (await this._isReachableNoCors(url)) {
                     throw new Error(
                         'CORS Error: the server hosting this file is reachable but does not allow ' +

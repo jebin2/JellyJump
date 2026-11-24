@@ -19,7 +19,7 @@
  * @property {string} title - what the list shows, usually the file name
  * @property {string} [path] - where it sits in the list's folders,
  *   `folder/sub/name`; the title when it is at the top
- * @property {string} [url] - what the player opens: a blob URL, a remote or
+ * @property {string|null} [url] - what the player opens: a blob URL, a remote or
  *   stream address; empty for a local file until it is opened
  * @property {string|null} [duration] - shown as text: "1:23", "" when
  *   unknown, "Loading..." while it is read
@@ -37,6 +37,7 @@
  * @property {boolean} [isAudio] - an audio file
  * @property {boolean} [needsReload] - saved without its file, to be read again
  * @property {number} [originalIndex] - its place before the list was shuffled
+ * @property {string} [addedAt] - ISO time it was added (dropped files)
  *
  * Made by a tool:
  * @property {boolean} [madeByTool] - a result, not the user's own file (the
@@ -57,6 +58,9 @@
  * @property {boolean} [isDiscovered] - found by the folder scan; not saved
  * @property {string} [linkListFolder] - the folder of the link list it came from
  * @property {boolean} [needsTitle] - a link with no name yet; titled once read
+ * @property {string} [m3uSource] - the M3U playlist it came from
+ * @property {{tvgId: string, tvgName: string, language: string, country: string, group: string}} [m3uData]
+ *   its channel's details there
  *
  * Subtitles that came with it:
  * @property {File} [subtitleFile] - a subtitle file picked with the video
@@ -72,6 +76,13 @@
  * @property {boolean} [isBroken] - a stream that could not be opened
  * @property {string} [errorMessage] - why
  * @property {boolean} [optimizeDeclined] - the user said no to optimizing it
+ * @property {string} [_metadataError] - why reading it failed (not shown; for debugging)
+ */
+
+/**
+ * An item made but not yet in the list: it gets its `id` when it is added
+ * (remote libraries, YouTube links).
+ * @typedef {Omit<PlaylistItem, 'id'> & { id?: string }} NewPlaylistItem
  */
 
 /**
@@ -92,7 +103,7 @@
 
 /**
  * @typedef {Object} AudioInfo
- * @property {string} codec
+ * @property {string|null} codec - null when the track will not say
  * @property {number} channels
  * @property {number} sampleRate
  * @property {string} [languageCode]
