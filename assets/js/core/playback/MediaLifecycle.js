@@ -1,4 +1,5 @@
 import { MediaBunny, ensureDecodersFor } from '../../shared/media/MediaBunny.js';
+import { mediaFetchFn } from '../../shared/net/mediaFetch.js';
 import { clearPlayerStall } from './BufferingGuard.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
@@ -218,7 +219,9 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
     const urlSourceOptions = player.config.withCredentials ? { requestInit: { credentials: 'include' } } : {};
     Logger.log(`[MediaLifecycle] Setting up tracks for ${url} (isHls: ${isHls})`);
     player.media.input = new MediaBunny.Input({
-        source: new MediaBunny.UrlSource(url, { ...urlSourceOptions, getRetryDelay: retryPolicyFor(url) }),
+        source: new MediaBunny.UrlSource(url, {
+            ...urlSourceOptions, getRetryDelay: retryPolicyFor(url), fetchFn: mediaFetchFn('playback'),
+        }),
         formats: [...(MediaBunny.HLS_FORMATS || []), ...MediaBunny.ALL_FORMATS]
     });
 

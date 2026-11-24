@@ -52,7 +52,7 @@ async function getTrackDetails(input) {
  * @param {string|Blob} source
  */
 export async function getMetadata(source) {
-    const input = createMediaBunnyInput(source);
+    const input = createMediaBunnyInput(source, 'metadata');
 
     try {
         const { video, audio } = await getTrackDetails(input);

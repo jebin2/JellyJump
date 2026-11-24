@@ -1,4 +1,5 @@
 import { Logger } from "../../shared/utils/Logger.js";
+import { mediaFetchFn } from '../../shared/net/mediaFetch.js';
 import { MediaBunny } from "../../shared/media/MediaBunny.js";
 
 const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink, EncodedPacketSink } = MediaBunny;
@@ -46,11 +47,17 @@ export class ThumbnailGenerator {
         Logger.log('[ThumbnailGenerator] Generating with settings:', { width, interval, duration });
 
         try {
+            // Nothing is read until it is this pass's turn: opening the file
+            // reads its index and its end, which on a slow link is itself
+            // enough to starve the playback of the same file.
+            if (options.waitTurn) await options.waitTurn();
+            if (!this.isGenerating) return;
+
             // 1. Setup Mediabunny Input
             // Handle File/Blob vs String URL
             const source = (resource instanceof File || resource instanceof Blob)
                 ? new BlobSource(resource)
-                : new UrlSource(resource);
+                : new UrlSource(resource, { fetchFn: mediaFetchFn('thumbnails') });
 
             // Dispose previous Input if re-generating
             this._disposeInput();

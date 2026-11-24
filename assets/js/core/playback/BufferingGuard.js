@@ -256,3 +256,18 @@ export async function whenPlayerHasHeadroom(player, isCancelled = () => false) {
         await new Promise((resolve) => setTimeout(resolve, 250));
     }
 }
+
+/**
+ * Resolves once the player is not playing (paused, ended, or nothing
+ * loaded). For background reads of a remote source, which on a slow link
+ * starve playback whatever they wait for between requests. Polled;
+ * `isCancelled` ends it.
+ * @param {any} player
+ * @param {() => boolean} [isCancelled]
+ * @returns {Promise<void>}
+ */
+export async function whenPlayerIdle(player, isCancelled = () => false) {
+    while (!isCancelled() && player.isPlaying) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+}

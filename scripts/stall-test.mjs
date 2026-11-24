@@ -127,7 +127,7 @@ try {
     if (process.env.STALL_DEBUG) {
         page.on('console', (message) => {
             const text = message.text();
-            if (/Buffering|FrameSync|Audio\]|Seek|Video way/.test(text)) console.log(`    [page] ${text.slice(0, 200)}`);
+            if (/Buffering|FrameSync|Audio\]|Seek|Video way|Net:/.test(text)) console.log(`    [page] ${text.slice(0, 200)}`);
         });
     }
     await page.goto(`${origin}/player.html${process.env.STALL_DEBUG ? '?debug=1' : ''}`);
