@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "quality": "node scripts/quality-check.mjs && node scripts/architecture-check.mjs && eslint assets/js",
     "verify:libs": "bash download_libs.sh verify",
-    "typecheck": "tsc -p jsconfig.json",
+    "typecheck": "tsc -p jsconfig.json && tsc -p jsconfig.strict.json",
     "check": "npm run quality && npm run typecheck && npm run verify:libs && npm run build",
     "test": "npm run quality && npm run typecheck && npm run verify:libs && npm run build && node scripts/size-report.mjs && node scripts/run-tests.mjs",
     "clean": "rm -rf dist",
