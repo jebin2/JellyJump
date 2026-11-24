@@ -1,0 +1,186 @@
+<!-- Playlist Templates -->
+<!-- All HTML templates for the playlist component -->
+<!-- These are cloned and populated with data in Playlist.js -->
+
+<!-- Playlist Item Template -->
+<template id="playlist-item-template">
+    <div class="playlist-item" data-index="" tabindex="0" role="button">
+        <div class="playlist-thumbnail"></div>
+        <div class="playlist-info">
+            <div class="playlist-title"></div>
+            <div class="playlist-duration"></div>
+        </div>
+        <div class="playlist-actions">
+            <button class="playlist-download-btn" title="Download video" aria-label="Download">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+            </button>
+            <button class="playlist-remove-btn" title="Remove" aria-label="Remove">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-trash"></use>
+                </svg>
+            </button>
+            <button class="playlist-settings-btn" title="Edit this video" aria-label="Edit this video">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-edit"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Modal Shell Template -->
+
+<!-- Common Process Footer Template - Configurable via FooterHelper.js -->
+<template id="common-process-footer-template">
+    <div class="process-footer-container flex-between items-center w-full gap-md">
+        <!-- Status Area (Left) -->
+        <div class="process-footer-status flex-1">
+            <div class="progress-section hidden flex items-center gap-sm">
+                <div
+                    class="spinner-sm border-2 border-current border-t-transparent rounded-full w-4 h-4 animate-spin text-primary">
+                </div>
+                <span class="progress-status text-sm font-mono text-secondary">Processing...</span>
+                <span class="progress-percentage text-sm font-bold text-accent">0%</span>
+            </div>
+            <div class="error-message hidden text-danger text-sm font-bold"></div>
+            <div class="success-message hidden text-success text-sm font-bold flex items-center gap-xs">
+                <svg width="14" height="14" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-check"></use>
+                </svg>
+                <span>Added to playlist</span>
+            </div>
+        </div>
+        <!-- Action Buttons (Right) -->
+        <div class="action-buttons flex gap-sm flex-shrink-0">
+            <!-- Labelled, not icon-only: a scissors or a refresh arrow on its
+                 own left the user guessing what the button would do. -->
+            <a href="#" class="btn jellyjump-btn-small process-action-btn hidden download-btn" title="Download"
+                download>
+                <svg width="16" height="16" fill="currentColor" aria-hidden="true">
+                    <use href="assets/icons/sprite.svg#icon-download"></use>
+                </svg>
+                <span>Download</span>
+            </a>
+            <button class="btn jellyjump-btn-small process-action-btn primary-action-btn" title="">
+                <svg width="16" height="16" fill="currentColor" aria-hidden="true">
+                    <use class="action-icon-use" href=""></use>
+                </svg>
+                <span class="action-label"></span>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Conversion Footer Template -->
+
+<!-- Folder Header Template -->
+<template id="playlist-folder-header-template">
+    <div class="playlist-folder-header">
+        <div class="playlist-folder-info">
+            <span class="playlist-toggle">▶</span>
+            <span class="folder-icon">📁</span>
+            <span class="folder-name"></span>
+        </div>
+        <button class="playlist-remove-btn folder-remove-btn" title="Remove Folder" aria-label="Remove folder">
+            <svg width="16" height="16" fill="currentColor">
+                <use href="assets/icons/sprite.svg#icon-trash"></use>
+            </svg>
+        </button>
+    </div>
+</template>
+
+<!-- Empty Playlist Template -->
+<template id="playlist-empty-template">
+    <div class="playlist-placeholder">
+        <p>No videos in playlist.</p>
+    </div>
+</template>
+
+<!-- Playlist Header Controls Template -->
+<template id="playlist-header-controls-template">
+    <div class="playlist-header-main">
+        <div class="playlist-header-top">
+            <div class="playlist-title-text">Playlist</div>
+            <button class="sidebar-collapse-btn" id="sidebar-toggle-btn" aria-label="Collapse sidebar"
+                aria-expanded="true" title="Collapse sidebar (Ctrl+B)">
+                ▶
+            </button>
+        </div>
+        <div class="playlist-controls">
+            <button class="jellyjump-btn-small" id="mb-scroll-to-playing" title="Scroll to Playing">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-target"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-files" title="Add Files">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-plus"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-folder" title="Add Folder">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-folder"></use>
+                </svg>
+            </button>
+            <button class="jellyjump-btn-small" id="mb-add-url" title="Add from URL">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-link"></use>
+                </svg>
+            </button>
+            <!-- A wrench, not the sliders each playlist row uses for its own
+                 tools: two buttons that looked alike opened different menus. -->
+            <button class="jellyjump-btn-small" id="mb-tools" title="Create &amp; share" aria-label="Create and share">
+                <svg width="16" height="16" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-tool"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+    <div class="playlist-search-bar">
+        <div class="playlist-search-wrapper">
+            <svg width="14" height="14" fill="currentColor" class="search-icon">
+                <use href="assets/icons/sprite.svg#icon-search"></use>
+            </svg>
+            <input type="text" id="mb-playlist-search-input" placeholder="Search playlist..."
+                class="playlist-search-input">
+            <button class="search-clear-btn hidden" id="mb-playlist-search-clear" title="Clear Search">
+                <svg width="12" height="12" fill="currentColor">
+                    <use href="assets/icons/sprite.svg#icon-close"></use>
+                </svg>
+            </button>
+        </div>
+    </div>
+</template>
+
+<!-- Video Placeholder SVG Template -->
+<template id="video-placeholder-template">
+    <svg width="24" height="24" fill="#666">
+        <use href="assets/icons/sprite.svg#icon-video-placeholder"></use>
+    </svg>
+</template>
+
+<!-- Missing File Status Text Template -->
+<template id="missing-file-status-template">
+    <span class="mb-modal-error-text"> (Missing File)</span>
+</template>
+
+<!-- Trim Footer Template -->
+
+<!-- Resize Footer Template -->
+
+<!-- Crop Footer Template -->
+
+<!-- GIF Footer Template -->
+
+<!-- Reverse Footer Template -->
+
+<!-- Remove Background Footer Template -->
+
+<!-- Speed Menu Templates -->
+
+<!-- Watermark Footer Template -->
+
+<!-- Blur Footer Template -->
+
