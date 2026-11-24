@@ -1,0 +1,20 @@
+{
+  "//": [
+    "Strict type checking (plan L5), folder by folder: each folder listed here",
+    "is checked with strict: true on top of jsconfig.json, and so is everything",
+    "it imports. `npm run typecheck` runs both. Add a folder once it is clean."
+  ],
+  "extends": "./jsconfig.json",
+  "compilerOptions": {
+    "strict": true
+  },
+  "include": [
+    "assets/js/shared/config/**/*.js",
+    "assets/js/shared/errors/**/*.js",
+    "assets/js/shared/settings/**/*.js",
+    "assets/js/shared/platform/**/*.js",
+    "assets/js/shared/net/**/*.js",
+    "assets/js/shared/diagnostics/**/*.js",
+    "assets/js/shared/types.js"
+  ]
+}

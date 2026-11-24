@@ -162,7 +162,7 @@ export const Settings = {
      * @template {SettingName} K
      * @param {K} name
      * @param {SettingsValues[K]|null} [fallback] - returned when nothing is saved
-     * @returns {SettingsValues[K]}
+     * @returns {SettingsValues[K]|null|undefined} the saved value, else `fallback`
      */
     get(name, fallback) {
         check(name);
