@@ -1,5 +1,5 @@
 import { Toast } from '../../shared/utils/Toast.js';
-import { cyclePlayerSpeed, stepPlayerFrame } from '../../core/playback/PlaybackState.js';
+import { cyclePlayerSpeed } from '../../core/playback/PlaybackState.js';
 import { togglePlayerFullscreen } from './PlayerShell.js';
 
 /**
@@ -155,10 +155,10 @@ export class PlayerKeyboard {
             // Editor Mode Controls
             // Frame by frame, in the editor and while editing (to place a cut).
             case ',':
-                if (p.config.mode === 'editor' || editing) { e.preventDefault(); stepPlayerFrame(p, -1); }
+                if (p.config.mode === 'editor' || editing) { e.preventDefault(); p.stepFrame(-1); }
                 break;
             case '.':
-                if (p.config.mode === 'editor' || editing) { e.preventDefault(); stepPlayerFrame(p, 1); }
+                if (p.config.mode === 'editor' || editing) { e.preventDefault(); p.stepFrame(1); }
                 break;
             case 'i':
                 e.preventDefault();
