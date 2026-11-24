@@ -4,6 +4,10 @@
  * fails here, and so does a §4.1 entry the player does not have (unless it is
  * marked "(planned" in its note), so the document and the code cannot drift apart.
  *
+ * Each of them also needs a JSDoc comment ending on the line above it (a
+ * setter is covered by its getter's), and the file must stay under
+ * `// @ts-check`, so the documentation is checked as well as present (T6).
+ *
  * Read from the source rather than by importing the player, which loads
  * MediaBunny and needs a browser. Public means a method or accessor on the
  * class whose name does not start with `_`; fields set in the constructor
@@ -28,12 +32,18 @@ const check = (ok, label) => {
 
 // --- the class: methods and accessors, at the class body's indent ------------
 const body = source.slice(source.indexOf('export class CorePlayer'));
-const MEMBER = /^ {4}(?:static\s+)?(?:async\s+)?(?:get\s+|set\s+)?([A-Za-z_$][\w$]*)\s*\(/gm;
 const KEYWORDS = new Set(['constructor', 'if', 'for', 'while', 'switch', 'catch', 'return']);
 const members = new Set();
-for (const [, name] of body.matchAll(MEMBER)) {
-    if (!KEYWORDS.has(name) && !name.startsWith('_')) members.add(name);
-}
+const undocumented = new Set();
+const bodyLines = body.split('\n');
+bodyLines.forEach((line, i) => {
+    const m = line.match(/^ {4}(?:static\s+)?(?:async\s+)?(?:(get|set)\s+)?([A-Za-z_$][\w$]*)\s*\(/);
+    if (!m || KEYWORDS.has(m[2]) || m[2].startsWith('_')) return;
+    members.add(m[2]);
+    const above = bodyLines[i - 1] ?? '';
+    const coveredByGetter = m[1] === 'set' && new RegExp(`^ {4}get\\s+${m[2]}\\b`).test(above);
+    if (!above.trim().endsWith('*/') && !coveredByGetter) undocumented.add(m[2]);
+});
 const fields = new Set([...source.matchAll(/\bthis\.([A-Za-z$][\w$]*)\s*=(?!=)/g)].map(m => m[1]));
 
 // --- §4.1: the backticked names in the table's member column -----------------
@@ -69,6 +79,12 @@ check(members.size > 30 && documented.size > 30, 'both sides were read (the pars
 console.log('\nevery public method and accessor is in §4.1');
 for (const name of [...members].sort()) {
     check(documented.has(name), `${name}${documented.has(name) ? '' : ' -- add it to §4.1, or make it private'}`);
+}
+
+console.log('\nevery public member has a JSDoc comment, and the file is type-checked');
+check(source.startsWith('// @ts-check'), 'core/Player.js starts with // @ts-check');
+for (const name of [...members].sort()) {
+    check(!undocumented.has(name), `${name}${undocumented.has(name) ? ' -- add a /** … */ on the line above it' : ' is documented'}`);
 }
 
 console.log('\neverything §4.1 lists exists (or is marked planned)');

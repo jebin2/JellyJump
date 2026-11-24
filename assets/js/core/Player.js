@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Core Player Class
  * Composition root — delegates to focused sub-modules for audio, rendering,
@@ -63,6 +64,8 @@ export class CorePlayer {
         this.timing = new PlayerTiming();
         /** Fires the §4.1 events when the state they describe changes. */
         this.announce = new PlayerStateEvents(this);
+        /** The stack of temporary values (`override`), made on first use. @type {PlayerOverrides|null} */
+        this._overrides = null;
         this.container = document.getElementById(containerId);
         if (!this.container) {
             Logger.error(`Container with ID "${containerId}" not found.`);
@@ -181,8 +184,11 @@ export class CorePlayer {
     }
 
     // ─── Event emitter ───────────────────────────────────────────────────────────
+    /** Listen to an event (the §4.1 list: play, pause, timeupdate, …). @param {string} event @param {(data: any) => void} callback */
     on(event, callback) { onPlayerEvent(this, event, callback); }
+    /** Stop listening. @param {string} event @param {(data: any) => void} callback */
     off(event, callback) { offPlayerEvent(this, event, callback); }
+    /** Fire an event; the core's parts use it. @param {string} event @param {Object} [data] */
     trigger(event, data = {}) { triggerPlayerEvent(this, event, data); }
 
     // ─── UI Updates ──────────────────────────────────────────────────────────────
@@ -193,11 +199,14 @@ export class CorePlayer {
     }
     _showBezel(icon, text) { this.view?.showBezel(this, icon, text); }
 
-
     // ─── Loop ────────────────────────────────────────────────────────────────────
+    /** Set the A marker at the current position (the `[` key). */
     setLoopStart() { this.loop.setLoopStart(); }
+    /** Set the B marker at the current position (the `]` key). */
     setLoopEnd() { this.loop.setLoopEnd(); }
+    /** Clear the A-B markers, keeping the loop mode. */
     clearLoopMarkers() { this.loop.clearLoopMarkers(); }
+    /** Loop off and the markers cleared. */
     resetLoop() { this.loop.resetLoop(); }
     /**
      * Loop `mode` ('off', 'one', 'playlist'); in 'one', `start` and `end`
@@ -211,22 +220,29 @@ export class CorePlayer {
         this.announce.loop();
     }
 
-
     // ─── Subtitle / audio track helpers ─────────────────────────────────────────
+    /** Show the subtitle track with this id. @param {string|number} trackId */
     switchSubtitleTrack(trackId) { this.subtitles.switchSubtitleTrack(trackId); }
+    /** Play the file's audio track with this id. @param {string|number} trackId */
     async switchAudioTrack(trackId) { return this.subtitles.switchAudioTrack(trackId); }
+    /** Add a subtitle file (VTT or SRT) and show it. @param {string} url @param {string} [name] */
     async loadSubtitle(url, name) { return this.subtitles.loadSubtitle(url, name); }
+    /** Make subtitles from the audio, on the device. @param {Object} [opts] */
     async generateSubtitles(opts) { return this.subtitles.generateSubtitles(opts); }
 
-
     // ─── Control Bar Mode ────────────────────────────────────────────────────────
+    /** Switch the control bar between overlay and fixed (saved as the user's choice). */
     toggleControlBarMode() { this.controlBar.toggleMode(); }
     _applyControlBarMode() { this.controlBar.applyMode(); } // announces controlbarmodechange
 
     // ─── Stream helpers ──────────────────────────────────────────────────────────
+    /** Show a camera (or screen) stream instead of a file. @param {MediaStream} stream */
     async loadWebcamStream(stream) { return this.stream.loadWebcamStream(stream); }
+    /** Record what the canvas shows, with its layers. @param {Object} [options] see CanvasRecorder */
     async startCanvasRecording(options = {}) { return this.stream.startCanvasRecording(options); }
+    /** Stop recording; resolves with the recording, or null if none was running. */
     async stopCanvasRecording() { return this.stream.stopCanvasRecording(); }
+    /** Stop the camera and leave camera mode. */
     stopWebcamStreamMode() { this.stream.stopWebcamStreamMode(); }
 
     // ─── Audio ───────────────────────────────────────────────────────────────────
@@ -234,17 +250,19 @@ export class CorePlayer {
     /** Unmute what autoplay muted, now that the user has interacted. @param {string} sourceLabel for the log */
     restoreAutoplayAudio(sourceLabel) { return restorePlayerAutoplayAudio(this, sourceLabel); }
 
-
     // ─── Media Lifecycle ─────────────────────────────────────────────────────────
+    /** Stop and unload everything: the end of playback, not a step between two videos. */
     async reset() {
         // A reset is the end of playback, not a step between two videos, so
         // the kept-alive embed goes with it.
         teardownPlayerYouTube(this);
         return resetPlayer(this);
     }
+    /** Blank the picture and the bar before the next item loads. */
     resetUI() { resetPlayerUI(this); }
 
     // ─── Playback State ──────────────────────────────────────────────────────────
+    /** Play if paused, pause if playing (either direction). */
     togglePlay() {
         if (this.reverse?.active) { this.pause(); return; }
         if (this.direction === 'backward' && this.engine !== 'youtube') { this.play(); return; }
@@ -304,13 +322,17 @@ export class CorePlayer {
     /** One frame forward (1) or back (-1), paused. @param {1|-1} direction */
     stepFrame(direction) { stepPlayerFrame(this, direction); }
 
-    // ─── Load ────────────────────────────────────────────────────────────────────
+    /**
+     * Open `url` (a file's blob URL, a stream, a YouTube link); resolves when it
+     * is ready. @param {string} url @param {boolean} [autoplay] @param {string|null} [videoId]
+     * the playlist item, for saved progress @param {Array|null} [savedSubtitles]
+     */
     async load(url, autoplay = false, videoId = null, savedSubtitles = null) {
         this.timing.loadStarted();
         return loadPlayerMedia(this, url, autoplay, videoId, savedSubtitles);
     }
 
-    // ─── Play ────────────────────────────────────────────────────────────────────
+    /** Play, in the current direction. */
     async play() {
         if (this.engine === 'youtube') { this.youtube?.play(); return; }
         if (this.direction === 'backward') return this._playBackward();
@@ -330,7 +352,7 @@ export class CorePlayer {
         return result;
     }
 
-    // ─── Pause ───────────────────────────────────────────────────────────────────
+    /** Pause. `showOverlay` false: a pause that is one step of something else (a stream then leaves its loading state alone). @param {boolean} [showOverlay] */
     pause(showOverlay = true) {
         if (this.reverse?.active) {
             this.reverse.stop();
@@ -379,7 +401,9 @@ export class CorePlayer {
     }
 
     // ─── Volume / Mute ───────────────────────────────────────────────────────────
+    /** 0–1, as the user set it (see isMuted). @type {number} */
     get volume() { return this.config.volume; }
+    /** @type {boolean} */
     get isMuted() { return this.config.muted; }
 
     /**
@@ -391,9 +415,7 @@ export class CorePlayer {
         if (this.config.volume > 0) this.config.muted = false;
 
         this.stream.syncVolumeState();
-
         syncPlayerVolume(this);
-
         this.announce.volume();
         if (!bezel) return;
 
@@ -403,19 +425,19 @@ export class CorePlayer {
         this._showBezel(icon, this.config.muted ? 'Muted' : `${volumePercent}%`);
     }
 
+    /** Mute or unmute, keeping the volume. */
     toggleMute() {
         this.config.muted = !this.config.muted;
 
         this.stream.syncVolumeState();
-
         syncPlayerVolume(this);
-
         this.announce.volume();
     }
 
-    // ─── Navigation ──────────────────────────────────────────────────────────────
+    /** What Play does when nothing is loaded (the playlist picks an item). @param {() => void} callback */
     setPlayCallback(callback) { this.onPlayRequest = callback; }
 
+    /** What Previous and Next do (the playlist). @param {() => void} onPrevious @param {() => void} onNext */
     setNavigationCallbacks(onPrevious, onNext) {
         this.onPrevious = onPrevious;
         this.onNext = onNext;
@@ -488,34 +510,42 @@ export class CorePlayer {
     // The getters tolerate a missing stream: there is a window in the
     // constructor, between `this.stream = null` and the real one being built,
     // where nothing reads them today but a read would otherwise throw.
+    /** Showing a live stream or camera rather than a file (PlayerStream). @type {boolean} */
     get isStreamMode() { return this.stream?.isStreamMode; }
     set isStreamMode(value) { this.stream.isStreamMode = value; }
 
+    /** The source is live: no duration, no seeking past the edge. @type {boolean} */
     get isLive() { return this.stream?.isLive; }
     set isLive(value) { this.stream.isLive = value; }
 
     // Read-only: the stream owns its video element. A setter used to sit
     // here forwarding to a getter-only property, so calling it would throw.
+    /** The element a live stream or camera plays in. @type {HTMLVideoElement|null} */
     get streamVideo() { return this.stream?.streamVideo; }
 
+    /** Showing the camera. @type {boolean} */
     get isWebcamMode() { return this.stream?.isWebcamMode; }
     set isWebcamMode(value) { this.stream.isWebcamMode = value; }
 
-
-
-
+    /** The loaded file, read-only (from `player.media`). */
     get input() { return this.media.input; }
+    /** Its video track. */
     get videoTrack() { return this.media.videoTrack; }
+    /** Where its video frames are decoded from. */
     get videoSink() { return this.media.videoSink; }
+    /** Its audio track. */
     get audioTrack() { return this.media.audioTrack; }
+    /** Where its audio is decoded from. */
     get audioSink() { return this.media.audioSink; }
 
-    // ─── Frames (core/playback/FramePresenter.js) ─────────────────────────────────
+    /** Put one frame on the canvas, with the layers over it (FramePresenter). @param {CanvasImageSource} source @param {{clear?: boolean}} [options] */
     presentFrame(source, options) { presentPlayerFrame(this, source, options); }
+    /** Draw over every frame (a layer). @param {Function} callback */
     addRenderCallback(callback) { addPlayerRenderCallback(this, callback); }
+    /** @param {Function} callback */
     removeRenderCallback(callback) { removePlayerRenderCallback(this, callback); }
 
-    // ─── Destroy ─────────────────────────────────────────────────────────────────
+    /** Take the player apart: unload, listeners off, the view and layers removed. */
     async destroy() {
         await this.reset();
 
