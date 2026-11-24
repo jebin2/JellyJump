@@ -1,7 +1,9 @@
 # JellyJump JS Structure
 
 What each folder under `assets/js/` owns, and which folders it may import
-from. The target structure, and the steps to get there, are in
+from. How the parts work together is in
+[`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md); the target structure,
+and the steps to get there, are in
 [`docs/ARCHITECTURE_PLAN.md`](../../docs/ARCHITECTURE_PLAN.md).
 
 ## Layers

@@ -90,6 +90,9 @@ docs/             the architecture plan and decision records
 
 ## Documentation
 
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how the app is put
+  together today -- layers, the player and playlist APIs, and the path a
+  file takes when it is opened, edited and exported.
 - [`docs/ARCHITECTURE_PLAN.md`](docs/ARCHITECTURE_PLAN.md): where the
   code is going, the plan to get there, and its progress.
 - [`docs/adr/`](docs/adr/): why the big decisions were made.
