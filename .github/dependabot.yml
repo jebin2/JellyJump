@@ -10,6 +10,12 @@ updates:
     groups:
       dev-tools:
         dependency-type: development
+    ignore:
+      # TypeScript 7 is the native rewrite: it reads JSDoc types differently
+      # (`Object` becomes `object`) and fails the type check across the app.
+      # Moving to it is a piece of work of its own, not a weekly bump.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /desktop
