@@ -1,6 +1,12 @@
 // @ts-check
 import { MediaBunny, ensureDecodersFor } from './MediaBunny.js';
 
+/**
+ * The buffer played at `speed`, so its length changes with it (and its pitch).
+ * @param {AudioBuffer} buffer
+ * @param {number} speed
+ * @returns {Promise<AudioBuffer>}
+ */
 export async function stretchAudioBuffer(buffer, speed) {
     const targetFrames = Math.ceil((buffer.duration / speed) * buffer.sampleRate);
     const offlineCtx = new OfflineAudioContext(buffer.numberOfChannels, targetFrames, buffer.sampleRate);
@@ -12,6 +18,13 @@ export async function stretchAudioBuffer(buffer, speed) {
     return offlineCtx.startRendering();
 }
 
+/**
+ * Add a buffer to an output's audio source, from `outputTimestamp` on.
+ * @param {any} audioSource - a MediaBunny AudioSampleSource
+ * @param {AudioBuffer} buffer
+ * @param {number} outputTimestamp - seconds
+ * @returns {Promise<number>} where the next buffer goes
+ */
 export async function addAudioSamples(audioSource, buffer, outputTimestamp) {
     const samples = MediaBunny.AudioSample.fromAudioBuffer(buffer, outputTimestamp);
     const arr = Array.isArray(samples) ? samples : [samples];
@@ -27,7 +40,9 @@ export async function addAudioSamples(audioSource, buffer, outputTimestamp) {
  * Open a file's primary audio track through Mediabunny, which reads every
  * format the player does -- including ones Web Audio's decodeAudioData does
  * not, such as AC-3, DTS and TrueHD, or the audio inside a video file.
- * @returns {Promise<{ input: Object, track: Object, firstTimestamp: number }>}
+ * MediaBunny is vendored and not type-checked, so its objects are `any`.
+ * @param {Blob} blob
+ * @returns {Promise<{ input: any, track: any, firstTimestamp: number }>}
  * @throws {Error} with a message meant for the user
  */
 async function openAudio(blob) {

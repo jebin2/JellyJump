@@ -82,7 +82,7 @@
  * @property {number} [displayHeight]
  * @property {number} [codedWidth]
  * @property {number} [codedHeight]
- * @property {string} codec
+ * @property {string|null} codec - null when the track will not say
  * @property {number} rotation
  * @property {boolean} hasHDR
  * @property {boolean} decodable - this browser can decode it

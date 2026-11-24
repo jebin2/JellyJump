@@ -3,6 +3,11 @@ import { MediaBunny } from './MediaBunny.js';
 
 export const AUDIO_BITRATE_BPS = 128000;
 
+/**
+ * A MediaBunny Input for an address (HLS included) or a file.
+ * @param {string|Blob} source
+ * @returns {any} a MediaBunny Input
+ */
 export function createMediaBunnyInput(source) {
     if (typeof source === 'string') {
         return new MediaBunny.Input({ source: new MediaBunny.UrlSource(source), formats: [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS] });
