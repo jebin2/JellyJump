@@ -6,12 +6,17 @@
  * for exactly this case — reload once to pick up the new build instead of
  * leaving dead menus. Rate-limited so a genuinely broken deploy cannot cause
  * a reload loop.
+ *
+ * Not offline: there a chunk fails because the network is gone, not the
+ * build (a tool never opened before is not stored, plan Q4), and a reload
+ * would only lose what the user was doing. The import's own error is shown.
  */
 import { Logger } from './Logger.js';
 const LAST_RELOAD_KEY = 'jj-stale-chunk-reload-at';
 const MIN_RELOAD_INTERVAL_MS = 30_000;
 
 window.addEventListener('vite:preloadError', (event) => {
+    if (navigator.onLine === false) return;
     const last = Number(sessionStorage.getItem(LAST_RELOAD_KEY) || 0);
     if (Date.now() - last < MIN_RELOAD_INTERVAL_MS) return; // let the error propagate
 

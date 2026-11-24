@@ -22,8 +22,9 @@ Live: <https://jellyjump.voidall.com>
   app, a library other machines can browse.
 - **Encrypts** a video into an ordinary-looking carrier video that survives
   re-encoding by video platforms (see `docs/adr/0011-encryption-format.md`).
-- **Installs** as an app from the browser. It needs a connection to open;
-  working offline is planned.
+- **Installs** as an app from the browser, and works offline after a first
+  visit: the player opens and plays local files; a tool works offline once
+  it has been opened online.
 
 Long jobs (conversions, exports) run in the background, one at a time, in the
 job tray.

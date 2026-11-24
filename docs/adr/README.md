@@ -18,6 +18,7 @@ one; the old one stays, marked.
 | [0009](0009-settings-and-overrides.md) | One settings module; tools override settings temporarily | Proposed |
 | [0010](0010-no-telemetry-by-default.md) | No error telemetry; bug reports are copied by the user | Accepted |
 | [0011](0011-encryption-format.md) | The JJC4 encrypted carrier format | Accepted; reviewed (F1–F3 open) |
+| [0012](0012-offline-through-the-service-worker.md) | Offline through the service worker | Accepted |
 
 New records: copy the shape of an existing one, take the next number, and
 add it to this table in the same pull request as the change it explains.

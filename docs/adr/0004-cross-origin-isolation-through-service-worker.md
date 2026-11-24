@@ -21,5 +21,4 @@ and preview servers set the same headers (`vite.config.js`).
 
 - The first visit is not isolated until the worker is active; the page
   reloads once to pick it up.
-- The service worker is also the place an offline cache would go (plan
-  step Q4).
+- The service worker is also where the offline cache is (ADR 0012).

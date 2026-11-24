@@ -202,7 +202,8 @@ with their own `MediaProcessor` call.
   as a message, never sent anywhere (ADR 0010).
 - Diagnostics (`shared/diagnostics/`) keep the last timings (first frame,
   seek, dropped frames) and the log on the device, for a bug report.
-- The page is cross-origin isolated through a service worker (ADR 0004);
+- The page is cross-origin isolated through a service worker (ADR 0004),
+  which also keeps the player working offline (ADR 0012, `public/sw.js`);
   the content security policy and the list of outside services are in
   `shared/config/`.
 
@@ -215,4 +216,5 @@ with their own `MediaProcessor` call.
 | `player-events-test`, `smoke-test` | the events, and the real player end to end |
 | `override-test` | overrides stack and restore exactly |
 | `edit-panel-test`, `processing-test` | the edit and export flows |
+| `offline-test` | after one visit, the player opens and plays a local file with the network off |
 | `bench-test` | first frame, seek, dropped frames, memory, playlist render, against budgets |
