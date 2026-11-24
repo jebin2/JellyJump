@@ -11,7 +11,8 @@ const { Input, BlobSource, UrlSource, ALL_FORMATS, CanvasSink, EncodedPacketSink
 export class MotionDetector {
     constructor() {
         this.isDetecting = false;
-        this.progressCallback = null; // (progress: number) => void
+        /** @type {((progress: number) => void)|null} */
+        this.progressCallback = null;
         this._input = null; // Track for cleanup
     }
 
@@ -199,6 +200,11 @@ export class MotionDetector {
         this._input = null;
     }
 
+    /**
+     * @param {Uint8ClampedArray} data1
+     * @param {Uint8ClampedArray} data2
+     * @returns {number}
+     */
     _calculateFrameDifference(data1, data2) {
         if (data1.length !== data2.length) return 1.0;
         let totalDiff = 0;

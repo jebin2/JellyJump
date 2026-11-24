@@ -43,7 +43,7 @@ export async function streamLibraryInto(url, {
     setLoading(url, true);
 
     try {
-        const result = await fetchStreaming(url, (batch) => {
+        const result = await fetchStreaming(url, (/** @type {import('../types.js').NewPlaylistItem[]} */ batch) => {
             if (!batch || batch.length === 0) return;
 
             for (const item of batch) {

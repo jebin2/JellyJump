@@ -26,6 +26,8 @@ const HOSTS = new Set([
  * A start offset, which YouTube writes several ways: plain seconds (t=90) or
  * a duration (t=1m30s, t=1h2m3s). Anything unparseable is simply no offset —
  * a link that plays from the beginning beats refusing the link.
+ * @param {string|null} value
+ * @returns {number}
  */
 function parseStart(value) {
     if (!value) return 0;
@@ -81,7 +83,11 @@ export function parseYouTubeUrl(rawUrl) {
     return null;
 }
 
-/** Cheap yes/no for callers that only need to route. */
+/**
+ * Cheap yes/no for callers that only need to route.
+ * @param {string} rawUrl
+ * @returns {boolean}
+ */
 export function looksLikeYouTubeUrl(rawUrl) {
     return parseYouTubeUrl(rawUrl) !== null;
 }
@@ -94,6 +100,7 @@ export function looksLikeYouTubeUrl(rawUrl) {
  * rather than refusing to add the video.
  *
  * @returns {Promise<{title: string, thumbnail: string, author: string}>}
+ * @param {string} id
  */
 export async function fetchYouTubeInfo(id) {
     const fallback = { title: `YouTube ${id}`, thumbnail: thumbnailUrl(id), author: '' };
@@ -116,7 +123,11 @@ export async function fetchYouTubeInfo(id) {
     }
 }
 
-/** Predictable thumbnail URL, used when oEmbed cannot be reached. */
+/**
+ * Predictable thumbnail URL, used when oEmbed cannot be reached.
+ * @param {string} id
+ * @returns {string}
+ */
 export function thumbnailUrl(id) {
     return `${SERVICES.youtubeThumbnail}${id}/hqdefault.jpg`;
 }
@@ -135,6 +146,7 @@ export function thumbnailUrl(id) {
  * @param {string} [options.thumbnail]
  * @param {string} [options.path] - where it sits in the playlist tree
  * @param {Object} [options.extra]
+ * @returns {import('../types.js').NewPlaylistItem}
  */
 export function buildYouTubeItem(video, url, { title, thumbnail, path, extra } = {}) {
     const name = title || `YouTube ${video.id}`;

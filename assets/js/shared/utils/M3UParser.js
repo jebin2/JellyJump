@@ -3,6 +3,12 @@ import { fetchWithPolicy } from '../net/fetchWithPolicy.js';
 import { Logger } from "./Logger.js";
 import { SERVICES } from '../config/services.js';
 /**
+ * One #EXTINF entry's details.
+ * @typedef {{duration: number, name: string, logo: string, group: string, tvgId: string,
+ *   tvgName: string, language: string, country: string}} ChannelInfo
+ * @typedef {ChannelInfo & {url: string, id: string}} Channel
+ */
+/**
  * M3U Playlist Parser
  * Parses IPTV channel lists in M3U/M3U8 format
  */
@@ -10,10 +16,11 @@ export class M3UParser {
     /**
      * Parse M3U content
      * @param {string} content - Raw M3U file content
-     * @returns {Array<Object>} Array of channel objects
+     * @returns {Channel[]} Array of channel objects
      */
     static parse(content) {
         const lines = content.split('\n').map(l => l.trim()).filter(l => l);
+        /** @type {Channel[]} */
         const channels = [];
 
         if (!lines[0]?.toUpperCase().startsWith('#EXTM3U')) {
@@ -44,10 +51,11 @@ export class M3UParser {
      * Parse #EXTINF line
      * Format: #EXTINF:-1 tvg-id="..." tvg-name="..." tvg-logo="..." group-title="...",Channel Name
      * @param {string} line
-     * @returns {Object}
+     * @returns {ChannelInfo}
      * @private
      */
     static _parseExtInf(line) {
+        /** @type {ChannelInfo} */
         const info = {
             duration: -1,
             name: '',
@@ -66,6 +74,7 @@ export class M3UParser {
         }
 
         // Extract attributes using regex
+        /** @type {Record<string, 'tvgId'|'tvgName'|'logo'|'group'|'language'|'country'>} */
         const attrPatterns = {
             'tvg-id': 'tvgId',
             'tvg-name': 'tvgName',
@@ -109,7 +118,7 @@ export class M3UParser {
     /**
      * Fetch and parse M3U from URL
      * @param {string} url
-     * @returns {Promise<Array<Object>>}
+     * @returns {Promise<Channel[]>}
      */
     static async fetchAndParse(url) {
         const response = await fetchWithPolicy(url);
@@ -122,8 +131,8 @@ export class M3UParser {
 
     /**
      * Group channels by category
-     * @param {Array<Object>} channels
-     * @returns {Object<string, Array<Object>>}
+     * @param {Channel[]} channels
+     * @returns {Record<string, Channel[]>}
      */
     static groupByCategory(channels) {
         return channels.reduce((groups, channel) => {
@@ -133,13 +142,13 @@ export class M3UParser {
             }
             groups[group].push(channel);
             return groups;
-        }, {});
+        }, /** @type {Record<string, Channel[]>} */ ({}));
     }
 
     /**
      * Group channels by country
-     * @param {Array<Object>} channels
-     * @returns {Object<string, Array<Object>>}
+     * @param {Channel[]} channels
+     * @returns {Record<string, Channel[]>}
      */
     static groupByCountry(channels) {
         return channels.reduce((groups, channel) => {
@@ -149,14 +158,14 @@ export class M3UParser {
             }
             groups[country].push(channel);
             return groups;
-        }, {});
+        }, /** @type {Record<string, Channel[]>} */ ({}));
     }
 
     /**
      * Search channels by name
-     * @param {Array<Object>} channels
+     * @param {Channel[]} channels
      * @param {string} query
-     * @returns {Array<Object>}
+     * @returns {Channel[]}
      */
     static search(channels, query) {
         if (!query) return channels;
@@ -171,7 +180,7 @@ export class M3UParser {
 
     /**
      * Get sample IPTV playlists for testing
-     * @returns {Array<Object>}
+     * @returns {{name: string, url: string, description: string}[]}
      */
     static getSamplePlaylists() {
         return [

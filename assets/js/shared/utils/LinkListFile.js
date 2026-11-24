@@ -29,7 +29,11 @@ import { parseYouTubeUrl } from './YouTubeUrl.js';
  */
 export const LINK_LIST_EXTENSION = '.jjlist';
 
-/** The folder a list's entries are grouped under: its name without our extension. */
+/**
+ * The folder a list's entries are grouped under: its name without our extension.
+ * @param {string} filename
+ * @returns {string}
+ */
 export function linkListFolderName(filename) {
     return filename.replace(new RegExp(`\\${LINK_LIST_EXTENSION}$`, 'i'), '');
 }
@@ -75,6 +79,7 @@ export function parseLinkListFile(text) {
  *
  * Split on the last " : " rather than the first, so a name containing a colon
  * survives. A line with no separator is all URL and has no name.
+ * @param {string} line
  */
 function splitNameAndUrl(line) {
     const at = line.lastIndexOf(' : ');

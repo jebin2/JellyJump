@@ -10,6 +10,8 @@ import { ElectronHelper } from '../platform/ElectronHelper.js';
 // Shared IndexedDB instance for caching remote blobs
 const _dbService = new StorageService();
 
+/** @typedef {import('../types.js').PlaylistItem} PlaylistItem */
+
 /**
  * Media Metadata Service
  * Handles extraction and processing of video/audio metadata using MediaBunny
@@ -17,7 +19,7 @@ const _dbService = new StorageService();
 export class MediaMetadata {
     /**
      * Process metadata for multiple items (batch processing)
-     * @param {Array} items - Playlist items to process
+     * @param {PlaylistItem[]} items - Playlist items to process
      * @param {Function} onUpdate - Callback when item metadata updates (item, callback)
      * @param {Function} onSave - Callback to save state after processing
      * @returns {Promise<void>}
@@ -47,7 +49,7 @@ export class MediaMetadata {
 
     /**
      * Check if item is already cached in IndexedDB
-     * @param {Object} item 
+     * @param {PlaylistItem} item 
      * @returns {Promise<Blob|null>}
      */
     static async checkCache(item) {
@@ -67,7 +69,7 @@ export class MediaMetadata {
 
     /**
      * Cache a remote URL in the background
-     * @param {Object} item 
+     * @param {PlaylistItem} item 
      * @param {Function} [onSave] 
      */
     static async cacheInBackground(item, onSave) {
@@ -112,7 +114,7 @@ export class MediaMetadata {
      * For remote URLs: downloads, saves to IndexedDB, then releases from memory
      * For local files: loads from IndexedDB on-demand if not in memory
      * For Electron: reads directly from disk using localPath
-     * @param {Object} item - Playlist item  
+     * @param {PlaylistItem} item - Playlist item  
      * @param {Function} [onSave] - Optional callback to save state after caching
      * @returns {Promise<Blob>} Source blob
      */
@@ -178,6 +180,11 @@ export class MediaMetadata {
         throw new AppError('FILE_MISSING', { message: 'No source available for item', context: { title: item?.title } });
     }
 
+    /**
+     * @param {PlaylistItem} item
+     * @param {Function} [onSave]
+     * @returns {Promise<string>}
+     */
     static async getProcessedSourceURL(item, onSave) {
         if (item.blob_url && item.blob_url.startsWith('blob:')) {
             return item.blob_url;
@@ -191,7 +198,7 @@ export class MediaMetadata {
 
     /**
      * Ensure metadata exists on item (lazy load if missing)
-     * @param {Object} item - Playlist item
+     * @param {PlaylistItem} item - Playlist item
      * @param {Function} onSave - Callback to save state after fetching
      * @returns {Promise<void>}
      */
@@ -206,17 +213,22 @@ export class MediaMetadata {
      * whole file to make a blob of it -- 992 MB for one episode, just to read
      * its codecs, while the player was streaming the same file.
      *
-     * @param {Object} item
+     * @param {PlaylistItem} item
      * @param {Function} [onSave]
      * @returns {Promise<string>} a URL the reader can open
      */
     static async sourceForReading(item, onSave) {
-        if (!item.blob_url?.startsWith('blob:') && /^https?:/i.test(item.url || '')) {
-            return item.url;
+        const url = item.url || '';
+        if (!item.blob_url?.startsWith('blob:') && /^https?:/i.test(url)) {
+            return url;
         }
         return MediaMetadata.getProcessedSourceURL(item, onSave);
     }
 
+    /**
+     * @param {PlaylistItem} item
+     * @param {Function} [onSave]
+     */
     static async ensureMetadata(item, onSave) {
         // Already cached
         if (item.videoInfo || item.audioInfo) {
@@ -239,11 +251,11 @@ export class MediaMetadata {
 
             if (onSave) onSave();
         } catch (e) {
-            Logger.warn('[MediaMetadata] Failed to extract metadata for', item.title, ':', e.message);
+            Logger.warn('[MediaMetadata] Failed to extract metadata for', item.title, ':', /** @type {Error} */ (e).message);
             if (!item.duration || item.duration === 'Loading...') {
                 item.duration = '--:--';
             }
-            item._metadataError = e.message;
+            item._metadataError = /** @type {Error} */ (e).message;
         }
     }
 

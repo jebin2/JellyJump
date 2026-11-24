@@ -16,6 +16,7 @@
     "assets/js/shared/net/**/*.js",
     "assets/js/shared/diagnostics/**/*.js",
     "assets/js/shared/media/**/*.js",
+    "assets/js/shared/services/**/*.js",
     "assets/js/shared/types.js"
   ]
 }

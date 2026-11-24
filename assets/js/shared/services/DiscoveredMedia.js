@@ -28,7 +28,7 @@ export class DiscoveredMedia {
         return MediaScanner.isSupported();
     }
 
-    /** @returns {Array} discovered files, newest-modified first */
+    /** @returns {any[]} discovered files, newest-modified first */
     get items() {
         return [...this._byPath.values()].sort((a, b) => b.mtime - a.mtime);
     }
@@ -47,6 +47,7 @@ export class DiscoveredMedia {
 
     /**
      * Subscribe to changes. Fires on every batch and once when a scan ends.
+     * @param {(event: Object) => void} listener
      * @returns {Function} unsubscribe
      */
     subscribe(listener) {
@@ -54,6 +55,9 @@ export class DiscoveredMedia {
         return () => this._listeners.delete(listener);
     }
 
+    /**
+     * @param {Object} event
+     */
     _emit(event) {
         for (const listener of this._listeners) {
             try {
@@ -74,7 +78,7 @@ export class DiscoveredMedia {
 
         await this._scanner.scan({
             ...options,
-            onBatch: (files) => {
+            onBatch: (/** @type {any[]} */ files) => {
                 for (const file of files) {
                     this._byPath.set(file.path, file);
                 }
@@ -83,20 +87,20 @@ export class DiscoveredMedia {
                 // scan, and consumers only need what just arrived.
                 this._emit({ type: 'batch', files, added: files.length, total: this._byPath.size });
             },
-            onLinkList: (file) => {
+            onLinkList: (/** @type {any} */ file) => {
                 // Its own event, not a batch: a link list is a playlist to
                 // expand, not a file that was found.
                 this._emit({ type: 'linklist', file });
             },
-            onPhase: (phase) => {
+            onPhase: (/** @type {string} */ phase) => {
                 this._phase = phase;
                 this._emit({ type: 'phase', phase, total: this._byPath.size });
             },
-            onDone: (summary) => {
+            onDone: (/** @type {Object} */ summary) => {
                 this._lastSummary = summary;
                 this._emit({ type: 'done', summary, total: this._byPath.size });
             },
-            onError: (error) => {
+            onError: (/** @type {Error} */ error) => {
                 this._emit({ type: 'error', error });
             },
         });

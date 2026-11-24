@@ -11,20 +11,8 @@ export const PLAYLIST_MARKER = `${DB_NAME}-playlist`;
  * Handles persistence of playlist, files, and player state using IndexedDB.
  * Allows storing large binary data (Blobs) which localStorage cannot handle.
  * 
- * Playlist Item Schema:
- * @typedef {Object} PlaylistItem
- * @property {string} id - Unique identifier (UUID)
- * @property {string} title - Display title (filename)
- * @property {string} duration - Formatted duration ("mm:ss" or "hh:mm:ss")
- * @property {string} thumbnail - Thumbnail URL or empty string
- * @property {boolean} isLocal - True if item is a local file (not remote stream)
- * @property {string} [path] - Filename/relative path
- * @property {string} [url] - Remote URL for streaming, or empty for local files
- * @property {string} [localPath] - Absolute filesystem path (Electron only, for disk access)
- * @property {string} [mimeType] - MIME type (e.g., "video/mp4")
- * @property {string} [fileType] - Same as mimeType (for compatibility)
- * @property {number} [fileSize] - File size in bytes
- * @property {number} [originalIndex] - Original position in playlist (for shuffle)
+ * Playlist items are saved as they are; their shape is `PlaylistItem` in
+ * shared/types.js.
  */
 /**
  * Whether a playlist has ever been saved on this device (a marker kept beside
@@ -39,6 +27,12 @@ export function hasSavedPlaylist() {
     }
 }
 
+/** @typedef {import('../types.js').PlaylistItem} PlaylistItem */
+/**
+ * Runs inside a transaction and settles the operation's promise itself.
+ * @typedef {(transaction: IDBTransaction, resolve: (value?: any) => void, reject: (reason?: any) => void) => void} TransactionExecutor
+ */
+
 export class IndexedDBService {
     constructor() {
         this.DB_NAME = DB_NAME;
@@ -48,6 +42,7 @@ export class IndexedDBService {
             FILES: 'files',
             STATE: 'state'
         };
+        /** @type {IDBDatabase|null} */
         this.db = null;
         this.initPromise = this._init();
     }
@@ -117,8 +112,8 @@ export class IndexedDBService {
      * Execute a transaction with automatic retry on InvalidStateError
      * @param {string[]} stores - Store names for transaction
      * @param {IDBTransactionMode} mode - 'readonly' or 'readwrite'
-     * @param {Function} executor - Function receiving (transaction) to execute operations
-     * @returns {Promise} Result from executor
+     * @param {TransactionExecutor} executor - runs the operations, and resolves or rejects
+     * @returns {Promise<any>} what the executor resolved with
      * @private
      */
     async _withTransaction(stores, mode, executor) {
@@ -126,11 +121,12 @@ export class IndexedDBService {
 
         return new Promise((resolve, reject) => {
             try {
-                const transaction = this.db.transaction(stores, mode);
+                // _ensureConnection has opened it.
+                const transaction = /** @type {IDBDatabase} */ (this.db).transaction(stores, mode);
                 executor(transaction, resolve, reject);
             } catch (e) {
                 // Handle InvalidStateError when connection is closing
-                if (e.name === 'InvalidStateError') {
+                if (/** @type {{name?: string}} */ (e)?.name === 'InvalidStateError') {
                     Logger.warn('[IndexedDB] Connection was closing, reinitializing and retrying...');
                     this.db = null;
                     this.initPromise = this._init();
@@ -149,10 +145,7 @@ export class IndexedDBService {
 
     /**
      * Save playlist items and their files
-     * @param {Array} items 
-     */
-    /**
-     * @param {Array} items
+     * @param {PlaylistItem[]} items
      * @param {{withFiles?: boolean}} [options] - withFiles: false saves the
      *   list alone, when storage is too full for the files (PlaylistStorage)
      */
@@ -239,7 +232,7 @@ export class IndexedDBService {
 
     /**
      * Load playlist (metadata only, no files)
-     * @returns {Promise<Array>}
+     * @returns {Promise<PlaylistItem[]>}
      */
     async loadPlaylist() {
         return this._withTransaction([this.STORES.PLAYLIST], 'readonly', (transaction, resolve, reject) => {
@@ -248,7 +241,7 @@ export class IndexedDBService {
 
             itemsRequest.onsuccess = () => {
                 const storedItems = itemsRequest.result;
-                const restoredItems = storedItems.map(item => {
+                const restoredItems = storedItems.map((/** @type {PlaylistItem} */ item) => {
                     const restored = { ...item };
                     if (restored.isLocal) {
                         // Local file: Don't load file yet. Set as null.

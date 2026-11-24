@@ -38,14 +38,14 @@ export class DesktopMediaScanner {
         if (this._scanning) return;
         this._scanning = true;
 
-        const finish = (summary) => {
+        const finish = (/** @type {Object} */ summary) => {
             this._scanning = false;
             this._unsubscribe?.();
             this._unsubscribe = null;
             onDone?.(summary);
         };
 
-        this._unsubscribe = desktopBridge().onMediaScanEvent((event) => {
+        this._unsubscribe = desktopBridge().onMediaScanEvent((/** @type {any} */ event) => {
             switch (event?.type) {
                 case 'started':
                     Logger.log(`[Scanner] Scanning ${event.roots.length} folder(s)`);
