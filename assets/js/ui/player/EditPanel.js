@@ -1,3 +1,4 @@
+// @ts-check
 import { ITEM_SELECTED_EVENT } from './PlaylistPlayback.js';
 import { Settings } from '../../shared/settings/Settings.js';
 import { Logger } from '../../shared/utils/Logger.js';
@@ -9,6 +10,17 @@ import { itemToolSections } from '../menus/features/ItemToolsMenu.js';
 import { JobQueue } from '../../shared/services/JobQueue.js';
 import { StorageService } from '../../shared/services/StorageService.js';
 import { html, trusted } from '../../shared/utils/html.js';
+
+/** @typedef {import('../../shared/types.js').PlaylistItem} PlaylistItem */
+/** @typedef {import('../../shared/types.js').Job} Job */
+/** @typedef {import('../../shared/types.js').EditHistoryRecord} EditHistoryRecord */
+/**
+ * The edits made to `original`: each step's result, with its file kept for
+ * Undo (the playlist lets go of the file of an item it moves away from;
+ * after a reload it is read back from storage), and the edit being applied.
+ * @typedef {{original: PlaylistItem, steps: Array<{item: PlaylistItem, file: File|null, name: string}>,
+ *   pending: {job: Job, name: string, action: string, named?: boolean}|null}} EditSession
+ */
 
 /**
  * EditPanel - editing a video in the sidebar, with the main player as preview.
@@ -137,29 +149,22 @@ export class EditPanel {
     constructor(playlist, section, before = null) {
         this.playlist = playlist;
         this.section = section;
-        /** @type {Object|null} the item being edited */
+        /** @type {PlaylistItem|null} the item being edited */
         this.item = null;
         /** @type {PanelSurface|null} the open tool */
         this.surface = null;
-        /**
-         * The edits made to `original`: each step's result, with its file
-         * kept for Undo (the playlist lets go of the file of an item it moves
-         * away from; after a reload it is read back from storage), and the
-         * edit being applied.
-         * @type {{original: Object, steps: Array<{item: Object, file: File|null, name: string}>,
-         *   pending: {job: Object, name: string, action: string, named?: boolean}|null}|null}
-         */
+        /** @type {EditSession|null} the edits to the item being edited */
         this.session = null;
         /**
          * Sessions to go back to, by the id of the copy they made last.
-         * @type {Map<string, Object>}
+         * @type {Map<string, EditSession>}
          */
         this.histories = new Map();
         /**
          * Sessions left while an edit was being applied, by the id of the
          * video it was applied to: opened again, the panel waits for it
          * again and takes its result, rather than starting afresh.
-         * @type {Map<string, Object>}
+         * @type {Map<string, EditSession>}
          */
         this.waiting = new Map();
         this._historiesLoaded = false;
@@ -199,19 +204,19 @@ export class EditPanel {
         `);
         section.insertBefore(this.el, before);
 
-        this.backBtn = this.el.querySelector('.edit-panel-back');
+        this.backBtn = /** @type {HTMLButtonElement} */ (this.el.querySelector('.edit-panel-back'));
         this.backLabel = this.el.querySelector('.edit-panel-back-label');
         this.titleEl = this.el.querySelector('.edit-panel-title');
-        this.itemEl = this.el.querySelector('.edit-panel-item');
-        this.toolsEl = this.el.querySelector('.edit-panel-tools');
+        this.itemEl = /** @type {HTMLElement} */ (this.el.querySelector('.edit-panel-item'));
+        this.toolsEl = /** @type {HTMLElement} */ (this.el.querySelector('.edit-panel-tools'));
         this.noteEl = this.el.querySelector('.edit-panel-note');
         this.historyEl = this.el.querySelector('.edit-panel-history');
-        this.stepsEl = this.el.querySelector('.edit-panel-steps');
-        this.undoBtn = this.el.querySelector('.edit-panel-undo');
-        this.resetBtn = this.el.querySelector('.edit-panel-reset');
+        this.stepsEl = /** @type {HTMLElement} */ (this.el.querySelector('.edit-panel-steps'));
+        this.undoBtn = /** @type {HTMLButtonElement} */ (this.el.querySelector('.edit-panel-undo'));
+        this.resetBtn = /** @type {HTMLButtonElement} */ (this.el.querySelector('.edit-panel-reset'));
         this.busyEl = this.el.querySelector('.edit-panel-busy');
         this.busyText = this.el.querySelector('.edit-panel-busy-text');
-        this.busyBar = this.el.querySelector('.edit-panel-busy-bar > div');
+        this.busyBar = /** @type {HTMLElement} */ (this.el.querySelector('.edit-panel-busy-bar > div'));
 
         this.backBtn.addEventListener('click', () => this.back());
         this.confirmEl = this.el.querySelector('.edit-panel-confirm');
@@ -312,7 +317,7 @@ export class EditPanel {
         const { sections, limited } = itemToolSections(this.item);
         const grid = renderToolGrid(sections, { columns: limited ? 3 : 4 });
         grid.addEventListener('click', (e) => {
-            const tile = e.target.closest('.tools-tile');
+            const tile = /** @type {HTMLElement|null} */ (/** @type {Element} */ (e.target).closest('.tools-tile'));
             if (tile) this._openTool(tile.dataset.action);
         });
         this.toolsEl.replaceChildren(grid);
@@ -642,6 +647,7 @@ export class EditPanel {
     }
 
     _saveHistories() {
+        /** @type {Record<string, EditHistoryRecord>} */
         const stored = {};
         for (const [id, session] of this.histories) {
             stored[id] = {
@@ -708,7 +714,7 @@ export class EditPanel {
             steps > 1 ? `Discard all ${steps} edits?` : 'Discard the edit?';
         this.confirmEl.classList.toggle('hidden', !asking);
         for (const el of [this.stepsEl, this.undoBtn, this.resetBtn]) el.classList.toggle('hidden', asking);
-        if (asking) this.confirmEl.querySelector('.edit-panel-confirm-no').focus({ preventScroll: true });
+        if (asking) /** @type {HTMLElement} */ (this.confirmEl.querySelector('.edit-panel-confirm-no')).focus({ preventScroll: true });
     }
 
     /**

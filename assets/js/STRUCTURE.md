@@ -59,7 +59,9 @@ One folder per operation (`trim/`, `speed/`, `merge/`, `transcode/`,
 - `settings/`: the user's saved preferences (`Settings`); the only place
   that writes them. A tool that needs a value for a while uses the
   player's `override()` (`core/PlayerOverrides.js`) instead.
-
+- `types.js`: types only — the playlist item, the job, the edit panel's
+  saved history and each setting's value, used by the playlist, the jobs,
+  the edit panel and `Settings`. A new field on items is added here.
 - `utils/`: stateless helpers — `Logger`, `html` (escaping), `mediaUtils`,
   `MediaMetadata`, parsers, `Toast`, `ConfirmDialog`.
 - `services/`: stateful services — storage (`IndexedDBService`,
