@@ -217,6 +217,6 @@ with their own `MediaProcessor` call.
 | `player-events-test`, `smoke-test` | the events, and the real player end to end |
 | `override-test` | overrides stack and restore exactly |
 | `edit-panel-test`, `processing-test` | the edit and export flows |
-| `stall-test` | a source slower than the video: the player waits for data and skips nothing, before and after a seek |
+| `stall-test`, `buffering-guard-test` | a source slower than the video: the player waits for data and skips nothing, before and after a seek; when it holds the clock and lets go; background reads of a remote file wait for a real pause |
 | `offline-test` | after one visit, the player opens and plays a local file with the network off |
 | `bench-test` | first frame, seek, dropped frames, memory, playlist render, against budgets |
