@@ -17,9 +17,13 @@ export function cancelledError() {
     return new DOMException('The operation was cancelled.', 'AbortError');
 }
 
-/** @returns {boolean} whether this error means the user cancelled */
+/**
+ * @param {unknown} error
+ * @returns {boolean} whether this error means the user cancelled
+ */
 export function isCancellation(error) {
-    return error?.name === 'AbortError' || error?.name === 'ConversionCanceledError';
+    const name = /** @type {{name?: string}|null|undefined} */ (error)?.name;
+    return name === 'AbortError' || name === 'ConversionCanceledError';
 }
 
 /**
@@ -34,7 +38,7 @@ export function throwIfCancelled(signal) {
 /**
  * Run `execute` on a Mediabunny Conversion, cancelling it if the signal fires.
  *
- * @param {Object} conversion - a Mediabunny Conversion
+ * @param {{execute: (options?: Object) => Promise<void>, cancel: () => Promise<void>}} conversion - a Mediabunny Conversion
  * @param {AbortSignal} [signal]
  * @param {Object} [executeOptions] - passed through to execute()
  */
@@ -66,10 +70,11 @@ export async function executeConversion(conversion, signal, executeOptions) {
  *
  * @param {(value: number, info?: Object) => void} [onProgress]
  * @param {AbortSignal} [signal]
+ * @returns {((value: number, info?: Object) => void)|undefined}
  */
 export function cancellableProgress(onProgress, signal) {
     if (!signal) return onProgress;
-    return (value, info) => {
+    return (/** @type {number} */ value, /** @type {Object|undefined} */ info) => {
         throwIfCancelled(signal);
         onProgress?.(value, info);
     };
@@ -78,7 +83,7 @@ export function cancellableProgress(onProgress, signal) {
 /**
  * Release an Output a job did not finish, so its encoders and writer are
  * closed now rather than whenever it is collected.
- * @param {Object|null} output - a Mediabunny Output
+ * @param {{state: string, cancel: () => Promise<void>}|null} output - a Mediabunny Output
  */
 export async function cancelUnfinished(output) {
     if (output && (output.state === 'pending' || output.state === 'started')) {

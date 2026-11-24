@@ -51,7 +51,7 @@ export class ElectronHelper {
     /**
      * Open native file dialog
      * @param {Object} options - Dialog options
-     * @returns {Promise<{success: boolean, files?: Array, canceled?: boolean, error?: string}>}
+     * @returns {Promise<{success: boolean, files?: string[], canceled?: boolean, error?: string}>}
      */
     static async openFileDialog(options = {}) {
         if (!this.isElectron()) {
@@ -72,6 +72,6 @@ export class ElectronHelper {
             Logger.error('[ElectronHelper] Failed to read file:', result.error);
             return null;
         }
-        return new Blob([result.buffer], { type: mimeType });
+        return new Blob([/** @type {ArrayBuffer} */ (result.buffer)], { type: mimeType });
     }
 }
