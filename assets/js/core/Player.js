@@ -155,6 +155,8 @@ export class CorePlayer {
         this.onNext = null;
         this.onPrevious = null;
         this.onEnded = null;
+        /** Told when the item playing cannot be read (the playlist marks it broken). @type {((videoId: string, error: string) => void)|null} */
+        this.onStreamError = null;
 
         this.currentVideoId = null;
         this.sourceUrl = null;

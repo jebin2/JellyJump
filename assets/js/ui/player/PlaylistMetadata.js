@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from '../../shared/utils/Logger.js';
 import { Toast } from '../../shared/utils/Toast.js';
 import { formatTime } from '../../shared/utils/mediaUtils.js';

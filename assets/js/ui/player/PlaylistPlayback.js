@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from '../../shared/utils/Logger.js';
 import { unlockIfEncrypted } from './EncryptedPlayback.js';
 import { classifyPlaylistItem } from './PlaylistItemKind.js';
@@ -48,14 +49,12 @@ export const PlaylistPlayback = {
                 ConfirmDialog.alert({
                     title: 'No Video Selected',
                     message: 'Please select a video from the playlist to play.',
-                    confirmText: 'OK',
                     icon: '📺'
                 });
             } else if (this.items.length === 0) {
                 ConfirmDialog.alert({
                     title: 'Playlist Empty',
                     message: 'Add videos to the playlist using the upload button or paste a URL.',
-                    confirmText: 'OK',
                     icon: '📂'
                 });
             }
@@ -221,6 +220,11 @@ export const PlaylistPlayback = {
         return true;
     },
 
+    /**
+     * Play item `index`: get its source and load it into the player, showing
+     * the spinner meanwhile. A file that has gone missing is removed and the
+     * next one played. @param {number} index @param {boolean} [autoplay]
+     */
     async selectItem(index, autoplay = true) {
         if (index < 0 || index >= this.items.length) return;
 
