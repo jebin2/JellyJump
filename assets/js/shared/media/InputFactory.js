@@ -1,3 +1,4 @@
+// @ts-check
 import { MediaBunny } from './MediaBunny.js';
 
 export const AUDIO_BITRATE_BPS = 128000;

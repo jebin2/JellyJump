@@ -134,6 +134,14 @@ if (playerLines > PLAYER_MAX_LINES) {
     failures.push(`${PLAYER_FILE} is ${playerLines} lines; keep it under ${PLAYER_MAX_LINES} by putting behaviour in a module beside it (ARCHITECTURE_PLAN.md H4)`);
 }
 
+// L2: everything in shared/ is type-checked, and stays so.
+for (const file of files) {
+    const r = rel(file);
+    if (r.startsWith('shared/') && !(await readFile(file, 'utf8')).startsWith('// @ts-check')) {
+        failures.push(`${r} does not start with // @ts-check; every file in shared/ is type-checked (ARCHITECTURE_PLAN.md L2)`);
+    }
+}
+
 const known = new Set(baseline.wrongWayImports);
 for (const imp of wrongWay) {
     if (!known.has(imp)) failures.push(`new wrong-way import: ${imp} (see ARCHITECTURE_PLAN.md §3.1)`);

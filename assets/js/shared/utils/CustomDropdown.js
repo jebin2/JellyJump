@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * CustomDropdown - Reusable themed dropdown menu utility
  * Creates a div-based dropdown matching the application's design system
@@ -6,13 +7,14 @@ export class CustomDropdown {
     /**
      * Initialize a custom dropdown
      * @param {Object} options
-     * @param {HTMLElement} options.button - The button element that triggers the dropdown
+     * @param {HTMLButtonElement} options.button - The button element that triggers the dropdown
      * @param {HTMLElement} options.menu - The dropdown menu element
      * @param {Function} options.onChange - Callback when selection changes, receives (value: string, label: string)
      * @param {string} [options.initialValue] - Initial selected value
      * @returns {Object} Controller object
      */
     static init({ button, menu, onChange, initialValue }) {
+        /** @type {NodeListOf<HTMLElement>} */
         const menuItems = menu.querySelectorAll('.jellyjump-menu-item');
         let currentValue = initialValue;
 
@@ -137,7 +139,7 @@ export class CustomDropdown {
 
             // Accessibility: handle Enter/Space
             menuItem.setAttribute('tabindex', '0');
-            menuItem.addEventListener('keydown', (e) => {
+            menuItem.addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     menuItem.click();

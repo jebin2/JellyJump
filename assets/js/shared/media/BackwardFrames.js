@@ -1,3 +1,4 @@
+// @ts-check
 import { MediaBunny } from './MediaBunny.js';
 
 /**
@@ -56,7 +57,9 @@ export class BackwardFrameReader {
     constructor(videoTrack, { decoderOptions, maxFrames = MAX_HELD_FRAMES, toHeld = null } = {}) {
         this.toHeld = toHeld;
         this.track = videoTrack;
+        /** @type {any} vendored MediaBunny, not type-checked */
         this.sink = new MediaBunny.VideoSampleSink(videoTrack, decoderOptions);
+        /** @type {any} */
         this.packets = new MediaBunny.EncodedPacketSink(videoTrack);
         const frameBytes = Math.max(1, (videoTrack.codedWidth || 1920) * (videoTrack.codedHeight || 1080) * 1.5);
         this.capacity = Math.max(4, Math.min(maxFrames, Math.floor(MAX_HELD_BYTES / frameBytes)));

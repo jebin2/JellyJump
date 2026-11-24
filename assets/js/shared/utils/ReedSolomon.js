@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Systematic Reed–Solomon erasure code over GF(256).
  *

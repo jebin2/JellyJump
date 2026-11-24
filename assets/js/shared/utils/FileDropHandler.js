@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * File Drop Handler
  * Reusable drag & drop file handler for any container element
@@ -87,7 +88,7 @@ export class FileDropHandler {
 
     /**
      * Recursively scan a FileSystemEntry (handles folders)
-     * @param {FileSystemEntry} entry
+     * @param {any} entry - a FileSystemFileEntry or FileSystemDirectoryEntry
      * @returns {Promise<Array<File>>}
      * @static
      */

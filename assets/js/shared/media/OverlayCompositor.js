@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * OverlayCompositor - one definition of "the picture, with everything on it".
  *
@@ -17,7 +18,7 @@
  */
 
 /**
- * @param {CanvasRenderingContext2D} ctx - destination
+ * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} ctx - destination
  * @param {CanvasImageSource} source - the frame to draw
  * @param {number} width
  * @param {number} height
@@ -50,6 +51,7 @@ export function composeFrame(ctx, source, width, height, {
  * colour gets baked into the pixels -- so counting it here would make a plain
  * filtered video bake itself for no reason, at full cost on every frame.
  */
+/** @param {{ stickers?: any, decorations?: any }} [layers] */
 export function hasOverlays({ stickers, decorations } = {}) {
     return !!(stickers?.stickers?.length > 0 || decorations?.isActive?.());
 }

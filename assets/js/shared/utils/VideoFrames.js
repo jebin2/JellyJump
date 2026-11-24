@@ -1,3 +1,4 @@
+// @ts-check
 import { AnimatedImage, decodePlan } from './AnimatedImage.js';
 
 /**
@@ -70,7 +71,9 @@ export async function decodeVideoSticker(blob, frameWidth) {
         // Every frame's timestamp, read from the packets without decoding
         // anything. Sorted, because packets come in decode order.
         const stamps = [];
-        for await (const packet of new MediaBunny.EncodedPacketSink(track).packets(undefined, undefined, { metadataOnly: true })) {
+        /** @type {any} vendored MediaBunny, not type-checked */
+        const packetSink = new MediaBunny.EncodedPacketSink(track);
+        for await (const packet of packetSink.packets(undefined, undefined, { metadataOnly: true })) {
             stamps.push(packet.timestamp);
         }
         stamps.sort((a, b) => a - b);

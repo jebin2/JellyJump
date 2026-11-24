@@ -1,3 +1,4 @@
+// @ts-check
 import { MediaBunny, ensureDecodersFor } from './MediaBunny.js';
 
 export async function stretchAudioBuffer(buffer, speed) {

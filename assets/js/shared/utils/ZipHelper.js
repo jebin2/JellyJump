@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Minimal stored-ZIP builder (DEFLATE method 0 — no compression).
  * Suitable for packaging HLS segments which are already compressed video data.
@@ -83,6 +84,9 @@ export class ZipHelper {
 
         return new Blob(parts, { type: 'application/zip' });
     }
+
+    /** @type {Uint32Array|null} CRC-32 lookup table, built on first use */
+    static _table = null;
 
     static _crc32(data) {
         if (!ZipHelper._table) {

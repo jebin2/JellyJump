@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from './Logger.js';
 
 /**

@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from '../utils/Logger.js';
 import { desktopBridge } from '../platform/Platform.js';
 
@@ -27,6 +28,8 @@ export class DesktopMediaScanner {
      * Start a scan.
      * @param {Object} handlers
      * @param {Function} [handlers.onBatch] - called with an array of file records
+     * @param {Function} [handlers.onLinkList] - called with a link-list file found by the scan
+     * @param {Function} [handlers.onPhase] - called as the scan moves between phases
      * @param {Function} [handlers.onDone] - called with { found, scanned, cancelled, elapsedMs }
      * @param {Function} [handlers.onError] - called with an Error
      * @param {string[]} [handlers.roots] - defaults to the platform's media folders

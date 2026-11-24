@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * After a deploy, pages that were loaded (or HTTP-cached) before it still
  * reference the previous build's hashed chunks, so lazy imports 404 with

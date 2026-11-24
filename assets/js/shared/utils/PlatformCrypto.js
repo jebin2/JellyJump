@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * PlatformCrypto — JJC4 format
  *
@@ -96,6 +97,7 @@ export class PlatformCrypto {
      * @param {string}   [options.hint]
      * @param {Function} [options.onProgress]  (0..1)
      * @param {AbortSignal} [options.signal]
+     * @param {any} [options.fileHandle] - a FileSystemFileHandle; required above the in-memory limit
      * @returns {Promise<Blob>}
      */
     static async encrypt(blob, password, options = {}) {
@@ -294,6 +296,7 @@ export class PlatformCrypto {
         // timestamp and silently returns the previous frame, losing ⅓ of all
         // shards. Each frame self-identifies via its header, so decoding
         // needs no timing assumptions at all.
+        /** @type {any} vendored MediaBunny, not type-checked */
         const videoSink = new MediaBunny.VideoSampleSink(videoTrack);
         for await (const sample of videoSink.samples()) {
             const decoded = await decodeSample(sample);
@@ -474,7 +477,9 @@ export class PlatformCrypto {
 
             const decodeSample = PlatformCrypto._makeFrameDecoder();
             let seen = 0;
-            for await (const sample of new MediaBunny.VideoSampleSink(videoTracks[0]).samples()) {
+            /** @type {any} vendored MediaBunny, not type-checked */
+            const sink = new MediaBunny.VideoSampleSink(videoTracks[0]);
+            for await (const sample of sink.samples()) {
                 const decoded = await decodeSample(sample);
                 sample.close();
                 if (decoded && decoded.valid) return true;

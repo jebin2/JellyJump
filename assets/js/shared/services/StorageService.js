@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * StorageService
  * Auto-detecting storage wrapper.

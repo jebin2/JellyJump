@@ -37,6 +37,8 @@ The rules, checked on every pull request by `npm run quality`
    are written only in `shared/config/services.js`.
 4. `core/Player.js` stays under 600 lines: new behaviour goes in a module
    beside it.
+5. Every file in `shared/` starts with `// @ts-check` (`npm run typecheck`
+   checks those files).
 
 ## The player
 
@@ -206,7 +208,7 @@ with their own `MediaProcessor` call.
 
 | Test | Holds |
 |---|---|
-| `architecture-check` | the layer rules, the private-call counts, the `Player.js` size |
+| `architecture-check` | the layer rules, the private-call counts, the `Player.js` size, `shared/` type-checked |
 | `player-api-test`, `playlist-api-test` | the player's and the playlist's public members match §4.1 and §4.2, each documented, in type-checked files |
 | `player-events-test`, `smoke-test` | the events, and the real player end to end |
 | `override-test` | overrides stack and restore exactly |

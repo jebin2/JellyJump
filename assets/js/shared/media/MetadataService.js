@@ -1,3 +1,4 @@
+// @ts-check
 import { Logger } from '../utils/Logger.js';
 import { MediaBunny, ensureDecodersFor, codecOf } from './MediaBunny.js';
 import { createMediaBunnyInput } from './InputFactory.js';
@@ -48,6 +49,7 @@ export async function getMetadata(source) {
     try {
         const { video, audio } = await getTrackDetails(input);
 
+        /** @type {any} */
         let videoInfo = null;
         let audioInfo = null;
         let duration = 0;

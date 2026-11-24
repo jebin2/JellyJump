@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * MediaScanner
  * Auto-detecting media scanner, mirroring the StorageService junction.

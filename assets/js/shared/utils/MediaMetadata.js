@@ -1,3 +1,4 @@
+// @ts-check
 import { AppError } from '../errors/AppError.js';
 import { Logger } from "./Logger.js";
 import '../media/MediaBunny.js'; // registers the codec plugins

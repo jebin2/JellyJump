@@ -1,3 +1,4 @@
+// @ts-check
 import { fetchWithPolicy } from '../net/fetchWithPolicy.js';
 import { Logger } from "./Logger.js";
 import { SERVICES } from '../config/services.js';

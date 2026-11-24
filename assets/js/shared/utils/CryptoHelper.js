@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * CryptoHelper — shared AES-256-CTR + HMAC-SHA256 + PBKDF2 primitives.
  *
@@ -31,7 +32,7 @@ export class CryptoHelper {
         );
 
         const bits = await crypto.subtle.deriveBits(
-            { name: 'PBKDF2', salt, iterations: CryptoHelper.PBKDF2_ITERATIONS, hash: 'SHA-256' },
+            { name: 'PBKDF2', salt: /** @type {BufferSource} */ (salt), iterations: CryptoHelper.PBKDF2_ITERATIONS, hash: 'SHA-256' },
             keyMaterial,
             512
         );
@@ -64,7 +65,7 @@ export class CryptoHelper {
 
         const zeros = new Uint8Array(size + remainder);
         const keystreamBuf = await crypto.subtle.encrypt(
-            { name: 'AES-CTR', counter, length: 32 },
+            { name: 'AES-CTR', counter: /** @type {BufferSource} */ (counter), length: 32 },
             key,
             zeros
         );
