@@ -1,5 +1,5 @@
 import { Toast } from '../../shared/utils/Toast.js';
-import { cyclePlayerSpeed, stepPlayerFrame, requestPlayerSeek } from '../../core/playback/PlaybackState.js';
+import { cyclePlayerSpeed, stepPlayerFrame } from '../../core/playback/PlaybackState.js';
 import { togglePlayerFullscreen } from './PlayerShell.js';
 
 /**
@@ -41,7 +41,7 @@ export class PlayerKeyboard {
                 p.restoreAutoplayAudio('Keyboard play');
                 p.togglePlay();
                 break;
-            // The four relative-seek keys go through requestPlayerSeek rather
+            // The four relative-seek keys go through requestSeek rather
             // than seek: these are the ones people hold down, and the OS repeats
             // them far faster than a seek can complete.
             case 'j':
@@ -52,7 +52,7 @@ export class PlayerKeyboard {
                         if (result?.reason) Toast.show(result.reason, 3500);
                     });
                 }
-                else requestPlayerSeek(p, p.currentTime - 10);
+                else p.requestSeek(p.currentTime - 10);
                 break;
             case 'l':
                 if (e.shiftKey) {
@@ -60,16 +60,16 @@ export class PlayerKeyboard {
                     p.clearLoopMarkers();
                 } else {
                     e.preventDefault();
-                    requestPlayerSeek(p, p.currentTime + 10);
+                    p.requestSeek(p.currentTime + 10);
                 }
                 break;
             case 'arrowleft':
                 e.preventDefault();
-                requestPlayerSeek(p, p.currentTime - 5);
+                p.requestSeek(p.currentTime - 5);
                 break;
             case 'arrowright':
                 e.preventDefault();
-                requestPlayerSeek(p, p.currentTime + 5);
+                p.requestSeek(p.currentTime + 5);
                 break;
             case 'home':
                 e.preventDefault();

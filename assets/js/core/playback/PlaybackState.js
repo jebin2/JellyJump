@@ -1,6 +1,11 @@
 import { saveProgress, loadProgress } from '../../shared/settings/Progress.js';
 import { Logger } from '../../shared/utils/Logger.js';
+import { startPlayerVideoIterator } from './VideoIterator.js';
 
+/** Players whose tab was hidden while they played, to resync on return. @type {WeakSet<object>} */
+const hiddenWhilePlaying = new WeakSet();
+/** The document listeners a scrub added, per player, for its end. @type {WeakMap<object, {move: EventListener, end: EventListener}>} */
+const scrubHandlers = new WeakMap();
 
 export function getPlayerPlaybackTime(player) {
     if (player.isStreamMode && player.streamVideo) {
@@ -26,14 +31,14 @@ export async function handlePlayerVisibilityChange(player) {
     if (!player.isPlaying) return;
 
     if (document.hidden) {
-        player._wasHiddenWhilePlaying = true;
+        hiddenWhilePlaying.add(player);
         Logger.log(`[Visibility] Tab hidden at playback time: ${getPlayerPlaybackTime(player).toFixed(2)}s`);
-    } else if (player._wasHiddenWhilePlaying) {
+    } else if (hiddenWhilePlaying.has(player)) {
         if (!player.isLive) {
             player.setLoading(true);
             const currentTime = getPlayerPlaybackTime(player);
             Logger.log(`[Visibility] Tab visible, syncing VOD video to: ${currentTime.toFixed(2)}s`);
-            await player._startVideoIterator();
+            await startPlayerVideoIterator(player);
             player.setLoading(false);
         } else {
             // For LIVE streams, we don't restart the loop or jump to the edge.
@@ -42,7 +47,7 @@ export async function handlePlayerVisibilityChange(player) {
             Logger.log('[Visibility] Tab visible, allowing Live loop to catch up naturally');
         }
 
-        player._wasHiddenWhilePlaying = false;
+        hiddenWhilePlaying.delete(player);
     }
 }
 
@@ -82,7 +87,7 @@ export function stepPlayerFrame(player, direction) {
     // reason the relative-seek keys do. _requestSeek also moves currentTime
     // synchronously, so each repeat steps from the position the last one asked
     // for rather than from whatever has finished decoding.
-    player._requestSeek(player.currentTime + (direction * frameDuration));
+    requestPlayerSeek(player, player.currentTime + (direction * frameDuration));
 }
 
 /**
@@ -99,7 +104,7 @@ export function stepPlayerFrame(player, direction) {
 export function completePlayerMedia(player) {
     // 'one' means repeat this item, so the end is not an end at all.
     if (player.loopMode === 'one') {
-        player._seekTo(0);
+        player.seek(0);
         return;
     }
 
@@ -112,7 +117,7 @@ export function completePlayerMedia(player) {
 }
 
 export async function seekPlayerTo(player, time) {
-    Logger.log(`[Seek] _seekTo time=${time.toFixed(3)}, vodAnchorWall=${player.vodAnchor.wall?.toFixed(3)}, vodAnchorContent=${player.vodAnchor.content?.toFixed(3)}, playbackTime=${getPlayerPlaybackTime(player).toFixed(3)}`);
+    Logger.log(`[Seek] seek time=${time.toFixed(3)}, vodAnchorWall=${player.vodAnchor.wall?.toFixed(3)}, vodAnchorContent=${player.vodAnchor.content?.toFixed(3)}, playbackTime=${getPlayerPlaybackTime(player).toFixed(3)}`);
 
     player.setLoading(true);
 
@@ -140,7 +145,7 @@ export async function seekPlayerTo(player, time) {
     player.vodAnchor.clear();
 
     try {
-        await player._startVideoIterator();
+        await startPlayerVideoIterator(player);
     } finally {
         player.setLoading(false);
     }
@@ -156,7 +161,7 @@ export async function seekPlayerTo(player, time) {
     if (wasPlaying && landedAtEnd) {
         // Anything still queued belongs to the item being left, not to whatever
         // the playlist moves on to.
-        player._pendingSeekTime = null;
+        player.seekQueue.pending = null;
         completePlayerMedia(player);
         return;
     }
@@ -169,7 +174,7 @@ export async function seekPlayerTo(player, time) {
 /**
  * Seek to a position that may be superseded before it lands.
  *
- * Every _seekTo tears down and rebuilds the video iterator — a decoder spin-up
+ * Every seek tears down and rebuilds the video iterator — a decoder spin-up
  * from the nearest key frame — which takes far longer than the gap between
  * repeat events from a held arrow key or a dragged scrub bar. Firing one per
  * event floods the pipeline with concurrent decoders and, worse, leaves a
@@ -187,21 +192,21 @@ export function requestPlayerSeek(player, time) {
     // the position would sit still for the whole hold and then jump — and each
     // repeat would measure its step from a stale currentTime, so holding the
     // key would crawl instead of scanning.
-    player._pendingSeekTime = target;
+    player.seekQueue.pending = target;
     player.currentTime = target;
     player.announce.progress();
 
-    if (player._seekLoopActive) return;
-    player._seekLoopActive = true;
+    if (player.seekQueue.active) return;
+    player.seekQueue.active = true;
     (async () => {
         try {
-            while (player._pendingSeekTime != null) {
-                const next = player._pendingSeekTime;
-                player._pendingSeekTime = null;
-                await player._seekTo(next);
+            while (player.seekQueue.pending != null) {
+                const next = player.seekQueue.pending;
+                player.seekQueue.pending = null;
+                await player.seek(next);
             }
         } finally {
-            player._seekLoopActive = false;
+            player.seekQueue.active = false;
         }
     })();
 }
@@ -215,7 +220,7 @@ export function playerSeek(player, e) {
     // click while the canvas can keep a frame decoded for an earlier one, so
     // the picture disagrees with the position it reports. Coalescing makes the
     // newest click the only one that paints.
-    player._requestSeek(pos * player.duration);
+    requestPlayerSeek(player, pos * player.duration);
 }
 
 export function playerScrubStart(player, e) {
@@ -234,11 +239,13 @@ export function playerScrubStart(player, e) {
 
     playerSeek(player, e);
 
-    player._scrubMoveHandler = (e) => playerScrubMove(player, e);
-    player._scrubEndHandler = (e) => playerScrubEnd(player, e);
-
-    document.addEventListener('mousemove', player._scrubMoveHandler);
-    document.addEventListener('mouseup', player._scrubEndHandler);
+    const handlers = {
+        move: (/** @type {MouseEvent} */ e) => playerScrubMove(player, e),
+        end: (/** @type {MouseEvent} */ e) => playerScrubEnd(player, e),
+    };
+    scrubHandlers.set(player, handlers);
+    document.addEventListener('mousemove', handlers.move);
+    document.addEventListener('mouseup', handlers.end);
 }
 
 export function playerScrubMove(player, e) {
@@ -254,8 +261,12 @@ export function playerScrubEnd(player, e) {
     if (!player.isScrubbing) return;
 
     player.isScrubbing = false;
-    document.removeEventListener('mousemove', player._scrubMoveHandler);
-    document.removeEventListener('mouseup', player._scrubEndHandler);
+    const handlers = scrubHandlers.get(player);
+    scrubHandlers.delete(player);
+    if (handlers) {
+        document.removeEventListener('mousemove', handlers.move);
+        document.removeEventListener('mouseup', handlers.end);
+    }
 
     if (player.scrubWasPlaying) player.play();
 }

@@ -1,5 +1,11 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { getPlayerPlaybackTime, completePlayerMedia } from './PlaybackState.js';
+import { startPlayerVideoIterator } from './VideoIterator.js';
+
+/** Frames drawn since the media loaded, per player, for a sync log every 60. @type {WeakMap<object, number>} */
+const frameSyncLogCount = new WeakMap();
+/** Start the sync log's count again (a new media). @param {object} player */
+export function resetPlayerFrameSyncLog(player) { frameSyncLogCount.set(player, 0); }
 
 // How long to leave a closed queue alone before trying to open it again, and
 // how many times to bother. Spaced out because the usual reason a rebuild gave
@@ -18,23 +24,23 @@ const REOPEN_ATTEMPTS = 3;
  * stops rather than retrying for ever behind a source that is simply gone.
  */
 function _reopenClosedQueue(player) {
-    if (player._reopenTimer || !player.isPlaying || player.isLive) return;
-    if ((player._reopenAttempts ?? 0) >= REOPEN_ATTEMPTS) return;
-    player._reopenAttempts = (player._reopenAttempts ?? 0) + 1;
+    if (player.frameReopen.timer || !player.isPlaying || player.isLive) return;
+    if (player.frameReopen.attempts >= REOPEN_ATTEMPTS) return;
+    player.frameReopen.attempts = player.frameReopen.attempts + 1;
     Logger.warn(`[FrameSync] The frame queue is closed while playing — reopening `
-        + `(attempt ${player._reopenAttempts}/${REOPEN_ATTEMPTS})`);
+        + `(attempt ${player.frameReopen.attempts}/${REOPEN_ATTEMPTS})`);
     // player.reopenDelayMs overrides the wait, which is how the suite exercises
     // this inside a two-second fixture.
-    player._reopenTimer = setTimeout(() => {
-        player._reopenTimer = null;
-        if (!player.frames.isOpen && player.isPlaying) player._startVideoIterator();
+    player.frameReopen.timer = setTimeout(() => {
+        player.frameReopen.timer = null;
+        if (!player.frames.isOpen && player.isPlaying) startPlayerVideoIterator(player);
     }, player.reopenDelayMs ?? REOPEN_DELAY_MS);
 }
 
 export async function updatePlayerNextFrame(player) {
     if (player.frames.isFetching || !player.frames.isOpen) return;
     // Pumping again, so a later closure starts counting from scratch.
-    player._reopenAttempts = 0;
+    player.frameReopen.attempts = 0;
     
     const epoch = player.epoch.current;
     const currentIterator = player.frames.iterator;
@@ -100,7 +106,7 @@ export async function updatePlayerNextFrame(player) {
             if (e?.name === 'QuotaExceededError' || e?.message?.includes('Codec reclaimed')) {
                 Logger.warn('[FrameSync] Codec reclaimed, restarting video iterator:', e);
                 player.frames.discard();
-                player._startVideoIterator();
+                startPlayerVideoIterator(player);
             } else {
                 Logger.error('[FrameSync] Iterator error:', e);
             }
@@ -118,12 +124,12 @@ export function startPlayerRenderLoop(player) {
             const playbackTime = getPlayerPlaybackTime(player);
             player.currentTime = playbackTime;
 
-            if (player._frameSyncLogCount === undefined) player._frameSyncLogCount = 0;
-            player._frameSyncLogCount++;
-            if (player._frameSyncLogCount % 60 === 0 && player.vodAnchor.isAnchored && !player.isLive) {
+            const frameSyncCount = (frameSyncLogCount.get(player) ?? 0) + 1;
+            frameSyncLogCount.set(player, frameSyncCount);
+            if (frameSyncCount % 60 === 0 && player.vodAnchor.isAnchored && !player.isLive) {
                 const nextTs = player.frames.pending?.timestamp;
                 const drift = nextTs !== undefined ? ((nextTs - playbackTime) * 1000).toFixed(0) : 'n/a';
-                Logger.log(`[FrameSync] frame=${player._frameSyncLogCount}, playback=${playbackTime.toFixed(3)}, nextFrameTs=${nextTs?.toFixed(3) ?? 'none'}, drift=${drift}ms, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}`);
+                Logger.log(`[FrameSync] frame=${frameSyncCount}, playback=${playbackTime.toFixed(3)}, nextFrameTs=${nextTs?.toFixed(3) ?? 'none'}, drift=${drift}ms, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}`);
             }
 
             player.trigger('timeupdate', { currentTime: player.currentTime });
@@ -131,7 +137,7 @@ export function startPlayerRenderLoop(player) {
             if (!player.isLive && player.duration > 0 && playbackTime >= player.duration) {
                 // Same completion a seek to the end goes through, so both ways
                 // of arriving there behave identically. It stops the loop
-                // either way: pause() for a real end, _seekTo for loop-one.
+                // either way: pause() for a real end, seek for loop-one.
                 completePlayerMedia(player);
                 return;
             }
@@ -139,8 +145,8 @@ export function startPlayerRenderLoop(player) {
             // Loop A-B: jump back to start marker when reaching the end marker
             if (!player.isLive && player.loopMode === 'one' && player.loopStart !== null && player.loopEnd !== null) {
                 if (playbackTime >= player.loopEnd) {
-                    player._seekTo(player.loopStart);
-                    return; // _seekTo resumes playback and restarts this loop
+                    player.seek(player.loopStart);
+                    return; // seek resumes playback and restarts this loop
                 }
             }
 
@@ -160,11 +166,11 @@ export function startPlayerRenderLoop(player) {
                     updatePlayerNextFrame(player);
                 } else if (!player.isLive && player.frames.pending.timestamp > playbackTime + 1.0) {
                     // Insane drift: video is way ahead of audio (VOD only).
-                    if (player._frameSyncLogCount % 60 === 0) {
+                    if (frameSyncCount % 60 === 0) {
                         Logger.warn(`[FrameSync] Video way ahead of audio (pending=${player.frames.pending.timestamp.toFixed(3)}, playback=${playbackTime.toFixed(3)}). Re-seeking video iterator.`);
                     }
                     player.frames.clearPending();
-                    player._startVideoIterator();
+                    startPlayerVideoIterator(player);
                 }
             }
 

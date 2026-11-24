@@ -95,7 +95,7 @@ const out=await page.evaluate(async (url)=>{
       const d=x.getImageData(0,0,c.width,c.height).data;
       let h=0,lit=0; for(let i=0;i<d.length;i+=97){h=(h*31+d[i])>>>0; if(d[i]!==0)lit++;} return {h,lit}; };
     // make sure the source is definitely playing, then sample both together
-    await p._seekTo(1).catch(()=>{});
+    await p.seek(1).catch(()=>{});
     await p.play().catch(()=>{});
     await sleep(800);
     const samples=[];

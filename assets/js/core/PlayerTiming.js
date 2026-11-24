@@ -4,7 +4,7 @@
  * from load() to the first frame on screen, from a seek to the frame at the
  * new position, and how many frames playback had to skip for being late.
  *
- * Fed from three places only: Player.load and Player._seekTo start a timing,
+ * Fed from three places only: Player.load and Player.seek start a timing,
  * Player.presentFrame ends it, and the render loop reports each late frame
  * it skips. It reads nothing from the player and changes nothing.
  */

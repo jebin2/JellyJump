@@ -248,7 +248,7 @@ const paused = isLiveSource ? null : await (async () => {
   await hostPage.evaluate(async () => {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const p = window.player;
-    await p._seekTo(0.8).catch(() => {});
+    await p.seek(0.8).catch(() => {});
     await sleep(500);
     p.pause();
     await sleep(400);

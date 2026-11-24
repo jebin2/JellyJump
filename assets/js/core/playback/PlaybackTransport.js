@@ -4,6 +4,10 @@ import { startPlayerAudioVisualizer, initPlayerAudio, suspendPlayerAudioContext,
 import { startPlayerRenderLoop } from './RenderLoop.js';
 import { savePlayerPlaybackState } from './PlaybackState.js';
 import { getPlayerPlaybackTime } from './PlaybackState.js';
+import { startPlayerVideoIterator } from './VideoIterator.js';
+
+/** When each player last paused (performance.now()), to spot a long pause. @type {WeakMap<object, number>} */
+const pausedAtWall = new WeakMap();
 
 export async function playPlayer(player) {
     player.stream.onPlay();
@@ -95,12 +99,13 @@ export async function playPlayer(player) {
     // WITHOUT awaiting return() — a wedged async generator queues return()
     // behind the stuck next(), which would hang this whole play() call — and
     // let the restart below spin up a fresh decoder at the same position.
-    const pausedForSec = player._pausedAtWall ? (performance.now() - player._pausedAtWall) / 1000 : 0;
+    const pausedAt = pausedAtWall.get(player);
+    const pausedForSec = pausedAt ? (performance.now() - pausedAt) / 1000 : 0;
     if (pausedForSec > 10 && player.frames.isOpen && !player.isLive) {
         Logger.log(`[Play] Resuming after ${pausedForSec.toFixed(0)}s pause — restarting video iterator (decoder may be reclaimed)`);
         player.frames.abandon();
     }
-    player._pausedAtWall = null;
+    pausedAtWall.delete(player);
 
     // Anchored before anything asks the clock, not after.
     //
@@ -136,9 +141,9 @@ export async function playPlayer(player) {
         // it when repositioning; this branch is a reposition that did not.
         player.fallbackStartTime = performance.now();
         player.vodAnchor.clear();
-        await player._startVideoIterator();
+        await startPlayerVideoIterator(player);
     } else if (!player.frames.isOpen) {
-        await player._startVideoIterator();
+        await startPlayerVideoIterator(player);
     }
 
     if (player.audioSink) {
@@ -194,7 +199,7 @@ export function pausePlayer(player, showOverlay = true) {
         player.playbackTimeAtStart = calculatedTime;
     }
     player.isPlaying = false;
-    player._pausedAtWall = performance.now();
+    pausedAtWall.set(player, performance.now());
     player.controlBar?.clearAutoHideTimer();
 
     player.announce.playState();
@@ -245,7 +250,7 @@ export async function setPlayerPlaybackRate(player, rate, { persist = true } = {
     player.announce.rate();
 
     if (wasPlaying) {
-        await player._seekTo(currentPosition);
+        await player.seek(currentPosition);
         await player.play();
     }
 }

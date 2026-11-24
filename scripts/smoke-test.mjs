@@ -211,7 +211,7 @@ async function run(page, origin) {
             let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) >>> 0;
             return h;
         };
-        const at = async t => { await p._seekTo(t); await sleep(400); return hash(); };
+        const at = async t => { await p.seek(t); await sleep(400); return hash(); };
         const a = await at(0.4), b = await at(1.6), again = await at(0.4);
         await p.play().catch(() => {});
         await sleep(600);
@@ -285,9 +285,9 @@ async function run(page, origin) {
         const results = [];
         await p.play().catch(() => {}); await sleep(500); results.push(agrees());
         p.pause(); await sleep(300); results.push(agrees());
-        await p._seekTo(0.4).catch(() => {}); await sleep(450); results.push(agrees());
+        await p.seek(0.4).catch(() => {}); await sleep(450); results.push(agrees());
         await p.play().catch(() => {}); await sleep(450); results.push(agrees());
-        await p._seekTo(1.9).catch(() => {}); await sleep(300);
+        await p.seek(1.9).catch(() => {}); await sleep(300);
         await p.play().catch(() => {}); await sleep(1500); results.push(agrees());
         p.pause();
         return results;
@@ -338,17 +338,17 @@ async function run(page, origin) {
         for (const [n, f] of listeners) p.on(n, f);
         await p.play().catch(() => {}); await sleep(400);
         p.pause(); await sleep(200);
-        await p._seekTo(0.5).catch(() => {}); await sleep(400);
+        await p.seek(0.5).catch(() => {}); await sleep(400);
         const volumeBefore = p.volume;
         p.setVolume(0.3); await sleep(50);
         p.setVolume(volumeBefore); await sleep(50);
         await p.setPlaybackRate(1.5, { persist: false }); await sleep(50);
         const speedShown = p.ui.speedBtn?.textContent;
         await p.setPlaybackRate(1, { persist: false }); await sleep(50);
-        await p._seekTo(1.0).catch(() => {}); await sleep(400);
+        await p.seek(1.0).catch(() => {}); await sleep(400);
         const timeShown = p.ui.timeDisplay?.textContent;
         const barShown = parseFloat(p.ui.progressBar?.style.width);
-        p.setLoopStart(); await p._seekTo(1.2).catch(() => {}); await sleep(300);
+        p.setLoopStart(); await p.seek(1.2).catch(() => {}); await sleep(300);
         p.setLoopEnd(); p.clearLoopMarkers(); await sleep(50);
         p.toggleControlBarMode(); p.toggleControlBarMode(); await sleep(50);
         for (const [n, f] of listeners) p.off(n, f);
@@ -419,7 +419,7 @@ async function run(page, origin) {
         const colourOnly = p.videoFilters.canvasMode;
         const s = p.stickers.addEmoji('x');
         s.x = 0.05; s.y = 0.05; s.w = 0.3;
-        await p._seekTo(0.4); await sleep(350);
+        await p.seek(0.4); await sleep(350);
         const withSticker = p.videoFilters.canvasMode;
         let shot = false;
         try { await p.screenshotManager.capture(); await sleep(350);
@@ -450,7 +450,7 @@ async function run(page, origin) {
         // play again WITHOUT seeking. Seeking first is what used to hide this:
         // it sets the position itself, so the stale clock was never read.
         // Pressing play on a finished video is the path a person takes.
-        await p._seekTo(1.0).catch(() => {});
+        await p.seek(1.0).catch(() => {});
         await sleep(300);
         p.play().catch(() => {});
         // Wait for it to start before waiting for it to stop: play() is async,
@@ -476,7 +476,7 @@ async function run(page, origin) {
         // dropped it, so only the seek's own frames were ever drawn.
         const previousLoop = p.loopMode;
         p.loopMode = 'one';
-        await p._seekTo(0).catch(() => {});
+        await p.seek(0).catch(() => {});
         p.play().catch(() => {});
         await sleep(5000);          // three loop boundaries on a 2s file
         draws = 0;
@@ -519,7 +519,7 @@ async function run(page, origin) {
         const paint = p.presentFrame.bind(p);
         p.presentFrame = (...args) => { draws++; return paint(...args); };
 
-        await p._seekTo(p.duration - 1.5).catch(() => {});
+        await p.seek(p.duration - 1.5).catch(() => {});
         await sleep(300);
         p.play().catch(() => {});
         for (let i = 0; i < 40 && !p.isPlaying; i++) await sleep(50);
@@ -575,7 +575,7 @@ async function run(page, origin) {
         // observed never to begin producing once drawing resumed -- the viewer
         // decoded one frame in two and a half seconds while the host's clock
         // advanced normally.
-        await p._seekTo(0.2).catch(() => {});
+        await p.seek(0.2).catch(() => {});
         await p.play().catch(() => {});
         await sleep(600);
         const opened = p.broadcast.open({ fps: 15 });
