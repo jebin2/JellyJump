@@ -3,7 +3,7 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
 import { StreamDetector } from '../../shared/utils/StreamDetector.js';
 import { loadPlayerYouTube, teardownPlayerYouTube } from '../youtube/YouTubePlayback.js';
-import { closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, closePlayerAudioContext, stopPlayerQueuedAudio, suspendPlayerAudioContext } from '../audio/AudioEngine.js';
+import { closePlayerAudioBufferIterator, closePlayerAudioBufferIteratorSoon, closePlayerAudioContext, stopPlayerQueuedAudio, suspendPlayerAudioContext, syncPlayerVolume } from '../audio/AudioEngine.js';
 import { loadPlayerPlaybackState } from './PlaybackState.js';
 import { getPlayerPlaybackTime } from './PlaybackState.js';
 
@@ -604,7 +604,7 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
             // The AudioContext/gainNode survive across loads, so the flag
             // alone doesn't silence anything - sync the gain or the icon
             // shows muted while audio keeps playing.
-            player._syncAudioGain();
+            syncPlayerVolume(player);
             // Mark as auto-muted so the first user interaction restores
             // audio instead of leaving the video silent until a manual
             // unmute. Skipped when the user muted deliberately (guard

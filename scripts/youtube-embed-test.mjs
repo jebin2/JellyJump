@@ -147,12 +147,10 @@ async function makePlayer({ restorePlayerAutoplayAudio, syncYouTubeAudio }) {
         stream: { wasMutedForAutoplay: false },
         announce: { volume() { }, progress() { }, playState() { }, loading() { } },
         setLoading() { },
-        _completeMedia() { },
         trigger() { },
         // The real player funnels volume changes to whichever engine is
         // playing; a no-op here would mean the unmute never reached the embed
         // and the test would be grading itself.
-        _syncAudioGain() { syncYouTubeAudio(player); },
         restoreAutoplayAudio(label) { return restorePlayerAutoplayAudio(player, label); },
     };
     return player;
@@ -336,7 +334,7 @@ check('a deliberate mute is left alone', async () => {
     await loadPlayerYouTube(player, { id: 'first', start: 0 }, true);
     await wait(600);
 
-    assert.equal(player._youtubeWantsSound, false, 'their choice is not overridden');
+    assert.equal(modules.youtubeWantsSound(player), false, 'their choice is not overridden');
     assert.equal(created[0].muted, true);
     assert.equal(player.config.muted, true);
 });

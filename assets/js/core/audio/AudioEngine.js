@@ -1,6 +1,7 @@
 import { AudioEqualizer } from './AudioEqualizer.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { getPlayerPlaybackTime } from '../playback/PlaybackState.js';
+import { syncYouTubeAudio } from '../youtube/YouTubePlayback.js';
 
 
 export async function initPlayerAudio(player) {
@@ -59,6 +60,16 @@ export async function startPlayerAudioVisualizer(player) {
     }
 }
 
+/**
+ * Apply the volume and mute to whichever engine is playing. Every volume and
+ * mute change funnels through here, so this is the one place the YouTube
+ * embed needs telling.
+ */
+export function syncPlayerVolume(player) {
+    if (player.engine === 'youtube') return syncYouTubeAudio(player);
+    return syncPlayerAudioGain(player);
+}
+
 export function syncPlayerAudioGain(player) {
     if (!player.gainNode) return;
     player.gainNode.gain.value = player.config.muted ? 0 : player.config.volume;
@@ -107,7 +118,7 @@ export function restorePlayerAutoplayAudio(player, sourceLabel) {
     player.config.muted = false;
     // Through the player's own funnel, so whichever engine is playing is the
     // one that hears about it.
-    player._syncAudioGain();
+    syncPlayerVolume(player);
     player.stream.wasMutedForAutoplay = false;
     player.announce.volume();
     return true;
