@@ -3,6 +3,10 @@ import { Logger } from '../utils/Logger.js';
 import { MediaBunny, ensureDecodersFor, codecOf } from './MediaBunny.js';
 import { createMediaBunnyInput } from './InputFactory.js';
 
+/**
+ * Every track's details, read once.
+ * @param {any} input - a MediaBunny Input (vendored, not type-checked)
+ */
 async function getTrackDetails(input) {
     const videoTracks = await input.getVideoTracks();
     const audioTracks = await input.getAudioTracks();
@@ -12,8 +16,8 @@ async function getTrackDetails(input) {
     // DTS or TrueHD track the player would go on to play perfectly well.
     await ensureDecodersFor(audioTracks);
 
-    const formatTrackInfo = async (tracks) => {
-        return Promise.all(tracks.map(async (track) => {
+    const formatTrackInfo = async (/** @type {any[]} */ tracks) => {
+        return Promise.all(tracks.map(async (/** @type {any} */ track) => {
             const duration = await track.computeDuration();
             const codecString = await track.getCodecParameterString();
             return {
@@ -43,6 +47,10 @@ async function getTrackDetails(input) {
     };
 }
 
+/**
+ * A file's or address's duration, tracks, and video and audio details.
+ * @param {string|Blob} source
+ */
 export async function getMetadata(source) {
     const input = createMediaBunnyInput(source);
 
@@ -59,7 +67,8 @@ export async function getMetadata(source) {
             const videoTrack = videoTrackInfo._track;
             duration = videoTrackInfo.duration;
 
-            videoInfo = {
+            /** @type {import('../types.js').VideoInfo} */
+            const info = {
                 width: videoTrackInfo.width,
                 height: videoTrackInfo.height,
                 displayWidth: videoTrack.displayWidth,
@@ -84,13 +93,14 @@ export async function getMetadata(source) {
 
             try {
                 const stats = await videoTrack.computePacketStats(50);
-                videoInfo.fps = Math.round(stats.averagePacketRate);
-                videoInfo.bitrate = stats.averageBitrate;
+                info.fps = Math.round(stats.averagePacketRate);
+                info.bitrate = stats.averageBitrate;
             } catch (e) {
                 Logger.warn('Failed to compute packet stats:', e);
-                videoInfo.fps = 0;
-                videoInfo.bitrate = 0;
+                info.fps = 0;
+                info.bitrate = 0;
             }
+            videoInfo = info;
         }
 
         if (audio && audio.length > 0) {
@@ -120,6 +130,11 @@ export async function getMetadata(source) {
     }
 }
 
+/**
+ * Frame rate and bitrate of a file's video, from its first `count` packets.
+ * @param {Blob} source
+ * @param {number} [count]
+ */
 export async function getVideoStats(source, count = 50) {
     const blobSource = new MediaBunny.BlobSource(source);
     const input = new MediaBunny.Input({ source: blobSource, formats: MediaBunny.ALL_FORMATS });

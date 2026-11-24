@@ -22,10 +22,10 @@
  * @param {CanvasImageSource} source - the frame to draw
  * @param {number} width
  * @param {number} height
- * @param {Object} options
- * @param {Object} [options.filters] - VideoFilters
- * @param {Object} [options.stickers] - StickerLayer
- * @param {Object} [options.decorations] - DecorationLayer
+ * @param {Object} [options]
+ * @param {any} [options.filters] - VideoFilters (ui/, not imported here)
+ * @param {any} [options.stickers] - StickerLayer
+ * @param {any} [options.decorations] - DecorationLayer
  * @param {number} [options.timeMs] - the moment this frame belongs to
  * @param {boolean} [options.bakeColour] - false when the colour is already in
  *   the source pixels, as it is on the camera's canvas
@@ -64,25 +64,29 @@ export function hasOverlays({ stickers, decorations } = {}) {
  * because `ctx.filter` reads while it writes and a canvas drawn onto itself
  * through a filter is not defined to give the right answer.
  *
+ * @param {{ filters?: any, stickers?: any, decorations?: any }} layers
  * @returns {(canvas: HTMLCanvasElement|OffscreenCanvas, timeMs: number) => void}
  */
 export function buildOverlayStage({ filters, stickers, decorations }) {
+    /** @type {HTMLCanvasElement|null} */
     let scratch = null;
+    /** @type {CanvasRenderingContext2D|null} */
     let scratchCtx = null;
 
     return (canvas, timeMs) => {
         const { width, height } = canvas;
-        if (!scratch || scratch.width !== width || scratch.height !== height) {
+        if (!scratch || !scratchCtx || scratch.width !== width || scratch.height !== height) {
             scratch = document.createElement('canvas');
             scratch.width = width;
             scratch.height = height;
-            scratchCtx = scratch.getContext('2d');
+            // A 2D context is always there for a canvas that has no other kind.
+            scratchCtx = /** @type {CanvasRenderingContext2D} */ (scratch.getContext('2d'));
         }
 
         scratchCtx.clearRect(0, 0, width, height);
         scratchCtx.drawImage(canvas, 0, 0);
 
-        const ctx = canvas.getContext('2d');
+        const ctx = /** @type {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} */ (canvas.getContext('2d'));
         ctx.clearRect(0, 0, width, height);
         composeFrame(ctx, scratch, width, height, { filters, stickers, decorations, timeMs });
     };

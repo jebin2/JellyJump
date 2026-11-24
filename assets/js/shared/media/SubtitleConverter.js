@@ -111,6 +111,7 @@ export function wordChunksToVTT(chunks, options = {}) {
     const useWidth = typeof measure === 'function' && maxWidth > 0;
 
     // Normalise to clean {text, start, end}, repairing missing/backwards stamps.
+    /** @type {{text: string, start: number, end: number}[]} */
     const words = [];
     for (const c of Array.isArray(chunks) ? chunks : []) {
         const text = (c?.text || '').trim();
@@ -125,6 +126,7 @@ export function wordChunksToVTT(chunks, options = {}) {
     if (words.length === 0) return 'WEBVTT\n\n';
 
     let vtt = 'WEBVTT\n\n';
+    /** @type {typeof words} */
     let group = [];
 
     const flush = () => {
@@ -179,19 +181,20 @@ export function parseTranscriptJSON(jsonContent) {
     }
     if (data.segments) {
         // Flatten segments that contain words
-        return data.segments.flatMap(seg => seg.words || []);
+        return data.segments.flatMap((/** @type {{words?: any[]}} */ seg) => seg.words || []);
     }
 
     throw new Error('Invalid transcript format: expected array or object with words/segments property');
 }
 
 /** HH:MM:SS.mmm from whole milliseconds, so 59.9996s cannot become "60.000". */
+/** @param {number} ms */
 function vttTimestamp(ms) {
     const total = Math.max(0, Math.round(ms));
     const h = Math.floor(total / 3_600_000);
     const m = Math.floor(total / 60_000) % 60;
     const s = Math.floor(total / 1000) % 60;
-    const pad = (n, w) => String(n).padStart(w, '0');
+    const pad = (/** @type {number} */ n, /** @type {number} */ w) => String(n).padStart(w, '0');
     return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)}.${pad(total % 1000, 3)}`;
 }
 

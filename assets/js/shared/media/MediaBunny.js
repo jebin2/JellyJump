@@ -34,6 +34,7 @@ if (!Logger.isEnabled()) {
 registerAc3Decoder();
 registerProresDecoder();
 
+/** @type {Promise<void>|null} */
 let encodersPromise = null;
 const decoderPromises = new Map();
 
@@ -100,7 +101,7 @@ const ON_DEMAND_DECODERS = [
  * read. Reading it here broke HLS outright: this function runs during setup
  * for every source, so the throw aborted track setup, leaving a stream with
  * no duration and no audio track while video frames still reached the canvas.
- * @param {Object} track
+ * @param {any} track - a MediaBunny track (vendored, not type-checked)
  * @returns {Promise<string|null>}
  */
 export async function codecOf(track) {
@@ -119,14 +120,14 @@ export async function codecOf(track) {
  * Register any on-demand decoder these tracks need, before asking whether they
  * can be decoded. Answering that question without this reports DTS and TrueHD
  * as undecodable and is self-fulfilling: nothing ever loads the decoder.
- * @param {Array<Object>} tracks
+ * @param {Array<any>} tracks
  */
 export async function ensureDecodersFor(tracks) {
     const codecs = await Promise.all((tracks ?? []).map(codecOf));
     await Promise.all(
         ON_DEMAND_DECODERS
             .filter(({ codec }) => codecs.includes(codec))
-            .map(({ label, ensure }) => ensure().catch((error) => {
+            .map(({ label, ensure }) => ensure().catch((/** @type {Error} */ error) => {
                 Logger.warn(`[MediaBunny] ${label} decoder failed to load:`, error.message);
             })),
     );
