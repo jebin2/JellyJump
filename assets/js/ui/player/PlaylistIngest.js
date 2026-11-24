@@ -337,7 +337,7 @@ export const PlaylistIngest = {
     /**
      * Insert a processed result into the playlist after its source item.
      * Centralizes the pattern used by menus after processing (convert, trim, encrypt, etc.)
-     * @param {Object} sourceItem - The original playlist item that was processed
+     * @param {import('../../shared/types.js').PlaylistItem|null} sourceItem - The original playlist item that was processed
      * @param {Blob} blob - The result blob
      * @param {string} filename - Display name / download filename
      * @param {Object} [options]
@@ -345,7 +345,7 @@ export const PlaylistIngest = {
      * @param {string} [options.mediaType] - Playlist type field ('video', 'audio', 'image/gif', etc.)
      * @param {string|null} [options.duration] - Duration string; null to skip (caller may ensureMetadata)
      * @param {Object} [options.extra] - Additional fields merged into the item
-     * @returns {{ item: Object, url: string }}
+     * @returns {{ item: import('../../shared/types.js').PlaylistItem, url: string }}
      */
     insertProcessedItem(sourceItem, blob, filename, options = {}) {
         // The edit panel names a copy it edits on itself, so that the name

@@ -18,37 +18,10 @@ import { Metrics } from '../diagnostics/Metrics.js';
  * and together can run it out of memory, so a second job waits its turn.
  */
 
-/**
- * @typedef {'queued'|'running'|'done'|'failed'|'cancelled'} JobStatus
- *
- * @typedef {Object} JobResult
- * @property {Object} item - The playlist item the job added
- * @property {string} url - Its blob URL, for Download
- * @property {string} filename
- * @property {File} [file] - Its file as made; the playlist lets go of the
- *   item's own once the file is stored
- *
- * @typedef {Object} Job
- * @property {number} id
- * @property {string} name - What the job does: "Cut", "Convert"
- * @property {string} subject - What it does it to, usually the item's title
- * @property {JobStatus} status
- * @property {number} progress - 0 to 1
- * @property {string} [label] - The work's own word for where it is
- * @property {string} [error]
- * @property {string} [errorCode] - the AppError code of the failure (shared/errors/codes.js)
- * @property {JobResult[]} results
- * @property {number} [startedAt] - performance.now() when it started running
- * @property {number} [finishedAt] - and when it stopped, however it ended
- * @property {() => void} cancel
- *
- * @typedef {Object} JobSpec
- * @property {string} name
- * @property {string} subject
- * @property {(api: {signal: AbortSignal, onProgress: (fraction: number, label?: string) => void}) => Promise<*>} work
- * @property {(result: *) => (void|Promise<void>)} [done] - Adds the result to the playlist
- * @property {(error: Error) => string} [failureText]
- */
+/** @typedef {import('../types.js').JobStatus} JobStatus */
+/** @typedef {import('../types.js').JobResult} JobResult */
+/** @typedef {import('../types.js').Job} Job */
+/** @typedef {import('../types.js').JobSpec} JobSpec */
 
 /** Fired by Playlist.insertProcessedItem; a job's results are read off it. */
 export const PROCESSED_ITEM_EVENT = 'jellyjump:processed-item';

@@ -106,7 +106,7 @@ export class Playlist {
     }
 
     // The state lives in PlaylistState; these read and write it.
-    /** The items, in order. Change them through the methods, not by assigning. @type {Object[]} */
+    /** The items, in order. Change them through the methods, not by assigning. @type {import('../../shared/types.js').PlaylistItem[]} */
     get items() { return this.state.items; }
     set items(val) { this.state.setItems(val); }
     /** The index of the item playing, or -1. @type {number} */

@@ -115,6 +115,8 @@ are sets of `Playlist` methods in files of their own:
 | `PlaylistMetadata` | durations, thumbnails, broken streams |
 | `PlaylistStore` | saving and restoring the list, the load guard, playback progress |
 
+An item is a plain object whose shape, `PlaylistItem`, is in
+`shared/types.js` with the job's and the settings' shapes.
 `PlaylistState` holds the items and the active index; `PlaylistRenderer`
 draws the tree in batches of 50 rows. Files are kept in IndexedDB in the
 browser (ADR 0005) and on disk in the desktop app (`DesktopStorageService`).

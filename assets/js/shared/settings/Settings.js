@@ -26,6 +26,9 @@
  */
 import { config } from '../config/index.js';
 
+/** @typedef {import('../types.js').SettingsValues} SettingsValues */
+/** @typedef {import('../types.js').SettingName} SettingName */
+
 /**
  * Every preference, with the key it was kept under before (moved once).
  * A name that is not here is a mistake, and `get`/`set` throw for it.
@@ -156,15 +159,15 @@ function notify(name, value) {
 
 export const Settings = {
     /**
-     * @template T
-     * @param {string} name
-     * @param {T} [fallback] - returned when nothing is saved
-     * @returns {any}
+     * @template {SettingName} K
+     * @param {K} name
+     * @param {SettingsValues[K]|null} [fallback] - returned when nothing is saved
+     * @returns {SettingsValues[K]}
      */
     get(name, fallback) {
         check(name);
         migrate();
-        if (memory.has(name)) return memory.get(name);
+        if (memory.has(name)) return /** @type {SettingsValues[K]} */ (memory.get(name));
         const s = store();
         if (!s) return fallback;
         try {
@@ -178,8 +181,9 @@ export const Settings = {
     /**
      * Save a preference. Only for a change the user made; `null` or
      * `undefined` removes it.
-     * @param {string} name
-     * @param {unknown} value
+     * @template {SettingName} K
+     * @param {K} name
+     * @param {SettingsValues[K]|null|undefined} value
      */
     set(name, value) {
         check(name);
@@ -250,5 +254,5 @@ globalThis.addEventListener?.('storage', (event) => {
     if (!key?.startsWith(PREFIX)) return;
     const name = key.slice(PREFIX.length);
     if (!Object.hasOwn(KEYS, name)) return;
-    notify(name, Settings.get(name));
+    notify(name, Settings.get(/** @type {SettingName} */ (name)));
 });

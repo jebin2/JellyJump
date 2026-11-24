@@ -49,7 +49,7 @@ export async function getMetadata(source) {
     try {
         const { video, audio } = await getTrackDetails(input);
 
-        /** @type {any} */
+        /** @type {import('../types.js').VideoInfo|null} */
         let videoInfo = null;
         let audioInfo = null;
         let duration = 0;
