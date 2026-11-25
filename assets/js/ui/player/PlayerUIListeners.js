@@ -8,7 +8,7 @@
  * then on every event that could change it.
  */
 import {
-    updatePlayerPlayPauseUI, updatePlayerProgress, updatePlayerVolumeUI, showPlayerLoading,
+    updatePlayerPlayPauseUI, updatePlayerProgress, updatePlayerVolumeUI, showPlayerLoading, showPlayerBufferWait,
 } from './PlayerUIUpdates.js';
 import { updatePlayerSpeedMenu, updatePlayerFiltersButtonState } from './PlayerPanels.js';
 import { Logger } from '../../shared/utils/Logger.js';
@@ -27,6 +27,8 @@ export function listenToPlayer(player) {
     player.on('volumechange', volume);
     player.on('ratechange', speed);
     player.on('loadingchange', loading);
+    // A wait sized to a slow link shows how long is left, and Play now.
+    player.on('bufferwaitchange', ({ secondsLeft }) => showPlayerBufferWait(player, secondsLeft));
 
     const filters = () => updatePlayerFiltersButtonState(player);
     // The A-B markers sit at a share of the duration, so a range set while

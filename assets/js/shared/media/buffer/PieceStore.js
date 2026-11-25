@@ -497,6 +497,18 @@ export class BufferedFile {
     }
 
     /**
+     * Bytes kept without a gap from the start of piece `index` on.
+     * @param {number} index
+     */
+    contiguousFrom(index) {
+        let bytes = 0;
+        for (let i = Math.max(0, index); i < this.pieceCount && this.has(i); i++) {
+            bytes += pieceLength(this.size, this.pieceSize, i);
+        }
+        return bytes;
+    }
+
+    /**
      * The bytes kept, as [start, end) ranges, merged.
      * @returns {Array<[number, number]>}
      */
@@ -956,14 +968,16 @@ export class BufferedFile {
 
     /**
      * The link's rate over the last few seconds of fetching (bytes per
-     * second), counting only the time spent receiving; null before enough
-     * has been fetched to say.
+     * second), counting only the time spent receiving; null before a second
+     * of it.
      */
     linkRate() {
         let bytes = 0;
         let ms = 0;
         for (const sample of this.samples) { bytes += sample.bytes; ms += sample.ms; }
-        if (bytes < 64 * 1024 || ms < 200) return null;
+        // A second of receiving is a measure at any rate; counting bytes
+        // instead never measured a link slower than they arrive in the window.
+        if (bytes === 0 || ms < 1000) return null;
         return bytes / (ms / 1000);
     }
 

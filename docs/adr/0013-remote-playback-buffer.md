@@ -70,6 +70,11 @@ phase U.
 - **Tools** that need a remote file whole get the kept pieces as they are on
   disk (a Blob of the piece files, nothing copied) and the rest fetched once,
   not kept: a tool must not push the file playing out of the buffer.
+- **A wait sized to the link.** On a link slower than the video, waiting a
+  second or two at a time means stopping every few seconds (nine times in
+  35 s on a device). With the link measured and the bitrate known, the wait
+  lasts until the bytes ahead cover 10 minutes of play, shown as a
+  countdown, with Play now to go on regardless.
 - **Phone data.** On a metered connection, 2 minutes ahead and nothing while
   paused.
 - **Two tabs.** A Web Lock per file. The holder keeps the pieces; another

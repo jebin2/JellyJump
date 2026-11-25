@@ -392,14 +392,15 @@ console.log('\nthe link\n');
 {
     const server = fakeServer({ 'https://h/r.mp4': { bytes: bytesOf(400000), etag: '"v1"' } });
     server.chunk = 10000;
-    server.delay = 5;
+    server.delay = 30;
     const store = new PieceStore({ backend: new MemoryBackend(), budget: 1e9, fetchFn: server.fetch, pieceSize: 100000 });
     const file = await store.open({ url: 'https://h/r.mp4', key: 'kr' });
     check('no rate before anything is fetched', file.linkRate() === null);
     for (let i = 0; i < 4; i++) await file.ensure(i);
     const rate = file.linkRate();
-    // 10 KB every ~5 ms is ~2 MB/s; timers are coarse, so a wide band.
-    check('the rate is measured from the time spent receiving', rate > 300000 && rate < 4000000, `${Math.round(rate)} B/s`);
+    // 10 KB every ~30 ms is ~330 KB/s, over more than the second it needs;
+    // timers are coarse, so a wide band.
+    check('the rate is measured from the time spent receiving', rate > 150000 && rate < 700000, `${Math.round(rate)} B/s`);
     file.close();
 }
 

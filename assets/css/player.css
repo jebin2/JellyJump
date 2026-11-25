@@ -576,6 +576,46 @@ button:focus-visible {
     display: block !important;
 }
 
+/* A wait sized to a slow link (BufferingGuard): time left and Play now. */
+.jellyjump-buffer-wait {
+    position: absolute;
+    top: calc(50% + 52px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 12px;
+    max-width: calc(100% - 32px);
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+}
+
+.jellyjump-buffer-wait[hidden] {
+    display: none;
+}
+
+.jellyjump-buffer-wait-btn {
+    padding: 4px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.jellyjump-buffer-wait-btn:hover,
+.jellyjump-buffer-wait-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.15);
+}
+
 @keyframes spin {
     from {
         transform: rotate(0deg);

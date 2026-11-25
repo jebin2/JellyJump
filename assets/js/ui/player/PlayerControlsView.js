@@ -12,6 +12,13 @@ export function createPlayerControls(player) {
 
     mount('player-loader-template');
     player.ui.loader = q('.jellyjump-loader');
+    // A wait sized to a slow link: how long, and going on anyway (BufferingGuard).
+    player.ui.bufferWait = q('.jellyjump-buffer-wait');
+    player.ui.bufferWaitText = q('.jellyjump-buffer-wait-text');
+    q('.jellyjump-buffer-wait-btn')?.addEventListener('click', (event) => {
+        event.stopPropagation();   // not a click on the picture (play/pause)
+        player.playNow();
+    });
 
     mount('player-controls-template');
     if (player.config.controls.loop) mount('player-loop-panel-template');

@@ -27,6 +27,17 @@
  * waits rather than one every couple of seconds.
  *
  * Play, pause, seek and load clear it: play resumes the context itself.
+ *
+ * **A wait sized to the link** (ARCHITECTURE_PLAN.md U5). For a remote file
+ * played through the buffer, the store measures the link and the downloader
+ * knows the video's bitrate. When the link is slower than the video (with
+ * MARGIN to spare), waiting 1–4 s at a time means stopping every few seconds:
+ * instead the wait lasts until the bytes downloaded ahead cover HORIZON_S of
+ * play (or the rest of the file) without another stop, `(bitrate − link) ×
+ * horizon`, recomputed as the link changes. The time left is announced
+ * (`bufferwaitchange`, shown under the spinner), and `playNow()` goes on at
+ * once, with the short waits for the rest of this stretch (until the next
+ * seek or load). On a link faster than the video it is the wait it was.
  */
 import { Logger } from '../../shared/utils/Logger.js';
 
@@ -46,6 +57,10 @@ export const VIDEO_GAP = 0.5;
 export const VIDEO_LAG = 0.3;
 /** Not judged in the first moments after the audio starts: it is still filling. */
 const AUDIO_GRACE = 0.5;
+/** The video plays this many seconds without stopping after a sized wait. */
+export const HORIZON_S = 600;
+/** The link counts as fast enough above this share of the video's bitrate. */
+export const MARGIN = 1.1;
 /** Background work (seek-bar thumbnails) waits for this much audio ahead. */
 export const HEADROOM = 2.5;   // the audio pump keeps 2–3 s ahead when the source keeps up
 
@@ -77,6 +92,79 @@ const resuming = new WeakSet();
  * @type {WeakMap<object, {goal: number, since: number, endedAt: number}>}
  */
 const waits = new WeakMap();
+/** Players told to go on (playNow) until the next seek or load. @type {WeakSet<object>} */
+const quick = new WeakSet();
+/** Seconds left of a sized wait, as last announced, per player. @type {WeakMap<object, number|null>} */
+const announced = new WeakMap();
+
+/**
+ * The bytes a sized wait wants downloaded ahead before playing on, and how
+ * many are; null when there is nothing to size (not a buffered remote file,
+ * the link not measured yet, or fast enough).
+ * @param {any} player
+ * @returns {{want: number, have: number, rate: number}|null}
+ */
+export function sizedWait(player) {
+    const remote = player.media?.remote;
+    if (!remote || quick.has(player)) return null;
+    const rate = remote.file.linkRate();
+    const byteRate = remote.downloader.byteRate;
+    if (!rate || !byteRate) return null;
+    const need = byteRate * (player.playbackRate || 1) * MARGIN;
+    if (rate >= need) return null;
+    const horizon = Math.max(0, Math.min(HORIZON_S, (player.duration || 0) - (player.currentTime || 0)));
+    const file = remote.file;
+    const cursor = remote.downloader.cursor;
+    // Never more than the downloader will fetch ahead, nor than there is
+    // left of the file from where it reads: the reads run ahead of the
+    // picture, so near the end the bytes for the rest of the time can be
+    // more than the file has left after them (a wait that never ended).
+    const ahead = remote.downloader.aheadPieces() * file.pieceSize * 0.9;
+    const left = Math.max(0, file.size - cursor * file.pieceSize);
+    const want = Math.min((need - rate) * horizon, ahead, left);
+    const have = file.contiguousFrom(cursor);
+    return { want, have, rate };
+}
+
+/**
+ * Seconds left of the current wait, when it is a sized one; null otherwise.
+ * @param {any} player
+ * @returns {number|null}
+ */
+export function bufferWaitSecondsLeft(player) {
+    if (!stalled.has(player)) return null;
+    const sized = sizedWait(player);
+    if (!sized || sized.have >= sized.want) return null;
+    return Math.ceil((sized.want - sized.have) / sized.rate);
+}
+
+/** @param {any} player */
+function announceWait(player) {
+    const left = bufferWaitSecondsLeft(player);
+    if (announced.get(player) === left) return;
+    announced.set(player, left);
+    player.trigger?.('bufferwaitchange', { waiting: stalled.has(player), secondsLeft: left });
+}
+
+/**
+ * Go on now, while waiting for data (the "Play now" button): the short waits
+ * apply for the rest of this stretch, until the next seek or load.
+ * @param {any} player
+ */
+export function skipBufferWait(player) {
+    quick.add(player);
+    const wait = waits.get(player);
+    if (wait) wait.goal = RESUME_AT;
+    checkPlayerBuffering(player);
+}
+
+/**
+ * A seek or a load: a sized wait applies again.
+ * @param {any} player
+ */
+export function resetBufferWaitChoice(player) {
+    quick.delete(player);
+}
 
 /**
  * How far ahead of the clock the audio pump may read (seconds): further
@@ -160,6 +248,7 @@ export function clearPlayerStall(player) {
     resuming.delete(player);
     if (!stalled.delete(player)) return;
     player.setLoading?.(false);
+    announceWait(player);
 }
 
 /**
@@ -214,19 +303,27 @@ export function checkPlayerBuffering(player) {
         const repeat = !!last && now - last.endedAt < REPEAT_WINDOW_MS;
         const goal = repeat ? Math.min(last.goal * 2, MAX_RESUME_AT) : RESUME_AT;
         waits.set(player, { goal, since: now, endedAt: last?.endedAt ?? -Infinity });
+        const sized = sizedWait(player);
         Logger.log(`[Buffering] Waiting for data at ${player.currentTime?.toFixed(3)}s `
             + `(audio ahead ${Number.isFinite(ahead) ? `${(ahead * 1000).toFixed(0)}ms` : 'n/a'}, `
-            + `video ${videoStarved(player) ? 'starved' : 'ok'}; playing on with ${goal.toFixed(1)}s ahead)`);
+            + `video ${videoStarved(player) ? 'starved' : 'ok'}; playing on with ${goal.toFixed(1)}s ahead`
+            + `${sized ? `, and ${(sized.want / 1048576).toFixed(0)} MB downloaded ahead: the link gives `
+                + `${(sized.rate / 1024).toFixed(0)} KB/s, the video needs more` : ''})`);
         player.setLoading(true);
         ctx.suspend().catch(() => { /* closed: the next load makes a new one */ });
+        announceWait(player);
         return;
     }
 
     const wait = waits.get(player);
     const goal = wait?.goal ?? RESUME_AT;
     const frameReady = !player.videoTrack || !player.frames?.isOpen || !!player.frames.pending;
+    // On a link slower than the video: enough downloaded to play on for a while.
+    const sized = sizedWait(player);
+    const enoughAhead = !sized || sized.have >= sized.want;
+    announceWait(player);
     // At the end of the file there is no more to wait for.
-    if ((ahead >= goal || ahead === Infinity) && frameReady && !resuming.has(player)) {
+    if ((ahead >= goal || ahead === Infinity) && frameReady && enoughAhead && !resuming.has(player)) {
         resuming.add(player);
         const finish = () => {
             // Paused, seeked or reloaded meanwhile: they own the context now.
