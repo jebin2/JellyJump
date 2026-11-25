@@ -141,8 +141,10 @@ export const PlaylistPlayback = {
         if (video.blob_url) return true;
 
         try {
-            // OPTIMIZATION: For remote URLs, check cache first.
-            // If not in cache, play directly from URL and cache in background.
+            // A remote URL plays from the address: the player reads it
+            // through the remote buffer, which keeps what it fetches (in
+            // pieces, on disk) for the next time. A file stored whole by an
+            // older version is still played from storage.
             if (!video.isLocal && video.url && !video.isStream) {
                 const cachedBlob = await MediaMetadata.checkCache(video);
 
@@ -152,18 +154,8 @@ export const PlaylistPlayback = {
                     // Mark as having file so we don't try to download again
                     video.file = cachedBlob;
                 } else {
-                    Logger.log(`[Playlist] Playing directly from URL (background caching): ${video.title}`);
-                    // Direct playback
+                    Logger.log(`[Playlist] Playing from the network: ${video.title}`);
                     video.blob_url = video.url;
-
-                    // Not for shared libraries: caching downloads the
-                    // whole file, which defeats streaming a multi-GB
-                    // movie over the network and fills storage with a
-                    // copy of someone else's library.
-                    if (!video.isRemoteLibrary) MediaMetadata.cacheInBackground(video, () => {
-                        Logger.log(`[Playlist] Background cache complete for: ${video.title}`);
-                        this.save();
-                    });
                 }
             } else {
                 // Local files or legacy behavior

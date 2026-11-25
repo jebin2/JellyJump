@@ -28,8 +28,25 @@ import { AppError } from '../../errors/AppError.js';
 import { Logger } from '../../utils/Logger.js';
 import { MemoryBackend } from './MemoryBackend.js';
 
-/** Bytes per piece. */
+/** Bytes per piece, at most: what a large file is cut into. */
 export const PIECE_SIZE = 4 * 1024 * 1024;
+/** Bytes per piece, at least: a small file is cut finer. */
+export const MIN_PIECE_SIZE = 64 * 1024;
+
+/**
+ * The piece size for a file: a 64th of it, between MIN_PIECE_SIZE and
+ * PIECE_SIZE, in whole multiples of 64 KB. A large file gets 4 MB pieces (a
+ * film is ~1,500); a small one is not fetched in pieces bigger than itself,
+ * and reading its header costs a fraction of it.
+ * @param {number} size
+ */
+export function pieceSizeFor(size) {
+    const step = MIN_PIECE_SIZE;
+    return Math.min(PIECE_SIZE, Math.max(MIN_PIECE_SIZE, Math.floor(size / 64 / step) * step));
+}
+
+/** Attempts for a piece a reader is waiting on, and the wait before each retry (s). */
+const READ_RETRY_DELAYS = [1, 2, 4];
 /** How far back the link's rate is measured (ms). */
 const RATE_WINDOW_MS = 10000;
 
@@ -39,7 +56,7 @@ const RATE_WINDOW_MS = 10000;
  * @property {string} id - the key's hash: the file's folder name
  * @property {string} key - remoteFileKey(...)
  * @property {number} size - bytes
- * @property {number} pieceSize - the PIECE_SIZE it was cut with
+ * @property {number} pieceSize - the size it was cut with (pieceSizeFor, or the store's fixed one)
  * @property {string} validator - `etag:<value>`, `modified:<value>`, or '' (none)
  * @property {number} lastUsed - Date.now() when last opened or read
  * @property {number[]} pinned - pieces kept whatever the window (the file's index)
@@ -124,14 +141,19 @@ function describe(response) {
 export class PieceStore {
     /**
      * @param {{backend: PieceBackend, budget: number, fetchFn?: typeof fetch,
-     *   pieceSize?: number, now?: () => number, lockPrefix?: string}} options
+     *   pieceSize?: number, now?: () => number, lockPrefix?: string,
+     *   retryDelays?: number[]}} options - `pieceSize` fixes the size for
+     *   every file (tests); without it each file gets pieceSizeFor(its size).
+     *   `retryDelays`: seconds before each retry of a piece a reader waits on
      */
-    constructor({ backend, budget, fetchFn, pieceSize = PIECE_SIZE, now = () => Date.now(), lockPrefix = 'jj-buffer' }) {
+    constructor({ backend, budget, fetchFn, pieceSize, now = () => Date.now(), lockPrefix = 'jj-buffer', retryDelays = READ_RETRY_DELAYS }) {
         this.backend = backend;
         /** Bytes all files' pieces may take together. */
         this.budget = budget;
         this.fetchFn = fetchFn ?? ((input, init) => fetch(input, init));
+        /** @type {number|undefined} */
         this.pieceSize = pieceSize;
+        this.retryDelays = retryDelays;
         this.now = now;
         this.lockPrefix = lockPrefix;
         /** @type {Map<string, FileRecord>} */
@@ -173,7 +195,8 @@ export class PieceStore {
         const held = await heldLocks();
         for (const { meta, pieces } of await this.backend.load()) {
             const busy = held.has(this.lockName(meta.id));
-            if (!busy && (meta.pieceSize !== this.pieceSize || !meta.validator || meta.id !== hashKey(meta.key))) {
+            const cut = this.pieceSize ?? pieceSizeFor(meta.size);
+            if (!busy && (meta.pieceSize !== cut || !meta.validator || meta.id !== hashKey(meta.key))) {
                 await this.backend.deleteFile(meta.id).catch(() => {});
                 continue;
             }
@@ -236,7 +259,7 @@ export class PieceStore {
         if (!record) {
             if (!now?.size) throw new AppError('NETWORK');
             record = {
-                meta: { id, key, size: now.size, pieceSize: this.pieceSize, validator: now.validator, lastUsed: this.now(), pinned: [] },
+                meta: { id, key, size: now.size, pieceSize: this.pieceSize ?? pieceSizeFor(now.size), validator: now.validator, lastUsed: this.now(), pinned: [] },
                 pieces: new Map(),
                 openCount: 0,
             };
@@ -349,15 +372,68 @@ async function takeLock(name) {
 }
 
 /**
- * A piece being fetched: its bytes so far, and who waits for which of them.
+ * One range request filling part of a piece: bytes [start, end) of it, the
+ * next to arrive at `pos`. `end` may be moved down while it runs, when a
+ * reader started another part further on.
+ * @typedef {object} PiecePart
+ * @property {number} start
+ * @property {number} end
+ * @property {number} pos
+ * @property {AbortController} controller
+ * @property {boolean} [yielded] - stopped for a reader's request; its bytes so far are kept
+ */
+
+/**
+ * A piece being fetched: its bytes so far, which of them have arrived (as
+ * [start, end) ranges within the piece), the requests filling it, and who
+ * waits for which bytes. Usually one request from the start; a reader that
+ * needs bytes further in starts one where it needs them, and the start is
+ * filled in after, so a seek never waits for a piece's beginning first.
  * @typedef {object} PieceFetch
  * @property {number} index
  * @property {Uint8Array} bytes
- * @property {number} received
- * @property {AbortController} controller
- * @property {Set<{need: number, resolve: () => void, reject: (e: unknown) => void}>} waiters
- * @property {Promise<void>} done
+ * @property {Array<[number, number]>} filled
+ * @property {Set<PiecePart>} parts
+ * @property {Set<{from: number, to: number, resolve: () => void, reject: (e: unknown) => void}>} waiters
+ * @property {boolean} finished
+ * @property {Promise<void>} done - resolves once the piece is whole and kept
+ * @property {() => void} resolve
+ * @property {(e: unknown) => void} reject
  */
+
+/**
+ * A reader this far (bytes; at most a 16th of a piece) or less ahead of a
+ * running request waits for it rather than starting its own.
+ */
+const JOIN_DISTANCE = 64 * 1024;
+
+/**
+ * Whether [from, to) is inside the merged ranges.
+ * @param {Array<[number, number]>} ranges
+ * @param {number} from
+ * @param {number} to
+ */
+function covered(ranges, from, to) {
+    return ranges.some(([a, b]) => a <= from && to <= b);
+}
+
+/**
+ * Add [from, to) to the merged ranges.
+ * @param {Array<[number, number]>} ranges
+ * @param {number} from
+ * @param {number} to
+ */
+function addRange(ranges, from, to) {
+    if (to <= from) return;
+    ranges.push([from, to]);
+    ranges.sort((x, y) => x[0] - y[0]);
+    for (let k = ranges.length - 1; k > 0; k--) {
+        if (ranges[k][0] <= ranges[k - 1][1]) {
+            ranges[k - 1][1] = Math.max(ranges[k - 1][1], ranges[k][1]);
+            ranges.splice(k, 1);
+        }
+    }
+}
 
 export class BufferedFile {
     /**
@@ -388,6 +464,10 @@ export class BufferedFile {
         this.closed = false;
         /** @type {Set<(start: number, end: number) => void>} */
         this.changeListeners = new Set();
+        /** Pieces waiting for an idle link to fill in their gaps. @type {Set<PieceFetch>} */
+        this.parked = new Set();
+        /** @type {Array<() => void>} whenIdle() callers */
+        this.idleWaiters = [];
     }
 
     get id() { return this.record.meta.id; }
@@ -491,15 +571,27 @@ export class BufferedFile {
      * @returns {Promise<Uint8Array>}
      */
     async readFromPiece(index, from, to) {
-        const kept = await this.readKept(index, from, to);
-        if (kept) return kept;
-        const job = this.fetchPiece(index);
-        await new Promise((resolve, reject) => {
-            if (job.received >= to) { resolve(undefined); return; }
-            const waiter = { need: to, resolve: () => resolve(undefined), reject };
-            job.waiters.add(waiter);
-        });
-        return job.bytes.slice(from, to);
+        for (let attempt = 0; ; attempt++) {
+            const kept = await this.readKept(index, from, to);
+            if (kept) return kept;
+            const job = this.fetchPiece(index, from, true);
+            try {
+                await new Promise((resolve, reject) => {
+                    if (covered(job.filled, from, to)) { resolve(undefined); return; }
+                    job.waiters.add({ from, to, resolve: () => resolve(undefined), reject });
+                });
+                return job.bytes.slice(from, to);
+            } catch (raw) {
+                // A blip on the link is retried for a reader, as UrlSource
+                // did: a few times, waiting longer each time. A refusal, a
+                // changed file or a close is the answer.
+                const error = AppError.from(raw);
+                const delay = this.store.retryDelays[attempt];
+                if (this.closed || delay === undefined || !['NETWORK', 'TIMEOUT'].includes(error.code)) throw error;
+                Logger.warn(`[Buffer] Piece ${index} of ${this.key} failed (${error.message}); trying again in ${delay}s`);
+                await new Promise((resolve) => setTimeout(resolve, delay * 1000));
+            }
+        }
     }
 
     /**
@@ -525,6 +617,42 @@ export class BufferedFile {
     }
 
     /**
+     * Resolves when no piece of this file is being fetched (or the file is
+     * closed): the downloader reads ahead only on an idle link.
+     * @returns {Promise<void>}
+     */
+    async whenIdle() {
+        if (this.closed || !this.linkBusy()) return;
+        await new Promise((resolve) => this.idleWaiters.push(() => resolve(undefined)));
+    }
+
+    /**
+     * Whether a request of this file is running (other than `except`'s).
+     * @param {PieceFetch} [except]
+     */
+    linkBusy(except) {
+        for (const job of this.fetching.values()) if (job !== except && job.parts.size > 0) return true;
+        return false;
+    }
+
+    /**
+     * A request ended: when none is running any more, fill in a piece that
+     * was waiting for the link (parked), else tell whoever waits for an idle
+     * link (the downloader).
+     */
+    settleLink() {
+        if (this.closed || this.linkBusy()) return;
+        for (const job of this.parked) {
+            this.parked.delete(job);
+            if (job.finished) continue;
+            this.afterPart(job);
+            if (this.linkBusy()) return;
+        }
+        const waiters = this.idleWaiters.splice(0);
+        for (const resolve of waiters) resolve();
+    }
+
+    /**
      * Fetch a piece unless it is kept or already being fetched. Resolves when
      * it is kept; the caller (the downloader) does not wait on bytes.
      * @param {number} index
@@ -536,49 +664,164 @@ export class BufferedFile {
     }
 
     /**
-     * The piece's fetch, started if it is not running.
+     * The piece's fetch, started if it is not running, and made to deliver
+     * byte `from` (within the piece) soon: by a request already running that
+     * is about to reach it, or by a new one starting there.
      * @param {number} index
+     * @param {number} [from]
+     * @param {boolean} [urgent] - a reader waits on it: requests for bytes
+     *   nobody waits on stop (keeping what they had) and finish later
      * @returns {PieceFetch}
      */
-    fetchPiece(index) {
-        const running = this.fetching.get(index);
-        if (running) return running;
-        const length = pieceLength(this.size, this.pieceSize, index);
-        /** @type {PieceFetch} */
-        const job = {
-            index,
-            bytes: new Uint8Array(length),
-            received: 0,
-            controller: new AbortController(),
-            waiters: new Set(),
-            done: Promise.resolve(),
-        };
-        this.fetching.set(index, job);
-        job.done = this.download(job).then(() => {
-            for (const waiter of job.waiters) waiter.resolve();
-        }, (raw) => {
-            // A fetch that failed (TypeError), was aborted, or was refused,
-            // as the app's one error type.
-            const error = AppError.from(raw);
-            for (const waiter of job.waiters) waiter.reject(error);
-            throw error;
-        }).finally(() => {
-            job.waiters.clear();
-            if (this.fetching.get(index) === job) this.fetching.delete(index);
-        });
-        // A failure is the waiters' to handle; a fetch nobody awaits must not
-        // be an unhandled rejection.
-        job.done.catch(() => {});
+    fetchPiece(index, from = 0, urgent = false) {
+        let job = this.fetching.get(index);
+        if (!job) {
+            /** @type {(e: unknown) => void} */
+            let reject = () => {};
+            /** @type {() => void} */
+            let resolve = () => {};
+            const done = new Promise((res, rej) => { resolve = () => res(undefined); reject = rej; });
+            job = {
+                index,
+                bytes: new Uint8Array(pieceLength(this.size, this.pieceSize, index)),
+                filled: [],
+                parts: new Set(),
+                waiters: new Set(),
+                finished: false,
+                done,
+                resolve,
+                reject,
+            };
+            // A failure is the waiters' to handle; a fetch nobody awaits must
+            // not be an unhandled rejection.
+            job.done.catch(() => {});
+            this.fetching.set(index, job);
+        }
+        if (urgent && !covered(job.filled, from, from + 1)) this.yieldTo(job);
+        this.cover(job, from);
         return job;
     }
 
     /**
+     * Stop the requests of pieces nobody waits on (the read-ahead), keeping
+     * the bytes they had: the reader's request gets the whole link. They are
+     * picked up again once it is idle (settleLink).
+     * @param {PieceFetch} reader
+     */
+    yieldTo(reader) {
+        for (const job of this.fetching.values()) {
+            if (job === reader || job.finished || job.waiters.size > 0) continue;
+            for (const part of job.parts) {
+                part.yielded = true;
+                part.controller.abort();
+            }
+        }
+    }
+
+    /**
+     * Make sure some request will deliver byte `from` of the piece soon.
+     * @param {PieceFetch} job
+     * @param {number} from
+     */
+    cover(job, from) {
+        if (job.finished || covered(job.filled, from, from + 1)) return;
+        for (const part of job.parts) {
+            if (part.start <= from && from < part.end && from - part.pos <= Math.min(JOIN_DISTANCE, this.pieceSize / 16)) return;
+        }
+        // Up to where the bytes already there (or coming) begin.
+        let end = job.bytes.length;
+        for (const [a] of job.filled) if (a > from) { end = Math.min(end, a); break; }
+        for (const part of job.parts) {
+            if (part.start > from) end = Math.min(end, part.start);
+            // A request heading through this point stops here; this one
+            // takes over from it.
+            else if (part.end > from) part.end = from;
+        }
+        this.startPart(job, from, end);
+    }
+
+    /**
+     * @param {PieceFetch} job
+     * @param {number} start
+     * @param {number} end
+     */
+    startPart(job, start, end) {
+        /** @type {PiecePart} */
+        const part = { start, end, pos: start, controller: new AbortController() };
+        job.parts.add(part);
+        this.parked.delete(job);
+        this.runPart(job, part).then(() => {
+            job.parts.delete(part);
+            this.afterPart(job);
+            this.settleLink();
+        }, (raw) => {
+            job.parts.delete(part);
+            if (part.yielded && !job.finished && !this.closed) {
+                if (job.parts.size === 0) this.parked.add(job);
+            } else {
+                this.failJob(job, AppError.from(raw));
+            }
+            this.settleLink();
+        });
+    }
+
+    /**
+     * A request ended: keep the piece if it is whole, else fill the first gap
+     * left (when nothing else is running).
      * @param {PieceFetch} job
      */
-    async download(job) {
-        const start = job.index * this.pieceSize;
-        const end = start + job.bytes.length - 1;
-        const init = withRange({ ...this.init, signal: job.controller.signal }, start, end);
+    afterPart(job) {
+        if (job.finished) return;
+        if (covered(job.filled, 0, job.bytes.length)) {
+            job.finished = true;
+            this.keep(job.index, job.bytes).then(() => {
+                if (this.fetching.get(job.index) === job) this.fetching.delete(job.index);
+                job.resolve();
+            }, (error) => this.failJob(job, AppError.from(error)));
+            return;
+        }
+        if (job.parts.size > 0) return;
+        // Bytes nobody is waiting for (the start of a piece a seek landed
+        // in) wait for the link: fetched now, they would halve the rate of
+        // the piece the player needs next.
+        if (job.waiters.size === 0 && this.linkBusy(job)) {
+            this.parked.add(job);
+            return;
+        }
+        let gap = 0;
+        for (const [a, b] of job.filled) {
+            if (a > gap) break;
+            gap = Math.max(gap, b);
+        }
+        this.cover(job, gap);
+    }
+
+    /**
+     * @param {PieceFetch} job
+     * @param {AppError} error
+     */
+    failJob(job, error) {
+        if (job.finished) return;
+        job.finished = true;
+        this.parked.delete(job);
+        for (const part of job.parts) part.controller.abort();
+        job.parts.clear();
+        for (const waiter of job.waiters) waiter.reject(error);
+        job.waiters.clear();
+        if (this.fetching.get(job.index) === job) this.fetching.delete(job.index);
+        job.reject(error);
+    }
+
+    /**
+     * Fetch bytes [part.start, part.end) of the piece into it.
+     * @param {PieceFetch} job
+     * @param {PiecePart} part
+     */
+    async runPart(job, part) {
+        const pieceStart = job.index * this.pieceSize;
+        const start = pieceStart + part.start;
+        const end = pieceStart + part.end - 1;
+        const init = withRange({ ...this.init, signal: part.controller.signal }, start, end);
         const began = performance.now();
         const response = await this.store.fetchFn(this.url, init);
         if (response.status !== 206 && !(response.status === 200 && start === 0 && end === this.size - 1)) {
@@ -595,26 +838,32 @@ export class BufferedFile {
 
         const reader = response.body.getReader();
         let last = began;
-        for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (job.received + value.length > job.bytes.length) {
-                await reader.cancel().catch(() => {});
-                throw new AppError('NETWORK', { message: 'The server sent more than was asked for' });
+        try {
+            while (part.pos < part.end) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (job.finished) return;
+                // `end` may have moved down meanwhile: keep only up to it.
+                const take = Math.min(value.length, part.end - part.pos);
+                if (take <= 0) break;
+                job.bytes.set(take === value.length ? value : value.subarray(0, take), part.pos);
+                addRange(job.filled, part.pos, part.pos + take);
+                part.pos += take;
+                const at = performance.now();
+                this.sample(take, at - last);
+                last = at;
+                for (const waiter of [...job.waiters]) {
+                    if (covered(job.filled, waiter.from, waiter.to)) { job.waiters.delete(waiter); waiter.resolve(); }
+                }
             }
-            job.bytes.set(value, job.received);
-            job.received += value.length;
-            const at = performance.now();
-            this.sample(value.length, at - last);
-            last = at;
-            for (const waiter of [...job.waiters]) {
-                if (job.received >= waiter.need) { job.waiters.delete(waiter); waiter.resolve(); }
-            }
+        } finally {
+            // Stopped short (another request took over, the piece is done) or
+            // ended: either way the connection's rest is not wanted.
+            reader.cancel().catch(() => {});
         }
-        if (job.received !== job.bytes.length) {
-            throw new AppError('NETWORK', { message: `Piece ${job.index} ended early (${job.received} of ${job.bytes.length} bytes)` });
+        if (part.pos < part.end) {
+            throw new AppError('NETWORK', { message: `Piece ${job.index} ended early (${part.pos} of ${part.end} bytes)` });
         }
-        await this.keep(job.index, job.bytes);
     }
 
     /**
@@ -679,9 +928,8 @@ export class BufferedFile {
      */
     abortExcept(keep) {
         for (const [index, job] of [...this.fetching]) {
-            if (job.waiters.size === 0 && !keep(index)) {
-                job.controller.abort();
-                this.fetching.delete(index);
+            if (job.waiters.size === 0 && !job.finished && !keep(index)) {
+                this.failJob(job, new AppError('CANCELLED', { message: 'No longer wanted' }));
             }
         }
     }
@@ -709,6 +957,25 @@ export class BufferedFile {
         }
     }
 
+    /**
+     * Delete these kept pieces (the downloader making room), except pinned
+     * ones and ones another tab keeps.
+     * @param {number[]} indexes
+     */
+    async forget(indexes) {
+        const pinned = new Set(this.record.meta.pinned);
+        for (const index of indexes) {
+            if (pinned.has(index)) continue;
+            if (this.ownsPieces && this.record.pieces.delete(index)) {
+                await this.store.backend.deletePiece(this.id, index).catch(() => {});
+                this.notifyChange(index);
+            } else if (this.memoryPieces.delete(index)) {
+                await this.memory?.deletePiece(this.id, index);
+                this.notifyChange(index);
+            }
+        }
+    }
+
     /** Bytes this file keeps, in the store and in memory. */
     usage() {
         let total = 0;
@@ -721,12 +988,13 @@ export class BufferedFile {
     close() {
         if (this.closed) return;
         this.closed = true;
-        for (const job of this.fetching.values()) {
-            job.controller.abort();
-            for (const waiter of job.waiters) waiter.reject(new AppError('CANCELLED', { message: 'The file was closed' }));
-            job.waiters.clear();
+        for (const job of [...this.fetching.values()]) {
+            // A piece already whole is still being stored: let it finish.
+            if (!job.finished) this.failJob(job, new AppError('CANCELLED', { message: 'The file was closed' }));
         }
         this.fetching.clear();
+        this.parked.clear();
+        for (const resolve of this.idleWaiters.splice(0)) resolve();
         this.record.openCount = Math.max(0, this.record.openCount - 1);
         this.memory = null;
         this.memoryPieces.clear();

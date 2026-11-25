@@ -154,6 +154,26 @@ user picks or drops files
 playing: the render loop presents each frame when the audio clock reaches it
 ```
 
+A remote file (a shared library's, or a URL; not HLS) is read through the
+remote buffer (`shared/media/buffer/`, ADR 0013) rather than straight from
+the network:
+
+```
+MediaLifecycle.setupPlayerMediaTracks
+  → openRemotePlayback(url)            PieceStore.open: a one-byte request for the
+                                       size and ETag; kept pieces checked against them
+  → MediaBunny CustomSource            each read → BufferedFile.read: from the pieces
+                                       on disk (OPFS), or a range request of its own
+  → Downloader                         follows the reads: fetches ahead (20 min),
+                                       playing or paused; a seek aborts what it left
+                                       behind; over the file's share of the budget,
+                                       the pieces furthest away go
+player.media.dispose → remote.close    fetches stop; the pieces stay for next time
+```
+
+It falls back to MediaBunny's `UrlSource`, as before, for a server that
+will not send part of a file, or a file never kept on a server not reached.
+
 ### Applying an edit (the edit panel)
 
 ```
