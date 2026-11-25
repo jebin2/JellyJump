@@ -13,6 +13,9 @@
 
 /** @typedef {import('./PieceStore.js').FileMeta} FileMeta */
 
+/** Pieces whose File objects are kept for reading. */
+const RECENT_PIECES = 16;
+
 export class OpfsBackend {
     /**
      * @param {FileSystemDirectoryHandle} base - the buffer's folder
@@ -28,6 +31,13 @@ export class OpfsBackend {
         this.pending = new Map();
         /** @type {Map<string, FileSystemDirectoryHandle>} */
         this.folders = new Map();
+        /**
+         * The last pieces read, as File objects: the player reads a packet
+         * at a time, and a piece never changes once written, so its File
+         * stays good until it is deleted.
+         * @type {Map<string, File>}
+         */
+        this.recent = new Map();
         worker.onmessage = (event) => {
             const { id, ok, error, name } = event.data;
             const call = this.pending.get(id);
@@ -129,11 +139,20 @@ export class OpfsBackend {
      * @param {number} end
      */
     async readPiece(id, index, start, end) {
+        const name = `${id}/${index}`;
         try {
-            const handle = await (await this.folder(id)).getFileHandle(`${index}.p`);
-            const file = await handle.getFile();
+            let file = this.recent.get(name);
+            if (file) {
+                this.recent.delete(name);
+            } else {
+                const handle = await (await this.folder(id)).getFileHandle(`${index}.p`);
+                file = await handle.getFile();
+            }
+            this.recent.set(name, file);
+            if (this.recent.size > RECENT_PIECES) this.recent.delete(/** @type {string} */ (this.recent.keys().next().value));
             return new Uint8Array(await file.slice(start, end).arrayBuffer());
         } catch {
+            this.recent.delete(name);
             return null;
         }
     }
@@ -143,12 +162,14 @@ export class OpfsBackend {
      * @param {number} index
      */
     async deletePiece(id, index) {
+        this.recent.delete(`${id}/${index}`);
         await this.call({ op: 'delete', dir: id, name: `${index}.p` });
     }
 
     /** @param {string} id */
     async deleteFile(id) {
         this.folders.delete(id);
+        for (const name of [...this.recent.keys()]) if (name.startsWith(`${id}/`)) this.recent.delete(name);
         await this.call({ op: 'delete', dir: id });
     }
 }

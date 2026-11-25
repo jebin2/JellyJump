@@ -49,6 +49,8 @@ const KEYS = {
     loadGuard: { old: 'jellyjump-load-guard' },
     /** Where each video was left, by item id: {time, at} (Progress.js). */
     progress: {},
+    /** The remote buffer's window, in seconds of video: {ahead, behind} (RemotePlayback.js). */
+    buffer: {},
 };
 
 /** One key per video before `progress` (BUG-5), moved into it once. */

@@ -10,6 +10,7 @@
  * browser says is free; in memory, MEMORY_BUDGET.
  */
 import { config } from '../../config/index.js';
+import { mediaFetchFn } from '../../net/mediaFetch.js';
 import { Logger } from '../../utils/Logger.js';
 import { MemoryBackend } from './MemoryBackend.js';
 import { OpfsBackend } from './OpfsBackend.js';
@@ -58,7 +59,7 @@ async function openStore() {
     if (budget) {
         try {
             const backend = await OpfsBackend.open(BUFFER_NAME);
-            const store = await new PieceStore({ backend, budget, lockPrefix: BUFFER_NAME }).load();
+            const store = await new PieceStore({ backend, budget, lockPrefix: BUFFER_NAME, fetchFn: mediaFetchFn('buffer') }).load();
             Logger.log(`[Buffer] On disk, budget ${(budget / MB).toFixed(0)} MB, ${(store.usage() / MB).toFixed(0)} MB kept`);
             return store;
         } catch (error) {
@@ -67,5 +68,5 @@ async function openStore() {
     } else {
         Logger.log('[Buffer] Too little storage free; keeping pieces in memory');
     }
-    return new PieceStore({ backend: new MemoryBackend(), budget: MEMORY_BUDGET, lockPrefix: BUFFER_NAME }).load();
+    return new PieceStore({ backend: new MemoryBackend(), budget: MEMORY_BUDGET, lockPrefix: BUFFER_NAME, fetchFn: mediaFetchFn('buffer') }).load();
 }

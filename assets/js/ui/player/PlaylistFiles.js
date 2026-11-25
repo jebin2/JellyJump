@@ -20,7 +20,7 @@ import { Logger } from '../../shared/utils/Logger.js';
 
 /**
  * @typedef {{deleteFile?: (id: string) => Promise<void>, fileIds?: () => Promise<string[]>}} FileStore
- * @typedef {{id: string, isLocal?: boolean}} StoredItem
+ * @typedef {{id: string, isLocal?: boolean, url?: string|null}} StoredItem
  */
 
 /**
@@ -55,7 +55,16 @@ function keptIds(items) {
 export function discardStoredFiles(storage, removed, remaining) {
     if (!storage?.deleteFile) return;
     const keep = keptIds(remaining);
+    const remainingUrls = new Set(remaining.map((item) => item?.url).filter(Boolean));
     for (const item of removed) {
+        // What the remote buffer kept of a remote file goes with its item
+        // (loaded only then: the playlist does not need the buffer to start).
+        if (item?.url && /^https?:/i.test(item.url) && !remainingUrls.has(item.url)) {
+            const url = item.url;
+            import('../../shared/media/buffer/RemotePlayback.js')
+                .then(({ dropRemoteBuffer }) => dropRemoteBuffer(url))
+                .catch((error) => Logger.warn('[PlaylistFiles] Could not drop a removed item\'s buffer:', error));
+        }
         if (!item?.isLocal || keep.has(item.id)) continue;
         storage.deleteFile(item.id).catch((error) => {
             Logger.warn('[PlaylistFiles] Could not delete a removed item\'s file:', error);

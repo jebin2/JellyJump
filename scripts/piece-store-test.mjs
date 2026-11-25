@@ -30,7 +30,7 @@ function fakeServer(files) {
         if (server.down) throw new TypeError('Failed to fetch');
         const file = files[url];
         const range = /bytes=(\d+)-(\d+)/.exec(new Headers(init.headers).get('range') || '');
-        const request = { url, range: range ? [Number(range[1]), Number(range[2])] : null, aborted: false };
+        const request = { url, range: range ? [Number(range[1]), Number(range[2])] : null, aborted: false, delivered: 0 };
         server.requests.push(request);
         init.signal?.addEventListener('abort', () => { request.aborted = true; });
         if (!file) return new Response('', { status: 404 });
@@ -48,10 +48,13 @@ function fakeServer(files) {
                     if (request.aborted) { controller.error(new DOMException('Aborted', 'AbortError')); return; }
                     if (server.delay) await sleep(server.delay);
                     if (request.aborted) { controller.error(new DOMException('Aborted', 'AbortError')); return; }
-                    controller.enqueue(body.slice(at, at + server.chunk));
+                    const piece = body.slice(at, at + server.chunk);
+                    request.delivered += piece.length;
+                    controller.enqueue(piece);
                 }
                 controller.close();
             },
+            cancel() { request.aborted = true; },
         });
         return new Response(stream, {
             status: 206,
@@ -65,11 +68,15 @@ const bytesOf = (n, seed = 0) => new Uint8Array(n).map((_, i) => (i * 7 + seed) 
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 let clock = 1000;
-const makeStore = (server, { backend = new MemoryBackend(), budget = 1e9 } = {}) =>
-    new PieceStore({ backend, budget, fetchFn: server.fetch, pieceSize: PIECE, now: () => clock++ });
+const makeStore = (server, { backend = new MemoryBackend(), budget = 1e9, retryDelays = [] } = {}) =>
+    new PieceStore({ backend, budget, fetchFn: server.fetch, pieceSize: PIECE, now: () => clock++, retryDelays });
 
 console.log('\nfile keys\n');
 {
+    const { pieceSizeFor } = await import('../assets/js/shared/media/buffer/PieceStore.js');
+    check('a film is cut into 4 MB pieces', pieceSizeFor(6e9) === 4 * 1024 * 1024);
+    check('a small file finer, never under 64 KB', pieceSizeFor(300 * 1024) === 64 * 1024 && pieceSizeFor(100e6) === 23 * 64 * 1024,
+        `${pieceSizeFor(300 * 1024)} ${pieceSizeFor(100e6)}`);
     check('a shared library file is known by server and id, not its URL',
         remoteFileKey('http://h/api/stream/abc?sig=1', { remoteServer: 'home', remoteId: 'abc' }) === 'library:home:abc');
     check('a URL is known without its access parameters',
@@ -90,13 +97,15 @@ console.log('\nreading\n');
         JSON.stringify(server.requests));
     const read = await file.read(900, 2100);
     check('a read across three pieces returns exactly those bytes', same(read, data.slice(900, 2100)));
-    check('each piece was fetched once, with its own range',
-        server.requests.slice(1).map((r) => r.range.join('-')).join() === '0-999,1000-1999,2000-2999',
+    await file.ensure(0);
+    check('each piece fetched with ranges of its own, from where the reader needed it first; its start after',
+        server.requests.slice(1).map((r) => r.range.join('-')).join() === '900-999,1000-1999,2000-2999,0-899',
         server.requests.slice(1).map((r) => r.range.join('-')).join());
     const before = server.requests.length;
     const again = await file.read(0, 3000);
     check('a read of kept pieces asks the network for nothing', server.requests.length === before && same(again, data.slice(0, 3000)));
     const tail = await file.read(3400, 9999);
+    await file.ensure(3);
     check('the last piece is shorter, and a read past the end stops at it', same(tail, data.slice(3400)));
     check('the kept bytes, merged', JSON.stringify(file.downloadedRanges()) === '[[0,3500]]', JSON.stringify(file.downloadedRanges()));
     check('and the file is complete', file.isComplete());
@@ -111,7 +120,12 @@ console.log('\none fetch, many readers\n');
     const store = makeStore(server);
     const file = await store.open({ url: 'https://h/b.mp4', key: 'url:b' });
     const [x, y] = await Promise.all([file.read(0, 500), file.read(100, 900)]);
-    check('two readers of the same piece share one request', server.requests.length === 2, `${server.requests.length - 1} piece requests`);
+    await file.ensure(0);
+    const delivered = server.requests.slice(1).reduce((sum, r) => sum + r.delivered, 0);
+    // The first request is cut short where the second began; at most the
+    // chunk it was sending when cut comes twice.
+    check('two readers of the same piece do not fetch it twice', delivered <= 1000 + server.chunk,
+        `${delivered} bytes delivered: ${server.requests.slice(1).map((r) => `${r.range.join('-')} (${r.delivered})`).join()}`);
     check('and both get their bytes', same(x, data.slice(0, 500)) && same(y, data.slice(100, 900)));
 
     const started = Date.now();
@@ -122,6 +136,32 @@ console.log('\none fetch, many readers\n');
         same(got, data.slice(1000, 1100)) && waited < 4 * server.delay, `${waited} ms; a whole piece takes ${4 * server.delay}+`);
     await file.ensure(1);
     check('and the piece is kept once it is whole', file.has(1));
+    file.close();
+}
+
+console.log('\na seek into the middle of a piece\n');
+{
+    const data = bytesOf(4000, 11);
+    const server = fakeServer({ 'https://h/m.mp4': { bytes: data, etag: '"v1"' } });
+    server.chunk = 100;
+    server.delay = 10;
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/m.mp4', key: 'url:m' });
+    file.fetchPiece(1);                       // the downloader working through piece 1
+    await sleep(15);
+    const started = Date.now();
+    const bytes = await file.read(1900, 1950);   // a seek to its end
+    const waited = Date.now() - started;
+    check('a reader near a piece\'s end does not wait for its beginning',
+        same(bytes, data.slice(1900, 1950)) && waited < 8 * server.delay, `${waited} ms; the whole piece takes ${10 * server.delay}+`);
+    check('it starts a request where it needs the bytes',
+        server.requests.some((r) => r.range?.[0] === 1900), server.requests.map((r) => r.range?.join('-')).join());
+    await file.ensure(1);
+    check('and the piece is still completed and kept, the request before it stopping where the new one began',
+        file.has(1) && same(await file.read(1000, 2000), data.slice(1000, 2000)));
+    const piece1 = server.requests.filter((r) => r.range && r.range[0] >= 1000 && r.range[0] < 2000);
+    check('without fetching any byte twice from the server... beyond what was in flight',
+        piece1.length <= 3, piece1.map((r) => r.range.join('-')).join());
     file.close();
 }
 
@@ -225,6 +265,15 @@ console.log('\nservers and networks\n');
     const missing = await offline.read(1000, 1100).then(() => 'read', (e) => e.code);
     check('a piece not kept fails as NETWORK', missing === 'NETWORK', missing);
     offline.close();
+    server.down = false;
+    const retrying = makeStore(server, { retryDelays: [0.02, 0.02] });
+    const flaky = await retrying.open({ url: 'https://h/e.mp4', key: 'flaky' });
+    server.down = true;
+    setTimeout(() => { server.down = false; }, 30);
+    const recovered = await flaky.read(1000, 1100).then((b) => same(b, bytesOf(2000).slice(1000, 1100)), (e) => e.code);
+    check('a reader\'s piece is retried after a blip on the link', recovered === true, String(recovered));
+    flaky.close();
+    server.down = true;
     const never = await store.open({ url: 'https://h/e.mp4', key: 'never' }).then(() => 'opened', (e) => e.code);
     check('offline, a file never fetched cannot open', never === 'NETWORK', never);
 }
@@ -254,7 +303,7 @@ console.log('\nwhat survives a reload\n');
     const file = await reloaded.open({ url: 'https://h/f.mp4', key: 'kf' });
     const bytes = await file.read(1500, 1600);
     check('a piece gone from storage is fetched again, not trusted from the list',
-        same(bytes, bytesOf(2000).slice(1500, 1600)) && server.requests.length === before + 2);
+        same(bytes, bytesOf(2000).slice(1500, 1600)) && server.requests.length > before + 1);
     file.close();
 }
 

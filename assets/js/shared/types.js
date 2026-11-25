@@ -178,6 +178,8 @@
  * @property {{ id: string, at: number }} loadGuard - the item being loaded
  * @property {Record<string, { time: number, at: number }>} progress - where
  *   each video was left, by item id
+ * @property {{ ahead?: number, behind?: number }} buffer - the remote buffer's
+ *   window, seconds of video ahead of and behind where it plays
  */
 
 /** @typedef {keyof SettingsValues} SettingName */

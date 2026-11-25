@@ -68,48 +68,6 @@ export class MediaMetadata {
     }
 
     /**
-     * Cache a remote URL in the background
-     * @param {PlaylistItem} item 
-     * @param {Function} [onSave] 
-     */
-    static async cacheInBackground(item, onSave) {
-        if (!item.url || !item.id) return;
-
-        Logger.log('[Cache] Starting background cache for:', item.title);
-
-        try {
-            // Check if already cached first to avoid redundant download
-            const existing = await this.checkCache(item);
-            if (existing) {
-                Logger.log('[Cache] Item already cached, skipping download:', item.title);
-                return;
-            }
-
-            const response = await fetch(item.url);
-            if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
-
-            const blob = await response.blob();
-            const sizeMB = blob.size / 1024 / 1024;
-            const MAX_CACHE_SIZE_MB = 500;
-
-            if (sizeMB > MAX_CACHE_SIZE_MB) {
-                Logger.warn(`[Cache] Video too large to cache (${sizeMB.toFixed(2)} MB)`);
-                return;
-            }
-
-            const filename = item.title || 'video';
-            const saved = await _dbService.saveFile(item.id, blob, filename, blob.type);
-
-            if (saved) {
-                Logger.log('[Cache] Successfully cached in background:', item.title);
-                if (onSave) onSave();
-            }
-        } catch (error) {
-            Logger.warn('[Cache] Background caching failed:', error);
-        }
-    }
-
-    /**
      * Get source blob for an item (with caching for remote URLs)
      * For remote URLs: downloads, saves to IndexedDB, then releases from memory
      * For local files: loads from IndexedDB on-demand if not in memory
@@ -145,7 +103,7 @@ export class MediaMetadata {
         }
 
         // 4. Remote URL - fetch and persist to IndexedDB (Blocking Legacy Mode)
-        // Note: For better UX, use cacheInBackground() in the UI layer instead of this blocking call
+        // Tools that need the whole file; playback reads it through the remote buffer instead.
         if (item.url) {
             Logger.log('[Cache] Fetching remote video (blocking):', item.title);
 

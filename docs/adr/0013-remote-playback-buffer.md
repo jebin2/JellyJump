@@ -16,10 +16,14 @@ phase U.
 
 ## Decision
 
-- **Pieces.** A remote file is cut into fixed 4 MB pieces, each fetched
-  with a range request of our own (so it can be aborted) and kept whole or
-  not at all. A reader waiting on a piece in flight gets its bytes as they
-  arrive.
+- **Pieces.** A remote file is cut into pieces (4 MB for a large file, a
+  64th of a small one, never under 64 KB), each fetched with range requests
+  of our own (so they can be aborted) and kept whole or not at all. A reader
+  gets its bytes as they arrive. One that needs bytes inside a piece not
+  there yet starts a request where it needs them; the piece's start is
+  filled in after, so a seek never waits for a piece's beginning. The player
+  reads exactly what the demuxer asks for (MediaBunny's own read-ahead off):
+  the downloader reads ahead instead.
 - **On disk, in the origin private file system.** One folder per file
   (`jj-buffer/<id>/`, namespaced for previews), a `meta.json` and one file
   per piece. A small worker writes, with a synchronous access handle (the
@@ -30,9 +34,15 @@ phase U.
 - **Memory when disk is not usable.** In a private window, when OPFS or
   workers are refused, or with under 200 MB free, the same store runs on a
   memory backend (256 MB). It is one code path with two backends.
-- **A window and a budget, not whole files.** The downloader (step U2)
-  keeps a window around where the player reads. Across files, the least
-  recently played file is let go first. The file playing is never let go.
+- **Ahead of the reads, within a share of the budget.** The downloader
+  follows the player's reads (any container; a seek moves it by itself once
+  reads settle, 300 ms) and fetches ahead, 20 minutes of video by default
+  (setting `buffer`), playing or paused. The reads made while the file opens
+  (its header and index) are pinned. One file may keep up to 80% of the
+  budget; over it, the pieces furthest from where it plays go, the ones
+  behind first, never the 5 minutes behind. A file that fits is kept whole.
+  Across files, the least recently played is let go first, never the one
+  playing.
 - **Known by identity, checked against the server.** A file's key is its
   server and id (library) or its URL without `sig`/`token`. Its size and
   validator (ETag, else Last-Modified; the library server sends an ETag
@@ -54,4 +64,6 @@ phase U.
 - The disk holds up to the budget of other people's media; Settings will
   show it and clear it (U3), and removing an item drops its pieces.
 - `piece-store-test` (Node, memory backend, a fake server) and
-  `piece-store-opfs-test` (browser) check it. The player uses it from U2.
+  `piece-store-opfs-test` (browser) check the store; `stream-buffer-test`
+  the player on it (a seek closes the fetch it left behind, a seek back asks
+  nothing, a reload plays with the server gone, the fallbacks).

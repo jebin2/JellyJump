@@ -1,17 +1,24 @@
 // @ts-check
 import { MediaBunny } from './MediaBunny.js';
 import { mediaFetchFn } from '../net/mediaFetch.js';
+import { createBufferedSource, findOpenRemote } from './buffer/RemotePlayback.js';
 
 export const AUDIO_BITRATE_BPS = 128000;
 
 /**
- * A MediaBunny Input for an address (HLS included) or a file.
+ * A MediaBunny Input for an address (HLS included) or a file. An address
+ * playing through the remote buffer is read from it.
  * @param {string|Blob} source
  * @param {string} [label] - who reads, in the network log (mediaFetch.js)
  * @returns {any} a MediaBunny Input
  */
 export function createMediaBunnyInput(source, label = 'media') {
     if (typeof source === 'string') {
+        // The file playing is read from its buffer: the bytes are there, or
+        // being fetched once for both. Not for the player's read-ahead: these
+        // reads do not move it.
+        const playing = findOpenRemote(source);
+        if (playing) return new MediaBunny.Input({ source: createBufferedSource(playing), formats: MediaBunny.ALL_FORMATS });
         return new MediaBunny.Input({ source: new MediaBunny.UrlSource(source, { fetchFn: mediaFetchFn(label) }), formats: [...MediaBunny.HLS_FORMATS, ...MediaBunny.ALL_FORMATS] });
     }
     return new MediaBunny.Input({ source: new MediaBunny.BlobSource(source), formats: MediaBunny.ALL_FORMATS });

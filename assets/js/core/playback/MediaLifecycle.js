@@ -1,5 +1,6 @@
 import { MediaBunny, ensureDecodersFor } from '../../shared/media/MediaBunny.js';
 import { mediaFetchFn } from '../../shared/net/mediaFetch.js';
+import { openRemotePlayback } from '../../shared/media/buffer/RemotePlayback.js';
 import { clearPlayerStall } from './BufferingGuard.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
@@ -215,11 +216,40 @@ async function explainSourceFailure(url, error) {
     return error;
 }
 
+/**
+ * A remote file (not HLS) through the buffer (ARCHITECTURE_PLAN.md phase U,
+ * ADR 0013): its pieces are kept, fetched ahead while it plays or is paused,
+ * and a seek aborts what it left behind. Null when it cannot be: a server
+ * that will not send part of a file, a file never kept on a server not
+ * reached (the plain source then reports why), or a newer load meanwhile.
+ * @returns {Promise<any|null>} the MediaBunny source, with player.media.remote set
+ */
+async function openBufferedSource(player, url, isHls) {
+    if (isHls || !/^https?:/i.test(url)) return null;
+    try {
+        const remote = await openRemotePlayback(url, {
+            init: player.config.withCredentials ? { credentials: 'include' } : {},
+        });
+        if (player.sourceUrl !== url) {
+            // Another load started while this one opened; it owns the player.
+            remote.close();
+            return null;
+        }
+        player.media.remote?.close();
+        player.media.remote = remote;
+        return remote.source;
+    } catch (error) {
+        Logger.log(`[MediaLifecycle] Not buffered (${error?.code || error?.message}); reading it straight from the network`);
+        return null;
+    }
+}
+
 export async function setupPlayerMediaTracks(player, url, isHls) {
     const urlSourceOptions = player.config.withCredentials ? { requestInit: { credentials: 'include' } } : {};
     Logger.log(`[MediaLifecycle] Setting up tracks for ${url} (isHls: ${isHls})`);
+    const buffered = await openBufferedSource(player, url, isHls);
     player.media.input = new MediaBunny.Input({
-        source: new MediaBunny.UrlSource(url, {
+        source: buffered ?? new MediaBunny.UrlSource(url, {
             ...urlSourceOptions, getRetryDelay: retryPolicyFor(url), fetchFn: mediaFetchFn('playback'),
         }),
         formats: [...(MediaBunny.HLS_FORMATS || []), ...MediaBunny.ALL_FORMATS]
@@ -231,6 +261,7 @@ export async function setupPlayerMediaTracks(player, url, isHls) {
         } catch (e) {
             throw await explainSourceFailure(url, e);
         }
+        player.media.remote?.setDuration(player.duration);
         player.announce.progress();
     }
 
@@ -569,6 +600,9 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         if (savedSubtitles?.length > 0) player.subtitles?.restoreSavedSubtitles(savedSubtitles);
 
         await handlePlayerInitialFrame(player, autoplay);
+        // Open: what is read from now on is playback, and the buffer starts
+        // reading ahead of it.
+        player.media.remote?.loaded();
         player.announce.tracks();
 
         if (!player.isLive) player.setLoading(false);

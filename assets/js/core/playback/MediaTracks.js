@@ -23,10 +23,16 @@ export class MediaTracks {
         this.videoSink = null;
         this.audioTrack = null;
         this.audioSink = null;
+        /**
+         * A remote file played through the buffer (RemotePlayback.js): its
+         * downloader keeps fetching until this is disposed.
+         * @type {import('../../shared/media/buffer/RemotePlayback.js').RemotePlaybackHandle|null}
+         */
+        this.remote = null;
     }
 
     /**
-     * Release the sinks and the input, in that order.
+     * Release the sinks, the input and the remote file, in that order.
      *
      * The tracks are left alone on purpose: this mirrors exactly what the
      * load pipeline did before, where the two track fields were cleared
@@ -46,5 +52,8 @@ export class MediaTracks {
         this.videoSink = null;
         this.audioSink = null;
         this.input = null;
+        // After the input: nothing reads the file any more. Its pieces stay.
+        this.remote?.close();
+        this.remote = null;
     }
 }
