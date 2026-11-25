@@ -1,3 +1,4 @@
+import { createBufferedSource, findOpenRemote } from '../../shared/media/buffer/RemotePlayback.js';
 import { Logger } from "../../shared/utils/Logger.js";
 import { mediaFetchFn } from '../../shared/net/mediaFetch.js';
 import { MediaBunny } from "../../shared/media/MediaBunny.js";
@@ -55,9 +56,13 @@ export class ThumbnailGenerator {
 
             // 1. Setup Mediabunny Input
             // Handle File/Blob vs String URL
+            // A remote file playing through the buffer is read from it: only
+            // once all of it is kept is this asked for (PlayerThumbnails).
+            const buffered = typeof resource === 'string' ? findOpenRemote(resource) : null;
             const source = (resource instanceof File || resource instanceof Blob)
                 ? new BlobSource(resource)
-                : new UrlSource(resource, { fetchFn: mediaFetchFn('thumbnails') });
+                : buffered ? createBufferedSource(buffered)
+                    : new UrlSource(resource, { fetchFn: mediaFetchFn('thumbnails') });
 
             // Dispose previous Input if re-generating
             this._disposeInput();

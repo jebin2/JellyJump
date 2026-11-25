@@ -201,6 +201,30 @@ console.log('\nthe downloader\n');
     file.close();
 }
 
+console.log('\nphone data\n');
+{
+    const data = bytesOf(10000, 17);
+    const server = fakeServer({ 'https://h/p.mp4': { bytes: data, etag: '"v1"' } });
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/p.mp4', key: 'url:p' });
+    let playing = false;
+    const downloader = new Downloader(file, { budget: 1e9, isPlaying: () => playing, metered: () => true });
+    downloader.start();
+    downloader.setDuration(1000);   // 10 bytes a second: 120 s is 1,200 bytes, two pieces
+    downloader.loaded();
+    await sleep(150);
+    check('on a metered connection nothing is fetched while paused', server.requests.length === 1,
+        server.requests.map((r) => r.range?.join('-')).join(', '));
+    playing = true;
+    for (let i = 0; i < 50 && !file.has(2); i++) await sleep(20);
+    await sleep(100);
+    const kept = [...file.record.pieces.keys()].sort((a, b) => a - b).join();
+    // The piece being read, and two more: 120 s at 10 bytes a second.
+    check('and while playing it reads only two minutes ahead', kept === '0,1,2', kept);
+    downloader.stop();
+    file.close();
+}
+
 console.log('\nletting go\n');
 {
     const data = bytesOf(10000, 5);
@@ -212,14 +236,34 @@ console.log('\nletting go\n');
     file.fetchPiece(3);
     const wanted = file.read(4000, 4100);
     await sleep(5);
-    file.abortExcept((index) => index === 3);
+    file.abortExcept((index) => index === 3 || index === 4);
     await sleep(5);
     const byPiece = (i) => server.requests.find((r) => r.range?.[0] === i * PIECE);
     check('a fetch the jump left behind is aborted', byPiece(2)?.aborted === true && !file.isFetching(2));
-    check('one a reader is waiting on is not', byPiece(4)?.aborted === false);
+    check('one a reader in the window is waiting on is not', byPiece(4)?.aborted === false);
     check('and the reader gets its bytes', same(await wanted, data.slice(4000, 4100)));
     await file.ensure(3);
     check('one still wanted, paused for the reader, is finished after it', file.has(3) && !file.has(2));
+
+    // The reader from before a seek: MediaBunny leaves it waiting.
+    server.requests.length = 0;
+    let staleDone = false;
+    const stale = file.read(8500, 8600).then(() => { staleDone = true; });
+    await sleep(15);
+    file.abortExcept((index) => index === 9);       // the seek: the window is piece 9 now
+    const fresh = file.read(9500, 9600);
+    await sleep(5);
+    const piece8 = server.requests.find((r) => r.range && r.range[0] >= 8 * PIECE && r.range[0] < 9 * PIECE);
+    check('a piece left behind with a reader still waiting on it stops downloading', piece8?.aborted === true,
+        server.requests.map((r) => `${r.range?.join('-')}${r.aborted ? ' aborted' : ''}`).join(', '));
+    check('so the seek\'s piece has the link to itself', same(await fresh, data.slice(9500, 9600)) && !staleDone);
+    await file.whenIdle();
+    check('it waits in the background, until the link is idle', !staleDone && file.resumeBackground() === true);
+    await stale;
+    await file.ensure(8);   // stored just after its reader had the bytes
+    check('and finishes when the downloader has nothing else to fetch, keeping the bytes it had', staleDone && file.has(8)
+        && server.requests.filter((r) => r.range && r.range[0] >= 8 * PIECE && r.range[0] < 9 * PIECE).length <= 3,
+        server.requests.map((r) => r.range?.join('-')).join(', '));
 
     server.delay = 0;
     for (let i = 0; i < 10; i++) await file.ensure(i);

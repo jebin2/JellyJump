@@ -72,6 +72,8 @@ const RATE_WINDOW_MS = 10000;
  * @property {(id: string, index: number, bytes: Uint8Array) => Promise<void>} writePiece
  * @property {(id: string, index: number, start: number, end: number) => Promise<Uint8Array|null>} readPiece
  *   bytes [start, end) of the piece; null when it is gone
+ * @property {(id: string, index: number) => Promise<Blob|null>} pieceBlob
+ *   the whole piece as a Blob (on disk: the file itself, nothing copied); null when gone
  * @property {(id: string, index: number) => Promise<void>} deletePiece
  * @property {(id: string) => Promise<void>} deleteFile
  */
@@ -396,6 +398,9 @@ async function takeLock(name) {
  * @property {Set<PiecePart>} parts
  * @property {Set<{from: number, to: number, resolve: () => void, reject: (e: unknown) => void}>} waiters
  * @property {boolean} finished
+ * @property {boolean} [background] - left behind by a seek: fetched only when
+ *   nothing else is (resumeBackground), though a reader from before the seek
+ *   may still be waiting on it
  * @property {Promise<void>} done - resolves once the piece is whole and kept
  * @property {() => void} resolve
  * @property {(e: unknown) => void} reject
@@ -617,6 +622,45 @@ export class BufferedFile {
     }
 
     /**
+     * A kept piece as a Blob (on disk, the piece file itself: nothing is
+     * read or copied); null when it is not kept whole.
+     * @param {number} index
+     * @returns {Promise<Blob|null>}
+     */
+    async pieceBlob(index) {
+        const length = pieceLength(this.size, this.pieceSize, index);
+        /** @type {Blob|null} */
+        let blob = null;
+        if (this.record.pieces.has(index)) blob = await this.store.backend.pieceBlob(this.id, index).catch(() => null);
+        if (!blob && this.memory && this.memoryPieces.has(index)) blob = await this.memory.pieceBlob(this.id, index);
+        return blob && blob.size === length ? blob : null;
+    }
+
+    /**
+     * Bytes [start, end) straight from the server as a Blob, checked like a
+     * piece but not kept (a tool reading the whole file must not push the
+     * file playing out of the buffer).
+     * @param {number} start
+     * @param {number} end
+     * @returns {Promise<Blob>}
+     */
+    async fetchRangeBlob(start, end) {
+        const response = await this.store.fetchFn(this.url, withRange(this.init, start, end - 1));
+        if (response.status !== 206 && !(response.status === 200 && start === 0 && end === this.size)) {
+            await response.body?.cancel().catch(() => {});
+            throw new AppError(response.status === 200 ? 'NO_RANGES' : 'NETWORK', { context: { status: response.status } });
+        }
+        const now = describe(response);
+        if ((now.size !== null && now.size !== this.size) || (now.validator && now.validator !== this.record.meta.validator)) {
+            await response.body?.cancel().catch(() => {});
+            throw new AppError('SOURCE_CHANGED', { context: { key: this.key } });
+        }
+        const blob = await response.blob();
+        if (blob.size !== end - start) throw new AppError('NETWORK', { message: `Got ${blob.size} of ${end - start} bytes` });
+        return blob;
+    }
+
+    /**
      * Resolves when no piece of this file is being fetched (or the file is
      * closed): the downloader reads ahead only on an idle link.
      * @returns {Promise<void>}
@@ -643,6 +687,7 @@ export class BufferedFile {
     settleLink() {
         if (this.closed || this.linkBusy()) return;
         for (const job of this.parked) {
+            if (job.background && !job.finished) continue;   // resumeBackground's
             this.parked.delete(job);
             if (job.finished) continue;
             this.afterPart(job);
@@ -697,6 +742,7 @@ export class BufferedFile {
             job.done.catch(() => {});
             this.fetching.set(index, job);
         }
+        if (urgent) job.background = false;   // a reader wants it now
         if (urgent && !covered(job.filled, from, from + 1)) this.yieldTo(job);
         this.cover(job, from);
         return job;
@@ -710,7 +756,7 @@ export class BufferedFile {
      */
     yieldTo(reader) {
         for (const job of this.fetching.values()) {
-            if (job === reader || job.finished || job.waiters.size > 0) continue;
+            if (job === reader || job.finished || (job.waiters.size > 0 && !job.background)) continue;
             for (const part of job.parts) {
                 part.yielded = true;
                 part.controller.abort();
@@ -784,7 +830,7 @@ export class BufferedFile {
         // Bytes nobody is waiting for (the start of a piece a seek landed
         // in) wait for the link: fetched now, they would halve the rate of
         // the piece the player needs next.
-        if (job.waiters.size === 0 && this.linkBusy(job)) {
+        if ((job.waiters.size === 0 && this.linkBusy(job)) || job.background) {
             this.parked.add(job);
             return;
         }
@@ -928,10 +974,40 @@ export class BufferedFile {
      */
     abortExcept(keep) {
         for (const [index, job] of [...this.fetching]) {
-            if (job.waiters.size === 0 && !job.finished && !keep(index)) {
+            if (job.finished || keep(index)) continue;
+            if (job.waiters.size === 0) {
                 this.failJob(job, new AppError('CANCELLED', { message: 'No longer wanted' }));
+                continue;
+            }
+            // Someone still waits on it: after a seek, nearly always the
+            // reader from before it, which MediaBunny leaves waiting rather
+            // than cancelling. Seen on a device: that piece kept coming in
+            // beside the one the seek needed, both at half the link's rate.
+            // Its request stops, keeping the bytes it had, and it finishes
+            // only when nothing else is to be fetched.
+            job.background = true;
+            for (const part of job.parts) {
+                part.yielded = true;
+                part.controller.abort();
             }
         }
+    }
+
+    /**
+     * Fetch one piece left behind by a seek (abortExcept), when nothing else
+     * is: the downloader calls this once its window is full. Returns whether
+     * it started one.
+     */
+    resumeBackground() {
+        if (this.closed || this.linkBusy()) return false;
+        for (const job of this.parked) {
+            if (!job.background || job.finished) continue;
+            this.parked.delete(job);
+            job.background = false;
+            this.afterPart(job);
+            return true;
+        }
+        return false;
     }
 
     /**

@@ -229,6 +229,7 @@ async function openBufferedSource(player, url, isHls) {
     try {
         const remote = await openRemotePlayback(url, {
             init: player.config.withCredentials ? { credentials: 'include' } : {},
+            isPlaying: () => player.isPlaying,
         });
         if (player.sourceUrl !== url) {
             // Another load started while this one opened; it owns the player.
@@ -601,8 +602,13 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
 
         await handlePlayerInitialFrame(player, autoplay);
         // Open: what is read from now on is playback, and the buffer starts
-        // reading ahead of it.
-        player.media.remote?.loaded();
+        // reading ahead of it. Once all of the file is kept, it is as good as
+        // a local one: the seek bar's thumbnails are made from the pieces.
+        const remote = player.media.remote;
+        remote?.loaded();
+        remote?.onComplete(() => {
+            if (player.media.remote === remote) player.thumbnails?.startGeneration();
+        });
         player.announce.tracks();
 
         if (!player.isLive) player.setLoading(false);

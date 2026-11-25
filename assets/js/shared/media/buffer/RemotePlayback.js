@@ -62,16 +62,18 @@ export function findOpenRemote(url) {
  * @property {Downloader} downloader
  * @property {(seconds: number) => void} setDuration
  * @property {() => void} loaded - the file is open: start reading ahead
+ * @property {(callback: () => void) => void} onComplete - called once, when
+ *   every piece is kept (at once if it already is)
  * @property {() => void} close
  */
 
 /**
  * Open a remote file for playback.
  * @param {string} url
- * @param {{init?: RequestInit}} [options]
+ * @param {{init?: RequestInit, isPlaying?: () => boolean}} [options]
  * @returns {Promise<RemotePlaybackHandle>}
  */
-export async function openRemotePlayback(url, { init } = {}) {
+export async function openRemotePlayback(url, { init, isPlaying } = {}) {
     const store = await getRemoteBuffer();
     const key = remoteFileKey(url);
     const file = await store.open({ url, key, init });
@@ -80,6 +82,7 @@ export async function openRemotePlayback(url, { init } = {}) {
         budget: store.budget,
         aheadSeconds: positive(chosen.ahead) ?? AHEAD_SECONDS,
         behindSeconds: positive(chosen.behind) ?? BEHIND_SECONDS,
+        isPlaying,
     });
     const source = createBufferedSource(file, (start, end) => downloader.noteRead(start, end));
     openFiles.set(key, file);
@@ -93,6 +96,14 @@ export async function openRemotePlayback(url, { init } = {}) {
         downloader,
         setDuration: (seconds) => downloader.setDuration(seconds),
         loaded: () => downloader.loaded(),
+        onComplete: (callback) => {
+            if (file.isComplete()) { callback(); return; }
+            const stop = file.onChange(() => {
+                if (!file.isComplete()) return;
+                stop();
+                callback();
+            });
+        },
         close: () => {
             if (closed) return;
             closed = true;
@@ -109,6 +120,49 @@ export async function openRemotePlayback(url, { init } = {}) {
  */
 function positive(value) {
     return typeof value === 'number' && value > 0 && Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * A remote file whole, for a tool: the pieces kept, as they are on disk (no
+ * copy), and what is missing fetched once from the server, not kept. Null
+ * when the server cannot send part of a file (the caller fetches it whole,
+ * as before).
+ * @param {string} url
+ * @param {{init?: RequestInit, type?: string}} [options] - `type`: the Blob's media type
+ * @returns {Promise<Blob|null>}
+ */
+export async function remoteSourceBlob(url, { init, type = '' } = {}) {
+    const store = await getRemoteBuffer();
+    /** @type {BufferedFile} */
+    let file;
+    try {
+        file = await store.open({ url, key: remoteFileKey(url), init });
+    } catch (error) {
+        if (/** @type {{code?: string}} */ (error).code === 'NO_RANGES') return null;
+        throw error;
+    }
+    try {
+        /** @type {Blob[]} */
+        const parts = [];
+        let kept = 0;
+        let gapStart = -1;
+        for (let index = 0; index < file.pieceCount; index++) {
+            const piece = await file.pieceBlob(index);
+            if (!piece) {
+                if (gapStart < 0) gapStart = index * file.pieceSize;
+                continue;
+            }
+            if (gapStart >= 0) parts.push(await file.fetchRangeBlob(gapStart, index * file.pieceSize));
+            gapStart = -1;
+            parts.push(piece);
+            kept += piece.size;
+        }
+        if (gapStart >= 0) parts.push(await file.fetchRangeBlob(gapStart, file.size));
+        Logger.log(`[Buffer] ${file.key} for a tool: ${(kept / 1048576).toFixed(1)} of ${(file.size / 1048576).toFixed(1)} MB from the buffer`);
+        return new Blob(parts, { type });
+    } finally {
+        file.close();
+    }
 }
 
 /**

@@ -29,14 +29,23 @@ phase U.
   the player needed after a seek came in at half the link's rate, under the
   film's. So the read-ahead starts only on an idle link, and a reader's
   request pauses whatever read-ahead is running (its bytes are kept, and it
-  finishes once the link is idle again).
+  finishes once the link is idle again). A piece a seek left behind stops
+  too, even with a reader still waiting on it (MediaBunny leaves the reader
+  from before a seek waiting rather than cancelling it; on a device that
+  piece kept coming in beside the one the seek needed), and is finished
+  only when the downloader has nothing else to fetch.
 - **On disk, in the origin private file system.** One folder per file
   (`jj-buffer/<id>/`, namespaced for previews), a `meta.json` and one file
   per piece. A small worker writes, with a synchronous access handle (the
   one write path every current browser has, Safari included). The page
   reads directly, since a finished piece is never written again. Browser
   quotas allow far more than this needs (Chromium up to about 60% of the
-  disk), and the buffer takes the smaller of 2 GB and 10% of what is free.
+  disk). The store asks the browser to keep the site's storage
+  (`navigator.storage.persist()`); kept, the buffer takes the smaller of
+  8 GB and half of what is free. Not kept, storage can be cleared when the
+  device runs low, the playlist with it, so the buffer takes only the
+  smaller of 2 GB and 10% (on one device that was 186 MB, three minutes of
+  a 1080p episode).
 - **Memory when disk is not usable.** In a private window, when OPFS or
   workers are refused, or with under 200 MB free, the same store runs on a
   memory backend (256 MB). It is one code path with two backends.
@@ -56,7 +65,13 @@ phase U.
   drops the pieces (`SOURCE_CHANGED` mid-play). A file without a validator
   is kept for the session only.
 - **Offline.** A file with pieces kept opens without the network, and what
-  was kept plays.
+  was kept plays. One kept whole gets seek-bar thumbnails, read from its
+  pieces.
+- **Tools** that need a remote file whole get the kept pieces as they are on
+  disk (a Blob of the piece files, nothing copied) and the rest fetched once,
+  not kept: a tool must not push the file playing out of the buffer.
+- **Phone data.** On a metered connection, 2 minutes ahead and nothing while
+  paused.
 - **Two tabs.** A Web Lock per file. The holder keeps the pieces; another
   tab reads them and keeps what it fetches itself in memory.
 - **Where it does not apply.** HLS, live, YouTube, local files and blobs,

@@ -245,6 +245,14 @@ try {
     const offline = await playToEnd(page, 30000);
     check('and plays through from what was kept', offline.shown >= 150 && offline.at >= offline.duration - 0.3,
         `${offline.shown} frames, to ${offline.at.toFixed(2)} s`);
+    const thumbs = await page.evaluate(async () => {
+        const t = window.player.thumbnails;
+        for (let i = 0; i < 100 && !(t.generator?.thumbnails?.length > 0 && !t.generator.isGenerating); i++) {
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        return t.generator?.thumbnails?.length ?? 0;
+    });
+    check('a file kept whole gets its seek-bar thumbnails, made from the pieces', thumbs > 0, `${thumbs} thumbnails`);
     check('no request reached the server', remote.requests.length === 0, `${remote.requests.length}`);
     remote.mode = 'ranges';
 
