@@ -167,6 +167,25 @@ console.log('\na seek into the middle of a piece\n');
     file.close();
 }
 
+console.log('\nthe bytes before a seek point\n');
+{
+    const data = bytesOf(4000, 23);
+    const server = fakeServer({ 'https://h/s.mp4': { bytes: data, etag: '"v1"' } });
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/s.mp4', key: 'url:s' });
+    const bytes = await file.read(1600, 1700);     // a seek lands inside piece 1
+    await sleep(30);
+    const asked = server.requests.slice(1).map((r) => r.range.join('-'));
+    check('the seek\'s bytes come first', same(bytes, data.slice(1600, 1700)) && asked[0] === '1600-1999', asked.join(', '));
+    check('the piece\'s start, behind the picture, waits', !asked.includes('1000-1599') && !file.has(1), asked.join(', '));
+    check('ahead of the seek point counts from it, not from the piece', file.contiguousFromByte(1650) === 350,
+        `${file.contiguousFromByte(1650)}`);
+    check('it is fetched once nothing else is', file.resumeBackground() === true);
+    await file.ensure(1);
+    check('and the piece is then kept whole', file.has(1) && file.contiguousFromByte(1650) === 350);
+    file.close();
+}
+
 console.log('\nthe downloader\n');
 {
     const data = bytesOf(6000, 13);

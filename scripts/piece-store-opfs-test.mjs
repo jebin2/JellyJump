@@ -107,10 +107,12 @@ async function run(context, origin) {
     const first = await inStore(origin, `
         await store.clear();
         const file = await store.open({ url, key: 'url:film' });
-        const bytes = await file.read(500, 3500);
+        // From the start: a read that lands inside a piece leaves the bytes
+        // before it for later (behind the picture), and that piece unkept.
+        const bytes = await file.read(0, 3500);
         await file.ensure(3);   // the read had its bytes before the piece was whole
         await store.settled();
-        const result = { ok: same(bytes, 500), kept: [...file.record.pieces.keys()].sort((a, b) => a - b).join(), folders: await folderNames() };
+        const result = { ok: same(bytes, 0), kept: [...file.record.pieces.keys()].sort((a, b) => a - b).join(), folders: await folderNames() };
         file.close();
         return result;
     `)(page);

@@ -150,8 +150,8 @@ console.log('\na wait sized to a slow link\n');
         p.remote = { have: 0 };
         p.media = {
             remote: {
-                file: { linkRate: () => linkRate, contiguousFrom: () => p.remote.have, pieceSize: 4 * MB, size: 4000 * MB },
-                downloader: { byteRate: 1 * MB, cursor: 0, aheadPieces: () => 1000 },
+                file: { linkRate: () => linkRate, contiguousFromByte: () => p.remote.have, pieceSize: 4 * MB, size: 4000 * MB },
+                downloader: { byteRate: 1 * MB, cursor: 0, readByte: 0, aheadPieces: () => 1000 },
             },
         };
         noteAudioStarted(p);
@@ -213,7 +213,7 @@ console.log('\na wait sized to a slow link\n');
     // Near the end: everything left downloaded is enough, whatever the sum says.
     const nearEnd = remotePlayer(0.1 * MB);
     nearEnd.media.remote.file.size = 20 * MB;
-    nearEnd.media.remote.downloader.cursor = 3;    // reads run ahead: from 12 MB on
+    nearEnd.media.remote.downloader.readByte = 12 * MB;   // reads run ahead: from 12 MB on
     runLow(nearEnd);
     enoughAudio(nearEnd);
     nearEnd.remote.have = 8 * MB;                  // the rest of the file

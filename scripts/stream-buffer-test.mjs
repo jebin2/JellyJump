@@ -188,9 +188,15 @@ try {
     const opened = await load(page, url);
     check('a remote file opens through the buffer', opened.buffered && opened.kind === 'opfs', JSON.stringify(opened));
     const atLoad = keptBytes(await kept(page));
-    await sleep(4000);
-    const paused = keptBytes(await kept(page));
-    check('paused, it keeps downloading ahead', paused > atLoad + 40 * 1024, `${atLoad} → ${paused} bytes in 4 s`);
+    const pausedAt = Date.now();
+    let paused = atLoad;
+    // One request at a time at 20 KB/s: a 64 KB piece takes a few seconds.
+    while (paused < atLoad + 64 * 1024 && Date.now() - pausedAt < 15000) {
+        await sleep(250);
+        paused = keptBytes(await kept(page));
+    }
+    check('paused, it keeps downloading ahead', paused >= atLoad + 64 * 1024,
+        `${atLoad} → ${paused} bytes in ${((Date.now() - pausedAt) / 1000).toFixed(1)} s`);
 
     console.log('\na seek aborts the fetch it left behind\n');
     // A window of 2 s ahead (the setting), so the 12 s file has pieces

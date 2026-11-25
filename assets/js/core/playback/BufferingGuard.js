@@ -122,15 +122,18 @@ export function sizedWait(player) {
     if (rate >= need) return null;
     const horizon = Math.max(0, Math.min(HORIZON_S, (player.duration || 0) - (player.currentTime || 0)));
     const file = remote.file;
-    const cursor = remote.downloader.cursor;
+    // From the byte the player has read up to, not the start of its piece:
+    // counted from the piece, the bytes before a seek point passed for
+    // bytes ahead (seen on a device: a 30 s wait, then 10 s of play).
+    const from = remote.downloader.readByte;
     // Never more than the downloader will fetch ahead, nor than there is
     // left of the file from where it reads: the reads run ahead of the
     // picture, so near the end the bytes for the rest of the time can be
     // more than the file has left after them (a wait that never ended).
     const ahead = remote.downloader.aheadPieces() * file.pieceSize * 0.9;
-    const left = Math.max(0, file.size - cursor * file.pieceSize);
+    const left = Math.max(0, file.size - from);
     const want = Math.min((need - rate) * horizon, rate * MAX_WAIT_S, ahead, left);
-    const have = file.contiguousFrom(cursor);
+    const have = file.contiguousFromByte(from);
     return { want, have, rate };
 }
 
