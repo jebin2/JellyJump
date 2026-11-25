@@ -1,0 +1,2 @@
+import{t as e}from"./Logger-D_pzEc_h.js";var t=`jj-stale-chunk-reload-at`,n=3e4;window.addEventListener(`vite:preloadError`,r=>{if(navigator.onLine===!1)return;let i=Number(sessionStorage.getItem(t)||0);Date.now()-i<n||(r.preventDefault(),sessionStorage.setItem(t,String(Date.now())),e.warn(`[App] Build changed underneath us — reloading to fetch new chunks`),window.location.reload())});
+//# sourceMappingURL=reload-on-stale-chunks-CV9k30Xw.js.map
