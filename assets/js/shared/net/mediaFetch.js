@@ -35,6 +35,10 @@ export function mediaFetchFn(label) {
         }
         let bytes = 0;
         let reported = false;
+        // A reader that stops once it has what it asked for never reads the
+        // stream's end (the remote buffer does that), so a whole body is
+        // reported when its last byte arrives, not only at the end.
+        const expected = Number(response.headers.get('content-length')) || Infinity;
         const report = (/** @type {string} */ how) => {
             if (reported) return;
             reported = true;
@@ -47,6 +51,7 @@ export function mediaFetchFn(label) {
             transform(chunk, controller) {
                 bytes += chunk.byteLength;
                 controller.enqueue(chunk);
+                if (bytes >= expected) report('read');
             },
             flush() { report('read'); },
         }));
