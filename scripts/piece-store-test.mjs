@@ -390,7 +390,7 @@ console.log('\nwhat survives a reload\n');
 
 console.log('\nthe link\n');
 {
-    const server = fakeServer({ 'https://h/r.mp4': { bytes: bytesOf(400000), etag: '"v1"' } });
+    const server = fakeServer({ 'https://h/r.mp4': { bytes: bytesOf(800000), etag: '"v1"' } });
     server.chunk = 10000;
     server.delay = 30;
     const store = new PieceStore({ backend: new MemoryBackend(), budget: 1e9, fetchFn: server.fetch, pieceSize: 100000 });
@@ -401,6 +401,12 @@ console.log('\nthe link\n');
     // 10 KB every ~30 ms is ~330 KB/s, over more than the second it needs;
     // timers are coarse, so a wide band.
     check('the rate is measured from the time spent receiving', rate > 150000 && rate < 700000, `${Math.round(rate)} B/s`);
+    // The link drops: a few seconds later the measure says so, not the
+    // fast seconds before it.
+    server.delay = 200;                // 10 KB every 200 ms: 50 KB/s
+    for (let i = 4; i < 8; i++) await file.ensure(i);
+    const dropped = file.linkRate();
+    check('when the link drops, the measure follows within seconds', dropped < 100000, `${Math.round(dropped)} B/s`);
     file.close();
 }
 

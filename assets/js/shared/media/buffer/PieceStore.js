@@ -47,8 +47,15 @@ export function pieceSizeFor(size) {
 
 /** Attempts for a piece a reader is waiting on, and the wait before each retry (s). */
 const READ_RETRY_DELAYS = [1, 2, 4];
-/** How far back the link's rate is measured (ms). */
-const RATE_WINDOW_MS = 10000;
+/** How long samples of the link are kept (ms). */
+const RATE_WINDOW_MS = 30000;
+/**
+ * The link's rate is over the last this much receiving time (ms). Not the
+ * whole window: when the link drops, the seconds before the drop carried
+ * most of the bytes and kept the average high for as long as they stayed in
+ * it (seen on a device: 10 MB/s, then 0.5 MB/s, still measured as fast).
+ */
+const RATE_RECENT_MS = 3000;
 
 /**
  * What is kept about a file besides its pieces.
@@ -967,14 +974,18 @@ export class BufferedFile {
     }
 
     /**
-     * The link's rate over the last few seconds of fetching (bytes per
+     * The link's rate over the last RATE_RECENT_MS of receiving (bytes per
      * second), counting only the time spent receiving; null before a second
      * of it.
      */
     linkRate() {
         let bytes = 0;
         let ms = 0;
-        for (const sample of this.samples) { bytes += sample.bytes; ms += sample.ms; }
+        // The most recent RATE_RECENT_MS of receiving, newest first.
+        for (let i = this.samples.length - 1; i >= 0 && ms < RATE_RECENT_MS; i--) {
+            bytes += this.samples[i].bytes;
+            ms += this.samples[i].ms;
+        }
         // A second of receiving is a measure at any rate; counting bytes
         // instead never measured a link slower than they arrive in the window.
         if (bytes === 0 || ms < 1000) return null;

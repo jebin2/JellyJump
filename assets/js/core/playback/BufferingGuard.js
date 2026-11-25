@@ -135,6 +135,23 @@ export function sizedWait(player) {
 }
 
 /**
+ * For the log: the link as measured, what the video needs, and why the wait
+ * is or is not sized.
+ * @param {any} player
+ */
+function linkSummary(player) {
+    const remote = player.media?.remote;
+    if (!remote) return '';
+    const rate = remote.file.linkRate();
+    const byteRate = remote.downloader.byteRate;
+    const kb = (/** @type {number|null} */ v) => (v ? `${(v / 1024).toFixed(0)} KB/s` : 'not known yet');
+    const need = byteRate ? byteRate * (player.playbackRate || 1) * MARGIN : null;
+    const why = quick.has(player) ? 'Play now pressed' : !rate || !need ? 'not measured yet'
+        : rate >= need ? 'the link keeps up' : 'the link is slower';
+    return `; link ${kb(rate)}, the video needs ${kb(need)}: ${why}`;
+}
+
+/**
  * Seconds left of the current wait, when it is a sized one; null otherwise.
  * @param {any} player
  * @returns {number|null}
@@ -316,8 +333,8 @@ export function checkPlayerBuffering(player) {
         Logger.log(`[Buffering] Waiting for data at ${player.currentTime?.toFixed(3)}s `
             + `(audio ahead ${Number.isFinite(ahead) ? `${(ahead * 1000).toFixed(0)}ms` : 'n/a'}, `
             + `video ${videoStarved(player) ? 'starved' : 'ok'}; playing on with ${goal.toFixed(1)}s ahead`
-            + `${sized ? `, and ${(sized.want / 1048576).toFixed(0)} MB downloaded ahead: the link gives `
-                + `${(sized.rate / 1024).toFixed(0)} KB/s, the video needs more` : ''})`);
+            + `${sized ? `, and ${(sized.want / 1048576).toFixed(1)} MB downloaded ahead` : ''}`
+            + `${linkSummary(player)})`);
         player.setLoading(true);
         ctx.suspend().catch(() => { /* closed: the next load makes a new one */ });
         announceWait(player);
