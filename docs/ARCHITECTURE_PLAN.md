@@ -88,7 +88,8 @@ start (`78c1c90`); this table is where things stand now.
 | 4 | L5 (`shared/services`) strict and clean, with the utils it imports (`MediaMetadata`, `M3UParser`, `YouTubeUrl`, `LinkListFile`). Items typed as `PlaylistItem` throughout; new `NewPlaylistItem` for one made before the list gives it an id (remote libraries, YouTube, a URL), and the item fields the services set (`addedAt`, `m3uSource`, `m3uData`) added to it; M3U channels typed (`Channel`); `IndexedDBService`'s old item schema replaced by the shared type; `DesktopStorageService` reads its config through one typed getter. No behaviour change. Left: the rest of `utils` | in progress | #99 |
 | 4 | L5 (`shared/utils`, done) all of `shared/` (63 files) is checked under `strict`; `jsconfig.strict.json` now names `shared/` whole. The encryption code (`PlatformCrypto`, `VisualStripCodec`, `ReedSolomon`, `AudioDataCodec`) got annotations only: the shard plan (`ShardPlan`) and carrier frame (`CarrierSlot`) named, `encrypt` declares the `null` it returns when it streams to disk; `crypto-vectors-test` and `encrypt-test` pass unchanged. No behaviour change | done | #100 |
 | 4 | Q4 offline (BUG-12): the service worker precaches the player and landing pages, their start-up code and direct imports (player, playlist, MediaBunny), the DTS/TrueHD decoders and the public files the player reads (51 files, 6.7 MB raw), listed into `dist/sw.js` by the build (`jellyjump-sw`); hashed files are served from the cache and stored on first use, everything else network-first with the cache as fallback; `version.json`, media, maps and range requests never stored; each build's worker drops the last build's files. The stale-chunk reload no longer fires offline. ADR 0012; `offline-test` (23): after one visit the player opens and plays a local file with the network off. README no longer says offline is planned | done | #102 |
-| 4 | Bug: a remote file on a slow link stuck after a seek -- picture and sound stopped while the timer ran on. The clock is the AudioContext's and nothing held it when data ran out; late audio and late frames are dropped, so it never caught up. `core/playback/BufferingGuard.js`: the render loop suspends the context when the scheduled audio runs out or no frame comes while the decoder waits, shows the spinner, and resumes with enough audio ahead and the next frame ready (1 s, doubled for each wait soon after the last, up to 4 s, so a slow link gives a few long waits rather than one every two seconds); frames decoded more than 0.3 s behind the clock count as starved too. Seek-bar thumbnails are no longer made for a file streamed from the network (they read 100 frames from all over it and starved its playback; device logs showed playback fall from ~2.8 to ~0.4 MB/s while they read); a cached remote file plays from a blob: copy and gets them, each frame waiting for spare audio. With ?debug=1 each remote range request is logged (`shared/net/mediaFetch.js`). Known, left for J3: after a seek, MediaBunny finishes its current read-ahead chunk (8–16 MB) of the old position; it cannot be cut short without rebuilding the reader. `stall-test`: without the fix the clock ran 3.95 s ahead and 60 of 180 frames were dropped; with it, 179 of 180 shown, and all 90 after a seek | done | this PR |
+| 4 | Bug: a remote file on a slow link stuck after a seek -- picture and sound stopped while the timer ran on. The clock is the AudioContext's and nothing held it when data ran out; late audio and late frames are dropped, so it never caught up. `core/playback/BufferingGuard.js`: the render loop suspends the context when the scheduled audio runs out or no frame comes while the decoder waits, shows the spinner, and resumes with enough audio ahead and the next frame ready (1 s, doubled for each wait soon after the last, up to 4 s, so a slow link gives a few long waits rather than one every two seconds); frames decoded more than 0.3 s behind the clock count as starved too. Seek-bar thumbnails are no longer made for a file streamed from the network (they read 100 frames from all over it and starved its playback; device logs showed playback fall from ~2.8 to ~0.4 MB/s while they read); a cached remote file plays from a blob: copy and gets them, each frame waiting for spare audio. With ?debug=1 each remote range request is logged (`shared/net/mediaFetch.js`). Known, left for J3: after a seek, MediaBunny finishes its current read-ahead chunk (8–16 MB) of the old position; it cannot be cut short without rebuilding the reader. `stall-test`: without the fix the clock ran 3.95 s ahead and 60 of 180 frames were dropped; with it, 179 of 180 shown, and all 90 after a seek | done | #104 |
+| 4 | U (plan) Phase U, the remote playback buffer: pieces on disk, a downloader that keeps going while paused, a window and budget, a wait sized to the link, the downloaded range on the seek bar; steps U1–U5 | planned | this PR |
 
 ---
 
@@ -969,6 +970,91 @@ by the same rule — state with its owner, DOM in the UI.
 | T5 | Runbook for bug reports: ask for Diagnostics → Copy, read the trace, reproduce | in `docs/runbooks/` |
 | T6 | Every public API in §4 has JSDoc; the API listing test (I2) points at it | `@ts-check` on the API files |
 
+### Phase U — Remote playback buffer (M each; one PR per step, each with a device check)
+
+**Why.** A file from a shared library or a URL is read by MediaBunny's
+`UrlSource`: open-ended range requests with an 8–16 MB read-ahead kept in
+memory. On a link slower than the video (measured: 0.3–0.55 MB/s against the
+0.84 MB/s a 1080p film needs) nothing is kept: a pause downloads nothing, a
+seek back fetches again, the read of the old position runs on after a seek
+(it cannot be aborted without rebuilding the reader), and every wait is a
+short one (BufferingGuard, 1–4 s). Separately, a plain URL item is also
+downloaded whole by `MediaMetadata.cacheInBackground`, in memory, beside the
+playback and over the same link, and kept only if it is under 500 MB.
+
+**What it becomes.** One reader for every remote file, the same everywhere
+(browser, desktop app, phone):
+
+1. **Pieces.** The file is cut into fixed 4 MB pieces. Each piece is fetched
+   with its own range request that we own, so it can be aborted cleanly, and
+   kept on disk in the browser's private file storage (OPFS) per file:
+   `jj-buffer/<file key>/<piece index>`. Writes go through one small worker
+   (`createSyncAccessHandle`, which every current browser has, Safari
+   included); a finished piece is never written again, so the page reads it
+   directly (`getFile().slice()`).
+2. **The player reads pieces** through MediaBunny's `CustomSource`
+   (`getSize`, `read(start, end)`): from disk when the piece is there,
+   otherwise it joins that piece's download and is streamed the bytes as
+   they arrive (`read` may return a `ReadableStream`), so a large piece adds
+   no delay.
+3. **A downloader** keeps fetching, one piece at a time, in order, ahead of
+   where the player reads: playing and paused. Where it reads is taken from
+   the reads themselves (the last offset the demuxer asked for), not from a
+   time→byte guess, so it works for any container and follows a seek on its
+   own. A piece someone is waiting for goes first; a fetch for a piece that
+   the jump left behind is aborted; the pieces with the file's index (read at
+   load and on every seek) are kept for as long as the file is.
+4. **A window, not the whole file.** Kept: up to `ahead` (default 20 min of
+   the video, from its average bitrate) ahead of the read position and
+   `behind` (5 min) behind it; the rest is deleted as playback moves. All
+   files together stay under a budget (default 2 GB, or 10% of what
+   `navigator.storage.estimate()` reports free, whichever is smaller);
+   over it, the least recently played file's pieces go first.
+5. **A file that got complete** (watched through, or paused long enough)
+   plays from its pieces as a local file (`BlobSource` over the pieces
+   joined into one `Blob`, which copies nothing), so it gets seek-bar
+   thumbnails and plays without the network. This replaces
+   `cacheInBackground` for URLs: no second download.
+6. **Stale data is impossible.** A file's key is its identity on the server
+   (library: server + id; URL: the URL without `sig`/`token`) plus its size
+   and validator. The library server sends `ETag` (from size and mtime) and
+   exposes it; every piece response is checked against the stored one, and
+   a mismatch drops the file's pieces and starts over.
+7. **Where it does not apply** (the player keeps today's path, unchanged):
+   HLS, live, YouTube, local files and blobs, and a server that answers a
+   range request with 200 (no ranges). Without usable storage (private
+   window, OPFS refused, quota under 200 MB) the same store runs on a memory
+   backend with a 256 MB budget: one code path, two backends, not two
+   features.
+
+**Smart wait (#1).** BufferingGuard keeps deciding *when* to wait (audio or
+frames running out), but *how long* comes from the store: it measures the
+link (bytes per second over the last 10 s of fetching) and the video's
+bitrate around the read position (bytes per second of media), and resumes
+when the bytes downloaded ahead cover the next 10 minutes (or the rest of
+the file, if shorter) without another stop: on a link faster than the video
+that is the 1 s it is today; on a slower one, `(bitrate − link) × horizon`.
+The spinner shows the time left ("Buffering… 1:20"), recomputed as the link
+changes, with **Play now** to go on anyway. Without the store (HLS, fallback)
+it is today's 1–4 s.
+
+**Seek bar.** The pieces on disk are drawn as a shaded range behind the
+progress, mapped bytes → time by the average bitrate and drawn a little
+short at each end, so a shaded part never promises what is not there.
+
+| Step | Work | Done when | Device check |
+|---|---|---|---|
+| U1 | `shared/media/buffer/PieceStore.js` (pieces, window, budget, least-recently-played eviction, file key and validator) with an OPFS backend in `PieceStoreWorker.js` and a memory backend; library server sends `ETag` and exposes it; ADR 0013 | `piece-store-test` (Node, memory backend + a fake fetch): window, budget, eviction order, validator mismatch, a piece fetched once for two readers, abort on jump; `library-server-test` checks `ETag`. Nothing uses it yet | — |
+| U2 | `BufferedSource` (`CustomSource` over the store) and the downloader; `MediaLifecycle` uses it for remote files that answer ranges, `InputFactory` for their metadata reads (same store, so bytes are fetched once); `cacheInBackground` and the blocking download in `getSourceBlob` read through the store; read position, budget and windows in `Settings` (`buffer.*`) | `stream-buffer-test` (browser, the throttled server from `stall-test`): plays a remote file through; after a seek the old fetch is aborted (the server sees the connection close); a seek back into downloaded bytes makes no request; a reload plays the start without the network; a 200-only server and a memory-only store still play; `stall-test` and `bench-test` unchanged | play a library file over Tailscale from another network: play, seek forward and back, switch files |
+| U3 | Downloading while paused; the window and budget applied across files; a complete file played as local (thumbnails, offline); Settings → Playback → **Buffer**: budget and "clear" | the test pauses 20 s on the throttled link and then plays that span with no wait; budget over → the oldest file's pieces go; a complete file plays with the network off and gets thumbnails | pause 5 min, then play: no spinner for what downloaded; close and reopen the tab |
+| U4 | Shaded downloaded range on the seek bar (`bufferchange` event from the player, drawn by `PlayerUIListeners`) | test: shaded ranges match the store, never past it; no shading for local files | looks right on a phone |
+| U5 | Smart wait: rate and bitrate from the store, resume target, "Buffering… m:ss" with **Play now** | test: on a link at 60% of the bitrate the whole fixture plays after one wait; with the link at full speed, waits are as short as today; Play now resumes at once | on the slow link, one wait then smooth play; Play now works |
+
+Later, on top of the same store: **Download** (keep every piece, ask
+`navigator.storage.persist()`, show progress in the job tray), and
+seek-bar thumbnails for the downloaded parts only. Stopping the old read
+after a seek (noted under J3) is done by U2 for remote files.
+
 ---
 
 ## 6. Order
@@ -982,7 +1068,7 @@ parallel; a wave starts when the one before it is done, except where noted.
 | **1. Foundations** | rules and tools the rest builds on | C1–C5, R1–R5, N1–N3, P1–P2, L4, T1, T2, A5–A7 | layering, config, errors and logging are used by every later step |
 | **2. App structure** | settings, playlist, tools and storage done properly | D1–D3, E1–E5, F1–F5, G1–G5, N4–N7, O2, O3, O5, O6, Q1–Q3, K1–K3 | the biggest files and the edit-panel workarounds; storage needs B4's test |
 | **3. Player surface** | the player is used only through its API | H1–H4, I1–I2, P3–P6, Q5–Q6, S4–S8, T3–T6, O7, O8, K4, K5 | needs D (overrides) and E (playlist) in place |
-| **4. Ongoing** | the risky internals and long tails | J1–J4 (each with a device check, when a bug there is next fixed), M, L1–L3, L5, Q2, Q4, P7 | high risk or low urgency |
+| **4. Ongoing** | the risky internals and long tails | J1–J4 (each with a device check, when a bug there is next fixed), M, L1–L3, L5, Q2, Q4, P7, U1–U5 | high risk or low urgency |
 
 ```
 Wave 0 ──► Wave 1 ──► Wave 2 ──► Wave 3 ──► Wave 4 (ongoing)
