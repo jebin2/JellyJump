@@ -7,7 +7,7 @@
 import {
     checkPlayerBuffering, isPlayerStalled, clearPlayerStall, noteAudioStarted, noteAudioScheduled,
     noteFramePresented, audioLeadLimit, RESUME_AT,
-    skipBufferWait, resetBufferWaitChoice, bufferWaitSecondsLeft, HORIZON_S,
+    skipBufferWait, resetBufferWaitChoice, bufferWaitSecondsLeft, HORIZON_S, MAX_WAIT_S,
 } from '../assets/js/core/playback/BufferingGuard.js';
 
 let passed = 0;
@@ -165,13 +165,20 @@ console.log('\na wait sized to a slow link\n');
     };
     const enoughAudio = (p) => noteAudioScheduled(p, 2 + 5);
 
-    // Link at 0.6 MB/s, video 1 MB/s: 0.5 MB/s short (with the 10% margin), for 600 s.
+    // Link at 1.05 MB/s, video 1 MB/s: 0.05 MB/s short (with the 10% margin), for 600 s: 30 MB, under half a minute.
+    const near = remotePlayer(1.05 * MB);
+    runLow(near);
+    const nearLeft = bufferWaitSecondsLeft(near);
+    check('on a link a little slower than the video, the wait is sized to play 10 minutes through',
+        isPlayerStalled(near) && Math.abs(nearLeft - (0.05 * MB * HORIZON_S) / (1.05 * MB)) <= 1, `${nearLeft} s left`);
+
+    // Link at 0.6 MB/s: 10 minutes through would mean 500 s of waiting; it waits half a minute.
     const slow = remotePlayer(0.6 * MB);
     runLow(slow);
-    const want = (1.1 - 0.6) * MB * HORIZON_S;
+    const want = 0.6 * MB * MAX_WAIT_S;
     const left = bufferWaitSecondsLeft(slow);
-    check('on a link slower than the video, the wait is sized to play 10 minutes through',
-        isPlayerStalled(slow) && Math.abs(left - want / (0.6 * MB)) <= 1, `${left} s left`);
+    check('on a much slower one, never more than half a minute',
+        isPlayerStalled(slow) && Math.abs(left - MAX_WAIT_S) <= 1, `${left} s left`);
     check('and says so (bufferwaitchange with the time left)',
         slow.events.some((e) => e.name === 'bufferwaitchange' && e.waiting && e.secondsLeft === left), JSON.stringify(slow.events));
     enoughAudio(slow);

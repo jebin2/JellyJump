@@ -34,7 +34,7 @@
  * MARGIN to spare), waiting 1–4 s at a time means stopping every few seconds:
  * instead the wait lasts until the bytes downloaded ahead cover HORIZON_S of
  * play (or the rest of the file) without another stop, `(bitrate − link) ×
- * horizon`, recomputed as the link changes. The time left is announced
+ * horizon`, but never longer than MAX_WAIT_S, recomputed as the link changes. The time left is announced
  * (`bufferwaitchange`, shown under the spinner), and `playNow()` goes on at
  * once, with the short waits for the rest of this stretch (until the next
  * seek or load). On a link faster than the video it is the wait it was.
@@ -57,8 +57,16 @@ export const VIDEO_GAP = 0.5;
 export const VIDEO_LAG = 0.3;
 /** Not judged in the first moments after the audio starts: it is still filling. */
 const AUDIO_GRACE = 0.5;
-/** The video plays this many seconds without stopping after a sized wait. */
+/** The video plays this many seconds without stopping after a sized wait... */
 export const HORIZON_S = 600;
+/**
+ * ...unless that takes longer than this to download: a wait is never sized
+ * past half a minute. On a device (link 0.6 MB/s, film 0.95 MB/s) the full
+ * horizon meant a countdown of several minutes, and Play now was pressed
+ * each time after about 20 s; half a minute's wait buys about three
+ * quarters of a minute of play there.
+ */
+export const MAX_WAIT_S = 30;
 /** The link counts as fast enough above this share of the video's bitrate. */
 export const MARGIN = 1.1;
 /** Background work (seek-bar thumbnails) waits for this much audio ahead. */
@@ -121,7 +129,7 @@ export function sizedWait(player) {
     // more than the file has left after them (a wait that never ended).
     const ahead = remote.downloader.aheadPieces() * file.pieceSize * 0.9;
     const left = Math.max(0, file.size - cursor * file.pieceSize);
-    const want = Math.min((need - rate) * horizon, ahead, left);
+    const want = Math.min((need - rate) * horizon, rate * MAX_WAIT_S, ahead, left);
     const have = file.contiguousFrom(cursor);
     return { want, have, rate };
 }
