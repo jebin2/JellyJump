@@ -152,6 +152,7 @@ function announceWait(player) {
  * @param {any} player
  */
 export function skipBufferWait(player) {
+    if (stalled.has(player)) Logger.log(`[Buffering] Play now at ${player.currentTime?.toFixed(3)}s: short waits until the next seek or load`);
     quick.add(player);
     const wait = waits.get(player);
     if (wait) wait.goal = RESUME_AT;
