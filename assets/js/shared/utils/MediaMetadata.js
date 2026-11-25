@@ -102,8 +102,17 @@ export class MediaMetadata {
             return cachedFile;
         }
 
-        // 4. Remote URL - fetch and persist to IndexedDB (Blocking Legacy Mode)
-        // Tools that need the whole file; playback reads it through the remote buffer instead.
+        // 4. A remote file a tool needs whole: what the remote buffer keeps of
+        // it, and the rest from the server, once. Not copied into IndexedDB:
+        // the buffer is where remote files are kept.
+        if (item.url && /^https?:/i.test(item.url)) {
+            const { remoteSourceBlob } = await import('../media/buffer/RemotePlayback.js');
+            const blob = await remoteSourceBlob(item.url, { type: item.mimeType || '' });
+            if (blob) return blob;
+        }
+
+        // 5. Anything else with an address (or a server that cannot send
+        // part of a file): fetched whole, and kept in IndexedDB if small.
         if (item.url) {
             Logger.log('[Cache] Fetching remote video (blocking):', item.title);
 

@@ -72,6 +72,8 @@ const RATE_WINDOW_MS = 10000;
  * @property {(id: string, index: number, bytes: Uint8Array) => Promise<void>} writePiece
  * @property {(id: string, index: number, start: number, end: number) => Promise<Uint8Array|null>} readPiece
  *   bytes [start, end) of the piece; null when it is gone
+ * @property {(id: string, index: number) => Promise<Blob|null>} pieceBlob
+ *   the whole piece as a Blob (on disk: the file itself, nothing copied); null when gone
  * @property {(id: string, index: number) => Promise<void>} deletePiece
  * @property {(id: string) => Promise<void>} deleteFile
  */
@@ -614,6 +616,45 @@ export class BufferedFile {
             this.memoryPieces.delete(index);
         }
         return null;
+    }
+
+    /**
+     * A kept piece as a Blob (on disk, the piece file itself: nothing is
+     * read or copied); null when it is not kept whole.
+     * @param {number} index
+     * @returns {Promise<Blob|null>}
+     */
+    async pieceBlob(index) {
+        const length = pieceLength(this.size, this.pieceSize, index);
+        /** @type {Blob|null} */
+        let blob = null;
+        if (this.record.pieces.has(index)) blob = await this.store.backend.pieceBlob(this.id, index).catch(() => null);
+        if (!blob && this.memory && this.memoryPieces.has(index)) blob = await this.memory.pieceBlob(this.id, index);
+        return blob && blob.size === length ? blob : null;
+    }
+
+    /**
+     * Bytes [start, end) straight from the server as a Blob, checked like a
+     * piece but not kept (a tool reading the whole file must not push the
+     * file playing out of the buffer).
+     * @param {number} start
+     * @param {number} end
+     * @returns {Promise<Blob>}
+     */
+    async fetchRangeBlob(start, end) {
+        const response = await this.store.fetchFn(this.url, withRange(this.init, start, end - 1));
+        if (response.status !== 206 && !(response.status === 200 && start === 0 && end === this.size)) {
+            await response.body?.cancel().catch(() => {});
+            throw new AppError(response.status === 200 ? 'NO_RANGES' : 'NETWORK', { context: { status: response.status } });
+        }
+        const now = describe(response);
+        if ((now.size !== null && now.size !== this.size) || (now.validator && now.validator !== this.record.meta.validator)) {
+            await response.body?.cancel().catch(() => {});
+            throw new AppError('SOURCE_CHANGED', { context: { key: this.key } });
+        }
+        const blob = await response.blob();
+        if (blob.size !== end - start) throw new AppError('NETWORK', { message: `Got ${blob.size} of ${end - start} bytes` });
+        return blob;
     }
 
     /**

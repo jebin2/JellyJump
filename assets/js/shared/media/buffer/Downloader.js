@@ -27,6 +27,9 @@
  *   ones ahead; never pinned ones, never those within BEHIND_SECONDS behind.
  *   A file that fits keeps everything, and once complete plays without the
  *   network.
+ * - **Phone data.** On a metered connection (`navigator.connection.saveData`,
+ *   or a cellular one where the browser says so) it reads METERED_AHEAD_S
+ *   ahead and nothing while paused.
  * - **Failures** are retried with a growing wait (up to MAX_RETRY_S), and at
  *   once when the page comes back online or to the front.
  */
@@ -44,17 +47,30 @@ export const SETTLE_MS = 300;
 export const FILE_SHARE = 0.8;
 /** Longest wait between retries (s). */
 const MAX_RETRY_S = 16;
+/** How far ahead on a metered connection (s of video). */
+export const METERED_AHEAD_S = 120;
+
+/** Whether the connection costs per byte, as far as the browser says. */
+export function isMetered() {
+    const connection = /** @type {any} */ (globalThis.navigator)?.connection;
+    return !!connection && (connection.saveData === true || connection.type === 'cellular');
+}
 
 /** @typedef {import('./PieceStore.js').BufferedFile} BufferedFile */
 
 export class Downloader {
     /**
      * @param {BufferedFile} file
-     * @param {{budget: number, aheadSeconds?: number, behindSeconds?: number}} options -
-     *   the store's budget (bytes), and the window (seconds of video)
+     * @param {{budget: number, aheadSeconds?: number, behindSeconds?: number,
+     *   isPlaying?: () => boolean, metered?: () => boolean}} options - the
+     *   store's budget (bytes), the window (seconds of video), whether the
+     *   player is playing, and whether the connection is metered
      */
-    constructor(file, { budget, aheadSeconds = AHEAD_SECONDS, behindSeconds = BEHIND_SECONDS }) {
+    constructor(file, { budget, aheadSeconds = AHEAD_SECONDS, behindSeconds = BEHIND_SECONDS,
+        isPlaying = () => true, metered = isMetered }) {
         this.file = file;
+        this.isPlaying = isPlaying;
+        this.metered = metered;
         this.aheadSeconds = aheadSeconds;
         this.behindSeconds = behindSeconds;
         /** Bytes this file may keep. */
@@ -117,7 +133,8 @@ export class Downloader {
     aheadPieces() {
         const piece = this.file.pieceSize;
         if (!this.byteRate) return AHEAD_PIECES_UNKNOWN;
-        const bytes = Math.min(this.byteRate * this.aheadSeconds, this.allowance * 0.75);
+        const seconds = this.metered() ? Math.min(this.aheadSeconds, METERED_AHEAD_S) : this.aheadSeconds;
+        const bytes = Math.min(this.byteRate * seconds, this.allowance * 0.75);
         return Math.max(1, Math.ceil(bytes / piece));
     }
 
@@ -228,6 +245,8 @@ export class Downloader {
     async loop() {
         while (!this.stopped) {
             if (this.loading) { await this.sleep(); continue; }
+            // Paid-for data is not spent on what may never be watched.
+            if (this.metered() && !this.isPlaying()) { await this.sleep(1000); continue; }
             // One request at a time: a reader's comes first.
             if (this.file.linkBusy()) { await this.file.whenIdle(); continue; }
             const index = this.nextPiece();

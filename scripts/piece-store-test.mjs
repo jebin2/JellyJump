@@ -201,6 +201,30 @@ console.log('\nthe downloader\n');
     file.close();
 }
 
+console.log('\nphone data\n');
+{
+    const data = bytesOf(10000, 17);
+    const server = fakeServer({ 'https://h/p.mp4': { bytes: data, etag: '"v1"' } });
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/p.mp4', key: 'url:p' });
+    let playing = false;
+    const downloader = new Downloader(file, { budget: 1e9, isPlaying: () => playing, metered: () => true });
+    downloader.start();
+    downloader.setDuration(1000);   // 10 bytes a second: 120 s is 1,200 bytes, two pieces
+    downloader.loaded();
+    await sleep(150);
+    check('on a metered connection nothing is fetched while paused', server.requests.length === 1,
+        server.requests.map((r) => r.range?.join('-')).join(', '));
+    playing = true;
+    for (let i = 0; i < 50 && !file.has(2); i++) await sleep(20);
+    await sleep(100);
+    const kept = [...file.record.pieces.keys()].sort((a, b) => a - b).join();
+    // The piece being read, and two more: 120 s at 10 bytes a second.
+    check('and while playing it reads only two minutes ahead', kept === '0,1,2', kept);
+    downloader.stop();
+    file.close();
+}
+
 console.log('\nletting go\n');
 {
     const data = bytesOf(10000, 5);

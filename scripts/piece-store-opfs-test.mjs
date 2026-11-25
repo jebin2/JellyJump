@@ -44,11 +44,16 @@ async function waitForServer(origin) {
 
 const SIZE = 10 * 1000 + 500;   // 11 pieces of 1000 bytes, the last one short
 const FILE = Buffer.from(Uint8Array.from({ length: SIZE }, (_, i) => (i * 13) % 251));
+const SMALL = FILE;
+/** A file large enough to be cut into pieces by its own size (64 KB: 5 pieces). */
+const BIG = Buffer.from(Uint8Array.from({ length: 300000 }, (_, i) => (i * 13) % 251));
 /** Requests the "remote" file got, per page. */
 const served = [];
 
 /** Answer the remote file's range requests. */
 async function serveRemote(route) {
+    const FILE = route.request().url().includes('/big.mp4') ? BIG : SMALL;
+    const SIZE = FILE.length;
     const range = /bytes=(\d+)-(\d+)/.exec(route.request().headers().range || '');
     served.push(range ? `${range[1]}-${range[2]}` : 'whole');
     if (!range) return route.fulfill({ status: 200, body: FILE, headers: { ETag: '"v1"', 'Content-Length': String(SIZE) } });
@@ -168,6 +173,32 @@ async function run(context, origin) {
     `)(page);
     check(dropped.left === '1,2', `pieces outside the window are deleted (${dropped.left} left)`);
     check(dropped.folders.length === 0, `a dropped file's folder is gone (${dropped.folders})`);
+
+    console.log('\na tool reading a remote file whole');
+    served.length = 0;
+    const tool = await page.evaluate(async (origin) => {
+        const { getRemoteBuffer } = await import(`${origin}/assets/js/shared/media/buffer/RemoteBuffer.js`);
+        const { remoteSourceBlob } = await import(`${origin}/assets/js/shared/media/buffer/RemotePlayback.js`);
+        const { remoteFileKey } = await import(`${origin}/assets/js/shared/media/buffer/PieceStore.js`);
+        const url = `${origin}/__remote__/big.mp4`;
+        const store = await getRemoteBuffer();
+        const file = await store.open({ url, key: remoteFileKey(url) });
+        // Pieces 0 and 2 kept, as playback would have left them.
+        await file.ensure(0);
+        await file.ensure(2);
+        await store.settled();
+        const pieceSize = file.pieceSize;
+        file.close();
+        const before = performance.now();
+        const blob = await remoteSourceBlob(url, { type: 'video/mp4' });
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const ok = bytes.length === 300000 && bytes.every((b, i) => b === (i * 13) % 251);
+        return { ok, type: blob.type, pieceSize, ms: performance.now() - before };
+    }, origin);
+    const afterOpen = served.slice(served.indexOf('0-0', 3));
+    check(tool.ok && tool.type === 'video/mp4', 'the whole file comes back, byte for byte');
+    check(!afterOpen.includes(`0-${tool.pieceSize - 1}`) && !afterOpen.some((r) => r.startsWith(`${2 * tool.pieceSize}-`)),
+        `the kept pieces are not fetched again (requests: ${served.join(', ')})`);
 
     await saveCoverage(page, 'piece-store-opfs-test');
 }

@@ -158,6 +158,20 @@ export class OpfsBackend {
     }
 
     /**
+     * The piece file itself: a Blob backed by the disk, nothing read.
+     * @param {string} id
+     * @param {number} index
+     */
+    async pieceBlob(id, index) {
+        try {
+            const handle = await (await this.folder(id)).getFileHandle(`${index}.p`);
+            return await handle.getFile();
+        } catch {
+            return null;
+        }
+    }
+
+    /**
      * @param {string} id
      * @param {number} index
      */

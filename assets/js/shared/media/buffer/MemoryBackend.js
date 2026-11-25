@@ -62,6 +62,15 @@ export class MemoryBackend {
      * @param {string} id
      * @param {number} index
      */
+    async pieceBlob(id, index) {
+        const bytes = this.files.get(id)?.pieces.get(index);
+        return bytes ? new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (bytes)]) : null;
+    }
+
+    /**
+     * @param {string} id
+     * @param {number} index
+     */
     async deletePiece(id, index) {
         this.files.get(id)?.pieces.delete(index);
     }

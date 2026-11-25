@@ -101,7 +101,6 @@ export class PlayerThumbnails {
 
     async startGeneration() {
         if (this.generationStarted) return;
-        this.generationStarted = true;
 
         const p = this.player;
         const url = p.sourceUrl;
@@ -113,16 +112,18 @@ export class PlayerThumbnails {
             return;
         }
 
-        // Nor for a file played straight from the network: making them reads
-        // 100 frames from all over it, and over a home link that starved the
-        // playback of the same file (or, held back until a pause, still read
-        // a large part of a film nobody may scrub through). A remote file
-        // that is in the cache plays from a blob: copy and gets them as a
-        // local file does. The overlay keeps its loading indicator.
-        if (/^https?:/i.test(url)) {
-            Logger.log('[Thumbnails] Not made for a file streamed from the network');
+        // Nor for a file played from the network, until the remote buffer
+        // has all of it: making them reads 100 frames from all over it, and
+        // over a home link that starved the playback of the same file (or,
+        // held back until a pause, still read a large part of a film nobody
+        // may scrub through). Once it is all kept they are read from the
+        // pieces, and the player asks again then (MediaLifecycle). The
+        // overlay keeps its loading indicator.
+        if (/^https?:/i.test(url) && !p.media.remote?.file.isComplete()) {
+            Logger.log('[Thumbnails] Not made for a file streamed from the network (until all of it is buffered)');
             return;
         }
+        this.generationStarted = true;
 
         Logger.log('[Thumbnails] Starting generation with URL:', url);
         try {
