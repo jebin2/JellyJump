@@ -1042,6 +1042,93 @@ it is today's 1–4 s.
 progress, mapped bytes → time by the average bitrate and drawn a little
 short at each end, so a shaded part never promises what is not there.
 
+**Cases it handles** (each one is a check in the step's test, or in its
+device check where a browser cannot fake it):
+
+*Switching and the playlist*
+- **Switching files.** Loading another file stops the old file's downloader
+  and aborts its fetch (the piece half-fetched is dropped); its finished
+  pieces stay, so going back plays what was downloaded at once. Only the
+  file playing downloads; the store is per file, the downloader per player.
+- **Fast switching** (A → B → C in a second): each load cancels the one
+  before, as `cleanupPlayerForLoad` does today; no fetch of A or B outlives
+  the switch.
+- **Removing an item, clearing the playlist, the app's reset** drop the
+  pieces of those files.
+- **Metadata of other items** (duration, size for the list) reads the same
+  store at low priority, a few small reads; it never moves the downloader.
+- **The next item.** Not fetched ahead in U1–U5; once the current file's
+  window is full, starting the next item's first minute is a small later
+  step on the same store.
+
+*Seeking and moving around*
+- **Seek forward or back past the window**: fetches outside the new window
+  are aborted; the downloader starts at the new read position.
+- **Scrubbing** (dragging the bar): the read position counts as moved only
+  once reads settle (300 ms), so a drag does not start and abort a fetch per
+  step; `requestSeek` already coalesces the seeks themselves.
+- **Index at the end of the file** (MP4 not "faststart", MKV cues): those
+  pieces are read on load and on every seek and are kept with the file.
+- **Reverse play, frame stepping backwards, A-B loop, Cut loop**: reads go
+  backwards or repeat; the downloader follows the reads' direction, and
+  `behind` covers a loop smaller than it.
+- **Near the end**: the window stops at the end of the file.
+
+*Network*
+- **The link drops mid-play**: what is downloaded plays; a missing piece is
+  retried with the backoff remote files use today, the spinner shows, and
+  after the last attempt the player reports the error as it does now. When
+  the page comes back online (`online` event, or the tab coming to the front)
+  the downloader starts again by itself.
+- **Laptop asleep, phone locked, tab in the background**: fetches fail or
+  pause; on wake they are retried, and a half-fetched piece is fetched again.
+- **The share token changes** (the server restarted): stream URLs change but
+  the key does not (it leaves out `sig` and `token`), so the pieces stay.
+- **The file changed on the server**: a different `ETag` or size drops its
+  pieces. A plain URL whose server sends neither `ETag` nor `Last-Modified`
+  keeps its pieces for the session only, never across reloads.
+- **A URL with other query parameters** (a signed CDN link): its key is the
+  whole URL; an expired one is simply a new file, and the old pieces leave
+  by the budget.
+- **A server that ignores ranges, gives no size, or refuses CORS for
+  ranges**: today's path, unchanged.
+
+*Storage*
+- **Storage full mid-download**: the least recently played files' pieces
+  go, then it tries again; still full, the file goes on in the memory
+  backend.
+- **The browser clears storage** (pressure, the user clearing site data):
+  a piece that is gone is fetched again; nothing trusts a list it kept.
+- **A crash or a closed tab mid-write**: a piece counts only once written
+  whole (its size is checked when read); a short one is fetched again.
+- **Two tabs playing the same file**: one tab owns the file's pieces (Web
+  Locks, `navigator.locks`); the other reads what is there and fetches the
+  rest into memory, never writing the same piece.
+- **Previews share the site's origin** (S6), so OPFS too: the folder is
+  namespaced like the database (`jj-buffer-pr-N`).
+- **Private window, OPFS refused, tiny quota**: the memory backend (256 MB).
+- **A file larger than the budget** (a 50 GB 4K file): the window is the
+  smaller of its minutes and its share of the budget, so it never asks for
+  more than the budget.
+
+*How it is used*
+- **Paused for hours**: it fills the window and stops; it does not download
+  the whole film unasked.
+- **Phone data**: on a metered connection (`navigator.connection.saveData`,
+  or a cellular `type` where the browser tells) the window ahead is 2
+  minutes and nothing is fetched while paused; Settings can change both.
+- **Playback speed**: at 2× the video needs twice the bytes per second; the
+  smart wait counts it.
+- **Tools on a remote item** (convert, trim, GIF, …): `getSourceBlob` reads
+  the whole file through the store (the pieces already there are not fetched
+  again); the job's file may go over the budget while it runs and is let go
+  after.
+- **Encrypted files, local files, the desktop app's own library**: not
+  remote reads, so unaffected. The desktop app playing another machine's
+  library is a remote file and uses the store like the browser.
+- **Watch party**: each viewer loads the file as a remote one and buffers on
+  their own side; the host's seeks reach them as seeks.
+
 | Step | Work | Done when | Device check |
 |---|---|---|---|
 | U1 | `shared/media/buffer/PieceStore.js` (pieces, window, budget, least-recently-played eviction, file key and validator) with an OPFS backend in `PieceStoreWorker.js` and a memory backend; library server sends `ETag` and exposes it; ADR 0013 | `piece-store-test` (Node, memory backend + a fake fetch): window, budget, eviction order, validator mismatch, a piece fetched once for two readers, abort on jump; `library-server-test` checks `ETag`. Nothing uses it yet | — |
