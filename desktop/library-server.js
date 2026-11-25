@@ -115,8 +115,10 @@ function applyCors(req, res) {
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Range');
-    // Without this the client cannot read them, and seeking needs Content-Range.
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+    // Without this the client cannot read them: seeking needs Content-Range,
+    // and the player's buffer checks ETag to know a file it kept pieces of
+    // has not changed since.
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, ETag');
 }
 
 function escapeHtml(value) {
@@ -247,6 +249,10 @@ function streamFile(req, res, entry) {
         'Accept-Ranges': 'bytes',
         'Cache-Control': 'private, max-age=0',
     };
+    // The file as it is now: size and modification time. A player that kept
+    // pieces of it (its remote buffer) compares this on every piece, and a
+    // file replaced or re-encoded under the same name drops what was kept.
+    if (Number.isFinite(entry.mtimeMs)) headers.ETag = `"${entry.size.toString(16)}-${Math.floor(entry.mtimeMs).toString(16)}"`;
 
     // An empty file has no byte to start at, and createReadStream({end: -1})
     // throws from inside this handler -- an uncaught exception in the main
