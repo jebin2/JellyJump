@@ -250,7 +250,12 @@ export class Downloader {
             // One request at a time: a reader's comes first.
             if (this.file.linkBusy()) { await this.file.whenIdle(); continue; }
             const index = this.nextPiece();
-            if (index < 0) { await this.sleep(); continue; }
+            if (index < 0) {
+                // The window is full: finish a piece a seek left behind, if any.
+                if (this.file.resumeBackground()) { await this.file.whenIdle(); continue; }
+                await this.sleep();
+                continue;
+            }
             await this.makeRoom();
             try {
                 await this.file.ensure(index);

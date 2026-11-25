@@ -236,14 +236,34 @@ console.log('\nletting go\n');
     file.fetchPiece(3);
     const wanted = file.read(4000, 4100);
     await sleep(5);
-    file.abortExcept((index) => index === 3);
+    file.abortExcept((index) => index === 3 || index === 4);
     await sleep(5);
     const byPiece = (i) => server.requests.find((r) => r.range?.[0] === i * PIECE);
     check('a fetch the jump left behind is aborted', byPiece(2)?.aborted === true && !file.isFetching(2));
-    check('one a reader is waiting on is not', byPiece(4)?.aborted === false);
+    check('one a reader in the window is waiting on is not', byPiece(4)?.aborted === false);
     check('and the reader gets its bytes', same(await wanted, data.slice(4000, 4100)));
     await file.ensure(3);
     check('one still wanted, paused for the reader, is finished after it', file.has(3) && !file.has(2));
+
+    // The reader from before a seek: MediaBunny leaves it waiting.
+    server.requests.length = 0;
+    let staleDone = false;
+    const stale = file.read(8500, 8600).then(() => { staleDone = true; });
+    await sleep(15);
+    file.abortExcept((index) => index === 9);       // the seek: the window is piece 9 now
+    const fresh = file.read(9500, 9600);
+    await sleep(5);
+    const piece8 = server.requests.find((r) => r.range && r.range[0] >= 8 * PIECE && r.range[0] < 9 * PIECE);
+    check('a piece left behind with a reader still waiting on it stops downloading', piece8?.aborted === true,
+        server.requests.map((r) => `${r.range?.join('-')}${r.aborted ? ' aborted' : ''}`).join(', '));
+    check('so the seek\'s piece has the link to itself', same(await fresh, data.slice(9500, 9600)) && !staleDone);
+    await file.whenIdle();
+    check('it waits in the background, until the link is idle', !staleDone && file.resumeBackground() === true);
+    await stale;
+    await file.ensure(8);   // stored just after its reader had the bytes
+    check('and finishes when the downloader has nothing else to fetch, keeping the bytes it had', staleDone && file.has(8)
+        && server.requests.filter((r) => r.range && r.range[0] >= 8 * PIECE && r.range[0] < 9 * PIECE).length <= 3,
+        server.requests.map((r) => r.range?.join('-')).join(', '));
 
     server.delay = 0;
     for (let i = 0; i < 10; i++) await file.ensure(i);

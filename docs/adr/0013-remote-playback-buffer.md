@@ -29,7 +29,11 @@ phase U.
   the player needed after a seek came in at half the link's rate, under the
   film's. So the read-ahead starts only on an idle link, and a reader's
   request pauses whatever read-ahead is running (its bytes are kept, and it
-  finishes once the link is idle again).
+  finishes once the link is idle again). A piece a seek left behind stops
+  too, even with a reader still waiting on it (MediaBunny leaves the reader
+  from before a seek waiting rather than cancelling it; on a device that
+  piece kept coming in beside the one the seek needed), and is finished
+  only when the downloader has nothing else to fetch.
 - **On disk, in the origin private file system.** One folder per file
   (`jj-buffer/<id>/`, namespaced for previews), a `meta.json` and one file
   per piece. A small worker writes, with a synchronous access handle (the
