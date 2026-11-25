@@ -8,6 +8,7 @@
  */
 import { PieceStore, remoteFileKey, hashKey } from '../assets/js/shared/media/buffer/PieceStore.js';
 import { MemoryBackend } from '../assets/js/shared/media/buffer/MemoryBackend.js';
+import { Downloader } from '../assets/js/shared/media/buffer/Downloader.js';
 
 let passed = 0;
 let failed = 0;
@@ -30,7 +31,7 @@ function fakeServer(files) {
         if (server.down) throw new TypeError('Failed to fetch');
         const file = files[url];
         const range = /bytes=(\d+)-(\d+)/.exec(new Headers(init.headers).get('range') || '');
-        const request = { url, range: range ? [Number(range[1]), Number(range[2])] : null, aborted: false, delivered: 0 };
+        const request = { url, range: range ? [Number(range[1]), Number(range[2])] : null, aborted: false, delivered: 0, started: Date.now(), ended: null };
         server.requests.push(request);
         init.signal?.addEventListener('abort', () => { request.aborted = true; });
         if (!file) return new Response('', { status: 404 });
@@ -45,16 +46,17 @@ function fakeServer(files) {
         const stream = new ReadableStream({
             async start(controller) {
                 for (let at = 0; at < body.length; at += server.chunk) {
-                    if (request.aborted) { controller.error(new DOMException('Aborted', 'AbortError')); return; }
+                    if (request.aborted) { request.ended ??= Date.now(); controller.error(new DOMException('Aborted', 'AbortError')); return; }
                     if (server.delay) await sleep(server.delay);
-                    if (request.aborted) { controller.error(new DOMException('Aborted', 'AbortError')); return; }
+                    if (request.aborted) { request.ended ??= Date.now(); controller.error(new DOMException('Aborted', 'AbortError')); return; }
                     const piece = body.slice(at, at + server.chunk);
                     request.delivered += piece.length;
                     controller.enqueue(piece);
                 }
+                request.ended = Date.now();
                 controller.close();
             },
-            cancel() { request.aborted = true; },
+            cancel() { request.aborted = true; request.ended = Date.now(); },
         });
         return new Response(stream, {
             status: 206,
@@ -165,6 +167,40 @@ console.log('\na seek into the middle of a piece\n');
     file.close();
 }
 
+console.log('\nthe downloader\n');
+{
+    const data = bytesOf(6000, 13);
+    const server = fakeServer({ 'https://h/w.mp4': { bytes: data, etag: '"v1"' } });
+    server.chunk = 100;
+    server.delay = 8;
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/w.mp4', key: 'url:w' });
+    const downloader = new Downloader(file, { budget: 1e9 });
+    downloader.start();
+    downloader.setDuration(60);           // 100 bytes a second: the whole file is "ahead"
+    downloader.loaded();
+    // A seek into the middle of piece 2 while the downloader works.
+    await sleep(20);
+    downloader.noteRead(2500, 2600);
+    const bytes = await file.read(2500, 2600);
+    check('a reader gets its bytes while the downloader runs', same(bytes, data.slice(2500, 2600)));
+    const ahead = () => [2, 3, 4, 5].every((i) => file.has(i));
+    for (let i = 0; i < 200 && !ahead(); i++) await sleep(20);
+    check('the downloader fetches what is ahead of the seek', ahead());
+    check('and finishes the piece it was on when the reader came, keeping the bytes it had', file.has(0),
+        server.requests.map((r) => r.range?.join('-')).join(', '));
+    const requests = server.requests.slice(1).filter((r) => r.delivered > 0);
+    let overlap = null;
+    for (const a of requests) for (const b of requests) {
+        // An abort takes a moment to reach the server: 20 ms of slack.
+        if (a !== b && a.started < b.started && b.started < (a.ended ?? Infinity) - 20) overlap = `${a.range.join('-')} and ${b.range.join('-')}`;
+    }
+    check('one request at a time: none starts while another is still sending', overlap === null,
+        `${overlap}; ${requests.map((r) => `${r.range.join('-')}@${r.started % 100000}-${r.ended % 100000}`).join(', ')}`);
+    downloader.stop();
+    file.close();
+}
+
 console.log('\nletting go\n');
 {
     const data = bytesOf(10000, 5);
@@ -179,10 +215,11 @@ console.log('\nletting go\n');
     file.abortExcept((index) => index === 3);
     await sleep(5);
     const byPiece = (i) => server.requests.find((r) => r.range?.[0] === i * PIECE);
-    check('a fetch the jump left behind is aborted', byPiece(2)?.aborted === true);
-    check('one still wanted is not', byPiece(3)?.aborted === false);
-    check('nor one a reader is waiting on', byPiece(4)?.aborted === false);
-    check('and the reader still gets its bytes', same(await wanted, data.slice(4000, 4100)));
+    check('a fetch the jump left behind is aborted', byPiece(2)?.aborted === true && !file.isFetching(2));
+    check('one a reader is waiting on is not', byPiece(4)?.aborted === false);
+    check('and the reader gets its bytes', same(await wanted, data.slice(4000, 4100)));
+    await file.ensure(3);
+    check('one still wanted, paused for the reader, is finished after it', file.has(3) && !file.has(2));
 
     server.delay = 0;
     for (let i = 0; i < 10; i++) await file.ensure(i);

@@ -14,7 +14,11 @@
  * - **Ahead.** From the piece being read, in order, one piece at a time, up
  *   to `ahead` (AHEAD_SECONDS of the video, from its average bitrate, within
  *   the file's share of the budget). A piece a reader waits on is the
- *   store's to fetch at once; this is the read-ahead.
+ *   store's to fetch at once; this is the read-ahead, and it starts only when
+ *   nothing else of the file is being fetched. Two requests side by side
+ *   share the link: after a seek, the piece the player was waiting on came
+ *   in at half the link's rate, under the video's on a link faster than it
+ *   (seen on a device: ~1.2 MB/s link, ~0.95 MB/s film, waits of up to 7 s).
  * - **A jump** (a seek: a read outside the window) counts once reads settle
  *   (SETTLE_MS), so dragging the seek bar does not start and abort a fetch
  *   per step. Then fetches the jump left behind are aborted.
@@ -224,6 +228,8 @@ export class Downloader {
     async loop() {
         while (!this.stopped) {
             if (this.loading) { await this.sleep(); continue; }
+            // One request at a time: a reader's comes first.
+            if (this.file.linkBusy()) { await this.file.whenIdle(); continue; }
             const index = this.nextPiece();
             if (index < 0) { await this.sleep(); continue; }
             await this.makeRoom();

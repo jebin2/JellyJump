@@ -24,6 +24,12 @@ phase U.
   filled in after, so a seek never waits for a piece's beginning. The player
   reads exactly what the demuxer asks for (MediaBunny's own read-ahead off):
   the downloader reads ahead instead.
+- **One request at a time, the player's first.** Two requests side by side
+  share the link, and on a device (1.2 MB/s link, 0.95 MB/s film) the piece
+  the player needed after a seek came in at half the link's rate, under the
+  film's. So the read-ahead starts only on an idle link, and a reader's
+  request pauses whatever read-ahead is running (its bytes are kept, and it
+  finishes once the link is idle again).
 - **On disk, in the origin private file system.** One folder per file
   (`jj-buffer/<id>/`, namespaced for previews), a `meta.json` and one file
   per piece. A small worker writes, with a synchronous access handle (the

@@ -380,6 +380,7 @@ async function takeLock(name) {
  * @property {number} end
  * @property {number} pos
  * @property {AbortController} controller
+ * @property {boolean} [yielded] - stopped for a reader's request; its bytes so far are kept
  */
 
 /**
@@ -463,6 +464,10 @@ export class BufferedFile {
         this.closed = false;
         /** @type {Set<(start: number, end: number) => void>} */
         this.changeListeners = new Set();
+        /** Pieces waiting for an idle link to fill in their gaps. @type {Set<PieceFetch>} */
+        this.parked = new Set();
+        /** @type {Array<() => void>} whenIdle() callers */
+        this.idleWaiters = [];
     }
 
     get id() { return this.record.meta.id; }
@@ -569,7 +574,7 @@ export class BufferedFile {
         for (let attempt = 0; ; attempt++) {
             const kept = await this.readKept(index, from, to);
             if (kept) return kept;
-            const job = this.fetchPiece(index, from);
+            const job = this.fetchPiece(index, from, true);
             try {
                 await new Promise((resolve, reject) => {
                     if (covered(job.filled, from, to)) { resolve(undefined); return; }
@@ -612,6 +617,42 @@ export class BufferedFile {
     }
 
     /**
+     * Resolves when no piece of this file is being fetched (or the file is
+     * closed): the downloader reads ahead only on an idle link.
+     * @returns {Promise<void>}
+     */
+    async whenIdle() {
+        if (this.closed || !this.linkBusy()) return;
+        await new Promise((resolve) => this.idleWaiters.push(() => resolve(undefined)));
+    }
+
+    /**
+     * Whether a request of this file is running (other than `except`'s).
+     * @param {PieceFetch} [except]
+     */
+    linkBusy(except) {
+        for (const job of this.fetching.values()) if (job !== except && job.parts.size > 0) return true;
+        return false;
+    }
+
+    /**
+     * A request ended: when none is running any more, fill in a piece that
+     * was waiting for the link (parked), else tell whoever waits for an idle
+     * link (the downloader).
+     */
+    settleLink() {
+        if (this.closed || this.linkBusy()) return;
+        for (const job of this.parked) {
+            this.parked.delete(job);
+            if (job.finished) continue;
+            this.afterPart(job);
+            if (this.linkBusy()) return;
+        }
+        const waiters = this.idleWaiters.splice(0);
+        for (const resolve of waiters) resolve();
+    }
+
+    /**
      * Fetch a piece unless it is kept or already being fetched. Resolves when
      * it is kept; the caller (the downloader) does not wait on bytes.
      * @param {number} index
@@ -628,9 +669,11 @@ export class BufferedFile {
      * is about to reach it, or by a new one starting there.
      * @param {number} index
      * @param {number} [from]
+     * @param {boolean} [urgent] - a reader waits on it: requests for bytes
+     *   nobody waits on stop (keeping what they had) and finish later
      * @returns {PieceFetch}
      */
-    fetchPiece(index, from = 0) {
+    fetchPiece(index, from = 0, urgent = false) {
         let job = this.fetching.get(index);
         if (!job) {
             /** @type {(e: unknown) => void} */
@@ -654,8 +697,25 @@ export class BufferedFile {
             job.done.catch(() => {});
             this.fetching.set(index, job);
         }
+        if (urgent && !covered(job.filled, from, from + 1)) this.yieldTo(job);
         this.cover(job, from);
         return job;
+    }
+
+    /**
+     * Stop the requests of pieces nobody waits on (the read-ahead), keeping
+     * the bytes they had: the reader's request gets the whole link. They are
+     * picked up again once it is idle (settleLink).
+     * @param {PieceFetch} reader
+     */
+    yieldTo(reader) {
+        for (const job of this.fetching.values()) {
+            if (job === reader || job.finished || job.waiters.size > 0) continue;
+            for (const part of job.parts) {
+                part.yielded = true;
+                part.controller.abort();
+            }
+        }
     }
 
     /**
@@ -689,12 +749,19 @@ export class BufferedFile {
         /** @type {PiecePart} */
         const part = { start, end, pos: start, controller: new AbortController() };
         job.parts.add(part);
+        this.parked.delete(job);
         this.runPart(job, part).then(() => {
             job.parts.delete(part);
             this.afterPart(job);
+            this.settleLink();
         }, (raw) => {
             job.parts.delete(part);
-            this.failJob(job, AppError.from(raw));
+            if (part.yielded && !job.finished && !this.closed) {
+                if (job.parts.size === 0) this.parked.add(job);
+            } else {
+                this.failJob(job, AppError.from(raw));
+            }
+            this.settleLink();
         });
     }
 
@@ -714,6 +781,13 @@ export class BufferedFile {
             return;
         }
         if (job.parts.size > 0) return;
+        // Bytes nobody is waiting for (the start of a piece a seek landed
+        // in) wait for the link: fetched now, they would halve the rate of
+        // the piece the player needs next.
+        if (job.waiters.size === 0 && this.linkBusy(job)) {
+            this.parked.add(job);
+            return;
+        }
         let gap = 0;
         for (const [a, b] of job.filled) {
             if (a > gap) break;
@@ -729,6 +803,7 @@ export class BufferedFile {
     failJob(job, error) {
         if (job.finished) return;
         job.finished = true;
+        this.parked.delete(job);
         for (const part of job.parts) part.controller.abort();
         job.parts.clear();
         for (const waiter of job.waiters) waiter.reject(error);
@@ -918,6 +993,8 @@ export class BufferedFile {
             if (!job.finished) this.failJob(job, new AppError('CANCELLED', { message: 'The file was closed' }));
         }
         this.fetching.clear();
+        this.parked.clear();
+        for (const resolve of this.idleWaiters.splice(0)) resolve();
         this.record.openCount = Math.max(0, this.record.openCount - 1);
         this.memory = null;
         this.memoryPieces.clear();
