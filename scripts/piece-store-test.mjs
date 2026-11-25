@@ -1,0 +1,277 @@
+/**
+ * The remote buffer's store (shared/media/buffer/PieceStore.js), on the
+ * memory backend with a fake server: what it fetches, keeps, lets go of and
+ * refuses. ARCHITECTURE_PLAN.md U1. The disk backend is checked in a browser
+ * by piece-store-opfs-test.
+ *
+ *   node scripts/piece-store-test.mjs
+ */
+import { PieceStore, remoteFileKey, hashKey } from '../assets/js/shared/media/buffer/PieceStore.js';
+import { MemoryBackend } from '../assets/js/shared/media/buffer/MemoryBackend.js';
+
+let passed = 0;
+let failed = 0;
+function check(name, ok, detail = '') {
+    if (ok) { passed++; console.log(`  PASS  ${name}`); }
+    else { failed++; console.log(`  FAIL  ${name}${detail ? ` -- ${detail}` : ''}`); }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const PIECE = 1000;
+
+/**
+ * A server for one or more files: answers range requests (206, Content-Range,
+ * ETag), sends bodies in chunks with an optional delay between them, and
+ * records every request and whether it was aborted.
+ */
+function fakeServer(files) {
+    const server = { requests: [], ranges: true, down: false, chunk: 250, delay: 0 };
+    server.fetch = async (url, init = {}) => {
+        if (server.down) throw new TypeError('Failed to fetch');
+        const file = files[url];
+        const range = /bytes=(\d+)-(\d+)/.exec(new Headers(init.headers).get('range') || '');
+        const request = { url, range: range ? [Number(range[1]), Number(range[2])] : null, aborted: false };
+        server.requests.push(request);
+        init.signal?.addEventListener('abort', () => { request.aborted = true; });
+        if (!file) return new Response('', { status: 404 });
+        const headers = { 'Content-Type': 'video/mp4' };
+        if (file.etag) headers.ETag = file.etag;
+        if (!server.ranges || !range) {
+            return new Response(file.bytes, { status: 200, headers: { ...headers, 'Content-Length': String(file.bytes.length) } });
+        }
+        const start = Number(range[1]);
+        const end = Math.min(Number(range[2]), file.bytes.length - 1);
+        const body = file.bytes.slice(start, end + 1);
+        const stream = new ReadableStream({
+            async start(controller) {
+                for (let at = 0; at < body.length; at += server.chunk) {
+                    if (request.aborted) { controller.error(new DOMException('Aborted', 'AbortError')); return; }
+                    if (server.delay) await sleep(server.delay);
+                    if (request.aborted) { controller.error(new DOMException('Aborted', 'AbortError')); return; }
+                    controller.enqueue(body.slice(at, at + server.chunk));
+                }
+                controller.close();
+            },
+        });
+        return new Response(stream, {
+            status: 206,
+            headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${file.bytes.length}`, 'Content-Length': String(body.length) },
+        });
+    };
+    return server;
+}
+
+const bytesOf = (n, seed = 0) => new Uint8Array(n).map((_, i) => (i * 7 + seed) % 251);
+const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+let clock = 1000;
+const makeStore = (server, { backend = new MemoryBackend(), budget = 1e9 } = {}) =>
+    new PieceStore({ backend, budget, fetchFn: server.fetch, pieceSize: PIECE, now: () => clock++ });
+
+console.log('\nfile keys\n');
+{
+    check('a shared library file is known by server and id, not its URL',
+        remoteFileKey('http://h/api/stream/abc?sig=1', { remoteServer: 'home', remoteId: 'abc' }) === 'library:home:abc');
+    check('a URL is known without its access parameters',
+        remoteFileKey('https://h/v.mp4?sig=aa&token=bb&id=3') === remoteFileKey('https://h/v.mp4?id=3&sig=cc'));
+    check('but other parameters still tell files apart',
+        remoteFileKey('https://h/v.mp4?id=3') !== remoteFileKey('https://h/v.mp4?id=4'));
+    check('the folder name is a fixed-length hash', /^[0-9a-f]{16}$/.test(hashKey('library:home:abc')));
+}
+
+console.log('\nreading\n');
+{
+    const data = bytesOf(3500);
+    const server = fakeServer({ 'https://h/a.mp4': { bytes: data, etag: '"v1"' } });
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/a.mp4', key: 'url:a' });
+    check('open asks the server for one byte, to learn the size and version',
+        server.requests.length === 1 && server.requests[0].range.join() === '0,0' && file.size === 3500,
+        JSON.stringify(server.requests));
+    const read = await file.read(900, 2100);
+    check('a read across three pieces returns exactly those bytes', same(read, data.slice(900, 2100)));
+    check('each piece was fetched once, with its own range',
+        server.requests.slice(1).map((r) => r.range.join('-')).join() === '0-999,1000-1999,2000-2999',
+        server.requests.slice(1).map((r) => r.range.join('-')).join());
+    const before = server.requests.length;
+    const again = await file.read(0, 3000);
+    check('a read of kept pieces asks the network for nothing', server.requests.length === before && same(again, data.slice(0, 3000)));
+    const tail = await file.read(3400, 9999);
+    check('the last piece is shorter, and a read past the end stops at it', same(tail, data.slice(3400)));
+    check('the kept bytes, merged', JSON.stringify(file.downloadedRanges()) === '[[0,3500]]', JSON.stringify(file.downloadedRanges()));
+    check('and the file is complete', file.isComplete());
+    file.close();
+}
+
+console.log('\none fetch, many readers\n');
+{
+    const data = bytesOf(2000, 3);
+    const server = fakeServer({ 'https://h/b.mp4': { bytes: data, etag: '"v1"' } });
+    server.delay = 20;
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/b.mp4', key: 'url:b' });
+    const [x, y] = await Promise.all([file.read(0, 500), file.read(100, 900)]);
+    check('two readers of the same piece share one request', server.requests.length === 2, `${server.requests.length - 1} piece requests`);
+    check('and both get their bytes', same(x, data.slice(0, 500)) && same(y, data.slice(100, 900)));
+
+    const started = Date.now();
+    const early = file.read(1000, 1100);
+    const got = await early;
+    const waited = Date.now() - started;
+    check('a reader gets its bytes as soon as they arrive, not when the whole piece has',
+        same(got, data.slice(1000, 1100)) && waited < 4 * server.delay, `${waited} ms; a whole piece takes ${4 * server.delay}+`);
+    await file.ensure(1);
+    check('and the piece is kept once it is whole', file.has(1));
+    file.close();
+}
+
+console.log('\nletting go\n');
+{
+    const data = bytesOf(10000, 5);
+    const server = fakeServer({ 'https://h/c.mp4': { bytes: data, etag: '"v1"' } });
+    server.delay = 30;
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/c.mp4', key: 'url:c' });
+    file.fetchPiece(2);
+    file.fetchPiece(3);
+    const wanted = file.read(4000, 4100);
+    await sleep(5);
+    file.abortExcept((index) => index === 3);
+    await sleep(5);
+    const byPiece = (i) => server.requests.find((r) => r.range?.[0] === i * PIECE);
+    check('a fetch the jump left behind is aborted', byPiece(2)?.aborted === true);
+    check('one still wanted is not', byPiece(3)?.aborted === false);
+    check('nor one a reader is waiting on', byPiece(4)?.aborted === false);
+    check('and the reader still gets its bytes', same(await wanted, data.slice(4000, 4100)));
+
+    server.delay = 0;
+    for (let i = 0; i < 10; i++) await file.ensure(i);
+    file.pin(0);
+    await file.keepOnly(5, 7);
+    check('the window keeps only its pieces, and the pinned one',
+        [...file.record.pieces.keys()].sort((a, b) => a - b).join() === '0,5,6,7', [...file.record.pieces.keys()].join());
+    const backendPieces = [...store.backend.files.get(file.id).pieces.keys()].sort((a, b) => a - b).join();
+    check('and deletes the rest from storage', backendPieces === '0,5,6,7', backendPieces);
+    file.close();
+    const closedRead = await file.read(0, 10).then(() => 'read', (e) => e.code);
+    check('a closed file refuses reads', closedRead === 'CANCELLED', closedRead);
+}
+
+console.log('\nthe budget\n');
+{
+    const server = fakeServer({
+        'https://h/1.mp4': { bytes: bytesOf(3000, 1), etag: '"1"' },
+        'https://h/2.mp4': { bytes: bytesOf(3000, 2), etag: '"2"' },
+        'https://h/3.mp4': { bytes: bytesOf(3000, 3), etag: '"3"' },
+    });
+    const store = makeStore(server, { budget: 7000 });
+    const one = await store.open({ url: 'https://h/1.mp4', key: 'k1' });
+    await one.read(0, 3000);
+    one.close();
+    const two = await store.open({ url: 'https://h/2.mp4', key: 'k2' });
+    await two.read(0, 3000);
+    two.close();
+    const three = await store.open({ url: 'https://h/3.mp4', key: 'k3' });
+    await three.read(0, 3000);
+    await store.settled();
+    check('over the budget, the least recently played file goes, whole',
+        !store.files.has(hashKey('k1')) && store.files.has(hashKey('k2')) && store.usage() <= 7000,
+        `${[...store.files.values()].map((r) => r.meta.key)} ${store.usage()}`);
+    check('the file playing is never the one let go', three.isComplete());
+    three.close();
+    await store.drop('k2');
+    check('a removed item\'s pieces are deleted', !store.files.has(hashKey('k2')) && !store.backend.files.has(hashKey('k2')));
+}
+
+console.log('\nthe file changed on the server\n');
+{
+    const file1 = { bytes: bytesOf(2500, 1), etag: '"v1"' };
+    const server = fakeServer({ 'https://h/d.mp4': file1 });
+    const backend = new MemoryBackend();
+    const store = makeStore(server, { backend });
+    let file = await store.open({ url: 'https://h/d.mp4', key: 'kd' });
+    await file.read(0, 2500);
+    file.close();
+
+    file1.etag = '"v2"';
+    file1.bytes = bytesOf(2500, 9);
+    file = await store.open({ url: 'https://h/d.mp4', key: 'kd' });
+    check('reopened with a new ETag: what was kept is dropped', file.downloadedRanges().length === 0);
+    check('and what is read is the new file', same(await file.read(0, 100), file1.bytes.slice(0, 100)));
+
+    file1.etag = '"v3"';
+    const midPlay = await file.read(1000, 1100).then(() => 'read', (e) => e.code);
+    check('changed while playing: the read fails as SOURCE_CHANGED', midPlay === 'SOURCE_CHANGED', midPlay);
+    check('and its pieces are dropped', !store.files.has(file.id));
+    file.close();
+}
+
+console.log('\nservers and networks\n');
+{
+    const server = fakeServer({ 'https://h/e.mp4': { bytes: bytesOf(2000), etag: '"v1"' } });
+    server.ranges = false;
+    const store = makeStore(server);
+    const refused = await store.open({ url: 'https://h/e.mp4', key: 'ke' }).then(() => 'opened', (e) => e.code);
+    check('a server that ignores ranges is refused as NO_RANGES (played the old way)', refused === 'NO_RANGES', refused);
+
+    server.ranges = true;
+    const file = await store.open({ url: 'https://h/e.mp4', key: 'ke' });
+    await file.read(0, 1000);
+    file.close();
+    server.down = true;
+    const offline = await store.open({ url: 'https://h/e.mp4', key: 'ke' }).then((f) => f, (e) => e);
+    check('offline, a file with pieces kept still opens', offline.size === 2000, String(offline?.code));
+    check('and plays what was kept', same(await offline.read(0, 1000), bytesOf(2000).slice(0, 1000)));
+    const missing = await offline.read(1000, 1100).then(() => 'read', (e) => e.code);
+    check('a piece not kept fails as NETWORK', missing === 'NETWORK', missing);
+    offline.close();
+    const never = await store.open({ url: 'https://h/e.mp4', key: 'never' }).then(() => 'opened', (e) => e.code);
+    check('offline, a file never fetched cannot open', never === 'NETWORK', never);
+}
+
+console.log('\nwhat survives a reload\n');
+{
+    const server = fakeServer({
+        'https://h/f.mp4': { bytes: bytesOf(2000), etag: '"v1"' },
+        'https://h/g.mp4': { bytes: bytesOf(2000) },   // no ETag, no Last-Modified
+    });
+    const backend = new MemoryBackend();
+    const store = makeStore(server, { backend });
+    const kept = await store.open({ url: 'https://h/f.mp4', key: 'kf' });
+    await kept.read(0, 2000);
+    kept.close();
+    const unversioned = await store.open({ url: 'https://h/g.mp4', key: 'kg' });
+    await unversioned.read(0, 2000);
+    unversioned.close();
+
+    const reloaded = await makeStore(server, { backend }).load();
+    check('a file with a validator is there after a reload', reloaded.files.get(hashKey('kf'))?.pieces.size === 2);
+    check('one without is not: it may have changed unseen', !reloaded.files.has(hashKey('kg')));
+
+    // The browser cleared a piece behind the store's back.
+    await backend.deletePiece(hashKey('kf'), 1);
+    const before = server.requests.length;
+    const file = await reloaded.open({ url: 'https://h/f.mp4', key: 'kf' });
+    const bytes = await file.read(1500, 1600);
+    check('a piece gone from storage is fetched again, not trusted from the list',
+        same(bytes, bytesOf(2000).slice(1500, 1600)) && server.requests.length === before + 2);
+    file.close();
+}
+
+console.log('\nthe link\n');
+{
+    const server = fakeServer({ 'https://h/r.mp4': { bytes: bytesOf(400000), etag: '"v1"' } });
+    server.chunk = 10000;
+    server.delay = 5;
+    const store = new PieceStore({ backend: new MemoryBackend(), budget: 1e9, fetchFn: server.fetch, pieceSize: 100000 });
+    const file = await store.open({ url: 'https://h/r.mp4', key: 'kr' });
+    check('no rate before anything is fetched', file.linkRate() === null);
+    for (let i = 0; i < 4; i++) await file.ensure(i);
+    const rate = file.linkRate();
+    // 10 KB every ~5 ms is ~2 MB/s; timers are coarse, so a wide band.
+    check('the rate is measured from the time spent receiving', rate > 300000 && rate < 4000000, `${Math.round(rate)} B/s`);
+    file.close();
+}
+
+console.log(`\n${passed} passed, ${failed} failed`);
+process.exit(failed ? 1 : 0);

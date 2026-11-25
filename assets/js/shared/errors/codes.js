@@ -13,6 +13,8 @@ export const ERROR_CODES = Object.freeze({
     NETWORK: 'Could not reach the server. Check the connection and try again.',
     OFFLINE: 'This device is offline. Connect to the internet and try again.',
     TIMEOUT: 'The server took too long to answer. Try again in a moment.',
+    NO_RANGES: 'That server cannot send part of a file, so the video plays without being buffered.',
+    SOURCE_CHANGED: 'The file changed on the server while it was playing. Open it again.',
     CORS: 'That site does not allow its videos to be played from another site.',
     STORAGE_FULL: 'The browser\'s storage is full. Remove some videos from the playlist and try again.',
     NOT_KEPT: 'The browser\'s storage is full, so new videos play until this page closes but are not kept. Remove some videos from the playlist to make room.',

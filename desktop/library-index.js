@@ -202,7 +202,7 @@ function resolveServable(id) {
     }
     if (!stat.isFile()) return null;
 
-    return { ...entry, realPath: real, size: stat.size };
+    return { ...entry, realPath: real, size: stat.size, mtimeMs: stat.mtimeMs };
 }
 
 module.exports = {

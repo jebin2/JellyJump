@@ -8,7 +8,7 @@
  *   node scripts/library-server-test.mjs
  */
 import { createRequire } from 'node:module';
-import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, symlinkSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -162,6 +162,13 @@ check(await openEnded.text() === 'uvwxyz', 'an open-ended range runs to the end'
 const suffix = await fetch(`${base}/api/stream/${clip.id}`, { headers: { ...auth, Range: 'bytes=-6' } });
 check(await suffix.text() === 'uvwxyz', 'a suffix range returns the last bytes');
 
+const etag = partial.headers.get('etag');
+check(/^"[0-9a-f]+-[0-9a-f]+"$/.test(etag || ''), `names the file's version (ETag ${etag})`);
+check(whole.headers.get('etag') === etag, 'the same for every request of the unchanged file');
+utimesSync(clipPath, new Date(), new Date(Date.now() + 60000));   // replaced: same size, newer
+const changed = await fetch(`${base}/api/stream/${clip.id}`, { headers: { ...auth, Range: 'bytes=0-0' } });
+check(changed.headers.get('etag') !== etag, 'a different one once the file changed, even at the same size');
+
 const bad = await fetch(`${base}/api/stream/${clip.id}`, { headers: { ...auth, Range: 'bytes=999-1200' } });
 check(bad.status === 416, 'an unsatisfiable range returns 416');
 
@@ -173,6 +180,8 @@ check(cors.headers.get('access-control-allow-origin') === 'https://jellyjump.voi
     'allows the hosted origin');
 check((cors.headers.get('access-control-expose-headers') || '').includes('Content-Range'),
     'exposes Content-Range, without which seeking cannot work');
+check((cors.headers.get('access-control-expose-headers') || '').includes('ETag'),
+    'exposes ETag, which the player\'s buffer checks');
 const foreign = await fetch(`${base}/api/library`, { headers: { ...auth, Origin: 'https://evil.example' } });
 check(!foreign.headers.get('access-control-allow-origin'), 'does not allow an unknown origin');
 
