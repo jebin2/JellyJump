@@ -1,5 +1,6 @@
 // @ts-check
 import { MediaBunny } from './MediaBunny.js';
+import { pickBack } from './BackwardPlan.js';
 
 /**
  * BackwardFrames - video frames in reverse order, at the speed of forward
@@ -24,6 +25,12 @@ import { MediaBunny } from './MediaBunny.js';
  * cap, only its tail is held, and the part before is decoded again from the
  * key frame when it is reached. That still costs a fraction of decoding each
  * frame from the key frame separately.
+ *
+ * A caller that cannot wait (reverse playback) can choose, per stretch,
+ * how many frames to hold and every how many: fill(t, {planFor}). Holding
+ * every k-th frame spans k times as long with the same frames, so a chunk
+ * far from its key frame -- 250 frames with ffmpeg's default spacing -- is
+ * decoded fewer times over.
  */
 
 /**
@@ -79,6 +86,10 @@ export class BackwardFrameReader {
         this.decodedFrames = 0;
         /** Whether a fill is under way. */
         this.busy = false;
+        /** The step between the frames the last fill held (fill's planFor). */
+        this.step = 1;
+        /** Frames of the chunk before the ones the last fill held; 0 when it held back to the key frame. */
+        this.framesLeft = 0;
     }
 
     /** The earliest held timestamp, or null when nothing is held. */
@@ -101,11 +112,17 @@ export class BackwardFrameReader {
      * Decode and hold the stretch ending at `timestamp`. Resolves once held;
      * a call while one is under way waits for that one instead.
      * @param {number} timestamp
+     * @param {{planFor?: (frames: number) => {step: number, count: number}}} [options]
+     *   `planFor` is told how many frames lie between the key frame and
+     *   `timestamp` (all of which are decoded) and answers which to hold:
+     *   every `step`-th one back from `timestamp` (1: each one), `count` of
+     *   them (at most twice the reader's capacity). The step used is left in
+     *   `step`, the frames before the held ones in the chunk in `framesLeft`.
      */
-    async fill(timestamp) {
+    async fill(timestamp, { planFor } = {}) {
         if (this.busy) return this._filling;
         this.busy = true;
-        this._filling = this._fill(timestamp).finally(() => { this.busy = false; });
+        this._filling = this._fill(timestamp, { planFor }).finally(() => { this.busy = false; });
         return this._filling;
     }
 
@@ -177,11 +194,11 @@ export class BackwardFrameReader {
      * Decode forwards from the key frame at or before `timestamp` up to it,
      * keeping the last `capacity` frames.
      * @param {number} timestamp
-     * @param {{trustPackets?: boolean}} [options]
+     * @param {{trustPackets?: boolean, planFor?: (frames: number) => {step: number, count: number}}} [options]
      * @returns {Promise<void>}
      * @private
      */
-    async _fill(timestamp, { trustPackets = true } = {}) {
+    async _fill(timestamp, { trustPackets = true, planFor } = {}) {
         const key = await this.packets.getKeyPacket(timestamp, { metadataOnly: true })
             ?? await this.packets.getFirstPacket({ metadataOnly: true });
         if (!key) {
@@ -196,7 +213,11 @@ export class BackwardFrameReader {
         // which ones that is comes from the packets' timestamps, read without
         // decoding. Converting every decoded frame and dropping most of them
         // cost far more than the decoding did.
-        const keep = this.toHeld && trustPackets ? await this._lastTimestamps(key, timestamp) : null;
+        this.step = 1;
+        this.framesLeft = 0;
+        const keep = this.toHeld && trustPackets ? await this._lastTimestamps(key, timestamp, planFor) : null;
+        // As many as were picked (a plan can ask for more than the capacity).
+        const limit = keep ? Math.max(keep.size, 1) : this.capacity;
         let decodedInRange = 0;
         /** @type {HeldFrame[]} */
         const kept = [];
@@ -214,7 +235,7 @@ export class BackwardFrameReader {
             } else {
                 kept.push(sample);
             }
-            if (kept.length > this.capacity) kept.shift()?.close();
+            if (kept.length > limit) kept.shift()?.close();
         }
         if (this.closed) {
             for (const frame of kept) frame.close();
@@ -236,13 +257,15 @@ export class BackwardFrameReader {
 
     /**
      * The timestamps of the last `capacity` frames from `key` up to
-     * `timestamp`, in microseconds, read from the packets alone.
+     * `timestamp` -- every `step`-th one back from it -- in microseconds,
+     * read from the packets alone.
      * @param {any} key - the key packet to read from
      * @param {number} timestamp
+     * @param {(frames: number) => {step: number, count: number}} [planFor]
      * @returns {Promise<Set<number>>}
      * @private
      */
-    async _lastTimestamps(key, timestamp) {
+    async _lastTimestamps(key, timestamp, planFor) {
         /** @type {number[]} */
         const stamps = [];
         for await (const packet of this.packets.packets(key, undefined, { metadataOnly: true })) {
@@ -252,7 +275,12 @@ export class BackwardFrameReader {
             if (packet.timestamp <= timestamp + SAME_INSTANT) stamps.push(packet.timestamp);
         }
         stamps.sort((a, b) => a - b);
-        return new Set(stamps.slice(-this.capacity).map(t => Math.round(t * 1e6)));
+        const plan = planFor?.(stamps.length);
+        this.step = Math.max(1, Math.floor(plan?.step ?? 1));
+        const count = Math.max(1, Math.min(2 * this.capacity, Math.floor(plan?.count ?? this.capacity)));
+        const picked = pickBack(stamps, count, this.step);
+        this.framesLeft = picked.length ? stamps.indexOf(picked[0]) : 0;
+        return new Set(picked.map(t => Math.round(t * 1e6)));
     }
 }
 
