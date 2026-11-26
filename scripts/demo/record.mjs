@@ -160,7 +160,7 @@ const scene = (name) => scenes.push({ name, t: (Date.now() - pausedFor) / 1000 }
 scene('play');
 await caption('Plays your videos, right in the browser', 'local files · streams · your own library');
 await click('#mb-play-btn', { after: 3600 });
-await click('.playlist-item:has-text("Fractal Dive")', { after: 300 });
+await click('.playlist-item:has-text("Fractal Dive")', { after: 0 });
 await playing('Fractal Dive');
 await wait(2400);
 
@@ -181,13 +181,20 @@ await click('#mb-filters-btn', { after: 300, ms: 500 });
 // 3. Backwards, and speed.
 scene('reverse');
 await caption('Play it backwards', 'with sound · any speed from 0.25× to 2×');
-await click('#mb-direction-btn', { after: 2600, ms: 600 });
+// Backwards starts once its first stretch is decoded (about a second, the
+// picture still): that wait is left out, like a load.
+await click('#mb-direction-btn', { after: 0, ms: 600 });
+pause();
+const from = await page.evaluate(() => window.playlist.player.currentTime);
+await page.waitForFunction((from) => window.playlist.player.currentTime < from - 0.15, from, { timeout: 15000 });
+resume();
+await wait(2600);
 await click('#mb-direction-btn', { after: 600, ms: 300 });
 
 // 4. Editing in the side panel.
 scene('edit');
 await caption('Edit in a side panel', 'cut · crop · rotate · speed · blur · GIF · and more');
-await click('.playlist-item:has-text("City Of Life")', { after: 300, ms: 600 });
+await click('.playlist-item:has-text("City Of Life")', { after: 0, ms: 600 });
 await playing('City Of Life');
 await wait(900);
 await click('.playlist-item:has-text("City Of Life") .playlist-settings-btn', { after: 100, ms: 500 });

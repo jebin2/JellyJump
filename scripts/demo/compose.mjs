@@ -1,8 +1,7 @@
 /**
  * Puts the demo together from record.mjs's frames: a title card, the
  * recording, a closing card, crossfaded, with music.mjs's track cut to the
- * length. Writes public/demo.mp4 (1920×1080, H.264 + AAC) and
- * public/demo-poster.webp.
+ * length. Writes public/demo.mp4 (1920×1080, H.264 + AAC).
  *
  *   node scripts/demo/compose.mjs
  */
@@ -79,7 +78,5 @@ ff(
     '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', '-shortest',
     join(ROOT, 'public/demo.mp4'),
 );
-// The poster: the title card, as the page shows before the video plays.
-ff('-i', join(OUT, 'intro.png'), '-vf', 'scale=1280:-1', '-quality', '82', join(ROOT, 'public/demo-poster.webp'));
 const size = Number(execFileSync('stat', ['-c', '%s', join(ROOT, 'public/demo.mp4')]).toString());
 console.log(`public/demo.mp4: ${total.toFixed(1)} s, ${(size / 1048576).toFixed(1)} MB`);

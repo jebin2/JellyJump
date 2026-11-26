@@ -18,8 +18,8 @@ which runs, in order:
    browser's own screencast. Waits are left out: a clip loading, a crop job
    running.
 4. `compose.mjs`: adds a title card and a closing card, crossfaded, and
-   `music.mjs`'s track, cut to the length. Writes `public/demo.mp4` and
-   `public/demo-poster.webp`.
+   `music.mjs`'s track, cut to the length. Writes `public/demo.mp4`, which
+   the dashboard plays in JellyJump's own embed player (`embed.html`).
 
 Needs ffmpeg, Node 22 and a Chromium (`CHROMIUM_PATH`). A GPU helps: in
 software, a busy video records at 15 frames a second. Everything in between

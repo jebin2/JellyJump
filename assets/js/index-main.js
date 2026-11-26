@@ -71,24 +71,11 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    // The demo: plays muted as a preview; "Watch with sound" starts it over
-    // with sound and the video's own controls. Not moving for people who ask
-    // for less motion until they press play.
-    const demo = document.querySelector('.hero-demo');
-    const demoVideo = demo?.querySelector('video');
-    if (demo && demoVideo) {
-        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-            demoVideo.removeAttribute('autoplay');
-            demoVideo.pause();
-            demoVideo.controls = true;
-        }
-        demo.querySelector('.demo-sound')?.addEventListener('click', () => {
-            demoVideo.muted = false;
-            demoVideo.loop = false;
-            demoVideo.controls = true;
-            demoVideo.currentTime = 0;
-            demoVideo.play().catch(() => {});
-            demo.classList.add('with-sound');
-        });
+    // The demo, in JellyJump's own embed player: playing, muted and looping,
+    // except for people who ask for less motion, who start it themselves.
+    const demoFrame = document.querySelector('.hero-demo iframe[data-src]');
+    if (demoFrame) {
+        const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        demoFrame.src = `${demoFrame.dataset.src}&autoplay=${still ? 0 : 1}`;
     }
 });

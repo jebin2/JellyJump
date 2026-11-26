@@ -132,6 +132,7 @@
     display: block;
     width: 100%;
     aspect-ratio: 16 / 9;
+    border: 0;
     background: var(--bg-primary);
 }
 
@@ -150,8 +151,9 @@
     color: var(--text-secondary);
 }
 
-.hero-demo.with-sound .demo-sound {
-    visibility: hidden;
+.demo-hint {
+    color: var(--accent-primary);
+    white-space: nowrap;
 }
 
 /* -----------------------------------------
@@ -327,6 +329,12 @@
 
     .hero-demo {
         box-shadow: var(--shadow-md) var(--accent-primary);
+    }
+
+    .demo-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-xs);
     }
 }
 

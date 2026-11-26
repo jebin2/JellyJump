@@ -9,7 +9,10 @@ root=$(cd "$here/../.." && pwd)
 out="$here/out/clips"
 mkdir -p "$out"
 font="$root/assets/fonts/SpaceGrotesk-Bold.ttf"
-enc=(-c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -r 30 -movflags +faststart)
+# A keyframe every second: playing backwards decodes from the keyframe before
+# each step, and with x264's default (one every 8 s) the fractal could not be
+# decoded backwards as fast as it plays, so its picture stood still.
+enc=(-c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -r 30 -g 30 -keyint_min 30 -movflags +faststart)
 title() { echo "drawtext=fontfile=$font:text='$1':fontcolor=white@0.92:fontsize=64:x=(w-text_w)/2:y=h-140:shadowcolor=black@0.5:shadowx=3:shadowy=3"; }
 
 # Soft colours drifting: a calm opener.

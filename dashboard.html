@@ -101,13 +101,15 @@
                     </ul>
                 </div>
                 <figure class="hero-demo" id="demo">
-                    <video class="demo-video" autoplay muted loop playsinline preload="metadata" poster="demo-poster.webp"
-                        aria-label="JellyJump in a minute: playing, filters, playing backwards, editing, creating">
-                        <source src="demo.mp4" type="video/mp4">
-                    </video>
+                    <!-- The demo plays in JellyJump's own player: embed.html, the
+                         page anyone can put on their site. Its address is set by
+                         index-main.js (still, for people who ask for less motion). -->
+                    <iframe class="demo-video" title="JellyJump in under a minute, in JellyJump's own embed player"
+                        data-src="embed.html?video_url=demo.mp4&amp;muted=1&amp;loop=1&amp;controlBarMode=overlay&amp;controls=play,progress,time,volume,fullscreen"
+                        allow="autoplay; fullscreen" allowfullscreen></iframe>
                     <figcaption class="demo-bar">
-                        <span class="demo-note">JellyJump in under a minute</span>
-                        <button type="button" class="btn btn-primary demo-sound">🔊 Watch with sound</button>
+                        <span class="demo-note">Under a minute, in JellyJump's own embed player</span>
+                        <span class="demo-note demo-hint">🔊 tap the speaker for sound</span>
                     </figcaption>
                 </figure>
             </div>
