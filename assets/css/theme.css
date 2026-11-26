@@ -801,3 +801,22 @@ body {
 .h-full {
   height: 100%;
 }
+/* ?debug=1: the log, one tap away (player-main.js). */
+.jellyjump-log-button {
+  position: fixed;
+  left: calc(8px + env(safe-area-inset-left, 0px));
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  z-index: 10030; /* over the panels (10010–10020), under modals (20000) */
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.4));
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.6));
+  color: var(--text-primary, #fff);
+  opacity: 0.75;
+  cursor: pointer;
+}
+.jellyjump-log-button:hover,
+.jellyjump-log-button:focus-visible {
+  opacity: 1;
+}

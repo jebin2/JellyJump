@@ -6,6 +6,10 @@
  *
  * No file names, folder paths or URLs: errors pass through redact(), jobs
  * are listed by tool, never by what they were run on.
+ *
+ * "Copy log" and "Save log" add the log kept in memory (Logger, the last
+ * entries of this page), passed through redact() the same way: what the
+ * player did, line by line, from a device with no console to read.
  */
 import { config } from '../config/index.js';
 import { Logger } from '../utils/Logger.js';
@@ -98,6 +102,34 @@ export async function collectDiagnostics() {
         })),
         metrics: Metrics.summary(),
     };
+}
+
+/** @param {number} n @param {number} width */
+const pad = (n, width = 2) => String(n).padStart(width, '0');
+
+/**
+ * The log kept in memory, one line per entry: the clock time, the level,
+ * the message, and which load or job it belongs to. Addresses, paths and
+ * file names are taken out.
+ * @param {ReturnType<typeof Logger.entries>} [entries]
+ */
+export function formatLog(entries = Logger.entries()) {
+    if (!entries.length) return '  none';
+    return entries.map((e) => {
+        const d = new Date(e.time);
+        const clock = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
+        const trace = e.trace ? ` {${Object.entries(e.trace).map(([k, v]) => `${k} ${v}`).join(', ')}}` : '';
+        return `${clock} ${e.level.toUpperCase().padEnd(5)} ${redact(e.message)}${trace}`;
+    }).join('\n');
+}
+
+/**
+ * The report and the log after it: what "Copy log" and "Save log" give.
+ * @param {Awaited<ReturnType<typeof collectDiagnostics>>} d
+ */
+export function formatDiagnosticsWithLog(d) {
+    const entries = Logger.entries();
+    return `${formatDiagnostics(d)}\n\nLog (${entries.length} lines, oldest first, in this device's time):\n${formatLog(entries)}`;
 }
 
 /** @param {number} bytes */

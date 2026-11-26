@@ -309,8 +309,11 @@ async function run(page, origin) {
         await sleep(300);
         const copied = await navigator.clipboard.readText().catch(e => `read failed: ${e.message}`);
         const status = modal.footer.querySelector('.diagnostics-status').textContent;
+        modal.footer.querySelector('.diagnostics-copy-log').click();
+        await sleep(300);
+        const withLog = await navigator.clipboard.readText().catch(e => `read failed: ${e.message}`);
         modal.close();
-        return { text: pre.textContent, copied, status, measures: performance.getEntriesByType('measure').map(m => m.name) };
+        return { text: pre.textContent, copied, status, withLog, measures: performance.getEntriesByType('measure').map(m => m.name) };
     });
     const metric = (name) => Number(new RegExp(`${name}: (\\d+) ms`).exec(diag.text)?.[1]);
 
@@ -325,6 +328,10 @@ async function run(page, origin) {
     check(diag.measures.includes('jj:firstFrame') && diag.measures.includes('jj:seek'), 'and in the browser\'s performance timeline');
     check(!diag.text.includes('smoke') && !diag.text.includes(origin) && !diag.text.includes('blob:'), 'no file name or address in it');
     check(diag.copied === diag.text && /Copied/.test(diag.status), `Copy puts exactly that on the clipboard (${diag.status})`);
+    const logPart = diag.withLog.slice(diag.text.length);
+    check(diag.withLog.startsWith(diag.text) && /^\n\nLog \(\d+ lines/.test(logPart) && /\[MediaLifecycle\]/.test(logPart),
+        `Copy log adds the player's log after it (${logPart.split('\n').length - 3} lines)`);
+    check(!logPart.includes(origin) && !logPart.includes('blob:'), 'and the log names no address either');
 
     // The player's events (plan H1): what the UI will listen to instead of
     // being called. Each fires on a change, once.

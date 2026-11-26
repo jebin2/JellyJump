@@ -84,6 +84,17 @@ async function initializeApp() {
     window.jellyjump = {
         openDiagnostics: async () => (await import('./ui/menus/features/DiagnosticsView.js')).DiagnosticsView.open(),
     };
+    // With ?debug=1, the log is one tap away (Diagnostics → Save log), on a
+    // phone where there is no console to read it from.
+    if (Logger.isDebugRequested()) {
+        const logButton = document.createElement('button');
+        logButton.type = 'button';
+        logButton.className = 'jellyjump-log-button';
+        logButton.textContent = 'Log';
+        logButton.title = 'Diagnostics and the log, to copy or share';
+        logButton.addEventListener('click', () => window.jellyjump.openDiagnostics());
+        document.body.append(logButton);
+    }
 
     // A newer build went live while this tab was open: offer, never force.
     startUpdateCheck({

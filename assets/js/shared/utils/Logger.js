@@ -59,7 +59,7 @@ if (debugRequested && !isLocalhost) {
  * kept, so nothing big (a decoded frame, a file) stays alive because it was
  * logged. Warnings and errors keep a short rendering of their objects.
  */
-const MAX_ENTRIES = 1000;
+const MAX_ENTRIES = 3000;
 /** @type {Array<{time: number, level: string, scope: string, message: string, trace?: Record<string, string|number>}>} */
 const ring = [];
 let ringNext = 0;
@@ -120,6 +120,15 @@ export const Logger = {
      */
     isEnabled() {
         return loggingOn;
+    },
+
+    /**
+     * Whether `?debug=1` asked for logging (not just localhost): the page
+     * then offers its log to save or share (player-main).
+     * @returns {boolean}
+     */
+    isDebugRequested() {
+        return debugRequested;
     },
 
     /**
