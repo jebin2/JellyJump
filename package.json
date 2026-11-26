@@ -36,7 +36,8 @@
     "test:encrypt": "node scripts/encrypt-test.mjs",
     "test:source": "node scripts/source-failure-test.mjs",
     "test:smoke": "node scripts/smoke-test.mjs",
-    "test:edit": "node scripts/edit-panel-test.mjs"
+    "test:edit": "node scripts/edit-panel-test.mjs",
+    "demo": "npm run build && bash scripts/demo/make-clips.sh && node scripts/demo/record.mjs && node scripts/demo/compose.mjs"
   },
   "devDependencies": {
     "eslint": "^10.14.0",

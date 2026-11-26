@@ -71,26 +71,24 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    // Hero Video Animation
-    const heroVideo = document.querySelector('.hero-video');
-    const heroSection = document.getElementById('hero');
-
-    if (heroVideo && heroSection) {
-        // Function to trigger animation
-        const triggerAnimation = () => {
-            heroSection.classList.add('video-loaded');
-        };
-
-        // If video is already playing (cached or fast load)
-        if (heroVideo.currentTime > 0 && !heroVideo.paused && !heroVideo.ended && heroVideo.readyState > 2) {
-            triggerAnimation();
-        } else {
-            // Wait for play event
-            heroVideo.addEventListener('play', triggerAnimation);
-            // Fallback: also check timeupdate in case play event fired before listener
-            heroVideo.addEventListener('timeupdate', () => {
-                if (heroVideo.currentTime > 0.5) triggerAnimation(); // Small buffer
-            }, { once: true });
+    // The demo: plays muted as a preview; "Watch with sound" starts it over
+    // with sound and the video's own controls. Not moving for people who ask
+    // for less motion until they press play.
+    const demo = document.querySelector('.hero-demo');
+    const demoVideo = demo?.querySelector('video');
+    if (demo && demoVideo) {
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+            demoVideo.removeAttribute('autoplay');
+            demoVideo.pause();
+            demoVideo.controls = true;
         }
+        demo.querySelector('.demo-sound')?.addEventListener('click', () => {
+            demoVideo.muted = false;
+            demoVideo.loop = false;
+            demoVideo.controls = true;
+            demoVideo.currentTime = 0;
+            demoVideo.play().catch(() => {});
+            demo.classList.add('with-sound');
+        });
     }
 });
