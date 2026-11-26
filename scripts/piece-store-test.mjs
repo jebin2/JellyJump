@@ -9,7 +9,7 @@
 import { PieceStore, remoteFileKey, hashKey } from '../assets/js/shared/media/buffer/PieceStore.js';
 import { MemoryBackend } from '../assets/js/shared/media/buffer/MemoryBackend.js';
 import { Downloader } from '../assets/js/shared/media/buffer/Downloader.js';
-import { downloadedTimeRanges, watchDownloadedRanges, stopDownloadedRanges, THROTTLE_MS } from '../assets/js/core/playback/DownloadedRanges.js';
+import { downloadedTimeRanges, watchDownloadedRanges, stopDownloadedRanges, ByteClock, THROTTLE_MS, SAMPLE_MS } from '../assets/js/core/playback/DownloadedRanges.js';
 
 let passed = 0;
 let failed = 0;
@@ -321,7 +321,9 @@ console.log('\nwhat the seek bar shades\n');
 
     // A player: announced at once, then at most every THROTTLE_MS as pieces come, and cleared when let go.
     const events = [];
-    const player = { duration: 95, media: { remote: { file } }, trigger: (name, data) => events.push({ name, ...data }) };
+    const downloader = { readByte: 0, loading: false, jumpTo: null };
+    const player = { duration: 95, isPlaying: false, currentTime: 0, media: { remote: { file, downloader } },
+        trigger: (name, data) => events.push({ name, ...data }) };
     watchDownloadedRanges(player);
     check('announced when the file opens', events.length === 1 && events[0].name === 'bufferchange'
         && JSON.stringify(events[0].ranges) === '[[0,30],[50,60]]', JSON.stringify(events));
@@ -341,6 +343,69 @@ console.log('\nwhat the seek bar shades\n');
     const local = { duration: 10, media: { remote: null }, trigger: (name, data) => events.push({ name, ...data }) };
     watchDownloadedRanges(local);
     check('a file not played through the buffer shows none', events.length === 4 && events[3].ranges.length === 0);
+    file.close();
+}
+
+console.log('\nbytes to time, from where the player reads\n');
+{
+    // A file whose bytes do not follow time evenly, as on a device: 76.5% of the time at 79.2% of the bytes.
+    const clock = new ByteClock(1000);
+    check('without points, a byte\'s share of the size', clock.timeAt(500, 100) === 50);
+    clock.note(792, 76.5);
+    check('a point seen places that byte at its time', Math.abs(clock.timeAt(792, 100) - 76.5) < 1e-9);
+    check('and the bytes around it between it and the ends',
+        Math.abs(clock.timeAt(396, 100) - 38.25) < 1e-9 && Math.abs(clock.timeAt(896, 100) - 88.25) < 1e-9,
+        `${clock.timeAt(396, 100)} ${clock.timeAt(896, 100)}`);
+    clock.note(300, 40);
+    clock.note(500, 30);    // contradicts 300 → 40: the newest wins
+    check('a point it contradicts goes', clock.points.map((p) => p.byte).join() === '500,792', clock.points.map((p) => p.byte).join());
+    check('a time never past the duration', clock.timeAt(1000, 80) <= 80 && clock.timeAt(900, 80) <= 80);
+
+    // The player: points taken only while the read position and the time are steady.
+    const data = bytesOf(10000, 3);
+    const server = fakeServer({ 'https://h/t.mkv': { bytes: data, etag: '"v1"' } });
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/t.mkv', key: 'url:t' });
+    // After a seek to 76.5 s, read at byte 7920: the piece it lands in is fetched from
+    // there (not kept whole), the next ones whole.
+    for (const i of [8, 9]) await file.ensure(i);
+    const events = [];
+    const downloader = { readByte: 7920, loading: false, jumpTo: null };
+    const player = { duration: 100, isPlaying: false, isLoading: false, currentTime: 76.5, playbackRate: 1,
+        media: { remote: { file, downloader } }, trigger: (name, data) => events.push({ name, ...data }) };
+    watchDownloadedRanges(player);
+    const first = events.at(-1).ranges[0];
+    check('before any point, by the share of the file (on the device: 90 s away)', Math.abs(first[0] - 80) < 1e-9, JSON.stringify(first));
+    downloader.jumpTo = 7;                                   // a seek settling: not a point
+    await sleep(SAMPLE_MS * 2 + THROTTLE_MS + 100);
+    check('no point while a seek settles', events.length === 1, `${events.length}`);
+    downloader.jumpTo = null;
+    await sleep(SAMPLE_MS * 2 + THROTTLE_MS + 100);         // paused, neither moving: a point
+    const placed = events.at(-1).ranges[0];
+    check('paused and steady, the read position places the shading at the playhead',
+        placed[0] >= 76.5 && placed[0] - 76.5 < 2 && placed[1] === 100, JSON.stringify(placed));
+    const count = events.length;
+    await sleep(SAMPLE_MS * 2 + 100);
+    check('and paused, it is not redrawn every second', events.length === count, `${events.length - count} more`);
+
+    // Playing: the time moves with the clock, the reads with it.
+    player.isPlaying = true;
+    const started = performance.now();
+    const tick = setInterval(() => {
+        player.currentTime = 76.5 + (performance.now() - started) / 1000;
+        downloader.readByte = 7920 + Math.round((performance.now() - started) / 1000 * 30);
+    }, 50);
+    await sleep(SAMPLE_MS * 3);
+    check('playing on at the clock\'s pace, points are taken', events.length > count);
+    clearInterval(tick);
+    await sleep(THROTTLE_MS + 100);
+    const before = events.at(-1).ranges[0];
+    player.currentTime = 20;                                // a jump in time between samples: not steady
+    await sleep(SAMPLE_MS * 2 + THROTTLE_MS + 100);
+    const after = events.at(-1).ranges[0];
+    check('a jump between two samples is not a point (the shading stays where it was)',
+        JSON.stringify(after) === JSON.stringify(before), `${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+    stopDownloadedRanges(player);
     file.close();
 }
 
