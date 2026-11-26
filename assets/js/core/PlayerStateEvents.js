@@ -14,8 +14,8 @@
  *
  * Events: play, pause, directionchange, timeupdate, durationchange, loadingchange,
  * volumechange, ratechange, loopmodechange, ended, trackschange,
- * streamstatechange, controlbarmodechange, filterschange (and reversefailed
- * and bufferwaitchange, fired where they happen).
+ * streamstatechange, controlbarmodechange, filterschange (and reversefailed,
+ * bufferwaitchange and bufferchange, fired where they happen).
  */
 
 /** @param {unknown} a @param {unknown} b */

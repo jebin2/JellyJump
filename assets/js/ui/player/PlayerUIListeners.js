@@ -9,6 +9,7 @@
  */
 import {
     updatePlayerPlayPauseUI, updatePlayerProgress, updatePlayerVolumeUI, showPlayerLoading, showPlayerBufferWait,
+    showPlayerDownloaded,
 } from './PlayerUIUpdates.js';
 import { updatePlayerSpeedMenu, updatePlayerFiltersButtonState } from './PlayerPanels.js';
 import { Logger } from '../../shared/utils/Logger.js';
@@ -29,6 +30,12 @@ export function listenToPlayer(player) {
     player.on('loadingchange', loading);
     // A wait sized to a slow link shows how long is left, and Play now.
     player.on('bufferwaitchange', ({ secondsLeft }) => showPlayerBufferWait(player, secondsLeft));
+    // A remote file's downloaded parts, shaded on the seek bar.
+    /** @type {Array<[number, number]>} */
+    let downloaded = [];
+    const shade = () => showPlayerDownloaded(player, downloaded);
+    player.on('bufferchange', ({ ranges }) => { downloaded = ranges; shade(); });
+    player.on('durationchange', shade);
 
     const filters = () => updatePlayerFiltersButtonState(player);
     // The A-B markers sit at a share of the duration, so a range set while

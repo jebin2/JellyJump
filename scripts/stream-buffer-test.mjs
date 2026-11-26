@@ -148,6 +148,14 @@ const kept = (page) => page.evaluate(() => window.player.media.remote?.file.down
 const keptBytes = (ranges) => ranges.reduce((sum, [a, b]) => sum + b - a, 0);
 
 /** Play until `seconds` of video have been shown, or the end. */
+/** The seek bar's shading: how many parts, their share of the bar, and the share of the file kept. */
+const shadedOnSeekBar = (page) => page.evaluate(() => {
+    const parts = [...document.querySelectorAll('.jellyjump-progress-downloaded-range')];
+    const share = parts.reduce((sum, el) => sum + parseFloat(el.style.width) / 100, 0);
+    const file = window.player.media.remote?.file;
+    const kept = file ? file.downloadedRanges().reduce((n, [a, b]) => n + b - a, 0) / file.size : 0;
+    return { parts: parts.length, share, kept };
+});
 const playUntil = (page, seconds, limitMs = 60000) => page.evaluate(async ({ seconds, limitMs }) => {
     const p = window.player;
     if (!p.isPlaying) await p.play();
@@ -197,6 +205,10 @@ try {
     }
     check('paused, it keeps downloading ahead', paused >= atLoad + 64 * 1024,
         `${atLoad} → ${paused} bytes in ${((Date.now() - pausedAt) / 1000).toFixed(1)} s`);
+    await sleep(700);   // the seek bar is redrawn at most every half second
+    const shaded = await shadedOnSeekBar(page);
+    check('the seek bar shades what is downloaded', shaded.parts > 0 && shaded.share > 0, JSON.stringify(shaded));
+    check('never more than the store keeps', shaded.share <= shaded.kept + 0.01, JSON.stringify(shaded));
 
     console.log('\na seek aborts the fetch it left behind\n');
     // A window of 2 s ahead (the setting), so the 12 s file has pieces
@@ -287,6 +299,7 @@ try {
     remote.mode = 'whole';
     const plain = await load(page, `${origin}/__remote__/plain.mp4`);
     check('is not buffered', !plain.buffered);
+    check('and its seek bar shades nothing', (await shadedOnSeekBar(page)).parts === 0);
     const plainRun = await playToEnd(page, 30000);
     check('but still plays, as before', plainRun.shown >= 150, `${plainRun.shown} frames`);
     remote.mode = 'ranges';

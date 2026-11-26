@@ -44,6 +44,7 @@ export function createPlayerControls(player) {
     if (player.config.controls.progress) {
         player.ui.progressContainer = q('.jellyjump-progress-container');
         player.ui.progressBar = q('.jellyjump-progress-bar');
+        player.ui.progressDownloaded = q('.jellyjump-progress-downloaded');
     }
     if (player.config.controls.time) player.ui.timeDisplay = q('#mb-time-display');
     if (player.config.controls.fullscreen) player.ui.fullscreenBtn = q('#mb-fullscreen-btn');

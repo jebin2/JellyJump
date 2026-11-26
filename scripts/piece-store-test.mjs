@@ -9,6 +9,7 @@
 import { PieceStore, remoteFileKey, hashKey } from '../assets/js/shared/media/buffer/PieceStore.js';
 import { MemoryBackend } from '../assets/js/shared/media/buffer/MemoryBackend.js';
 import { Downloader } from '../assets/js/shared/media/buffer/Downloader.js';
+import { downloadedTimeRanges, watchDownloadedRanges, stopDownloadedRanges, THROTTLE_MS } from '../assets/js/core/playback/DownloadedRanges.js';
 
 let passed = 0;
 let failed = 0;
@@ -295,6 +296,52 @@ console.log('\nletting go\n');
     file.close();
     const closedRead = await file.read(0, 10).then(() => 'read', (e) => e.code);
     check('a closed file refuses reads', closedRead === 'CANCELLED', closedRead);
+}
+
+console.log('\nwhat the seek bar shades\n');
+{
+    const data = bytesOf(9500, 9);
+    const server = fakeServer({ 'https://h/s.mkv': { bytes: data, etag: '"v1"' } });
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/s.mkv', key: 'url:s' });
+    for (const i of [0, 1, 2, 5, 8, 9]) await file.ensure(i);
+    // The header (piece 0) and the index at the end (8, 9), as a load pins them.
+    for (const i of [0, 8, 9]) file.pin(i);
+    const ranges = file.playableRanges();
+    check('whole pieces kept, merged; a run of only the index at the end is left out',
+        JSON.stringify(ranges) === '[[0,3000],[5000,6000]]', JSON.stringify(ranges));
+    check('never more than is kept', ranges.every(([a, b]) => file.downloadedRanges().some(([c, d]) => c <= a && b <= d)));
+    const times = downloadedTimeRanges(file, 95);
+    check('placed in time by the share of the file', JSON.stringify(times) === '[[0,30],[50,60]]', JSON.stringify(times));
+    await file.forget([1, 2]);
+    check('the first piece alone still shows: it holds the start of the video',
+        JSON.stringify(file.playableRanges()) === '[[0,1000],[5000,6000]]', JSON.stringify(file.playableRanges()));
+    for (const i of [1, 2]) await file.ensure(i);
+    check('nothing before the duration is known', downloadedTimeRanges(file, NaN).length === 0 && downloadedTimeRanges(file, 0).length === 0);
+
+    // A player: announced at once, then at most every THROTTLE_MS as pieces come, and cleared when let go.
+    const events = [];
+    const player = { duration: 95, media: { remote: { file } }, trigger: (name, data) => events.push({ name, ...data }) };
+    watchDownloadedRanges(player);
+    check('announced when the file opens', events.length === 1 && events[0].name === 'bufferchange'
+        && JSON.stringify(events[0].ranges) === '[[0,30],[50,60]]', JSON.stringify(events));
+    await file.ensure(3);
+    await file.ensure(4);
+    await sleep(THROTTLE_MS + 50);
+    check('and again as pieces come, once for several', events.length === 2
+        && JSON.stringify(events[1].ranges) === '[[0,60]]', JSON.stringify(events));
+    stopDownloadedRanges(player);
+    check('cleared when the media is let go', events.length === 3 && events[2].ranges.length === 0);
+    await file.ensure(6);
+    await sleep(THROTTLE_MS + 50);
+    check('and no longer follows the file', events.length === 3);
+    stopDownloadedRanges(player);
+    check('let go twice: announced once', events.length === 3);
+
+    const local = { duration: 10, media: { remote: null }, trigger: (name, data) => events.push({ name, ...data }) };
+    watchDownloadedRanges(local);
+    check('a file not played through the buffer shows none', events.length === 4 && events[3].ranges.length === 0);
+    file.close();
 }
 
 console.log('\nthe budget\n');

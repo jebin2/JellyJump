@@ -76,6 +76,9 @@ phase U.
   lasts until the bytes ahead cover 10 minutes of play, but never longer
   than 20 s (an uncapped countdown of minutes was skipped after ~20 s every
   time), shown as a countdown, with Play now to go on regardless.
+- **The seek bar** shades what is downloaded (whole pieces, placed in time
+  by the average bitrate), so it shows where a seek plays without waiting.
+  The file's index at the end, kept for seeking, is not shaded.
 - **Phone data.** On a metered connection, 2 minutes ahead and nothing while
   paused.
 - **Two tabs.** A Web Lock per file. The holder keeps the pieces; another
