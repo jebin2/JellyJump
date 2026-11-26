@@ -37,7 +37,7 @@ function findBrowser() {
 
 async function waitForServer(origin) {
     for (let i = 0; i < 90; i++) {
-        try { if ((await fetch(`${origin}/index.html`)).ok) return true; } catch { /* starting */ }
+        try { if ((await fetch(`${origin}/dashboard.html`)).ok) return true; } catch { /* starting */ }
         await new Promise(r => setTimeout(r, 1000));
     }
     return false;
@@ -79,7 +79,7 @@ async function step(page, origin, label, body) {
 }
 
 async function run(page, origin) {
-    await page.goto(`${origin}/index.html`);
+    await page.goto(`${origin}/dashboard.html`);
 
     const src = await step(page, origin, 'the fixture', `return meta(fixture);`);
     if (!src) return;

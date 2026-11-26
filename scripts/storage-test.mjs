@@ -36,7 +36,7 @@ function findBrowser() {
 
 async function waitForServer(origin) {
     for (let i = 0; i < 90; i++) {
-        try { if ((await fetch(`${origin}/index.html`)).ok) return true; } catch { /* starting */ }
+        try { if ((await fetch(`${origin}/dashboard.html`)).ok) return true; } catch { /* starting */ }
         await new Promise(r => setTimeout(r, 1000));
     }
     return false;
@@ -51,7 +51,7 @@ const withStorage = (origin, body) => async (page) => page.evaluate(async ({ ori
 }, { origin, body });
 
 async function run(page, origin) {
-    await page.goto(`${origin}/index.html`);
+    await page.goto(`${origin}/dashboard.html`);
 
     console.log('\nsaving a playlist with a file');
     const saved = await withStorage(origin, `

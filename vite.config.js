@@ -53,12 +53,31 @@ const versionFile = {
     },
 };
 
+/**
+ * The site's root is the player: index.html is written as a copy of the
+ * built player.html, so https://…/ opens the player with nothing in between
+ * (no redirect), and player.html links keep working. The landing page is
+ * dashboard.html. Same folder, so the copy's relative paths are the same.
+ */
+const rootIsPlayer = {
+    name: 'jellyjump-root-is-player',
+    enforce: /** @type {const} */ ('post'),
+    generateBundle: {
+        order: /** @type {const} */ ('post'),
+        handler(_options, bundle) {
+            const player = bundle['player.html'];
+            if (!player || player.type !== 'asset') return;   // a build without the player page
+            this.emitFile({ type: 'asset', fileName: 'index.html', source: player.source });
+        },
+    },
+};
+
 /** A build file named by its content (assets/name-HASH.ext): never changes. */
 const HASHED_FILE = /(^|\/)assets\/[^/]+-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/i;
 /** Public files the offline player needs; the rest (media, SEO) are not stored. */
 const OFFLINE_PUBLIC = /^(manifest\.json|favicon\.ico|icon-\d+\.png|poster\.webp|assets\/(icons|templates)\/.+|assets\/js\/lib\/.+)$/;
-/** Pages stored for offline use: the player, and the landing page. */
-const OFFLINE_PAGES = { 'player.html': 'player', 'index.html': 'main' };
+/** Pages stored for offline use, by their entry: the player (also at the root), and the landing page. */
+const OFFLINE_PAGES = { 'player.html': 'player', 'index.html': 'player', 'dashboard.html': 'dashboard' };
 /** On-demand decoders a file may need before it plays (plan Q4). */
 const OFFLINE_DECODERS = /^mediabunny-(dts|truehd)$/;
 
@@ -116,7 +135,7 @@ const serviceWorkerManifest = {
 
 export default defineConfig({
     root: '.',
-    plugins: [contentSecurityPolicy, versionFile, serviceWorkerManifest],
+    plugins: [contentSecurityPolicy, versionFile, rootIsPlayer, serviceWorkerManifest],
 
     define: {
         'import.meta.env.VITE_BUILD_ID': JSON.stringify(buildId),
@@ -153,7 +172,7 @@ export default defineConfig({
         sourcemap: true,
         rollupOptions: {
             input: {
-                main: resolve(__dirname, 'index.html'),
+                dashboard: resolve(__dirname, 'dashboard.html'),
                 player: resolve(__dirname, 'player.html'),
                 embed: resolve(__dirname, 'embed.html'),
                 watch: resolve(__dirname, 'watch.html'),

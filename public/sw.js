@@ -130,7 +130,9 @@ async function respond(req, url) {
         // (player.html?debug=1) is the same page, and the templates are
         // fetched with ?v=<build> only to get past the HTTP cache.
         const options = { ignoreSearch: true };
-        const hit = await (await caches.open(PRECACHE)).match(key, options) ?? await caches.match(key, options);
+        // A folder is its index.html: the site's root is the player, stored by that name.
+        const page = url.pathname.endsWith('/') ? new URL('index.html', url).href : key;
+        const hit = await (await caches.open(PRECACHE)).match(page, options) ?? await caches.match(page, options);
         if (hit) return hit;
         throw error;
     }

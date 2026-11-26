@@ -45,8 +45,11 @@ const match = sw.match(/const BUILD = (\{.*?\});\n/);
 check('dist/sw.js carries the build manifest', !!match);
 const manifest = match ? JSON.parse(match[1]) : { precache: [], files: [], id: '' };
 check('it names the build', typeof manifest.id === 'string' && manifest.id.length > 0);
-check('the precache holds the player page and the landing page',
-    manifest.precache.includes('player.html') && manifest.precache.includes('index.html'));
+check('the precache holds the player page, the root (the player too) and the landing page',
+    ['player.html', 'index.html', 'dashboard.html'].every((page) => manifest.precache.includes(page)));
+check('the site\'s root is the player page, byte for byte; the landing page is dashboard.html',
+    readFileSync(join(DIST, 'index.html'), 'utf8') === readFileSync(join(DIST, 'player.html'), 'utf8')
+    && readFileSync(join(DIST, 'dashboard.html'), 'utf8').includes('LAUNCH PLAYER'));
 check('every precached file is in the build', manifest.precache.every((file) => existsSync(join(DIST, file))),
     manifest.precache.filter((file) => !existsSync(join(DIST, file))).join(', '));
 check('no media, source maps, version.json or sw.js precached',
@@ -175,6 +178,11 @@ try {
     // A query on the page is the same page (player.html?debug=1).
     const withQuery = await page.goto(`${origin}/player.html?from=offline-test`).catch((error) => error);
     check('the page with a query opens offline too', !(withQuery instanceof Error) && withQuery?.ok());
+    // The site's root is the player (index.html, a copy of it).
+    const root = await page.goto(`${origin}/`).catch((error) => error);
+    const rootBooted = !(root instanceof Error) && root?.ok()
+        && await page.waitForFunction(() => !!window.player, null, { timeout: 30000 }).then(() => true, () => false);
+    check('the site\'s root opens the player offline', rootBooted, root instanceof Error ? root.message : `status ${root?.status()}`);
 
     await context.setOffline(false);
 } catch (error) {
