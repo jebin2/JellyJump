@@ -45,8 +45,9 @@ const WITH_YOUTUBE = {
 
 /** @type {Record<string, Policy>} */
 const PAGES = {
-    /** The landing page. */
-    index: APP,
+    /** The landing page (dashboard.html; it was the site's root until the player took its place). */
+    dashboard: APP,
+    /** Also the site's root: the build writes index.html as a copy of it (vite.config.js). */
     player: WITH_YOUTUBE,
     embed: WITH_YOUTUBE,
     /**

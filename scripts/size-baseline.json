@@ -1,13 +1,13 @@
 {
   "totals": {
     "firstPaintJs": {
-      "index": 7594,
+      "dashboard": 7594,
       "player": 11188,
       "embed": 8347,
       "watch": 10973
     },
     "css": {
-      "index": 4450,
+      "dashboard": 4450,
       "player": 18764,
       "embed": 9571,
       "watch": 2750

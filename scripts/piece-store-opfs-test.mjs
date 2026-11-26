@@ -36,7 +36,7 @@ const { chromium } = await import('playwright-core');
 
 async function waitForServer(origin) {
     for (let i = 0; i < 90; i++) {
-        try { if ((await fetch(`${origin}/index.html`)).ok) return true; } catch { /* starting */ }
+        try { if ((await fetch(`${origin}/dashboard.html`)).ok) return true; } catch { /* starting */ }
         await new Promise((r) => setTimeout(r, 1000));
     }
     return false;
@@ -91,7 +91,7 @@ async function run(context, origin) {
     const page = await context.newPage();
     await startCoverage(page);
     page.on('pageerror', (e) => { fail++; console.log(`  FAIL  page error: ${String(e.message).slice(0, 160)}`); });
-    await page.goto(`${origin}/index.html`);
+    await page.goto(`${origin}/dashboard.html`);
 
     console.log('\nthe page\'s buffer');
     const chosen = await page.evaluate(async (origin) => {
@@ -141,7 +141,7 @@ async function run(context, origin) {
     `)(page);
     const other = await context.newPage();
     other.on('pageerror', (e) => { fail++; console.log(`  FAIL  page error (second tab): ${String(e.message).slice(0, 160)}`); });
-    await other.goto(`${origin}/index.html`);
+    await other.goto(`${origin}/dashboard.html`);
     served.length = 0;
     const second = await inStore(origin, `
         const file = await store.open({ url, key: 'url:film' });

@@ -36,7 +36,7 @@ for (const page of ['player', 'embed']) {
     const d = directives(cspFor(page));
     check(d['frame-src']?.every((s) => /youtube/.test(s)), `${page}: frames only for YouTube's player`);
 }
-check(!directives(cspFor('index'))['frame-src'] && !directives(cspFor('watch'))['frame-src'], 'the landing and watch pages allow no frames');
+check(!directives(cspFor('dashboard'))['frame-src'] && !directives(cspFor('watch'))['frame-src'], 'the landing and watch pages allow no frames');
 check(!directives(cspFor('watch'))['script-src'].includes("'wasm-unsafe-eval'"), 'the watch page runs no WebAssembly');
 let threw = false;
 try { cspFor('nope'); } catch { threw = true; }

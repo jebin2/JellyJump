@@ -24,7 +24,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 const BASELINE = path.join(ROOT, 'scripts/size-baseline.json');
 const UPDATE = process.argv.includes('--update');
-const PAGES = ['index', 'player', 'embed', 'watch'];
+const PAGES = ['dashboard', 'player', 'embed', 'watch'];
 
 const KB = 1024;
 const BUDGET = {
