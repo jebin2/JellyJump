@@ -37,7 +37,7 @@
  * horizon`, but never longer than MAX_WAIT_S. Both are fixed when the wait
  * begins, counted from the byte play stopped at: worked out again on each
  * frame, the target grew as the link sped up and moved on with the reads
- * made while waiting (seen on a device: "at most 30 s" lasted past 33 s, and
+ * made while waiting (seen on a device: a wait meant to last 30 s lasted past 33 s, and
  * past any length with the tab in the background). The time left is announced
  * (`bufferwaitchange`, shown under the spinner), and `playNow()` goes on at
  * once, with the short waits for the rest of this stretch (until the next
@@ -65,12 +65,12 @@ const AUDIO_GRACE = 0.5;
 export const HORIZON_S = 600;
 /**
  * ...unless that takes longer than this to download: a wait is never sized
- * past half a minute. On a device (link 0.6 MB/s, film 0.95 MB/s) the full
- * horizon meant a countdown of several minutes, and Play now was pressed
- * each time after about 20 s; half a minute's wait buys about three
- * quarters of a minute of play there.
+ * past 20 s. On a device (link 0.6 MB/s, film 0.95 MB/s) the full horizon
+ * meant a countdown of several minutes, and Play now was pressed each time
+ * after about 20 s, with 30 s too; there 20 s of waiting buys about 45 s of
+ * play (the link keeps adding while it plays).
  */
-export const MAX_WAIT_S = 30;
+export const MAX_WAIT_S = 20;
 /** The link counts as fast enough above this share of the video's bitrate. */
 export const MARGIN = 1.1;
 /** Background work (seek-bar thumbnails) waits for this much audio ahead. */

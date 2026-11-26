@@ -74,7 +74,7 @@ phase U.
   second or two at a time means stopping every few seconds (nine times in
   35 s on a device). With the link measured and the bitrate known, the wait
   lasts until the bytes ahead cover 10 minutes of play, but never longer
-  than 30 s (an uncapped countdown of minutes was skipped after ~20 s every
+  than 20 s (an uncapped countdown of minutes was skipped after ~20 s every
   time), shown as a countdown, with Play now to go on regardless.
 - **Phone data.** On a metered connection, 2 minutes ahead and nothing while
   paused.

@@ -169,19 +169,19 @@ console.log('\na wait sized to a slow link\n');
     };
     const enoughAudio = (p) => noteAudioScheduled(p, 2 + 5);
 
-    // Link at 1.05 MB/s, video 1 MB/s: 0.05 MB/s short (with the 10% margin), for 600 s: 30 MB, under half a minute.
-    const near = remotePlayer(1.05 * MB);
+    // Link at 1.08 MB/s, video 1 MB/s: 0.02 MB/s short (with the 10% margin), for 600 s: 12 MB, 11 s of the link.
+    const near = remotePlayer(1.08 * MB);
     runLow(near);
     const nearLeft = bufferWaitSecondsLeft(near);
     check('on a link a little slower than the video, the wait is sized to play 10 minutes through',
-        isPlayerStalled(near) && Math.abs(nearLeft - (0.05 * MB * HORIZON_S) / (1.05 * MB)) <= 1, `${nearLeft} s left`);
+        isPlayerStalled(near) && Math.abs(nearLeft - (0.02 * MB * HORIZON_S) / (1.08 * MB)) <= 1, `${nearLeft} s left`);
 
-    // Link at 0.6 MB/s: 10 minutes through would mean 500 s of waiting; it waits half a minute.
+    // Link at 0.6 MB/s: 10 minutes through would mean 500 s of waiting; it waits MAX_WAIT_S.
     const slow = remotePlayer(0.6 * MB);
     runLow(slow);
     const want = 0.6 * MB * MAX_WAIT_S;
     const left = bufferWaitSecondsLeft(slow);
-    check('on a much slower one, never more than half a minute',
+    check('on a much slower one, never more than MAX_WAIT_S',
         isPlayerStalled(slow) && Math.abs(left - MAX_WAIT_S) <= 1, `${left} s left`);
     check('and says so (bufferwaitchange with the time left)',
         slow.events.some((e) => e.name === 'bufferwaitchange' && e.waiting && e.secondsLeft === left), JSON.stringify(slow.events));
@@ -235,7 +235,7 @@ console.log('\na wait sized to a slow link\n');
     checkPlayerBuffering(steady);
     check('the bytes planned when it began are enough, whatever the link does after', steady.audioContext.resumes === 1);
 
-    // Half a minute by the clock, whatever has come (a tab in the background stops the checks).
+    // MAX_WAIT_S by the clock, whatever has come (a tab in the background stops the checks).
     const late = remotePlayer(0.4 * MB);
     const realNow = performance.now.bind(performance);
     runLow(late);
@@ -249,7 +249,7 @@ console.log('\na wait sized to a slow link\n');
     performance.now = () => start + (MAX_WAIT_S + 1) * 1000;
     checkPlayerBuffering(late);
     performance.now = realNow;
-    check('after half a minute it plays on anyway', late.audioContext.resumes === 1);
+    check('after MAX_WAIT_S it plays on anyway', late.audioContext.resumes === 1);
 
     const fast = remotePlayer(2 * MB);
     runLow(fast);
