@@ -17,8 +17,13 @@
  * the downloader has read up to and the time then, taken only while that
  * pair is steady (playing on at the clock's pace, or paused with neither
  * moving; never during a seek, a wait or a load). Between points, and
- * before the first, a straight line (from the start and to the end of the
+ * past the last, a straight line (from the start and to the end of the
  * file).
+ *
+ * A part only shows once a point is in it (or a piece before it), or when it
+ * holds the start of the file: a guess by the share of the file put it in
+ * the wrong place for the second or two after a seek, then it jumped to the
+ * right one as the video played.
  */
 import { isPlayerStalled } from './BufferingGuard.js';
 
@@ -67,6 +72,18 @@ export class ByteClock {
     }
 
     /**
+     * Whether the bytes [start, end) have been placed: a point seen in them,
+     * or within `lead` bytes before (a seek reads from inside a piece, which
+     * is then not kept whole).
+     * @param {number} start
+     * @param {number} end
+     * @param {number} [lead]
+     */
+    placed(start, end, lead = 0) {
+        return this.points.some((p) => p.byte >= start - lead && p.byte <= end);
+    }
+
+    /**
      * The time a byte plays at.
      * @param {number} byte
      * @param {number} duration - seconds
@@ -87,15 +104,19 @@ export class ByteClock {
 
 /**
  * A file's downloaded parts that play, as time ranges [start, end) in seconds.
- * @param {{size: number, playableRanges: () => Array<[number, number]>}} file
+ * @param {{size: number, pieceSize?: number, playableRanges: () => Array<[number, number]>}} file
  * @param {number} duration - seconds
  * @param {ByteClock} [clock] - points seen; without, a byte's share of the
  *   size is its share of the duration
+ * @param {{placedOnly?: boolean}} [options] - `placedOnly`: only the parts
+ *   the clock has placed, and the one at the start of the file
  * @returns {Array<[number, number]>}
  */
-export function downloadedTimeRanges(file, duration, clock = new ByteClock(file.size)) {
+export function downloadedTimeRanges(file, duration, clock = new ByteClock(file.size), { placedOnly = false } = {}) {
     if (!(duration > 0) || !Number.isFinite(duration) || !(file.size > 0)) return [];
+    const lead = file.pieceSize ?? 0;
     return file.playableRanges()
+        .filter(([start, end]) => !placedOnly || start === 0 || clock.placed(start, end, lead))
         .map(([start, end]) => /** @type {[number, number]} */ ([clock.timeAt(start, duration), clock.timeAt(end, duration)]))
         .filter(([start, end]) => end > start);
 }
@@ -115,7 +136,7 @@ export function watchDownloadedRanges(player) {
     const clock = new ByteClock(remote.file.size);
     const announce = () => {
         if (player.media?.remote !== remote) return;
-        player.trigger?.('bufferchange', { ranges: downloadedTimeRanges(remote.file, player.duration, clock) });
+        player.trigger?.('bufferchange', { ranges: downloadedTimeRanges(remote.file, player.duration, clock, { placedOnly: true }) });
     };
     /** @type {ReturnType<typeof setTimeout>|null} */
     let timer = null;

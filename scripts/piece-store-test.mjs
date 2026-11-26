@@ -317,6 +317,11 @@ console.log('\nwhat the seek bar shades\n');
     check('the first piece alone still shows: it holds the start of the video',
         JSON.stringify(file.playableRanges()) === '[[0,1000],[5000,6000]]', JSON.stringify(file.playableRanges()));
     for (const i of [1, 2]) await file.ensure(i);
+    const seen = new ByteClock(file.size);
+    seen.note(4500, 45);    // read inside piece 4, before the kept piece 5
+    check('only the parts placed: a read in them, or in the piece before',
+        JSON.stringify(downloadedTimeRanges(file, 95, seen, { placedOnly: true })) === '[[0,30],[50,60]]'
+        && JSON.stringify(downloadedTimeRanges(file, 95, new ByteClock(file.size), { placedOnly: true })) === '[[0,30]]');
     check('nothing before the duration is known', downloadedTimeRanges(file, NaN).length === 0 && downloadedTimeRanges(file, 0).length === 0);
 
     // A player: announced at once, then at most every THROTTLE_MS as pieces come, and cleared when let go.
@@ -325,8 +330,9 @@ console.log('\nwhat the seek bar shades\n');
     const player = { duration: 95, isPlaying: false, currentTime: 0, media: { remote: { file, downloader } },
         trigger: (name, data) => events.push({ name, ...data }) };
     watchDownloadedRanges(player);
-    check('announced when the file opens', events.length === 1 && events[0].name === 'bufferchange'
-        && JSON.stringify(events[0].ranges) === '[[0,30],[50,60]]', JSON.stringify(events));
+    check('announced when the file opens: the start of the file, not yet a part no read has placed',
+        events.length === 1 && events[0].name === 'bufferchange'
+        && JSON.stringify(events[0].ranges) === '[[0,30]]', JSON.stringify(events));
     await file.ensure(3);
     await file.ensure(4);
     await sleep(THROTTLE_MS + 50);
@@ -374,8 +380,8 @@ console.log('\nbytes to time, from where the player reads\n');
     const player = { duration: 100, isPlaying: false, isLoading: false, currentTime: 76.5, playbackRate: 1,
         media: { remote: { file, downloader } }, trigger: (name, data) => events.push({ name, ...data }) };
     watchDownloadedRanges(player);
-    const first = events.at(-1).ranges[0];
-    check('before any point, by the share of the file (on the device: 90 s away)', Math.abs(first[0] - 80) < 1e-9, JSON.stringify(first));
+    check('before any point, not shown (by the share of the file it would be 90 s away on the device)',
+        events.at(-1).ranges.length === 0, JSON.stringify(events.at(-1).ranges));
     downloader.jumpTo = 7;                                   // a seek settling: not a point
     await sleep(SAMPLE_MS * 2 + THROTTLE_MS + 100);
     check('no point while a seek settles', events.length === 1, `${events.length}`);
