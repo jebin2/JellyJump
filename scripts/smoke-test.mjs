@@ -333,6 +333,28 @@ async function run(page, origin) {
         `Copy log adds the player's log after it (${logPart.split('\n').length - 3} lines)`);
     check(!logPart.includes(origin) && !logPart.includes('blob:'), 'and the log names no address either');
 
+    // The embed with only a mute button (the dashboard's demo): no control
+    // bar, one button over the picture, playing muted and looping.
+    console.log('\nthe embed, controls=mute');
+    const embedPage = await page.context().newPage();
+    await embedPage.goto(`${origin}/embed.html?video_url=${encodeURIComponent(FIXTURE_URL)}&autoplay=1&muted=1&loop=1&controls=mute`);
+    await embedPage.waitForFunction(() => window.player?.isPlaying, null, { timeout: 30000 }).catch(() => {});
+    const embed = await embedPage.evaluate(async () => {
+        const p = window.player;
+        const bar = document.querySelector('.jellyjump-controls');
+        const before = { playing: p.isPlaying, muted: p.isMuted, loop: p.loopMode,
+            barShown: !!bar && getComputedStyle(bar).display !== 'none' };
+        const mute = document.querySelector('.embed-mute-btn');
+        const label = mute?.getAttribute('aria-label');
+        mute?.click();
+        await new Promise((r) => setTimeout(r, 200));
+        return { ...before, label, after: { muted: p.isMuted, label: mute?.getAttribute('aria-label') } };
+    });
+    await embedPage.close();
+    check(embed.playing && embed.muted && embed.loop === 'one', `it plays, muted, looping (${JSON.stringify([embed.playing, embed.muted, embed.loop])})`);
+    check(!embed.barShown, 'no control bar');
+    check(embed.label === 'Unmute' && !embed.after.muted && embed.after.label === 'Mute', `the one button unmutes, and says so (${embed.label} -> ${embed.after.label})`);
+
     // The player's events (plan H1): what the UI will listen to instead of
     // being called. Each fires on a change, once.
     const events = await page.evaluate(async () => {
