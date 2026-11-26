@@ -47,14 +47,14 @@
     <!-- Common CSS -->
     <!-- Landing CSS -->
     <script defer src="./js/analytics-embed.js" data-project="JellyJump"></script>
-  <script type="module" crossorigin src="./assets/dashboard-Cs0Vhb_g.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/Logger-DhR2Dtet.js">
-  <link rel="modulepreload" crossorigin href="./assets/ErrorReporter-BPtWaF4h.js">
-  <link rel="modulepreload" crossorigin href="./assets/coi-lziSSlC-.js">
-  <link rel="modulepreload" crossorigin href="./assets/reload-on-stale-chunks-DmH6RShG.js">
+  <script type="module" crossorigin src="./assets/dashboard-C9clwxxx.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/Logger-BjianYtO.js">
+  <link rel="modulepreload" crossorigin href="./assets/ErrorReporter-BlPtvWc8.js">
+  <link rel="modulepreload" crossorigin href="./assets/coi-Ck8ffxTu.js">
+  <link rel="modulepreload" crossorigin href="./assets/reload-on-stale-chunks-DWV6NzSg.js">
   <link rel="stylesheet" crossorigin href="./assets/ErrorReporter-CkkKVcRy.css">
   <link rel="stylesheet" crossorigin href="./assets/coi-DgKzoTlh.css">
-  <link rel="stylesheet" crossorigin href="./assets/dashboard-vqDXxngW.css">
+  <link rel="stylesheet" crossorigin href="./assets/dashboard-CV4EScCw.css">
 </head>
 
 <body>
@@ -77,355 +77,291 @@
             </button>
             <div class="mobile-menu-overlay"></div>
             <nav class="nav-links">
+                <a href="#demo" class="nav-link">Demo</a>
                 <a href="#features" class="nav-link">Features</a>
                 <a href="#downloads" class="nav-link">Download</a>
-                <a href="player.html" class="btn btn-secondary">Player</a>
+                <a href="player.html" class="btn btn-primary">Open the player</a>
             </nav>
         </div>
     </header>
 
     <!-- Main Content -->
     <main>
-        <!-- Hero Section -->
+        <!-- Hero: what it is, and the demo -->
         <section id="hero" class="hero">
-            <!-- <video class="hero-video" autoplay muted loop playsinline>
-                <source src="JellyJumpActionAd.mp4" type="video/mp4">
-            </video> -->
-            <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="poster.webp">
-                <source src="homepage.mp4" type="video/mp4">
-            </video>
-
-            <!-- Overlay Trigger for "Play" button in video -->
-            <a href="player.html" class="video-overlay-trigger" aria-label="Launch Player"></a>
-            <div class="container hero-content">
-                <h1 class="hero-title hidden">
-                    PLAY. EDIT. CREATE.<br>
-                    <span class="text-accent">YOUR VIDEOS.</span>
-                </h1>
-                <p class="hero-subtitle hidden">Powerful video tools. Brutally simple.</p>
-                <div class="hero-actions">
-                    <a href="player.html" class="btn btn-primary btn-lg">LAUNCH PLAYER</a>
+            <div class="container hero-grid">
+                <div class="hero-copy">
+                    <h1 class="hero-title">Play. Edit. Create.<br><span class="text-accent">Right in your browser.</span></h1>
+                    <p class="hero-lead">A video player and editor that runs on your device. Nothing to install, nothing uploaded.</p>
+                    <div class="hero-actions">
+                        <a href="player.html" class="btn btn-primary btn-lg">Open the player</a>
+                        <a href="#downloads" class="btn btn-secondary btn-lg">Desktop app</a>
+                    </div>
+                    <ul class="hero-points">
+                        <li>Free</li>
+                        <li>No uploads</li>
+                        <li>Works offline</li>
+                        <li>Linux · macOS · Windows</li>
+                    </ul>
                 </div>
+                <figure class="hero-demo" id="demo">
+                    <!-- The demo plays in JellyJump's own player: embed.html, the
+                         page anyone can put on their site. Its address is set by
+                         index-main.js (still, for people who ask for less motion). -->
+                    <iframe class="demo-video" title="JellyJump in under a minute, in JellyJump's own embed player"
+                        data-src="embed.html?video_url=demo.mp4&amp;muted=1&amp;loop=1&amp;controls=mute"
+                        allow="autoplay; fullscreen" allowfullscreen></iframe>
+                    <figcaption class="demo-bar">
+                        <span class="demo-note">Under a minute, in JellyJump's own embed player</span>
+                        <span class="demo-note demo-hint">🔇 tap for sound</span>
+                    </figcaption>
+                </figure>
             </div>
         </section>
 
-        <!-- Features Section -->
+        <!-- The short version -->
+        <section class="strip" aria-label="In short">
+            <div class="container strip-grid">
+                <a class="strip-item" href="#play"><strong>Play</strong><span>almost any format</span></a>
+                <a class="strip-item" href="#edit"><strong>Edit</strong><span>cut, crop, effects</span></a>
+                <a class="strip-item" href="#create"><strong>Create</strong><span>record, merge, share</span></a>
+                <a class="strip-item" href="#private"><strong>Private</strong><span>on your device</span></a>
+            </div>
+        </section>
+
+        <!-- Features, grouped -->
         <section id="features" class="features">
             <div class="container">
-                <div class="features-header">
-                    <h2 class="text-2xl font-bold uppercase text-accent">Features</h2>
-                    <p class="text-secondary mt-sm">Powerful video tools. 100% client-side. Complete privacy.</p>
+                <div class="section-head">
+                    <h2 class="section-title">Everything it does</h2>
+                    <p class="section-lead">One app for watching, fixing and making videos.</p>
                 </div>
-                <div class="grid-2 gap-lg">
-                    <!-- Feature 8: Powered by MediaBunny -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md flex items-center gap-sm">
-                            <img src="./assets/mediabunny-D3TGndiP.svg" alt="MediaBunny Logo"
-                                style="height: 24px; vertical-align: middle;">
-                            POWERED BY MEDIABUNNY
-                        </h3>
-                        <ul class="text-secondary space-y-xs">
-                            <li>• WebCodecs-based video processing library</li>
-                            <li>• Hardware-accelerated encoding/decoding</li>
-                            <li>• Built on modern web standards</li>
-                            <li>• Zero external dependencies</li>
-                            <li>• Open-source and lightweight</li>
-                        </ul>
-                    </div>
-
-                    <!-- Feature 7: Client-Side Processing -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🔒 100% CLIENT-SIDE</h3>
-                        <ul class="text-secondary space-y-xs">
-                            <li>• No server uploads - complete privacy</li>
-                            <li>• WebCodecs API for native performance</li>
-                            <li>• Process videos locally in your browser</li>
-                            <li>• No data leaves your device</li>
-                            <li>• Lightning-fast processing</li>
-                        </ul>
-                    </div>
-
-                    <!-- Feature 1: Advanced Player -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🎬 ADVANCED PLAYER</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Custom playback controls with speed adjustment</li>
-                            <li>• A-B loop mode for segment practice</li>
-                            <li>• Frame-by-frame stepping</li>
-                            <li>• Playlist management with drag-and-drop</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Try Player &rarr;</a>
-                    </div>
-
-                    <!-- Feature 9: Stream from URL -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🌐 STREAM FROM URL</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Play HLS streams (.m3u8) directly</li>
-                            <li>• Support for MP4, WebM, MOV URLs</li>
-                            <li>• Import M3U playlists</li>
-                            <li>• Live stream playback support</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Stream Now &rarr;</a>
-                    </div>
-
-                    <!-- Feature 16: Screen & Camera (Input) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🎥 SCREEN & CAMERA</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Record screen, window, or tab</li>
-                            <li>• Add Facecam (PiP/Circle/Popup)</li>
-                            <li>• Capture microphone & system audio</li>
-                            <li>• No install required - 100% Web</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Start Recording &rarr;</a>
-                    </div>
-
-                    <!-- Feature 8: Record Video (Input) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🔴 RECORD VIDEO</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Record live streams and playback</li>
-                            <li>• Capture video and audio</li>
-                            <li>• Save directly to device</li>
-                            <li>• No time limits</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Try Recording &rarr;</a>
-                    </div>
-
-                    <!-- Feature 13: Scene Detection (Analysis) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🔍 SCENE DETECTION</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Automatically detect scene changes</li>
-                            <li>• Split long videos into segments</li>
-                            <li>• Add individual scenes to playlist</li>
-                            <li>• Powered by pixel-difference analysis</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Try Scene Detection &rarr;</a>
-                    </div>
-
-                    <!-- Feature 14: Motion Detection (Analysis) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🏃 MOTION DETECTION</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Smart motion monitoring & analysis</li>
-                            <li>• Auto-extract events with activity</li>
-                            <li>• Adjustable sensitivity controls</li>
-                            <li>• Perfect for security cam footage</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Try Motion Detection &rarr;</a>
-                    </div>
-
-                    <!-- Feature 17: Remove Background (Advanced Edit) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🎭 REMOVE BACKGROUND</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Advanced Chroma Key (Green Screen)</li>
-                            <li>• Auto-detect background color</li>
-                            <li>• Real-time transparency preview</li>
-                            <li>• Export as transparent WebM/MP4</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Remove Background &rarr;</a>
-                    </div>
-
-                    <!-- Feature 2: Clip Video (Edit) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">✂️ CLIP VIDEO</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Visual timeline with drag handles</li>
-                            <li>• Live video preview with A-B loop</li>
-                            <li>• Precise time input controls</li>
-                            <li>• Real-time duration calculation</li>
-                            <li>• Instant preview of trimmed segment</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Try Trimming &rarr;</a>
-                    </div>
-
-                    <!-- Feature 2b: Multi-Cut Video -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">✂️ EXTRACT CLIPS</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Remove multiple regions from video</li>
-                            <li>• Preview skips removed sections</li>
-                            <li>• Select unwanted sections to delete</li>
-                            <li>• Perfect for cutting commercials/boring parts</li>
-                            <li>• Real-time remaining duration</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Remove Clips &rarr;</a>
-                    </div>
-
-                    <!-- Feature 15: Crop Video (Edit) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">✂️ CROP VIDEO</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Custom freeform or aspect ratio crop</li>
-                            <li>• Real-time interactive preview</li>
-                            <li>• Lossless quality processing</li>
-                            <li>• Remove black bars or unwanted areas</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Try Cropping &rarr;</a>
-                    </div>
-
-                    <!-- Feature 4: Resize Video (Edit) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">📐 RESIZE VIDEO</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Multiple resolution presets (720p, 480p, 360p)</li>
-                            <li>• Maintain aspect ratio</li>
-                            <li>• Quality preservation options</li>
-                            <li>• Instant resolution preview</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Resize Videos &rarr;</a>
-                    </div>
-
-                    <!-- Feature 5: Merge Videos (Edit) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">➕ MERGE VIDEOS</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Combine multiple videos seamlessly</li>
-                            <li>• Drag-and-drop reordering</li>
-                            <li>• Automatic format matching</li>
-                            <li>• Smooth transitions</li>
-                            <li>• Real-time progress tracking</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Merge Videos &rarr;</a>
-                    </div>
-
-                    <!-- Feature: Slideshow / Images to Video -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🖼️ IMAGES TO VIDEO</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Turn photos into an MP4 slideshow</li>
-                            <li>• Drag-and-drop image reordering</li>
-                            <li>• Custom duration per image</li>
-                            <li>• Fade, slide, or cut transitions</li>
-                            <li>• Add background music with trim</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Create Slideshow &rarr;</a>
-                    </div>
-
-                    <!-- Feature 9: Video Filters (Enhance) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🎨 VIDEO FILTERS</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Adjust brightness, contrast, saturation</li>
-                            <li>• Apply instant presets (Night, Vivid, B&W)</li>
-                            <li>• Real-time visual feedback</li>
-                            <li>• Enhance video appearance</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Try Filters &rarr;</a>
-                    </div>
-
-                    <!-- Feature 11: Speed & Reverse (Enhance) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">⏩ SPEED & REVERSE</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Precision speed control (0.1x - 4x)</li>
-                            <li>• Smooth slow-motion playback</li>
-                            <li>• Instant reverse playback</li>
-                            <li>• Frame-accurate seeking</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Control Speed &rarr;</a>
-                    </div>
-
-                    <!-- Feature 10: Audio Equalizer (Audio) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🎚️ AUDIO EQUALIZER</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• 3-band equalizer (Bass, Mid, Treble)</li>
-                            <li>• Volume boost up to 200%</li>
-                            <li>• Presets for Rock, Voice, Bass Boost</li>
-                            <li>• Enhanced audio experience</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Adjust Audio &rarr;</a>
-                    </div>
-
-                    <!-- Feature 18: Track Manager (Audio) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🎼 DOWNLOAD TRACKS</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Manage multiple audio/video tracks</li>
-                            <li>• Extract audio from video files</li>
-                            <li>• Handle multi-language capabilities</li>
-                            <li>• Format conversion for tracks</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Download Tracks &rarr;</a>
-                    </div>
-
-                    <!-- Feature 19: Rotate Video -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🔄 ROTATE VIDEO</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Rotate 90°, 180°, 270° or flip</li>
-                            <li>• Mirror horizontal or vertical</li>
-                            <li>• Fix rotated recordings</li>
-                            <li>• Real-time preview</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Rotate Video &rarr;</a>
-                    </div>
-
-                    <!-- Feature 20: Blur -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">💧 BLUR</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Blur faces or sensitive areas</li>
-                            <li>• Adjustable blur intensity</li>
-                            <li>• Multiple blur regions</li>
-                            <li>• Protect privacy in videos</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Blur &rarr;</a>
-                    </div>
-
-                    <!-- Feature 21: Encrypt/Decrypt -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🔐 ENCRYPT / DECRYPT</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Password-protect your videos</li>
-                            <li>• AES-256 encryption</li>
-                            <li>• Secure local storage</li>
-                            <li>• Decrypt when needed</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Encrypt Video &rarr;</a>
-                    </div>
-
-                    <!-- Feature 12: Custom Watermark (Finalize) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">💧 WATERMARK</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Add image or text watermarks</li>
-                            <li>• Customizable position & opacity</li>
-                            <li>• Protect your content</li>
-                            <li>• Real-time preview</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Watermark &rarr;</a>
-                    </div>
-
-                    <!-- Feature 3: Convert & Compress (Export) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🔄 CONVERT & COMPRESS</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Multi-format support (MP4, WebM, MOV)</li>
-                            <li>• Quality control (Low to Original)</li>
-                            <li>• Modern codecs (H.264, VP9, AAC, Opus)</li>
-                            <li>• Estimated file size reduction</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Convert Videos &rarr;</a>
-                    </div>
-
-                    <!-- Feature 6: Create GIF (Export) -->
-                    <div class="card feature-card">
-                        <h3 class="card-title mb-md">🎞️ CREATE GIF</h3>
-                        <ul class="text-secondary mb-lg space-y-xs">
-                            <li>• Convert video segments to animated GIFs</li>
-                            <li>• Live preview with A-B loop</li>
-                            <li>• Customizable frame rate (5-20 FPS)</li>
-                            <li>• Quality control and size options</li>
-                            <li>• Powered by gif.js library</li>
-                        </ul>
-                        <a href="player.html" class="feature-link">Create GIFs &rarr;</a>
-                    </div>
+            <div class="group" id="play">
+                <div class="group-head">
+                    <h3 class="group-title">Play</h3>
+                    <p class="group-tag">Almost anything, in the browser</p>
                 </div>
+                <ul class="feature-grid">
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">▶️</span>
+                        <h4 class="feature-title">Plays almost anything</h4>
+                        <p class="feature-text">Local video and audio, HLS streams, IPTV lists, YouTube links and live streams, including AC-3, DTS, TrueHD and ProRes.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">⏪</span>
+                        <h4 class="feature-title">Play it backwards</h4>
+                        <p class="feature-text">A playback direction, with sound, at any speed.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">⏩</span>
+                        <h4 class="feature-title">Speed and A–B loop</h4>
+                        <p class="feature-text">0.25× to 2×, and loop any stretch.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">💬</span>
+                        <h4 class="feature-title">Subtitles</h4>
+                        <p class="feature-text">Load .srt or .vtt files, or generate them on your device with AI (Whisper).</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🎚️</span>
+                        <h4 class="feature-title">Sound</h4>
+                        <p class="feature-text">Equaliser (bass, mid, treble), and choice of audio track.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🎨</span>
+                        <h4 class="feature-title">Filters and fun FX</h4>
+                        <p class="feature-text">Presets, live effects and stickers while it plays.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">📸</span>
+                        <h4 class="feature-title">Screenshots</h4>
+                        <p class="feature-text">Save the frame on screen.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">📂</span>
+                        <h4 class="feature-title">Playlists and folders</h4>
+                        <p class="feature-text">Add files, whole folders or links; search the list.</p>
+                    </li>
+                </ul>
+            </div>
+            <div class="group" id="library">
+                <div class="group-head">
+                    <h3 class="group-title">Your library</h3>
+                    <p class="group-tag">Your files, wherever you are</p>
+                </div>
+                <ul class="feature-grid">
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🖥️</span>
+                        <h4 class="feature-title">Stream your own library</h4>
+                        <p class="feature-text">The desktop app shares a folder; open it on your phone or laptop with a link.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">⚡</span>
+                        <h4 class="feature-title">Smart buffering</h4>
+                        <p class="feature-text">Downloads ahead of what you watch; the seek bar shows what is ready, even on a slow link.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">📴</span>
+                        <h4 class="feature-title">Works offline</h4>
+                        <p class="feature-text">Install it as an app; after a first visit it opens and plays local files with no network.</p>
+                    </li>
+                </ul>
+            </div>
+            <div class="group" id="edit">
+                <div class="group-head">
+                    <h3 class="group-title">Edit</h3>
+                    <p class="group-tag">In a side panel, with the player as the preview</p>
+                </div>
+                <ul class="feature-grid">
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">✂️</span>
+                        <h4 class="feature-title">Cut and multi-cut</h4>
+                        <p class="feature-text">Keep one part, or many.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🔲</span>
+                        <h4 class="feature-title">Crop</h4>
+                        <p class="feature-text">Drag the corners on the picture.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🔄</span>
+                        <h4 class="feature-title">Rotate and resize</h4>
+                        <p class="feature-text">Turn it, or change its size.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🐢</span>
+                        <h4 class="feature-title">Speed and reverse</h4>
+                        <p class="feature-text">Save it faster, slower or backwards.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">💧</span>
+                        <h4 class="feature-title">Blur and watermark</h4>
+                        <p class="feature-text">Hide a part, or add your mark.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🎭</span>
+                        <h4 class="feature-title">Remove background</h4>
+                        <p class="feature-text">On your device, no green screen.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">✨</span>
+                        <h4 class="feature-title">Export with effects</h4>
+                        <p class="feature-text">Save it with the filters and stickers you see.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">↩️</span>
+                        <h4 class="feature-title">Undo and reset</h4>
+                        <p class="feature-text">Edits stack on one copy, and are remembered after a reload.</p>
+                    </li>
+                </ul>
+            </div>
+            <div class="group" id="save">
+                <div class="group-head">
+                    <h3 class="group-title">Save as</h3>
+                    <p class="group-tag">The format you need</p>
+                </div>
+                <ul class="feature-grid">
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🔁</span>
+                        <h4 class="feature-title">Convert and compress</h4>
+                        <p class="feature-text">Another format, or a smaller file.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🎞️</span>
+                        <h4 class="feature-title">GIF</h4>
+                        <p class="feature-text">Any stretch, as an animated GIF.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🎼</span>
+                        <h4 class="feature-title">Tracks</h4>
+                        <p class="feature-text">Take out the audio, video or subtitle tracks.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🔐</span>
+                        <h4 class="feature-title">Encrypt</h4>
+                        <p class="feature-text">Hide a video inside an ordinary-looking one that survives re-uploading.</p>
+                    </li>
+                </ul>
+            </div>
+            <div class="group" id="analyze">
+                <div class="group-head">
+                    <h3 class="group-title">Analyse</h3>
+                    <p class="group-tag">Find what matters</p>
+                </div>
+                <ul class="feature-grid">
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🎬</span>
+                        <h4 class="feature-title">Scene detection</h4>
+                        <p class="feature-text">Finds the cuts, to jump between or export.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🏃</span>
+                        <h4 class="feature-title">Motion detection</h4>
+                        <p class="feature-text">Finds where something moves.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">ℹ️</span>
+                        <h4 class="feature-title">Info</h4>
+                        <p class="feature-text">Codecs, tracks, sizes and more.</p>
+                    </li>
+                </ul>
+            </div>
+            <div class="group" id="create">
+                <div class="group-head">
+                    <h3 class="group-title">Create and share</h3>
+                    <p class="group-tag">Make something new</p>
+                </div>
+                <ul class="feature-grid">
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🔴</span>
+                        <h4 class="feature-title">Record your screen</h4>
+                        <p class="feature-text">Or your camera.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">➕</span>
+                        <h4 class="feature-title">Merge videos</h4>
+                        <p class="feature-text">Several clips, one video.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🖼️</span>
+                        <h4 class="feature-title">Images to video</h4>
+                        <p class="feature-text">A slideshow with transitions and music.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🎵</span>
+                        <h4 class="feature-title">Combine audio and video</h4>
+                        <p class="feature-text">The picture of one, the sound of another.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">👥</span>
+                        <h4 class="feature-title">Watch together</h4>
+                        <p class="feature-text">Watch with friends, peer to peer.</p>
+                    </li>
+                </ul>
+            </div>
+            <div class="group" id="private">
+                <div class="group-head">
+                    <h3 class="group-title">Private by design</h3>
+                    <p class="group-tag">Your videos stay yours</p>
+                </div>
+                <ul class="feature-grid">
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">🔒</span>
+                        <h4 class="feature-title">Nothing is uploaded</h4>
+                        <p class="feature-text">Files are played and edited on your device.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">⚙️</span>
+                        <h4 class="feature-title">Long jobs in the background</h4>
+                        <p class="feature-text">Conversions and exports run one at a time while you keep watching.</p>
+                    </li>
+                    <li class="feature">
+                        <span class="feature-icon" aria-hidden="true">💸</span>
+                        <h4 class="feature-title">Free</h4>
+                        <p class="feature-text">No account, no sign-up.</p>
+                    </li>
+                </ul>
+            </div>
             </div>
         </section>
 
@@ -433,8 +369,8 @@
         <section id="downloads" class="downloads section-padding section-padding-y-large">
             <div class="container">
                 <div class="features-header mb-xl">
-                    <h2 class="text-2xl font-bold uppercase text-accent">Get Desktop App</h2>
-                    <p class="text-secondary mt-sm">Download JellyJump for your operating system.</p>
+                    <h2 class="section-title">Get the desktop app</h2>
+                    <p class="section-lead">Everything above, plus a library you can share with your other devices.</p>
                 </div>
 
                 <div class="grid-3 gap-lg">
@@ -508,7 +444,8 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p class="footer-text">&copy; 2026 JellyJump Player. All rights reserved.</p>
+            <p class="footer-text">JellyJump · a video player and editor for the browser and the desktop</p>
+            <p class="footer-links"><a href="player.html">Player</a> · <a href="https://github.com/jebin2/JellyJump/releases/latest" target="_blank" rel="noopener">Releases</a> · <a href="https://github.com/jebin2/JellyJump" target="_blank" rel="noopener">GitHub</a></p>
         </div>
     </footer>
 
