@@ -8,7 +8,7 @@
 import { Metrics, KEEP } from '../assets/js/shared/diagnostics/Metrics.js';
 import { PlayerTiming } from '../assets/js/core/PlayerTiming.js';
 import { redact } from '../assets/js/shared/diagnostics/redact.js';
-import { collectDiagnostics, formatDiagnostics } from '../assets/js/shared/diagnostics/Diagnostics.js';
+import { collectDiagnostics, formatDiagnostics, formatLog, formatDiagnosticsWithLog } from '../assets/js/shared/diagnostics/Diagnostics.js';
 import { Logger } from '../assets/js/shared/utils/Logger.js';
 import { JobQueue } from '../assets/js/shared/services/JobQueue.js';
 
@@ -97,6 +97,27 @@ console.log('\nthe report');
     check(/Cut: done, \d+(\.\d)? s/.test(text), 'lists the job by tool, with its time');
     check(!/secret|ana|nas\.local/.test(text), 'no file name, path or address anywhere, from the errors or the jobs');
     check(text.includes('Could not open <path>'), 'the error itself is there');
+}
+
+console.log('\nthe log');
+{
+    Logger.clearEntries();
+    check(formatLog() === '  none', 'an empty log says so');
+    Logger.setTrace('load', 3);
+    Logger.log('[Buffer] Playing url:https://nas.local/api/stream/7?token=abc Our Trip.mp4 through the buffer', { big: 'object' });
+    Logger.setTrace('load', null);
+    Logger.warn('[Buffering] Waiting for data at 12.000s');
+    const lines = formatLog().split('\n');
+    check(lines.length === 2, `one line per entry (${lines.length})`);
+    check(/^\d\d:\d\d:\d\d\.\d{3} LOG {3}\[Buffer\] Playing /.test(lines[0]) && /^\d\d:\d\d:\d\d\.\d{3} WARN {2}\[Buffering\] Waiting for data at 12\.000s$/.test(lines[1]),
+        `the time, the level and the message: "${lines[0]}" / "${lines[1]}"`);
+    check(lines[0].endsWith('{load 3}'), 'with the load it belongs to');
+    check(!/nas\.local|token|abc|Trip/.test(lines[0]) && lines[0].includes('<url>'), `no address, token or file name: "${lines[0]}"`);
+    const full = formatDiagnosticsWithLog(await collectDiagnostics());
+    check(/^JellyJump \S+/.test(full) && /\n\nLog \(2 lines, oldest first, in this device's time\):\n\d\d:/.test(full), 'the report, then the log');
+    for (let i = 0; i < 3500; i++) Logger.log(`[Test] line ${i}`);
+    const kept = Logger.entries();
+    check(kept.length === 3000 && kept.at(-1).message === '[Test] line 3499', `the newest 3000 entries are kept (${kept.length})`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

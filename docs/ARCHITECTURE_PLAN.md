@@ -614,7 +614,7 @@ restores the values under it. This replaces every workaround listed in §2.5.
 Nothing leaves the device unless the user turns it on (decision §9).
 
 - **Logs:** `Logger` writes structured entries (`time`, `level`, `scope`,
-  `event`, `data`, `traceId`) to a ring buffer of the last 1,000 entries,
+  `event`, `data`, `traceId`) to a ring buffer of the last 3,000 entries (1,000 until the log could be saved from Diagnostics),
   always; the console only shows them in debug mode, as now.
 - **Trace ids:** each playback load and each job gets an id; every log entry
   and error made during it carries the id, so one session or one job can be

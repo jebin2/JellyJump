@@ -57,10 +57,10 @@ check(entries[0].scope === 'Player' && entries[0].message === '[Player] loaded 3
 check(entries[1].message.includes('{"ms":1200}'), 'a warning keeps a rendering of its objects');
 check(entries[2].message.includes('AppError [DECODE_FAILED]'), 'an error keeps its code');
 Logger.clearEntries();
-for (let i = 0; i < 1005; i++) Logger.log(`line ${i}`);
+for (let i = 0; i < 3005; i++) Logger.log(`line ${i}`);
 entries = Logger.entries();
-check(entries.length === 1000 && entries[0].message === 'line 5' && entries[999].message === 'line 1004', 'keeps the last 1,000, oldest first');
-check(Logger.entries(3).map((e) => e.message).join() === 'line 1002,line 1003,line 1004', 'entries(n) gives the newest n');
+check(entries.length === 3000 && entries[0].message === 'line 5' && entries[2999].message === 'line 3004', 'keeps the last 3,000, oldest first');
+check(Logger.entries(3).map((e) => e.message).join() === 'line 3002,line 3003,line 3004', 'entries(n) gives the newest n');
 const circular = {}; circular.self = circular;
 Logger.warn('circular', circular);
 check(Logger.entries(1)[0].message === 'circular [Object]', 'an object that cannot be rendered is named instead');

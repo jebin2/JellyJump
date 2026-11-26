@@ -247,8 +247,12 @@ export class PieceStore {
 
         /** @type {{size: number|null, validator: string}|null} */
         let now = null;
+        const asked = performance.now();
         try {
             const probe = await this.fetchFn(url, withRange(init, 0, 0));
+            // Not in the [Net] lines (its body is never read); on a device the
+            // first answer for a file took seconds, before any video came.
+            Logger.log(`[Buffer] The server answered for ${key} in ${(performance.now() - asked).toFixed(0)}ms (${probe.status})`);
             await probe.body?.cancel().catch(() => {});
             if (probe.status !== 206) {
                 throw new AppError('NO_RANGES', { context: { status: probe.status } });

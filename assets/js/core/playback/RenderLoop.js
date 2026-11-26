@@ -1,7 +1,7 @@
 import { Logger } from '../../shared/utils/Logger.js';
 import { getPlayerPlaybackTime, completePlayerMedia } from './PlaybackState.js';
 import { startPlayerVideoIterator } from './VideoIterator.js';
-import { checkPlayerBuffering, noteFramePresented, noteFrameLag, notePlaybackStarted } from './BufferingGuard.js';
+import { checkPlayerBuffering, isPlayerStalled, noteFramePresented, noteFrameLag, notePlaybackStarted } from './BufferingGuard.js';
 
 /** Frames drawn since the media loaded, per player, for a sync log every 60. @type {WeakMap<object, number>} */
 const frameSyncLogCount = new WeakMap();
@@ -133,7 +133,9 @@ export function startPlayerRenderLoop(player) {
 
             const frameSyncCount = (frameSyncLogCount.get(player) ?? 0) + 1;
             frameSyncLogCount.set(player, frameSyncCount);
-            if (frameSyncCount % 60 === 0 && player.vodAnchor.isAnchored && !player.isLive) {
+            // Not while waiting for data: the same line every second, which
+            // filled most of a saved log (the wait has its own lines).
+            if (frameSyncCount % 60 === 0 && player.vodAnchor.isAnchored && !player.isLive && !isPlayerStalled(player)) {
                 const nextTs = player.frames.pending?.timestamp;
                 const drift = nextTs !== undefined ? ((nextTs - playbackTime) * 1000).toFixed(0) : 'n/a';
                 Logger.log(`[FrameSync] frame=${frameSyncCount}, playback=${playbackTime.toFixed(3)}, nextFrameTs=${nextTs?.toFixed(3) ?? 'none'}, drift=${drift}ms, audioCtx=${player.audioContext?.currentTime?.toFixed(3)}`);
