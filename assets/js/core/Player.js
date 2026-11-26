@@ -49,6 +49,7 @@ import { AudioBufferQueue } from './audio/AudioBufferQueue.js';
 import { ReversePlayback } from './playback/ReversePlayback.js';
 import { PlayerTiming } from './PlayerTiming.js';
 import { PlayerStateEvents } from './PlayerStateEvents.js';
+import { skipBufferWait } from './playback/BufferingGuard.js';
 
 export class CorePlayer {
     /**
@@ -199,6 +200,8 @@ export class CorePlayer {
         this.isLoading = isLoading;
         this.announce.loading();
     }
+    /** Go on now while it waits for data ("Play now"): short waits until the next seek or load. */
+    playNow() { skipBufferWait(this); }
     _showBezel(icon, text) { this.view?.showBezel(this, icon, text); }
 
     // ─── Loop ────────────────────────────────────────────────────────────────────

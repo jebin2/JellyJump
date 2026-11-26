@@ -1,7 +1,7 @@
 import { MediaBunny, ensureDecodersFor } from '../../shared/media/MediaBunny.js';
 import { mediaFetchFn } from '../../shared/net/mediaFetch.js';
 import { openRemotePlayback } from '../../shared/media/buffer/RemotePlayback.js';
-import { clearPlayerStall } from './BufferingGuard.js';
+import { clearPlayerStall, resetBufferWaitChoice } from './BufferingGuard.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
 import { StreamDetector } from '../../shared/utils/StreamDetector.js';
@@ -114,6 +114,7 @@ export async function resetPlayer(player) {
 
 export async function cleanupPlayerForLoad(player) {
     clearPlayerStall(player);
+    resetBufferWaitChoice(player);
     // Nothing to hand back to: the media is being replaced. A new file
     // always starts forward, so it never surprises anyone by running
     // backwards.

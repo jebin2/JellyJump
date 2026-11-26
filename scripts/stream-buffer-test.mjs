@@ -188,9 +188,15 @@ try {
     const opened = await load(page, url);
     check('a remote file opens through the buffer', opened.buffered && opened.kind === 'opfs', JSON.stringify(opened));
     const atLoad = keptBytes(await kept(page));
-    await sleep(4000);
-    const paused = keptBytes(await kept(page));
-    check('paused, it keeps downloading ahead', paused > atLoad + 40 * 1024, `${atLoad} → ${paused} bytes in 4 s`);
+    const pausedAt = Date.now();
+    let paused = atLoad;
+    // One request at a time at 20 KB/s: a 64 KB piece takes a few seconds.
+    while (paused < atLoad + 64 * 1024 && Date.now() - pausedAt < 15000) {
+        await sleep(250);
+        paused = keptBytes(await kept(page));
+    }
+    check('paused, it keeps downloading ahead', paused >= atLoad + 64 * 1024,
+        `${atLoad} → ${paused} bytes in ${((Date.now() - pausedAt) / 1000).toFixed(1)} s`);
 
     console.log('\na seek aborts the fetch it left behind\n');
     // A window of 2 s ahead (the setting), so the 12 s file has pieces
@@ -214,6 +220,27 @@ try {
         newOnes.length > 0 && newOnes.every((r) => r.range && r.range[0] >= video.length * 0.4),
         newOnes.map((r) => r.range?.join('-')).join(', '));
     await page.evaluate(() => { window.player.pause(); localStorage.removeItem('jj:buffer'); });
+
+    console.log('\na wait sized to a slow link\n');
+    remote.rate = 4 * 1024;   // a sixth of the bitrate
+    remote.requests.length = 0;
+    await load(page, `${origin}/__remote__/slow.mp4`);
+    await page.evaluate(() => window.player.play());
+    // Long enough to measure the link, then the audio runs out.
+    const shown = await page.waitForFunction(() => {
+        const box = document.querySelector('.jellyjump-buffer-wait');
+        return box && !box.hidden && /Buffering… \d+:\d\d/.test(box.textContent) ? box.textContent.trim() : null;
+    }, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => null);
+    check('it shows how long it waits, with Play now', !!shown && /Play now/.test(shown), String(shown));
+    await page.click('.jellyjump-buffer-wait-btn');
+    const skipped = await page.evaluate(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+        const box = document.querySelector('.jellyjump-buffer-wait');
+        return { hidden: box.hidden, playing: window.player.isPlaying, loading: window.player.isLoading };
+    });
+    check('Play now goes on at once, and the line goes', skipped.hidden && skipped.playing, JSON.stringify(skipped));
+    await page.evaluate(() => window.player.pause());
+    remote.rate = 0;
 
     console.log('\na seek back into what was downloaded\n');
     remote.rate = 0;

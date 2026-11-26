@@ -47,8 +47,15 @@ export function pieceSizeFor(size) {
 
 /** Attempts for a piece a reader is waiting on, and the wait before each retry (s). */
 const READ_RETRY_DELAYS = [1, 2, 4];
-/** How far back the link's rate is measured (ms). */
-const RATE_WINDOW_MS = 10000;
+/** How long samples of the link are kept (ms). */
+const RATE_WINDOW_MS = 30000;
+/**
+ * The link's rate is over the last this much receiving time (ms). Not the
+ * whole window: when the link drops, the seconds before the drop carried
+ * most of the bytes and kept the average high for as long as they stayed in
+ * it (seen on a device: 10 MB/s, then 0.5 MB/s, still measured as fast).
+ */
+const RATE_RECENT_MS = 3000;
 
 /**
  * What is kept about a file besides its pieces.
@@ -398,6 +405,9 @@ async function takeLock(name) {
  * @property {Set<PiecePart>} parts
  * @property {Set<{from: number, to: number, resolve: () => void, reject: (e: unknown) => void}>} waiters
  * @property {boolean} finished
+ * @property {number} [readerFrom] - where in the piece the first reader
+ *   started (a seek landing in it): the bytes before it are behind the
+ *   picture, and fetched only when nothing else is
  * @property {boolean} [background] - left behind by a seek: fetched only when
  *   nothing else is (resumeBackground), though a reader from before the seek
  *   may still be waiting on it
@@ -494,6 +504,36 @@ export class BufferedFile {
     isComplete() {
         for (let i = 0; i < this.pieceCount; i++) if (!this.has(i)) return false;
         return true;
+    }
+
+    /**
+     * Bytes there without a gap from byte `offset` on: kept pieces, and what
+     * has arrived of the piece being fetched at `offset`.
+     * @param {number} offset
+     */
+    contiguousFromByte(offset) {
+        let end = offset;
+        for (let i = this.pieceAt(offset); i < this.pieceCount; i++) {
+            const start = i * this.pieceSize;
+            if (this.has(i)) { end = start + pieceLength(this.size, this.pieceSize, i); continue; }
+            const job = this.fetching.get(i);
+            const range = job?.filled.find(([a, b]) => a <= end - start && end - start < b);
+            if (range) end = start + range[1];
+            break;
+        }
+        return Math.max(0, end - offset);
+    }
+
+    /**
+     * Bytes kept without a gap from the start of piece `index` on.
+     * @param {number} index
+     */
+    contiguousFrom(index) {
+        let bytes = 0;
+        for (let i = Math.max(0, index); i < this.pieceCount && this.has(i); i++) {
+            bytes += pieceLength(this.size, this.pieceSize, i);
+        }
+        return bytes;
     }
 
     /**
@@ -742,7 +782,10 @@ export class BufferedFile {
             job.done.catch(() => {});
             this.fetching.set(index, job);
         }
-        if (urgent) job.background = false;   // a reader wants it now
+        if (urgent) {
+            job.background = false;   // a reader wants it now
+            if (!job.filled.length && !job.parts.size) job.readerFrom = Math.min(job.readerFrom ?? from, from);
+        }
         if (urgent && !covered(job.filled, from, from + 1)) this.yieldTo(job);
         this.cover(job, from);
         return job;
@@ -838,6 +881,14 @@ export class BufferedFile {
         for (const [a, b] of job.filled) {
             if (a > gap) break;
             gap = Math.max(gap, b);
+        }
+        // The start of a piece a seek landed in is behind the picture: seen on
+        // a device, fetching it during a wait spent ten seconds of a slow
+        // link on video already passed. Only once the window is full.
+        if (job.waiters.size === 0 && job.readerFrom !== undefined && gap < job.readerFrom) {
+            job.background = true;
+            this.parked.add(job);
+            return;
         }
         this.cover(job, gap);
     }
@@ -955,15 +1006,21 @@ export class BufferedFile {
     }
 
     /**
-     * The link's rate over the last few seconds of fetching (bytes per
-     * second), counting only the time spent receiving; null before enough
-     * has been fetched to say.
+     * The link's rate over the last RATE_RECENT_MS of receiving (bytes per
+     * second), counting only the time spent receiving; null before a second
+     * of it.
      */
     linkRate() {
         let bytes = 0;
         let ms = 0;
-        for (const sample of this.samples) { bytes += sample.bytes; ms += sample.ms; }
-        if (bytes < 64 * 1024 || ms < 200) return null;
+        // The most recent RATE_RECENT_MS of receiving, newest first.
+        for (let i = this.samples.length - 1; i >= 0 && ms < RATE_RECENT_MS; i--) {
+            bytes += this.samples[i].bytes;
+            ms += this.samples[i].ms;
+        }
+        // A second of receiving is a measure at any rate; counting bytes
+        // instead never measured a link slower than they arrive in the window.
+        if (bytes === 0 || ms < 1000) return null;
         return bytes / (ms / 1000);
     }
 
@@ -1004,6 +1061,7 @@ export class BufferedFile {
             if (!job.background || job.finished) continue;
             this.parked.delete(job);
             job.background = false;
+            job.readerFrom = undefined;   // its turn now, behind the picture or not
             this.afterPart(job);
             return true;
         }

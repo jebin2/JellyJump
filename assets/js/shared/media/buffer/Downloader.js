@@ -81,6 +81,10 @@ export class Downloader {
         this.loading = true;
         /** The piece the player reads (where the window is). */
         this.cursor = 0;
+        /** The byte the player has read up to: what is "ahead" counts from here. */
+        this.readByte = 0;
+        /** Where the read waiting to settle as a jump started. */
+        this.jumpByte = 0;
         /** The last read outside the window, waiting to settle; null if none. */
         this.jumpTo = /** @type {number|null} */ (null);
         /** @type {ReturnType<typeof setTimeout>|null} */
@@ -166,17 +170,20 @@ export class Downloader {
         }
         if (last >= this.cursor - this.behindPieces() && first <= this.cursor + this.aheadPieces()) {
             // Within the window: playback moving on.
+            this.readByte = end;
             if (last > this.cursor) { this.cursor = last; this.wake(); }
             this.jumpTo = null;
             return;
         }
         // Outside it: a seek, or a step of a drag. Counted once reads settle.
         this.jumpTo = first;
+        this.jumpByte = start;
         if (this.jumpTimer) clearTimeout(this.jumpTimer);
         this.jumpTimer = setTimeout(() => {
             this.jumpTimer = null;
             if (this.jumpTo === null) return;
             this.cursor = this.jumpTo;
+            this.readByte = this.jumpByte;
             this.jumpTo = null;
             const from = this.cursor;
             const to = this.cursor + this.aheadPieces();

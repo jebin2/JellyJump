@@ -91,6 +91,25 @@ export function showPlayerLoading(player, isLoading) {
     }
 }
 
+/**
+ * Under the spinner: how long a wait sized to a slow link has left, and
+ * Play now. Hidden when the wait is not a sized one (null).
+ * @param {any} player
+ * @param {number|null} secondsLeft
+ */
+export function showPlayerBufferWait(player, secondsLeft) {
+    const box = player.ui.bufferWait;
+    if (!box) return;
+    if (secondsLeft === null || secondsLeft === undefined) {
+        box.hidden = true;
+        return;
+    }
+    const minutes = Math.floor(secondsLeft / 60);
+    const seconds = String(secondsLeft % 60).padStart(2, '0');
+    player.ui.bufferWaitText.textContent = `Buffering… ${minutes}:${seconds}`;
+    box.hidden = false;
+}
+
 export function showPlayerBezel(player, icon, text) {
     if (!player.ui.bezelOverlay) return;
 

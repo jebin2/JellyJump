@@ -1,5 +1,5 @@
 import { saveProgress, loadProgress } from '../../shared/settings/Progress.js';
-import { isPlayerStalled } from './BufferingGuard.js';
+import { isPlayerStalled, resetBufferWaitChoice } from './BufferingGuard.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { startPlayerVideoIterator } from './VideoIterator.js';
 
@@ -121,6 +121,7 @@ export function completePlayerMedia(player) {
 }
 
 export async function seekPlayerTo(player, time) {
+    resetBufferWaitChoice(player);   // a sized wait applies again after a seek
     Logger.log(`[Seek] seek time=${time.toFixed(3)}, vodAnchorWall=${player.vodAnchor.wall?.toFixed(3)}, vodAnchorContent=${player.vodAnchor.content?.toFixed(3)}, playbackTime=${getPlayerPlaybackTime(player).toFixed(3)}`);
 
     player.setLoading(true);

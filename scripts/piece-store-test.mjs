@@ -167,6 +167,25 @@ console.log('\na seek into the middle of a piece\n');
     file.close();
 }
 
+console.log('\nthe bytes before a seek point\n');
+{
+    const data = bytesOf(4000, 23);
+    const server = fakeServer({ 'https://h/s.mp4': { bytes: data, etag: '"v1"' } });
+    const store = makeStore(server);
+    const file = await store.open({ url: 'https://h/s.mp4', key: 'url:s' });
+    const bytes = await file.read(1600, 1700);     // a seek lands inside piece 1
+    await sleep(30);
+    const asked = server.requests.slice(1).map((r) => r.range.join('-'));
+    check('the seek\'s bytes come first', same(bytes, data.slice(1600, 1700)) && asked[0] === '1600-1999', asked.join(', '));
+    check('the piece\'s start, behind the picture, waits', !asked.includes('1000-1599') && !file.has(1), asked.join(', '));
+    check('ahead of the seek point counts from it, not from the piece', file.contiguousFromByte(1650) === 350,
+        `${file.contiguousFromByte(1650)}`);
+    check('it is fetched once nothing else is', file.resumeBackground() === true);
+    await file.ensure(1);
+    check('and the piece is then kept whole', file.has(1) && file.contiguousFromByte(1650) === 350);
+    file.close();
+}
+
 console.log('\nthe downloader\n');
 {
     const data = bytesOf(6000, 13);
@@ -390,16 +409,23 @@ console.log('\nwhat survives a reload\n');
 
 console.log('\nthe link\n');
 {
-    const server = fakeServer({ 'https://h/r.mp4': { bytes: bytesOf(400000), etag: '"v1"' } });
+    const server = fakeServer({ 'https://h/r.mp4': { bytes: bytesOf(800000), etag: '"v1"' } });
     server.chunk = 10000;
-    server.delay = 5;
+    server.delay = 30;
     const store = new PieceStore({ backend: new MemoryBackend(), budget: 1e9, fetchFn: server.fetch, pieceSize: 100000 });
     const file = await store.open({ url: 'https://h/r.mp4', key: 'kr' });
     check('no rate before anything is fetched', file.linkRate() === null);
     for (let i = 0; i < 4; i++) await file.ensure(i);
     const rate = file.linkRate();
-    // 10 KB every ~5 ms is ~2 MB/s; timers are coarse, so a wide band.
-    check('the rate is measured from the time spent receiving', rate > 300000 && rate < 4000000, `${Math.round(rate)} B/s`);
+    // 10 KB every ~30 ms is ~330 KB/s, over more than the second it needs;
+    // timers are coarse, so a wide band.
+    check('the rate is measured from the time spent receiving', rate > 150000 && rate < 700000, `${Math.round(rate)} B/s`);
+    // The link drops: a few seconds later the measure says so, not the
+    // fast seconds before it.
+    server.delay = 200;                // 10 KB every 200 ms: 50 KB/s
+    for (let i = 4; i < 8; i++) await file.ensure(i);
+    const dropped = file.linkRate();
+    check('when the link drops, the measure follows within seconds', dropped < 100000, `${Math.round(dropped)} B/s`);
     file.close();
 }
 
