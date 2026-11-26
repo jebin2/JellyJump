@@ -1,19 +1,19 @@
 {
   "totals": {
     "firstPaintJs": {
-      "dashboard": 7594,
-      "player": 11188,
-      "embed": 8347,
-      "watch": 10973
+      "dashboard": 7815,
+      "player": 11586,
+      "embed": 8842,
+      "watch": 11174
     },
     "css": {
-      "dashboard": 4450,
-      "player": 18764,
-      "embed": 9571,
-      "watch": 2750
+      "dashboard": 4970,
+      "player": 19053,
+      "embed": 9860,
+      "watch": 2879
     },
-    "lazyBudgeted": 223059,
-    "allJs": 3153129,
+    "lazyBudgeted": 220820,
+    "allJs": 3168377,
     "duplicates": 7
   }
 }

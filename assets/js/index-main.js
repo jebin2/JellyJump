@@ -71,26 +71,11 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    // Hero Video Animation
-    const heroVideo = document.querySelector('.hero-video');
-    const heroSection = document.getElementById('hero');
-
-    if (heroVideo && heroSection) {
-        // Function to trigger animation
-        const triggerAnimation = () => {
-            heroSection.classList.add('video-loaded');
-        };
-
-        // If video is already playing (cached or fast load)
-        if (heroVideo.currentTime > 0 && !heroVideo.paused && !heroVideo.ended && heroVideo.readyState > 2) {
-            triggerAnimation();
-        } else {
-            // Wait for play event
-            heroVideo.addEventListener('play', triggerAnimation);
-            // Fallback: also check timeupdate in case play event fired before listener
-            heroVideo.addEventListener('timeupdate', () => {
-                if (heroVideo.currentTime > 0.5) triggerAnimation(); // Small buffer
-            }, { once: true });
-        }
+    // The demo, in JellyJump's own embed player: playing, muted and looping,
+    // except for people who ask for less motion, who start it themselves.
+    const demoFrame = document.querySelector('.hero-demo iframe[data-src]');
+    if (demoFrame) {
+        const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        demoFrame.src = `${demoFrame.dataset.src}&autoplay=${still ? 0 : 1}`;
     }
 });

@@ -49,7 +49,7 @@ check('the precache holds the player page, the root (the player too) and the lan
     ['player.html', 'index.html', 'dashboard.html'].every((page) => manifest.precache.includes(page)));
 check('the site\'s root is the player page, byte for byte; the landing page is dashboard.html',
     readFileSync(join(DIST, 'index.html'), 'utf8') === readFileSync(join(DIST, 'player.html'), 'utf8')
-    && readFileSync(join(DIST, 'dashboard.html'), 'utf8').includes('LAUNCH PLAYER'));
+    && readFileSync(join(DIST, 'dashboard.html'), 'utf8').includes('Open the player'));
 check('every precached file is in the build', manifest.precache.every((file) => existsSync(join(DIST, file))),
     manifest.precache.filter((file) => !existsSync(join(DIST, file))).join(', '));
 check('no media, source maps, version.json or sw.js precached',

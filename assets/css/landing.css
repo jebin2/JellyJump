@@ -48,140 +48,294 @@
     content: url('../../assets/icons/jelly_jump_logo.gif');
 }
 
-/* -----------------------------------------
-   2. Hero Section
-   ----------------------------------------- */
-.hero {
-    min-height: 100vh;
+.nav-logo {
     display: flex;
     align-items: center;
-    justify-content: center;
-    background-color: var(--bg-primary);
+    gap: var(--space-sm);
+    font-weight: var(--font-bold);
+    font-size: var(--text-lg);
+    color: var(--text-primary);
+}
+
+.nav-logo-img {
+    width: 36px;
+    height: 36px;
+}
+
+/* -----------------------------------------
+   2. Hero: what it is, and the demo
+   ----------------------------------------- */
+.hero {
     padding: var(--space-3xl) 0;
-    position: relative;
-    overflow: hidden;
+    background-color: var(--bg-primary);
 }
 
-.hero-video {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 100%;
-    min-height: 100%;
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    /* Maintain aspect ratio for the 9:16 video, but ensure it covers */
-    /* Since we want it contained/blended, let's try to center it and let black bg fill rest if needed */
-    /* Update: User said "render properly in the center it will blend" */
-    height: 100%;
-    /* Fit height */
-    width: auto;
-    /* Auto width */
-    object-fit: contain;
-    /* Ensure full video is visible */
-    z-index: 1;
-    opacity: 0.6;
-    /* Dim the video slightly to make text readable */
-    mix-blend-mode: screen;
-    /* specific blend for black background video on dark bg */
-}
-
-.hero-content {
-    text-align: center;
-    max-width: 900px;
-    z-index: 10;
-    position: relative;
-    /* Ensure it stays above video */
+.hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: var(--space-2xl);
+    align-items: center;
 }
 
 .hero-title {
-    font-family: var(--font-primary);
-    font-weight: var(--font-black);
-    font-size: var(--text-3xl);
-    line-height: 1.1;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    margin-bottom: var(--space-lg);
+    font-size: clamp(2.25rem, 4.2vw, 3.75rem);
+    line-height: 1.05;
+    font-weight: var(--font-bold);
+    letter-spacing: -0.02em;
+    margin: 0 0 var(--space-lg);
 }
 
-.hero-subtitle {
-    font-family: var(--font-primary);
+.hero-lead {
     font-size: var(--text-lg);
     color: var(--text-secondary);
-    margin-bottom: var(--space-2xl);
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 0 var(--space-xl);
+    max-width: 34rem;
 }
 
 .hero-actions {
-    align-items: center;
-    transition: transform 2s ease-in-out;
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
 }
 
-/* Video Loaded Animation States */
-.hero.video-loaded .hero-title,
-.hero.video-loaded .hero-subtitle {
-    opacity: 0;
-    transition: opacity 1.5s ease-out;
-    pointer-events: none;
-    /* Prevent interaction with invisible text */
+.btn-lg {
+    padding: var(--space-md) var(--space-xl);
+    font-size: var(--text-lg);
 }
 
-.hero.video-loaded .hero-actions {
-    transform: translateY(32vh);
-    /* Push to bottom (adjusted for missing text) */
+.hero-points {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-lg);
+    margin: var(--space-xl) 0 0;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--accent-primary);
 }
 
-/* Ensure content is positioned correctly for animation */
-.hero-content {
-    text-align: center;
-    max-width: 900px;
-    z-index: 10;
+.hero-points li::before {
+    content: "✓ ";
+}
+
+.hero-demo {
     position: relative;
-    /* Ensure height doesn't collapse when items fade */
+    margin: 0;
+    border: var(--border-medium) solid var(--accent-primary);
+    box-shadow: var(--shadow-xl) var(--accent-primary);
+    background: var(--bg-secondary);
+    scroll-margin-top: 120px;
+}
+
+.demo-video {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    background: var(--bg-primary);
+}
+
+.demo-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border-top: var(--border-medium) solid var(--accent-primary);
+}
+
+.demo-note {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.demo-hint {
+    color: var(--accent-primary);
+    white-space: nowrap;
+}
+
+/* -----------------------------------------
+   3. The short version
+   ----------------------------------------- */
+.strip {
+    border-top: var(--border-medium) solid var(--accent-primary);
+    border-bottom: var(--border-medium) solid var(--accent-primary);
+    background: var(--bg-secondary);
+}
+
+.strip-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.strip-item {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    min-height: 50vh;
+    gap: var(--space-xs);
+    padding: var(--space-lg) var(--space-md);
+    color: var(--text-primary);
+    border-left: var(--border-thin) solid var(--border-dark);
+    transition: background-color var(--transition-fast);
 }
 
-/* 
-   Video Overlay Trigger 
-   Usage: Transparent clickable area over the video content.
-   Adjust top/left/width/height to match the video's button.
-*/
-.video-overlay-trigger {
-    position: absolute;
-    z-index: 20;
-
-    /* Default Positioning - ADJUST THESE VALUES */
-    top: 55.5%;
-    left: 50%;
-    width: 260px;
-    height: 60px;
-    transform: translate(-50%, -50%);
-    /* Centered by default */
-
-    /* DEBUG STYLES - Remove border when positioned correctly */
-    /* border: 2px dashed #ff0000;
-    background-color: rgba(255, 0, 0, 0.2); */
-    cursor: pointer;
-
-    /* Only show when video is actively showcasing */
-    display: none;
+.strip-item:first-child {
+    border-left: none;
 }
 
-.hero.video-loaded .video-overlay-trigger {
-    display: block;
+.strip-item:hover {
+    background: var(--bg-tertiary);
 }
 
-/* Large buttons for hero */
-.btn-lg {
-    padding: var(--space-md) var(--space-2xl);
-    font-size: var(--text-lg);
+.strip-item strong {
+    font-size: var(--text-xl);
+    text-transform: uppercase;
+}
+
+.strip-item span {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--accent-primary);
+}
+
+/* -----------------------------------------
+   4. Features, grouped
+   ----------------------------------------- */
+.features,
+.downloads {
+    padding: var(--space-3xl) 0;
+    background-color: var(--bg-primary);
+    scroll-margin-top: 80px;
+}
+
+.section-head {
+    margin-bottom: var(--space-2xl);
+}
+
+.section-title {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-bold);
+    text-transform: uppercase;
+    color: var(--accent-primary);
+    margin: 0;
+}
+
+.section-lead {
+    color: var(--text-secondary);
+    margin: var(--space-sm) 0 0;
+}
+
+.downloads .features-header {
+    margin-bottom: var(--space-xl);
+}
+
+.group {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    gap: var(--space-xl);
+    padding: var(--space-2xl) 0;
+    border-top: var(--border-thin) solid var(--border-dark);
+    scroll-margin-top: 80px;
+}
+
+.group-title {
+    font-size: var(--text-xl);
+    font-weight: var(--font-bold);
+    margin: 0;
+}
+
+.group-tag {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--accent-primary);
+    margin: var(--space-sm) 0 0;
+}
+
+.feature-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: var(--space-md);
+}
+
+.feature {
+    background: var(--bg-secondary);
+    border: var(--border-thin) solid var(--border-dark);
+    padding: var(--space-lg);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.feature:hover {
+    border-color: var(--accent-primary);
+    box-shadow: var(--shadow-md) var(--accent-primary);
+    transform: translate(-2px, -2px);
+}
+
+.feature-icon {
+    font-size: var(--text-xl);
+}
+
+.feature-title {
+    font-size: var(--text-base);
+    font-weight: var(--font-bold);
+    margin: var(--space-sm) 0 var(--space-xs);
+}
+
+.feature-text {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* -----------------------------------------
+   5. Small screens
+   ----------------------------------------- */
+@media (max-width: 960px) {
+    .hero-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .group {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+}
+
+@media (max-width: 640px) {
+    .hero {
+        padding: var(--space-xl) 0 var(--space-2xl);
+    }
+
+    .hero-actions .btn-lg {
+        width: 100%;
+        text-align: center;
+    }
+
+    .strip-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .strip-item:nth-child(3) {
+        border-left: none;
+    }
+
+    .strip-item:nth-child(n + 3) {
+        border-top: var(--border-thin) solid var(--border-dark);
+    }
+
+    .hero-demo {
+        box-shadow: var(--shadow-md) var(--accent-primary);
+    }
+
+    .demo-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-xs);
+    }
 }
 
 @media (max-width: 768px) {
@@ -307,69 +461,9 @@
 }
 
 
-@media (max-width: 640px) {
-    .hero-title {
-        font-size: var(--text-2xl);
-    }
-
-    .hero-actions {
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .btn-lg {
-        width: 100%;
-    }
-
-    .feature-card {
-        padding: var(--space-md);
-    }
-}
-
 /* -----------------------------------------
-   3. Features Section
+   6. Footer
    ----------------------------------------- */
-.features {
-    padding: var(--space-3xl) 0;
-    background-color: var(--bg-primary);
-    scroll-margin-top: 100px;
-}
-
-.downloads {
-    scroll-margin-top: 100px;
-}
-
-.features-header {
-    text-align: center;
-    margin-bottom: var(--space-3xl);
-}
-
-.feature-card {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-.feature-link {
-    margin-top: auto;
-    padding: var(--space-sm) 0;
-    font-family: var(--font-mono);
-    font-weight: var(--font-bold);
-    color: var(--accent-primary);
-    text-transform: uppercase;
-    font-size: var(--text-sm);
-    transition: all var(--transition-fast);
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-}
-
-.feature-link:hover {
-    color: var(--text-primary);
-    gap: var(--space-sm);
-}
-
 /* -----------------------------------------
    4. Footer
    ----------------------------------------- */
@@ -384,4 +478,15 @@
     font-family: var(--font-mono);
     color: var(--text-secondary);
     font-size: var(--text-sm);
+}
+
+.footer-links {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-top: var(--space-sm);
+}
+
+.footer-links a {
+    color: var(--accent-primary);
 }

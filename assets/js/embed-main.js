@@ -5,8 +5,12 @@
  * Query params:
  *   - video_url: URL of video to play (required)
  *   - controls: Comma-separated controls (default: play,pause,fullscreen,progress,time,volume)
+ *       `none` hides the control bar; `mute` alone shows no bar, only a
+ *       mute/unmute button over the picture (a looping preview, say)
  *   - autoplay: 1 to autoplay (default: 1)
  *   - muted: 1 to start muted (default: 0)
+ *   - loop: 1 to play it over and over (the loop button shows only when
+ *       `loop` is in controls)
  */
 import './shared/utils/reload-on-stale-chunks.js';
 import { Logger } from './shared/utils/Logger.js';
@@ -41,7 +45,9 @@ async function initEmbed() {
     let allowedControls = [];
     let isNone = false;
 
-    if (controlsParam === 'none') {
+    // Only a mute/unmute button: no bar, the button drawn over the picture.
+    const muteOnly = controlsParam === 'mute';
+    if (controlsParam === 'none' || muteOnly) {
         isNone = true;
         // For "none", we keep 'play' in allowed list internally so logic works,
         // but we will hide the control bar via controlsConfig.controlBar = false
@@ -69,7 +75,7 @@ async function initEmbed() {
 
         // Disabled in embed mode
         captions: false,
-        loop: !isNone && (allowedControls.includes('loop') || params.get('loop') === '1' || params.get('loop') === 'true'),
+        loop: !isNone && allowedControls.includes('loop'),
         filters: false,
         equalizer: !isNone && allowedControls.includes('volume'),
         volumeOnly: true,
@@ -77,7 +83,8 @@ async function initEmbed() {
         keyboard: true  // Keep shortcuts
     };
 
-    controlsConfig.loopMode = controlsConfig.loop ? "one" : 'off';
+    const looping = allowedControls.includes('loop') || params.get('loop') === '1' || params.get('loop') === 'true';
+    controlsConfig.loopMode = looping ? 'one' : 'off';
 
     try {
         // Load player and screenshot templates
@@ -106,6 +113,11 @@ async function initEmbed() {
             controls: controlsConfig
         });
 
+        // No bar: not drawn below the picture either, where its buttons
+        // could still be reached with Tab without being seen.
+        if (isNone) document.body.classList.add('embed-no-bar');
+        if (muteOnly) addMuteButton(player);
+
         // Load the video (use load() method with autoplay param)
         const decodedUrl = decodeURIComponent(videoUrl);
         await player.load(decodedUrl, autoplay);
@@ -126,6 +138,32 @@ async function initEmbed() {
         Logger.error('[Embed] Init error:', err);
         showError('Failed to load player', err.message);
     }
+}
+
+/**
+ * The one control of `controls=mute`: a button over the picture that
+ * mutes and unmutes, and says which it is.
+ * @param {any} player
+ */
+function addMuteButton(player) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'embed-mute-btn';
+    const show = () => {
+        const muted = player.isMuted;
+        button.textContent = muted ? '🔇' : '🔊';
+        button.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+        button.setAttribute('aria-pressed', String(muted));
+        button.title = muted ? 'Sound on' : 'Sound off';
+    };
+    button.addEventListener('click', (event) => {
+        event.stopPropagation();   // not a click on the picture (play/pause)
+        player.toggleMute();
+        show();
+    });
+    player.on?.('volumechange', show);
+    document.getElementById('player-container').append(button);
+    show();
 }
 
 function showError(title, message) {

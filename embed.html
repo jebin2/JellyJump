@@ -37,6 +37,30 @@
             display: none !important;
         }
 
+        /* controls=none or mute: no control bar at all */
+        .embed-no-bar .jellyjump-controls {
+            display: none !important;
+        }
+        /* controls=mute: the only control, over the picture */
+        .embed-mute-btn {
+            position: fixed;
+            right: 14px;
+            bottom: 14px;
+            z-index: 50;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 3px solid var(--accent-primary, #00ff88);
+            background: rgba(10, 10, 10, 0.75);
+            color: #fff;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .embed-mute-btn:hover,
+        .embed-mute-btn:focus-visible {
+            background: rgba(10, 10, 10, 0.95);
+        }
         /* Error state */
         .embed-error {
             display: flex;

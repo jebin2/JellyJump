@@ -75,7 +75,7 @@ const rootIsPlayer = {
 /** A build file named by its content (assets/name-HASH.ext): never changes. */
 const HASHED_FILE = /(^|\/)assets\/[^/]+-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/i;
 /** Public files the offline player needs; the rest (media, SEO) are not stored. */
-const OFFLINE_PUBLIC = /^(manifest\.json|favicon\.ico|icon-\d+\.png|poster\.webp|assets\/(icons|templates)\/.+|assets\/js\/lib\/.+)$/;
+const OFFLINE_PUBLIC = /^(manifest\.json|favicon\.ico|icon-\d+\.png|assets\/(icons|templates)\/.+|assets\/js\/lib\/.+)$/;
 /** Pages stored for offline use, by their entry: the player (also at the root), and the landing page. */
 const OFFLINE_PAGES = { 'player.html': 'player', 'index.html': 'player', 'dashboard.html': 'dashboard' };
 /** On-demand decoders a file may need before it plays (plan Q4). */
