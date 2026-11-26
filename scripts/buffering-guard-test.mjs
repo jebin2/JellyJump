@@ -147,10 +147,14 @@ console.log('\na wait sized to a slow link\n');
         p.duration = 3600;
         p.trigger = (name, data) => events.push({ name, ...data });
         p.events = events;
-        p.remote = { have: 0 };
+        p.remote = { have: 0, rate: linkRate };   // have: kept without a gap up to this byte
         p.media = {
             remote: {
-                file: { linkRate: () => linkRate, contiguousFromByte: () => p.remote.have, pieceSize: 4 * MB, size: 4000 * MB },
+                file: {
+                    linkRate: () => p.remote.rate,
+                    contiguousFromByte: (from) => Math.max(0, p.remote.have - from),
+                    pieceSize: 4 * MB, size: 4000 * MB,
+                },
                 downloader: { byteRate: 1 * MB, cursor: 0, readByte: 0, aheadPieces: () => 1000 },
             },
         };
@@ -216,9 +220,36 @@ console.log('\na wait sized to a slow link\n');
     nearEnd.media.remote.downloader.readByte = 12 * MB;   // reads run ahead: from 12 MB on
     runLow(nearEnd);
     enoughAudio(nearEnd);
-    nearEnd.remote.have = 8 * MB;                  // the rest of the file
+    nearEnd.remote.have = 20 * MB;                 // the rest of the file
     checkPlayerBuffering(nearEnd);
     check('with the rest of the file downloaded, it plays on', nearEnd.audioContext.resumes === 1);
+
+    // Fixed when it begins: the target does not grow with the link, nor move with the reads.
+    const steady = remotePlayer(0.4 * MB);
+    runLow(steady);
+    enoughAudio(steady);
+    const planned = 0.4 * MB * MAX_WAIT_S;
+    steady.remote.rate = 0.6 * MB;                         // the link speeds up
+    steady.media.remote.downloader.readByte = 2 * MB;      // the player reads on while waiting
+    steady.remote.have = planned;
+    checkPlayerBuffering(steady);
+    check('the bytes planned when it began are enough, whatever the link does after', steady.audioContext.resumes === 1);
+
+    // Half a minute by the clock, whatever has come (a tab in the background stops the checks).
+    const late = remotePlayer(0.4 * MB);
+    const realNow = performance.now.bind(performance);
+    runLow(late);
+    enoughAudio(late);
+    late.remote.have = 1 * MB;
+    checkPlayerBuffering(late);
+    check('waiting while little has come', late.audioContext.resumes === 0 && bufferWaitSecondsLeft(late) > 1);
+    const start = realNow();
+    performance.now = () => start + (MAX_WAIT_S - 5) * 1000;
+    check('the time left counts the clock down, not only the bytes', bufferWaitSecondsLeft(late) <= 5, `${bufferWaitSecondsLeft(late)}`);
+    performance.now = () => start + (MAX_WAIT_S + 1) * 1000;
+    checkPlayerBuffering(late);
+    performance.now = realNow;
+    check('after half a minute it plays on anyway', late.audioContext.resumes === 1);
 
     const fast = remotePlayer(2 * MB);
     runLow(fast);
