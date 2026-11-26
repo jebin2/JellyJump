@@ -10,7 +10,7 @@ had nothing behind it: production dropped every log line.
 
 ## Decision
 
-Nothing about errors is sent automatically. The app keeps the last 1,000 log
+Nothing about errors is sent automatically. The app keeps the last 3,000 log
 entries in memory, with trace ids for the playback load and the job in
 progress; uncaught errors are recorded and shown once with "Copy details",
 which builds a report with addresses replaced, for the user to send if they
