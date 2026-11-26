@@ -51,6 +51,26 @@ export function updatePlayerProgress(player) {
     updatePlayerTimeDisplay(player);
 }
 
+/**
+ * Shade the parts of the seek bar downloaded (bufferchange's time ranges).
+ * @param {any} player
+ * @param {Array<[number, number]>} ranges - seconds
+ */
+export function showPlayerDownloaded(player, ranges) {
+    const layer = player.ui.progressDownloaded;
+    if (!layer) return;
+    const duration = player.duration;
+    const known = duration > 0 && Number.isFinite(duration);
+    const share = (/** @type {number} */ t) => Math.min(100, Math.max(0, (t / duration) * 100));
+    layer.replaceChildren(...(known ? ranges : []).map(([start, end]) => {
+        const range = document.createElement('div');
+        range.className = 'jellyjump-progress-downloaded-range';
+        range.style.left = `${share(start)}%`;
+        range.style.width = `${share(end) - share(start)}%`;
+        return range;
+    }));
+}
+
 export function updatePlayerTimeDisplay(player) {
     if (!player.ui.timeDisplay) return;
     const current = formatTime(player.currentTime);

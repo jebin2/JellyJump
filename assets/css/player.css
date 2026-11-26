@@ -311,6 +311,22 @@ button:focus-visible {
     position: relative;
 }
 
+/* What is downloaded of a remote file, under the played part: a seek
+   there plays without the network. */
+.jellyjump-progress-downloaded {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.jellyjump-progress-downloaded-range {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background-color: var(--text-secondary);
+    opacity: 0.35;
+}
+
 .jellyjump-progress-bar {
     height: 100%;
     background-color: var(--accent-primary);

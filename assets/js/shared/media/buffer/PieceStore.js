@@ -559,6 +559,33 @@ export class BufferedFile {
     }
 
     /**
+     * The bytes kept that play, as [start, end) ranges, merged: whole pieces
+     * only, so never more than is kept. A run made only of pinned pieces is
+     * left out unless the file starts with it: past the start, pinned pieces
+     * are the file's index (an MKV's cues, or the index of an MP4 not made
+     * "faststart", both at the end), kept for seeking, not video that plays;
+     * the first piece holds the header and the first seconds of the video.
+     * @returns {Array<[number, number]>}
+     */
+    playableRanges() {
+        const pinned = new Set(this.record.meta.pinned);
+        /** @type {Array<[number, number]>} */
+        const ranges = [];
+        let runStart = -1;
+        let plays = false;
+        for (let i = 0; i <= this.pieceCount; i++) {
+            if (i < this.pieceCount && this.has(i)) {
+                if (runStart < 0) { runStart = i; plays = i === 0; }
+                if (!pinned.has(i)) plays = true;
+                continue;
+            }
+            if (runStart >= 0 && plays) ranges.push([runStart * this.pieceSize, Math.min(this.size, i * this.pieceSize)]);
+            runStart = -1;
+        }
+        return ranges;
+    }
+
+    /**
      * Called with the byte range of each piece kept or let go.
      * @param {(start: number, end: number) => void} listener
      * @returns {() => void} removes it

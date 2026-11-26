@@ -2,6 +2,7 @@ import { MediaBunny, ensureDecodersFor } from '../../shared/media/MediaBunny.js'
 import { mediaFetchFn } from '../../shared/net/mediaFetch.js';
 import { openRemotePlayback } from '../../shared/media/buffer/RemotePlayback.js';
 import { clearPlayerStall, resetBufferWaitChoice } from './BufferingGuard.js';
+import { watchDownloadedRanges, stopDownloadedRanges } from './DownloadedRanges.js';
 import { Logger } from '../../shared/utils/Logger.js';
 import { parseYouTubeUrl } from '../../shared/utils/YouTubeUrl.js';
 import { StreamDetector } from '../../shared/utils/StreamDetector.js';
@@ -65,6 +66,7 @@ export function clearPlayerCanvas(player) {
 }
 
 export function disposeMediaBunnyResources(player) {
+    stopDownloadedRanges(player);
     player.media.dispose();
 }
 
@@ -610,6 +612,8 @@ export async function loadPlayerMedia(player, url, autoplay = false, videoId = n
         remote?.onComplete(() => {
             if (player.media.remote === remote) player.thumbnails?.startGeneration();
         });
+        // The seek bar shades what is downloaded (none for a local file).
+        watchDownloadedRanges(player);
         player.announce.tracks();
 
         if (!player.isLive) player.setLoading(false);
