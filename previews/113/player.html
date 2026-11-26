@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https: http:; media-src 'self' blob: data: https: http:; connect-src * blob: data:; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src https://www.youtube-nocookie.com https://www.youtube.com">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JellyJump — video player and editor in your browser</title>
+    <meta name="description" content="Play local files, your own media library and HLS streams; trim, convert and make GIFs. All in your browser, private by design.">
+    <link rel="icon" href="./assets/jelly_jump_logo-qiMeMAa9.png">
+    <link rel="canonical" href="https://jellyjump.voidall.com/">
+
+    <!-- Open Graph (Facebook, LinkedIn, Discord, WhatsApp, …) -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="JellyJump">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:url" content="https://jellyjump.voidall.com/">
+    <meta property="og:title" content="JellyJump — video player and editor in your browser">
+    <meta property="og:description" content="Play local files, your own media library and HLS streams; trim, convert and make GIFs. All in your browser, private by design.">
+    <meta property="og:image" content="https://jellyjump.voidall.com/og-image.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JellyJump logo, a green jellyfish, with the words: Video player and editor, right in your browser.">
+
+    <!-- X / Twitter: name=, not property= -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="JellyJump — video player and editor in your browser">
+    <meta name="twitter:description" content="Play local files, your own media library and HLS streams; trim, convert and make GIFs. All in your browser, private by design.">
+    <meta name="twitter:image" content="https://jellyjump.voidall.com/og-image.png">
+    <meta name="twitter:image:alt" content="JellyJump logo, a green jellyfish, with the words: Video player and editor, right in your browser.">
+
+    <!-- Preload animated logo for loading indicator -->
+    <link rel="preload" href="./assets/jelly_jump_logo-jF-iEcbg.gif" as="image">
+    <!-- Preload play button (WebP for smaller size) -->
+    <link rel="preload" href="./assets/jelly_play-BM5NAVCG.webp" as="image">
+
+    <!-- PWA Support -->
+    <meta name="theme-color" content="#00d9a5">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./assets/jelly_jump_logo-qiMeMAa9.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="JellyJump">
+
+    <!-- CSS -->
+    <!-- Common CSS -->
+    <script defer src="./js/analytics-embed.js" data-project="JellyJump" data-skip-referrer="/JellyJump"></script>
+  <script type="module" crossorigin src="./assets/player-BqTcyqqT.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/Logger-DL-emtyC.js">
+  <link rel="modulepreload" crossorigin href="./assets/ErrorReporter-CXrfQs56.js">
+  <link rel="modulepreload" crossorigin href="./assets/preload-helper-qai7ov5E.js">
+  <link rel="modulepreload" crossorigin href="./assets/coi-G1Gh5GjO.js">
+  <link rel="modulepreload" crossorigin href="./assets/reload-on-stale-chunks-DHIEpqMc.js">
+  <link rel="stylesheet" crossorigin href="./assets/ErrorReporter-CkkKVcRy.css">
+  <link rel="stylesheet" crossorigin href="./assets/preload-helper-B8YEJJ5A.css">
+  <link rel="stylesheet" crossorigin href="./assets/coi-DgKzoTlh.css">
+  <link rel="stylesheet" crossorigin href="./assets/player-DyUqVfoJ.css">
+</head>
+
+<body>
+    <!-- Page Loading Overlay -->
+    <div class="page-loader" id="page-loader">
+        <div class="page-loader-logo"></div>
+    </div>
+
+    <!-- SVG Icon Sprite (loaded first for immediate use) -->
+    <div style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- Icons are defined in sprite.svg and loaded via <use> tags -->
+            </defs>
+        </svg>
+    </div>
+
+    <div class="player-layout">
+        <!-- Video Section -->
+        <main class="video-section" id="player-container">
+            <!-- Core Player will be injected here -->
+        </main>
+
+        <!-- Playlist Section -->
+        <aside class="playlist-section hidden">
+            <header class="playlist-header" style="display: none;">
+                <!-- Header is now generated by Playlist.js -->
+            </header>
+            <div class="playlist-content">
+                <div class="playlist-placeholder">
+                    <!-- Content will be rendered by Playlist.js when ready -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Mobile Expand Button (separate from playlist) -->
+        <button id="mobile-expand-btn" class="mobile-expand-button" aria-label="Expand playlist" title="Expand playlist"
+            style="display: none;">
+            ▲
+        </button>
+    </div>
+
+    <!-- Hidden File Inputs -->
+    <input type="file" id="mb-file-input" multiple
+        accept=".mp4,.webm,.mov,.avi,.mkv,.mp3,.wav,.aac,.m4a,.flac,.ogg,.opus,.vtt,.srt" style="display: none;">
+    <input type="file" id="mb-folder-input" webkitdirectory directory style="display: none;">
+
+    <!-- Hidden Download Anchor (reusable) -->
+    <a id="mb-download-link" style="display: none;"></a>
+
+    <!-- Scripts -->
+
+</body>
+
+</html>

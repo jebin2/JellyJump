@@ -1,0 +1,2 @@
+var e=new Set;function t(t){if(e.has(t)||typeof document>`u`)return;e.add(t);let n=document.getElementById(`jj-tool-templates`);n||(n=document.createElement(`div`),n.id=`jj-tool-templates`,n.hidden=!0,document.body.appendChild(n));let r=document.createElement(`div`);r.innerHTML=t;for(let e of r.querySelectorAll(`template`))document.getElementById(e.id)||n.appendChild(e)}export{t};
+//# sourceMappingURL=Templates-DuKuTQ0b.js.map
