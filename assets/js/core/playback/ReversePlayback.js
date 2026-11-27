@@ -2,6 +2,7 @@ import { Logger } from '../../shared/utils/Logger.js';
 import { BackwardFrameReader } from '../../shared/media/BackwardFrames.js';
 import { decodeTrackRange } from '../../shared/media/AudioHelpers.js';
 import { initPlayerAudio } from '../audio/AudioEngine.js';
+import { planStretch } from '../../shared/media/BackwardPlan.js';
 
 /**
  * ReversePlayback - plays the loaded video backwards, from wherever it is.
@@ -18,6 +19,18 @@ import { initPlayerAudio } from '../audio/AudioEngine.js';
  * stall at every key frame. Each holds fewer frames than the reader's default,
  * since together they hold twice as many.
  *
+ * Keeping up. Every stretch is decoded from its key frame, so far from one
+ * (ffmpeg puts them 8 s apart by default: 250 frames) a stretch of 24 frames
+ * can take longer to decode than to show, and the picture stood still for
+ * seconds while the sound went on. So the stretch before is started as soon
+ * as one is shown, not just before it runs out; and each stretch is planned
+ * before decoding, from how many frames lie between the key frame and it and
+ * how fast this device has been decoding them (planStretch): every k-th
+ * frame when decoding cannot keep up otherwise, and never a stretch of a few
+ * frames just after a key frame, which is all there would be to watch while
+ * the whole chunk before it decodes. The picture then moves less smoothly,
+ * and does not stop.
+ *
  * What they hold are screen-sized copies, not the decoder's own frames: each
  * decoded frame is drawn (with the file's rotation, as the forward path's
  * CanvasSink applies it) and released straight away. A hardware decoder keeps
@@ -33,8 +46,8 @@ import { initPlayerAudio } from '../audio/AudioEngine.js';
 
 /** Frames each reader holds; two readers run at once. */
 const FRAMES_PER_READER = 24;
-/** Start decoding the next stretch back when this little is left, in seconds. */
-const PREFETCH_LEAD = 0.5;
+/** Frames decoded a second, for the wait at the start when the first stretch measured nothing. */
+const DECODE_FPS_GUESS = 120;
 /** Two timestamps this close are the same instant. */
 const EPSILON = 1e-6;
 /** Closer than this to the start, there is nothing to play back from. */
@@ -197,6 +210,8 @@ export class ReversePlayback {
 
         const toHeld = (sample) => this._copy(sample);
         this._readers = [0, 1].map(() => new BackwardFrameReader(p.videoTrack, { maxFrames: FRAMES_PER_READER, toHeld }));
+        this._decodeFps = null;
+        this._chunkFrames = 0;
         this._shown = this._readers[0];
         this._lastDrawn = null;
         this._origin = { position: from, wall: performance.now(), rate: p.playbackRate || 1 };
@@ -234,6 +249,29 @@ export class ReversePlayback {
             Logger.warn(`[Reverse] Gave up starting (${outcome})`);
             await this.stop({ reposition: false });
             return { started: false, reason: 'This video could not be decoded backwards here.' };
+        }
+        // The first stretch holds every frame (nothing is known yet of how
+        // fast this video decodes here), so it can be too short to decode the
+        // next one in -- just after a key frame, a few frames before a whole
+        // chunk (seen: 4 frames, then 1.6 s on a 250-frame one, the picture
+        // still while the sound went on). Then the next one is waited for
+        // too, here, before anything moves.
+        const first = this._shown;
+        const firstSeconds = first.oldest === null ? 0 : (first.heldUntil - first.oldest) / this._origin.rate;
+        // Reaching back to its key frame, the next stretch is the chunk
+        // before, of a size not known yet: waited for whatever it costs.
+        const nextSeconds = first.framesLeft > 0
+            ? first.framesLeft / (this._decodeFps ?? DECODE_FPS_GUESS)
+            : Infinity;
+        if (first.oldest !== null && first.oldest > this._start + EPSILON && firstSeconds < nextSeconds) {
+            const second = this._readers[1];
+            let coverTimer;
+            await Promise.race([
+                this._fillLogged(second, first.oldest - EPSILON).catch(error => Logger.warn('[Reverse] Prefetch failed:', error)),
+                new Promise(resolve => { coverTimer = setTimeout(resolve, START_TIMEOUT_MS); }),
+            ]);
+            clearTimeout(coverTimer);
+            if (!this.active) return { started: false };
         }
         // The sound gets the same patience the picture got, and no more.
         const withSound = await Promise.race([audioReady, new Promise(r => setTimeout(() => r(false), START_TIMEOUT_MS))]);
@@ -345,12 +383,11 @@ export class ReversePlayback {
             this._lastDrawn = frame;
         }
 
-        // Nearly through the held stretch: the idle reader decodes the one
-        // before it.
+        // The idle reader decodes the stretch before this one straight away:
+        // all the time this one plays for is its time to decode in.
         const next = this._shown === a ? b : a;
         const oldest = this._shown.oldest;
-        const lead = PREFETCH_LEAD * this._origin.rate;
-        if (oldest !== null && oldest > this._start + EPSILON && t - oldest < lead
+        if (oldest !== null && oldest > this._start + EPSILON
             && !decoding && next.peek(oldest - EPSILON) === undefined) {
             this._fillLogged(next, oldest - EPSILON).catch(error => Logger.warn('[Reverse] Prefetch failed:', error));
         }
@@ -365,9 +402,37 @@ export class ReversePlayback {
         const began = performance.now();
         const decodedBefore = reader.decodedFrames;
         Logger.log(`[Reverse] Decoding the stretch up to ${t.toFixed(3)}s`);
-        await reader.fill(t);
-        Logger.log(`[Reverse] Ready up to ${t.toFixed(3)}s: ${reader.held.length} frames held, `
-            + `${reader.decodedFrames - decodedBefore} decoded, ${Math.round(performance.now() - began)}ms`);
+        const p = this.player;
+        await reader.fill(t, {
+            planFor: (frames) => {
+                this._chunkFrames = Math.max(this._chunkFrames, frames);
+                // Until this device has been measured on this video, every
+                // frame: a guess either way was wrong by ten times (a small
+                // clip decodes at 2000 frames a second, a busy 720p at 150).
+                // As many as a stretch may hold, so the first one lasts long
+                // enough to decode the next in, and leaves no few frames over
+                // for a stretch of their own.
+                if (this._decodeFps === null) return { step: 1, count: Math.min(frames, 2 * FRAMES_PER_READER) };
+                return planStretch({
+                    frames,
+                    decodeFps: this._decodeFps,
+                    frameDuration: 1 / (p.frameRate || 30),
+                    capacity: FRAMES_PER_READER,
+                    rate: this._origin?.rate || 1,
+                    chunkFrames: this._chunkFrames,
+                });
+            },
+        });
+        const ms = performance.now() - began;
+        const decoded = reader.decodedFrames - decodedBefore;
+        // How fast this device decodes this video, for the next stretch's
+        // step; a stretch of a few frames is mostly setting up, not decoding.
+        if (decoded >= 8 && ms > 0) {
+            const fps = decoded / (ms / 1000);
+            this._decodeFps = this._decodeFps === null ? fps : (this._decodeFps + fps) / 2;
+        }
+        Logger.log(`[Reverse] Ready up to ${t.toFixed(3)}s: ${reader.held.length} frames held, every ${reader.step ?? 1}, `
+            + `${decoded} decoded, ${Math.round(ms)}ms`);
     }
 
     /**
