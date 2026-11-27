@@ -41,7 +41,7 @@ export const config = Object.freeze({
      * The video put in an empty playlist on a first visit, relative to the
      * page; empty for none.
      */
-    sampleVideoPath: env.VITE_SAMPLE_VIDEO_PATH ?? 'homepage.mp4',
+    sampleVideoPath: env.VITE_SAMPLE_VIDEO_PATH ?? 'promo.mp4',
     /**
      * The hosts that carry that video: the site and its mirrors, and a local
      * dev server. Anywhere else (a test server on 127.0.0.1, someone else's

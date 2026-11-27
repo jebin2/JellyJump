@@ -33,3 +33,4 @@ scripts/fixtures/.tune-720p30.webm
 .env.*.local
 .coverage/
 scripts/demo/out/
+scripts/promo/out/

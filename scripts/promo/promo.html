@@ -1,0 +1,402 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>JellyJump promo</title>
+<!--
+  The promo video's frames. Nothing moves by itself: render.mjs calls
+  seek(t) for each frame, and every style is worked out from t, so the
+  same t always draws the same picture.
+-->
+<style>
+@font-face { font-family: SG; src: url(../../assets/fonts/SpaceGrotesk-Bold.ttf); font-weight: 700; }
+@font-face { font-family: SG; src: url(../../assets/fonts/SpaceGrotesk-Medium.ttf); font-weight: 500; }
+@font-face { font-family: SM; src: url(../../assets/fonts/SpaceMono-Bold.ttf); font-weight: 700; }
+@font-face { font-family: SM; src: url(../../assets/fonts/SpaceMono-Regular.ttf); font-weight: 400; }
+:root { --g: #00ff88; --m: #ff00ff; --c: #00d4ff; --a: #ffaa00; --r: #ff3366; --bg: #0a0a0a; --panel: #151515; }
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: #fff; font-family: SG, sans-serif; }
+#grid { position: absolute; inset: -80px; background-image:
+    linear-gradient(#161616 2px, transparent 2px), linear-gradient(90deg, #161616 2px, transparent 2px);
+    background-size: 80px 80px; }
+.scene { position: absolute; inset: 0; display: none; }
+.abs { position: absolute; }
+.box { position: absolute; background: var(--panel); border: 6px solid var(--g); box-shadow: 14px 14px 0 var(--g); }
+h1, h2, p { margin: 0; }
+.head { position: absolute; font: 700 124px/1.02 SG; letter-spacing: -3px; white-space: nowrap; }
+.green { color: var(--g); }
+.mono { font: 700 34px/1.3 SM; letter-spacing: 2px; color: var(--g); white-space: nowrap; }
+.chip { position: absolute; display: flex; align-items: center; justify-content: center; height: 96px; padding: 0 34px;
+    font: 700 46px/1 SG; background: var(--panel); border: 5px solid currentColor; box-shadow: 10px 10px 0 currentColor; white-space: nowrap; }
+.chip span { color: #fff; }
+#wipe { position: absolute; top: 0; bottom: 0; width: 2400px; left: -2400px; background: var(--g); z-index: 10; }
+#wipe2 { position: absolute; top: 0; bottom: 0; width: 160px; left: -2400px; background: var(--m); z-index: 11; }
+#fade { position: absolute; inset: 0; background: #000; opacity: 0; z-index: 20; }
+
+/* 1: intro */
+#logo1 { left: 250px; top: 300px; width: 480px; height: 480px; transform-origin: 50% 100%; }
+#word { left: 800px; top: 330px; font: 700 196px/1 SG; letter-spacing: -6px; white-space: nowrap; }
+#word span { display: inline-block; }
+#tag1 { left: 806px; top: 580px; font: 500 62px/1.25 SG; color: #e6e6e6; white-space: nowrap; }
+#tag2 { left: 806px; top: 660px; font: 700 62px/1.25 SG; color: var(--g); white-space: nowrap; }
+
+/* 3: playback */
+#player { left: 120px; top: 230px; width: 1040px; height: 640px; overflow: hidden; }
+#screen { position: absolute; left: 0; top: 0; right: 0; height: 520px; background: #050505; overflow: hidden; }
+.orb { position: absolute; width: 180px; height: 180px; border-radius: 50%; mix-blend-mode: screen; filter: blur(2px); }
+#bar { position: absolute; left: 40px; right: 40px; top: 562px; height: 18px; background: #2a2a2a; }
+#fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--g); }
+#head { position: absolute; top: -13px; width: 44px; height: 44px; margin-left: -22px; background: #fff; border: 5px solid #0a0a0a; border-radius: 50%; }
+#badge { position: absolute; right: 26px; top: 24px; font: 700 44px/1 SM; padding: 14px 22px; background: var(--g); color: #0a0a0a; }
+.line3 { position: absolute; left: 1250px; font: 700 110px/1 SG; letter-spacing: -3px; white-space: nowrap; }
+
+/* 4: edit */
+.seg { position: absolute; top: 520px; height: 150px; border: 5px solid #0a0a0a; }
+#cut1, #cut2 { position: absolute; top: 470px; width: 10px; height: 250px; background: #fff; box-shadow: 0 0 30px #fff; }
+
+/* 5: create */
+.card { position: absolute; top: 380px; width: 500px; height: 470px; }
+.card h3 { position: absolute; left: 0; right: 0; bottom: 42px; margin: 0; text-align: center; font: 700 48px/1.1 SG; }
+.mini { position: absolute; background: #050505; border: 5px solid #fff; }
+
+/* 6: private */
+#shackle { left: 330px; width: 300px; height: 300px; border: 46px solid #fff; border-bottom: none; border-radius: 150px 150px 0 0; }
+#lockbody { left: 260px; top: 560px; width: 440px; height: 330px; background: var(--g); border: 6px solid #0a0a0a; box-shadow: 16px 16px 0 #fff; }
+#keyhole { left: 190px; top: 100px; width: 60px; height: 120px; background: #0a0a0a; border-radius: 30px 30px 8px 8px; }
+
+/* 7: end */
+#endbox { left: 150px; top: 150px; width: 1620px; height: 780px; }
+#logo7 { left: 260px; top: 320px; width: 440px; height: 440px; }
+#end1 { left: 800px; top: 340px; font: 700 150px/1 SG; letter-spacing: -4px; white-space: nowrap; }
+#end2 { left: 806px; top: 530px; font: 700 76px/1 SG; color: var(--g); white-space: nowrap; }
+#end3 { left: 806px; top: 660px; }
+#end4 { left: 806px; top: 720px; color: #b0b0b0; }
+</style>
+</head>
+<body>
+<div id="grid"></div>
+
+<section class="scene" id="s1">
+    <img class="abs" id="logo1" src="../../public/assets/icons/jelly_jump_logo.png" alt="">
+    <div class="abs" id="word"></div>
+    <div class="abs" id="tag1">Play, edit and create video.</div>
+    <div class="abs" id="tag2">Right in your browser.</div>
+</section>
+
+<section class="scene" id="s2">
+    <div class="head" id="h2a" style="left:120px;top:110px">Plays almost</div>
+    <div class="head green" id="h2b" style="left:120px;top:236px">anything.</div>
+    <div id="chips2"></div>
+    <div class="abs mono" id="sub2" style="left:124px;top:930px">FILES · FOLDERS · LINKS · LIVE STREAMS</div>
+</section>
+
+<section class="scene" id="s3">
+    <div class="box" id="player">
+        <div id="screen"></div>
+        <div id="badge">▶ 1×</div>
+        <div id="bar"><div id="fill"></div><div id="head"></div></div>
+    </div>
+    <div class="line3" id="l3a" style="top:300px">Forwards.</div>
+    <div class="line3 green" id="l3b" style="top:450px">Backwards.</div>
+    <div class="line3" id="l3c" style="top:600px">Any speed.</div>
+</section>
+
+<section class="scene" id="s4">
+    <div class="head" id="h4a" style="left:120px;top:110px">Edit without</div>
+    <div class="head green" id="h4b" style="left:120px;top:236px">uploading.</div>
+    <div id="segs"></div>
+    <div id="cut1"></div><div id="cut2"></div>
+    <div id="chips4"></div>
+</section>
+
+<section class="scene" id="s5">
+    <div class="head" id="h5" style="left:120px;top:110px">Create <span class="green">and share.</span></div>
+    <div class="box card" id="c1" style="left:120px;--k:var(--r)"><h3>Record your screen</h3>
+        <div class="mini" style="left:90px;top:60px;width:310px;height:200px"></div>
+        <div class="abs" id="rec" style="left:215px;top:130px;width:60px;height:60px;border-radius:50%;background:var(--r)"></div>
+    </div>
+    <div class="box card" id="c2" style="left:710px"><h3>Merge videos</h3>
+        <div class="abs" id="mA" style="top:110px;width:150px;height:90px;background:var(--c);border:5px solid #fff"></div>
+        <div class="abs" id="mB" style="top:110px;width:150px;height:90px;background:var(--m);border:5px solid #fff"></div>
+    </div>
+    <div class="box card" id="c3" style="left:1300px"><h3>Watch together</h3>
+        <div class="mini" style="left:50px;top:80px;width:160px;height:120px"></div>
+        <div class="mini" style="left:290px;top:80px;width:160px;height:120px"></div>
+        <div id="dots"></div>
+    </div>
+</section>
+
+<section class="scene" id="s6">
+    <div class="abs" id="lock">
+        <div class="abs" id="shackle"></div>
+        <div class="abs" id="lockbody"><div class="abs" id="keyhole"></div></div>
+    </div>
+    <div class="head" id="h6a" style="left:900px;top:260px">Private</div>
+    <div class="head green" id="h6b" style="left:900px;top:386px">by design.</div>
+    <div class="abs" id="p6a" style="left:906px;top:580px;font:500 56px/1.3 SG;color:#e6e6e6;white-space:nowrap">Nothing is uploaded.</div>
+    <div class="abs" id="p6b" style="left:906px;top:656px;font:500 56px/1.3 SG;color:#e6e6e6;white-space:nowrap">Your videos stay on your device.</div>
+    <div class="abs mono" id="p6c" style="left:908px;top:790px">WORKS OFFLINE · NO SIGN-UP</div>
+</section>
+
+<section class="scene" id="s7">
+    <div class="box" id="endbox"></div>
+    <img class="abs" id="logo7" src="../../public/assets/icons/jelly_jump_logo.png" alt="">
+    <div class="abs" id="end1">JellyJump</div>
+    <div class="abs" id="end2">jellyjump.voidall.com</div>
+    <div class="abs mono" id="end3">FREE · NO UPLOADS · WORKS OFFLINE</div>
+    <div class="abs mono" id="end4">LINUX · MACOS · WINDOWS · ANY BROWSER</div>
+</section>
+
+<div id="wipe"></div><div id="wipe2"></div>
+<div id="fade"></div>
+
+<script>
+// ---- time helpers ------------------------------------------------------------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const p = (t, start, dur) => clamp((t - start) / dur);
+const out3 = (x) => 1 - (1 - x) ** 3;
+const inOut = (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2);
+const back = (x) => { const c1 = 1.9, c3 = c1 + 1; return x <= 0 ? 0 : x >= 1 ? 1 : 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2; };
+/** A spring settling from 1 to 0 after `since` seconds: a jelly wobble. */
+const wobble = (t, since, freq = 3.2, damp = 4.5) => (t < since ? 0 : Math.exp(-(t - since) * damp) * Math.cos((t - since) * freq * 2 * Math.PI));
+const $ = (id) => document.getElementById(id);
+const set = (el, styles) => Object.assign(el.style, styles);
+/** Slide up and fade in, from `start`, over `dur`. */
+const rise = (el, t, start, dur = 0.45, dist = 60) => {
+    const k = out3(p(t, start, dur));
+    set(el, { opacity: k, transform: `translateY(${(1 - k) * dist}px)` });
+};
+/** Pop in from nothing with an overshoot. */
+const pop = (el, t, start, dur = 0.4, extra = '') => {
+    const k = p(t, start, dur);
+    set(el, { opacity: k > 0 ? 1 : 0, transform: `${extra} scale(${back(k)})` });
+};
+
+// The beat: 96 BPM, a bar every 2.5 s. Scenes change on the beat.
+const SCENES = [['s1', 0, 5], ['s2', 5, 8.75], ['s3', 8.75, 12.5], ['s4', 12.5, 17.5], ['s5', 17.5, 21.25], ['s6', 21.25, 25], ['s7', 25, 30.5]];
+const WIPE = 0.42;
+
+// ---- built once ----------------------------------------------------------------
+$('word').innerHTML = [...'JellyJump'].map((c) => `<span>${c}</span>`).join('');
+const COLORS = ['var(--g)', 'var(--c)', 'var(--m)', 'var(--a)'];
+const FORMATS = ['MP4', 'MKV', 'WebM', 'MOV', 'HLS', 'IPTV', 'YouTube', 'Live', 'HEVC', 'AV1', 'AC-3', 'DTS', 'TrueHD', 'ProRes'];
+const chips2 = FORMATS.map((name, i) => {
+    const el = document.createElement('div');
+    el.className = 'chip';
+    el.style.color = COLORS[i % 4];
+    el.innerHTML = `<span>${name}</span>`;
+    $('chips2').appendChild(el);
+    return el;
+});
+// Laid out in rows once the fonts give them their widths.
+function layoutChips(chips, top, rowGap, maxWidth, left = 124, gap = 34) {
+    let x = left, y = top;
+    for (const el of chips) {
+        const w = el.offsetWidth;
+        if (x + w > left + maxWidth) { x = left; y += rowGap; }
+        set(el, { left: `${x}px`, top: `${y}px` });
+        x += w + gap;
+    }
+}
+const SEGS = [['#00ff88', 220], ['#ff00ff', 200], ['#00d4ff', 280], ['#ffaa00', 180], ['#ff3366', 240], ['#7a5cff', 260]];
+const segs = [];
+{
+    let x = 120;
+    for (const [color, w] of SEGS) {
+        const el = document.createElement('div');
+        el.className = 'seg';
+        set(el, { left: `${x}px`, width: `${w}px`,
+            background: `repeating-linear-gradient(90deg, ${color} 0 ${w / 4 - 6}px, #0a0a0a ${w / 4 - 6}px ${w / 4}px)` });
+        el.dataset.x = x;
+        $('segs').appendChild(el);
+        segs.push(el);
+        x += w;
+    }
+}
+const TOOLS = ['Cut', 'Crop', 'Rotate', 'Blur', 'Watermark', 'Remove background', 'GIF', 'Compress'];
+const chips4 = TOOLS.map((name, i) => {
+    const el = document.createElement('div');
+    el.className = 'chip';
+    el.style.color = COLORS[(i + 1) % 4];
+    el.innerHTML = `<span>${name}</span>`;
+    $('chips4').appendChild(el);
+    return el;
+});
+const orbs = ['#00ff88', '#ff00ff', '#00d4ff', '#ffaa00'].map((color) => {
+    const el = document.createElement('div');
+    el.className = 'orb';
+    el.style.background = `radial-gradient(circle at 35% 35%, #fff, ${color} 45%, transparent 72%)`;
+    $('screen').appendChild(el);
+    return el;
+});
+const dots = [0, 1, 2].map(() => {
+    const el = document.createElement('div');
+    set(el, { position: 'absolute', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--g)', top: '129px' });
+    $('dots').appendChild(el);
+    return el;
+});
+// Measured with every scene laid out (a hidden one has no widths).
+window.ready = document.fonts.ready.then(() => {
+    const scenes = [...document.querySelectorAll('.scene')];
+    for (const el of scenes) set(el, { display: 'block', visibility: 'hidden' });
+    for (const el of chips2) set(el, { height: '124px', padding: '0 44px', fontSize: '62px' });
+    layoutChips(chips2, 440, 165, 1680, 124, 44);
+    layoutChips(chips4, 800, 130, 1700, 120, 30);
+    for (const el of scenes) set(el, { display: 'none', visibility: '' });
+    window.seek(0);
+});
+
+// ---- the scenes ----------------------------------------------------------------
+function s1(t) {
+    // The logo drops in and lands like jelly.
+    const drop = p(t, 0.25, 0.6);
+    const y = -800 * (1 - drop ** 2);
+    const w = wobble(t, 0.85);
+    set($('logo1'), { opacity: t > 0.25 ? 1 : 0,
+        transform: `translateY(${y}px) scale(${1 + 0.22 * w}, ${1 - 0.22 * w}) rotate(${-4 * Math.sin(t * 1.6)}deg)` });
+    [...$('word').children].forEach((el, i) => {
+        const k = p(t, 1.25 + i * 0.06, 0.45);
+        set(el, { opacity: k > 0 ? 1 : 0, transform: `translateY(${(1 - back(k)) * 90}px)` });
+    });
+    rise($('tag1'), t, 2.4);
+    rise($('tag2'), t, 2.75);
+}
+
+function s2(t) {
+    rise($('h2a'), t, 5.15, 0.45, 80);
+    rise($('h2b'), t, 5.3, 0.45, 80);
+    chips2.forEach((el, i) => pop(el, t, 5.6 + i * 0.075, 0.38, `rotate(${(i % 3 - 1) * 2}deg)`));
+    rise($('sub2'), t, 7.0);
+}
+
+/** Where the little film is, 0..1: forwards, a pause to turn, backwards at 2×. */
+function media3(t) {
+    if (t < 10.35) return 0.2 + 0.25 * p(t, 9.0, 1.35);
+    if (t < 10.6) return 0.45;
+    return 0.45 - 0.4 * p(t, 10.6, 1.6);
+}
+function s3(t) {
+    const k = out3(p(t, 8.85, 0.5));
+    set($('player'), { opacity: k, transform: `translateX(${(1 - k) * -200}px)` });
+    const m = media3(t);
+    // The film: orbs on paths of the film's own time, so backwards really runs backwards.
+    orbs.forEach((el, i) => {
+        const a = m * Math.PI * 6 + i * Math.PI / 2;
+        set(el, { left: `${430 + Math.cos(a) * (260 + i * 30)}px`, top: `${170 + Math.sin(a * 1.3) * (130 + i * 10)}px`,
+            transform: `scale(${1 + 0.25 * Math.sin(a * 2)})` });
+    });
+    set($('fill'), { width: `${m * 100}%` });
+    set($('head'), { left: `${m * 100}%` });
+    const backwards = t >= 10.5;
+    $('badge').textContent = backwards ? '◀ 2×' : '▶ 1×';
+    set($('badge'), { background: backwards ? 'var(--m)' : 'var(--g)', transform: `scale(${1 + 0.25 * Math.max(0, wobble(t, 10.5, 3, 6))})` });
+    rise($('l3a'), t, 9.05, 0.4, 70);
+    rise($('l3b'), t, 10.5, 0.4, 70);
+    rise($('l3c'), t, 11.4, 0.4, 70);
+}
+
+function s4(t) {
+    rise($('h4a'), t, 12.65, 0.45, 80);
+    rise($('h4b'), t, 12.8, 0.45, 80);
+    // The strip slides in, two cuts flash, two pieces fall out, the rest close up.
+    const inK = out3(p(t, 12.8, 0.6));
+    const fallK = p(t, 14.35, 0.55);
+    const closeK = inOut(p(t, 14.85, 0.5));
+    let closedX = 120 + (1680 - (220 + 280 + 240 + 260)) / 2;
+    segs.forEach((el, i) => {
+        const x0 = Number(el.dataset.x) + (1680 - 1380) / 2;
+        const drops = i === 1 || i === 3;
+        let x = x0, y = 0, rot = 0, op = inK;
+        if (drops) {
+            y = 500 * fallK ** 2;
+            rot = (i === 1 ? -14 : 12) * fallK;
+            op = inK * (1 - fallK);
+        } else {
+            x = x0 + (closedX - x0) * closeK;
+            closedX += SEGS[i][1];
+        }
+        set(el, { opacity: op, transform: `translate(${x - Number(el.dataset.x) + (1 - inK) * 400}px, ${y}px) rotate(${rot}deg)` });
+    });
+    const flash = (el, start, x) => {
+        const k = p(t, start, 0.35);
+        set(el, { left: `${x - 5}px`, opacity: k > 0 && k < 1 ? 1 - k : 0, transform: `scaleY(${0.4 + 0.6 * out3(Math.min(1, k * 3))})` });
+    };
+    const off = (1680 - 1380) / 2;
+    flash($('cut1'), 13.75, 120 + off + 220);
+    flash($('cut2'), 14.05, 120 + off + 220 + 200 + 280);
+    chips4.forEach((el, i) => pop(el, t, 15.4 + i * 0.1, 0.36));
+}
+
+function s5(t) {
+    rise($('h5'), t, 17.65, 0.45, 80);
+    ['c1', 'c2', 'c3'].forEach((id, i) => {
+        const k = p(t, 17.95 + i * 0.25, 0.5);
+        set($(id), { opacity: k > 0 ? 1 : 0, transform: `translateY(${(1 - back(k)) * 300}px) rotate(${(1 - k) * (i - 1) * 8}deg)` });
+    });
+    // Recording: the dot pulses.
+    const pulse = 0.5 + 0.5 * Math.cos(t * Math.PI * 2 * 1.6);
+    set($('rec'), { transform: `scale(${0.8 + 0.35 * pulse})`, opacity: 0.6 + 0.4 * pulse });
+    // Merging: two clips slide together, again and again.
+    const mk = inOut(clamp(((t - 18.6) % 1.25) / 0.7));
+    set($('mA'), { left: `${60 + 85 * mk}px` });
+    set($('mB'), { left: `${290 - 85 * mk}px` });
+    // Watching together: dots travel between the two screens.
+    dots.forEach((el, i) => {
+        const f = ((t * 0.9 + i / 3) % 1);
+        set(el, { left: `${215 + f * 60}px`, opacity: Math.sin(f * Math.PI) });
+    });
+}
+
+function s6(t) {
+    const enter = out3(p(t, 21.35, 0.5));
+    // The shackle closes with a bounce.
+    const close = p(t, 21.95, 0.35);
+    const shY = 300 - 90 * (1 - close ** 2) + 18 * Math.max(0, wobble(t, 22.3, 4, 7));
+    set($('lock'), { left: '0px', top: '0px', opacity: enter, transform: `translateY(${(1 - enter) * 200}px)` });
+    set($('shackle'), { top: `${shY}px` });
+    const glow = Math.max(0, wobble(t, 22.3, 2, 3));
+    set($('lockbody'), { boxShadow: `16px 16px 0 #fff, 0 0 ${80 * glow}px var(--g)` });
+    rise($('h6a'), t, 21.55, 0.45, 80);
+    rise($('h6b'), t, 21.7, 0.45, 80);
+    rise($('p6a'), t, 22.5);
+    rise($('p6b'), t, 22.85);
+    rise($('p6c'), t, 23.5);
+}
+
+function s7(t) {
+    const k = p(t, 25.1, 0.5);
+    set($('endbox'), { opacity: k > 0 ? 1 : 0, transform: `scale(${0.85 + 0.15 * back(k)})` });
+    const w = wobble(t, 25.5, 2.6, 3.5);
+    pop($('logo7'), t, 25.3, 0.5, `rotate(${-6 * w}deg)`);
+    rise($('end1'), t, 25.55, 0.45, 70);
+    rise($('end2'), t, 25.85, 0.45, 70);
+    rise($('end3'), t, 26.4);
+    rise($('end4'), t, 26.7);
+    // Breathing, while it holds.
+    if (t > 26.5) $('logo7').style.transform = `scale(${1 + 0.03 * Math.sin((t - 26.5) * 2.5)})`;
+}
+
+const RENDER = { s1, s2, s3, s4, s5, s6, s7 };
+
+/** Draw the frame at `t` seconds. */
+window.seek = (t) => {
+    set($('grid'), { transform: `translate(${-(t * 22) % 80}px, ${-(t * 10) % 80}px)` });
+    for (const [id, start, end] of SCENES) {
+        const on = t >= start && t < end;
+        $(id).style.display = on ? 'block' : 'none';
+        if (on) RENDER[id](t);
+    }
+    // The wipe: green across, the next scene behind it, on every change.
+    let wx = -2400;
+    for (const [, start] of SCENES.slice(1)) {
+        const k = (t - (start - WIPE / 2)) / WIPE;
+        if (k >= 0 && k <= 1) wx = -2400 + inOut(k) * (1920 + 2400 + 200);
+    }
+    set($('wipe'), { left: `${wx}px` });
+    set($('wipe2'), { left: `${wx === -2400 ? -2400 : wx + 2400}px` });
+    set($('fade'), { opacity: clamp((t - 29.2) / 0.8) + (1 - clamp(t / 0.4)) });
+};
+window.seek(0);
+</script>
+</body>
+</html>
