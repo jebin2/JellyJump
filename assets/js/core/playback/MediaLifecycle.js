@@ -121,6 +121,7 @@ export async function cleanupPlayerForLoad(player) {
     // always starts forward, so it never surprises anyone by running
     // backwards.
     await player.reverse?.stop({ reposition: false });
+    player.reverse?.release();
     if (player.direction !== 'forward') {
         player.direction = 'forward';
         player.announce.playState();
