@@ -341,8 +341,10 @@ export class CorePlayer {
     async play() {
         if (this.engine === 'youtube') { this.youtube?.play(); return; }
         if (this.direction === 'backward') return this._playBackward();
-        // Forwards from wherever playing backwards got to.
+        // Forwards from wherever playing backwards got to; the frames it
+        // kept for going backwards again are let go.
         if (this.reverse?.active) await this.reverse.stop();
+        this.reverse?.release();
         return playPlayer(this);
     }
 

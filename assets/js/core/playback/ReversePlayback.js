@@ -42,6 +42,18 @@ import { planStretch } from '../../shared/media/BackwardPlan.js';
  * picture follows its clock -- the AudioContext's -- as forward playback's
  * does, so the two stay together. Without sound, or if the audio cannot be
  * decoded, the picture keeps time by the wall clock.
+ *
+ * Starting and stopping. Every decode starts at a key frame, so both used to
+ * cost a stretch's worth of decoding: stopping rebuilt the forward decoder at
+ * once (a seek: 0.5-1 s on a 720p clip with key frames 8 s apart, while the
+ * stretch before, still decoding, competed with it), and playing backwards
+ * again from the same place decoded again what had just been shown. Now
+ * stopping only hands the position back -- the forward decoder is rebuilt by
+ * the next forward play, step or seek, as after any long pause -- and stops
+ * the decoding under way. What was decoded is kept for a while (PARK_MS), so
+ * playing backwards again from within it starts at once; and how fast this
+ * video decodes here is kept too, so the next start plans its stretches
+ * rather than guessing.
  */
 
 /** Frames each reader holds; two readers run at once. */
@@ -58,6 +70,10 @@ const START_TIMEOUT_MS = 8000;
 const AUDIO_WINDOW = 2;
 /** Decode the next window once the current one has this little left to play. */
 const AUDIO_AHEAD = 1;
+/** Stopped, the frames decoded are kept this long for playing backwards again. */
+const PARK_MS = 30000;
+/** Stopping settles on the frame showing if it is this close to the clock. */
+const SETTLE_WITHIN = 0.5;
 
 /**
  * The sound, backwards: decoded forwards a window at a time from the current
@@ -174,6 +190,40 @@ export class ReversePlayback {
         this._raf = null;
         this._readers = null;
         this._canvas = null;
+        /** Readers kept after a stop: {readers, track, width, height, timer}. */
+        this._parked = null;
+        /** Frames decoded a second here, and for which track. */
+        this._decodeFps = null;
+        this._fpsTrack = null;
+    }
+
+    /**
+     * Let go of the frames kept from the last time playing backwards, as
+     * forward playback starts or the media changes.
+     */
+    release() {
+        const parked = this._parked;
+        if (!parked) return;
+        this._parked = null;
+        clearTimeout(parked.timer);
+        for (const reader of parked.readers) reader.close();
+    }
+
+    /**
+     * The kept readers, if one of them holds `from` for this track at this
+     * size; any closed one replaced by a new reader. Otherwise they go.
+     * @private
+     */
+    _unpark(from, track, width, height, makeReader) {
+        const parked = this._parked;
+        if (!parked) return null;
+        const fits = parked.track === track && parked.width === width && parked.height === height;
+        const shown = fits ? parked.readers.find(r => !r.closed && r.peek(from) !== undefined) : undefined;
+        if (!shown) { this.release(); return null; }
+        this._parked = null;
+        clearTimeout(parked.timer);
+        const readers = parked.readers.map(r => (r.closed ? makeReader() : r));
+        return { readers, shown };
     }
 
     /** Why the loaded media cannot be played backwards, or null if it can. */
@@ -209,17 +259,27 @@ export class ReversePlayback {
         if (!(from > this._start + AT_START)) return { started: false, reason: 'This video is too short to play backwards.' };
 
         const toHeld = (sample) => this._copy(sample);
-        this._readers = [0, 1].map(() => new BackwardFrameReader(p.videoTrack, { maxFrames: FRAMES_PER_READER, toHeld }));
-        this._decodeFps = null;
+        const makeReader = () => new BackwardFrameReader(p.videoTrack, { maxFrames: FRAMES_PER_READER, toHeld });
+        // Frames kept from the last time, if they reach here: no first
+        // stretch to wait for.
+        const kept = this._unpark(from, p.videoTrack, p.canvas?.width, p.canvas?.height, makeReader);
+        this._readers = kept ? kept.readers : [makeReader(), makeReader()];
+        // How fast this video decoded here last time stands until measured
+        // again; another video starts from nothing.
+        if (this._fpsTrack !== p.videoTrack) {
+            this._decodeFps = null;
+            this._fpsTrack = p.videoTrack;
+        }
         this._chunkFrames = 0;
-        this._shown = this._readers[0];
+        this._shown = kept ? kept.shown : this._readers[0];
         this._lastDrawn = null;
         this._origin = { position: from, wall: performance.now(), rate: p.playbackRate || 1 };
         this.position = from;
         this.active = true;
         p.announce.playState();
         p.trigger?.('reversechange', { active: true });
-        Logger.log(`[Reverse] Playing backwards from ${from.toFixed(3)}s at ${this._origin.rate}x`);
+        Logger.log(`[Reverse] Playing backwards from ${from.toFixed(3)}s at ${this._origin.rate}x`
+            + (kept ? `, with ${this._shown.held.length} frames kept from last time` : ''));
 
         // The sound, if there is any the player can decode. Its first window
         // is decoded alongside the first stretch of picture.
@@ -233,16 +293,18 @@ export class ReversePlayback {
         // The first stretch is waited for, so the picture starts moving at
         // once -- but not for ever: a decoder that never delivers would
         // otherwise leave a button that seems to do nothing.
-        let timer;
-        const timedOut = new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), START_TIMEOUT_MS); });
-        let outcome;
-        try {
-            outcome = await Promise.race([this._fillLogged(this._shown, from).then(() => 'ok'), timedOut]);
-        } catch (error) {
-            Logger.warn('[Reverse] Could not decode the first stretch:', error);
-            outcome = 'error';
-        } finally {
-            clearTimeout(timer);
+        let outcome = 'ok';
+        if (!kept) {
+            let timer;
+            const timedOut = new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), START_TIMEOUT_MS); });
+            try {
+                outcome = await Promise.race([this._fillLogged(this._shown, from).then(() => 'ok'), timedOut]);
+            } catch (error) {
+                Logger.warn('[Reverse] Could not decode the first stretch:', error);
+                outcome = 'error';
+            } finally {
+                clearTimeout(timer);
+            }
         }
         if (!this.active) return { started: false };
         if (outcome !== 'ok' || this._shown.peek(from) === undefined) {
@@ -256,15 +318,17 @@ export class ReversePlayback {
         // chunk (seen: 4 frames, then 1.6 s on a 250-frame one, the picture
         // still while the sound went on). Then the next one is waited for
         // too, here, before anything moves.
+        // Kept frames count from where this starts, not from where they end.
         const first = this._shown;
-        const firstSeconds = first.oldest === null ? 0 : (first.heldUntil - first.oldest) / this._origin.rate;
+        const second = first === this._readers[0] ? this._readers[1] : this._readers[0];
+        const firstSeconds = first.oldest === null ? 0 : (from - first.oldest) / this._origin.rate;
         // Reaching back to its key frame, the next stretch is the chunk
         // before, of a size not known yet: waited for whatever it costs.
         const nextSeconds = first.framesLeft > 0
             ? first.framesLeft / (this._decodeFps ?? DECODE_FPS_GUESS)
             : Infinity;
-        if (first.oldest !== null && first.oldest > this._start + EPSILON && firstSeconds < nextSeconds) {
-            const second = this._readers[1];
+        if (first.oldest !== null && first.oldest > this._start + EPSILON && firstSeconds < nextSeconds
+            && second.peek(first.oldest - EPSILON) === undefined) {
             let coverTimer;
             await Promise.race([
                 this._fillLogged(second, first.oldest - EPSILON).catch(error => Logger.warn('[Reverse] Prefetch failed:', error)),
@@ -301,18 +365,49 @@ export class ReversePlayback {
         this._raf = null;
         this._audio?.stop();
         this._audio = null;
-        for (const reader of this._readers ?? []) reader.close();
+        this._park(this._readers ?? []);
         this._readers = null;
+
+        if (reposition) {
+            // Where the picture is: the frame showing, when it is close to
+            // the clock (every k-th frame held, it can be a few behind).
+            const shownAt = this._lastDrawn?.timestamp;
+            if (shownAt !== undefined && Math.abs(shownAt - this.position) <= SETTLE_WITHIN) this.position = shownAt;
+            // Handed back as a paused position, as a seek leaves it, without
+            // the seek's decoding: the forward pipeline was let go at the
+            // start, and the next play, step or seek opens it from here.
+            p.playbackTimeAtStart = this.position;
+            p.currentTime = this.position;
+            p.vodAnchor.clear();
+            p.trigger?.('timeupdate', { currentTime: this.position });
+            p.announce.progress();
+        }
         p.announce.playState();
         p.trigger?.('reversechange', { active: false });
         Logger.log(`[Reverse] Stopped at ${this.position.toFixed(3)}s`);
+    }
 
-        if (reposition) {
-            // The forward pipeline is rebuilt at the new position, so the next
-            // play, step or seek starts from here rather than from where
-            // forward playback last was.
-            await p.seek(this.position);
+    /**
+     * Keep the readers' frames for playing backwards again soon. A stretch
+     * still decoding is the one before what was shown: stopped, not waited
+     * for, so it does not hold up what comes next.
+     * @private
+     */
+    _park(readers) {
+        this.release();
+        for (const reader of readers) if (reader.busy) reader.close();
+        if (!readers.some(r => !r.closed && r.oldest !== null)) {
+            for (const reader of readers) reader.close();
+            return;
         }
+        const p = this.player;
+        this._parked = {
+            readers,
+            track: p.videoTrack,
+            width: p.canvas?.width,
+            height: p.canvas?.height,
+            timer: setTimeout(() => this.release(), PARK_MS),
+        };
     }
 
     /** @private */

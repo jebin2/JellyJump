@@ -27,3 +27,14 @@ goes to `scripts/demo/out/`, which is not committed.
 
 `music.mjs` writes the music on its own too: `node scripts/demo/music.mjs 60`
 gives 60 s, 96 BPM in C major.
+
+`reverse-timing.mjs` is not part of the demo: it measures how long playing
+backwards takes to start and stop on clips in `out/clips/`. Its default,
+`longgop.mp4`, has ffmpeg's default key frame spacing (one every 250 frames),
+which is where both cost the most:
+
+```bash
+ffmpeg -f lavfi -i mandelbrot=s=1280x720:r=30 -f lavfi -i sine=f=440 -t 24 \
+  -c:v libx264 -pix_fmt yuv420p -c:a aac scripts/demo/out/clips/longgop.mp4
+node scripts/demo/reverse-timing.mjs              # or: clip.mp4 seconds ...
+```

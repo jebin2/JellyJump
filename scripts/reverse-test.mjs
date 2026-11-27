@@ -10,7 +10,9 @@
  *
  * Here: played backwards from near the end, the picture must change often,
  * never stand still for long, follow the clock down, and hand over to
- * forward playback where it stopped.
+ * forward playback where it stopped. Stopping must not wait for decoding
+ * (it used to rebuild the forward decoder at once: 0.5-1 s), and playing
+ * backwards again from there must start from the frames it kept.
  *
  *   npm run build && node scripts/reverse-test.mjs
  */
@@ -70,7 +72,8 @@ try {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     const stretches = [];
-    page.on('console', (m) => { const s = m.text(); if (/\[Reverse\] Ready up to/.test(s)) stretches.push(s.replace(/.*Ready up to /, '')); });
+    const kept = [];
+    page.on('console', (m) => { const s = m.text(); if (/\[Reverse\] Ready up to/.test(s)) stretches.push(s.replace(/.*Ready up to /, '')); if (/kept from last time/.test(s)) kept.push(s); });
     await page.route('**/*', (route) => (route.request().url().startsWith(origin) || /^(blob|data):/.test(route.request().url()) ? route.continue() : route.abort()));
     await page.goto(`${origin}/player.html`);
     await page.waitForFunction(() => !!window.player && !!window.playlist, null, { timeout: 60000 });
@@ -114,15 +117,29 @@ try {
         still = Math.max(still, performance.now() - lastChange);
         const falling = times.every((t, i) => i === 0 || t <= times[i - 1] + 1e-6);
         const at = p.currentTime;
+        let t0 = performance.now();
         p.pause();
+        while (p.reverse.active || p.isLoading) await new Promise((r) => setTimeout(r, 5));
+        const stopMs = performance.now() - t0;
         await new Promise((r) => setTimeout(r, 300));
         const stoppedAt = p.currentTime;
+        // Backwards again from there: the frames it was showing are kept.
+        t0 = performance.now();
+        const again = await p.play();
+        const againMs = performance.now() - t0;
+        const againFrom = p.currentTime;
+        await new Promise((r) => setTimeout(r, 600));
+        const againMoved = againFrom - p.currentTime;
+        p.pause();
+        await new Promise((r) => setTimeout(r, 100));
+        const handedBack = p.currentTime;
         await p.toggleDirection();
         await p.play();
         await new Promise((r) => setTimeout(r, 700));
         const forward = p.currentTime;
         p.pause();
         return { result, from, at, stoppedAt, forward, changes, still: Math.round(still), falling,
+            stopMs: Math.round(stopMs), again, againMs: Math.round(againMs), againMoved, handedBack,
             toast: [...document.querySelectorAll('.mb-toast')].map((t) => t.textContent).join(' | ') };
     });
     check('it starts', run.result?.started === true, JSON.stringify(run.result));
@@ -131,7 +148,11 @@ try {
     check('the picture keeps changing', run.changes >= 20, `${run.changes} changes in 3 s`);
     check('it never stands still for long', run.still < 700, `${run.still} ms at most`);
     check('stopped, it stays where it got to', Math.abs(run.stoppedAt - run.at) < 0.5, `${run.at.toFixed(2)} / ${run.stoppedAt.toFixed(2)}`);
-    check('and plays forwards from there', run.forward > run.stoppedAt + 0.2 && run.forward < run.stoppedAt + 1.5, `${run.stoppedAt.toFixed(2)} -> ${run.forward.toFixed(2)}`);
+    check('stopping does not wait for any decoding', run.stopMs < 100, `${run.stopMs} ms`);
+    check('backwards again from there starts at once, from what it kept', run.again?.started === true && run.againMs < 300
+        && kept.length === 1, `${run.againMs} ms, ${kept.length} kept`);
+    check('and moves', run.againMoved > 0.3 && run.againMoved < 1.2, `${run.againMoved.toFixed(2)} s in 0.6 s`);
+    check('and plays forwards from where that stopped', run.forward > run.handedBack + 0.2 && run.forward < run.handedBack + 1.5, `${run.handedBack.toFixed(2)} -> ${run.forward.toFixed(2)}`);
     check('no error shown', !/could not be decoded/i.test(run.toast), run.toast);
     check('no uncaught errors', errors.length === 0, errors.join(' | '));
     console.log(`  stretches: ${stretches.slice(0, 6).join(' | ')}`);

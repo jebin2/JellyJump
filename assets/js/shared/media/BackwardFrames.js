@@ -161,8 +161,8 @@ export class BackwardFrameReader {
     }
 
     /**
-     * Release every held frame. Final: a fill still under way releases what
-     * it decoded instead of holding it.
+     * Release every held frame. Final: a fill still under way stops decoding
+     * and releases what it decoded instead of holding it.
      */
     close() {
         this.closed = true;
@@ -199,6 +199,7 @@ export class BackwardFrameReader {
      * @private
      */
     async _fill(timestamp, { trustPackets = true, planFor } = {}) {
+        if (this.closed) return;
         const key = await this.packets.getKeyPacket(timestamp, { metadataOnly: true })
             ?? await this.packets.getFirstPacket({ metadataOnly: true });
         if (!key) {
@@ -222,6 +223,9 @@ export class BackwardFrameReader {
         /** @type {HeldFrame[]} */
         const kept = [];
         for await (const sample of this.sink.samples(key.timestamp, end)) {
+            // Closed while decoding: stop here, so the decoder is let go
+            // rather than left running for frames nobody will hold.
+            if (this.closed) { sample.close(); break; }
             this.decodedFrames++;
             if (sample.timestamp > timestamp + SAME_INSTANT) { sample.close(); continue; }
             decodedInRange++;
