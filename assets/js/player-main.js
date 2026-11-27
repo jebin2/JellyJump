@@ -69,7 +69,7 @@ async function initializeApp() {
     if (isFirstVisit && hostHasSample && isEnabled('sampleVideo') && config.sampleVideoPath && !ElectronHelper.isElectron()) {
         playlist.addItems([
             {
-                title: 'Sample Video',
+                title: 'JellyJump in 30 seconds',
                 url: new URL(config.sampleVideoPath, window.location.href).href,
                 isLocal: true
             }

@@ -1,7 +1,7 @@
 /**
  * Puts the demo together from record.mjs's frames: a title card, the
  * recording, a closing card, crossfaded, with music.mjs's track cut to the
- * length. Writes public/demo.mp4 (1920×1080, H.264 + AAC).
+ * length. Writes scripts/demo/out/demo.mp4 (1920×1080, H.264 + AAC).
  *
  *   node scripts/demo/compose.mjs
  */
@@ -76,7 +76,7 @@ ff(
     '-map', '[v]', '-map', '[m]',
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '30', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-r', String(FPS),
     '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', '-shortest',
-    join(ROOT, 'public/demo.mp4'),
+    join(OUT, 'demo.mp4'),
 );
-const size = Number(execFileSync('stat', ['-c', '%s', join(ROOT, 'public/demo.mp4')]).toString());
-console.log(`public/demo.mp4: ${total.toFixed(1)} s, ${(size / 1048576).toFixed(1)} MB`);
+const size = Number(execFileSync('stat', ['-c', '%s', join(OUT, 'demo.mp4')]).toString());
+console.log(`scripts/demo/out/demo.mp4: ${total.toFixed(1)} s, ${(size / 1048576).toFixed(1)} MB`);
